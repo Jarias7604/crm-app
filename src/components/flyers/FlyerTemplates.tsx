@@ -1488,7 +1488,6 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
                 textTransform: 'uppercase',
                 margin: '0 0 12px 0',
                 width: '100%',
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                 transform: (data.titleX || data.titleY) ? `translate(${data.titleX ?? 0}px, ${data.titleY ?? 0}px)` : undefined
               }}
             >
@@ -1508,7 +1507,6 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
                 letterSpacing: '0.01em',
                 margin: 0,
                 maxWidth: 880,
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                 transform: (data.subtitleX || data.subtitleY) ? `translate(${data.subtitleX ?? 0}px, ${data.subtitleY ?? 0}px)` : undefined
               }}
             >
@@ -1801,7 +1799,6 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                 textTransform: 'uppercase',
                 margin: '0 0 12px 0',
                 width: '100%',
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                 transform: (data.titleX || data.titleY) ? `translate(${data.titleX ?? 0}px, ${data.titleY ?? 0}px)` : undefined
               }}
             >
@@ -1821,7 +1818,6 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                 letterSpacing: '0.01em',
                 margin: 0,
                 maxWidth: 880,
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                 transform: (data.subtitleX || data.subtitleY) ? `translate(${data.subtitleX ?? 0}px, ${data.subtitleY ?? 0}px)` : undefined
               }}
             >

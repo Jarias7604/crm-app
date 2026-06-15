@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, Sparkles, Download, Send, RefreshCw,
-  Zap, Image, Check, ChevronRight, ChevronDown, Upload, X, Eye,
+  Zap, Image, Check, ChevronLeft, ChevronRight, ChevronDown, Upload, X, Eye, Plus,
   BarChart3, Wand2, Layers, Palette, Type, Layout,
   ExternalLink, Star, Cpu, Crown, Smile, Building2,
   Instagram, Facebook, Linkedin, Smartphone, Video,
-  FolderOpen, Save, Loader2, Trash2, Edit2
+  FolderOpen, Save, Loader2, Trash2, Edit2,
+  Info, Target, Award, Globe
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
@@ -157,7 +158,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(dentista|dental|diente|dientes|cl[íi]nica|odontolog[íi]a)\b/i.test(lower)) {
@@ -165,7 +177,37 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1579684389782-64d84b5e901a?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1579684389782-64d84b5e901a?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1598256989800-fe5f95da9787?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1606811971618-4486d14f3f99?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1629909615184-74f495363b67?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1560185007-c5ca9d2c014d?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1468495244123-6c6c332eeece?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1460157491444-f1a517793577?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1512223792601-592a9809eed4?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(doctor|doctores|m[eé]dico|m[eé]dicos|farmacia|farmacias|medicina|medicinas|salud|hospital|hospitales|cl[íi]nica|cl[íi]nicas|medical|consultorio|pediatra|terapia|enfermera)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1586015555751-63bb77f4322a?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1607619056574-7b8d304a3b24?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1584515906207-523b4c207da7?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1527613426441-4da17471b66d?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1579684389782-64d84b5e901a?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1631815541552-b5848c1a596c?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(defensa|seguridad|karate|marciales|taekwondo)\b/i.test(lower)) {
@@ -173,7 +215,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1544045560-723f24137ade?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1599058917212-d750089bc07e?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1599058917212-d750089bc07e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1557597774-9d273605dfa9?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1551854838-212c50b4c184?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1501724391406-81a1bbbaeb28?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1579758629938-03607ccdbaba?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1495364141860-b0d03eccd065?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1521295121783-8a321d551ad2?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1508962914676-134849a727f0?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1614064641938-3bbee52942c7?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(taller|auto|carro|veh[íi]culo|mec[aá]nico|motor)\b/i.test(lower)) {
@@ -181,7 +234,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1517524206127-48bbd363f3d7?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1507767439269-2c64f107e609?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1507767439269-2c64f107e609?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1601362840469-51e4d8d59085?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1530047139182-5485141a7265?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1617886322168-72b886573c3c?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1616788494707-ec28f08d05a1?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1506015391300-4802dc74de2e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1516575150278-77136aed6920?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1525609004556-c46c7d6cf0a3?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(belleza|salon|sal[oó]n|u[ñn]as|spa|maquillaje|cabello|peluquer[íi]a)\b/i.test(lower)) {
@@ -189,7 +253,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1607779097040-26e80aa78e66?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1582095133179-bfd08e2fc6b3?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1512290923902-8a9f81dc236c?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1527799820374-dcf8d9d4a438?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1500840216050-6ffa99d7cd76?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1590156546746-c23109b257c3?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(gym|gimnasio|fit|fitness|ejercicio|entrenamiento)\b/i.test(lower)) {
@@ -197,7 +272,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1605296867304-46d5465a25f1?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1526506118085-60ce8714f8c5?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1517963879433-6ad2b056d712?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1593079831268-3381b0db4a77?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1574680096145-d05b474e2155?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1594381898411-846e7d193883?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1518310383802-64c2de311b2?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(abogado|legal|firma|consultor[íi]a|leyes|derecho)\b/i.test(lower)) {
@@ -205,7 +291,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1505664194779-8bebcb95c02e?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1453728013993-6d66e9c9123a?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1521791136368-1a46827d06e5?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1447069387593-a5de0862481e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1589829085413-56de8ae18c73?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1455390582262-044cdead277a?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1425421598808-4a22ce59cc97?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(cafe|café|panaderia|panader[íi]a|reposter[íi]a|dulce|cafeter[íi]a)\b/i.test(lower)) {
@@ -213,7 +310,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1442512595331-e89e73853f31?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1507133750040-4a8f57021571?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1517256064527-09c53b2d0bc6?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1521017432531-fbd92d768814?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1498804103079-a6351b050096?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1558961309-dbdf000a127b?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(casa|inmobiliaria|apartamento|hogar|propiedad|real estate|construccion|construcci[oó]n)\b/i.test(lower)) {
@@ -221,7 +329,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1560520653-9e0e4c89eb11?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1582407947304-fd86f028f716?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1513584684374-8bab748fbf90?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(perro|gato|mascota|veterinario|veterinaria|animal)\b/i.test(lower)) {
@@ -229,7 +348,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1576201836106-db1758fd1c97?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1576201836106-db1758fd1c97?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1535268647977-a403b69fc756?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1533738363-b7f9aef128ce?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1628009368231-7bb7cfcb0def?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1450778869180-41d0601e046e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1504595403659-9088ce801e29?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1530281700549-e82e7bf110d6?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(educacion|educaci[oó]n|escuela|colegio|curso|clases|estudiar)\b/i.test(lower)) {
@@ -237,7 +367,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1535982330050-f1c2ee7cddab?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1557672172-298e090bd0f1?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1576086213369-97a306d36557?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1507537297725-24a1c029d3ca?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(limpieza|lavado|limpiar|planchado|orden)\b/i.test(lower)) {
@@ -245,7 +386,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1545173168-9f1947e80135?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1581578732697-761a308876e6?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1558317374-067fb5f30001?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1528740561666-ac2479e00021?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1507652313519-d4e9174996dd?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1603796846097-bee99e4a60c9?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1583907608452-715d716254d5?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1518349619113-03114f06ac3a?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(yoga|wellness|meditacion|meditaci[oó]n|relajacion|relajaci[oó]n)\b/i.test(lower)) {
@@ -253,7 +405,18 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1508672019048-805c876b67e2?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1575052814086-f385e2e2ad1b?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1592432678016-e910b452f9a2?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1512438248247-f0f2a5a8b7f0?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1599447421416-3414500d18a5?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1518241423405-7c0098aa9920?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1529693662653-9d4e9174996dd?auto=format&fit=crop&w=1080&q=80'
     ];
   }
   if (/\b(contable|finanzas|dinero|taxes|impuestos|accounting)\b/i.test(lower)) {
@@ -261,7 +424,37 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&w=1080&q=80',
-      'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1080&q=80'
+      'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1544377193-33dcf4d68fb5?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1586486855514-8c633cc6fa98?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1502945015378-0e284029ddf8?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1521898284481-a5ec348cb555?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1518186285589-2f7649de83e0?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(ferreter[íi]a|ferreter[íi]as|herramienta|herramientas|tornillo|tornillos|martillo|construcci[oó]n|taller|carpinter[íi]a|pintura|brocha|brochas|woodworking|tools)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1530124560072-aec9361891df?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1534224039826-c7a0dea0e66a?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1504222490345-c075b6008014?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1567306226416-28f0efdc888a?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1608613304899-ea8098577e38?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1426927308491-6380b6a9936f?auto=format&fit=crop&w=1080&q=80'
     ];
   }
 
@@ -269,7 +462,18 @@ function getThematicImages(prompt: string): string[] {
     'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1080&q=80',
     'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1080&q=80',
     'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1080&q=80',
-    'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1080&q=80'
+    'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1531538606174-0f90ff5dce83?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=1080&q=80'
   ];
 }
 
@@ -302,6 +506,7 @@ export default function FlyerStudio() {
   const [phone, setPhone] = useState('+503 7971-8911');
   const [website, setWebsite] = useState('www.ariasdefense.com');
   const [format, setFormat] = useState('ig-post');
+  const [flyerWidth, setFlyerWidth] = useState(520);
   const canvasH = Math.round(1080 * (getFlyerDimensions(format).height / getFlyerDimensions(format).width));
   const [tone, setTone] = useState('moderno');
   const [variantCount, setVariantCount] = useState<1 | 2 | 3>(1);
@@ -315,6 +520,11 @@ export default function FlyerStudio() {
   const [isColorModalOpen, setIsColorModalOpen] = useState(false);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [customHex, setCustomHex] = useState('#7c3aed');
+
+  // Free photo gallery modal states
+  const [isFreePhotoModalOpen, setIsFreePhotoModalOpen] = useState(false);
+  const [freePhotoIndex, setFreePhotoIndex] = useState(0);
+  const [freePhotosPool, setFreePhotosPool] = useState<string[]>([]);
 
   // Custom background upload states
   const [bgFile, setBgFile] = useState<File | null>(null);
@@ -340,7 +550,7 @@ export default function FlyerStudio() {
   const [optimizing, setOptimizing] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [showScoreDetails, setShowScoreDetails] = useState(false);
+  const [isAidaModalOpen, setIsAidaModalOpen] = useState(false);
 
   // Auto-optimize (debounced — fires 2.5s after user stops typing)
   const [autoOptimizing, setAutoOptimizing] = useState(false);
@@ -696,6 +906,41 @@ export default function FlyerStudio() {
     document.removeEventListener('mouseup', handleHeaderMouseUp);
   };
 
+  useEffect(() => {
+    if (!flyerRef.current) return;
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const width = entry.contentRect.width;
+        if (width > 0) {
+          setFlyerWidth(width);
+        }
+      }
+    });
+    resizeObserver.observe(flyerRef.current);
+    return () => resizeObserver.disconnect();
+  }, [showFullAiResult, selectedTemplate, variants, previewMode, format, selected]);
+
+  useEffect(() => {
+    if (!isFreePhotoModalOpen || freePhotosPool.length === 0) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        setFreePhotoIndex(prev => (prev === 0 ? freePhotosPool.length - 1 : prev - 1));
+      } else if (e.key === 'ArrowRight') {
+        setFreePhotoIndex(prev => (prev === freePhotosPool.length - 1 ? 0 : prev + 1));
+      } else if (e.key === 'Escape') {
+        setIsFreePhotoModalOpen(false);
+      } else if (e.key === 'Enter') {
+        // Prevent default form submit or other defaults
+        e.preventDefault();
+        handleSelectFreePhoto(freePhotosPool[freePhotoIndex]);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFreePhotoModalOpen, freePhotosPool, freePhotoIndex]);
+
 
   useEffect(() => {
     if (!profile?.company_id) return;
@@ -816,13 +1061,14 @@ export default function FlyerStudio() {
       let shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
       if (currentImg && fallbackImgs.length > 1) {
         let attempts = 0;
-        while (shuffled[0] === currentImg && attempts < 10) {
+        while (shuffled[0] === currentImg && attempts < 15) {
           shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
           attempts++;
         }
       }
-      lastGeneratedImg.current = shuffled[0];
-      setVariants(shuffled);
+      const selectedVariants = shuffled.slice(0, 4);
+      lastGeneratedImg.current = selectedVariants[0];
+      setVariants(selectedVariants);
       
       // Also generate optimized copy locally based on basic parsing since openai failed
       const parsed = parsePrompt(prompt);
@@ -853,7 +1099,17 @@ export default function FlyerStudio() {
 
   async function generateFree() {
     if (!prompt.trim()) { toast.error('Describe qué quieres promocionar'); return; }
-    const currentImg = bgUploadPreview || (variants.length > 0 ? variants[selected] : lastGeneratedImg.current);
+    const pool = getThematicImages(prompt);
+    if (pool.length === 0) {
+      toast.error('No se encontraron imágenes para esta descripción.');
+      return;
+    }
+    setFreePhotosPool(pool);
+    setFreePhotoIndex(0);
+    setIsFreePhotoModalOpen(true);
+  }
+
+  async function handleSelectFreePhoto(selectedPhoto: string) {
     setGenerating(true);
     setVariants([]);
     setBgFile(null);
@@ -863,17 +1119,14 @@ export default function FlyerStudio() {
     setShowFullAiResult(false);
 
     try {
-      const fallbackImgs = getThematicImages(prompt);
-      let shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
-      if (currentImg && fallbackImgs.length > 1) {
-        let attempts = 0;
-        while (shuffled[0] === currentImg && attempts < 10) {
-          shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
-          attempts++;
-        }
-      }
-      lastGeneratedImg.current = shuffled[0];
-      setVariants(shuffled);
+      // Create variants array: variant[0] is the selectedPhoto.
+      // The other 3 variants are random unique photos from the pool, excluding selectedPhoto.
+      const poolWithoutSelected = freePhotosPool.filter(img => img !== selectedPhoto);
+      let shuffled = [...poolWithoutSelected].sort(() => Math.random() - 0.5);
+      const selectedVariants = [selectedPhoto, ...shuffled.slice(0, 3)];
+      
+      lastGeneratedImg.current = selectedPhoto;
+      setVariants(selectedVariants);
 
       // Parse prompt locally to generate structured copy
       const parsed = parsePrompt(prompt);
@@ -896,7 +1149,8 @@ export default function FlyerStudio() {
       setSelected(0);
       setPreviewMode('ai');
       setShowFullAiResult(false);
-      toast.success('✨ Flyer generado usando imagen temática gratuita');
+      setIsFreePhotoModalOpen(false);
+      toast.success('✨ Flyer generado usando la foto seleccionada');
     } catch (e: any) {
       console.error('Error generating free background:', e);
       toast.error('Error al generar flyer: ' + e.message);
@@ -1355,8 +1609,13 @@ export default function FlyerStudio() {
   return (
     <div style={css.page}>
 
-      {/* ── HEADER ──────────────────────────────────────────────────────────── */}
-      <header style={css.header}>
+      <header style={{
+        ...css.header,
+        filter: editingElement !== null ? 'blur(5px)' : 'none',
+        opacity: editingElement !== null ? 0.4 : 1,
+        pointerEvents: editingElement !== null ? 'none' : 'auto',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => navigate('/marketing')}
             style={{ background: '#fff', border: '1px solid #d8dde6', borderRadius: 7, padding: 7, cursor: 'pointer', display: 'flex' }}>
@@ -1461,7 +1720,13 @@ export default function FlyerStudio() {
       <div style={css.cols}>
 
         {/* ══ COL 1 — CREATIVE BRIEF (320px) ════════════════════════════════ */}
-        <div style={css.col('320px')}>
+        <div style={{
+          ...css.col('320px'),
+          filter: editingElement !== null ? 'blur(5px)' : 'none',
+          opacity: editingElement !== null ? 0.4 : 1,
+          pointerEvents: editingElement !== null ? 'none' : 'auto',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
           <div style={css.colHead}>
             <div style={{ width: 26, height: 26, borderRadius: 6, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Type size={13} color="#0070d2" />
@@ -1583,133 +1848,119 @@ export default function FlyerStudio() {
                   <div style={{ height: 6, background: '#f1f5f9', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
                     <div style={{ height: '100%', width: `${vs.score}%`, background: `linear-gradient(90deg, ${color}, ${color}cc)`, borderRadius: 10, transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
                   </div>
-                  
-                  {/* Accordion Toggle Button */}
+
+                  {/* Clean Text Button to Open Modal */}
                   <button
                     type="button"
-                    onClick={() => setShowScoreDetails(prev => !prev)}
+                    onClick={() => setIsAidaModalOpen(true)}
                     style={{
-                      width: '100%',
-                      background: 'linear-gradient(180deg, #f8fafc, #f1f5f9)',
-                      border: '1px solid #edf2f7',
-                      borderRadius: 8,
-                      padding: '8px 12px',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: '#6366f1',
+                      fontSize: 10,
+                      fontWeight: 700,
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
+                      gap: 4,
                       cursor: 'pointer',
-                      fontSize: 10,
-                      color: '#475569',
-                      fontWeight: 700,
-                      marginBottom: 10,
-                      transition: 'all 0.15s ease',
-                      textAlign: 'left',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                      marginBottom: 14,
+                      transition: 'color 0.15s ease'
                     }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = '#cbd5e1';
-                      e.currentTarget.style.background = 'linear-gradient(180deg, #f1f5f9, #e2e8f0)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = '#edf2f7';
-                      e.currentTarget.style.background = 'linear-gradient(180deg, #f8fafc, #f1f5f9)';
-                    }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#4f46e5'}
+                    onMouseLeave={e => e.currentTarget.style.color = '#6366f1'}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span>📊</span>
-                      <span>¿Cómo se calcula? (Metodología AIDA)</span>
-                    </div>
-                    <ChevronDown
-                      size={13}
-                      style={{
-                        transform: showScoreDetails ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s ease',
-                        color: '#64748b'
-                      }}
-                    />
+                    <Info size={12} />
+                    <span>Ver metodología de cálculo AIDA</span>
                   </button>
-
-                  {/* Accordion Content */}
-                  {showScoreDetails && (
-                    <div style={{
-                      background: '#ffffff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 10,
-                      padding: '12px 14px',
-                      marginBottom: 12,
-                      fontSize: 10,
-                      color: '#334155',
-                      lineHeight: 1.5,
-                      boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.015)'
-                    }}>
-                      <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span>🌐</span> Rigor y Origen de los Datos
-                      </div>
-                      <p style={{ margin: '0 0 10px 0', color: '#475569', textAlign: 'justify' }}>
-                        Evaluamos matemáticamente tu brief comparándolo con patrones de conversión extraídos de más de <strong>100,000 anuncios y posts virales</strong> históricos en Instagram, Facebook, LinkedIn y TikTok. Los copies que coinciden con estas estructuras logran hasta un <strong>400% más interacción y conversión</strong>.
-                      </p>
-
-                      <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span>⚡</span> Estructura del Score (Metodología AIDA)
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingLeft: 2 }}>
-                        <div>
-                          <strong style={{ color: '#7c3aed' }}>Atención (A - 18 pts):</strong> Uso de precios, descuentos claros u ofertas concretas (ej: <em>$12.95, 30% OFF</em>) para detener el scroll.
-                        </div>
-                        <div>
-                          <strong style={{ color: '#7c3aed' }}>Interés (I - 20 pts):</strong> Palabras de urgencia o escasez (ej: <em>hoy, oferta limitada, solo esta semana</em>) que enganchan de inmediato.
-                        </div>
-                        <div>
-                          <strong style={{ color: '#7c3aed' }}>Deseo (D - 15 pts):</strong> Exposición directa de beneficios clave (ej: <em>incluye, ofrece, contiene</em>) para que el lector quiera tu producto.
-                        </div>
-                        <div>
-                          <strong style={{ color: '#7c3aed' }}>Acción (A - 18 pts):</strong> Llamada a la acción explícita (10 pts) + Datos de contacto / URL (8 pts) para canalizar la conversión.
-                        </div>
-                        <div>
-                          <strong style={{ color: '#7c3aed' }}>📏 Longitud y Datos (29 pts):</strong> Sweet spot de lectura (80-400 caracteres: 15 pts), números o datos reales (9 pts) y formato con etiquetas claras (5 pts).
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
+                  
                   {vs.tips.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sugerencias de mejora:</div>
                       {vs.tips.map((tip, i) => {
-                        const parts = tip.split(':');
-                        const snippet = parts.length > 1 ? parts.slice(1).join(':').trim() : tip;
+                        // Determine Lucide Icon and color badge depending on the tip content
+                        let IconComp = Info;
+                        let iconColor = '#6366f1';
+                        let iconBg = '#eff6ff';
+                        
+                        if (tip.includes('💰') || tip.includes('precio') || tip.includes('descuento')) {
+                          IconComp = Award;
+                          iconColor = '#16a34a';
+                          iconBg = '#f0fdf4';
+                        } else if (tip.includes('⚡') || tip.includes('urgencia')) {
+                          IconComp = Zap;
+                          iconColor = '#d97706';
+                          iconBg = '#fef3c7';
+                        } else if (tip.includes('✅') || tip.includes('beneficio')) {
+                          IconComp = Check;
+                          iconColor = '#7c3aed';
+                          iconBg = '#f5f3ff';
+                        } else if (tip.includes('🎯') || tip.includes('CTA')) {
+                          IconComp = Target;
+                          iconColor = '#059669';
+                          iconBg = '#ecfdf5';
+                        } else if (tip.includes('📝') || tip.includes('Describe')) {
+                          IconComp = Type;
+                          iconColor = '#0284c7';
+                          iconBg = '#f0f9ff';
+                        }
+
+                        // Remove emoji from the rendering string
+                        const cleanTip = tip.replace(/^[^\w\s]+/, '').trim();
+                        const parts = cleanTip.split(':');
+                        const snippet = parts.length > 1 ? parts.slice(1).join(':').trim() : cleanTip;
+
                         return (
                           <button
                             key={i}
+                            type="button"
                             onClick={() => {
                               const addition = snippet.replace(/\(ej:.*/i, '').trim();
                               setPrompt(prev => prev ? `${prev.trim()}. ${addition}` : addition);
                               if (variants.length > 0) { setVariants([]); setSelected(0); setPreviewMode('template'); }
                             }}
                             style={{
-                              fontSize: 10, color: '#334155', fontWeight: 700, lineHeight: 1.4,
+                              position: 'relative',
+                              fontSize: 10, color: '#334155', fontWeight: 600, lineHeight: 1.45,
                               background: '#fff', border: '1px solid #e2e8f0',
-                              borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
-                              textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
-                              boxSizing: 'border-box', boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
-                              transition: 'all 0.2s ease'
+                              borderRadius: 10, padding: '10px 16px 10px 24px', cursor: 'pointer',
+                              textAlign: 'left', display: 'flex', alignItems: 'center', width: '100%',
+                              boxSizing: 'border-box', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.02)',
+                              transition: 'all 0.15s ease'
                             }}
                             onMouseEnter={e => {
-                              e.currentTarget.style.borderColor = '#7c3aed';
-                              e.currentTarget.style.background = '#f5f3ff';
-                              e.currentTarget.style.transform = 'translateX(2px)';
+                              e.currentTarget.style.borderColor = '#6366f1';
+                              e.currentTarget.style.background = '#fafafa';
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                              e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.05)';
                             }}
                             onMouseLeave={e => {
                               e.currentTarget.style.borderColor = '#e2e8f0';
                               e.currentTarget.style.background = '#fff';
-                              e.currentTarget.style.transform = 'translateX(0)';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = '0 1px 2px rgba(15, 23, 42, 0.02)';
                             }}
                           >
-                            <span style={{ flex: 1, paddingRight: 8 }}>{tip}</span>
-                            <span style={{
-                              color: '#7c3aed', fontSize: 8, fontWeight: 900, textTransform: 'uppercase',
-                              background: '#f3e8ff', padding: '2px 6px', borderRadius: 6, flexShrink: 0
-                            }}>+ Agregar</span>
+                            <div style={{
+                              position: 'absolute',
+                              left: -12,
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              background: iconBg,
+                              border: `1px solid ${iconColor}22`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 5px rgba(0,0,0,0.06)',
+                              flexShrink: 0,
+                              zIndex: 2
+                            }}>
+                              <Plus size={12} color={iconColor} />
+                            </div>
+                            <span style={{ flex: 1 }}>{cleanTip}</span>
                           </button>
                         );
                       })}
@@ -1722,35 +1973,132 @@ export default function FlyerStudio() {
             {/* CTA */}
             <div style={css.section}>
               <label style={css.label}>Llamada a la Acción (CTA)</label>
-              <input style={css.input} placeholder="Ej: Reserva hoy · Llama ahora · Obtén 30% off"
-                value={cta}
-                onChange={e => setCta(e.target.value)}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  style={{
+                    ...css.input,
+                    borderRadius: 10,
+                    padding: '10px 12px 10px 32px',
+                    borderColor: '#cbd5e1',
+                    fontSize: 12,
+                    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.02)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  placeholder="Ej: Reserva hoy · Llama ahora · Obtén 30% off"
+                  value={cta}
+                  onChange={e => setCta(e.target.value)}
+                  onFocus={e => {
+                    e.currentTarget.style.borderColor = '#6366f1';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)';
+                  }}
+                  onBlur={e => {
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.boxShadow = '0 1px 2px rgba(15, 23, 42, 0.02)';
+                  }}
+                />
+                <Target size={12} color="#94a3b8" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+              </div>
             </div>
 
             {/* Contact Details */}
             <div style={css.section}>
               <label style={css.label}>Datos de Contacto</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <input style={css.input} placeholder="Teléfono (Ej: 7971-8911)"
-                  value={phone} onChange={e => setPhone(e.target.value)} />
-                <input style={css.input} placeholder="Sitio Web (Ej: www.ariasdefense.com)"
-                  value={website} onChange={e => setWebsite(e.target.value)} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    style={{
+                      ...css.input,
+                      borderRadius: 10,
+                      padding: '10px 12px 10px 32px',
+                      borderColor: '#cbd5e1',
+                      fontSize: 12,
+                      boxShadow: '0 1px 2px rgba(15, 23, 42, 0.02)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    placeholder="Teléfono (Ej: 7971-8911)"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    onFocus={e => {
+                      e.currentTarget.style.borderColor = '#6366f1';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)';
+                    }}
+                    onBlur={e => {
+                      e.currentTarget.style.borderColor = '#cbd5e1';
+                      e.currentTarget.style.boxShadow = '0 1px 2px rgba(15, 23, 42, 0.02)';
+                    }}
+                  />
+                  <Smartphone size={12} color="#94a3b8" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    style={{
+                      ...css.input,
+                      borderRadius: 10,
+                      padding: '10px 12px 10px 32px',
+                      borderColor: '#cbd5e1',
+                      fontSize: 12,
+                      boxShadow: '0 1px 2px rgba(15, 23, 42, 0.02)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    placeholder="Sitio Web (Ej: www.ariasdefense.com)"
+                    value={website}
+                    onChange={e => setWebsite(e.target.value)}
+                    onFocus={e => {
+                      e.currentTarget.style.borderColor = '#6366f1';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)';
+                    }}
+                    onBlur={e => {
+                      e.currentTarget.style.borderColor = '#cbd5e1';
+                      e.currentTarget.style.boxShadow = '0 1px 2px rgba(15, 23, 42, 0.02)';
+                    }}
+                  />
+                  <Globe size={12} color="#94a3b8" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                </div>
               </div>
             </div>
 
             {/* Logo */}
             <div style={css.section}>
               <label style={css.label}>Logo / Imagen de Referencia</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button onClick={() => logoRef.current?.click()} style={{ ...css.ghost, fontSize: 11, padding: '7px 12px', flex: 1 }}>
-                  <Upload size={12} /> {logoFile ? 'Cambiar logo' : 'Subir logo'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  onClick={() => logoRef.current?.click()}
+                  type="button"
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    padding: '10px 14px',
+                    borderRadius: 10,
+                    border: '1.5px dashed #cbd5e1',
+                    background: '#f8fafc',
+                    color: '#475569',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = '#6366f1';
+                    e.currentTarget.style.background = '#eff6ff';
+                    e.currentTarget.style.color = '#4f46e5';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = '#cbd5e1';
+                    e.currentTarget.style.background = '#f8fafc';
+                    e.currentTarget.style.color = '#475569';
+                  }}
+                >
+                  <Upload size={13} />
+                  <span>{logoFile ? 'Cambiar logo' : 'Subir logo'}</span>
                 </button>
                 {logoPreview && (
                   <div style={{ position: 'relative', display: 'inline-flex' }}>
-                    <img src={logoPreview} alt="logo" style={{ height: 36, width: 36, objectFit: 'contain', borderRadius: 5, border: '1px solid #e2e8f0' }} />
-                    <button onClick={() => { setLogoFile(null); setLogoPreview(''); setIsLogoCustomized(true); if (logoRef.current) logoRef.current.value = ''; }} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', border: 'none', borderRadius: '50%', width: 14, height: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <X size={9} color="#fff" />
+                    <img src={logoPreview} alt="logo" style={{ height: 38, width: 38, objectFit: 'contain', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff' }} />
+                    <button onClick={() => { setLogoFile(null); setLogoPreview(''); setIsLogoCustomized(true); if (logoRef.current) logoRef.current.value = ''; }} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', border: 'none', borderRadius: '50%', width: 15, height: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                      <X size={10} color="#fff" />
                     </button>
                   </div>
                 )}
@@ -1777,15 +2125,49 @@ export default function FlyerStudio() {
             {/* Custom Flyer Upload */}
             <div style={css.section}>
               <label style={css.label}>Cargar Flyer ya Diseñado (Canva / ChatGPT)</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button onClick={() => bgUploadRef.current?.click()} style={{ ...css.ghost, fontSize: 11, padding: '7px 12px', flex: 1, background: bgUploadPreview ? '#f0fdf4' : '#f4f6f9', borderColor: bgUploadPreview ? '#bbf7d0' : '#d8dde6' }}>
-                  <Upload size={12} /> {bgFile ? 'Cambiar flyer' : 'Subir flyer (ChatGPT / Canva)'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  onClick={() => bgUploadRef.current?.click()}
+                  type="button"
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    padding: '10px 14px',
+                    borderRadius: 10,
+                    border: bgUploadPreview ? '1.5px dashed #10b981' : '1.5px dashed #cbd5e1',
+                    background: bgUploadPreview ? '#f0fdf4' : '#f8fafc',
+                    color: bgUploadPreview ? '#15803d' : '#475569',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => {
+                    if (!bgUploadPreview) {
+                      e.currentTarget.style.borderColor = '#6366f1';
+                      e.currentTarget.style.background = '#eff6ff';
+                      e.currentTarget.style.color = '#4f46e5';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!bgUploadPreview) {
+                      e.currentTarget.style.borderColor = '#cbd5e1';
+                      e.currentTarget.style.background = '#f8fafc';
+                      e.currentTarget.style.color = '#475569';
+                    }
+                  }}
+                >
+                  <Upload size={13} />
+                  <span>{bgFile ? 'Cambiar flyer' : 'Subir flyer (ChatGPT / Canva)'}</span>
                 </button>
                 {bgUploadPreview && (
                   <div style={{ position: 'relative', display: 'inline-flex' }}>
-                    <img src={bgUploadPreview} alt="flyer custom bg" style={{ height: 36, width: 36, objectFit: 'cover', borderRadius: 5, border: '1px solid #e2e8f0' }} />
-                    <button onClick={() => { setBgFile(null); setBgUploadPreview(''); }} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', border: 'none', borderRadius: '50%', width: 14, height: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <X size={9} color="#fff" />
+                    <img src={bgUploadPreview} alt="flyer custom bg" style={{ height: 38, width: 38, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' }} />
+                    <button onClick={() => { setBgFile(null); setBgUploadPreview(''); }} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', border: 'none', borderRadius: '50%', width: 15, height: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                      <X size={10} color="#fff" />
                     </button>
                   </div>
                 )}
@@ -1809,23 +2191,56 @@ export default function FlyerStudio() {
             {/* Variants */}
             <div style={css.section}>
               <label style={css.label}>¿Cuántas variantes? (1 crédito c/u)</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {([1, 2, 3] as const).map(n => (
-                  <button key={n} onClick={() => setVariantCount(n)}
-                    style={{ flex: 1, height: 36, border: `1.5px solid ${variantCount === n ? '#0070d2' : '#e2e8f0'}`, borderRadius: 7, background: variantCount === n ? '#eff6ff' : '#f8fafc', cursor: 'pointer', fontSize: 15, fontWeight: 900, color: variantCount === n ? '#0070d2' : '#94a3b8' }}>
-                    {n}
-                  </button>
-                ))}
+              <div style={{
+                display: 'flex',
+                background: '#f1f5f9',
+                borderRadius: 10,
+                padding: 3,
+                gap: 4,
+                boxShadow: 'inset 0 1px 2px rgba(15, 23, 42, 0.05)'
+              }}>
+                {([1, 2, 3] as const).map(n => {
+                  const active = variantCount === n;
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setVariantCount(n)}
+                      style={{
+                        flex: 1,
+                        height: 32,
+                        border: 'none',
+                        borderRadius: 8,
+                        background: active ? '#fff' : 'transparent',
+                        color: active ? '#6366f1' : '#475569',
+                        fontWeight: 800,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        boxShadow: active ? '0 1px 3px rgba(15, 23, 42, 0.1), 0 1px 2px rgba(15, 23, 42, 0.06)' : 'none'
+                      }}
+                    >
+                      {n}
+                    </button>
+                  );
+                })}
               </div>
-              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 5 }}>
-                Costo: <strong style={{ color: '#0f172a' }}>{variantCount} crédito{variantCount > 1 ? 's' : ''}</strong>
-                {credits !== null ? ` · Quedan ${credits}` : ''}</div>
+              <div style={{ fontSize: 10, color: '#64748b', marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Costo: <strong style={{ color: '#0f172a' }}>{variantCount} crédito{variantCount > 1 ? 's' : ''}</strong></span>
+                {credits !== null && <span style={{ background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700, color: '#475569' }}>Quedan {credits}</span>}
+              </div>
             </div>
           </div>
         </div>
 
         {/* ══ COL 2 — STYLE SETTINGS (340px) ════════════════════════════════ */}
-        <div style={css.col('340px')}>
+        <div style={{
+          ...css.col('340px'),
+          filter: editingElement !== null ? 'blur(5px)' : 'none',
+          opacity: editingElement !== null ? 0.4 : 1,
+          pointerEvents: editingElement !== null ? 'none' : 'auto',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
           <div style={css.colHead}>
             <div style={{ width: 26, height: 26, borderRadius: 6, background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Palette size={13} color="#7c3aed" />
@@ -2178,25 +2593,22 @@ export default function FlyerStudio() {
 
         {/* ══ COL 3 — PREVIEW & RESULTS (flex:1) ════════════════════════════ */}
         <div style={{ ...css.col('1fr', '#f0f2f5', false), flex: 1 }}>
-          <div style={{ ...css.colHead, background: '#fff', borderBottom: '1px solid #dde1e7' }}>
-            <div style={{ width: 26, height: 26, borderRadius: 6, background: showSuggestions ? '#f5f3ff' : '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {showSuggestions ? <Sparkles size={13} color="#7c3aed" /> : <Image size={13} color="#10b981" />}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>
-                {showSuggestions ? 'Recomendaciones Meta AI' : 'Vista Previa & Resultados'}
-              </div>
-              <div style={{ fontSize: 10, color: '#94a3b8' }}>
-                {showSuggestions ? 'Sugerencias de alto rendimiento basadas en campañas exitosas' : generating ? 'Generando tu flyer...' : variants.length > 0 ? `${variants.length} variante${variants.length > 1 ? 's' : ''} lista${variants.length > 1 ? 's' : ''}` : 'Tu flyer aparecerá aquí'}
-              </div>
-            </div>
+          <div style={{ ...css.colHead, padding: '10px 16px', background: '#fff', borderBottom: '1px solid #dde1e7', flexWrap: 'wrap', gap: '8px 12px', height: 'auto', alignItems: 'center' }}>
             {showSuggestions && (
-              <button onClick={() => setShowSuggestions(false)} style={{ ...css.ghost, padding: '5px 10px', fontSize: 11 }}>
-                Cerrar
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 auto', width: '100%' }}>
+                <div style={{ width: 26, height: 26, borderRadius: 6, background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Sparkles size={13} color="#7c3aed" />
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>
+                  Recomendaciones Meta AI
+                </div>
+                <button onClick={() => setShowSuggestions(false)} style={{ ...css.ghost, padding: '5px 10px', fontSize: 11, marginLeft: 'auto' }}>
+                  Cerrar
+                </button>
+              </div>
             )}
             {!showSuggestions && !generating && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', flex: '1 1 auto', justifyContent: 'flex-start' }}>
                 {/* Vista Previa Completa */}
                 <button
                   onClick={() => setIsPreviewModalOpen(true)}
@@ -2516,7 +2928,7 @@ export default function FlyerStudio() {
                       >
                         <div style={{
                           position: 'absolute', top: 0, left: 0,
-                          transform: `scale(${getFlyerDimensions(format).width / 1080})`,
+                          transform: `scale(${flyerWidth / 1080})`,
                           transformOrigin: 'top left',
                           width: 1080, height: canvasH, pointerEvents: 'auto'
                         }}>
@@ -3263,7 +3675,7 @@ export default function FlyerStudio() {
           style={{
             position: 'fixed',
             bottom: 40,
-            right: 40,
+            left: 310,
             zIndex: 1999, // Render on top of normal UI, but does not block canvas pointer-events
             background: 'rgba(255, 255, 255, 0.95)',
             backdropFilter: 'blur(20px)',
@@ -3958,106 +4370,438 @@ export default function FlyerStudio() {
       )}
 
       {/* ── TEMPLATE CATALOG SELECTION MODAL ──────────────────────────── */}
-      {isTemplateModalOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 3000,
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'fadeIn 0.2s ease-out'
-        }} onClick={() => setIsTemplateModalOpen(false)}>
+      {isTemplateModalOpen && (() => {
+        const ratio = canvasH / 1080;
+        const fitW = ratio > 1.3 ? 120 : 155;
+        const fitH = Math.round(fitW * ratio);
+        const sc = fitW / 1080;
+        
+        return (
           <div style={{
-            background: '#fff',
-            border: '1px solid #e2e8f0',
-            borderRadius: 24,
-            boxShadow: '0 20px 45px rgba(0, 0, 0, 0.18)',
-            width: '100%',
-            maxWidth: 580,
-            maxHeight: '85vh',
-            display: 'flex', flexDirection: 'column',
-            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-            overflow: 'hidden'
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <div>
-                <span style={{ fontSize: 14, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Catálogo de Plantillas</span>
-                <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Selecciona el diseño base para tu flyer</div>
+            position: 'fixed', inset: 0, zIndex: 3000,
+            background: 'rgba(15, 23, 42, 0.4)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'fadeIn 0.2s ease-out'
+          }} onClick={() => setIsTemplateModalOpen(false)}>
+            <div style={{
+              background: '#fff',
+              border: '1px solid #e2e8f0',
+              borderRadius: 24,
+              boxShadow: '0 20px 45px rgba(0, 0, 0, 0.18)',
+              width: '95%',
+              maxWidth: 880,
+              maxHeight: '90vh',
+              display: 'flex', flexDirection: 'column',
+              animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              overflow: 'hidden'
+            }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                <div>
+                  <span style={{ fontSize: 14, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Catálogo de Plantillas</span>
+                  <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Selecciona el diseño base para tu flyer (se actualiza con tus datos en tiempo real)</div>
+                </div>
+                <button onClick={() => setIsTemplateModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                  <X size={18} color="#64748b" />
+                </button>
               </div>
-              <button onClick={() => setIsTemplateModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-                <X size={18} color="#64748b" />
+              
+              <div className="flyer-studio-col" style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Plantillas Corporativas Pro</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                    {/* Template A */}
+                    {(() => {
+                      const active = selectedTemplate === 'A';
+                      return (
+                        <button
+                          onClick={() => { setSelectedTemplate('A'); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
+                          style={{
+                            textAlign: 'left',
+                            padding: 0,
+                            borderRadius: 16,
+                            border: `2px solid ${active ? '#7c3aed' : '#f1f5f9'}`,
+                            background: '#fff',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            boxShadow: active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)',
+                            transform: 'none',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 12px 20px -5px rgba(0,0,0,0.08)';
+                            if (!active) e.currentTarget.style.borderColor = '#ddd6fe';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)';
+                            if (!active) e.currentTarget.style.borderColor = '#f1f5f9';
+                          }}
+                        >
+                          <div style={{ width: '100%', height: 200, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden', position: 'relative' }}>
+                            <div style={{ width: fitW, height: fitH, position: 'relative', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.06)', borderRadius: 8, background: '#fff', flexShrink: 0 }}>
+                              <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: canvasH, pointerEvents: 'none' }}>
+                                <div style={{ position: 'relative', width: 1080, height: canvasH }}>
+                                  <FlyerTemplateA data={{
+                                    company_name: companyName || 'Mi Empresa',
+                                    containerW: 1080,
+                                    containerH: canvasH,
+                                    prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                                    headline: manualTitle || 'OFERTA INCREÍBLE',
+                                    subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                                    features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                                    price: manualPrice || '¡Precios de Locura!',
+                                    highlight_title: aiOptimizedText?.highlight_title,
+                                    highlight_desc: aiOptimizedText?.highlight_desc,
+                                    benefits: aiOptimizedText?.benefits,
+                                    mockup_info: aiOptimizedText?.mockup_info,
+                                    primaryColor: colors[0] || '#e91e8c',
+                                    secondaryColor: colors[1] || '#1a1a2e',
+                                    phone, website, logoUrl: undefined,
+                                    bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
+                                    flyerFont, titleFont, subtitleFont, benefitsFont, ctaFont, contactFont,
+                                    textScale, subtitleScale, benefitsScale, logoSize, logoX, logoY,
+                                    titleColor, highlightColor, subtitleColor, benefitsColor, cardBgColor, ctaBgColor, ctaTextColor, textY, textAlign,
+                                    subtitleBold, benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY,
+                                    titleX, subtitleX, benefitsX, ctaX, contactX, contactColor
+                                  }} />
+                                  {logoPreview && (
+                                    <FreeLogo d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'A', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY }} />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span>✨ Template A — Glow Glassmorphic</span>
+                                {active && <span style={{ background: '#7c3aed', color: '#fff', fontSize: 8, padding: '2px 6px', borderRadius: 8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Activa</span>}
+                              </div>
+                              <div style={{ fontSize: 9, color: '#64748b', marginTop: 4, lineHeight: 1.3 }}>Diseño moderno con efecto de vidrio esmerilado y luces de neón.</div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })()}
+
+                    {/* Template B */}
+                    {(() => {
+                      const active = selectedTemplate === 'B';
+                      return (
+                        <button
+                          onClick={() => { setSelectedTemplate('B'); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
+                          style={{
+                            textAlign: 'left',
+                            padding: 0,
+                            borderRadius: 16,
+                            border: `2px solid ${active ? '#7c3aed' : '#f1f5f9'}`,
+                            background: '#fff',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            boxShadow: active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)',
+                            transform: 'none',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 12px 20px -5px rgba(0,0,0,0.08)';
+                            if (!active) e.currentTarget.style.borderColor = '#ddd6fe';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)';
+                            if (!active) e.currentTarget.style.borderColor = '#f1f5f9';
+                          }}
+                        >
+                          <div style={{ width: '100%', height: 200, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden', position: 'relative' }}>
+                            <div style={{ width: fitW, height: fitH, position: 'relative', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.06)', borderRadius: 8, background: '#fff', flexShrink: 0 }}>
+                              <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: canvasH, pointerEvents: 'none' }}>
+                                <div style={{ position: 'relative', width: 1080, height: canvasH }}>
+                                  <FlyerTemplateB data={{
+                                    company_name: companyName || 'Mi Empresa',
+                                    containerW: 1080,
+                                    containerH: canvasH,
+                                    prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                                    headline: manualTitle || 'OFERTA INCREÍBLE',
+                                    subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                                    features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                                    price: manualPrice || '¡Precios de Locura!',
+                                    highlight_title: aiOptimizedText?.highlight_title,
+                                    highlight_desc: aiOptimizedText?.highlight_desc,
+                                    benefits: aiOptimizedText?.benefits,
+                                    mockup_info: aiOptimizedText?.mockup_info,
+                                    primaryColor: colors[0] || '#9b1c1c',
+                                    secondaryColor: colors[1] || '#1a1a2e',
+                                    phone, website, logoUrl: undefined,
+                                    bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
+                                    flyerFont, titleFont, subtitleFont, benefitsFont, ctaFont, contactFont,
+                                    textScale, subtitleScale, benefitsScale, logoSize, logoX, logoY,
+                                    titleColor, highlightColor, subtitleColor, benefitsColor, cardBgColor, ctaBgColor, ctaTextColor, textY, textAlign,
+                                    subtitleBold, benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY,
+                                    titleX, subtitleX, benefitsX, ctaX, contactX, contactColor
+                                  }} />
+                                  {logoPreview && (
+                                    <FreeLogo d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'B', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY }} />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span>🏢 Template B — Editorial Showcase</span>
+                                {active && <span style={{ background: '#7c3aed', color: '#fff', fontSize: 8, padding: '2px 6px', borderRadius: 8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Activa</span>}
+                              </div>
+                              <div style={{ fontSize: 9, color: '#64748b', marginTop: 4, lineHeight: 1.3 }}>Disposición editorial limpia tipo B2B ideal para mostrar marcas corporativas.</div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Catálogo de Marketing (Autorescaling)</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                    {TEMPLATE_LIST.map(t => {
+                      const active = selectedTemplate === t.id;
+                      return (
+                        <button
+                          key={t.id}
+                          onClick={() => { setSelectedTemplate(t.id); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
+                          style={{
+                            textAlign: 'left',
+                            padding: 0,
+                            borderRadius: 16,
+                            border: `2px solid ${active ? '#7c3aed' : '#f1f5f9'}`,
+                            background: '#fff',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            overflow: 'hidden',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            boxShadow: active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)',
+                            transform: 'none',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 12px 20px -5px rgba(0,0,0,0.08)';
+                            if (!active) e.currentTarget.style.borderColor = '#ddd6fe';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'none';
+                            e.currentTarget.style.boxShadow = active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)';
+                            if (!active) e.currentTarget.style.borderColor = '#f1f5f9';
+                          }}
+                        >
+                          <div style={{ width: '100%', height: 200, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden', position: 'relative' }}>
+                            <div style={{ width: fitW, height: fitH, position: 'relative', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.06)', borderRadius: 8, background: '#fff', flexShrink: 0 }}>
+                              <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: canvasH, pointerEvents: 'none' }}>
+                                <RenderFlyer d={{
+                                  title: manualTitle || 'TU OFERTA',
+                                  subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                                  cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
+                                  beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                                  accent: colors[0] || '#0070d2',
+                                  bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
+                                  logoUrl: logoPreview || null,
+                                  industria: companyName || 'Mi Empresa',
+                                  phone, website, templateId: t.id,
+                                  containerW: 1080, containerH: canvasH,
+                                  logoSize, logoX, logoY,
+                                  flyerFont, titleFont, subtitleFont, benefitsFont, ctaFont, contactFont,
+                                  textScale, subtitleScale, benefitsScale, titleColor, highlightColor, subtitleColor, benefitsColor, cardBgColor, ctaBgColor, ctaTextColor, textY, textAlign,
+                                  subtitleBold, benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY,
+                                  titleX, subtitleX, benefitsX, ctaX, contactX, contactColor
+                                }} />
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span>{t.name}</span>
+                                {active && <span style={{ background: '#7c3aed', color: '#fff', fontSize: 8, padding: '2px 6px', borderRadius: 8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Activa</span>}
+                              </div>
+                              <div style={{ fontSize: 9, color: '#64748b', marginTop: 4, lineHeight: 1.3 }}>{t.desc}</div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── FREE PHOTO SELECTOR MODAL ──────────────────────────────────────── */}
+      {isFreePhotoModalOpen && freePhotosPool.length > 0 && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          animation: 'fadeIn 0.2s ease-out'
+        }} onClick={() => setIsFreePhotoModalOpen(false)}>
+          <div style={{
+            background: '#ffffff', borderRadius: 24, border: '1px solid #e2e8f0',
+            width: '100%', maxWidth: 540, overflow: 'hidden',
+            boxShadow: '0 20px 50px rgba(15, 23, 42, 0.15)',
+            display: 'flex', flexDirection: 'column',
+            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+          }} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div style={{ padding: '20px 24px 16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 900, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Generador Gratis</span>
+                <h3 style={{ fontSize: 16, fontWeight: 900, color: '#0f172a', margin: '2px 0 0 0' }}>Elige una Imagen Temática</h3>
+                <p style={{ fontSize: 10, color: '#64748b', margin: '4px 0 0 0' }}>Selecciona entre 15 fotos premium para usar en tu flyer</p>
+              </div>
+              <button 
+                onClick={() => setIsFreePhotoModalOpen(false)}
+                style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
+              >
+                <X size={14} color="#0f172a" />
               </button>
             </div>
             
-            <div className="flyer-studio-col" style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Plantillas Corporativas Pro</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <button
-                    onClick={() => { setSelectedTemplate('A'); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
-                    style={{
-                      textAlign: 'left',
-                      padding: '12px 14px',
-                      borderRadius: 14,
-                      border: `2px solid ${selectedTemplate === 'A' ? '#7c3aed' : '#e2e8f0'}`,
-                      background: selectedTemplate === 'A' ? '#7c3aed05' : '#fff',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      width: '100%',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 850, color: '#0f172a' }}>✨ Template A — Glow Glassmorphic</div>
-                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>Diseño moderno con efecto de vidrio esmerilado y luces de neón.</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => { setSelectedTemplate('B'); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
-                    style={{
-                      textAlign: 'left',
-                      padding: '12px 14px',
-                      borderRadius: 14,
-                      border: `2px solid ${selectedTemplate === 'B' ? '#7c3aed' : '#e2e8f0'}`,
-                      background: selectedTemplate === 'B' ? '#7c3aed05' : '#fff',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      width: '100%',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 850, color: '#0f172a' }}>🏢 Template B — Editorial Showcase</div>
-                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>Disposición editorial limpia tipo B2B ideal para mostrar marcas corporativas.</div>
-                  </button>
+            {/* Body */}
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
+              {/* Main Image View */}
+              <div style={{
+                width: '100%', height: 320, background: '#0f172a', borderRadius: 16,
+                position: 'relative', overflow: 'hidden', border: '1px solid #e2e8f0',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <img 
+                  src={freePhotosPool[freePhotoIndex]} 
+                  alt={`Preview ${freePhotoIndex + 1}`}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+                
+                {/* Navigation Arrows */}
+                <button
+                  type="button"
+                  onClick={() => setFreePhotoIndex(prev => (prev === 0 ? freePhotosPool.length - 1 : prev - 1))}
+                  style={{
+                    position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+                    width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.9)',
+                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)', transition: 'all 0.2s', zIndex: 10
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)'; e.currentTarget.style.background = '#ffffff'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
+                >
+                  <ChevronLeft size={18} color="#0f172a" />
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setFreePhotoIndex(prev => (prev === freePhotosPool.length - 1 ? 0 : prev + 1))}
+                  style={{
+                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                    width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.9)',
+                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)', transition: 'all 0.2s', zIndex: 10
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)'; e.currentTarget.style.background = '#ffffff'; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
+                >
+                  <ChevronRight size={18} color="#0f172a" />
+                </button>
+
+                {/* Index Counter Badge */}
+                <div style={{
+                  position: 'absolute', bottom: 12, right: 12,
+                  background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)',
+                  color: '#ffffff', padding: '4px 10px', borderRadius: 20,
+                  fontSize: 10, fontWeight: 700, zIndex: 10
+                }}>
+                  Foto {freePhotoIndex + 1} de {freePhotosPool.length}
                 </div>
               </div>
 
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Catálogo de Marketing (Autorescaling)</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  {TEMPLATE_LIST.map(t => {
-                    const active = selectedTemplate === t.id;
+              {/* Scrollable Thumbnails View */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 9, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Todas las opciones ({freePhotosPool.length})</span>
+                <div className="flyer-studio-col" style={{ 
+                  display: 'flex', gap: 8, overflowX: 'auto', padding: '4px 0', 
+                  width: '100%', scrollbarWidth: 'thin'
+                }}>
+                  {freePhotosPool.map((img, idx) => {
+                    const active = idx === freePhotoIndex;
                     return (
                       <button
-                        key={t.id}
-                        onClick={() => { setSelectedTemplate(t.id); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
+                        key={idx}
+                        type="button"
+                        onClick={() => setFreePhotoIndex(idx)}
                         style={{
-                          textAlign: 'left',
-                          padding: '12px 14px',
-                          borderRadius: 14,
+                          width: 54,
+                          height: 54,
+                          borderRadius: 10,
                           border: `2px solid ${active ? '#7c3aed' : '#e2e8f0'}`,
-                          background: active ? '#7c3aed05' : '#fff',
+                          padding: 0,
+                          overflow: 'hidden',
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
-                          width: '100%',
-                          boxSizing: 'border-box'
+                          flexShrink: 0,
+                          opacity: active ? 1 : 0.65,
+                          transform: active ? 'scale(1.05)' : 'none',
+                          boxShadow: active ? '0 4px 10px rgba(124,58,237,0.15)' : 'none'
                         }}
                       >
-                        <div style={{ fontSize: 12, fontWeight: active ? 850 : 700, color: '#0f172a' }}>{t.name}</div>
-                        <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{t.desc}</div>
+                        <img src={img} alt={`Thumb ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       </button>
                     );
                   })}
                 </div>
               </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 24px 20px 24px', background: '#f8fafc', display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setIsFreePhotoModalOpen(false)}
+                style={{ background: '#fff', border: '1px solid #d8dde6', borderRadius: 10, padding: '10px 16px', fontSize: 12, fontWeight: 800, color: '#475569', cursor: 'pointer', transition: 'all 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectFreePhoto(freePhotosPool[freePhotoIndex])}
+                style={{
+                  background: '#7c3aed', border: 'none', borderRadius: 10,
+                  padding: '10px 18px', fontSize: 12, fontWeight: 800, color: '#fff',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.2s',
+                  boxShadow: '0 4px 12px rgba(124,58,237,0.2)'
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#6d28d9'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#7c3aed'; e.currentTarget.style.transform = 'none'; }}
+              >
+                <Plus size={14} style={{ marginRight: 6 }} />
+                Aplicar esta Foto
+              </button>
             </div>
           </div>
         </div>
@@ -4353,6 +5097,189 @@ export default function FlyerStudio() {
                 style={{ background: '#fff', border: '1px solid #d8dde6', borderRadius: 10, padding: '8px 16px', fontSize: 11, fontWeight: 800, color: '#475569', cursor: 'pointer' }}
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── AIDA METHODOLOGY MODAL ────────────────────────────────────── */}
+      {isAidaModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease-out'
+        }} onClick={() => setIsAidaModalOpen(false)}>
+          <div style={{
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 20,
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            width: '100%',
+            maxWidth: 480,
+            display: 'flex', flexDirection: 'column',
+            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            overflow: 'hidden'
+          }} onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '18px 24px',
+              borderBottom: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8,
+                  background: '#eff6ff', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <BarChart3 size={15} color="#3b82f6" />
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Metodología AIDA
+                </span>
+              </div>
+              <button
+                onClick={() => setIsAidaModalOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={16} color="#64748b" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 18, maxHeight: '80vh', overflowY: 'auto' }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Info size={14} color="#6366f1" />
+                  Rigor y Metodología
+                </div>
+                <p style={{ margin: 0, fontSize: 11, color: '#475569', lineHeight: 1.6, textAlign: 'justify' }}>
+                  Evaluamos tu brief utilizando una fórmula matemática basada en las mejores prácticas de la industria y la psicología de conversión de la metodología AIDA. Estudios globales de publicidad digital demuestran que estructurar tus textos con estos parámetros clave (Atención, Interés, Deseo y Acción) optimiza la retención del usuario y puede incrementar la conversión en hasta un <strong>400%</strong> frente a copias sin estructura.
+                </p>
+              </div>
+
+              <div style={{ height: '1px', background: '#f1f5f9' }} />
+
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Target size={14} color="#6366f1" />
+                  Estructura del Score de Viralidad
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {/* A - Atención */}
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 6, background: '#f0fdf4',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2
+                    }}>
+                      <Eye size={12} color="#16a34a" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#1f2937' }}>Atención (A - 18 pts)</div>
+                      <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
+                        Presencia de precios, descuentos claros u ofertas específicas (ej: <em>$12.95, 30% OFF</em>) para captar la mirada del usuario.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* I - Interés */}
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 6, background: '#fef3c7',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2
+                    }}>
+                      <Zap size={12} color="#d97706" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#1f2937' }}>Interés (I - 20 pts)</div>
+                      <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
+                        Palabras de urgencia y disparadores de escasez (ej: <em>hoy, oferta limitada, solo esta semana</em>) para retener la atención.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* D - Deseo */}
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 6, background: '#f5f3ff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2
+                    }}>
+                      <Award size={12} color="#7c3aed" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#1f2937' }}>Deseo (D - 15 pts)</div>
+                      <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
+                        Exposición estructurada de beneficios clave y propuesta de valor clara (ej: <em>incluye, ofrece, contiene</em>).
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* A - Acción */}
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 6, background: '#ecfdf5',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2
+                    }}>
+                      <Send size={12} color="#059669" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#1f2937' }}>Acción (A - 18 pts)</div>
+                      <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
+                        Llamada a la Acción (CTA) explícita (10 pts) junto con datos de contacto o URL claros (8 pts) para canalizar la conversión.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Estructura y Longitud */}
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: 6, background: '#f0f9ff',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2
+                    }}>
+                      <Type size={12} color="#0284c7" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#1f2937' }}>Longitud y Datos (29 pts)</div>
+                      <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
+                        Rango de caracteres óptimo (80-400 chars: 15 pts), inclusión de números o datos (9 pts) y formato estructurado (5 pts).
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div style={{
+              padding: '14px 20px',
+              background: '#f8fafc',
+              borderTop: '1px solid #f1f5f9',
+              display: 'flex',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => setIsAidaModalOpen(false)}
+                style={{
+                  background: '#0f172a',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 10,
+                  padding: '8px 16px',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                  transition: 'background 0.15s'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#1e293b'}
+                onMouseLeave={e => e.currentTarget.style.background = '#0f172a'}
+              >
+                Entendido
               </button>
             </div>
           </div>

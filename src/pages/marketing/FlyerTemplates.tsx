@@ -323,7 +323,7 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
             onClick={d.onSubtitleClick ? (e) => { e.stopPropagation(); d.onSubtitleClick?.(); } : undefined}
             style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: d.subtitleColor || 'rgba(255,255,255,0.85)', fontWeight: (d.subtitleBold ? 900 : 500), lineHeight: 1.4, transform: d.subtitleY ? `translateY(${d.subtitleY}px)` : undefined }}
           >
-            {trunc(d.subtitle || '', 120)}
+            {d.subtitle || ''}
           </div>
         </div>
 
@@ -406,14 +406,14 @@ export const Template_Cinematic = ({ d }: { d: FlyerData }) => {
           onClick={d.onTitleClick ? (e) => { e.stopPropagation(); d.onTitleClick?.(); } : undefined}
           style={{ fontSize: (Math.round(28 * s)) * (d.titleScale ?? 1), fontWeight: 900, color: d.titleColor || '#fff', lineHeight: 1.15, letterSpacing: '-0.02em', textShadow: '0 2px 8px rgba(0,0,0,0.3)', width: '100%', transform: d.titleY ? `translateY(${d.titleY}px)` : undefined }}
         >
-          {d.title?.includes('**') ? renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#fff', d.highlightColor) : trunc((d.title || 'TU OFERTA').toUpperCase(), 50)}
+          {renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#fff', d.highlightColor)}
         </div>
         <div 
           data-element-id="subtitle" className={d.onSubtitleClick ? "editable-element flyer-subtitle-element" : "flyer-subtitle-element"}
           onClick={d.onSubtitleClick ? (e) => { e.stopPropagation(); d.onSubtitleClick?.(); } : undefined}
           style={{ fontSize: Math.round(11 * s * (d.subtitleScale ?? 1)), color: d.subtitleColor || 'rgba(255,255,255,0.75)', fontWeight: (d.subtitleBold ? 900 : 400), lineHeight: 1.4, width: '100%', transform: d.subtitleY ? `translateY(${d.subtitleY}px)` : undefined }}
         >
-          {trunc(d.subtitle || '', 120)}
+          {d.subtitle || ''}
         </div>
         
         <div 
@@ -423,7 +423,7 @@ export const Template_Cinematic = ({ d }: { d: FlyerData }) => {
         >
           {(d.beneficios || []).slice(0, 4).map((b, i) => (
             <div key={i} style={{ background: 'rgba(255,255,255,0.1)', border: `1px solid ${acc}44`, color: '#f1f5f9', fontSize: Math.round(10 * s * (d.benefitsScale ?? 1)), fontWeight: d.benefitsBold ? 900 : 600, padding: `${Math.round(5 * s)}px ${Math.round(10 * s)}px`, borderRadius: Math.round(20 * s) }}>
-              {trunc(b, 32)}
+              {b}
             </div>
           ))}
         </div>
@@ -505,7 +505,7 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
           onClick={d.onTitleClick ? (e) => { e.stopPropagation(); d.onTitleClick?.(); } : undefined}
           style={{ fontSize: (Math.round(26 * s)) * (d.titleScale ?? 1), fontWeight: 900, color: d.titleColor || '#0f172a', lineHeight: 1.1, letterSpacing: '-0.02em', width: '100%', transform: d.titleY ? `translateY(${d.titleY}px)` : undefined }}
         >
-          {d.title?.includes('**') ? renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#0f172a', d.highlightColor) : trunc((d.title || 'TU OFERTA').toUpperCase(), 40)}
+          {renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#0f172a', d.highlightColor)}
         </div>
         <div style={{ height: Math.round(3 * s), width: Math.round(50 * s), background: acc, borderRadius: Math.round(2 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
         <div 
@@ -513,7 +513,7 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
           onClick={d.onSubtitleClick ? (e) => { e.stopPropagation(); d.onSubtitleClick?.(); } : undefined}
           style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: d.subtitleColor || '#334155', fontWeight: (d.subtitleBold ? 900 : 500), lineHeight: 1.4, width: '100%', transform: d.subtitleY ? `translateY(${d.subtitleY}px)` : undefined }}
         >
-          {trunc(d.subtitle || '', 120)}
+          {d.subtitle || ''}
         </div>
         
         <div 
@@ -603,7 +603,7 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
             onClick={d.onTitleClick ? (e) => { e.stopPropagation(); d.onTitleClick?.(); } : undefined}
             style={{ fontSize: (Math.round(28 * s)) * (d.titleScale ?? 1), fontWeight: 900, color: d.titleColor || '#fff', lineHeight: 1.15, letterSpacing: '-0.02em', margin: 0, transform: d.titleY ? `translateY(${d.titleY}px)` : undefined }}
           >
-            {d.title?.includes('**') ? renderTitleWithHighlights(title, d.titleColor || '#fff', d.highlightColor) : trunc(title, 40)}
+            {renderTitleWithHighlights(title, d.titleColor || '#fff', d.highlightColor)}
           </h1>
           <div style={{ height: Math.round(3 * s), background: acc, width: '40%', alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
           <div 
@@ -611,7 +611,7 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
             onClick={d.onSubtitleClick ? (e) => { e.stopPropagation(); d.onSubtitleClick?.(); } : undefined}
             style={{ fontSize: Math.round(11 * s * (d.subtitleScale ?? 1)), color: d.subtitleColor || 'rgba(255,255,255,0.75)', fontWeight: (d.subtitleBold ? 900 : 400), lineHeight: 1.5, transform: d.subtitleY ? `translateY(${d.subtitleY}px)` : undefined }}
           >
-            {trunc(d.subtitle || '', 100)}
+            {d.subtitle || ''}
           </div>
         </div>
         
@@ -698,14 +698,14 @@ export const Template_CenterGradient = ({ d }: { d: FlyerData }) => {
           onClick={d.onTitleClick ? (e) => { e.stopPropagation(); d.onTitleClick?.(); } : undefined}
           style={{ fontSize: (Math.round(32 * s)) * (d.titleScale ?? 1), fontWeight: 900, color: d.titleColor || '#fff', lineHeight: 1.1, letterSpacing: '-0.02em', textShadow: '0 2px 10px rgba(0,0,0,0.4)', width: '100%', transform: d.titleY ? `translateY(${d.titleY}px)` : undefined }}
         >
-          {d.title?.includes('**') ? renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#fff', d.highlightColor) : trunc((d.title || 'TU OFERTA').toUpperCase(), 40)}
+          {renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#fff', d.highlightColor)}
         </div>
         <div 
           data-element-id="subtitle" className={d.onSubtitleClick ? "editable-element flyer-subtitle-element" : "flyer-subtitle-element"}
           onClick={d.onSubtitleClick ? (e) => { e.stopPropagation(); d.onSubtitleClick?.(); } : undefined}
           style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: d.subtitleColor || 'rgba(255,255,255,0.85)', fontWeight: (d.subtitleBold ? 900 : 400), lineHeight: 1.5, width: '100%', transform: d.subtitleY ? `translateY(${d.subtitleY}px)` : undefined }}
         >
-          {trunc(d.subtitle || '', 100)}
+          {d.subtitle || ''}
         </div>
         
         <div 
@@ -715,7 +715,7 @@ export const Template_CenterGradient = ({ d }: { d: FlyerData }) => {
         >
           {(d.beneficios || []).slice(0, 4).map((b, i) => (
             <div key={i} style={{ background: 'rgba(255,255,255,0.12)', border: d.benefitsColor ? '1px solid ' + d.benefitsColor : '1px solid rgba(255,255,255,0.2)', color: d.benefitsColor || '#fff', fontSize: Math.round(11 * s * (d.benefitsScale ?? 1)), fontWeight: d.benefitsBold ? 900 : 600, padding: `${Math.round(5 * s)}px ${Math.round(12 * s)}px`, borderRadius: Math.round(20 * s) }}>
-              ✓ {trunc(b, 28)}
+              ✓ {b}
             </div>
           ))}
         </div>
@@ -790,7 +790,7 @@ export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
             onClick={d.onTitleClick ? (e) => { e.stopPropagation(); d.onTitleClick?.(); } : undefined}
             style={{ fontSize: (Math.round(28 * s)) * (d.titleScale ?? 1), fontWeight: 900, color: d.titleColor || '#0f172a', lineHeight: 1.15, letterSpacing: '-0.02em', margin: 0, transform: d.titleY ? `translateY(${d.titleY}px)` : undefined }}
           >
-            {d.title?.includes('**') ? renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#0f172a', d.highlightColor) : trunc((d.title || 'TU OFERTA').toUpperCase(), 40)}
+            {renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#0f172a', d.highlightColor)}
           </h1>
           <div style={{ height: Math.round(3 * s), background: acc, width: Math.round(50 * s), borderRadius: Math.round(2 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
           <div 
@@ -798,7 +798,7 @@ export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
             onClick={d.onSubtitleClick ? (e) => { e.stopPropagation(); d.onSubtitleClick?.(); } : undefined}
             style={{ fontSize: Math.round(11 * s * (d.subtitleScale ?? 1)), color: d.subtitleColor || '#334155', fontWeight: (d.subtitleBold ? 900 : 500), lineHeight: 1.4, transform: d.subtitleY ? `translateY(${d.subtitleY}px)` : undefined }}
           >
-            {trunc(d.subtitle || '', 120)}
+            {d.subtitle || ''}
           </div>
         </div>
 
@@ -902,7 +902,7 @@ export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
           onClick={d.onTitleClick ? (e) => { e.stopPropagation(); d.onTitleClick?.(); } : undefined}
           style={{ fontSize: (Math.round(30 * s)) * (d.titleScale ?? 1), fontWeight: 900, color: d.titleColor || '#fff', lineHeight: 1.1, letterSpacing: '-0.02em', width: '100%', transform: d.titleY ? `translateY(${d.titleY}px)` : undefined }}
         >
-          {d.title?.includes('**') ? renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#fff', d.highlightColor) : trunc((d.title || 'TU OFERTA').toUpperCase(), 40)}
+          {renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#fff', d.highlightColor)}
         </div>
         <div style={{ height: Math.round(3 * s), width: Math.round(60 * s), background: acc, borderRadius: Math.round(2 * s), margin: d.textAlign === 'left' ? `${Math.round(4 * s)}px 0` : d.textAlign === 'right' ? `${Math.round(4 * s)}px 0 ${Math.round(4 * s)}px auto` : `${Math.round(4 * s)}px auto` }} />
         <div 
@@ -910,7 +910,7 @@ export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
           onClick={d.onSubtitleClick ? (e) => { e.stopPropagation(); d.onSubtitleClick?.(); } : undefined}
           style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: d.subtitleColor || 'rgba(255,255,255,0.7)', fontStyle: 'italic', lineHeight: 1.4, width: '100%', transform: d.subtitleY ? `translateY(${d.subtitleY}px)` : undefined }}
         >
-          {trunc(d.subtitle || '', 100)}
+          {d.subtitle || ''}
         </div>
         
         <div 
@@ -921,7 +921,7 @@ export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
           {(d.beneficios || []).slice(0, 4).map((b, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * s), background: 'rgba(255,255,255,0.04)', border: d.benefitsColor ? `1px solid ${d.benefitsColor}` : `1px solid ${acc}22`, borderRadius: Math.round(8 * s), padding: `${Math.round(6 * s)}px ${Math.round(12 * s)}px` }}>
               <span style={{ color: d.benefitsColor || acc, fontWeight: 900, flexShrink: 0 }}>★</span>
-              <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: Math.round(11 * s * (d.benefitsScale ?? 1)), fontWeight: d.benefitsBold ? 900 : 500 }}>{trunc(b, 48)}</span>
+              <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: Math.round(11 * s * (d.benefitsScale ?? 1)), fontWeight: d.benefitsBold ? 900 : 500 }}>{b}</span>
             </div>
           ))}
         </div>
@@ -1007,14 +1007,14 @@ export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
           onClick={d.onTitleClick ? (e) => { e.stopPropagation(); d.onTitleClick?.(); } : undefined}
           style={{ fontSize: (Math.round(28 * s)) * (d.titleScale ?? 1), fontWeight: 900, color: d.titleColor || '#0f172a', lineHeight: 1.1, letterSpacing: '-0.03em', width: '100%', transform: d.titleY ? `translateY(${d.titleY}px)` : undefined }}
         >
-          {d.title?.includes('**') ? renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#0f172a', d.highlightColor) : trunc((d.title || 'TU OFERTA').toUpperCase(), 40)}
+          {renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#0f172a', d.highlightColor)}
         </div>
         <div 
           data-element-id="subtitle" className={d.onSubtitleClick ? "editable-element flyer-subtitle-element" : "flyer-subtitle-element"}
           onClick={d.onSubtitleClick ? (e) => { e.stopPropagation(); d.onSubtitleClick?.(); } : undefined}
           style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: d.subtitleColor || '#334155', lineHeight: 1.4, width: '100%', transform: d.subtitleY ? `translateY(${d.subtitleY}px)` : undefined }}
         >
-          {trunc(d.subtitle || '', 120)}
+          {d.subtitle || ''}
         </div>
         <div 
           data-element-id="benefits" className={d.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
@@ -1101,7 +1101,7 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
           onClick={d.onTitleClick ? (e) => { e.stopPropagation(); d.onTitleClick?.(); } : undefined}
           style={{ fontSize: (Math.round(28 * s)) * (d.titleScale ?? 1), fontWeight: 900, color: d.titleColor || acc, lineHeight: 1.1, letterSpacing: '-0.03em', width: '100%', transform: d.titleY ? `translateY(${d.titleY}px)` : undefined }}
         >
-          {d.title?.includes('**') ? renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || acc, d.highlightColor) : trunc((d.title || 'TU OFERTA').toUpperCase(), 40)}
+          {renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || acc, d.highlightColor)}
         </div>
         <div style={{ height: Math.round(3 * s), background: acc, width: Math.round(50 * s), borderRadius: Math.round(2 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
         <div 
@@ -1109,7 +1109,7 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
           onClick={d.onSubtitleClick ? (e) => { e.stopPropagation(); d.onSubtitleClick?.(); } : undefined}
           style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: d.subtitleColor || '#475569', lineHeight: 1.4, width: '100%', transform: d.subtitleY ? `translateY(${d.subtitleY}px)` : undefined }}
         >
-          {trunc(d.subtitle || '', 120)}
+          {d.subtitle || ''}
         </div>
         
         <div 
@@ -1195,7 +1195,7 @@ export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
           onClick={d.onTitleClick ? (e) => { e.stopPropagation(); d.onTitleClick?.(); } : undefined}
           style={{ fontSize: (Math.round(36 * s)) * (d.titleScale ?? 1), fontWeight: 900, color: d.titleColor || '#fff', lineHeight: 1.1, letterSpacing: '-0.02em', textShadow: '0 2px 10px rgba(0,0,0,0.5)', width: '100%', transform: d.titleY ? `translateY(${d.titleY}px)` : undefined }}
         >
-          {d.title?.includes('**') ? renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#fff', d.highlightColor) : trunc((d.title || 'TU OFERTA').toUpperCase(), 40)}
+          {renderTitleWithHighlights((d.title || 'TU OFERTA').toUpperCase(), d.titleColor || '#fff', d.highlightColor)}
         </div>
         <div style={{ height: Math.round(3 * s), background: acc, width: Math.round(60 * s), borderRadius: Math.round(2 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
         <div 
@@ -1203,7 +1203,7 @@ export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
           onClick={d.onSubtitleClick ? (e) => { e.stopPropagation(); d.onSubtitleClick?.(); } : undefined}
           style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: d.subtitleColor || 'rgba(255,255,255,0.85)', lineHeight: 1.4, textShadow: '0 2px 8px rgba(0,0,0,0.5)', width: '100%', transform: d.subtitleY ? `translateY(${d.subtitleY}px)` : undefined }}
         >
-          {trunc(d.subtitle || '', 120)}
+          {d.subtitle || ''}
         </div>
         
         <div 
@@ -1213,7 +1213,7 @@ export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
         >
           {(d.beneficios || []).slice(0, 4).map((b, i) => (
             <div key={i} style={{ background: d.cardBgColor || 'rgba(255,255,255,0.1)', border: d.benefitsColor ? `1px solid ${d.benefitsColor}` : `1px solid ${acc}55`, color: d.benefitsColor || '#fff', fontSize: Math.round(10 * s * (d.benefitsScale ?? 1)), fontWeight: d.benefitsBold ? 900 : 600, padding: `${Math.round(4 * s)}px ${Math.round(10 * s)}px`, borderRadius: Math.round(16 * s) }}>
-              ✓ {trunc(b, 26)}
+              ✓ {b}
             </div>
           ))}
         </div>
