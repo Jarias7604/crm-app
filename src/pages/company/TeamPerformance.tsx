@@ -446,6 +446,7 @@ export default function TeamPerformancePage() {
                     filters={filters}
                     callLogs={callLogs}
                     userPerformance={userPerformance}
+                    getUserGoal={getUserGoal}
                 />
             ) : activeTab === 'forecast' ? (
                 <ForecastSection companyId={profile?.company_id || ''} isAdmin={isAdmin} />
@@ -465,6 +466,8 @@ export default function TeamPerformancePage() {
                     userPerformance={userPerformance}
                     teams={teams}
                     goals={goals}
+                    callSummary={callSummary}
+                    callGoals={callGoals}
                     companyId={profile?.company_id || ''}
                     onClose={() => setIsGoalModalOpen(false)}
                     onSaved={() => {
@@ -1124,10 +1127,21 @@ function formatCompact(n: number): string {
 }
 
 // === GOAL CONFIG MODAL ===
-function GoalConfigModal({ userPerformance, teams, goals, companyId, onClose, onSaved }: {
+function GoalConfigModal({ 
+    userPerformance, 
+    teams, 
+    goals, 
+    callSummary, 
+    callGoals, 
+    companyId, 
+    onClose, 
+    onSaved 
+}: {
     userPerformance: UserPerformance[];
     teams: Team[];
     goals: PerformanceGoal[];
+    callSummary: CallActivitySummary[];
+    callGoals: CallGoal[];
     companyId: string;
     onClose: () => void;
     onSaved: () => void;
@@ -1155,6 +1169,42 @@ function GoalConfigModal({ userPerformance, teams, goals, companyId, onClose, on
         return map;
     });
 
+    // Días laborales por usuario
+    const [workingDays, setWorkingDays] = useState<Record<string, number>>(() => {
+        const map: Record<string, number> = {};
+        userPerformance.forEach((u) => {
+            const stored = localStorage.getItem(`crm_working_days_${companyId}_${u.user_id}`);
+            map[u.user_id] = stored ? Number(stored) : 24; // default 24
+        });
+        return map;
+    });
+
+    // Metas de llamadas diarias
+    const [callGoalsState, setCallGoalsState] = useState<Record<string, number>>(() => {
+        const map: Record<string, number> = {};
+        userPerformance.forEach((u) => {
+            const existing = callGoals.find((g) => g.user_id === u.user_id && !g.team_id);
+            map[u.user_id] = existing?.daily_call_goal || 0;
+        });
+        return map;
+    });
+
+    const getRecommendedCalls = (userId: string, leadsGoal: number, days: number) => {
+        if (!leadsGoal || days <= 0) return 0;
+        const uPerf = userPerformance.find((p) => p.user_id === userId);
+        const leadsWon = uPerf ? uPerf.leads_won : 0;
+        const summary = callSummary.find((s) => s.user_id === userId);
+        const actualCalls = summary ? summary.calls_total : 0;
+        let callsPerClose = leadsWon > 0 ? (actualCalls / leadsWon) : 0;
+        if (callsPerClose <= 0) {
+            const totalActualCalls = callSummary.reduce((s, u) => s + u.calls_total, 0);
+            const globalWon = userPerformance.reduce((s, p) => s + p.leads_won, 0);
+            callsPerClose = globalWon > 0 ? (totalActualCalls / globalWon) : 40;
+        }
+        callsPerClose = Math.max(10, callsPerClose);
+        return Math.ceil((leadsGoal * callsPerClose) / days);
+    };
+
     const handleSave = async () => {
         setSaving(true);
         try {
@@ -1163,6 +1213,14 @@ function GoalConfigModal({ userPerformance, teams, goals, companyId, onClose, on
                     companyId,
                     Object.entries(userGoals).map(([user_id, g]) => ({ user_id, goal_leads: g.leads, goal_value: g.value }))
                 );
+                const callGoalsArray = Object.entries(callGoalsState).map(([user_id, daily_call_goal]) => ({
+                    user_id,
+                    daily_call_goal,
+                }));
+                await callActivityService.saveUserGoals(companyId, callGoalsArray);
+                Object.entries(workingDays).forEach(([userId, days]) => {
+                    localStorage.setItem(`crm_working_days_${companyId}_${userId}`, String(days));
+                });
             } else {
                 await performanceGoalsService.saveTeamGoals(
                     companyId,
@@ -1182,7 +1240,7 @@ function GoalConfigModal({ userPerformance, teams, goals, companyId, onClose, on
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
-            <div className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden animate-in zoom-in-95 fade-in duration-300">
+            <div className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden animate-in zoom-in-95 fade-in duration-300">
                 {/* Header */}
                 <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-violet-50 to-indigo-50">
                     <div className="flex items-center justify-between">
@@ -1211,40 +1269,89 @@ function GoalConfigModal({ userPerformance, teams, goals, companyId, onClose, on
                     {modalTab === 'users' ? (
                         <div className="space-y-1">
                             <div className="grid grid-cols-12 gap-2 py-2 text-[8px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                                <div className="col-span-5">Vendedor</div>
-                                <div className="col-span-3 text-center">Meta Leads / Mes</div>
-                                <div className="col-span-4 text-center">Meta Valor ($) / Mes</div>
+                                <div className="col-span-3">Vendedor</div>
+                                <div className="col-span-2 text-center">Meta Leads/Mes</div>
+                                <div className="col-span-2 text-center">Meta Valor ($)/Mes</div>
+                                <div className="col-span-2 text-center">Días Lab.</div>
+                                <div className="col-span-3 text-center">Seguimientos/Día</div>
                             </div>
                             {userPerformance.map((u) => (
                                 <div key={u.user_id} className="grid grid-cols-12 gap-2 py-3 items-center hover:bg-gray-50/50 rounded-xl transition-colors">
-                                    <div className="col-span-5 flex items-center gap-2">
+                                    <div className="col-span-3 flex items-center gap-2 min-w-0">
                                         <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
                                             {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" alt="" /> : <Users className="w-3.5 h-3.5 text-gray-300" />}
                                         </div>
-                                        <span className="text-[11px] font-black text-gray-700 truncate">{u.full_name}</span>
+                                        <span className="text-[11px] font-black text-gray-700 truncate leading-tight">{u.full_name}</span>
                                     </div>
-                                    <div className="col-span-3 flex justify-center">
+                                    <div className="col-span-2 flex justify-center">
                                         <input
                                             type="number"
                                             min={0}
                                             value={userGoals[u.user_id]?.leads || ''}
-                                            onChange={(e) => setUserGoals({ ...userGoals, [u.user_id]: { ...userGoals[u.user_id], leads: parseInt(e.target.value) || 0 } })}
+                                            onChange={(e) => {
+                                                const leads = parseInt(e.target.value) || 0;
+                                                setUserGoals({ ...userGoals, [u.user_id]: { ...userGoals[u.user_id], leads } });
+                                                const rec = getRecommendedCalls(u.user_id, leads, workingDays[u.user_id] || 24);
+                                                if (rec > 0 && (callGoalsState[u.user_id] === 0 || !callGoalsState[u.user_id])) {
+                                                    setCallGoalsState(prev => ({ ...prev, [u.user_id]: rec }));
+                                                }
+                                            }}
                                             placeholder="0"
-                                            className="w-20 h-9 text-center text-[12px] font-bold text-gray-700 border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all"
+                                            className="w-16 h-9 text-center text-[12px] font-bold text-gray-700 border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all"
                                         />
                                     </div>
-                                    <div className="col-span-4 flex justify-center">
-                                        <div className="flex items-center gap-1 border border-gray-200 rounded-xl px-2 h-9 focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-100 transition-all">
-                                            <span className="text-[11px] font-bold text-gray-400">$</span>
+                                    <div className="col-span-2 flex justify-center">
+                                        <div className="flex items-center gap-0.5 border border-gray-200 rounded-xl px-1.5 h-9 focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-100 transition-all w-20">
+                                            <span className="text-[10px] font-bold text-gray-400">$</span>
                                             <input
                                                 type="number"
                                                 min={0}
                                                 value={userGoals[u.user_id]?.value || ''}
                                                 onChange={(e) => setUserGoals({ ...userGoals, [u.user_id]: { ...userGoals[u.user_id], value: parseFloat(e.target.value) || 0 } })}
                                                 placeholder="0"
-                                                className="w-24 text-center text-[12px] font-bold text-gray-700 outline-none bg-transparent"
+                                                className="w-full text-center text-[11px] font-bold text-gray-700 outline-none bg-transparent"
                                             />
                                         </div>
+                                    </div>
+                                    <div className="col-span-2 flex justify-center">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={31}
+                                            value={workingDays[u.user_id] || ''}
+                                            onChange={(e) => {
+                                                const d = parseInt(e.target.value) || 24;
+                                                setWorkingDays({ ...workingDays, [u.user_id]: d });
+                                                const rec = getRecommendedCalls(u.user_id, userGoals[u.user_id]?.leads || 0, d);
+                                                if (rec > 0) {
+                                                    setCallGoalsState(prev => ({ ...prev, [u.user_id]: rec }));
+                                                }
+                                            }}
+                                            placeholder="24"
+                                            className="w-14 h-9 text-center text-[12px] font-bold text-gray-700 border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all"
+                                        />
+                                    </div>
+                                    <div className="col-span-3 flex flex-col items-center justify-center gap-0.5">
+                                        <div className="flex items-center gap-1">
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                value={callGoalsState[u.user_id] || ''}
+                                                onChange={(e) => setCallGoalsState({ ...callGoalsState, [u.user_id]: parseInt(e.target.value) || 0 })}
+                                                placeholder="0"
+                                                className="w-14 h-9 text-center text-[12px] font-bold text-gray-700 border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all"
+                                            />
+                                            <span className="text-[9px] text-gray-400 font-bold">/día</span>
+                                        </div>
+                                        {(() => {
+                                            const rec = getRecommendedCalls(u.user_id, userGoals[u.user_id]?.leads || 0, workingDays[u.user_id] || 24);
+                                            return rec > 0 ? (
+                                                <span className="text-[7.5px] font-black text-emerald-600 bg-emerald-50 px-1 rounded uppercase tracking-wider">
+                                                    Sugerido: {rec}
+                                                </span>
+                                            ) : null;
+                                        })()}
                                     </div>
                                 </div>
                             ))}
@@ -1894,6 +2001,7 @@ function CallActivitySection({
     filters,
     callLogs,
     userPerformance,
+    getUserGoal,
 }: {
     callSummary: CallActivitySummary[];
     callGoals: CallGoal[];
@@ -1907,6 +2015,7 @@ function CallActivitySection({
     filters: PerformanceFilters;
     callLogs: CallActivity[];
     userPerformance: UserPerformance[];
+    getUserGoal: (userId: string) => { leads: number; value: number } | null;
 }) {
     const navigate = useNavigate();
     const [isGoalPanelOpen, setIsGoalPanelOpen] = useState(false);
@@ -1914,6 +2023,39 @@ function CallActivitySection({
     const [savingGoals, setSavingGoals] = useState(false);
     const [subTab, setSubTab] = useState<'dashboard' | 'report'>('dashboard');
     const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+
+    const getPeriodProgress = () => {
+        const range = getDateRange(filters);
+        const now = new Date();
+        if (!range.start || !range.end) {
+            return { elapsed: 30, total: 30, ratio: 1 };
+        }
+        if (filters.period === 'today') {
+            return { elapsed: 1, total: 1, ratio: 1 };
+        }
+        const start = new Date(range.start);
+        const end = new Date(range.end);
+        const totalDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 1;
+        const elapsedDays = Math.max(1, Math.min(totalDays, Math.ceil(Math.abs(Math.min(now.getTime(), end.getTime()) - start.getTime()) / (1000 * 60 * 60 * 24))));
+        return {
+            elapsed: elapsedDays,
+            total: totalDays,
+            ratio: elapsedDays / totalDays,
+        };
+    };
+
+    const getWorkingDaysInPeriod = (userId: string) => {
+        const userWorkingDaysPerMonth = Number(localStorage.getItem(`crm_working_days_${companyId}_${userId}`) || '24');
+        if (filters.period === 'today') return 1;
+        const range = getDateRange(filters);
+        if (!range.start || !range.end) {
+            return userWorkingDaysPerMonth;
+        }
+        const diffTime = Math.abs(range.end.getTime() - range.start.getTime());
+        const calendarDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+        const estimatedWorkingDays = (calendarDays / 30) * userWorkingDaysPerMonth;
+        return Math.min(estimatedWorkingDays, calendarDays);
+    };
 
     const formatCurrency = (val: number) => {
         return new Intl.NumberFormat('es-SV', {
@@ -2225,7 +2367,8 @@ function CallActivitySection({
             connect_rate: 0
         };
         const dailyGoal = getUserCallGoal(user.user_id);
-        const periodGoal = dailyGoal * days;
+        const userPeriodWorkingDays = getWorkingDaysInPeriod(user.user_id);
+        const periodGoal = Math.round(dailyGoal * userPeriodWorkingDays);
         const actual = summary.calls_total;
         const actualConnected = summary.calls_connected;
         const deviation = actual - periodGoal;
@@ -2690,17 +2833,75 @@ function CallActivitySection({
                             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-550 to-orange-600 flex items-center justify-center shadow-md shadow-rose-200/50 shrink-0 no-print">
                                 <TrendingDown className="w-5 h-5 text-white animate-bounce" />
                             </div>
-                            <div>
-                                <h4 className="text-[10px] font-bold text-rose-850 uppercase tracking-wider mb-1">Costo de Oportunidad por Falta de Seguimiento (Equipo)</h4>
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <h4 className="text-[10px] font-bold text-rose-850 uppercase tracking-wider">Costo de Oportunidad por Falta de Seguimiento (Equipo)</h4>
+                                    <span className="relative group inline-block cursor-help text-rose-800 hover:text-rose-950 transition-colors">
+                                        <span className="w-3.5 h-3.5 rounded-full border border-rose-300 hover:border-rose-400 flex items-center justify-center text-[9px] font-black leading-none">!</span>
+                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
+                                            <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Fórmula Global del Equipo</p>
+                                            <p className="text-white/90">Suma del costo de oportunidad individual de todos los asesores que tienen déficit de llamadas en el periodo.</p>
+                                            <p className="mt-1.5 font-bold text-amber-300">Parámetros Globales:</p>
+                                            <p className="text-white/90">Llamadas por Cierre Promedio: <span className="font-bold text-emerald-400">{companyCallsPerClose.toFixed(1)}</span></p>
+                                            <p className="text-white/90">Ticket Promedio Global: <span className="font-bold text-emerald-400">{formatCurrency(companyAvgDealSize)} USD</span></p>
+                                            <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                        </span>
+                                    </span>
+                                </div>
                                 <p className="text-[13px] font-bold text-slate-700 leading-relaxed">
                                     Por no realizar las llamadas de seguimiento programadas ({Math.abs(globalDeviation)} llamadas de déficit), el equipo ha dejado de capturar aproximadamente <span className="font-extrabold text-rose-600">{totalLostLeadsEst.toFixed(1)} cierres de venta</span>, lo que representa una pérdida estimada de <span className="font-extrabold text-rose-600">{formatCurrency(totalLostRevenueEst)} USD</span> en facturación para este periodo.
-                                </p>
-                                <p className="text-[9px] text-slate-400 mt-2 font-bold uppercase tracking-wider">
-                                    * Métrica de Dirección de Ventas: Tasa de {companyCallsPerClose.toFixed(1)} llamadas/cierre y ticket promedio de {formatCurrency(companyAvgDealSize)} USD.
                                 </p>
                             </div>
                         </div>
                     )}
+
+                    {/* Proyección Financiera Global de Ventas */}
+                    {(() => {
+                        const progress = getPeriodProgress();
+                        
+                        const totalLeadsGoal = userPerformance.reduce((s, p) => {
+                            const goal = getUserGoal(p.user_id);
+                            return s + (goal?.leads || 0);
+                        }, 0);
+                        
+                        const totalValueGoal = userPerformance.reduce((s, p) => {
+                            const goal = getUserGoal(p.user_id);
+                            return s + (goal?.value || 0);
+                        }, 0);
+                        
+                        const totalActualWon = userPerformance.reduce((s, p) => s + p.leads_won, 0);
+                        const totalActualClosing = userPerformance.reduce((s, p) => s + p.total_closing_amount, 0);
+                        
+                        const projGlobalWon = Math.round((totalActualWon / progress.elapsed) * progress.total);
+                        const projGlobalValue = Math.round((totalActualClosing / progress.elapsed) * progress.total);
+                        const globalValueDiff = projGlobalValue - totalValueGoal;
+                        
+                        if (totalValueGoal <= 0) return null;
+                        
+                        return (
+                            <div className="bg-gradient-to-r from-indigo-500/5 via-violet-500/5 to-purple-500/5 border border-indigo-100/30 rounded-2xl p-6 flex items-start gap-4 print-card">
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-200/50 shrink-0 no-print">
+                                    <TrendingUp className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className="text-[10px] font-bold text-indigo-850 uppercase tracking-wider mb-1">
+                                        📊 Proyección Financiera al Cierre del Periodo (Equipo)
+                                    </h4>
+                                    <p className="text-[13px] font-bold text-slate-700 leading-relaxed">
+                                        Al ritmo de ventas actual (progreso del periodo: {Math.round(progress.ratio * 100)}%), el equipo proyecta cerrar un total de <span className="font-extrabold text-indigo-650">{projGlobalWon} leads</span> con una facturación estimada de <span className="font-extrabold text-indigo-650">{formatCurrency(projGlobalValue)} USD</span>. 
+                                        {globalValueDiff >= 0 ? (
+                                            <span> ¡Esto representa un <span className="font-extrabold text-emerald-600">superávit proyectado de +{formatCurrency(globalValueDiff)} USD</span> por encima de la meta global ({formatCurrency(totalValueGoal)} USD)!</span>
+                                        ) : (
+                                            <span> Esto representa una <span className="font-extrabold text-red-500">brecha proyectada de -{formatCurrency(Math.abs(globalValueDiff))} USD</span> respecto a la meta global de ventas ({formatCurrency(totalValueGoal)} USD).</span>
+                                        )}
+                                    </p>
+                                    <p className="text-[9.5px] text-slate-400 mt-2 font-bold uppercase tracking-wider">
+                                        * FÓRMULA DE PROYECCIÓN: (Ventas Logradas / {Math.round(progress.elapsed)} días transcurridos) × {Math.round(progress.total)} días totales del periodo.
+                                    </p>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* Individual performance Cards */}
                     <div className="space-y-4">
@@ -2843,15 +3044,64 @@ function CallActivitySection({
                                             {row.deficit > 0 ? (
                                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs font-bold text-gray-700">
                                                     <div className="border-r border-slate-100 last:border-0 pr-4">
-                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Llamadas Faltantes</p>
+                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Llamadas Faltantes</p>
+                                                            <span className="relative group inline-block cursor-help text-slate-400 hover:text-slate-650 transition-colors">
+                                                                <span className="w-3.5 h-3.5 rounded-full border border-slate-300 hover:border-slate-400 flex items-center justify-center text-[9px] font-black leading-none">!</span>
+                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
+                                                                    <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Fórmula & Variables</p>
+                                                                    <p className="text-white/90">Llamadas pendientes para alcanzar el objetivo proporcional a los días laborales del periodo.</p>
+                                                                    <p className="mt-1.5 font-bold text-amber-300">Cálculo:</p>
+                                                                    <p className="font-mono text-[9px] bg-black/30 p-1 rounded mt-0.5 text-emerald-400">Meta Periodo ({row.periodGoal}) - Realizadas ({row.actual}) = Déficit ({row.deficit})</p>
+                                                                    <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                                                </span>
+                                                            </span>
+                                                        </div>
                                                         <p className="text-2xl font-black text-rose-600">{row.deficit} <span className="text-[10px] text-slate-400 font-bold">de meta</span></p>
                                                     </div>
                                                     <div className="border-r border-slate-100 last:border-0 px-4">
-                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Leads Perdidos (Est.)</p>
+                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Leads Perdidos (Est.)</p>
+                                                            <span className="relative group inline-block cursor-help text-slate-400 hover:text-slate-650 transition-colors">
+                                                                <span className="w-3.5 h-3.5 rounded-full border border-slate-300 hover:border-slate-400 flex items-center justify-center text-[9px] font-black leading-none">!</span>
+                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
+                                                                    <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Fórmula & Variables</p>
+                                                                    <p className="text-white/90">Ventas estimadas que se dejaron de concretar por falta de seguimiento.</p>
+                                                                    <p className="mt-1.5 font-bold text-amber-300">Cálculo:</p>
+                                                                    <p className="font-mono text-[9px] bg-black/30 p-1 rounded mt-0.5 text-emerald-400">Déficit de Llamadas ({row.deficit}) / Conversión Histórica ({(() => {
+                                                                        const uPerf = userPerformance.find(p => p.user_id === row.userId);
+                                                                        const leadsWon = uPerf ? uPerf.leads_won : 0;
+                                                                        const callsPerClose = leadsWon > 0 ? (row.actual / leadsWon) : 0;
+                                                                        return (callsPerClose > 0 ? Math.max(10, callsPerClose) : companyCallsPerClose).toFixed(1);
+                                                                    })()} llamadas/cierre)</p>
+                                                                    <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                                                </span>
+                                                            </span>
+                                                        </div>
                                                         <p className="text-2xl font-black text-rose-600">-{row.lostLeadsEst.toFixed(1)} <span className="text-[10px] text-slate-400 font-bold">cierres</span></p>
                                                     </div>
                                                     <div className="px-4">
-                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Impacto Financiero (Est.)</p>
+                                                        <div className="flex items-center gap-1.5 mb-1">
+                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Impacto Financiero (Est.)</p>
+                                                            <span className="relative group inline-block cursor-help text-slate-400 hover:text-slate-650 transition-colors">
+                                                                <span className="w-3.5 h-3.5 rounded-full border border-slate-300 hover:border-slate-400 flex items-center justify-center text-[9px] font-black leading-none">!</span>
+                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
+                                                                    <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Fórmula & Variables</p>
+                                                                    <p className="text-white/90">Monto estimado de facturación perdido debido a los cierres no realizados.</p>
+                                                                    <p className="mt-1.5 font-bold text-amber-300">Cálculo:</p>
+                                                                    <p className="font-mono text-[9px] bg-black/30 p-1 rounded mt-0.5 text-emerald-400">Leads Perdidos ({row.lostLeadsEst.toFixed(1)}) × Ticket Promedio ({formatCurrency(
+                                                                        (() => {
+                                                                            const uPerf = userPerformance.find(p => p.user_id === row.userId);
+                                                                            const leadsWon = uPerf ? uPerf.leads_won : 0;
+                                                                            const totalClosingAmount = uPerf ? uPerf.total_closing_amount : 0;
+                                                                            const avgDealSize = leadsWon > 0 ? (totalClosingAmount / leadsWon) : 0;
+                                                                            return avgDealSize > 0 ? avgDealSize : companyAvgDealSize;
+                                                                        })()
+                                                                    )}) USD</p>
+                                                                    <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                                                </span>
+                                                            </span>
+                                                        </div>
                                                         <p className="text-2xl font-black text-rose-600">-{formatCurrency(row.lostRevenueEst)} USD</p>
                                                     </div>
                                                 </div>
@@ -2861,6 +3111,67 @@ function CallActivitySection({
                                                 </p>
                                             )}
                                         </div>
+
+                                        {/* Proyección de Cierre de Periodo */}
+                                        {(() => {
+                                            const progress = getPeriodProgress();
+                                            const userSalesGoal = getUserGoal(row.userId);
+                                            const targetLeads = userSalesGoal?.leads || 0;
+                                            const targetValue = userSalesGoal?.value || 0;
+                                            
+                                            const uPerf = userPerformance.find(p => p.user_id === row.userId);
+                                            const leadsWon = uPerf ? uPerf.leads_won : 0;
+                                            const totalClosingAmount = uPerf ? uPerf.total_closing_amount : 0;
+                                            const avgDealSize = leadsWon > 0 ? (totalClosingAmount / leadsWon) : companyAvgDealSize;
+                                            
+                                            const projLeads = Math.round((leadsWon / progress.elapsed) * progress.total);
+                                            const projValue = projLeads * avgDealSize;
+                                            
+                                            const leadsDiff = projLeads - targetLeads;
+                                            const valueDiff = projValue - targetValue;
+                                            
+                                            return (
+                                                <div className="bg-slate-50/70 border border-slate-100 rounded-2xl p-5 space-y-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                                            <TrendingUp className="w-3.5 h-3.5 text-indigo-500" />
+                                                            Proyección al Cierre de Periodo:
+                                                        </h5>
+                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
+                                                            Progreso Periodo: {Math.round(progress.ratio * 100)}% ({Math.round(progress.elapsed)} de {Math.round(progress.total)} días)
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                        <div className="bg-white border border-slate-100/50 rounded-xl p-3 text-center">
+                                                            <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Leads Ganados Proyectados</p>
+                                                            <p className="text-xl font-black text-slate-800">{projLeads} <span className="text-[10px] text-slate-400 font-bold">cierres</span></p>
+                                                            <p className={`text-[8.5px] font-bold mt-1 ${leadsDiff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                                {leadsDiff >= 0 ? `+${leadsDiff}` : leadsDiff} vs meta ({targetLeads})
+                                                            </p>
+                                                        </div>
+                                                        <div className="bg-white border border-slate-100/50 rounded-xl p-3 text-center">
+                                                            <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Monto Proyectado</p>
+                                                            <p className="text-xl font-black text-indigo-650">{formatCurrency(projValue)} USD</p>
+                                                            <p className={`text-[8.5px] font-bold mt-1 ${valueDiff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                                {valueDiff >= 0 ? `+${formatCurrency(valueDiff)}` : `-${formatCurrency(Math.abs(valueDiff))}`} vs meta ({formatCurrency(targetValue)})
+                                                            </p>
+                                                        </div>
+                                                        <div className="bg-white border border-slate-100/50 rounded-xl p-3 flex flex-col items-center justify-center">
+                                                            <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Impacto en Ventas</p>
+                                                            {valueDiff >= 0 ? (
+                                                                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                                                                    <ArrowUpRight className="w-3.5 h-3.5" /> Meta Lograda
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] font-black text-red-500 bg-red-50 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                                                                    <ArrowDownRight className="w-3.5 h-3.5" /> Brecha: -{formatCurrency(Math.abs(valueDiff))}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
  
                                         {/* AI Recommendations block */}
                                         <div className="bg-gradient-to-r from-teal-50/20 to-cyan-50/20 rounded-2xl border border-teal-100/40 p-5 mt-2">
