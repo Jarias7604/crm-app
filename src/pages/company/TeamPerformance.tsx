@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-    Trophy, Users, TrendingUp, DollarSign, Target, Crown,
+    Trophy, Users, TrendingUp, TrendingDown, DollarSign, Target, Crown,
     Loader2, ChevronDown, BarChart3, Award, Zap, ArrowUpRight,
     ArrowDownRight, Minus, CalendarDays, CheckCircle, Settings, X, Save,
-    Phone, PhoneCall, Sparkles,
+    Phone, PhoneCall, Sparkles, Printer,
 } from 'lucide-react';
 import { ActivityDashboard } from '../../components/ActivityDashboard';
 import { AIPerformanceChat } from '../../components/AIPerformanceChat';
@@ -22,7 +22,7 @@ import {
 import { teamsService, type Team } from '../../services/teams';
 import { performanceGoalsService, type PerformanceGoal } from '../../services/performanceGoals';
 import { forecastService, type ForecastWithActual } from '../../services/forecastService';
-import { callActivityService, type CallActivitySummary, type CallGoal, type ContactActivitySummary, ACTION_TYPE_CONFIG } from '../../services/callActivity';
+import { callActivityService, type CallActivitySummary, type CallGoal, type ContactActivitySummary, ACTION_TYPE_CONFIG, type CallActivity } from '../../services/callActivity';
 import { supabase } from '../../services/supabase';
 
 // === CONSTANTS ===
@@ -120,6 +120,7 @@ export default function TeamPerformancePage() {
     const [callGoals, setCallGoals] = useState<CallGoal[]>([]);
     const [callStatusEvolution, setCallStatusEvolution] = useState<{ from: string; to: string; count: number }[]>([]);
     const [contactSummary, setContactSummary] = useState<ContactActivitySummary[]>([]);
+    const [callLogs, setCallLogs] = useState<CallActivity[]>([]);
 
     // Goals
     const [goals, setGoals] = useState<PerformanceGoal[]>([]);
@@ -187,16 +188,18 @@ export default function TeamPerformancePage() {
                 const dateRange = getDateRange(filters);
                 const dateFrom = dateRange.start?.toISOString();
                 const dateTo = dateRange.end?.toISOString();
-                const [callData, callGoalsData, statusEvo, contactData] = await Promise.all([
+                const [callData, callGoalsData, statusEvo, contactData, logsData] = await Promise.all([
                     callActivityService.getCallSummary(profile.company_id, dateFrom, dateTo),
                     callActivityService.getGoals(profile.company_id),
                     callActivityService.getStatusEvolution(profile.company_id, dateFrom, dateTo),
                     callActivityService.getContactSummary(profile.company_id, dateFrom, dateTo),
+                    callActivityService.getCompanyCalls(profile.company_id, dateFrom, dateTo),
                 ]);
                 setCallSummary(callData);
                 setCallGoals(callGoalsData);
                 setCallStatusEvolution(statusEvo);
                 setContactSummary(contactData);
+                setCallLogs(logsData);
             } catch (callErr) {
                 console.warn('Call activity data not available yet (tables may not exist):', callErr);
             }
@@ -332,7 +335,7 @@ export default function TeamPerformancePage() {
                         {isPeriodDropdownOpen && (
                             <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
                                 {PERIODS.map((p) => (
-                                    <button key={p.value} onClick={() => { const period = p.value; setFilters(period === 'custom' ? { ...filters, period, date_from: '', date_to: '' } : { ...filters, period, date_from: undefined, date_to: undefined }); setIsPeriodDropdownOpen(false); }} className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-between ${filters.period === p.value ? 'bg-violet-50 text-violet-600' : 'text-gray-500 hover:bg-gray-50'}`}>
+                                    <button key={p.value} onClick={() => { const period = p.value; setFilters(period === 'custom' ? { ...filters, period, date_from: new Date(Date.now() - 13 * 86400000).toISOString().split('T')[0], date_to: new Date().toISOString().split('T')[0] } : { ...filters, period, date_from: undefined, date_to: undefined }); setIsPeriodDropdownOpen(false); }} className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-between ${filters.period === p.value ? 'bg-violet-50 text-violet-600' : 'text-gray-500 hover:bg-gray-50'}`}>
                                         <span className="flex items-center gap-2"><span className="text-sm">{p.icon}</span>{p.label}</span>
                                         {filters.period === p.value && <CheckCircle className="w-4 h-4 text-violet-500" />}
                                     </button>
@@ -441,6 +444,8 @@ export default function TeamPerformancePage() {
                     isAdmin={isAdmin}
                     onGoalsSaved={() => loadData()}
                     filters={filters}
+                    callLogs={callLogs}
+                    userPerformance={userPerformance}
                 />
             ) : activeTab === 'forecast' ? (
                 <ForecastSection companyId={profile?.company_id || ''} isAdmin={isAdmin} />
@@ -1887,6 +1892,8 @@ function CallActivitySection({
     isAdmin,
     onGoalsSaved,
     filters,
+    callLogs,
+    userPerformance,
 }: {
     callSummary: CallActivitySummary[];
     callGoals: CallGoal[];
@@ -1898,11 +1905,190 @@ function CallActivitySection({
     isAdmin: boolean;
     onGoalsSaved: () => void;
     filters: PerformanceFilters;
+    callLogs: CallActivity[];
+    userPerformance: UserPerformance[];
 }) {
     const navigate = useNavigate();
     const [isGoalPanelOpen, setIsGoalPanelOpen] = useState(false);
     const [editGoals, setEditGoals] = useState<Record<string, number>>({});
     const [savingGoals, setSavingGoals] = useState(false);
+    const [subTab, setSubTab] = useState<'dashboard' | 'report'>('dashboard');
+    const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+
+    const formatCurrency = (val: number) => {
+        return new Intl.NumberFormat('es-SV', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(val);
+    };
+
+    const getDaysInPeriod = () => {
+        if (filters.period === 'today') return 1;
+        if (filters.period === 'all') return 30; // standard fallback
+        const range = getDateRange(filters);
+        if (!range.start || !range.end) return 1;
+        const diffTime = Math.abs(range.end.getTime() - range.start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays || 1;
+    };
+
+    const formatDateSimple = (d: Date) => {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        return `${day}/${month}/${year}`;
+    };
+
+    const getFormattedDateRange = () => {
+        const range = getDateRange(filters);
+        if (!range.start || !range.end) return 'Todo el tiempo';
+        return `${formatDateSimple(range.start)} al ${formatDateSimple(range.end)}`;
+    };
+
+    const getRecommendation = (userName: string, actual: number, periodGoal: number) => {
+        if (periodGoal === 0) {
+            return `Asignar una meta diaria de llamadas a ${userName} para medir su rendimiento.`;
+        }
+        const percent = (actual / periodGoal) * 100;
+        if (percent >= 100) {
+            return `Excelente desempeño. ${userName} superó la meta por un ${Math.round(percent - 100)}%. Seguir así.`;
+        } else if (percent >= 80) {
+            return `Buen ritmo de llamadas (${Math.round(percent)}%). Le falta poco para el 100%. Incrementar ligeramente el ritmo diario.`;
+        } else if (percent > 0) {
+            return `Bajo cumplimiento (${Math.round(percent)}%). Se recomienda revisar bloqueos de agenda y priorizar llamadas diarias.`;
+        } else {
+            return `Crítico: 0 llamadas registradas. Validar si ${userName} tiene problemas con la telefonía o reasignar tareas.`;
+        }
+    };
+
+    const getGlobalRecommendation = (actual: number, totalGoal: number) => {
+        if (totalGoal === 0) {
+            return "Configure las metas de actividad de llamadas para el equipo de ventas para habilitar las recomendaciones automáticas.";
+        }
+        const percent = (actual / totalGoal) * 100;
+        if (percent >= 100) {
+            return `🎉 ¡Felicidades! El equipo ha alcanzado el ${Math.round(percent)}% del objetivo de contacto. La prospección está en un nivel saludable para garantizar el cierre de tratos.`;
+        } else if (percent >= 80) {
+            return `📈 Buen avance global del ${Math.round(percent)}%. Para asegurar el cumplimiento del embudo de ventas, incentive a los asesores a realizar 2 o 3 llamadas más por día.`;
+        } else {
+            return `🚨 Alerta de Prospección: El equipo está al ${Math.round(percent)}% de la meta de llamadas. Un bajo volumen de contacto impactará directamente en la creación de cotizaciones y cierres. Se recomienda una sesión de alineación con el equipo.`;
+        }
+    };
+
+    const getDatesInRange = () => {
+        const range = getDateRange(filters);
+        let start = range.start;
+        let end = range.end;
+        
+        if (!start || !end) {
+            // Align to the latest call log dates to show relevant days in all-time view
+            if (callLogs.length > 0) {
+                const latestTime = Math.max(...callLogs.map(l => new Date(l.call_date).getTime()));
+                end = new Date(latestTime);
+                start = new Date(latestTime);
+                start.setDate(start.getDate() - 13);
+            } else {
+                end = new Date();
+                start = new Date();
+                start.setDate(start.getDate() - 13);
+            }
+        }
+        
+        const diffTime = Math.abs(end.getTime() - start.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Cap at 31 days. If it's more (e.g. quarterly or yearly), show the last 14 days of that period
+        if (diffDays > 31) {
+            const adjustedStart = new Date(end);
+            adjustedStart.setDate(adjustedStart.getDate() - 13);
+            start = adjustedStart;
+        }
+        
+        const dates: Date[] = [];
+        const current = new Date(start);
+        current.setHours(0,0,0,0);
+        const targetEnd = new Date(end);
+        targetEnd.setHours(23,59,59,999);
+        
+        while (current <= targetEnd) {
+            dates.push(new Date(current));
+            current.setDate(current.getDate() + 1);
+        }
+        return dates;
+    };
+
+    const getUserCallsForDate = (userId: string, date: Date) => {
+        const year = date.getFullYear();
+        const month = date.getMonth();
+        const day = date.getDate();
+        
+        return callLogs.filter(log => {
+            if (log.user_id !== userId) return false;
+            if (log.action_type !== 'call') return false;
+            const logDate = new Date(log.call_date);
+            return logDate.getFullYear() === year &&
+                   logDate.getMonth() === month &&
+                   logDate.getDate() === day;
+        });
+    };
+
+    const getDetailedRecommendation = (
+        userName: string,
+        dailyGoal: number,
+        days: number,
+        totalCalls: number,
+        totalConnected: number,
+        daysRange: Date[],
+        userId: string
+    ) => {
+        if (dailyGoal === 0) {
+            return `Asignar una meta diaria de llamadas a ${userName} para medir su rendimiento.`;
+        }
+        
+        const periodGoal = dailyGoal * days;
+        const totalPct = periodGoal > 0 ? (totalCalls / periodGoal) * 100 : 0;
+        const connectRate = totalCalls > 0 ? (totalConnected / totalCalls) * 100 : 0;
+        
+        if (totalCalls === 0) {
+            return `🚨 Alerta Crítica: ${userName} no registra llamadas en este periodo. Se requiere supervisión inmediata para verificar fallas técnicas o reasignación de prioridades.`;
+        }
+        
+        let text = `🎯 Desempeño: Completó el ${Math.round(totalPct)}% de la meta acumulada del periodo (${totalCalls} de ${periodGoal} llamadas). `;
+        
+        // Consistency check
+        let activeDays = 0;
+        let metGoalDays = 0;
+        daysRange.forEach(date => {
+            const calls = getUserCallsForDate(userId, date);
+            if (calls.length > 0) {
+                activeDays++;
+                if (calls.length >= dailyGoal) {
+                    metGoalDays++;
+                }
+            }
+        });
+        
+        const consistencyPct = (metGoalDays / daysRange.length) * 100;
+        if (consistencyPct >= 80) {
+            text += `Excelente constancia, alcanzando la meta diaria en ${metGoalDays} de ${daysRange.length} días. `;
+        } else if (consistencyPct >= 40) {
+            text += `Consistencia moderada. Cumplió la meta en ${metGoalDays} días, pero se observan fluctuaciones. `;
+        } else {
+            text += `Baja constancia. Solo cumplió la meta diaria en ${metGoalDays} de ${daysRange.length} días. Se recomienda establecer bloqueos de horario fijos para prospección. `;
+        }
+        
+        if (connectRate >= 45) {
+            text += `Alta tasa de conexión (${Math.round(connectRate)}%), lo que indica calidad en su prospección.`;
+        } else if (connectRate < 25) {
+            text += `La tasa de respuesta es baja (${Math.round(connectRate)}%). Se recomienda revisar los horarios de llamada.`;
+        } else {
+            text += `Tasa de conexión estable de ${Math.round(connectRate)}%.`;
+        }
+        
+        return text;
+    };
 
     const handleCallClick = async (userId: string, type: 'all' | 'connected' | 'no_answer' | 'unique' | 'status_change') => {
         try {
@@ -2015,7 +2201,7 @@ function CallActivitySection({
         }
     };
 
-    if (callSummary.length === 0) {
+    if (userPerformance.length === 0 && callSummary.length === 0) {
         return (
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-16 flex flex-col items-center text-center">
                 <Phone className="w-12 h-12 text-gray-200 mb-4" />
@@ -2025,275 +2211,671 @@ function CallActivitySection({
         );
     }
 
+    const days = getDaysInPeriod();
+    const tempReportData = userPerformance.map(user => {
+        const summary = callSummary.find(s => s.user_id === user.user_id) || {
+            calls_total: 0,
+            calls_connected: 0,
+            calls_no_answer: 0,
+            calls_voicemail: 0,
+            calls_busy: 0,
+            calls_wrong_number: 0,
+            unique_leads_called: 0,
+            leads_with_status_change: 0,
+            connect_rate: 0
+        };
+        const dailyGoal = getUserCallGoal(user.user_id);
+        const periodGoal = dailyGoal * days;
+        const actual = summary.calls_total;
+        const actualConnected = summary.calls_connected;
+        const deviation = actual - periodGoal;
+        const percent = periodGoal > 0 ? (actual / periodGoal) * 100 : 0;
+        const userName = user.full_name || user.email.split('@')[0];
+        const avatarUrl = user.avatar_url;
+        
+        return {
+            userId: user.user_id,
+            userName,
+            avatarUrl,
+            dailyGoal,
+            periodGoal,
+            actual,
+            actualConnected,
+            deviation,
+            percent,
+            recommendation: getRecommendation(userName, actual, periodGoal)
+        };
+    });
+    
+    const totalPeriodGoal = tempReportData.reduce((s, r) => s + r.periodGoal, 0);
+    const totalActualCalls = tempReportData.reduce((s, r) => s + r.actual, 0);
+    const globalPercent = totalPeriodGoal > 0 ? (totalActualCalls / totalPeriodGoal) * 100 : 0;
+    const globalDeviation = totalActualCalls - totalPeriodGoal;
+
+    const globalWon = userPerformance.reduce((s, p) => s + p.leads_won, 0);
+    const globalClosing = userPerformance.reduce((s, p) => s + p.total_closing_amount, 0);
+    const companyCallsPerClose = globalWon > 0 ? (totalActualCalls / globalWon) : 40;
+    const companyAvgDealSize = globalWon > 0 ? (globalClosing / globalWon) : 2500;
+
+    const reportData = tempReportData.map(row => {
+        const uPerf = userPerformance.find(p => p.user_id === row.userId);
+        const leadsWon = uPerf ? uPerf.leads_won : 0;
+        const totalClosingAmount = uPerf ? uPerf.total_closing_amount : 0;
+        
+        const deficit = Math.max(0, row.periodGoal - row.actual);
+        const callsPerClose = leadsWon > 0 ? (row.actual / leadsWon) : 0;
+        const finalCallsPerClose = callsPerClose > 0 ? Math.max(10, callsPerClose) : Math.max(10, companyCallsPerClose);
+        const avgDealSize = leadsWon > 0 ? (totalClosingAmount / leadsWon) : 0;
+        const finalAvgDealSize = avgDealSize > 0 ? avgDealSize : companyAvgDealSize;
+        
+        const lostLeadsEst = deficit > 0 ? (deficit / finalCallsPerClose) : 0;
+        const lostRevenueEst = lostLeadsEst * finalAvgDealSize;
+
+        return {
+            ...row,
+            deficit,
+            lostLeadsEst,
+            lostRevenueEst,
+        };
+    }).sort((a, b) => b.percent - a.percent);
+
+    const totalLostLeadsEst = reportData.reduce((s, r) => s + r.lostLeadsEst, 0);
+    const totalLostRevenueEst = reportData.reduce((s, r) => s + r.lostRevenueEst, 0);
+
     return (
         <div className="space-y-6">
-            {/* Multi-Channel Breakdown */}
-            {channelBreakdown.length > 0 && (
-                <div className="bg-white rounded-[2rem] border border-gray-100/50 shadow-sm p-6">
-                    <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">
-                        📊 Acciones por Canal — Total: {totalAllActions}
-                    </h3>
-                    <div className="flex gap-2 flex-wrap">
-                        {channelBreakdown.map(ch => (
-                            <button
-                                key={ch.type}
-                                onClick={() => handleChannelClick(ch.type)}
-                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${ch.bgColor} border border-white/50 hover:scale-105 hover:shadow-md transition-all duration-150 cursor-pointer`}
-                            >
-                                <span className="text-lg">{ch.icon}</span>
-                                <div>
-                                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-600">{ch.label}</p>
-                                    <p className="text-lg font-black text-gray-900 leading-tight">{ch.count}</p>
-                                </div>
-                                {totalAllActions > 0 && (
-                                    <span className="text-[9px] font-bold text-gray-400 ml-1">
-                                        {Math.round((ch.count / totalAllActions) * 100)}%
-                                    </span>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* KPI Summary Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
-                            <Phone className="w-4 h-4 text-blue-500" />
-                        </div>
-                        <div>
-                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total Acciones</p>
-                            <p className="text-lg font-black text-gray-900 tracking-tight">{totalAllActions || totalCalls}</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
-                            <PhoneCall className="w-4 h-4 text-green-500" />
-                        </div>
-                        <div>
-                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Conectadas</p>
-                            <p className="text-lg font-black text-emerald-600 tracking-tight">{totalConnected}</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center">
-                            <TrendingUp className="w-4 h-4 text-violet-500" />
-                        </div>
-                        <div>
-                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Tasa Conexión</p>
-                            <p className="text-lg font-black text-violet-600 tracking-tight">{overallConnectRate.toFixed(1)}%</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
-                            <Target className="w-4 h-4 text-amber-500" />
-                        </div>
-                        <div>
-                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Leads Contactados</p>
-                            <p className="text-lg font-black text-gray-900 tracking-tight">{totalUniqueLeads}</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-rose-50 flex items-center justify-center">
-                            <ArrowUpRight className="w-4 h-4 text-rose-500" />
-                        </div>
-                        <div>
-                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Cambios de Estado</p>
-                            <p className="text-lg font-black text-rose-600 tracking-tight">{totalStatusChanges}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Admin: Set Call Goals */}
-            {isAdmin && (
-                <div className="flex justify-end">
+            {/* Sub-tabs for Calls Section */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white border border-gray-100 p-2 rounded-2xl shadow-sm gap-2">
+                <div className="flex gap-1">
                     <button
-                        onClick={openGoalPanel}
-                        className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-teal-200 transition-all"
+                        onClick={() => setSubTab('dashboard')}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${subTab === 'dashboard' ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
                     >
-                        <Settings className="w-3.5 h-3.5" />
-                        Metas de Actividad
+                        📊 Vista Resumen
+                    </button>
+                    <button
+                        onClick={() => setSubTab('report')}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${subTab === 'report' ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
+                    >
+                        📋 Reporte de Cumplimiento vs Meta
                     </button>
                 </div>
-            )}
+                <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-3 py-1.5 rounded-xl uppercase tracking-wider self-start sm:self-auto">
+                    Rango: {getFormattedDateRange()} ({days} {days === 1 ? 'día' : 'días'})
+                </span>
+            </div>
 
-            {/* Per-User Call Table */}
-            <div className="bg-white rounded-[2rem] border border-gray-100/50 shadow-[0_8px_40px_rgb(0,0,0,0.03)] overflow-hidden">
-                <div className="px-6 py-3 bg-gradient-to-r from-teal-50 to-cyan-50 border-b border-teal-100">
-                    <p className="text-[9px] font-black text-teal-600 uppercase tracking-widest">
-                        📞 Actividad de Llamadas por Vendedor
-                    </p>
-                </div>
+            {subTab === 'dashboard' ? (
+                <>
+                    {/* Multi-Channel Breakdown */}
+                    {channelBreakdown.length > 0 && (
+                        <div className="bg-white rounded-[2rem] border border-gray-100/50 shadow-sm p-6">
+                            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">
+                                📊 Acciones por Canal — Total: {totalAllActions}
+                            </h3>
+                            <div className="flex gap-2 flex-wrap">
+                                {channelBreakdown.map(ch => (
+                                    <button
+                                        key={ch.type}
+                                        onClick={() => handleChannelClick(ch.type)}
+                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${ch.bgColor} border border-white/50 hover:scale-105 hover:shadow-md transition-all duration-150 cursor-pointer`}
+                                    >
+                                        <span className="text-lg">{ch.icon}</span>
+                                        <div>
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-gray-600">{ch.label}</p>
+                                            <p className="text-lg font-black text-gray-900 leading-tight">{ch.count}</p>
+                                        </div>
+                                        {totalAllActions > 0 && (
+                                            <span className="text-[9px] font-bold text-gray-400 ml-1">
+                                                {Math.round((ch.count / totalAllActions) * 100)}%
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {/* KPI Summary Cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
+                            <div className="flex items-center gap-4">
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center border border-blue-100/30 shrink-0">
+                                    <Phone className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Acciones</p>
+                                    <p className="text-2xl lg:text-3xl font-black text-slate-800 tracking-tight leading-none">{totalAllActions || totalCalls}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
+                            <div className="flex items-center gap-4">
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 flex items-center justify-center border border-emerald-100/30 shrink-0">
+                                    <PhoneCall className="w-5 h-5 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Conectadas</p>
+                                    <p className="text-2xl lg:text-3xl font-black text-emerald-600 tracking-tight leading-none">{totalConnected}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
+                            <div className="flex items-center gap-4">
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500/10 to-purple-500/10 flex items-center justify-center border border-violet-100/30 shrink-0">
+                                    <TrendingUp className="w-5 h-5 text-violet-600" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tasa Conexión</p>
+                                    <p className="text-2xl lg:text-3xl font-black text-violet-600 tracking-tight leading-none">{overallConnectRate.toFixed(1)}%</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
+                            <div className="flex items-center gap-4">
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 flex items-center justify-center border border-amber-100/30 shrink-0">
+                                    <Target className="w-5 h-5 text-amber-600" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Leads Contactados</p>
+                                    <p className="text-2xl lg:text-3xl font-black text-slate-800 tracking-tight leading-none">{totalUniqueLeads}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
+                            <div className="flex items-center gap-4">
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-500/10 to-red-500/10 flex items-center justify-center border border-rose-100/30 shrink-0">
+                                    <ArrowUpRight className="w-5 h-5 text-rose-600" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cambios de Estado</p>
+                                    <p className="text-2xl lg:text-3xl font-black text-rose-600 tracking-tight leading-none">{totalStatusChanges}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                {/* Header */}
-                <div className="grid grid-cols-12 gap-2 px-6 py-3 bg-gray-50/80 border-b border-gray-100 text-[8px] font-black text-gray-400 uppercase tracking-widest">
-                    <div className="col-span-1 text-center">#</div>
-                    <div className="col-span-3">Vendedor</div>
-                    <div className="col-span-1 text-center">Llamadas</div>
-                    <div className="col-span-1 text-center">Conectadas</div>
-                    <div className="col-span-1 text-center">Sin Resp.</div>
-                    <div className="col-span-1 text-center">Tasa</div>
-                    <div className="col-span-2 text-center">Leads Únicos</div>
-                    <div className="col-span-2 text-center">Cambios Estado</div>
-                </div>
+                    {/* Admin: Set Call Goals */}
+                    {isAdmin && (
+                        <div className="flex justify-end">
+                            <button
+                                onClick={openGoalPanel}
+                                className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-teal-200 transition-all"
+                            >
+                                <Settings className="w-3.5 h-3.5" />
+                                Metas de Actividad
+                            </button>
+                        </div>
+                    )}
 
-                {/* Rows */}
-                <div className="divide-y divide-gray-50">
-                    {callSummary
-                        .sort((a, b) => b.calls_total - a.calls_total)
-                        .map((user, index) => {
-                            const goal = getUserCallGoal(user.user_id);
-                            const connectRate = user.calls_total > 0 ? (user.calls_connected / user.calls_total) * 100 : 0;
-                            const userName = profileNames[user.user_id] || 'Desconocido';
-                            const avatarUrl = profileAvatars[user.user_id];
+                    {/* Per-User Call Table */}
+                    <div className="bg-white rounded-[2rem] border border-gray-100/50 shadow-[0_8px_40px_rgb(0,0,0,0.03)] overflow-hidden">
+                        <div className="px-6 py-3 bg-gradient-to-r from-teal-50 to-cyan-50 border-b border-teal-100">
+                            <p className="text-[9px] font-black text-teal-600 uppercase tracking-widest">
+                                📞 Actividad de Llamadas por Vendedor
+                            </p>
+                        </div>
+                        {/* Header */}
+                        <div className="grid grid-cols-12 gap-2 px-6 py-3.5 bg-slate-50/50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <div className="col-span-1 text-center">#</div>
+                            <div className="col-span-3">Vendedor</div>
+                            <div className="col-span-1 text-center">Llamadas</div>
+                            <div className="col-span-1 text-center">Conectadas</div>
+                            <div className="col-span-1 text-center">Sin Resp.</div>
+                            <div className="col-span-1 text-center">Tasa</div>
+                            <div className="col-span-2 text-center">Leads Únicos</div>
+                            <div className="col-span-2 text-center">Cambios Estado</div>
+                        </div>
+
+                        {/* Rows */}
+                        <div className="divide-y divide-slate-100">
+                            {callSummary
+                                .sort((a, b) => b.calls_total - a.calls_total)
+                                .map((user, index) => {
+                                    const goal = getUserCallGoal(user.user_id);
+                                    const connectRate = user.calls_total > 0 ? (user.calls_connected / user.calls_total) * 100 : 0;
+                                    const userName = profileNames[user.user_id] || 'Desconocido';
+                                    const avatarUrl = profileAvatars[user.user_id];
+
+                                    return (
+                                        <div key={user.user_id} className="grid grid-cols-12 gap-2 px-6 py-5 items-center hover:bg-slate-50/50 transition-colors">
+                                            {/* Rank */}
+                                            <div className="col-span-1 flex justify-center">
+                                                {index === 0 ? (
+                                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow-sm">
+                                                        <span className="text-[10px] font-bold text-white">1</span>
+                                                    </div>
+                                                ) : index === 1 ? (
+                                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center shadow-sm">
+                                                        <span className="text-[10px] font-bold text-white">2</span>
+                                                    </div>
+                                                ) : index === 2 ? (
+                                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-600 to-amber-700 flex items-center justify-center shadow-sm">
+                                                        <span className="text-[10px] font-bold text-white">3</span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs font-bold text-slate-300">{index + 1}</span>
+                                                )}
+                                            </div>
+
+                                            {/* User Info */}
+                                            <div className="col-span-3 flex items-center gap-3 min-w-0">
+                                                <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/40">
+                                                    {avatarUrl ? (
+                                                        <img src={avatarUrl} className="w-full h-full object-cover" alt="" />
+                                                    ) : (
+                                                        <Users className="w-4 h-4 text-slate-400" />
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-semibold text-slate-800 tracking-tight truncate">{userName}</p>
+                                                    {goal > 0 && (
+                                                        <div className="mt-1">
+                                                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={`h-full rounded-full transition-all duration-700 ${user.calls_total >= goal ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : user.calls_total >= goal * 0.5 ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-red-400 to-red-500'}`}
+                                                                    style={{ width: `${Math.min((user.calls_total / goal) * 100, 100)}%` }}
+                                                                />
+                                                            </div>
+                                                            <p className="text-[8px] font-bold text-slate-400 mt-1">
+                                                                {user.calls_total >= goal ? '🟢' : user.calls_total >= goal * 0.5 ? '🟡' : '🔴'} {Math.round((user.calls_total / goal) * 100)}% de meta diaria ({goal})
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Total Calls */}
+                                            <div className="col-span-1 text-center">
+                                                {user.calls_total > 0 ? (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'all'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-slate-100 transition-all cursor-pointer border border-transparent hover:border-slate-200">
+                                                        <span className="text-[15px] font-bold text-slate-700 group-hover:text-indigo-650 transition-colors">{user.calls_total}</span>
+                                                        <ArrowUpRight className="w-3.5 h-3.5 text-indigo-500 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
+                                                    </button>
+                                                ) : <span className="text-[15px] font-medium text-slate-350">{user.calls_total}</span>}
+                                            </div>
+
+                                            {/* Connected */}
+                                            <div className="col-span-1 text-center">
+                                                {user.calls_connected > 0 ? (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'connected'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-emerald-50 transition-all cursor-pointer border border-transparent hover:border-emerald-100">
+                                                        <span className="text-[15px] font-bold text-emerald-600 group-hover:text-emerald-700 transition-colors">{user.calls_connected}</span>
+                                                        <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
+                                                    </button>
+                                                ) : <span className="text-[15px] font-medium text-slate-350">{user.calls_connected}</span>}
+                                            </div>
+
+                                            {/* No Answer */}
+                                            <div className="col-span-1 text-center">
+                                                {user.calls_no_answer > 0 ? (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'no_answer'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-red-50 transition-all cursor-pointer border border-transparent hover:border-red-100">
+                                                        <span className="text-[15px] font-bold text-red-500 group-hover:text-red-600 transition-colors">{user.calls_no_answer}</span>
+                                                        <ArrowUpRight className="w-3.5 h-3.5 text-red-550 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
+                                                    </button>
+                                                ) : <span className="text-[15px] font-medium text-slate-350">{user.calls_no_answer}</span>}
+                                            </div>
+
+                                            {/* Connect Rate */}
+                                            <div className="col-span-1 text-center">
+                                                <span className={`inline-flex items-center justify-center text-xs font-bold px-2.5 py-1 rounded-full ${connectRate >= 50 ? 'bg-emerald-50 text-emerald-700' :
+                                                    connectRate >= 30 ? 'bg-amber-50 text-amber-700' :
+                                                        'bg-rose-50 text-rose-600'
+                                                    }`}>
+                                                    {connectRate.toFixed(0)}%
+                                                </span>
+                                            </div>
+
+                                            {/* Unique Leads */}
+                                            <div className="col-span-2 text-center">
+                                                {user.unique_leads_called > 0 ? (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'unique'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-slate-100 transition-all cursor-pointer border border-transparent hover:border-slate-200">
+                                                        <span className="text-[15px] font-bold text-slate-700 group-hover:text-indigo-650 transition-colors">{user.unique_leads_called}</span>
+                                                        <ArrowUpRight className="w-3.5 h-3.5 text-indigo-500 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
+                                                    </button>
+                                                ) : <span className="text-[15px] font-medium text-slate-350">{user.unique_leads_called}</span>}
+                                            </div>
+
+                                            {/* Status Changes */}
+                                            <div className="col-span-2 text-center">
+                                                {user.leads_with_status_change > 0 ? (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'status_change'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-violet-50 transition-all cursor-pointer border border-transparent hover:border-violet-100">
+                                                        <span className="text-[15px] font-bold text-indigo-600 group-hover:text-violet-700 transition-colors">{user.leads_with_status_change}</span>
+                                                        <ArrowUpRight className="w-3.5 h-3.5 text-violet-600 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
+                                                    </button>
+                                                ) : <span className="text-[15px] font-medium text-slate-350">{user.leads_with_status_change}</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                        </div>
+                    </div>
+
+                    {/* Status Evolution */}
+                    {statusEvolution.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                            <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-violet-500" />
+                                Evolución de Estados por Llamadas
+                            </h3>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {statusEvolution.map((evo) => (
+                                    <div key={`${evo.from}-${evo.to}`} className="bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100 p-3">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-[9px] font-black text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">
+                                                {evo.from || 'Nuevo'}
+                                            </span>
+                                            <ArrowUpRight className="w-3 h-3 text-violet-500" />
+                                            <span className="text-[9px] font-black text-violet-600 px-1.5 py-0.5 bg-violet-50 rounded">
+                                                {evo.to}
+                                            </span>
+                                        </div>
+                                        <p className="text-lg font-black text-gray-900">{evo.count}</p>
+                                        <p className="text-[7px] font-bold text-gray-400 uppercase tracking-widest">transiciones</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </>
+            ) : (
+                <div className="space-y-6 print-container">
+                    {/* CSS for print mode */}
+                    <style dangerouslySetInnerHTML={{__html: `
+                        @media print {
+                            /* Override scrollable viewport heights and overflow restrictions */
+                            html, body, #root, .min-h-screen, [class*="h-screen"], [class*="overflow-hidden"], main, .main-content {
+                                height: auto !important;
+                                min-height: initial !important;
+                                max-height: initial !important;
+                                overflow: visible !important;
+                                position: static !important;
+                            }
+                            
+                            body {
+                                background: white !important;
+                                color: black !important;
+                            }
+                            aside, nav, header, footer, button, .no-print, [class*="no-print"] {
+                                display: none !important;
+                            }
+                            main, .main-content, .print-container, .space-y-6 {
+                                padding: 0 !important;
+                                margin: 0 !important;
+                                width: 100% !important;
+                                max-width: 100% !important;
+                            }
+                            .print-card {
+                                border: 1px solid #e5e7eb !important;
+                                box-shadow: none !important;
+                                page-break-inside: avoid;
+                                margin-bottom: 20px !important;
+                                padding: 15px !important;
+                                background: white !important;
+                            }
+                            .print-grid {
+                                display: grid !important;
+                                grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+                                gap: 4px !important;
+                            }
+                        }
+                    `}} />
+
+                    {/* Print Header Actions */}
+                    <div className="flex items-center justify-between bg-white border border-gray-100 p-4 rounded-2xl shadow-sm no-print">
+                        <div>
+                            <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">Reporte de Desempeño Diario</h3>
+                            <p className="text-[10px] text-gray-400 font-bold">Imprime o exporta a PDF para compartir con el equipo</p>
+                        </div>
+                        <button
+                            onClick={() => window.print()}
+                            className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-teal-200 transition-all cursor-pointer"
+                        >
+                            <Printer className="w-3.5 h-3.5" />
+                            Imprimir Reporte / PDF
+                        </button>
+                    </div>
+
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print-card bg-white rounded-2xl border border-slate-100 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                        <div className="border-r border-slate-100 last:border-0 pr-4">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Días del Periodo</p>
+                            <p className="text-2xl font-black text-slate-800">{days} <span className="text-xs text-slate-400 font-semibold">días</span></p>
+                            <p className="text-[10px] text-slate-400 mt-2 font-medium">Rango: {getFormattedDateRange()}</p>
+                        </div>
+                        <div className="border-r border-slate-100 last:border-0 px-4">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Meta Acumulada</p>
+                            <p className="text-2xl font-black text-slate-800">{totalPeriodGoal} <span className="text-xs text-slate-400 font-semibold">llamadas</span></p>
+                            <p className="text-[10px] text-slate-400 mt-2 font-medium">Meta de llamadas del equipo</p>
+                        </div>
+                        <div className="border-r border-slate-100 last:border-0 px-4">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Llamadas Realizadas</p>
+                            <p className="text-2xl font-black text-indigo-600">{totalActualCalls} <span className="text-xs text-indigo-400 font-semibold">hechas</span></p>
+                            <p className="text-[10px] text-slate-400 mt-2 font-medium">
+                                Desviación: <span className={globalDeviation >= 0 ? 'text-emerald-600 font-extrabold' : 'text-rose-600 font-extrabold'}>
+                                    {globalDeviation >= 0 ? `+${globalDeviation}` : globalDeviation}
+                                </span>
+                            </p>
+                        </div>
+                        <div className="px-4">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cumplimiento Global</p>
+                            <div className="flex items-baseline gap-2">
+                                <p className={`text-2xl font-black ${globalPercent >= 100 ? 'text-emerald-600' : globalPercent >= 80 ? 'text-amber-500' : 'text-rose-600'}`}>
+                                    {globalPercent.toFixed(1)}%
+                                </p>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2.5 overflow-hidden">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-700 ${globalPercent >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : globalPercent >= 80 ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-red-400 to-red-500'}`}
+                                    style={{ width: `${Math.min(globalPercent, 100)}%` }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* AI Recommendation Summary Banner */}
+                    <div className="bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-indigo-500/10 border border-teal-100/40 rounded-2xl p-6 flex items-start gap-4 print-card">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-md shadow-teal-200/50 shrink-0 no-print">
+                            <Sparkles className="w-5 h-5 text-white animate-pulse" />
+                        </div>
+                        <div>
+                            <h4 className="text-[10px] font-bold text-teal-850 uppercase tracking-wider mb-1">Recomendación General de Sofía AI (Equipo)</h4>
+                            <p className="text-[13px] font-semibold text-slate-700 leading-relaxed">
+                                {getGlobalRecommendation(totalActualCalls, totalPeriodGoal)}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Costo de Oportunidad Global Card */}
+                    {totalLostRevenueEst > 0 && (
+                        <div className="bg-gradient-to-r from-red-550/10 via-rose-500/10 to-orange-500/10 border border-rose-100/40 rounded-2xl p-6 flex items-start gap-4 print-card">
+                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-550 to-orange-600 flex items-center justify-center shadow-md shadow-rose-200/50 shrink-0 no-print">
+                                <TrendingDown className="w-5 h-5 text-white animate-bounce" />
+                            </div>
+                            <div>
+                                <h4 className="text-[10px] font-bold text-rose-850 uppercase tracking-wider mb-1">Costo de Oportunidad por Falta de Seguimiento (Equipo)</h4>
+                                <p className="text-[13px] font-bold text-slate-700 leading-relaxed">
+                                    Por no realizar las llamadas de seguimiento programadas ({Math.abs(globalDeviation)} llamadas de déficit), el equipo ha dejado de capturar aproximadamente <span className="font-extrabold text-rose-600">{totalLostLeadsEst.toFixed(1)} cierres de venta</span>, lo que representa una pérdida estimada de <span className="font-extrabold text-rose-600">{formatCurrency(totalLostRevenueEst)} USD</span> en facturación para este periodo.
+                                </p>
+                                <p className="text-[9px] text-slate-400 mt-2 font-bold uppercase tracking-wider">
+                                    * Métrica de Dirección de Ventas: Tasa de {companyCallsPerClose.toFixed(1)} llamadas/cierre y ticket promedio de {formatCurrency(companyAvgDealSize)} USD.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Individual performance Cards */}
+                    <div className="space-y-4">
+                        {reportData.map((row) => {
+                            const daysRange = getDatesInRange();
+                            const detailedRecommendationText = getDetailedRecommendation(
+                                row.userName,
+                                row.dailyGoal,
+                                days,
+                                row.actual,
+                                row.actualConnected,
+                                daysRange,
+                                row.userId
+                            );
+                            const isExpanded = expandedUserId === row.userId;
 
                             return (
-                                <div key={user.user_id} className="grid grid-cols-12 gap-2 px-6 py-4 items-center hover:bg-gray-50/50 transition-colors">
-                                    {/* Rank */}
-                                    <div className="col-span-1 flex justify-center">
-                                        {index === 0 ? (
-                                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow-sm">
-                                                <span className="text-[10px] font-black text-white">1</span>
+                                <div 
+                                    key={row.userId} 
+                                    className={`bg-white rounded-[2rem] border transition-all duration-300 overflow-hidden ${
+                                        isExpanded 
+                                            ? 'border-indigo-100 shadow-[0_12px_30px_rgba(68,73,170,0.05)]' 
+                                            : 'border-gray-100 shadow-[0_4px_16px_rgba(0,0,0,0.01)] hover:border-gray-200 hover:shadow-[0_8px_24px_rgba(0,0,0,0.02)]'
+                                    } print-card`}
+                                >
+                                    {/* Seller Info Header (Accordion Toggle) */}
+                                    <div 
+                                        onClick={() => setExpandedUserId(isExpanded ? null : row.userId)}
+                                        className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-6 cursor-pointer select-none"
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/40">
+                                                {row.avatarUrl ? (
+                                                    <img src={row.avatarUrl} className="w-full h-full object-cover" alt="" />
+                                                ) : (
+                                                    <Users className="w-5 h-5 text-slate-400" />
+                                                )}
                                             </div>
-                                        ) : index === 1 ? (
-                                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center shadow-sm">
-                                                <span className="text-[10px] font-black text-white">2</span>
+                                            <div>
+                                                <h4 className="text-lg font-bold text-slate-800 uppercase tracking-tight">{row.userName}</h4>
+                                                <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-0.5">Asesor de Ventas</p>
                                             </div>
-                                        ) : index === 2 ? (
-                                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-600 to-amber-700 flex items-center justify-center shadow-sm">
-                                                <span className="text-[10px] font-black text-white">3</span>
+                                        </div>
+
+                                        {/* Cumulative stats badges */}
+                                        <div className="flex flex-wrap items-center gap-3 lg:gap-4">
+                                            <div className="bg-slate-50/70 px-5 py-2.5 rounded-2xl text-center border border-slate-100 min-w-[95px] hover:bg-slate-100/50 transition-colors">
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta Diaria</p>
+                                                <p className="text-lg font-extrabold text-slate-700 mt-1">{row.dailyGoal}</p>
                                             </div>
-                                        ) : (
-                                            <span className="text-[11px] font-bold text-gray-300">{index + 1}</span>
-                                        )}
+                                            <div className="bg-slate-50/70 px-5 py-2.5 rounded-2xl text-center border border-slate-100 min-w-[95px] hover:bg-slate-100/50 transition-colors">
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta Periodo</p>
+                                                <p className="text-lg font-extrabold text-slate-700 mt-1">{row.periodGoal}</p>
+                                            </div>
+                                            <div className="bg-indigo-50/40 px-5 py-2.5 rounded-2xl text-center border border-indigo-100/50 min-w-[95px] hover:bg-indigo-50/70 transition-colors">
+                                                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Llamadas Real.</p>
+                                                <p className="text-2xl font-black text-indigo-650 mt-1">{row.actual}</p>
+                                            </div>
+                                            <div className={`${row.deviation >= 0 ? 'bg-emerald-50/40 border-emerald-100/40 hover:bg-emerald-50/60' : 'bg-rose-50/40 border-rose-100/40 hover:bg-rose-50/60'} px-5 py-2.5 rounded-2xl text-center border min-w-[95px] transition-colors`}>
+                                                <p className={`text-[10px] font-bold ${row.deviation >= 0 ? 'text-emerald-500' : 'text-rose-400'} uppercase tracking-wider`}>Desviación</p>
+                                                <p className={`text-2xl font-black ${row.deviation >= 0 ? 'text-emerald-600' : 'text-rose-600'} mt-1`}>
+                                                    {row.deviation >= 0 ? `+${row.deviation}` : row.deviation}
+                                                </p>
+                                            </div>
+                                            <div className={`${
+                                                row.dailyGoal === 0 ? 'bg-slate-50 border-slate-100 text-slate-650' :
+                                                row.percent >= 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-sm shadow-emerald-100' :
+                                                row.percent >= 80 ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white border-transparent shadow-sm shadow-amber-100' :
+                                                'bg-gradient-to-r from-rose-500 to-red-500 text-white border-transparent shadow-sm shadow-rose-100'
+                                            } px-5 py-3 rounded-2xl text-center border flex items-center justify-center font-extrabold text-xs min-w-[115px]`}>
+                                                {row.dailyGoal === 0 ? 'SIN META' : `${Math.round(row.percent)}% CUMP.`}
+                                            </div>
+                                            
+                                            {/* Expand/Collapse Chevron (Hidden in print mode) */}
+                                            <div className="ml-2 no-print">
+                                                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    {/* User Info */}
-                                    <div className="col-span-3 flex items-center gap-3 min-w-0">
-                                        <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
-                                            {avatarUrl ? (
-                                                <img src={avatarUrl} className="w-full h-full object-cover" alt="" />
-                                            ) : (
-                                                <Users className="w-4 h-4 text-gray-300" />
-                                            )}
+                                    {/* Expandable Body (Always visible in print mode) */}
+                                    <div className={`${isExpanded ? 'block' : 'hidden print:block'} border-t border-gray-50 bg-gray-50/10 p-6 space-y-6 animate-in slide-in-from-top-4 duration-300`}>
+                                        {/* Day-by-Day Calendar breakdown */}
+                                        <div>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">📅 Desglose de Rendimiento Diario:</p>
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 print-grid">
+                                                {daysRange.map(date => {
+                                                    const dayCalls = getUserCallsForDate(row.userId, date);
+                                                    const count = dayCalls.length;
+                                                    const goal = row.dailyGoal;
+                                                    const pct = goal > 0 ? (count / goal) * 100 : 0;
+                                                    const dateLabel = date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+                                                    
+                                                    let bgClass = 'bg-rose-50/60 border-rose-100 text-rose-700';
+                                                    let dotClass = 'bg-rose-500';
+                                                    if (goal === 0) {
+                                                        bgClass = 'bg-slate-50 border-slate-100 text-slate-500';
+                                                        dotClass = 'bg-slate-400';
+                                                    } else if (pct >= 100) {
+                                                        bgClass = 'bg-emerald-50/60 border-emerald-100 text-emerald-700';
+                                                        dotClass = 'bg-emerald-500';
+                                                    } else if (pct >= 80) {
+                                                        bgClass = 'bg-teal-50/60 border-teal-100 text-teal-700';
+                                                        dotClass = 'bg-teal-500';
+                                                    } else if (pct >= 50) {
+                                                        bgClass = 'bg-amber-50/60 border-amber-100 text-amber-700';
+                                                        dotClass = 'bg-amber-500';
+                                                    } else if (count > 0) {
+                                                        bgClass = 'bg-orange-50/60 border-orange-100 text-orange-700';
+                                                        dotClass = 'bg-orange-500';
+                                                    }
+                                                    
+                                                    return (
+                                                        <div key={date.getTime()} className={`border ${bgClass} rounded-2xl p-4 flex flex-col items-center justify-between text-center transition-all hover:scale-[1.02] hover:shadow-sm`}>
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider opacity-75">{dateLabel}</p>
+                                                            <div className="my-2.5 flex flex-col items-center">
+                                                                <span className="text-xl font-extrabold tracking-tight">{count}</span>
+                                                                <span className="text-[9px] font-medium opacity-50 mt-0.5">meta: {goal}</span>
+                                                            </div>
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+                                                                {goal > 0 ? `${Math.round(pct)}%` : 'Sin meta'}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                        <div className="min-w-0">
-                                            <p className="text-[12px] font-black text-gray-800 uppercase tracking-tight truncate">{userName}</p>
-                                            {goal > 0 && (
-                                                <div className="mt-0.5">
-                                                    <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
-                                                        <div
-                                                            className={`h-full rounded-full transition-all duration-700 ${user.calls_total >= goal ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : user.calls_total >= goal * 0.5 ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-red-400 to-red-500'}`}
-                                                            style={{ width: `${Math.min((user.calls_total / goal) * 100, 100)}%` }}
-                                                        />
+ 
+                                        {/* Costo de Oportunidad / Pérdida por Seguimiento */}
+                                        <div className={`rounded-2xl border p-5 ${row.deficit > 0 ? 'bg-rose-50/20 border-rose-100/50' : 'bg-emerald-50/15 border-emerald-100/50'}`}>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                                    💰 Costo de Oportunidad por Seguimiento:
+                                                </p>
+                                                <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full ${row.deficit > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                                    {row.deficit > 0 ? 'PÉRDIDA DETECTADA' : 'EFICIENCIA MÁXIMA'}
+                                                </span>
+                                            </div>
+                                            {row.deficit > 0 ? (
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs font-bold text-gray-700">
+                                                    <div className="border-r border-slate-100 last:border-0 pr-4">
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Llamadas Faltantes</p>
+                                                        <p className="text-2xl font-black text-rose-600">{row.deficit} <span className="text-[10px] text-slate-400 font-bold">de meta</span></p>
                                                     </div>
-                                                    <p className="text-[7px] font-bold text-gray-400 mt-0.5">
-                                                        {user.calls_total >= goal ? '🟢' : user.calls_total >= goal * 0.5 ? '🟡' : '🔴'} {Math.round((user.calls_total / goal) * 100)}% de meta diaria ({goal})
-                                                    </p>
+                                                    <div className="border-r border-slate-100 last:border-0 px-4">
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Leads Perdidos (Est.)</p>
+                                                        <p className="text-2xl font-black text-rose-600">-{row.lostLeadsEst.toFixed(1)} <span className="text-[10px] text-slate-400 font-bold">cierres</span></p>
+                                                    </div>
+                                                    <div className="px-4">
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Impacto Financiero (Est.)</p>
+                                                        <p className="text-2xl font-black text-rose-600">-{formatCurrency(row.lostRevenueEst)} USD</p>
+                                                    </div>
                                                 </div>
+                                            ) : (
+                                                <p className="text-sm text-emerald-800 font-medium leading-relaxed">
+                                                    Has completado el 100% de tus metas de prospección. Tu costo de oportunidad por inactividad es <span className="font-extrabold text-emerald-700">$0.00 USD</span>. ¡Tu ritmo de trabajo protege activamente las ventas de la empresa!
+                                                </p>
                                             )}
                                         </div>
-                                    </div>
-
-                                    {/* Total Calls */}
-                                    <div className="col-span-1 text-center">
-                                        {user.calls_total > 0 ? (
-                                            <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'all'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-gray-100 transition-all cursor-pointer border border-transparent hover:border-gray-200">
-                                                <span className="text-[13px] font-black text-gray-700 group-hover:text-[#4449AA] transition-colors">{user.calls_total}</span>
-                                                <ArrowUpRight className="w-3.5 h-3.5 text-[#4449AA] opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
-                                            </button>
-                                        ) : <span className="text-[13px] font-black text-gray-300">{user.calls_total}</span>}
-                                    </div>
-
-                                    {/* Connected */}
-                                    <div className="col-span-1 text-center">
-                                        {user.calls_connected > 0 ? (
-                                            <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'connected'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-emerald-50 transition-all cursor-pointer border border-transparent hover:border-emerald-100">
-                                                <span className="text-[13px] font-black text-emerald-600 group-hover:text-emerald-700 transition-colors">{user.calls_connected}</span>
-                                                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
-                                            </button>
-                                        ) : <span className="text-[13px] font-black text-gray-300">{user.calls_connected}</span>}
-                                    </div>
-
-                                    {/* No Answer */}
-                                    <div className="col-span-1 text-center">
-                                        {user.calls_no_answer > 0 ? (
-                                            <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'no_answer'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-red-50 transition-all cursor-pointer border border-transparent hover:border-red-100">
-                                                <span className="text-[13px] font-black text-red-400 group-hover:text-red-600 transition-colors">{user.calls_no_answer}</span>
-                                                <ArrowUpRight className="w-3.5 h-3.5 text-red-500 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
-                                            </button>
-                                        ) : <span className="text-[13px] font-black text-gray-300">{user.calls_no_answer}</span>}
-                                    </div>
-
-                                    {/* Connect Rate */}
-                                    <div className="col-span-1 text-center">
-                                        <span className={`inline-flex items-center justify-center text-[11px] font-black px-2.5 py-1 rounded-lg ${connectRate >= 50 ? 'bg-emerald-50 text-emerald-700' :
-                                            connectRate >= 30 ? 'bg-amber-50 text-amber-700' :
-                                                'bg-red-50 text-red-600'
-                                            }`}>
-                                            {connectRate.toFixed(0)}%
-                                        </span>
-                                    </div>
-
-                                    {/* Unique Leads */}
-                                    <div className="col-span-2 text-center">
-                                        {user.unique_leads_called > 0 ? (
-                                            <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'unique'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-gray-100 transition-all cursor-pointer border border-transparent hover:border-gray-200">
-                                                <span className="text-[13px] font-black text-gray-600 group-hover:text-[#4449AA] transition-colors">{user.unique_leads_called}</span>
-                                                <ArrowUpRight className="w-3.5 h-3.5 text-[#4449AA] opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
-                                            </button>
-                                        ) : <span className="text-[13px] font-black text-gray-300">{user.unique_leads_called}</span>}
-                                    </div>
-
-                                    {/* Status Changes */}
-                                    <div className="col-span-2 text-center">
-                                        {user.leads_with_status_change > 0 ? (
-                                            <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'status_change'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-violet-50 transition-all cursor-pointer border border-transparent hover:border-violet-100">
-                                                <span className="text-[13px] font-black text-[#4449AA] group-hover:text-violet-700 transition-colors">{user.leads_with_status_change}</span>
-                                                <ArrowUpRight className="w-3.5 h-3.5 text-violet-600 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
-                                            </button>
-                                        ) : <span className="text-[13px] font-black text-gray-300">{user.leads_with_status_change}</span>}
+ 
+                                        {/* AI Recommendations block */}
+                                        <div className="bg-gradient-to-r from-teal-50/20 to-cyan-50/20 rounded-2xl border border-teal-100/40 p-5 mt-2">
+                                            <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                                <Sparkles className="w-3.5 h-3.5 text-teal-500" />
+                                                Recomendación y Análisis de Sofía AI:
+                                            </p>
+                                            <p className="text-sm text-slate-700 leading-relaxed font-medium">
+                                                {detailedRecommendationText}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             );
                         })}
-                </div>
-            </div>
-
-            {/* Status Evolution */}
-            {statusEvolution.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                    <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-violet-500" />
-                        Evolución de Estados por Llamadas
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {statusEvolution.map((evo) => (
-                            <div key={`${evo.from}-${evo.to}`} className="bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100 p-3">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-[9px] font-black text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">
-                                        {evo.from || 'Nuevo'}
-                                    </span>
-                                    <ArrowUpRight className="w-3 h-3 text-violet-500" />
-                                    <span className="text-[9px] font-black text-violet-600 px-1.5 py-0.5 bg-violet-50 rounded">
-                                        {evo.to}
-                                    </span>
-                                </div>
-                                <p className="text-lg font-black text-gray-900">{evo.count}</p>
-                                <p className="text-[7px] font-bold text-gray-400 uppercase tracking-widest">transiciones</p>
-                            </div>
-                        ))}
                     </div>
                 </div>
             )}
