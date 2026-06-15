@@ -16,7 +16,7 @@ import html2canvas from 'html2canvas';
 import { toPng } from 'html-to-image';
 import { RenderFlyer, FreeLogo, TEMPLATE_LIST } from './FlyerTemplates';
 import type { FlyerData } from './FlyerTemplates';
-import { FlyerTemplateA, FlyerTemplateB, parsePrompt, deriveHeadline, deriveFeatures, derivePrice } from '../../components/flyers/FlyerTemplates';
+import { FlyerTemplateA, FlyerTemplateB, parsePrompt, deriveHeadline, deriveFeatures, derivePrice, deriveCta } from '../../components/flyers/FlyerTemplates';
 import { brandingService } from '../../services/branding';
 import { storageService } from '../../services/storage';
 
@@ -979,6 +979,10 @@ export default function FlyerStudio() {
     setManualSubtitle(parsed.subtitle || h2 || '');
     setManualFeatures(parsed.features && parsed.features.length > 0 ? parsed.features : deriveFeatures(prompt).slice(0, 4));
     setManualPrice(parsed.price || derivePrice(prompt) || '');
+    
+    // Set CTA: parsed first, then derived, then fallback
+    const derivedCta = parsed.cta || deriveCta(prompt) || 'CONTACTAR AHORA';
+    setCta(derivedCta);
   }, [prompt, companyName, keepCustomText]);
   // Reset font dropdown open state when switching edit elements or closing modals
   useEffect(() => {
@@ -1041,6 +1045,7 @@ export default function FlyerStudio() {
           setManualSubtitle(data.structured_text.subheadline || '');
           setManualFeatures(data.structured_text.features && data.structured_text.features.length > 0 ? data.structured_text.features : ['', '', '', '']);
           setManualPrice(data.structured_text.price || '');
+          setCta(data.structured_text.cta || 'CONTACTAR AHORA');
         }
       }
       setSelected(0);
@@ -1086,6 +1091,7 @@ export default function FlyerStudio() {
         setManualSubtitle(fallbackText.subheadline || '');
         setManualFeatures(fallbackText.features && fallbackText.features.length > 0 ? fallbackText.features : ['', '', '', '']);
         setManualPrice(fallbackText.price || '');
+        setCta(fallbackText.cta || 'CONTACTAR AHORA');
       }
 
       setSelected(0);
@@ -1144,6 +1150,7 @@ export default function FlyerStudio() {
         setManualSubtitle(fallbackText.subheadline || '');
         setManualFeatures(fallbackText.features && fallbackText.features.length > 0 ? fallbackText.features : ['', '', '', '']);
         setManualPrice(fallbackText.price || '');
+        setCta(fallbackText.cta || 'CONTACTAR AHORA');
       }
 
       setSelected(0);
@@ -2938,7 +2945,7 @@ export default function FlyerStudio() {
                                 company_name: companyName || 'Mi Empresa',
                                 containerW: 1080,
                                 containerH: canvasH,
-                                prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                                prompt, cta: cta || 'CONTACTAR AHORA',
                                 headline: manualTitle || 'OFERTA INCREÍBLE',
                                 subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
                                 features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
@@ -2996,7 +3003,7 @@ export default function FlyerStudio() {
                                 company_name: companyName || 'Mi Empresa',
                                 containerW: 1080,
                                 containerH: canvasH,
-                                prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                                prompt, cta: cta || 'CONTACTAR AHORA',
                                 headline: manualTitle || 'OFERTA INCREÍBLE',
                                 subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
                                 features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
@@ -3052,7 +3059,7 @@ export default function FlyerStudio() {
                             <RenderFlyer d={{
                               title: manualTitle || 'TU OFERTA',
                               subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-                              cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
+                              cta: cta || 'CONTACTAR AHORA',
                               beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                               accent: colors[0] || '#0070d2',
                               bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
@@ -3242,7 +3249,7 @@ export default function FlyerStudio() {
           <FlyerTemplateA data={{
             company_name: companyName || 'Mi Empresa',
             prompt,
-            cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+            cta: cta || 'CONTACTAR AHORA',
             headline: manualTitle || 'OFERTA INCREÍBLE',
             subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
             features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
@@ -3306,7 +3313,7 @@ export default function FlyerStudio() {
           <FlyerTemplateB data={{
             company_name: companyName || 'Mi Empresa',
             prompt,
-            cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+            cta: cta || 'CONTACTAR AHORA',
             headline: manualTitle || 'OFERTA INCREÍBLE',
             subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
             features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
@@ -3370,7 +3377,7 @@ export default function FlyerStudio() {
           <RenderFlyer d={{
             title: manualTitle || 'TU OFERTA',
             subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-            cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
+            cta: cta || 'CONTACTAR AHORA',
             beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
             accent: colors[0] || '#0070d2',
             bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
@@ -3515,7 +3522,7 @@ export default function FlyerStudio() {
                       <div style={{ position: 'relative', width: 1080, height: canvasH }}>
                         <FlyerTemplateA data={{
                           company_name: companyName || 'Mi Empresa', prompt,
-                          cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                          cta: cta || 'CONTACTAR AHORA',
                           headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
                           features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'], price: manualPrice || '¡Precios de Locura!',
                           highlight_title: aiOptimizedText?.highlight_title,
@@ -3560,7 +3567,7 @@ export default function FlyerStudio() {
                       <div style={{ position: 'relative', width: 1080, height: canvasH }}>
                         <FlyerTemplateB data={{
                           company_name: companyName || 'Mi Empresa', prompt,
-                          cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                          cta: cta || 'CONTACTAR AHORA',
                           headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
                           features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'], price: manualPrice || '¡Precios de Locura!',
                           highlight_title: aiOptimizedText?.highlight_title,
@@ -3605,7 +3612,7 @@ export default function FlyerStudio() {
                       <RenderFlyer d={{
                         title: manualTitle || 'TU OFERTA',
                         subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-                        cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
+                        cta: cta || 'CONTACTAR AHORA',
                         beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                         accent: colors[0] || '#0070d2',
                         bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
@@ -4451,7 +4458,7 @@ export default function FlyerStudio() {
                                     company_name: companyName || 'Mi Empresa',
                                     containerW: 1080,
                                     containerH: canvasH,
-                                    prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                                    prompt, cta: cta || 'CONTACTAR AHORA',
                                     headline: manualTitle || 'OFERTA INCREÍBLE',
                                     subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
                                     features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
@@ -4531,7 +4538,7 @@ export default function FlyerStudio() {
                                     company_name: companyName || 'Mi Empresa',
                                     containerW: 1080,
                                     containerH: canvasH,
-                                    prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                                    prompt, cta: cta || 'CONTACTAR AHORA',
                                     headline: manualTitle || 'OFERTA INCREÍBLE',
                                     subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
                                     features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
@@ -4614,7 +4621,7 @@ export default function FlyerStudio() {
                                 <RenderFlyer d={{
                                   title: manualTitle || 'TU OFERTA',
                                   subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-                                  cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
+                                  cta: cta || 'CONTACTAR AHORA',
                                   beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                                   accent: colors[0] || '#0070d2',
                                   bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,

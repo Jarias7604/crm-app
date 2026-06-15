@@ -369,12 +369,12 @@ function deriveWebsite(prompt: string, defaultWebsite?: string): string {
   return defaultWebsite || '';
 }
 
-function deriveCta(prompt: string, defaultCta?: string): string {
+export function deriveCta(prompt: string, defaultCta?: string): string {
   const match = prompt.match(/(?:cta|bot[oó]n|llamado a la acci[oó]n|acci[oó]n)\s*[:：]\s*([^\n|;.-]+)/i);
   if (match && match[1]) {
     return cleanPhrase(match[1]);
   }
-  return defaultCta || 'Contáctanos HOY';
+  return defaultCta || 'CONTACTAR AHORA';
 }
 
 export interface IndustryContent {
@@ -1397,7 +1397,7 @@ function renderBottomBanner(primary: string, secondary: string, data: FlyerData,
           cursor: 'pointer',
           whiteSpace: 'nowrap'
         }}>
-          {data.cta || 'Agenda tu demo gratis →'}
+          {data.cta || 'CONTACTAR AHORA'}
         </div>
 
         {/* Center: QR Code mockup */}
@@ -1435,7 +1435,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
     // Default values matching User Request
     const defaultHeadline = 'REVOLUCIONA TU WORKFLOW.';
     const defaultSubheadline = 'CRM Inteligente de Leads y Automatización Total.';
-    const defaultCta = 'SOLICITA TU DEMO GRATIS';
+    const defaultCta = 'CONTACTAR AHORA';
     const defaultPrice = 'Desde $12.95';
 
     const price = data.price || parsed.price || derivePrice(data.prompt) || defaultPrice;
@@ -1745,7 +1745,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
     // Default values matching User Request
     const defaultHeadline = 'REVOLUCIONA TU WORKFLOW.';
     const defaultSubheadline = 'CRM Inteligente de Leads y Automatización Total.';
-    const defaultCta = 'SOLICITA TU DEMO GRATIS';
+    const defaultCta = 'CONTACTAR AHORA';
     const defaultPrice = 'Desde $12.95';
 
     const price = data.price || parsed.price || derivePrice(data.prompt) || defaultPrice;
