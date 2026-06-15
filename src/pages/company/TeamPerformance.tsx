@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Trophy, Users, TrendingUp, DollarSign, Target, Crown,
     Loader2, ChevronDown, BarChart3, Award, Zap, ArrowUpRight,
@@ -89,12 +89,27 @@ function getGoalPeriodLabel(period: string): string {
 // === MAIN COMPONENT ===
 export default function TeamPerformancePage() {
     const { profile } = useAuth();
+    const navigate = useNavigate();
+    const location = useLocation();
     const [userPerformance, setUserPerformance] = useState<UserPerformance[]>([]);
     const [teamPerformance, setTeamPerformance] = useState<TeamPerformance[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'users' | 'teams' | 'charts' | 'forecast' | 'calls'>('users');
     const [filters, setFilters] = useState<PerformanceFilters>({ period: 'all' });
+
+    // Restore state from Leads detail page if coming back
+    useEffect(() => {
+        if (location.state) {
+            const state = location.state as any;
+            if (state.activeTab) {
+                setActiveTab(state.activeTab);
+            }
+            if (state.filters) {
+                setFilters(state.filters);
+            }
+        }
+    }, [location.state]);
     const [profileNames, setProfileNames] = useState<Record<string, string>>({});
     const [profileAvatars, setProfileAvatars] = useState<Record<string, string | null>>({});
     const [companySummary, setCompanySummary] = useState<CompanySummary>({ totalLeads: 0, wonDeals: 0, lostDeals: 0, totalValue: 0, totalClosing: 0 });
@@ -1916,10 +1931,10 @@ function CallActivitySection({
             }
 
             const leadIds = [...new Set(filtered.map(c => c.lead_id))];
-            navigate('/leads', { state: { assignedFilter: userId, leadIds } });
+            navigate('/leads', { state: { assignedFilter: userId, leadIds, fromPerformance: true, activeTab: 'calls', filters } });
         } catch (err) {
             console.error('Error filtering leads by call activity:', err);
-            navigate('/leads', { state: { assignedFilter: userId } });
+            navigate('/leads', { state: { assignedFilter: userId, fromPerformance: true, activeTab: 'calls', filters } });
         }
     };
 
@@ -1941,10 +1956,10 @@ function CallActivitySection({
             if (error) throw error;
 
             const leadIds = data ? [...new Set(data.map(r => r.lead_id))] : [];
-            navigate('/leads', { state: { leadIds } });
+            navigate('/leads', { state: { leadIds, fromPerformance: true, activeTab: 'calls', filters } });
         } catch (err) {
             console.error('Error filtering leads by channel activity:', err);
-            navigate('/leads', { state: { actionTypeFilter: actionType } });
+            navigate('/leads', { state: { actionTypeFilter: actionType, fromPerformance: true, activeTab: 'calls', filters } });
         }
     };
 

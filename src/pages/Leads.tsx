@@ -14,7 +14,7 @@ import type { Lead, LeadStatus, LeadPriority, FollowUp, LossReason, Industry } f
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search, Target, Calendar, Settings2, SlidersHorizontal } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search, Target, Calendar, Settings2, SlidersHorizontal, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -305,6 +305,13 @@ export default function Leads() {
                 if (state.completedLeadIds) setCompletedLeadIds(state.completedLeadIds);
                 if (state.calendarDate) setCalendarDateLabel(state.calendarDate);
                 if (state.fromCalendar) cameFromRef.current = 'calendar';
+                if (state.fromPerformance) {
+                    cameFromRef.current = {
+                        destination: 'performance',
+                        activeTab: state.activeTab,
+                        filters: state.filters
+                    } as any;
+                }
                 // Dashboard sends full ISO timestamps — normalize to yyyy-MM-dd for date picker compatibility
                 if (state.startDate) {
                     const sd = String(state.startDate);

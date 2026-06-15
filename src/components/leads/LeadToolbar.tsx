@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, SlidersHorizontal, ChevronDown, CheckCircle, Filter, Calendar, X, User } from 'lucide-react';
+import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, SlidersHorizontal, ChevronDown, CheckCircle, Filter, Calendar, X, User, ArrowLeft } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { CustomDatePicker } from '../ui/CustomDatePicker';
 import { PRIORITY_CONFIG, STATUS_CONFIG, SOURCE_CONFIG } from '../../types';
@@ -572,40 +572,68 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                     {/* Left: Title + Stats */}
                     <div className="flex items-center justify-between md:justify-start gap-4 w-full md:w-auto">
-                        <div>
-                            <h1 className="text-2xl md:text-3xl font-black text-[#4449AA] tracking-tight">Lead Discovery</h1>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse inline-block" />
-                                <p className="text-[13px] text-gray-500 font-semibold">
-                                    {filteredLeads.length} de {leads.length} prospectos
-                                    {filteredPipelineTotal > 0 && (
-                                        <span className="text-emerald-600 ml-1">· ${filteredPipelineTotal.toLocaleString()}</span>
-                                    )}
-                                </p>
-                                {/* Badge Legend Tooltip */}
-                                <div className="relative group/legend ml-1">
-                                    <button className="w-4 h-4 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors" type="button">
-                                        <span className="text-[8px] font-black text-gray-400 leading-none">?</span>
-                                    </button>
-                                    <div className="absolute left-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-gray-100 p-3 opacity-0 invisible group-hover/legend:opacity-100 group-hover/legend:visible transition-all duration-200 z-50">
-                                        <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2">Indicadores</p>
-                                        <div className="space-y-2">
-                                            <div className="flex items-start gap-2">
-                                                <span className="text-[10px] shrink-0">📞</span>
-                                                <div>
-                                                    <p className="text-[10px] font-bold text-gray-700">Intentos de contacto</p>
-                                                    <p className="text-[9px] text-gray-400">Verde &lt;4 · Ámbar 4-5 · Rojo 6+</p>
+                        <div className="flex items-center gap-3">
+                            {cameFromRef.current && (
+                                <button
+                                    onClick={() => {
+                                        const origin = cameFromRef.current;
+                                        cameFromRef.current = null;
+                                        if (typeof origin === 'string') {
+                                            if (origin === 'calendar') {
+                                                navigate('/calendar');
+                                            }
+                                        } else if (origin && typeof origin === 'object') {
+                                            if (origin.destination === 'performance') {
+                                                navigate('/company/performance', {
+                                                    state: {
+                                                        activeTab: origin.activeTab,
+                                                        filters: origin.filters
+                                                    }
+                                                });
+                                            }
+                                        }
+                                    }}
+                                    className="p-2.5 bg-violet-50 hover:bg-violet-100 text-[#4449AA] rounded-xl transition-all cursor-pointer shadow-sm flex items-center justify-center border border-violet-100/50"
+                                    title="Regresar"
+                                >
+                                    <ArrowLeft className="w-5 h-5" />
+                                </button>
+                            )}
+                            <div>
+                                <h1 className="text-2xl md:text-3xl font-black text-[#4449AA] tracking-tight">Lead Discovery</h1>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse inline-block" />
+                                    <p className="text-[13px] text-gray-500 font-semibold">
+                                        {filteredLeads.length} de {leads.length} prospectos
+                                        {filteredPipelineTotal > 0 && (
+                                            <span className="text-emerald-600 ml-1">· ${filteredPipelineTotal.toLocaleString()}</span>
+                                        )}
+                                    </p>
+                                    {/* Badge Legend Tooltip */}
+                                    <div className="relative group/legend ml-1">
+                                        <button className="w-4 h-4 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors" type="button">
+                                            <span className="text-[8px] font-black text-gray-400 leading-none">?</span>
+                                        </button>
+                                        <div className="absolute left-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-gray-100 p-3 opacity-0 invisible group-hover/legend:opacity-100 group-hover/legend:visible transition-all duration-200 z-50">
+                                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2">Indicadores</p>
+                                            <div className="space-y-2">
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-[10px] shrink-0">📞</span>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-gray-700">Intentos de contacto</p>
+                                                        <p className="text-[9px] text-gray-400">Verde &lt;4 · Ámbar 4-5 · Rojo 6+</p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex items-start gap-2">
-                                                <span className="text-[10px] shrink-0">🔥</span>
-                                                <div>
-                                                    <p className="text-[10px] font-bold text-gray-700">Engagement Score</p>
-                                                    <p className="text-[9px] text-gray-400">Enviado=1pt · Abierto=5 · Click=10</p>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span><span className="text-[8px] text-gray-400">1-4</span></span>
-                                                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span><span className="text-[8px] text-gray-400">5-9</span></span>
-                                                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span><span className="text-[8px] text-gray-400">10+</span></span>
+                                                <div className="flex items-start gap-2">
+                                                    <span className="text-[10px] shrink-0">🔥</span>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-gray-700">Engagement Score</p>
+                                                        <p className="text-[9px] text-gray-400">Enviado=1pt · Abierto=5 · Click=10</p>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span><span className="text-[8px] text-gray-400">1-4</span></span>
+                                                            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span><span className="text-[8px] text-gray-400">5-9</span></span>
+                                                            <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span><span className="text-[8px] text-gray-400">10+</span></span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -899,7 +927,26 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                         )}
                         <button
                             onClick={() => {
-                                if (cameFromRef.current === 'calendar') { cameFromRef.current = null; navigate('/calendar'); return; }
+                                if (cameFromRef.current) {
+                                    const origin = cameFromRef.current;
+                                    cameFromRef.current = null;
+                                    if (typeof origin === 'string') {
+                                        if (origin === 'calendar') {
+                                            navigate('/calendar');
+                                            return;
+                                        }
+                                    } else if (origin && typeof origin === 'object') {
+                                        if (origin.destination === 'performance') {
+                                            navigate('/company/performance', {
+                                                state: {
+                                                    activeTab: origin.activeTab,
+                                                    filters: origin.filters
+                                                }
+                                            });
+                                            return;
+                                        }
+                                    }
+                                }
                                 setFilteredLeadId(null); setFilteredLeadIds(null);
                                 setStatusFilter('all'); setPriorityFilter('all'); setAssignedFilter('all');
                                 setSourceFilter('all'); setLossReasonFilter('all'); setLostAtStageFilter('all');
