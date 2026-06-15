@@ -219,6 +219,18 @@ function AccountPicker({ platform, accounts, selected, onChange }: {
   );
 }
 
+function dataURLtoFile(dataurl: string, filename: string): File {
+  const arr = dataurl.split(',');
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
+
 export default function SocialHub() {
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -256,17 +268,41 @@ export default function SocialHub() {
 
   // Read flyer from Flyer Studio via sessionStorage
   useEffect(() => {
+    if (!profile?.company_id) return;
+
     const prefill = sessionStorage.getItem('socialhub_prefill_image');
     if (prefill) {
-      setContentUrl(prefill);
-      setContentType('image');
-      setImgError(false);
-      sessionStorage.removeItem('socialhub_prefill_image');
-      toast.success('✅ Flyer cargado desde Flyer Studio');
+      if (prefill.startsWith('data:')) {
+        setUploading(true);
+        setImgError(false);
+        sessionStorage.removeItem('socialhub_prefill_image');
+
+        const uploadPrefill = async () => {
+          try {
+            const file = dataURLtoFile(prefill, 'flyer.jpg');
+            const url = await socialPublishService.uploadContent(file, profile.company_id!);
+            setContentUrl(url);
+            setContentType('image');
+            toast.success('✅ Flyer cargado desde Flyer Studio');
+          } catch (err) {
+            console.error('Error uploading prefilled image:', err);
+            toast.error('Error al procesar el flyer. Intenta subirlo manualmente.');
+          } finally {
+            setUploading(false);
+          }
+        };
+        uploadPrefill();
+      } else {
+        setContentUrl(prefill);
+        setContentType('image');
+        setImgError(false);
+        sessionStorage.removeItem('socialhub_prefill_image');
+        toast.success('✅ Flyer cargado desde Flyer Studio');
+      }
 
       // Auto-generate caption instantly based on the prefilled metadata if available
       const prefillMeta = sessionStorage.getItem('socialhub_prefill_meta');
-      if (prefillMeta && profile?.company_id) {
+      if (prefillMeta) {
         try {
           const meta = JSON.parse(prefillMeta);
           sessionStorage.removeItem('socialhub_prefill_meta');
