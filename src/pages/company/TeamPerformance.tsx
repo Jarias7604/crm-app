@@ -2212,13 +2212,13 @@ function CallActivitySection({
             }
         });
         
-        const consistencyPct = (metGoalDays / daysRange.length) * 100;
+        const consistencyPct = (metGoalDays / days) * 100;
         if (consistencyPct >= 80) {
-            text += `Excelente constancia, alcanzando la meta diaria en ${metGoalDays} de ${daysRange.length} días. `;
+            text += `Excelente constancia, alcanzando la meta diaria en ${metGoalDays} de ${Math.round(days)} días laborales. `;
         } else if (consistencyPct >= 40) {
-            text += `Consistencia moderada. Cumplió la meta en ${metGoalDays} días, pero se observan fluctuaciones. `;
+            text += `Consistencia moderada. Cumplió la meta en ${metGoalDays} días laborales, pero se observan fluctuaciones. `;
         } else {
-            text += `Baja constancia. Solo cumplió la meta diaria en ${metGoalDays} de ${daysRange.length} días. Se recomienda establecer bloqueos de horario fijos para prospección. `;
+            text += `Baja constancia. Solo cumplió la meta diaria en ${metGoalDays} de ${Math.round(days)} días laborales. Se recomienda establecer bloqueos de horario fijos para prospección. `;
         }
         
         if (connectRate >= 45) {
@@ -2910,7 +2910,7 @@ function CallActivitySection({
                             const detailedRecommendationText = getDetailedRecommendation(
                                 row.userName,
                                 row.dailyGoal,
-                                days,
+                                getWorkingDaysInPeriod(row.userId),
                                 row.actual,
                                 row.actualConnected,
                                 daysRange,
