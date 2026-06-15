@@ -2959,8 +2959,6 @@ function CallActivitySection({
 
                     {/* Proyección Financiera Global de Ventas */}
                     {(() => {
-                        const progress = getPeriodProgress();
-                        
                         const totalLeadsGoal = userPerformance.reduce((s, p) => {
                             const goal = getUserGoal(p.user_id);
                             return s + (goal?.leads || 0);
@@ -2971,11 +2969,18 @@ function CallActivitySection({
                             return s + (goal?.value || 0);
                         }, 0);
                         
-                        const totalActualWon = userPerformance.reduce((s, p) => s + p.leads_won, 0);
-                        const totalActualClosing = userPerformance.reduce((s, p) => s + p.total_closing_amount, 0);
+                        // Pipeline-based projection: Already Won + (Active Leads * individual Win Rate)
+                        const projGlobalWon = Math.round(userPerformance.reduce((s, p) => {
+                            const expectedWon = p.leads_active * (p.win_rate / 100);
+                            return s + p.leads_won + expectedWon;
+                        }, 0));
                         
-                        const projGlobalWon = Math.round((totalActualWon / progress.elapsed) * progress.total);
-                        const projGlobalValue = Math.round((totalActualClosing / progress.elapsed) * progress.total);
+                        // Pipeline-based value projection: Already Closed Amount + (Active Value * individual Win Rate)
+                        const projGlobalValue = Math.round(userPerformance.reduce((s, p) => {
+                            const expectedValue = p.total_value * (p.win_rate / 100);
+                            return s + p.total_closing_amount + expectedValue;
+                        }, 0));
+                        
                         const globalValueDiff = projGlobalValue - totalValueGoal;
                         
                         if (totalValueGoal <= 0) return null;
@@ -2990,7 +2995,7 @@ function CallActivitySection({
                                         📊 Proyección Financiera al Cierre del Periodo (Equipo)
                                     </h4>
                                     <p className="text-[13px] font-bold text-slate-700 leading-relaxed">
-                                        Al ritmo de ventas actual (progreso del periodo: {Math.round(progress.ratio * 100)}%), el equipo proyecta cerrar un total de <span className="font-extrabold text-indigo-650">{projGlobalWon} leads</span> con una facturación estimada de <span className="font-extrabold text-indigo-650">{formatCurrency(projGlobalValue)} USD</span>. 
+                                        En base a la probabilidad de conversión del embudo actual (Tratos Ganados + Tratos Activos × Tasa de Cierre), el equipo proyecta cerrar un total de <span className="font-extrabold text-indigo-650">{projGlobalWon} leads</span> con una facturación estimada de <span className="font-extrabold text-indigo-650">{formatCurrency(projGlobalValue)} USD</span>. 
                                         {globalValueDiff >= 0 ? (
                                             <span> ¡Esto representa un <span className="font-extrabold text-emerald-600">superávit proyectado de +{formatCurrency(globalValueDiff)} USD</span> por encima de la meta global ({formatCurrency(totalValueGoal)} USD)!</span>
                                         ) : (
@@ -2998,7 +3003,7 @@ function CallActivitySection({
                                         )}
                                     </p>
                                     <p className="text-[9.5px] text-slate-400 mt-2 font-bold uppercase tracking-wider">
-                                        * FÓRMULA DE PROYECCIÓN: (Ventas Logradas / {Math.round(progress.elapsed)} días transcurridos) × {Math.round(progress.total)} días totales del periodo.
+                                        * FÓRMULA DE PROYECCIÓN REALISTA: Tratos Ganados + (Tratos Activos × Tasa de Cierre Histórica).
                                     </p>
                                 </div>
                             </div>
@@ -3247,11 +3252,14 @@ function CallActivitySection({
                                             
                                             const uPerf = userPerformance.find(p => p.user_id === row.userId);
                                             const leadsWon = uPerf ? uPerf.leads_won : 0;
+                                            const leadsActive = uPerf ? uPerf.leads_active : 0;
+                                            const winRate = uPerf ? uPerf.win_rate : 0;
                                             const totalClosingAmount = uPerf ? uPerf.total_closing_amount : 0;
-                                            const avgDealSize = leadsWon > 0 ? (totalClosingAmount / leadsWon) : companyAvgDealSize;
+                                            const activeValue = uPerf ? uPerf.total_value : 0;
                                             
-                                            const projLeads = Math.round((leadsWon / progress.elapsed) * progress.total);
-                                            const projValue = projLeads * avgDealSize;
+                                            // Pipeline-based projection: Won + Active * Win Rate
+                                            const projLeads = Math.round(leadsWon + (leadsActive * (winRate / 100)));
+                                            const projValue = Math.round(totalClosingAmount + (activeValue * (winRate / 100)));
                                             
                                             const leadsDiff = projLeads - targetLeads;
                                             const valueDiff = projValue - targetValue;
@@ -3261,10 +3269,10 @@ function CallActivitySection({
                                                     <div className="flex items-center justify-between">
                                                         <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                                             <TrendingUp className="w-3.5 h-3.5 text-indigo-500" />
-                                                            Proyección al Cierre de Periodo:
+                                                            Proyección al Cierre (Pipeline + Tratos Ganados):
                                                         </h5>
                                                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
-                                                            Progreso Periodo: {Math.round(progress.ratio * 100)}% ({Math.round(progress.elapsed)} de {Math.round(progress.total)} días)
+                                                            Fórmula: Ganados + (Activos en Pipeline × Tasa de Cierre {winRate.toFixed(1)}%)
                                                         </span>
                                                     </div>
                                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
