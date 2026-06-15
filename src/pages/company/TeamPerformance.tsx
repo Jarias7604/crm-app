@@ -3279,6 +3279,9 @@ function CallActivitySection({
                                                         <div className="bg-white border border-slate-100/50 rounded-xl p-3 text-center">
                                                             <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Leads Ganados Proyectados</p>
                                                             <p className="text-xl font-black text-slate-800">{projLeads} <span className="text-[10px] text-slate-400 font-bold">cierres</span></p>
+                                                            <p className="text-[9.5px] text-slate-400 font-bold mt-0.5">
+                                                                (Actual: <span className="text-slate-650">{leadsWon}</span> | En Embudo: <span className="text-slate-650">{leadsActive}</span>)
+                                                            </p>
                                                             <p className={`text-[8.5px] font-bold mt-1 ${leadsDiff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                                                                 {leadsDiff >= 0 ? `+${leadsDiff}` : leadsDiff} vs meta ({targetLeads})
                                                             </p>
@@ -3286,6 +3289,9 @@ function CallActivitySection({
                                                         <div className="bg-white border border-slate-100/50 rounded-xl p-3 text-center">
                                                             <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Monto Proyectado</p>
                                                             <p className="text-xl font-black text-indigo-650">{formatCurrency(projValue)} USD</p>
+                                                            <p className="text-[9.5px] text-slate-400 font-bold mt-0.5">
+                                                                (Cerrado: <span className="text-slate-650">{formatCurrency(totalClosingAmount)}</span> | En Embudo: <span className="text-slate-650">{formatCurrency(activeValue)}</span>)
+                                                            </p>
                                                             <p className={`text-[8.5px] font-bold mt-1 ${valueDiff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                                                                 {valueDiff >= 0 ? `+${formatCurrency(valueDiff)}` : `-${formatCurrency(Math.abs(valueDiff))}`} vs meta ({formatCurrency(targetValue)})
                                                             </p>

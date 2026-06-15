@@ -187,7 +187,14 @@ export const teamPerformanceService = {
         if (end) lostQuery = lostQuery.lte('lost_date', end.toISOString());
         const { count: lostCount } = await lostQuery;
 
-        const totalValue = (totalLeads || []).reduce((sum, l) => sum + Number(l.value || 0), 0);
+        // Get all currently active leads for pipeline value
+        let activeQuery = supabase.from('leads')
+            .select('value')
+            .eq('company_id', companyId)
+            .not('status', 'in', '("Cerrado","Cliente","Perdido","Erróneo")');
+        
+        const { data: activeLeadsForVal } = await activeQuery;
+        const totalValue = (activeLeadsForVal || []).reduce((sum, l) => sum + Number(l.value || 0), 0);
         const totalClosing = filteredWon.reduce((sum, l) => sum + Number(l.closing_amount || l.value || 0), 0);
 
         return {
@@ -307,8 +314,22 @@ export const teamPerformanceService = {
 
         const { data: lostLeads } = await lostQuery;
 
+        // 3d. Get all currently active leads (all-time creation) for active pipeline metrics
+        let activeLeadsQuery = supabase
+            .from('leads')
+            .select('id, assigned_to, status, value')
+            .eq('company_id', companyId)
+            .not('status', 'in', '("Cerrado","Cliente","Perdido","Erróneo")');
+
+        if (teamUserIds) {
+            activeLeadsQuery = activeLeadsQuery.in('assigned_to', teamUserIds);
+        }
+
+        const { data: activeLeads, error: activeError } = await activeLeadsQuery;
+        if (activeError) throw activeError;
+
         // 4. Aggregate per user
-                const userStats: Record<string, {
+        const userStats: Record<string, {
             total: number; won: number; lost: number; active: number; erroneous: number;
             totalValue: number; totalClosing: number;
             totalDaysToClose: number; wonWithDate: number;
@@ -326,8 +347,7 @@ export const teamPerformanceService = {
             }
         };
 
-        // Pipeline metrics from created_at query (total, active, erroneous, pipeline value)
-        // totalValue = ONLY active leads in pipeline (not won/lost — those go to totalClosing)
+        // Pipeline metrics from created_at query (total, erroneous, response time)
         (leads || []).forEach(lead => {
             const uid = lead.assigned_to;
             if (!uid) return;
@@ -337,12 +357,6 @@ export const teamPerformanceService = {
 
             if (lead.status === 'Erróneo') {
                 userStats[uid].erroneous++;
-            } else if (lead.status === 'Cerrado' || lead.status === 'Cliente' || lead.status === 'Perdido') {
-                // Won/Lost leads DO count toward total leads but NOT toward pipeline value
-            } else {
-                // Active pipeline leads only
-                userStats[uid].active++;
-                userStats[uid].totalValue += Number(lead.value || 0);
             }
 
             // Lead response time calculation: assignment (or creation if not explicitly assigned) to first follow up
@@ -355,6 +369,16 @@ export const teamPerformanceService = {
                     userStats[uid].leadsWithResponseTime++;
                 }
             }
+        });
+
+        // Pipeline metrics from activeLeads query (all-time active leads)
+        (activeLeads || []).forEach(lead => {
+            const uid = lead.assigned_to;
+            if (!uid) return;
+            ensureUser(uid);
+
+            userStats[uid].active++;
+            userStats[uid].totalValue += Number(lead.value || 0);
         });
 
         // Won metrics from internal_won_date query
@@ -504,6 +528,15 @@ export const teamPerformanceService = {
 
         const { data: lostLeads } = await lostQuery;
 
+        // 3d. Get all currently active leads (all-time creation) for active pipeline metrics
+        let activeLeadsQuery = supabase
+            .from('leads')
+            .select('id, assigned_to, status, value')
+            .eq('company_id', companyId)
+            .not('status', 'in', '("Cerrado","Cliente","Perdido","Erróneo")');
+
+        const { data: activeLeads } = await activeLeadsQuery;
+
         // Build user -> lead stats (pipeline by created_at)
         const userLeads: Record<string, typeof leads> = {};
         (leads || []).forEach(lead => {
@@ -539,14 +572,16 @@ export const teamPerformanceService = {
             const userWins: Record<string, number> = {};
 
             members.forEach(userId => {
-                // Pipeline metrics from created_at — only active leads contribute to pipeline value
+                // Pipeline metrics from created_at
                 const uLeads = userLeads[userId] || [];
                 uLeads.forEach(lead => {
                     totalLeads++;
-                    // Only active leads (not won/lost) count toward pipeline value
-                    if (lead.status !== 'Cerrado' && lead.status !== 'Cliente' && lead.status !== 'Perdido' && lead.status !== 'Erróneo') {
-                        totalValue += Number(lead.value || 0);
-                    }
+                });
+
+                // Pipeline metrics from activeLeads (all-time)
+                const uActive = (activeLeads || []).filter(l => l.assigned_to === userId);
+                uActive.forEach(lead => {
+                    totalValue += Number(lead.value || 0);
                 });
 
                 // Won metrics from internal_won_date
