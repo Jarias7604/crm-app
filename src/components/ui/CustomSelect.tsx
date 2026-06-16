@@ -14,9 +14,10 @@ interface CustomSelectProps {
     options: SelectOption[];
     placeholder?: string;
     className?: string;
+    buttonClassName?: string;
 }
 
-export const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, placeholder = 'Seleccionar...', className = '' }) => {
+export const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, options, placeholder = 'Seleccionar...', className = '', buttonClassName = '' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
@@ -40,7 +41,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({ value, onChange, opt
                     e.preventDefault();
                     setIsOpen(!isOpen);
                 }}
-                className={`w-full flex items-center justify-between bg-white border ${isOpen ? 'border-indigo-300 ring-4 ring-indigo-50/50' : 'border-gray-200 hover:border-gray-300'} shadow-sm rounded-xl px-3 py-2.5 text-left transition-all outline-none`}
+                className={buttonClassName || `w-full flex items-center justify-between bg-white border ${isOpen ? 'border-indigo-300 ring-4 ring-indigo-50/50' : 'border-gray-200 hover:border-gray-300'} shadow-sm rounded-xl px-3 py-2.5 text-left transition-all outline-none`}
             >
                 <span className="flex items-center gap-2 text-sm font-bold text-gray-700 truncate">
                     {selectedOption?.icon && <span className="flex-shrink-0">{selectedOption.icon}</span>}

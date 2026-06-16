@@ -67,6 +67,12 @@ export interface Ticket {
     created_at: string;
     updated_at: string;
     created_by: string | null;
+    parent_ticket_id?: string | null;
+
+    // QA Checklist and Tracking hours
+    estimated_hours?: number;
+    actual_hours?: number;
+    checklist?: { id: string; text: string; status: 'pending' | 'passed' | 'failed' }[];
 
     // Resolution Report fields (optional — filled when closing a ticket)
     findings?: string | null;
@@ -223,7 +229,7 @@ export const ticketService = {
 
     async updateTicket(
         ticketId: string,
-        updates: Partial<Pick<Ticket, 'status' | 'priority' | 'assigned_to' | 'title' | 'description' | 'category_id' | 'due_date' | 'lead_id' | 'findings' | 'root_cause' | 'solution' | 'created_by' | 'resolved_at'>> & { metadata?: Record<string, unknown> }
+        updates: Partial<Pick<Ticket, 'status' | 'priority' | 'assigned_to' | 'title' | 'description' | 'category_id' | 'due_date' | 'lead_id' | 'findings' | 'root_cause' | 'solution' | 'created_by' | 'resolved_at' | 'parent_ticket_id' | 'estimated_hours' | 'actual_hours' | 'checklist'>> & { metadata?: Record<string, unknown> }
     ): Promise<Ticket> {
         const payload: Record<string, unknown> = {
             ...updates,

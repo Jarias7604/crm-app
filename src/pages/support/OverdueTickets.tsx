@@ -83,6 +83,7 @@ export default function OverdueTickets() {
     const navigate = useNavigate();
 
     const [tickets, setTickets] = useState<Ticket[]>([]);
+    const [allTickets, setAllTickets] = useState<Ticket[]>([]);
     const [categories, setCategories] = useState<TicketCategory[]>([]);
     const [agents, setAgents] = useState<CompanyAgent[]>([]);
     const [loading, setLoading] = useState(true);
@@ -104,14 +105,15 @@ export default function OverdueTickets() {
         setLoading(true);
         try {
             // Load all active (non-resolved) tickets and filter overdue client-side
-            const [allTickets, cats, agts] = await Promise.all([
+            const [fetchedTickets, cats, agts] = await Promise.all([
                 ticketService.getTickets(profile.company_id, { status: ['new', 'open', 'pending'] }),
                 ticketService.getCategories(profile.company_id),
                 ticketService.getAgents(profile.company_id),
             ]);
             const now = new Date();
-            const overdue = allTickets.filter(t => t.due_date && new Date(t.due_date) < now);
+            const overdue = fetchedTickets.filter(t => t.due_date && new Date(t.due_date) < now);
             setTickets(overdue);
+            setAllTickets(fetchedTickets);
             setCategories(cats);
             setAgents(agts);
         } catch { toast.error('Error al cargar tickets atrasados'); }
@@ -481,6 +483,7 @@ export default function OverdueTickets() {
                     <div className="fixed top-0 right-0 bottom-0 w-[380px] z-50 shadow-2xl animate-in slide-in-from-right duration-300">
                         <TicketPanel
                             ticket={selected}
+                            allTickets={allTickets}
                             categories={categories}
                             agents={agents}
                             leads={[]}
@@ -488,7 +491,13 @@ export default function OverdueTickets() {
                             authorId={profile?.id || ''}
                             onClose={() => setSelected(null)}
                             onUpdate={handleUpdated}
-                            onDelete={(id) => { setTickets(p => p.filter(t => t.id !== id)); setSelected(null); }}
+                            onDelete={(id) => {
+                                setTickets(p => p.filter(t => t.id !== id));
+                                setAllTickets(p => p.filter(t => t.id !== id));
+                                setSelected(null);
+                            }}
+                            onSelectTicket={setSelected}
+                            onCreateSubticket={(parentId) => navigate('/support/tickets', { state: { parentTicketId: parentId } })}
                         />
                     </div>
                 </>

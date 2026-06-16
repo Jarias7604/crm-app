@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { TicketIcon, AlertCircle, CheckCircle2, Filter, Plus, Search, ChevronDown, Timer, ShieldCheck, X, TrendingUp, RefreshCw, AlertTriangle, UserCheck, Edit2, MoreHorizontal, CalendarDays, Tag, Send, ArrowUpDown, CalendarRange, Trophy, CalendarClock, Settings, Users, Paperclip, Image, FileVideo, Trash2 } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
+import { TicketIcon, AlertCircle, CheckCircle2, Filter, Plus, Search, ChevronDown, ChevronRight, Timer, ShieldCheck, X, TrendingUp, RefreshCw, AlertTriangle, UserCheck, Edit2, MoreHorizontal, CalendarDays, Tag, Send, ArrowUpDown, CalendarRange, Trophy, CalendarClock, Settings, Users, Paperclip, Image, FileVideo, Trash2 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { ticketService, type Ticket, type TicketCategory, type TicketStatus, type TicketPriority, type TicketStats, type CompanyAgent, type TicketLead } from '../../services/tickets';
 import { Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
@@ -9,6 +10,7 @@ import toast from 'react-hot-toast';
 import { CategoryManager } from './components/CategoryManager';
 import { TicketPanel } from './components/TicketPanel';
 import { storageService } from '../../services/storage';
+import { CustomSelect } from '../../components/ui/CustomSelect';
 
 const SC: Record<TicketStatus, { label: string; color: string; bg: string }> = {
     new: { label: 'Nuevo', color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -129,7 +131,18 @@ function Charts({ stats, agentCompliance, onOpenConfig }: {
 
 export default function Tickets() {
     const { profile } = useAuth();
+    const location = useLocation();
     const [tickets, setTickets] = useState<Ticket[]>([]);
+    const [expandedTicketIds, setExpandedTicketIds] = useState<Set<string>>(new Set());
+
+    const toggleExpand = useCallback((id: string) => {
+        setExpandedTicketIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
     const [allTickets, setAllTickets] = useState<Ticket[]>([]);  // all statuses, used for compliance
     const [categories, setCategories] = useState<TicketCategory[]>([]);
     const [agents, setAgents] = useState<CompanyAgent[]>([]);
@@ -144,9 +157,13 @@ export default function Tickets() {
     const [agentFilter, setAgentFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState<TicketStatus[]>(['new', 'open', 'pending']);
     const [search, setSearch] = useState('');
-    const [newT, setNewT] = useState({ title: '', description: '', category_id: '', priority: 'medium' as TicketPriority, due_date: '', lead_id: '', created_by: '' });
+    const [newT, setNewT] = useState({ title: '', description: '', category_id: '', priority: 'medium' as TicketPriority, due_date: '', lead_id: '', created_by: '', parent_ticket_id: '' });
     const [attachFiles, setAttachFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [parentSearch, setParentSearch] = useState('');
+    const [isParentDropdownOpen, setIsParentDropdownOpen] = useState(false);
+    const parentDropdownRef = useRef<HTMLDivElement>(null);
+    const [dropdownCoords, setDropdownCoords] = useState({ top: 0, left: 0, width: 0 });
     // Advanced filters
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
@@ -159,6 +176,10 @@ export default function Tickets() {
     const [sortKey, setSortKey] = useState<SortKey>('created_at');
     const [sortAsc, setSortAsc] = useState(false);
     function toggleSort(k: SortKey) { if (sortKey === k) setSortAsc(p => !p); else { setSortKey(k); setSortAsc(false); } }
+
+    const isFilterOrSearchActive = useMemo(() => {
+        return !!search || !!catFilter || !!agentFilter || priorityFilter.length > 0 || !!dateFrom || !!dateTo || !!closedFrom || !!closedTo;
+    }, [search, catFilter, agentFilter, priorityFilter, dateFrom, dateTo, closedFrom, closedTo]);
     // Compliance filter — default current month
     const todayStr = new Date().toISOString().slice(0, 10);
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
@@ -193,6 +214,43 @@ export default function Tickets() {
 
     useEffect(() => { load(); }, [load]);
 
+    useEffect(() => {
+        const state = location.state as { parentTicketId?: string } | null;
+        if (state?.parentTicketId) {
+            openCreateModalWithParent(state.parentTicketId);
+            // Clear location state to avoid opening the modal again on refresh or subsequent navigation
+            window.history.replaceState({}, document.title);
+        }
+    }, [location.state]);
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (parentDropdownRef.current && !parentDropdownRef.current.contains(e.target as Node)) {
+                setIsParentDropdownOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        function handleScroll(e: Event) {
+            if (parentDropdownRef.current && parentDropdownRef.current.contains(e.target as Node)) {
+                return;
+            }
+            setIsParentDropdownOpen(false);
+        }
+        if (isParentDropdownOpen) {
+            window.addEventListener('scroll', handleScroll, true);
+        }
+        return () => window.removeEventListener('scroll', handleScroll, true);
+    }, [isParentDropdownOpen]);
+
+    function openCreateModalWithParent(parentId: string) {
+        setNewT({ title: '', description: '', category_id: '', priority: 'medium', due_date: '', lead_id: '', created_by: '', parent_ticket_id: parentId });
+        setIsCreateOpen(true);
+    }
+
     async function handleCreate(e: React.FormEvent) {
         e.preventDefault();
         if (!profile) return;
@@ -213,14 +271,18 @@ export default function Tickets() {
                 metadata: attachments.length > 0 ? { attachments } : {},
                 created_by: newT.created_by || profile.id,
                 due_date: newT.due_date ? new Date(newT.due_date).toISOString() : null,
+                parent_ticket_id: newT.parent_ticket_id || null,
             });
             toast.success('Ticket creado', { id: tid });
             setIsCreateOpen(false);
-            setNewT({ title: '', description: '', category_id: '', priority: 'medium', due_date: '', lead_id: '', created_by: '' });
+            setNewT({ title: '', description: '', category_id: '', priority: 'medium', due_date: '', lead_id: '', created_by: '', parent_ticket_id: '' });
             setAttachFiles([]);
             setLeadSearch('');
             load();
-        } catch { toast.error('Error', { id: tid }); }
+        } catch (err: any) {
+            console.error('Error al crear ticket:', err);
+            toast.error(err?.message || 'Error al crear el ticket', { id: tid });
+        }
     }
 
     function handleUpdated(u: Ticket) {
@@ -450,7 +512,7 @@ export default function Tickets() {
                                 {/* Sort buttons */}
                                 <div className="flex items-center gap-1 bg-gray-50 rounded-xl p-1">
                                     <ArrowUpDown className="w-3 h-3 text-gray-400 ml-1" />
-                                    {([['created_at', 'Fecha'], ['priority', 'Prioridad'], ['due_date', 'Vence']] as [string, string][]).map(([k, label]) => (
+                                    {([['created_at', 'Fecha'], ['priority', 'Prioridad'], ['due_date', 'Fecha límite']] as [string, string][]).map(([k, label]) => (
                                         <button key={k} onClick={() => toggleSort(k as any)}
                                             className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${sortKey === k ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
                                                 }`}>
@@ -533,7 +595,7 @@ export default function Tickets() {
                                 <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Estado</th>
                                 <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Prioridad</th>
                                 <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Asignado</th>
-                                <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Vence</th>
+                                <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Fecha límite</th>
                                 <th className="px-4 py-3 text-[9px] font-black text-emerald-500 uppercase tracking-widest">✓ Cerrado</th>
                                 <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Acción</th>
                             </tr></thead>
@@ -542,109 +604,156 @@ export default function Tickets() {
                                     <tr key={i} className="animate-pulse">{[0,1,2,3,4,5,6,7,8,9].map(j => <td key={j} className="px-4 py-4"><div className="h-3 bg-gray-100 rounded-full" /></td>)}</tr>
                                 )) : filtered.length === 0 ? (
                                     <tr><td colSpan={10} className="py-16 text-center"><TicketIcon className="w-10 h-10 text-gray-100 mx-auto mb-3" /><p className="text-sm font-bold text-gray-300">No hay tickets</p></td></tr>
-                                ) : filtered.map(ticket => {
-                                    const isSelected = selected?.id === ticket.id;
-                                    const cat = categories.find(c => c.id === ticket.category_id);
-                                    const sla = cat?.sla_hours ?? 24;
-                                    const pct = Math.min(100, (Date.now() - new Date(ticket.created_at).getTime()) / (sla * 3600000) * 100);
-                                    const barColor = pct < 50 ? '#10B981' : pct < 80 ? '#F59E0B' : '#EF4444';
-                                    const resolved = ['resolved', 'closed'].includes(ticket.status);
-                                    const agent = agents.find(a => a.id === ticket.assigned_to);
-                                    const stepIdx = STATUS_ORDER.indexOf(ticket.status);
-                                    const overdue = ticket.due_date && new Date(ticket.due_date) < new Date();
-                                    return (
-                                        <tr key={ticket.id} onClick={() => setSelected(isSelected ? null : ticket)} className={`cursor-pointer transition-colors group ${isSelected ? 'bg-indigo-50/60' : 'hover:bg-gray-50/50'}`}>
-                                            <td className="px-5 py-3.5">
-                                                <div className="flex items-center gap-1.5 mb-0.5">
-                                                    <span className="text-[9px] font-black text-indigo-400 bg-indigo-50 px-1.5 py-0.5 rounded-md tracking-widest">#{ticket.id.slice(0, 8).toUpperCase()}</span>
-                                                    {ticket.lead?.name && (
-                                                        <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md truncate max-w-[120px]">{ticket.lead.name}</span>
-                                                    )}
-                                                </div>
-                                                <p className={`text-sm font-black ${isSelected ? 'text-indigo-700' : 'text-gray-900 group-hover:text-indigo-600'} transition-colors`}>{ticket.title}</p>
-                                                <p className="text-[9px] text-gray-300 mt-0.5">{formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true, locale: es })}</p>
-                                            </td>
-                                            <td className="px-4 py-3.5">
-                                                {(() => {
-                                                    const creator = agents.find(a => a.id === ticket.created_by);
-                                                    if (creator) return (
-                                                        <div className="flex items-center gap-1.5">
-                                                            <AgentAvatar agent={creator} />
-                                                            <span className="text-[10px] font-bold text-gray-600 truncate max-w-[80px]">{creator.full_name}</span>
-                                                        </div>
-                                                    );
-                                                    // Fallback: show lead_name snapshot as requester
-                                                    const fallbackName = ticket.lead?.name || ticket.lead_name;
-                                                    if (fallbackName) return (
-                                                        <div className="flex items-center gap-1.5">
-                                                            <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shrink-0">
-                                                                {fallbackName.charAt(0).toUpperCase()}
-                                                            </div>
-                                                            <span className="text-[10px] font-bold text-gray-600 truncate max-w-[80px]">{fallbackName}</span>
-                                                        </div>
-                                                    );
-                                                    return <span className="text-[10px] text-gray-300 italic">—</span>;
-                                                })()}
-                                            </td>
-                                            <td className="px-4 py-3.5">
-                                                {cat ? <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} /><span className="text-[10px] font-bold text-gray-600">{cat.name}</span></div> : <span className="text-[10px] text-gray-300">—</span>}
-                                            </td>
-                                            <td className="px-4 py-3.5 min-w-[160px]">
-                                                {resolved ? (
-                                                    <div>
-                                                        <div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /><span className="text-xs font-bold text-emerald-600">Completado</span></div>
-                                                        {ticket.resolved_at && (
-                                                            <p className="text-[9px] text-emerald-500 font-bold mt-0.5 ml-5">
-                                                                {format(new Date(ticket.resolved_at), "dd MMM · HH:mm", { locale: es })}
-                                                            </p>
+                                ) : (() => {
+                                    const renderTicketRow = (ticket: Ticket, isSubticket = false) => {
+                                        const isSelected = selected?.id === ticket.id;
+                                        const cat = categories.find(c => c.id === ticket.category_id);
+                                        const sla = cat?.sla_hours ?? 24;
+                                        const pct = Math.min(100, (Date.now() - new Date(ticket.created_at).getTime()) / (sla * 3600000) * 100);
+                                        const barColor = pct < 50 ? '#10B981' : pct < 80 ? '#F59E0B' : '#EF4444';
+                                        const resolved = ['resolved', 'closed'].includes(ticket.status);
+                                        const agent = agents.find(a => a.id === ticket.assigned_to);
+                                        const stepIdx = STATUS_ORDER.indexOf(ticket.status);
+                                        const overdue = ticket.due_date && new Date(ticket.due_date) < new Date();
+                                        const parentTicket = ticket.parent_ticket_id ? allTickets.find(t => t.id === ticket.parent_ticket_id) : null;
+                                        
+                                        const hasChildren = allTickets.some(t => t.parent_ticket_id === ticket.id);
+                                        const isExpanded = expandedTicketIds.has(ticket.id);
+
+                                        return (
+                                            <tr key={ticket.id} onClick={() => setSelected(isSelected ? null : ticket)} className={`cursor-pointer transition-colors group ${isSelected ? 'bg-indigo-50/60' : isSubticket ? 'bg-gray-50/25 hover:bg-gray-50/50' : 'hover:bg-gray-50/50'}`}>
+                                                <td className={`px-5 py-3.5 ${isSubticket ? 'pl-9' : ''}`}>
+                                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                                        {!isSubticket && hasChildren && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    e.preventDefault();
+                                                                    toggleExpand(ticket.id);
+                                                                }}
+                                                                className="text-indigo-400 hover:text-indigo-600 shrink-0 transition-colors p-0.5 rounded hover:bg-indigo-50 flex items-center justify-center mr-0.5"
+                                                                title={isExpanded ? 'Colapsar subtickets' : 'Expandir subtickets'}
+                                                            >
+                                                                <ChevronRight size={13} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                                                            </button>
+                                                        )}
+                                                        {!isSubticket && !hasChildren && <span className="w-5 shrink-0" />}
+                                                        
+                                                        {isSubticket && <span className="text-gray-300 font-bold select-none mr-0.5 text-xs">↳</span>}
+
+                                                        <span className="text-[9px] font-black text-indigo-400 bg-indigo-50 px-1.5 py-0.5 rounded-md tracking-widest">#{ticket.id.slice(0, 8).toUpperCase()}</span>
+                                                        {ticket.lead?.name && (
+                                                            <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md truncate max-w-[120px]">{ticket.lead.name}</span>
                                                         )}
                                                     </div>
-                                                )
-                                                    : (<div className="space-y-1.5">
-                                                        {/* % + label row */}
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: barColor }}>
-                                                                {Math.round(pct)}%
+                                                    <p className={`text-sm font-black ${isSelected ? 'text-indigo-700' : 'text-gray-900 group-hover:text-indigo-600'} transition-colors`}>{ticket.title}</p>
+                                                    {Array.isArray(ticket.checklist) && ticket.checklist.length > 0 && (
+                                                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 select-none">
+                                                             <CheckCircle2 size={11} className={ticket.checklist.every(c => c.status === 'passed') ? "text-emerald-500 shrink-0" : "text-indigo-400 shrink-0"} />
+                                                             <span>{ticket.checklist.filter(c => c.status === 'passed').length}/{ticket.checklist.length} pruebas</span>
+                                                         </div>
+                                                     )}
+                                                    {parentTicket && isFilterOrSearchActive && (
+                                                        <div className="flex items-center gap-1 mt-0.5 text-[10px] text-indigo-500 font-bold hover:underline" onClick={(e) => { e.stopPropagation(); setSelected(parentTicket); }}>
+                                                            <span>↳ Subticket de: #{parentTicket.id.slice(0, 8).toUpperCase()} - {parentTicket.title}</span>
+                                                        </div>
+                                                    )}
+                                                    <p className="text-[9px] text-gray-300 mt-0.5">{formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true, locale: es })}</p>
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    {(() => {
+                                                        const creator = agents.find(a => a.id === ticket.created_by);
+                                                        if (creator) return (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <AgentAvatar agent={creator} />
+                                                                <span className="text-[10px] font-bold text-gray-600 truncate max-w-[80px]">{creator.full_name}</span>
+                                                            </div>
+                                                        );
+                                                        const fallbackName = ticket.lead?.name || ticket.lead_name;
+                                                        if (fallbackName) return (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shrink-0">
+                                                                    {fallbackName.charAt(0).toUpperCase()}
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-gray-600 truncate max-w-[80px]">{fallbackName}</span>
+                                                            </div>
+                                                        );
+                                                        return <span className="text-[10px] text-gray-300 italic">—</span>;
+                                                    })()}
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    {cat ? <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} /><span className="text-[10px] font-bold text-gray-600">{cat.name}</span></div> : <span className="text-[10px] text-gray-300">—</span>}
+                                                </td>
+                                                <td className="px-4 py-3.5 min-w-[160px]">
+                                                    {resolved ? (
+                                                        <div>
+                                                            <div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /><span className="text-xs font-bold text-emerald-600">Completado</span></div>
+                                                            {ticket.resolved_at && (
+                                                                <p className="text-[9px] text-emerald-500 font-bold mt-0.5 ml-5">
+                                                                    {format(new Date(ticket.resolved_at), "dd MMM · HH:mm", { locale: es })}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: barColor }}>
+                                                                    {Math.round(pct)}%
+                                                                </span>
+                                                                <span className="text-[9px] text-gray-300">{sla}h SLA</span>
+                                                            </div>
+                                                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                                <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
+                                                            </div>
+                                                            <div className="flex gap-0.5">{STATUS_ORDER.slice(0, 4).map((_, i) => <div key={i} className={`flex-1 h-0.5 rounded-full ${i <= stepIdx ? 'bg-indigo-400' : 'bg-gray-100'}`} />)}</div>
+                                                            {pct >= 80 && <div className="flex items-center gap-1"><AlertTriangle className="w-3 h-3 text-amber-500" /><span className="text-[10px] font-black text-amber-600">En riesgo</span></div>}
+                                                            {pct >= 100 && <div className="flex items-center gap-1"><AlertTriangle className="w-3 h-3 text-red-500" /><span className="text-[10px] font-black text-red-600">SLA vencido</span></div>}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3.5 text-center"><span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${SC[ticket.status].bg} ${SC[ticket.status].color}`}>{SC[ticket.status].label}</span></td>
+                                                <td className="px-4 py-3.5"><span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${PC[ticket.priority].bg} ${PC[ticket.priority].color}`}>{PC[ticket.priority].icon} {PC[ticket.priority].label}</span></td>
+                                                <td className="px-4 py-3.5">
+                                                    {agent ? <div className="flex items-center gap-1.5"><AgentAvatar agent={agent} /><span className="text-[10px] font-bold text-gray-600 truncate max-w-[80px]">{agent.full_name}</span></div> : <span className="text-[10px] text-gray-300 italic">Sin asignar</span>}
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    {ticket.due_date ? <span className={`text-[10px] font-bold ${overdue ? 'text-red-500' : 'text-gray-500'}`}>{format(new Date(ticket.due_date), 'dd MMM', { locale: es })}{overdue && ' ⚠️'}</span> : <span className="text-[10px] text-gray-200">—</span>}
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    {ticket.resolved_at ? (
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] font-black text-emerald-600">
+                                                                {format(new Date(ticket.resolved_at), 'dd MMM', { locale: es })}
                                                             </span>
-                                                            <span className="text-[9px] text-gray-300">{sla}h SLA</span>
+                                                            <span className="text-[9px] text-emerald-400 font-bold">
+                                                                {format(new Date(ticket.resolved_at), 'HH:mm', { locale: es })}
+                                                            </span>
                                                         </div>
-                                                        {/* Progress bar */}
-                                                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                                                            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
-                                                        </div>
-                                                        {/* Step dots */}
-                                                        <div className="flex gap-0.5">{STATUS_ORDER.slice(0, 4).map((_, i) => <div key={i} className={`flex-1 h-0.5 rounded-full ${i <= stepIdx ? 'bg-indigo-400' : 'bg-gray-100'}`} />)}</div>
-                                                        {pct >= 80 && <div className="flex items-center gap-1"><AlertTriangle className="w-3 h-3 text-amber-500" /><span className="text-[10px] font-black text-amber-600">En riesgo</span></div>}
-                                                        {pct >= 100 && <div className="flex items-center gap-1"><AlertTriangle className="w-3 h-3 text-red-500" /><span className="text-[10px] font-black text-red-600">SLA vencido</span></div>}
-                                                    </div>)}
-                                            </td>
-                                            <td className="px-4 py-3.5 text-center"><span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${SC[ticket.status].bg} ${SC[ticket.status].color}`}>{SC[ticket.status].label}</span></td>
-                                            <td className="px-4 py-3.5"><span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${PC[ticket.priority].bg} ${PC[ticket.priority].color}`}>{PC[ticket.priority].icon} {PC[ticket.priority].label}</span></td>
-                                            <td className="px-4 py-3.5">
-                                                {agent ? <div className="flex items-center gap-1.5"><AgentAvatar agent={agent} /><span className="text-[10px] font-bold text-gray-600 truncate max-w-[80px]">{agent.full_name}</span></div> : <span className="text-[10px] text-gray-300 italic">Sin asignar</span>}
-                                            </td>
-                                            <td className="px-4 py-3.5">
-                                                {ticket.due_date ? <span className={`text-[10px] font-bold ${overdue ? 'text-red-500' : 'text-gray-500'}`}>{format(new Date(ticket.due_date), 'dd MMM', { locale: es })}{overdue && ' ⚠️'}</span> : <span className="text-[10px] text-gray-200">—</span>}
-                                            </td>
-                                            {/* ── Fecha de Cierre ── */}
-                                            <td className="px-4 py-3.5">
-                                                {ticket.resolved_at ? (
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[10px] font-black text-emerald-600">
-                                                            {format(new Date(ticket.resolved_at), 'dd MMM', { locale: es })}
-                                                        </span>
-                                                        <span className="text-[9px] text-emerald-400 font-bold">
-                                                            {format(new Date(ticket.resolved_at), 'HH:mm', { locale: es })}
-                                                        </span>
-                                                    </div>
-                                                ) : <span className="text-[10px] text-gray-200">—</span>}
-                                            </td>
-                                            <td className="px-4 py-3.5 text-right">
-                                                <button onClick={e => { e.stopPropagation(); setSelected(isSelected ? null : ticket); }} className={`p-1.5 rounded-lg transition-all ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'hover:bg-gray-100 text-gray-400'}`}><Edit2 className="w-3.5 h-3.5" /></button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                                                    ) : <span className="text-[10px] text-gray-200">—</span>}
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right">
+                                                    <button onClick={e => { e.stopPropagation(); setSelected(isSelected ? null : ticket); }} className={`p-1.5 rounded-lg transition-all ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'hover:bg-gray-100 text-gray-400'}`}><Edit2 className="w-3.5 h-3.5" /></button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    };
+
+                                    if (isFilterOrSearchActive) {
+                                        return filtered.map(ticket => renderTicketRow(ticket, !!ticket.parent_ticket_id));
+                                    }
+
+                                    return filtered.filter(t => !t.parent_ticket_id).map(parent => {
+                                        const children = filtered.filter(t => t.parent_ticket_id === parent.id);
+                                        const isExpanded = expandedTicketIds.has(parent.id);
+                                        return (
+                                            <React.Fragment key={parent.id}>
+                                                {renderTicketRow(parent, false)}
+                                                {isExpanded && children.map(child => renderTicketRow(child, true))}
+                                            </React.Fragment>
+                                        );
+                                    });
+                                })()}
                             </tbody>
                         </table>
                     </div>
@@ -664,7 +773,7 @@ export default function Tickets() {
                     <div className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-40" onClick={() => setSelected(null)} />
                     {/* Panel */}
                     <div className="fixed top-0 right-0 bottom-0 w-[580px] z-50 shadow-2xl animate-in slide-in-from-right duration-300">
-                        <TicketPanel ticket={selected} categories={categories} agents={agents} leads={leads} companyId={profile?.company_id || ''} authorId={profile?.id || ''} onClose={() => setSelected(null)} onUpdate={handleUpdated} onDelete={handleDeleted} />
+                        <TicketPanel ticket={selected} allTickets={allTickets} categories={categories} agents={agents} leads={leads} companyId={profile?.company_id || ''} authorId={profile?.id || ''} onClose={() => setSelected(null)} onUpdate={handleUpdated} onDelete={handleDeleted} onSelectTicket={setSelected} onCreateSubticket={openCreateModalWithParent} />
                     </div>
                 </>
             )}
@@ -710,30 +819,157 @@ export default function Tickets() {
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                                         <div>
                                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Solicitante</label>
-                                            <select className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition appearance-none"
-                                                value={newT.created_by || profile?.id || ''} onChange={e => setNewT(p => ({ ...p, created_by: e.target.value }))}>
-                                                {agents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
-                                            </select>
+                                            <CustomSelect
+                                                value={newT.created_by || profile?.id || ''}
+                                                onChange={val => setNewT(p => ({ ...p, created_by: val }))}
+                                                options={agents.map(a => ({ value: a.id, label: a.full_name }))}
+                                                buttonClassName="mt-1.5 w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 outline-none hover:bg-gray-100/50 transition"
+                                            />
                                         </div>
                                         <div>
                                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Categoría</label>
-                                            <select className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition appearance-none"
-                                                value={newT.category_id} onChange={e => setNewT(p => ({ ...p, category_id: e.target.value }))}>
-                                                <option value="">Sin categoría</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                            </select>
+                                            <CustomSelect
+                                                value={newT.category_id}
+                                                onChange={val => setNewT(p => ({ ...p, category_id: val }))}
+                                                options={[
+                                                    { value: '', label: 'Sin categoría' },
+                                                    ...categories.map(c => ({ value: c.id, label: c.name }))
+                                                ]}
+                                                buttonClassName="mt-1.5 w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 outline-none hover:bg-gray-100/50 transition"
+                                            />
                                         </div>
                                         <div>
                                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Prioridad</label>
-                                            <select className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition appearance-none"
-                                                value={newT.priority} onChange={e => setNewT(p => ({ ...p, priority: e.target.value as TicketPriority }))}>
-                                                <option value="low">↓ Baja</option><option value="medium">→ Media</option><option value="high">↑ Alta</option><option value="urgent">⚡ Urgente</option>
-                                            </select>
+                                            <CustomSelect
+                                                value={newT.priority}
+                                                onChange={val => setNewT(p => ({ ...p, priority: val as TicketPriority }))}
+                                                options={[
+                                                    { value: 'low', label: 'Baja', icon: '↓' },
+                                                    { value: 'medium', label: 'Media', icon: '→' },
+                                                    { value: 'high', label: 'Alta', icon: '↑' },
+                                                    { value: 'urgent', label: 'Urgente', icon: '⚡' },
+                                                ]}
+                                                buttonClassName="mt-1.5 w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold text-gray-700 outline-none hover:bg-gray-100/50 transition"
+                                            />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CalendarDays className="w-3 h-3" />Vencimiento</label>
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CalendarDays className="w-3 h-3" />Fecha límite</label>
                                             <input type="datetime-local" className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition"
                                                 value={newT.due_date} onChange={e => setNewT(p => ({ ...p, due_date: e.target.value }))} />
                                         </div>
+                                    </div>
+                                    
+                                    {/* Parent Ticket Selection */}
+                                    <div className="mb-4 relative" ref={parentDropdownRef}>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Ticket Padre (Opcional)</label>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                setDropdownCoords({
+                                                    top: rect.bottom,
+                                                    left: rect.left,
+                                                    width: rect.width
+                                                });
+                                                setIsParentDropdownOpen(!isParentDropdownOpen);
+                                            }}
+                                            className="mt-1.5 w-full flex items-center justify-between px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition text-left"
+                                        >
+                                            {newT.parent_ticket_id ? (
+                                                (() => {
+                                                    const parent = allTickets.find(t => t.id === newT.parent_ticket_id);
+                                                    return parent ? (
+                                                        <span className="text-gray-900">
+                                                            <span className="text-[10px] font-black text-indigo-400 bg-indigo-50 px-1.5 py-0.5 rounded-md mr-1.5">
+                                                                #{parent.id.slice(0, 8).toUpperCase()}
+                                                            </span>
+                                                            {parent.title}
+                                                        </span>
+                                                    ) : 'Ninguno (Es un ticket principal)';
+                                                })()
+                                            ) : (
+                                                <span className="text-gray-400">Ninguno (Es un ticket principal)</span>
+                                            )}
+                                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isParentDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+
+                                        {isParentDropdownOpen && (
+                                            <div
+                                                className="fixed bg-white border border-gray-100 rounded-2xl shadow-2xl z-[999] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200"
+                                                style={{
+                                                    top: `${dropdownCoords.top + 8}px`,
+                                                    left: `${dropdownCoords.left}px`,
+                                                    width: `${dropdownCoords.width}px`
+                                                }}
+                                            >
+                                                {/* Search Input */}
+                                                <div className="p-2 border-b border-gray-50 bg-gray-50/50 flex items-center gap-2">
+                                                    <Search className="w-4 h-4 text-gray-400 shrink-0 ml-1" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Buscar ticket..."
+                                                        value={parentSearch}
+                                                        onChange={e => setParentSearch(e.target.value)}
+                                                        className="w-full bg-transparent border-none text-xs font-bold focus:ring-0 focus:border-none p-1"
+                                                    />
+                                                    {parentSearch && (
+                                                        <button type="button" onClick={() => setParentSearch('')} className="text-gray-400 hover:text-gray-600">
+                                                            <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {/* List */}
+                                                <div className="max-h-[380px] overflow-y-auto divide-y divide-gray-50 custom-scrollbar">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setNewT(p => ({ ...p, parent_ticket_id: '' }));
+                                                            setIsParentDropdownOpen(false);
+                                                            setParentSearch('');
+                                                        }}
+                                                        className="w-full text-left px-4 py-2.5 text-xs font-bold text-indigo-600 hover:bg-indigo-50/50 transition-colors"
+                                                    >
+                                                        Ninguno (Es un ticket principal)
+                                                    </button>
+                                                    {allTickets
+                                                        .filter(t => !t.parent_ticket_id)
+                                                        .filter(t => 
+                                                            t.title.toLowerCase().includes(parentSearch.toLowerCase()) || 
+                                                            t.id.toLowerCase().includes(parentSearch.toLowerCase())
+                                                        )
+                                                        .map(t => (
+                                                            <button
+                                                                key={t.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setNewT(p => ({ ...p, parent_ticket_id: t.id }));
+                                                                    setIsParentDropdownOpen(false);
+                                                                    setParentSearch('');
+                                                                }}
+                                                                className={`w-full text-left px-4 py-2.5 text-xs font-bold transition-colors hover:bg-gray-50 flex items-center justify-between ${
+                                                                    newT.parent_ticket_id === t.id ? 'bg-indigo-50/40 text-indigo-700' : 'text-gray-700'
+                                                                }`}
+                                                            >
+                                                                <span className="truncate flex items-center gap-1.5">
+                                                                    <span className="text-[9px] font-black text-indigo-400 bg-indigo-50 px-1 py-0.5 rounded">
+                                                                        #{t.id.slice(0, 8).toUpperCase()}
+                                                                    </span>
+                                                                    {t.title}
+                                                                </span>
+                                                                {newT.parent_ticket_id === t.id && (
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0 ml-2" />
+                                                                )}
+                                                            </button>
+                                                        ))}
+                                                    {allTickets.filter(t => !t.parent_ticket_id).filter(t => t.title.toLowerCase().includes(parentSearch.toLowerCase()) || t.id.toLowerCase().includes(parentSearch.toLowerCase())).length === 0 && (
+                                                        <div className="px-4 py-3 text-center text-xs font-bold text-gray-300">
+                                                            No se encontraron tickets principales
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Client / Lead */}

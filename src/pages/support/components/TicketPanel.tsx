@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Edit2, Save, RefreshCw, ChevronRight, UserCheck, MessageSquare, Lock, CalendarDays, Activity, ShieldCheck, CheckCircle2, Send, Search, Trash2, AlertTriangle, Clock, Paperclip, Image, FileVideo, ExternalLink, Microscope, Lightbulb, SearchCode, FileUp, FileBadge2, UploadCloud } from 'lucide-react';
+import { X, Edit2, Save, RefreshCw, ChevronRight, ChevronDown, UserCheck, MessageSquare, Lock, CalendarDays, Activity, ShieldCheck, CheckCircle2, Send, Search, Trash2, AlertTriangle, Clock, Paperclip, Image, FileVideo, ExternalLink, Microscope, Lightbulb, SearchCode, FileUp, FileBadge2, UploadCloud, Check, Plus } from 'lucide-react';
 import { storageService } from '../../../services/storage';
 import { ticketService, type Ticket, type TicketCategory, type TicketStatus, type TicketPriority, type CompanyAgent, type TicketComment, type TicketLead, type ResolutionAttachment } from '../../../services/tickets';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { CustomDatePicker } from '../../../components/ui/CustomDatePicker';
+import { CustomSelect } from '../../../components/ui/CustomSelect';
 
 const SC: Record<TicketStatus, { label: string; color: string; bg: string; darkColor: string }> = {
     new: { label: 'Nuevo', color: 'text-blue-600', bg: 'bg-blue-50', darkColor: 'text-blue-300' },
@@ -135,21 +136,58 @@ function CommentThread({ ticketId, companyId, authorId, agents }: { ticketId: st
     );
 }
 
-type PanelTab = 'info' | 'edit' | 'comments' | 'sla' | 'resolution';
+type PanelTab = 'info' | 'edit' | 'comments' | 'sla' | 'resolution' | 'qa';
 
 interface PanelProps {
-    ticket: Ticket; categories: TicketCategory[]; agents: CompanyAgent[]; leads: TicketLead[];
+    ticket: Ticket; allTickets: Ticket[]; categories: TicketCategory[]; agents: CompanyAgent[]; leads: TicketLead[];
     companyId: string; authorId: string;
     onClose: () => void; onUpdate: (t: Ticket) => void; onDelete: (id: string) => void;
+    onSelectTicket: (t: Ticket) => void; onCreateSubticket: (parentId: string) => void;
 }
 
-export function TicketPanel({ ticket, categories, agents, leads, companyId, authorId, onClose, onUpdate, onDelete }: PanelProps) {
+export function TicketPanel({ ticket, allTickets, categories, agents, leads, companyId, authorId, onClose, onUpdate, onDelete, onSelectTicket, onCreateSubticket }: PanelProps) {
+    const subTickets = allTickets.filter(t => t.parent_ticket_id === ticket.id);
+    const parentTicket = ticket.parent_ticket_id ? allTickets.find(t => t.id === ticket.parent_ticket_id) : null;
     const [tab, setTab] = useState<PanelTab>('info');
+    const [editingEst, setEditingEst] = useState(false);
+    const [editingAct, setEditingAct] = useState(false);
+    const [tempEst, setTempEst] = useState('');
+    const [tempAct, setTempAct] = useState('');
+    const [uploadingAtt, setUploadingAtt] = useState(false);
+    const attFileRef = useRef<HTMLInputElement>(null);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [leadSearch, setLeadSearch] = useState('');
     const [editingDate, setEditingDate] = useState(false);
+    const [parentSearch, setParentSearch] = useState('');
+    const [isParentDropdownOpen, setIsParentDropdownOpen] = useState(false);
+    const parentDropdownRef = useRef<HTMLDivElement>(null);
+    const [dropdownCoords, setDropdownCoords] = useState({ top: 0, left: 0, width: 0 });
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (parentDropdownRef.current && !parentDropdownRef.current.contains(e.target as Node)) {
+                setIsParentDropdownOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        function handleScroll(e: Event) {
+            if (parentDropdownRef.current && parentDropdownRef.current.contains(e.target as Node)) {
+                return;
+            }
+            setIsParentDropdownOpen(false);
+        }
+        if (isParentDropdownOpen) {
+            window.addEventListener('scroll', handleScroll, true);
+        }
+        return () => window.removeEventListener('scroll', handleScroll, true);
+    }, [isParentDropdownOpen]);
+
     const [form, setForm] = useState({
         status: ticket.status as TicketStatus, priority: ticket.priority as TicketPriority,
         assigned_to: ticket.assigned_to || '', category_id: ticket.category_id || '',
@@ -158,6 +196,7 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
         lead_id: ticket.lead_id || '',
         created_by: ticket.created_by || '',
         resolved_at: ticket.resolved_at ? ticket.resolved_at.slice(0, 16) : '',
+        parent_ticket_id: ticket.parent_ticket_id || '',
     });
 
     // Resolution Report state
@@ -181,6 +220,7 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
             lead_id: ticket.lead_id || '',
             created_by: ticket.created_by || '',
             resolved_at: ticket.resolved_at ? ticket.resolved_at.slice(0, 16) : '',
+            parent_ticket_id: ticket.parent_ticket_id || '',
         });
         setResForm({
             findings: ticket.findings || '',
@@ -190,6 +230,8 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
         setResFiles([]);
         setLeadSearch('');
         setEditingDate(false);
+        setTempEst((ticket.estimated_hours ?? 0).toString());
+        setTempAct((ticket.actual_hours ?? 0).toString());
     }, [ticket]);
 
     async function handleSaveResolution() {
@@ -227,9 +269,13 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                 lead_id: form.lead_id || null,
                 created_by: form.created_by || null,
                 resolved_at: form.resolved_at ? new Date(form.resolved_at).toISOString() : null,
+                parent_ticket_id: form.parent_ticket_id || null,
             });
             onUpdate(updated); setTab('info'); toast.success('Ticket actualizado ✓');
-        } catch { toast.error('Error al actualizar'); } finally { setSaving(false); }
+        } catch (err: any) {
+            console.error('Error al actualizar ticket:', err);
+            toast.error(err?.message || 'Error al actualizar');
+        } finally { setSaving(false); }
     }
 
     async function handleDelete() {
@@ -242,15 +288,133 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
         } catch { toast.error('Error al eliminar'); setDeleting(false); setConfirmDelete(false); }
     }
 
+    // QA & Attachment helpers
+    const attachments = (ticket.metadata?.attachments as any[]) || [];
+
+    async function handleAddAttachment(e: React.ChangeEvent<HTMLInputElement>) {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        if (attachments.length + files.length > 2) {
+            toast.error('Solo se permite un máximo de 2 documentos por ticket.');
+            return;
+        }
+
+        setUploadingAtt(true);
+        try {
+            const uploaded = await Promise.all(
+                Array.from(files).map(f => storageService.uploadTicketAttachment(companyId, f))
+            );
+            const newAttachments = [...attachments, ...uploaded];
+            const updated = await ticketService.updateTicket(ticket.id, {
+                metadata: { ...ticket.metadata, attachments: newAttachments }
+            });
+            onUpdate(updated);
+            toast.success('Documento adjuntado con éxito');
+        } catch (err) {
+            console.error(err);
+            toast.error('Error al subir el archivo');
+        } finally {
+            setUploadingAtt(false);
+            if (attFileRef.current) attFileRef.current.value = '';
+        }
+    }
+
+    async function handleDeleteAttachment(idxToDelete: number) {
+        try {
+            const newAttachments = attachments.filter((_, idx) => idx !== idxToDelete);
+            const updated = await ticketService.updateTicket(ticket.id, {
+                metadata: { ...ticket.metadata, attachments: newAttachments }
+            });
+            onUpdate(updated);
+            toast.success('Documento eliminado');
+        } catch (err) {
+            console.error(err);
+            toast.error('Error al eliminar el documento');
+        }
+    }
+
+    async function handleUpdateEstimatedHours(val: number) {
+        try {
+            const updated = await ticketService.updateTicket(ticket.id, {
+                estimated_hours: val,
+            });
+            onUpdate(updated);
+            toast.success('Horas estimadas actualizadas ✓');
+        } catch {
+            toast.error('Error al actualizar estimación');
+        }
+    }
+
+    async function handleUpdateActualHours(val: number) {
+        try {
+            const updated = await ticketService.updateTicket(ticket.id, {
+                actual_hours: val,
+            });
+            onUpdate(updated);
+            toast.success('Horas ejecutadas actualizadas ✓');
+        } catch {
+            toast.error('Error al actualizar horas ejecutadas');
+        }
+    }
+
+    async function handleChecklistItemChange(index: number, field: 'status' | 'text', val: any) {
+        const checklist = [...(ticket.checklist || [])];
+        if (!checklist[index]) return;
+
+        checklist[index] = {
+            ...checklist[index],
+            [field]: val,
+        };
+
+        try {
+            const updated = await ticketService.updateTicket(ticket.id, {
+                checklist,
+            });
+            onUpdate(updated);
+        } catch {
+            toast.error('Error al actualizar caso de prueba');
+        }
+    }
+
+    async function handleAddChecklistItem() {
+        const checklist = [
+            ...(ticket.checklist || []),
+            { id: `chk-${Date.now()}`, text: '', status: 'pending' as const },
+        ];
+        try {
+            const updated = await ticketService.updateTicket(ticket.id, {
+                checklist,
+            });
+            onUpdate(updated);
+        } catch {
+            toast.error('Error al agregar caso de prueba');
+        }
+    }
+
+    async function handleDeleteChecklistItem(itemId: string) {
+        const checklist = (ticket.checklist || []).filter(c => c.id !== itemId);
+        try {
+            const updated = await ticketService.updateTicket(ticket.id, {
+                checklist,
+            });
+            onUpdate(updated);
+            toast.success('Caso de prueba eliminado');
+        } catch {
+            toast.error('Error al eliminar caso de prueba');
+        }
+    }
+
     const cat = categories.find(c => c.id === (tab === 'edit' ? form.category_id : ticket.category_id));
     const slaHours = cat?.sla_hours ?? 24;
     const assignedAgent = agents.find(a => a.id === (tab === 'edit' ? form.assigned_to : ticket.assigned_to));
     const tabs = [
-        { key: 'info' as PanelTab, label: 'Info', icon: <Activity className="w-3 h-3" /> },
+        { key: 'info' as PanelTab, label: 'Detalles', icon: <Activity className="w-3 h-3" /> },
         { key: 'edit' as PanelTab, label: 'Editar', icon: <Edit2 className="w-3 h-3" /> },
         { key: 'comments' as PanelTab, label: 'Notas', icon: <MessageSquare className="w-3 h-3" /> },
         { key: 'sla' as PanelTab, label: 'SLA', icon: <ShieldCheck className="w-3 h-3" /> },
         { key: 'resolution' as PanelTab, label: 'Resolución', icon: <FileBadge2 className="w-3 h-3" /> },
+        { key: 'qa' as PanelTab, label: 'QA Checklist', icon: <CheckCircle2 className="w-3 h-3" /> },
     ];
 
     return (
@@ -358,43 +522,139 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                                 <div><p className="text-xs font-bold text-gray-800">{ticket.lead.name}</p><p className="text-[10px] text-gray-400">{ticket.lead.email}</p></div>
                             </div>
                         )}
-                        {ticket.description && <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100"><p className="text-[9px] font-black text-gray-400 uppercase mb-1.5">Descripción</p><p className="text-xs text-gray-600 leading-relaxed">{ticket.description}</p></div>}
-                        {/* ── Attachments Gallery ── */}
-                        {(ticket.metadata as any)?.attachments?.length > 0 && (
+
+                        {/* Ticket Padre (Si este ticket es hijo) */}
+                        {parentTicket && (
+                            <div className="bg-gradient-to-br from-indigo-50/50 to-purple-50/50 rounded-xl p-3.5 border border-indigo-100/60 shadow-sm">
+                                <p className="text-[9px] font-black text-indigo-500 uppercase mb-1.5 flex items-center gap-1"><Microscope className="w-3 h-3 text-indigo-500" />Ticket Padre</p>
+                                <div className="flex items-center justify-between">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-black text-gray-800 truncate">{parentTicket.title}</p>
+                                        <p className="text-[9px] text-gray-400 mt-0.5">#{parentTicket.id.slice(0, 8).toUpperCase()}</p>
+                                    </div>
+                                    <button type="button" onClick={() => onSelectTicket(parentTicket)} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-indigo-100 px-2.5 py-1 rounded-lg shadow-sm flex items-center gap-0.5 shrink-0 transition-all">Ver <ChevronRight className="w-3.5 h-3.5" /></button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Listado de Subtickets (Si este ticket es padre) */}
+                        {!ticket.parent_ticket_id && (
                             <div className="space-y-2">
-                                <p className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1"><Paperclip className="w-3 h-3" />Archivos Adjuntos ({(ticket.metadata as any).attachments.length})</p>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1"><Activity className="w-3 h-3" />Subtickets ({subTickets.length})</p>
+                                    <button type="button" onClick={() => onCreateSubticket(ticket.id)} className="text-[10px] font-black text-indigo-500 hover:text-indigo-700 transition-colors bg-indigo-50/50 hover:bg-indigo-50 px-2 py-1 rounded-lg">+ Agregar Subticket</button>
+                                </div>
+                                {subTickets.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {subTickets.map(sub => (
+                                            <div key={sub.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-indigo-100 hover:shadow-sm transition-all">
+                                                <div className="min-w-0 pr-2">
+                                                    <p className="text-xs font-bold text-gray-800 truncate">{sub.title}</p>
+                                                    <p className="text-[9px] text-gray-400 flex items-center gap-1.5 mt-0.5">
+                                                        <span className="font-bold uppercase" style={{ color: SC[sub.status]?.color || 'gray' }}>{SC[sub.status]?.label}</span>
+                                                        {sub.due_date && <span>· Vence: {format(new Date(sub.due_date), "dd MMM · HH:mm", { locale: es })}</span>}
+                                                    </p>
+                                                </div>
+                                                <button type="button" onClick={() => onSelectTicket(sub)} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-gray-100 px-2.5 py-1 rounded-lg shadow-sm shrink-0 transition-all">Ver</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-[10px] text-gray-300 italic pl-1">No hay subtickets creados.</p>
+                                )}
+                            </div>
+                        )}
+
+                        {ticket.description && <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100"><p className="text-[9px] font-black text-gray-400 uppercase mb-1.5">Descripción</p><p className="text-xs text-gray-600 leading-relaxed">{ticket.description}</p></div>}
+                        {/* ── Attachments Section (Max 2) ── */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <p className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1">
+                                    <Paperclip className="w-3 h-3" /> Documentos Adjuntos ({attachments.length}/2)
+                                </p>
+                                {attachments.length < 2 && (
+                                    <button
+                                        type="button"
+                                        disabled={uploadingAtt}
+                                        onClick={() => attFileRef.current?.click()}
+                                        className="text-[10px] font-black text-indigo-500 hover:text-indigo-700 transition-colors bg-indigo-50/50 hover:bg-indigo-50 px-2 py-1 rounded-lg flex items-center gap-1"
+                                    >
+                                        {uploadingAtt ? (
+                                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                            <UploadCloud className="w-3.5 h-3.5" />
+                                        )}
+                                        Adjuntar
+                                    </button>
+                                )}
+                            </div>
+
+                            <input
+                                type="file"
+                                ref={attFileRef}
+                                onChange={handleAddAttachment}
+                                className="hidden"
+                                accept="image/*,video/*,application/pdf,text/*,.doc,.docx,.xls,.xlsx"
+                            />
+
+                            {attachments.length > 0 ? (
                                 <div className="grid grid-cols-2 gap-2">
-                                    {((ticket.metadata as any).attachments as { url: string; name: string; type: string; size: number }[]).map((att, idx) => {
+                                    {attachments.map((att: any, idx: number) => {
                                         const isImage = att.type?.startsWith('image/');
                                         const isVideo = att.type?.startsWith('video/');
                                         const sizeKB = Math.round((att.size || 0) / 1024);
                                         const sizeLabel = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`;
                                         return (
-                                            <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="group relative bg-gray-50 border border-gray-100 rounded-xl overflow-hidden hover:border-indigo-200 hover:shadow-md transition-all">
-                                                {isImage ? (
-                                                    <img src={att.url} alt={att.name} className="w-full h-24 object-cover" />
-                                                ) : isVideo ? (
-                                                    <div className="w-full h-24 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
-                                                        <FileVideo className="w-8 h-8 text-gray-300" />
+                                            <div key={idx} className="group relative bg-gray-50 border border-gray-100 rounded-xl overflow-hidden hover:border-indigo-200 hover:shadow-md transition-all flex flex-col justify-between">
+                                                <a href={att.url} target="_blank" rel="noopener noreferrer" className="block flex-1">
+                                                    {isImage ? (
+                                                        <img src={att.url} alt={att.name} className="w-full h-20 object-cover" />
+                                                    ) : isVideo ? (
+                                                        <div className="w-full h-20 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+                                                            <FileVideo className="w-6 h-6 text-gray-300" />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-full h-20 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+                                                            <Image className="w-6 h-6 text-gray-300" />
+                                                        </div>
+                                                    )}
+                                                    <div className="px-2.5 py-1.5">
+                                                        <p className="text-[9px] font-bold text-gray-600 truncate">{att.name}</p>
+                                                        <p className="text-[8px] text-gray-300">{sizeLabel}</p>
                                                     </div>
-                                                ) : (
-                                                    <div className="w-full h-24 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
-                                                        <Image className="w-8 h-8 text-gray-300" />
-                                                    </div>
-                                                )}
-                                                <div className="px-2.5 py-2">
-                                                    <p className="text-[9px] font-bold text-gray-600 truncate">{att.name}</p>
-                                                    <p className="text-[8px] text-gray-300">{sizeLabel}</p>
-                                                </div>
-                                                <div className="absolute inset-0 bg-indigo-600/0 group-hover:bg-indigo-600/10 transition-colors flex items-center justify-center">
-                                                    <ExternalLink className="w-5 h-5 text-white opacity-0 group-hover:opacity-80 drop-shadow-lg transition-opacity" />
-                                                </div>
-                                            </a>
+                                                </a>
+                                                {/* Delete button absolute in corner */}
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        e.preventDefault();
+                                                        handleDeleteAttachment(idx);
+                                                    }}
+                                                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-lg bg-white/85 hover:bg-red-50 hover:text-red-600 text-gray-400 border border-gray-100 flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-all"
+                                                    title="Eliminar adjunto"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
                                         );
                                     })}
                                 </div>
-                            </div>
-                        )}
+                            ) : (
+                                <div className="text-center py-6 border border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                                    <Paperclip className="w-6 h-6 text-gray-300 mx-auto mb-1" />
+                                    <p className="text-[10px] text-gray-400 font-medium">No hay documentos adjuntos</p>
+                                    <p className="text-[9px] text-gray-300 mt-0.5">Máximo 2 archivos</p>
+                                </div>
+                            )}
+
+                            {attachments.length >= 2 && (
+                                <p className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                                    <AlertTriangle className="w-3 h-3 text-amber-500 shrink-0" />
+                                    Límite de 2 documentos alcanzado.
+                                </p>
+                            )}
+                        </div>
                         <div className="pt-3 border-t border-gray-100 space-y-2">
                             <p className="text-[10px] text-gray-400 flex items-center gap-1.5">
                                 <Clock className="w-3 h-3" />Creado: <span className="font-bold text-gray-600">{format(new Date(ticket.created_at), "dd MMM yyyy · HH:mm", { locale: es })}</span>
@@ -421,42 +681,182 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                         {/* ── Solicitante ── */}
                         <div>
                             <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1"><UserCheck className="w-3 h-3" />Solicitante</label>
-                            <select
-                                className="mt-1 w-full px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs font-bold focus:ring-2 focus:ring-indigo-400/30"
+                            <CustomSelect
                                 value={form.created_by}
-                                onChange={e => setForm(p => ({ ...p, created_by: e.target.value }))}
-                            >
-                                <option value="">— Sin asignar —</option>
-                                {agents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
-                            </select>
+                                onChange={val => setForm(p => ({ ...p, created_by: val }))}
+                                options={[
+                                    { value: '', label: '— Sin asignar —' },
+                                    ...agents.map(a => ({ value: a.id, label: a.full_name }))
+                                ]}
+                                buttonClassName="mt-1 w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold text-gray-700 outline-none hover:bg-gray-100/50 transition"
+                            />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="text-[9px] font-black text-gray-400 uppercase">Estado</label>
-                                <select className="mt-1 w-full px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs font-bold focus:ring-2 focus:ring-indigo-400/30" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value as TicketStatus }))}>
-                                    {(Object.keys(SC) as TicketStatus[]).map(s => <option key={s} value={s}>{SC[s].label}</option>)}
-                                </select>
+                                <CustomSelect
+                                    value={form.status}
+                                    onChange={val => setForm(p => ({ ...p, status: val as TicketStatus }))}
+                                    options={(Object.keys(SC) as TicketStatus[]).map(s => ({ value: s, label: SC[s].label }))}
+                                    buttonClassName="mt-1 w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold text-gray-700 outline-none hover:bg-gray-100/50 transition"
+                                />
                             </div>
                             <div>
                                 <label className="text-[9px] font-black text-gray-400 uppercase">Prioridad</label>
-                                <select className="mt-1 w-full px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs font-bold focus:ring-2 focus:ring-indigo-400/30" value={form.priority} onChange={e => setForm(p => ({ ...p, priority: e.target.value as TicketPriority }))}>
-                                    {(Object.keys(PC) as TicketPriority[]).map(p => <option key={p} value={p}>{PC[p].label}</option>)}
-                                </select>
+                                <CustomSelect
+                                    value={form.priority}
+                                    onChange={val => setForm(p => ({ ...p, priority: val as TicketPriority }))}
+                                    options={(Object.keys(PC) as TicketPriority[]).map(p => ({ value: p, label: PC[p].label, icon: PC[p].icon }))}
+                                    buttonClassName="mt-1 w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold text-gray-700 outline-none hover:bg-gray-100/50 transition"
+                                />
                             </div>
                         </div>
                         <div>
                             <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1"><UserCheck className="w-3 h-3" />Agente</label>
-                            <select className="mt-1 w-full px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs font-bold focus:ring-2 focus:ring-indigo-400/30" value={form.assigned_to} onChange={e => setForm(p => ({ ...p, assigned_to: e.target.value }))}>
-                                <option value="">— Sin asignar —</option>{agents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
-                            </select>
+                            <CustomSelect
+                                value={form.assigned_to}
+                                onChange={val => setForm(p => ({ ...p, assigned_to: val }))}
+                                options={[
+                                    { value: '', label: '— Sin asignar —' },
+                                    ...agents.map(a => ({ value: a.id, label: a.full_name }))
+                                ]}
+                                buttonClassName="mt-1 w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold text-gray-700 outline-none hover:bg-gray-100/50 transition"
+                            />
                             {agents.length === 0 && <p className="text-[9px] text-amber-500 mt-1">Sin agentes disponibles en esta empresa</p>}
                         </div>
                         <div>
                             <label className="text-[9px] font-black text-gray-400 uppercase">Categoría</label>
-                            <select className="mt-1 w-full px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs font-bold focus:ring-2 focus:ring-indigo-400/30" value={form.category_id} onChange={e => setForm(p => ({ ...p, category_id: e.target.value }))}>
-                                <option value="">Sin categoría</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
+                            <CustomSelect
+                                value={form.category_id}
+                                onChange={val => setForm(p => ({ ...p, category_id: val }))}
+                                options={[
+                                    { value: '', label: 'Sin categoría' },
+                                    ...categories.map(c => ({ value: c.id, label: c.name }))
+                                ]}
+                                buttonClassName="mt-1 w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold text-gray-700 outline-none hover:bg-gray-100/50 transition"
+                            />
                         </div>
+
+                        {subTickets.length === 0 ? (
+                            <div className="relative" ref={parentDropdownRef}>
+                                <label className="text-[9px] font-black text-gray-400 uppercase">Ticket Padre</label>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setDropdownCoords({
+                                            top: rect.bottom,
+                                            left: rect.left,
+                                            width: rect.width
+                                        });
+                                        setIsParentDropdownOpen(!isParentDropdownOpen);
+                                    }}
+                                    className="mt-1 w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-400/30 transition text-left"
+                                >
+                                    {form.parent_ticket_id ? (
+                                        (() => {
+                                            const parent = allTickets.find(t => t.id === form.parent_ticket_id);
+                                            return parent ? (
+                                                <span className="text-gray-900">
+                                                    <span className="text-[9px] font-black text-indigo-400 bg-indigo-50 px-1.5 py-0.5 rounded-md mr-1.5">
+                                                        #{parent.id.slice(0, 8).toUpperCase()}
+                                                    </span>
+                                                    {parent.title}
+                                                </span>
+                                            ) : 'Ninguno (Es un ticket principal)';
+                                        })()
+                                    ) : (
+                                        <span className="text-gray-400">Ninguno (Es un ticket principal)</span>
+                                    )}
+                                    <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isParentDropdownOpen ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {isParentDropdownOpen && (
+                                    <div
+                                        className="fixed bg-white border border-gray-100 rounded-xl shadow-2xl z-[999] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200"
+                                        style={{
+                                            top: `${dropdownCoords.top + 4}px`,
+                                            left: `${dropdownCoords.left}px`,
+                                            width: `${dropdownCoords.width}px`
+                                        }}
+                                    >
+                                        {/* Search Input */}
+                                        <div className="p-2 border-b border-gray-50 bg-gray-50/50 flex items-center gap-2">
+                                            <Search className="w-3.5 h-3.5 text-gray-400 shrink-0 ml-1" />
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar ticket..."
+                                                value={parentSearch}
+                                                onChange={e => setParentSearch(e.target.value)}
+                                                className="w-full bg-transparent border-none text-[10px] font-bold focus:ring-0 focus:border-none p-0.5"
+                                            />
+                                            {parentSearch && (
+                                                <button type="button" onClick={() => setParentSearch('')} className="text-gray-400 hover:text-gray-600">
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* List */}
+                                        <div className="max-h-[380px] overflow-y-auto divide-y divide-gray-50 custom-scrollbar">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setForm(p => ({ ...p, parent_ticket_id: '' }));
+                                                    setIsParentDropdownOpen(false);
+                                                    setParentSearch('');
+                                                }}
+                                                className="w-full text-left px-3 py-2 text-[10px] font-bold text-indigo-600 hover:bg-indigo-50/50 transition-colors"
+                                            >
+                                                Ninguno (Es un ticket principal)
+                                            </button>
+                                            {allTickets
+                                                .filter(t => t.id !== ticket.id && !t.parent_ticket_id)
+                                                .filter(t => 
+                                                    t.title.toLowerCase().includes(parentSearch.toLowerCase()) || 
+                                                    t.id.toLowerCase().includes(parentSearch.toLowerCase())
+                                                )
+                                                .map(t => (
+                                                    <button
+                                                        key={t.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setForm(p => ({ ...p, parent_ticket_id: t.id }));
+                                                            setIsParentDropdownOpen(false);
+                                                            setParentSearch('');
+                                                        }}
+                                                        className={`w-full text-left px-3 py-2 text-[10px] font-bold transition-colors hover:bg-gray-50 flex items-center justify-between ${
+                                                            form.parent_ticket_id === t.id ? 'bg-indigo-50/40 text-indigo-700' : 'text-gray-700'
+                                                        }`}
+                                                    >
+                                                        <span className="truncate flex items-center gap-1.5">
+                                                            <span className="text-[8px] font-black text-indigo-400 bg-indigo-50 px-1 py-0.5 rounded">
+                                                                #{t.id.slice(0, 8).toUpperCase()}
+                                                            </span>
+                                                            {t.title}
+                                                        </span>
+                                                        {form.parent_ticket_id === t.id && (
+                                                            <span className="w-1 h-1 rounded-full bg-indigo-600 shrink-0 ml-2" />
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            {allTickets.filter(t => t.id !== ticket.id && !t.parent_ticket_id).filter(t => t.title.toLowerCase().includes(parentSearch.toLowerCase()) || t.id.toLowerCase().includes(parentSearch.toLowerCase())).length === 0 && (
+                                                <div className="px-3 py-2 text-center text-[10px] font-bold text-gray-300">
+                                                    No se encontraron tickets principales
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="text-[9px] font-black text-gray-400 uppercase">Ticket Padre</label>
+                                <div className="mt-1 w-full px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs font-bold text-gray-400 bg-gray-50/50">
+                                    No se puede asignar un padre porque este ticket ya tiene subtickets.
+                                </div>
+                            </div>
+                        )}
 
                         {/* ── Premium Date Picker ── */}
                         <div>
@@ -811,6 +1211,235 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                         )}
                     </div>
                 )}
+
+                {tab === 'qa' && (() => {
+                    const est = Number(ticket.estimated_hours ?? 0);
+                    const act = Number(ticket.actual_hours ?? 0);
+                    const pct = est > 0 ? Math.min((act / est) * 100, 150) : 0;
+                    const over = act > est && est > 0;
+
+                    const checklist = (Array.isArray(ticket.checklist) ? ticket.checklist : []).filter(c => c && typeof c === 'object' && c.id && c.status);
+                    const passed = checklist.filter(c => c.status === 'passed').length;
+                    const failed = checklist.filter(c => c.status === 'failed').length;
+                    const pending = checklist.filter(c => c.status === 'pending').length;
+
+                    return (
+                        <div className="space-y-4 animate-in fade-in duration-300">
+                            {/* ── TIME COMPARISON WIDGET ── */}
+                            <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                    <Clock size={12} className="text-indigo-400" /> Tiempo & Rendimiento
+                                </p>
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    {/* Estimated hours card */}
+                                    <div className="bg-white rounded-xl border border-gray-100 p-3 text-center shadow-sm relative group">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Estimado</p>
+                                        {editingEst ? (
+                                            <div className="mt-1 flex items-center justify-center">
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    value={tempEst}
+                                                    onChange={e => setTempEst(e.target.value)}
+                                                    onBlur={() => {
+                                                        setEditingEst(false);
+                                                        handleUpdateEstimatedHours(Number(tempEst) || 0);
+                                                    }}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') {
+                                                            setEditingEst(false);
+                                                            handleUpdateEstimatedHours(Number(tempEst) || 0);
+                                                        } else if (e.key === 'Escape') {
+                                                            setEditingEst(false);
+                                                            setTempEst((ticket.estimated_hours ?? 0).toString());
+                                                        }
+                                                    }}
+                                                    className="w-16 px-1.5 py-0.5 text-center text-sm font-bold border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
+                                                    autoFocus
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div
+                                                onClick={() => {
+                                                    setTempEst((ticket.estimated_hours ?? 0).toString());
+                                                    setEditingEst(true);
+                                                }}
+                                                className="cursor-pointer hover:bg-gray-50 rounded py-0.5 px-2 inline-flex items-center gap-1 mt-0.5"
+                                                title="Haz clic para editar"
+                                            >
+                                                <span className="text-lg font-black text-gray-800">{est}h</span>
+                                                <Edit2 className="w-2.5 h-2.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Executed hours card */}
+                                    <div className={`rounded-xl border p-3 text-center shadow-sm relative group ${over ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Ejecutado</p>
+                                        {editingAct ? (
+                                            <div className="mt-1 flex items-center justify-center">
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    value={tempAct}
+                                                    onChange={e => setTempAct(e.target.value)}
+                                                    onBlur={() => {
+                                                        setEditingAct(false);
+                                                        handleUpdateActualHours(Number(tempAct) || 0);
+                                                    }}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') {
+                                                            setEditingAct(false);
+                                                            handleUpdateActualHours(Number(tempAct) || 0);
+                                                        } else if (e.key === 'Escape') {
+                                                            setEditingAct(false);
+                                                            setTempAct((ticket.actual_hours ?? 0).toString());
+                                                        }
+                                                    }}
+                                                    className="w-16 px-1.5 py-0.5 text-center text-sm font-bold border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400/20"
+                                                    autoFocus
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div
+                                                onClick={() => {
+                                                    setTempAct((ticket.actual_hours ?? 0).toString());
+                                                    setEditingAct(true);
+                                                }}
+                                                className="cursor-pointer hover:bg-black/5 rounded py-0.5 px-2 inline-flex items-center gap-1 mt-0.5"
+                                                title="Haz clic para editar"
+                                            >
+                                                <span className={`text-lg font-black ${over ? 'text-rose-600' : 'text-emerald-700'}`}>{act.toFixed(1)}h</span>
+                                                <Edit2 className="w-2.5 h-2.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Progress bar */}
+                                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full transition-all duration-500 ${over ? 'bg-gradient-to-r from-rose-400 to-rose-600' : 'bg-gradient-to-r from-emerald-400 to-emerald-600'}`}
+                                        style={{ width: `${Math.min(pct, 100)}%` }}
+                                    />
+                                </div>
+                                <div className="flex justify-between items-center mt-1.5">
+                                    <span className="text-[10px] text-gray-400 font-semibold">{pct.toFixed(0)}% del presupuesto</span>
+                                    <span className={`text-[10px] font-black uppercase tracking-wider ${over ? 'text-rose-500' : 'text-emerald-600'}`}>
+                                        {over ? '⚠ Sobre presupuesto' : est === 0 ? '—' : '✓ En rango'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* ── TEST CASES CHECKLIST ── */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Casos de Prueba</p>
+                                        <div className="flex items-center gap-1">
+                                            {passed > 0 && <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">{passed} ✓</span>}
+                                            {failed > 0 && <span className="text-[9px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full">{failed} ✗</span>}
+                                            {pending > 0 && <span className="text-[9px] font-black bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{pending} ○</span>}
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={handleAddChecklistItem}
+                                        className="text-xs text-indigo-600 font-bold hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2.5 py-1 rounded-lg transition-colors"
+                                    >
+                                        <Plus className="w-3 h-3" /> Añadir
+                                    </button>
+                                </div>
+
+                                {checklist.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {checklist.map((item, idx) => (
+                                            <div
+                                                key={item.id}
+                                                className={`flex items-center gap-3 group px-3 py-2.5 rounded-xl border transition-all ${
+                                                    item.status === 'passed' ? 'bg-emerald-50/60 border-emerald-200/60' :
+                                                    item.status === 'failed' ? 'bg-rose-50/60 border-rose-200/60' :
+                                                    'bg-white border-gray-100 hover:border-gray-200'
+                                                }`}
+                                            >
+                                                {/* Pass / Fail buttons */}
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleChecklistItemChange(idx, 'status', item.status === 'passed' ? 'pending' : 'passed')}
+                                                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                                                            item.status === 'passed'
+                                                                ? 'bg-emerald-500 text-white shadow-sm'
+                                                                : 'bg-gray-100 text-gray-400 hover:bg-emerald-100 hover:text-emerald-600'
+                                                        }`}
+                                                        title="Marcar como PASADO"
+                                                    >
+                                                        <Check size={12} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleChecklistItemChange(idx, 'status', item.status === 'failed' ? 'pending' : 'failed')}
+                                                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                                                            item.status === 'failed'
+                                                                ? 'bg-rose-500 text-white shadow-sm'
+                                                                : 'bg-gray-100 text-gray-400 hover:bg-rose-100 hover:text-rose-600'
+                                                        }`}
+                                                        title="Marcar como FALLIDO"
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </div>
+
+                                                {/* Test description input */}
+                                                <input
+                                                    type="text"
+                                                    placeholder="Ej: Validar guardado en BD"
+                                                    value={item.text}
+                                                    onChange={e => handleChecklistItemChange(idx, 'text', e.target.value)}
+                                                    className={`flex-1 bg-transparent text-[13px] outline-none px-1 transition-all ${
+                                                        item.status === 'passed' ? 'line-through text-emerald-700/70 font-medium' :
+                                                        item.status === 'failed' ? 'text-rose-700 font-semibold' :
+                                                        'text-gray-700'
+                                                    }`}
+                                                />
+
+                                                {/* Status badge */}
+                                                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${
+                                                    item.status === 'passed' ? 'bg-emerald-100 text-emerald-700' :
+                                                    item.status === 'failed' ? 'bg-rose-100 text-rose-700' :
+                                                    'bg-gray-100 text-gray-400'
+                                                }`}>
+                                                    {item.status === 'passed' ? 'Pasó' : item.status === 'failed' ? 'Falló' : 'Pendiente'}
+                                                </span>
+
+                                                {/* Delete button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteChecklistItem(item.id)}
+                                                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-rose-500 rounded-lg transition-all"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                                        <CheckCircle2 size={24} className="text-gray-300 mx-auto mb-2" />
+                                        <p className="text-[13px] text-gray-400 font-medium mb-3">Sin casos de prueba aún</p>
+                                        <button
+                                            type="button"
+                                            onClick={handleAddChecklistItem}
+                                            className="text-xs bg-indigo-50 text-indigo-600 font-bold px-4 py-2 rounded-lg border border-indigo-100 hover:bg-indigo-100 transition-colors flex items-center gap-1.5 mx-auto"
+                                        >
+                                            <Plus size={12} /> Agregar Caso de Prueba
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* ── Save Button (Edit tab) ── */}
