@@ -169,6 +169,75 @@ class PricingService {
         throw deleteError;
     }
 
+    async checkItemUsage(item: PricingItem): Promise<{ inUse: boolean; count: number; sampleQuotes: any[] }> {
+        // 1. Si es de tipo plan, buscamos en cotizaciones por plan_nombre
+        if (item.tipo === 'plan') {
+            const { data, error, count } = await supabase
+                .from('cotizaciones')
+                .select('id, nombre_cliente, created_at', { count: 'exact' })
+                .eq('plan_nombre', item.nombre)
+                .limit(5);
+
+            if (error) {
+                console.error('Error checking plan usage in cotizaciones:', error);
+                return { inUse: false, count: 0, sampleQuotes: [] };
+            }
+            return {
+                inUse: (count ?? 0) > 0,
+                count: count ?? 0,
+                sampleQuotes: data || []
+            };
+        } else {
+            // 2. Si es de otro tipo (modulo, servicio, etc.), buscamos si está en modulos_adicionales (JSONB)
+            try {
+                const { data, error, count } = await supabase
+                    .from('cotizaciones')
+                    .select('id, nombre_cliente, created_at', { count: 'exact' })
+                    .filter('modulos_adicionales', 'cs', JSON.stringify([{ nombre: item.nombre }]))
+                    .limit(5);
+
+                if (error) throw error;
+
+                return {
+                    inUse: (count ?? 0) > 0,
+                    count: count ?? 0,
+                    sampleQuotes: data || []
+                };
+            } catch (err) {
+                console.warn('Error fetching via contains filter, doing in-memory fallback check:', err);
+                
+                // Fallback: cargar cotizaciones recientes y filtrar en memoria
+                const { data: allQuotes, error: allQuotesError } = await supabase
+                    .from('cotizaciones')
+                    .select('id, nombre_cliente, modulos_adicionales, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+
+                if (allQuotesError) {
+                    console.error('Error fetching quotes for fallback check:', allQuotesError);
+                    return { inUse: false, count: 0, sampleQuotes: [] };
+                }
+
+                const matchedQuotes = (allQuotes || []).filter((q: any) => {
+                    const mods = typeof q.modulos_adicionales === 'string'
+                        ? JSON.parse(q.modulos_adicionales)
+                        : (q.modulos_adicionales || []);
+                    return Array.isArray(mods) && mods.some((m: any) => m.nombre === item.nombre);
+                });
+
+                return {
+                    inUse: matchedQuotes.length > 0,
+                    count: matchedQuotes.length,
+                    sampleQuotes: matchedQuotes.slice(0, 5).map((q: any) => ({
+                        id: q.id,
+                        nombre_cliente: q.nombre_cliente,
+                        created_at: q.created_at
+                    }))
+                };
+            }
+        }
+    }
+
     async getAllPricingItems(includeInactive = false): Promise<PricingItem[]> {
         let query = simGuard(
             supabase

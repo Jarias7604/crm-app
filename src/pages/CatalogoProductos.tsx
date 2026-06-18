@@ -33,6 +33,9 @@ export default function CatalogoProductos() {
     const [savingType, setSavingType] = useState(false);
     const { types, getName, getColor, reload: reloadTypes } = useItemTypes();
 
+    const [usageInfo, setUsageInfo] = useState<{ inUse: boolean; count: number; sampleQuotes: any[] } | null>(null);
+    const [loadingUsage, setLoadingUsage] = useState(false);
+
     const [uiState, setUiState] = useState({
         frecuencia_cobro: 'unico' as 'unico' | 'recurrente',
         intervalo: 'mensual' as 'mensual' | 'anual',
@@ -103,7 +106,7 @@ export default function CatalogoProductos() {
         }
     };
 
-    const handleEdit = (item: PricingItem) => {
+    const handleEdit = async (item: PricingItem) => {
         setEditingId(item.id);
         setFormData(item);
         
@@ -122,6 +125,17 @@ export default function CatalogoProductos() {
         
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        setLoadingUsage(true);
+        setUsageInfo(null);
+        try {
+            const usage = await pricingService.checkItemUsage(item);
+            setUsageInfo(usage);
+        } catch (err) {
+            console.error('Error checking item usage:', err);
+        } finally {
+            setLoadingUsage(false);
+        }
     };
 
     const handleClone = async (item: PricingItem) => {
@@ -192,7 +206,19 @@ export default function CatalogoProductos() {
 
     const handleDelete = async (id: string) => {
         if (!canEdit) return toast.error('No tienes permisos');
-        if (!confirm('¿Estás seguro de eliminar este producto? Si nunca ha sido cotizado se borrará por completo. Si ya tiene historial, se archivará automáticamente.')) return;
+        
+        let confirmMsg = '¿Estás seguro de eliminar este producto?';
+        if (usageInfo) {
+            if (usageInfo.inUse) {
+                confirmMsg = `⚠️ Este producto tiene historial comercial (${usageInfo.count} cotización(es) asociadas).\n\nNo se puede eliminar físicamente para conservar el historial financiero. En su lugar, se archivará automáticamente (dejará de estar disponible para futuras cotizaciones).\n\n¿Deseas archivar el producto?`;
+            } else {
+                confirmMsg = `🗑️ Este producto no tiene historial registrado en cotizaciones.\n\nSe eliminará permanentemente de la base de datos de manera limpia.\n\n¿Deseas eliminarlo?`;
+            }
+        } else {
+            confirmMsg = '¿Estás seguro de eliminar este producto? Si nunca ha sido cotizado se borrará por completo. Si ya tiene historial, se archivará automáticamente.';
+        }
+
+        if (!confirm(confirmMsg)) return;
 
         try {
             const result = await pricingService.deletePricingItem(id);
@@ -231,6 +257,8 @@ export default function CatalogoProductos() {
             min_dtes: 0,
             max_dtes: 0
         });
+        setUsageInfo(null);
+        setLoadingUsage(false);
     };
 
     // Derived Data
@@ -367,6 +395,70 @@ export default function CatalogoProductos() {
 
                         {/* Drawer Body */}
                         <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+                            
+                            {/* Banner de Historial/Eliminación */}
+                            {editingId && (
+                                <div className={`mb-6 rounded-2xl border p-4 shadow-sm transition-all duration-300 ${
+                                    loadingUsage 
+                                        ? 'border-slate-200 bg-slate-50/40 animate-pulse' 
+                                        : usageInfo?.inUse 
+                                            ? 'border-amber-200 bg-amber-50/40' 
+                                            : 'border-emerald-200 bg-emerald-50/40'
+                                }`}>
+                                    {loadingUsage ? (
+                                        <div className="flex items-center gap-3 text-slate-500">
+                                            <RefreshCw className="w-5 h-5 animate-spin text-slate-400" />
+                                            <span className="text-sm font-bold">Cargando historial comercial del producto...</span>
+                                        </div>
+                                    ) : usageInfo ? (
+                                        usageInfo.inUse ? (
+                                            <div className="flex gap-3">
+                                                <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl self-start">
+                                                    <Clock className="w-5 h-5" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <h4 className="text-sm font-extrabold text-amber-800">Producto con Historial Activo</h4>
+                                                    <p className="text-xs text-amber-700 font-medium leading-relaxed">
+                                                        Este producto está asociado a <span className="font-extrabold">{usageInfo.count} cotización(es)</span>. 
+                                                        Por seguridad del historial financiero, <span className="font-bold">no se puede borrar físicamente</span> de la base de datos.
+                                                    </p>
+                                                    <div className="pt-1.5 flex flex-wrap gap-1.5 items-center">
+                                                        <span className="text-[10px] uppercase tracking-wider font-extrabold text-amber-600 mr-1">Clientes asociados:</span>
+                                                        {usageInfo.sampleQuotes.map((q: any, idx: number) => (
+                                                            <span key={q.id || idx} className="text-[11px] font-bold bg-amber-500/10 text-amber-800 px-2.5 py-0.5 rounded-lg border border-amber-200/40">
+                                                                {q.nombre_cliente}
+                                                            </span>
+                                                        ))}
+                                                        {usageInfo.count > 5 && (
+                                                            <span className="text-[11px] font-bold text-amber-600">
+                                                                y {usageInfo.count - 5} más...
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex gap-3">
+                                                <div className="p-2 bg-emerald-500/10 text-emerald-600 rounded-xl self-start">
+                                                    <CheckCircle className="w-5 h-5" />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <h4 className="text-sm font-extrabold text-emerald-800">Producto sin Historial Activo</h4>
+                                                    <p className="text-xs text-emerald-700 font-medium leading-relaxed">
+                                                        Este producto no se ha utilizado en ninguna cotización registrada. 
+                                                        Si decides eliminarlo, se <span className="font-extrabold">borrará permanentemente</span> de la base de datos de manera limpia.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )
+                                    ) : (
+                                        <div className="text-xs text-red-500 font-semibold">
+                                            No se pudo verificar el historial de cotizaciones de este producto.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                                 {/* Left Column: General Info */}
                                 <div className="lg:col-span-6 space-y-6">
