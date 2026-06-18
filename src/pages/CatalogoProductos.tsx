@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Box, Layers, Zap, ArrowUpDown, Tag, DollarSign, Copy, Clock, Hash, RefreshCw, Repeat, ChevronDown, CheckCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Edit, Trash2, Save, X, Search, Box, Layers, Zap, ArrowUpDown, Tag, DollarSign, Copy, Clock, Hash, RefreshCw, Repeat, ChevronDown, CheckCircle, AlertTriangle } from 'lucide-react';
 import { pricingService } from '../services/pricing';
 import type { PricingItem } from '../types/pricing';
 import { useAuth } from '../auth/AuthProvider';
@@ -8,6 +8,7 @@ import { useItemTypes } from '../hooks/useItemTypes';
 import { itemTypesService, pickColor } from '../services/itemTypes';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 import toast from 'react-hot-toast';
 import { useAriasTables } from '../hooks/useAriasTables';
 
@@ -32,6 +33,33 @@ export default function CatalogoProductos() {
     const [newTypeColor, setNewTypeColor] = useState(PRESET_COLORS[0]);
     const [savingType, setSavingType] = useState(false);
     const { types, getName, getColor, reload: reloadTypes } = useItemTypes();
+
+    // States for custom categories dropdown filter & Type-to-Confirm deletion modal
+    const [showCategoryFilterDropdown, setShowCategoryFilterDropdown] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<PricingItem | null>(null);
+    const [deleteInputText, setDeleteInputText] = useState('');
+    const categoryFilterDropdownRef = useRef<HTMLDivElement>(null);
+
+    // States for custom categories deletion
+    const [showDeleteCategoryModal, setShowDeleteCategoryModal] = useState(false);
+    const [categoryToDelete, setCategoryToDelete] = useState<any | null>(null);
+    const [deleteCategoryConfirmText, setDeleteCategoryConfirmText] = useState('');
+
+    // Close custom categories filter dropdown when clicking outside
+    useEffect(() => {
+        const handleOutsideClick = (e: MouseEvent) => {
+            if (categoryFilterDropdownRef.current && !categoryFilterDropdownRef.current.contains(e.target as Node)) {
+                setShowCategoryFilterDropdown(false);
+            }
+        };
+        if (showCategoryFilterDropdown) {
+            document.addEventListener('mousedown', handleOutsideClick);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleOutsideClick);
+        };
+    }, [showCategoryFilterDropdown]);
 
     const [usageInfo, setUsageInfo] = useState<{ inUse: boolean; count: number; sampleQuotes: any[] } | null>(null);
     const [loadingUsage, setLoadingUsage] = useState(false);
@@ -207,19 +235,6 @@ export default function CatalogoProductos() {
     const handleDelete = async (id: string) => {
         if (!canEdit) return toast.error('No tienes permisos');
         
-        let confirmMsg = '¿Estás seguro de eliminar este producto?';
-        if (usageInfo) {
-            if (usageInfo.inUse) {
-                confirmMsg = `⚠️ Este producto tiene historial comercial (${usageInfo.count} cotización(es) asociadas).\n\nNo se puede eliminar físicamente para conservar el historial financiero. En su lugar, se archivará automáticamente (dejará de estar disponible para futuras cotizaciones).\n\n¿Deseas archivar el producto?`;
-            } else {
-                confirmMsg = `🗑️ Este producto no tiene historial registrado en cotizaciones.\n\nSe eliminará permanentemente de la base de datos de manera limpia.\n\n¿Deseas eliminarlo?`;
-            }
-        } else {
-            confirmMsg = '¿Estás seguro de eliminar este producto? Si nunca ha sido cotizado se borrará por completo. Si ya tiene historial, se archivará automáticamente.';
-        }
-
-        if (!confirm(confirmMsg)) return;
-
         try {
             const result = await pricingService.deletePricingItem(id);
             if (result.deleted) {
@@ -231,6 +246,18 @@ export default function CatalogoProductos() {
             loadItems();
         } catch (error) {
             toast.error('Error al eliminar el producto');
+        }
+    };
+
+    const handleDeleteCategory = async (id: string) => {
+        try {
+            await itemTypesService.deactivate(id);
+            await reloadTypes();
+            setFilterTipo('all');
+            toast.success('🗑️ Categoría eliminada exitosamente');
+        } catch (err: any) {
+            console.error('Error deactivating category:', err);
+            toast.error(`Error al eliminar la categoría: ${err.message}`);
         }
     };
 
@@ -305,34 +332,101 @@ export default function CatalogoProductos() {
                         />
                     </div>
                     
-                    <div className="hidden md:flex flex-wrap gap-1 p-1 bg-gray-50 rounded-xl border border-gray-200/60">
+                    {/* Custom Categories Dropdown Filter */}
+                    <div className="relative shrink-0" ref={categoryFilterDropdownRef}>
                         <button
-                            onClick={() => setFilterTipo('all')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterTipo === 'all' ? 'bg-white shadow-sm text-gray-900 border border-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+                            type="button"
+                            onClick={() => setShowCategoryFilterDropdown(!showCategoryFilterDropdown)}
+                            className="h-10 px-3.5 flex items-center justify-between gap-2.5 rounded-xl border border-gray-200/80 bg-white hover:border-blue-500/50 text-xs font-semibold text-gray-700 outline-none focus:ring-4 focus:ring-blue-500/10 w-[210px] text-left transition-all shadow-sm cursor-pointer"
                         >
-                            Todos ({items.length})
+                            <span className="truncate flex items-center gap-2">
+                                <Layers size={14} className="text-blue-500 shrink-0" />
+                                {(() => {
+                                    if (filterTipo === 'all') return `Todos (${items.length})`;
+                                    const activeTypeObj = types.find(t => t.slug === filterTipo);
+                                    const count = items.filter(i => i.tipo === filterTipo).length;
+                                    return activeTypeObj ? `${activeTypeObj.name} (${count})` : `Categoría (${count})`;
+                                })()}
+                            </span>
+                            <ChevronDown size={14} className={`text-gray-400 transition-transform shrink-0 ${showCategoryFilterDropdown ? 'rotate-180' : ''}`} />
                         </button>
-                        {types.map(t => {
-                            const count = items.filter(i => i.tipo === t.slug).length;
-                            return (
-                                <button
-                                    key={t.slug}
-                                    onClick={() => setFilterTipo(t.slug)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5`}
-                                    style={filterTipo === t.slug ? {
-                                        backgroundColor: t.color,
-                                        color: 'white',
-                                        boxShadow: `0 2px 8px ${t.color}40`,
-                                    } : {
-                                        color: t.color,
-                                        opacity: 0.8
-                                    }}
-                                >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                                    {t.name} ({count})
-                                </button>
-                            );
-                        })}
+
+                        {showCategoryFilterDropdown && (
+                            <div className="absolute right-0 top-full mt-1.5 w-[260px] bg-white border border-gray-100 rounded-xl shadow-xl z-50 py-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                                <div className="px-3 py-1.5 border-b border-gray-50 mb-1 flex items-center justify-between">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Categorías</span>
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-50 text-gray-500">{types.length + 1}</span>
+                                </div>
+                                <div className="max-h-[225px] overflow-y-auto custom-scrollbar">
+                                    {/* Option for 'Todos' */}
+                                    <div
+                                        className={`flex items-center justify-between px-3 py-2 text-xs font-semibold cursor-pointer transition-colors ${
+                                            filterTipo === 'all' 
+                                                ? 'bg-blue-50 text-blue-700' 
+                                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                        }`}
+                                        onClick={() => {
+                                            setFilterTipo('all');
+                                            setShowCategoryFilterDropdown(false);
+                                        }}
+                                    >
+                                        <span className="truncate flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+                                            Todos
+                                        </span>
+                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100/80 text-gray-500">{items.length}</span>
+                                    </div>
+
+                                    {/* Map through types */}
+                                    {types.map(t => {
+                                        const count = items.filter(i => i.tipo === t.slug).length;
+                                        const isActive = filterTipo === t.slug;
+                                        return (
+                                            <div
+                                                key={t.slug}
+                                                className={`group/cat flex items-center justify-between px-3 py-2 text-xs font-semibold cursor-pointer transition-colors ${
+                                                    isActive 
+                                                        ? 'bg-blue-50 text-blue-700' 
+                                                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                                }`}
+                                                onClick={() => {
+                                                    setFilterTipo(t.slug);
+                                                    setShowCategoryFilterDropdown(false);
+                                                }}
+                                            >
+                                                <span className="truncate flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }}></span>
+                                                    {t.name}
+                                                </span>
+                                                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100/80 text-gray-500 group-hover/cat:hidden">{count}</span>
+                                                    {t.company_id !== null && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                if (count > 0) {
+                                                                    toast.error('No se puede eliminar una categoría que contiene productos activos.');
+                                                                    return;
+                                                                }
+                                                                setCategoryToDelete(t);
+                                                                setDeleteCategoryConfirmText('');
+                                                                setShowDeleteCategoryModal(true);
+                                                                setShowCategoryFilterDropdown(false);
+                                                            }}
+                                                            className="opacity-0 group-hover/cat:opacity-100 p-1 text-gray-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition-all flex items-center justify-center"
+                                                            title="Eliminar Categoría"
+                                                        >
+                                                            <Trash2 size={13} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -377,8 +471,15 @@ export default function CatalogoProductos() {
                                 {editingId && (
                                     <button
                                         type="button"
-                                        onClick={() => handleDelete(editingId)}
-                                        className="p-2 bg-red-950/40 text-red-400 hover:text-red-200 hover:bg-red-900/50 rounded-xl transition-all border border-red-900/60 shadow-sm active:scale-95 flex items-center justify-center"
+                                        onClick={() => {
+                                            const itemObj = items.find(i => i.id === editingId);
+                                            if (itemObj) {
+                                                setItemToDelete(itemObj);
+                                                setDeleteInputText('');
+                                                setShowDeleteModal(true);
+                                            }
+                                        }}
+                                        className="p-2 bg-red-950/40 text-red-400 hover:text-red-200 hover:bg-red-900/50 rounded-xl transition-all border border-red-900/60 shadow-sm active:scale-95 flex items-center justify-center animate-in fade-in duration-200"
                                         title="Eliminar producto"
                                     >
                                         <Trash2 className="w-5 h-5" />
@@ -849,6 +950,146 @@ export default function CatalogoProductos() {
                     </div>
                 )}
             </div>
+
+            {/* Modal de Confirmación de Borrado de Producto */}
+            {showDeleteModal && (
+                <Modal
+                    isOpen={showDeleteModal}
+                    onClose={() => setShowDeleteModal(false)}
+                    title="¿Eliminar Producto?"
+                    className="max-w-md border border-rose-100/60 shadow-2xl animate-in fade-in duration-200"
+                >
+                    <div className="space-y-5">
+                        <div className="flex gap-4 p-4 bg-rose-50/60 rounded-2xl border border-rose-100/40">
+                            <AlertTriangle className="w-8 h-8 text-rose-500 shrink-0 mt-0.5 animate-bounce" />
+                            <div className="space-y-1">
+                                <h4 className="text-[13px] font-bold text-rose-900 leading-tight">Acción Crítica e Irreversible</h4>
+                                <p className="text-xs text-rose-700 leading-relaxed font-medium">
+                                    Estás a punto de eliminar el producto <strong className="font-extrabold">"{itemToDelete?.nombre}"</strong>.
+                                </p>
+                                {usageInfo?.inUse ? (
+                                    <p className="text-xs text-rose-600 leading-relaxed font-semibold">
+                                        ⚠️ Este producto está asociado a {usageInfo.count} cotización(es). 
+                                        Por seguridad del historial financiero, no se puede eliminar físicamente. En su lugar, se archivará automáticamente.
+                                    </p>
+                                ) : (
+                                    <p className="text-xs text-rose-600 leading-relaxed font-semibold">
+                                        🗑️ Este producto no tiene cotizaciones asociadas. Se eliminará permanentemente de forma limpia de la base de datos.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
+                                Para confirmar, escribe <span className="font-extrabold text-rose-600 select-all">ELIMINAR</span> o el nombre del producto
+                            </label>
+                            <Input
+                                placeholder={`Escribe "ELIMINAR" o "${itemToDelete?.nombre}"`}
+                                value={deleteInputText}
+                                onChange={e => setDeleteInputText(e.target.value)}
+                                className="w-full p-3.5 h-auto bg-gray-50 border-gray-200 rounded-xl text-[13px] font-semibold text-gray-800 placeholder:text-gray-400 focus-visible:ring-4 focus-visible:ring-rose-500/10 focus-visible:border-rose-500/40 shadow-sm"
+                                required
+                            />
+                        </div>
+
+                        <div className="flex gap-3 pt-4">
+                            <Button
+                                type="button"
+                                onClick={() => setShowDeleteModal(false)}
+                                className="w-full bg-gray-100/80 text-gray-600 hover:bg-gray-200 border border-gray-200/50 h-12 text-xs font-bold uppercase tracking-widest rounded-xl transition-all"
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                type="button"
+                                disabled={
+                                    deleteInputText.trim() !== 'ELIMINAR' &&
+                                    deleteInputText.trim() !== itemToDelete?.nombre?.trim()
+                                }
+                                onClick={() => {
+                                    if (itemToDelete) {
+                                        handleDelete(itemToDelete.id);
+                                        setShowDeleteModal(false);
+                                    }
+                                }}
+                                className={`w-full text-white border-0 h-12 text-xs font-bold uppercase tracking-widest rounded-xl transition-all active:scale-[0.98] ${
+                                    (deleteInputText.trim() === 'ELIMINAR' || deleteInputText.trim() === itemToDelete?.nombre?.trim())
+                                        ? 'bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-950/20'
+                                        : 'bg-gray-300 cursor-not-allowed text-gray-400'
+                                }`}
+                            >
+                                Confirmar Borrado
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+            {/* Modal de Confirmación de Borrado de Categoría */}
+            {showDeleteCategoryModal && (
+                <Modal
+                    isOpen={showDeleteCategoryModal}
+                    onClose={() => setShowDeleteCategoryModal(false)}
+                    title="¿Eliminar Categoría?"
+                    className="max-w-md border border-rose-100/60 shadow-2xl animate-in fade-in duration-200"
+                >
+                    <div className="space-y-5">
+                        <div className="flex gap-4 p-4 bg-rose-50/60 rounded-2xl border border-rose-100/40">
+                            <AlertTriangle className="w-8 h-8 text-rose-500 shrink-0 mt-0.5 animate-bounce" />
+                            <div className="space-y-1">
+                                <h4 className="text-[13px] font-bold text-rose-900 leading-tight">Eliminación de Categoría</h4>
+                                <p className="text-xs text-rose-700 leading-relaxed font-medium">
+                                    Estás a punto de desactivar la categoría <strong className="font-extrabold">"{categoryToDelete?.name}"</strong>.
+                                    Esta categoría ya no estará disponible para catalogar nuevos productos.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
+                                Para confirmar, escribe <span className="font-extrabold text-rose-600 select-all">ELIMINAR</span> o el nombre de la categoría
+                            </label>
+                            <Input
+                                placeholder={`Escribe "ELIMINAR" o el nombre`}
+                                value={deleteCategoryConfirmText}
+                                onChange={e => setDeleteCategoryConfirmText(e.target.value)}
+                                className="w-full p-3.5 h-auto bg-gray-50 border-gray-200 rounded-xl text-[13px] font-semibold text-gray-800 placeholder:text-gray-400 focus-visible:ring-4 focus-visible:ring-rose-500/10 focus-visible:border-rose-500/40 shadow-sm"
+                                required
+                            />
+                        </div>
+
+                        <div className="flex gap-3 pt-4">
+                            <Button
+                                type="button"
+                                onClick={() => setShowDeleteCategoryModal(false)}
+                                className="w-full bg-gray-100/80 text-gray-600 hover:bg-gray-200 border border-gray-200/50 h-12 text-xs font-bold uppercase tracking-widest rounded-xl transition-all"
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                type="button"
+                                disabled={
+                                    deleteCategoryConfirmText.trim() !== 'ELIMINAR' &&
+                                    deleteCategoryConfirmText.trim() !== categoryToDelete?.name?.trim()
+                                }
+                                onClick={() => {
+                                    if (categoryToDelete) {
+                                        handleDeleteCategory(categoryToDelete.id);
+                                        setShowDeleteCategoryModal(false);
+                                    }
+                                }}
+                                className={`w-full text-white border-0 h-12 text-xs font-bold uppercase tracking-widest rounded-xl transition-all active:scale-[0.98] ${
+                                    (deleteCategoryConfirmText.trim() === 'ELIMINAR' || deleteCategoryConfirmText.trim() === categoryToDelete?.name?.trim())
+                                        ? 'bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-950/20'
+                                        : 'bg-gray-300 cursor-not-allowed text-gray-400'
+                                }`}
+                            >
+                                Confirmar Borrado
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 }
