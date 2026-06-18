@@ -1,0 +1,1 @@
+-- Dummy migration placeholder to satisfy Supabase CLI local file check
