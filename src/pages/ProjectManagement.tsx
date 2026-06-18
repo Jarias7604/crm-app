@@ -129,6 +129,28 @@ export default function ProjectManagement() {
   // Supervisor rejection reason input
   const [rejectionInput, setRejectionInput] = useState('');
 
+  // Custom Project Select Dropdown & Deletion States
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [showDeleteProjectModal, setShowDeleteProjectModal] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+  const projectDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close custom project dropdown when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(e.target as Node)) {
+        setShowProjectDropdown(false);
+      }
+    };
+    if (showProjectDropdown) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showProjectDropdown]);
+
   // Load Initial Data
   useEffect(() => {
     if (activeCompanyId) {
@@ -419,6 +441,49 @@ export default function ProjectManagement() {
       setNewProject({ name: '', description: '' });
     } catch (err) {
       toast.error("Error al crear proyecto");
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    try {
+      if (dbAvailable) {
+        const { error } = await supabase
+          .from('crm_projects')
+          .delete()
+          .eq('id', projectId);
+        if (error) throw error;
+      } else {
+        // Mock Mode Delete Project
+        const mockProjs: Project[] = JSON.parse(localStorage.getItem('mock_projects') || '[]');
+        const updatedProjs = mockProjs.filter(p => p.id !== projectId);
+        localStorage.setItem('mock_projects', JSON.stringify(updatedProjs));
+
+        const mockTasks: Task[] = JSON.parse(localStorage.getItem('mock_tasks') || '[]');
+        const updatedTasks = mockTasks.filter(t => t.project_id !== projectId);
+        localStorage.setItem('mock_tasks', JSON.stringify(updatedTasks));
+      }
+
+      // Update state
+      const updatedProjectsList = projects.filter(p => p.id !== projectId);
+      setProjects(updatedProjectsList);
+
+      // Select another project if the active one was deleted
+      if (selectedProjectId === projectId) {
+        if (updatedProjectsList.length > 0) {
+          const nextProj = updatedProjectsList[0];
+          setSelectedProjectId(nextProj.id);
+          localStorage.setItem('last_project_id', nextProj.id);
+          await loadTasks(nextProj.id);
+        } else {
+          setSelectedProjectId('');
+          localStorage.removeItem('last_project_id');
+          setTasks([]);
+        }
+      }
+      toast.success("Proyecto eliminado exitosamente");
+    } catch (err) {
+      console.error("Error al eliminar proyecto:", err);
+      toast.error("Error al eliminar el proyecto");
     }
   };
 
@@ -1198,8 +1263,11 @@ export default function ProjectManagement() {
                 </button>
               )
             )}
-            <button type="button" onClick={() => openTaskModal(task)} className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100" title="Editar">
-              <Plus size={13} className="rotate-45" />
+            <button type="button" onClick={() => openTaskModal(task)} className="p-1.5 rounded-lg text-gray-400 hover:text-[#4449AA] hover:bg-indigo-50 transition-colors opacity-0 group-hover:opacity-100" title="Editar">
+              <Pencil size={13} />
+            </button>
+            <button type="button" onClick={() => handleDeleteTask(task.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100" title="Eliminar">
+              <Trash2 size={13} />
             </button>
           </div>
         </div>
@@ -1222,6 +1290,8 @@ export default function ProjectManagement() {
       </React.Fragment>
     );
   };
+
+  const currentProject = projects.find(p => p.id === selectedProjectId);
 
   return (
     <div className="w-full max-w-[1600px] mx-auto space-y-5 animate-in fade-in duration-300 pb-12">
@@ -1248,17 +1318,76 @@ export default function ProjectManagement() {
         </div>
 
         {/* Right: Project selector + New Project */}
-        <div className="flex items-center gap-2 shrink-0">
-          <select
-            className="h-9 md:h-10 px-3 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-[#4449AA]/20 max-w-[180px] cursor-pointer"
-            value={selectedProjectId}
-            onChange={(e) => { setSelectedProjectId(e.target.value); localStorage.setItem('last_project_id', e.target.value); loadTasks(e.target.value); }}
+        <div className="flex items-center gap-2 shrink-0 relative animate-in fade-in duration-200" ref={projectDropdownRef}>
+          {/* Custom Trigger */}
+          <button
+            type="button"
+            onClick={() => setShowProjectDropdown(!showProjectDropdown)}
+            className="h-9 md:h-10 px-3.5 flex items-center justify-between gap-2.5 rounded-xl border border-gray-200/80 bg-white hover:border-[#4449AA]/55 text-xs font-semibold text-gray-700 outline-none focus:ring-4 focus:ring-[#4449AA]/10 w-[210px] text-left transition-all shadow-sm cursor-pointer"
           >
-            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
+            <span className="truncate flex items-center gap-2">
+              <Layers size={14} className="text-[#4449AA] shrink-0" />
+              {currentProject ? currentProject.name : 'Seleccionar Proyecto'}
+            </span>
+            <ChevronRight size={14} className={`text-gray-400 transition-transform shrink-0 ${showProjectDropdown ? 'rotate-90' : ''}`} />
+          </button>
+
+          {/* Custom Dropdown Menu */}
+          {showProjectDropdown && (
+            <div className="absolute right-0 top-full mt-1.5 w-[280px] bg-white border border-gray-100 rounded-xl shadow-xl z-50 py-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="px-3 py-1.5 border-b border-gray-50 mb-1 flex items-center justify-between">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Tus Proyectos</span>
+                {projects.length > 0 && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-50 text-gray-500">{projects.length}</span>
+                )}
+              </div>
+              <div className="max-h-[220px] overflow-y-auto custom-scrollbar">
+                {projects.map(p => {
+                  const isActive = p.id === selectedProjectId;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`group/item flex items-center justify-between px-3 py-2 text-xs font-semibold cursor-pointer transition-colors ${
+                        isActive 
+                          ? 'bg-[#4449AA]/5 text-[#4449AA]' 
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                      onClick={() => {
+                        setSelectedProjectId(p.id);
+                        localStorage.setItem('last_project_id', p.id);
+                        loadTasks(p.id);
+                        setShowProjectDropdown(false);
+                      }}
+                    >
+                      <span className="truncate pr-2">{p.name}</span>
+                      
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isActive && <Check size={14} className="text-[#4449AA]" />}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProjectToDelete(p);
+                            setDeleteConfirmInput('');
+                            setShowDeleteProjectModal(true);
+                            setShowProjectDropdown(false);
+                          }}
+                          className="opacity-0 group-hover/item:opacity-100 p-1 text-gray-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition-all"
+                          title="Eliminar Proyecto"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <button
             onClick={() => setIsProjectModalOpen(true)}
-            className="h-9 md:h-10 px-4 flex items-center gap-1.5 bg-white border border-gray-200 hover:border-[#4449AA]/40 hover:text-[#4449AA] text-gray-600 rounded-xl text-xs font-semibold transition-all shadow-sm"
+            className="h-9 md:h-10 px-4 flex items-center gap-1.5 bg-[#4449AA] hover:bg-[#383d8f] text-white rounded-xl text-xs font-semibold shadow-sm shadow-indigo-900/10 transition-all cursor-pointer"
           >
             <Plus size={14} /> Nuevo
           </button>
@@ -2152,7 +2281,7 @@ export default function ProjectManagement() {
 
 
       <Modal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} title="Crear Nuevo Proyecto" className="max-w-md">
-        <form onSubmit={handleCreateProject} className="space-y-6 p-6">
+        <form onSubmit={handleCreateProject} className="space-y-5">
           <div className="space-y-2">
             <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Nombre del Proyecto</label>
             <Input
@@ -2172,7 +2301,7 @@ export default function ProjectManagement() {
               className="w-full p-3.5 bg-gray-50/50 border border-gray-200/80 rounded-xl text-[13px] font-medium text-gray-800 placeholder:text-gray-400 outline-none focus:bg-white focus:border-[#4449AA]/40 focus:ring-4 focus:ring-[#4449AA]/10 transition-all shadow-sm min-h-[100px]"
             />
           </div>
-          <div className="flex gap-3 pt-6">
+          <div className="flex gap-3 pt-4">
             <Button
               type="button"
               onClick={() => setIsProjectModalOpen(false)}
@@ -2188,6 +2317,67 @@ export default function ProjectManagement() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* ── Modal de Confirmación de Borrado de Proyecto ── */}
+      <Modal 
+        isOpen={showDeleteProjectModal} 
+        onClose={() => setShowDeleteProjectModal(false)} 
+        title="¿Eliminar Proyecto?" 
+        className="max-w-md border border-rose-100/60 shadow-2xl animate-in fade-in duration-200"
+      >
+        <div className="space-y-5">
+          <div className="flex gap-4 p-4 bg-rose-50/60 rounded-2xl border border-rose-100/40">
+            <AlertTriangle className="w-8 h-8 text-rose-500 shrink-0 mt-0.5 animate-bounce" />
+            <div className="space-y-1">
+              <h4 className="text-[13px] font-bold text-rose-900 leading-tight">Acción Irreversible y Crítica</h4>
+              <p className="text-xs text-rose-700 leading-relaxed font-medium">
+                Estás a punto de eliminar el proyecto <strong className="font-extrabold">"{projectToDelete?.name}"</strong>. 
+                Esta acción eliminará permanentemente todas sus tareas y registros de tiempos.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
+              Para confirmar, escribe <span className="font-extrabold text-rose-600 select-all">ELIMINAR</span> o el nombre del proyecto
+            </label>
+            <Input
+              placeholder={`Escribe "ELIMINAR" o el nombre`}
+              value={deleteConfirmInput}
+              onChange={e => setDeleteConfirmInput(e.target.value)}
+              className="w-full p-3.5 h-auto bg-gray-50 border-gray-200 rounded-xl text-[13px] font-semibold text-gray-800 placeholder:text-gray-400 focus-visible:ring-4 focus-visible:ring-rose-500/10 focus-visible:border-rose-500/40 shadow-sm"
+              required
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              onClick={() => setShowDeleteProjectModal(false)}
+              className="w-full bg-gray-100/80 text-gray-600 hover:bg-gray-200 border border-gray-200/50 h-12 text-xs font-bold uppercase tracking-widest rounded-xl transition-all"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={deleteConfirmInput !== 'ELIMINAR' && deleteConfirmInput !== projectToDelete?.name}
+              onClick={() => {
+                if (projectToDelete) {
+                  handleDeleteProject(projectToDelete.id);
+                  setShowDeleteProjectModal(false);
+                }
+              }}
+              className={`w-full text-white border-0 h-12 text-xs font-bold uppercase tracking-widest rounded-xl transition-all active:scale-[0.98] ${
+                (deleteConfirmInput === 'ELIMINAR' || deleteConfirmInput === projectToDelete?.name)
+                  ? 'bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-950/20'
+                  : 'bg-gray-300 cursor-not-allowed text-gray-400'
+              }`}
+            >
+              Confirmar Borrado
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* ── Slide-over Task Drawer ── */}
@@ -2213,9 +2403,24 @@ export default function ProjectManagement() {
                       {selectedTask?.title || 'Borrador de Tarea'}
                     </h3>
                   </div>
-                  <button onClick={() => setIsTaskModalOpen(false)} className="p-2 text-white/60 hover:text-white rounded-full hover:bg-white/10 transition-colors">
-                     <X size={18} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {selectedTask && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleDeleteTask(selectedTask.id);
+                          setIsTaskModalOpen(false);
+                        }}
+                        className="p-2 text-rose-300 hover:text-rose-100 rounded-full hover:bg-rose-500/20 transition-colors"
+                        title="Eliminar Tarea"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                    <button onClick={() => setIsTaskModalOpen(false)} className="p-2 text-white/60 hover:text-white rounded-full hover:bg-white/10 transition-colors">
+                       <X size={18} />
+                    </button>
+                  </div>
                </div>
 
                {/* Tabs inside Header */}
