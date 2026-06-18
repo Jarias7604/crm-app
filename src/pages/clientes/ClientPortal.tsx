@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Upload, CheckCircle2, Loader2, AlertCircle,
-  ShieldCheck, File, X, Lock, ChevronDown, Save
+  ShieldCheck, File, X, Lock, ChevronDown, Save, Pencil
 } from 'lucide-react';
 import { clientPortalService, clientDocumentsService } from '../../services/clients';
 import type { ClientPortalData, ClientStageDocumentType, ClientDocument } from '../../types/clients';
@@ -36,6 +36,7 @@ export default function ClientPortal() {
   const [termsModalOpen, setTermsModalOpen] = useState(false);
   const [textValues, setTextValues] = useState<Record<string, string>>({});
   const [savingText, setSavingText] = useState<Record<string, boolean>>({});
+  const [editingTexts, setEditingTexts] = useState<Record<string, boolean>>({});
 
   // ── Confetti ─────────────────────────────────────────
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -152,6 +153,7 @@ export default function ClientPortal() {
         true
       );
       toast.success('Respuesta guardada correctamente');
+      setEditingTexts(prev => ({ ...prev, [docType.id]: false }));
       const fresh = await clientPortalService.getByToken(token);
       if (fresh) {
         setData(fresh);
@@ -315,6 +317,8 @@ export default function ClientPortal() {
               setTextValues={setTextValues}
               savingText={savingText}
               isReqFilled={isReqFilled}
+              editingTexts={editingTexts}
+              setEditingTexts={setEditingTexts}
             />
 
             {/* T&C */}
@@ -517,29 +521,64 @@ export default function ClientPortal() {
                       {/* Text Input for Desktop */}
                       {reqTxt && (
                         <div className="pl-12 space-y-2">
-                          <div className="flex items-end gap-2">
-                            <textarea
-                              disabled={isDisabled}
-                              value={textValues[dt.id] || ''}
-                              onChange={e => setTextValues(prev => ({ ...prev, [dt.id]: e.target.value }))}
-                              placeholder="Escribe la información solicitada aquí..."
-                              rows={2}
-                              className="flex-1 text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4449AA]/20 bg-white resize-none"
-                            />
-                            <button
-                              onClick={() => handleSaveText(dt, textValues[dt.id] || '')}
-                              disabled={isDisabled || savingText[dt.id] || (textValues[dt.id] || '').trim() === (uploaded[0]?.valor_texto || '')}
-                              title="Guardar respuesta"
-                              className="p-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
-                            >
-                              {savingText[dt.id] ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Save className="w-3.5 h-3.5" />
+                          {uploaded[0]?.valor_texto && !editingTexts[dt.id] ? (
+                            /* Modo Lectura / Guardado */
+                            <div className="flex items-start justify-between gap-3 p-2.5 rounded-xl bg-gray-50 border border-gray-100 mt-1">
+                              <div className="flex-1 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed py-0.5">
+                                {uploaded[0]?.valor_texto}
+                              </div>
+                              {!isDisabled && (
+                                <button
+                                  onClick={() => setEditingTexts(prev => ({ ...prev, [dt.id]: true }))}
+                                  className="p-1 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-200 transition-all flex-shrink-0"
+                                  title="Editar respuesta"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
                               )}
-                            </button>
-                          </div>
-                          {uploaded[0]?.valor_texto && (
+                            </div>
+                          ) : (
+                            /* Modo Edición */
+                            <div className="flex items-end gap-2">
+                              <textarea
+                                disabled={isDisabled}
+                                value={textValues[dt.id] || ''}
+                                onChange={e => setTextValues(prev => ({ ...prev, [dt.id]: e.target.value }))}
+                                placeholder="Escribe la información solicitada aquí..."
+                                rows={2}
+                                className="flex-1 text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4449AA]/20 bg-white resize-none"
+                              />
+                              {!isDisabled && (
+                                <div className="flex items-center gap-1.5 flex-shrink-0">
+                                  <button
+                                    onClick={() => handleSaveText(dt, textValues[dt.id] || '')}
+                                    disabled={savingText[dt.id] || (textValues[dt.id] || '').trim() === (uploaded[0]?.valor_texto || '')}
+                                    title="Guardar respuesta"
+                                    className="p-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                  >
+                                    {savingText[dt.id] ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Save className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                  {uploaded[0]?.valor_texto && (
+                                    <button
+                                      onClick={() => {
+                                        setEditingTexts(prev => ({ ...prev, [dt.id]: false }));
+                                        setTextValues(prev => ({ ...prev, [dt.id]: uploaded[0]?.valor_texto || '' }));
+                                      }}
+                                      title="Cancelar"
+                                      className="p-2 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-all"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {uploaded[0]?.valor_texto && !editingTexts[dt.id] && (
                             <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
                               ✓ Respuesta guardada
                             </p>
@@ -635,6 +674,8 @@ function MobileDocList({
   setTextValues,
   savingText,
   isReqFilled,
+  editingTexts,
+  setEditingTexts,
 }: {
   docTypes: ClientStageDocumentType[];
   stageDocs: ClientDocument[];
@@ -647,6 +688,8 @@ function MobileDocList({
   setTextValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   savingText: Record<string, boolean>;
   isReqFilled: (dt: ClientStageDocumentType) => boolean;
+  editingTexts: Record<string, boolean>;
+  setEditingTexts: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }) {
   // Paleta pastel por índice
   const PASTELS = [
@@ -717,29 +760,64 @@ function MobileDocList({
                 {/* Text input for Mobile */}
                 {reqTxt && (
                   <div className="mt-2.5 space-y-2">
-                    <div className="flex items-end gap-2">
-                      <textarea
-                        disabled={isDisabled}
-                        value={textValues[dt.id] || ''}
-                        onChange={e => setTextValues(prev => ({ ...prev, [dt.id]: e.target.value }))}
-                        placeholder="Escribe la información solicitada aquí..."
-                        rows={2}
-                        className="flex-1 text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4449AA]/20 bg-white resize-none"
-                      />
-                      <button
-                        onClick={() => handleSaveText(dt, textValues[dt.id] || '')}
-                        disabled={isDisabled || savingText[dt.id] || (textValues[dt.id] || '').trim() === (uploaded[0]?.valor_texto || '')}
-                        title="Guardar respuesta"
-                        className="p-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
-                      >
-                        {savingText[dt.id] ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Save className="w-3.5 h-3.5" />
+                    {uploaded[0]?.valor_texto && !editingTexts[dt.id] ? (
+                      /* Modo Lectura / Guardado */
+                      <div className="flex items-start justify-between gap-3 p-2.5 rounded-xl bg-gray-50 border border-gray-100 mt-1">
+                        <div className="flex-1 text-xs text-gray-700 whitespace-pre-wrap leading-relaxed py-0.5">
+                          {uploaded[0]?.valor_texto}
+                        </div>
+                        {!isDisabled && (
+                          <button
+                            onClick={() => setEditingTexts(prev => ({ ...prev, [dt.id]: true }))}
+                            className="p-1 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-200 transition-all flex-shrink-0"
+                            title="Editar respuesta"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
                         )}
-                      </button>
-                    </div>
-                    {uploaded[0]?.valor_texto && (
+                      </div>
+                    ) : (
+                      /* Modo Edición */
+                      <div className="flex items-end gap-2">
+                        <textarea
+                          disabled={isDisabled}
+                          value={textValues[dt.id] || ''}
+                          onChange={e => setTextValues(prev => ({ ...prev, [dt.id]: e.target.value }))}
+                          placeholder="Escribe la información solicitada aquí..."
+                          rows={2}
+                          className="flex-1 text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4449AA]/20 bg-white resize-none"
+                        />
+                        {!isDisabled && (
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <button
+                              onClick={() => handleSaveText(dt, textValues[dt.id] || '')}
+                              disabled={savingText[dt.id] || (textValues[dt.id] || '').trim() === (uploaded[0]?.valor_texto || '')}
+                              title="Guardar respuesta"
+                              className="p-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                            >
+                              {savingText[dt.id] ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Save className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                            {uploaded[0]?.valor_texto && (
+                              <button
+                                onClick={() => {
+                                  setEditingTexts(prev => ({ ...prev, [dt.id]: false }));
+                                  setTextValues(prev => ({ ...prev, [dt.id]: uploaded[0]?.valor_texto || '' }));
+                                }}
+                                title="Cancelar"
+                                className="p-2.5 rounded-xl bg-gray-100 text-gray-500 hover:bg-gray-200 transition-all"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {uploaded[0]?.valor_texto && !editingTexts[dt.id] && (
                       <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
                         ✓ Respuesta guardada
                       </p>
