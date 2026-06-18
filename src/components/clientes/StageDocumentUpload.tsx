@@ -86,6 +86,10 @@ export default function StageDocumentUpload({ stage, client, documents, onDocume
 
   const handleDownload = async (doc: ClientDocument) => {
     try {
+      if (!doc.file_path) {
+        toast.error('No hay archivo disponible para descargar');
+        return;
+      }
       const url = await clientDocumentsService.getSignedUrl(doc.file_path);
       window.open(url, '_blank');
     } catch {
@@ -95,6 +99,10 @@ export default function StageDocumentUpload({ stage, client, documents, onDocume
 
   const handleDelete = async (doc: ClientDocument) => {
     try {
+      if (!doc.file_path) {
+        toast.error('No hay archivo disponible para eliminar');
+        return;
+      }
       await clientDocumentsService.delete(doc.id, doc.file_path);
       toast.success('🗑️ Documento eliminado');
       onDocumentUploaded();
