@@ -92,7 +92,7 @@ export const stageDocTypesService = {
     return data as ClientStageDocumentType;
   },
 
-  async update(id: string, updates: Partial<Pick<ClientStageDocumentType, 'nombre' | 'descripcion' | 'requerido' | 'orden'>>): Promise<ClientStageDocumentType> {
+  async update(id: string, updates: Partial<Pick<ClientStageDocumentType, 'nombre' | 'descripcion' | 'requerido' | 'orden' | 'requiere_documento' | 'requiere_texto'>>): Promise<ClientStageDocumentType> {
     const { data, error } = await supabase
       .from('client_stage_document_types')
       .update(updates)
@@ -232,7 +232,8 @@ export const clientDocumentsService = {
     stageId: string | null,
     docTypeId: string | null,
     file: File,
-    subioPorCliente = false
+    subioPorCliente = false,
+    existingDocId?: string
   ): Promise<ClientDocument> {
     const ext = file.name.split('.').pop();
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
@@ -245,23 +246,75 @@ export const clientDocumentsService = {
     if (storageError) throw storageError;
 
     // Registrar en BD
-    const { data, error } = await supabase
-      .from('client_documents')
-      .insert({
-        company_id: companyId,
-        client_id: clientId,
-        stage_id: stageId,
-        doc_type_id: docTypeId,
-        nombre: file.name,
-        file_path: path,
-        file_size: file.size,
-        file_type: file.type,
-        subido_por_cliente: subioPorCliente,
-      })
-      .select()
-      .single();
+    let query;
+    if (existingDocId) {
+      query = supabase
+        .from('client_documents')
+        .update({
+          nombre: file.name,
+          file_path: path,
+          file_size: file.size,
+          file_type: file.type,
+          subido_por_cliente: subioPorCliente,
+        })
+        .eq('id', existingDocId);
+    } else {
+      query = supabase
+        .from('client_documents')
+        .insert({
+          company_id: companyId,
+          client_id: clientId,
+          stage_id: stageId,
+          doc_type_id: docTypeId,
+          nombre: file.name,
+          file_path: path,
+          file_size: file.size,
+          file_type: file.type,
+          subido_por_cliente: subioPorCliente,
+        });
+    }
+
+    const { data, error } = await query.select().single();
     if (error) throw error;
-    return data as ClientDocument;
+    return data as unknown as ClientDocument;
+  },
+
+  async saveTextResponse(
+    clientId: string,
+    companyId: string,
+    stageId: string | null,
+    docTypeId: string | null,
+    textValue: string,
+    existingDocId?: string,
+    subioPorCliente = false
+  ): Promise<ClientDocument> {
+    let query;
+    if (existingDocId) {
+      query = supabase
+        .from('client_documents')
+        .update({
+          valor_texto: textValue,
+          subido_por_cliente: subioPorCliente,
+        })
+        .eq('id', existingDocId);
+    } else {
+      query = supabase
+        .from('client_documents')
+        .insert({
+          company_id: companyId,
+          client_id: clientId,
+          stage_id: stageId,
+          doc_type_id: docTypeId,
+          nombre: 'Respuesta de texto',
+          valor_texto: textValue,
+          file_path: null,
+          subido_por_cliente: subioPorCliente,
+        });
+    }
+
+    const { data, error } = await query.select().single();
+    if (error) throw error;
+    return data as unknown as ClientDocument;
   },
 
   async getSignedUrl(filePath: string): Promise<string> {

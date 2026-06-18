@@ -27,6 +27,8 @@ export interface ClientStageDocumentType {
   nombre: string;
   descripcion: string | null;
   requerido: boolean;
+  requiere_documento: boolean;
+  requiere_texto: boolean;
   orden: number;
   created_at: string;
 }
@@ -62,12 +64,13 @@ export interface ClientDocument {
   stage_id: string | null;
   doc_type_id: string | null;
   nombre: string;
-  file_path: string;
+  file_path: string | null;
   file_size: number | null;
   file_type: string | null;
   subido_por_cliente: boolean;
   uploaded_by: string | null;
   created_at: string;
+  valor_texto: string | null;
   // relaciones
   doc_type?: ClientStageDocumentType;
   uploader?: { full_name: string | null; email: string };
@@ -79,6 +82,7 @@ export interface ClientPortalData {
     id: string;
     nombre: string;
     contacto: string | null;
+    company_id: string;
     etapa_actual: ClientPipelineStage & {
       document_types: ClientStageDocumentType[];
     };

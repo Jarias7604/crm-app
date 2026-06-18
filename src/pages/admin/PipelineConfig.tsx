@@ -54,11 +54,11 @@ export default function PipelineConfig() {
   // Panel de documentos
   const [expandedDocs, setExpandedDocs] = useState<string | null>(null);
   const [docTypes, setDocTypes] = useState<Record<string, ClientStageDocumentType[]>>({});
-  const [newDocInputs, setNewDocInputs] = useState<Record<string, { nombre: string; descripcion: string; requerido: boolean }>>({});
+  const [newDocInputs, setNewDocInputs] = useState<Record<string, { nombre: string; descripcion: string; requerido: boolean; requiere_documento: boolean; requiere_texto: boolean }>>({});
 
   // Edición inline de doc types
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
-  const [editDocForm, setEditDocForm] = useState<{ nombre: string; descripcion: string; requerido: boolean }>({ nombre: '', descripcion: '', requerido: true });
+  const [editDocForm, setEditDocForm] = useState<{ nombre: string; descripcion: string; requerido: boolean; requiere_documento: boolean; requiere_texto: boolean }>({ nombre: '', descripcion: '', requerido: true, requiere_documento: true, requiere_texto: false });
 
   // Términos y empresa
   const [termsText, setTermsText] = useState('');
@@ -224,6 +224,12 @@ export default function PipelineConfig() {
   const handleAddDocType = async (stageId: string) => {
     const input = newDocInputs[stageId];
     if (!input?.nombre?.trim()) { toast.error('Nombre requerido'); return; }
+    const reqDoc = input.requiere_documento ?? true;
+    const reqTxt = input.requiere_texto ?? false;
+    if (!reqDoc && !reqTxt) {
+      toast.error('Debes seleccionar al menos una opción (Documento o Texto)');
+      return;
+    }
     const existing = docTypes[stageId] || [];
     try {
       await stageDocTypesService.create({
@@ -231,10 +237,12 @@ export default function PipelineConfig() {
         nombre: input.nombre.trim(),
         descripcion: input.descripcion || '',
         requerido: input.requerido,
+        requiere_documento: reqDoc,
+        requiere_texto: reqTxt,
         orden: existing.length + 1,
       });
       toast.success('Documento agregado');
-      setNewDocInputs(prev => ({ ...prev, [stageId]: { nombre: '', descripcion: '', requerido: true } }));
+      setNewDocInputs(prev => ({ ...prev, [stageId]: { nombre: '', descripcion: '', requerido: true, requiere_documento: true, requiere_texto: false } }));
       await load();
     } catch { toast.error('Error al agregar'); }
   };
@@ -250,16 +258,28 @@ export default function PipelineConfig() {
 
   const openEditDoc = (dt: ClientStageDocumentType) => {
     setEditingDocId(dt.id);
-    setEditDocForm({ nombre: dt.nombre, descripcion: dt.descripcion || '', requerido: dt.requerido });
+    setEditDocForm({
+      nombre: dt.nombre,
+      descripcion: dt.descripcion || '',
+      requerido: dt.requerido,
+      requiere_documento: dt.requiere_documento ?? true,
+      requiere_texto: dt.requiere_texto ?? false,
+    });
   };
 
   const handleUpdateDocType = async (docId: string) => {
     if (!editDocForm.nombre.trim()) { toast.error('Nombre requerido'); return; }
+    if (!editDocForm.requiere_documento && !editDocForm.requiere_texto) {
+      toast.error('Debes seleccionar al menos una opción (Documento o Texto)');
+      return;
+    }
     try {
       await stageDocTypesService.update(docId, {
         nombre: editDocForm.nombre.trim(),
         descripcion: editDocForm.descripcion.trim(),
         requerido: editDocForm.requerido,
+        requiere_documento: editDocForm.requiere_documento,
+        requiere_texto: editDocForm.requiere_texto,
       });
       toast.success('✅ Documento actualizado');
       setEditingDocId(null);
@@ -306,7 +326,7 @@ export default function PipelineConfig() {
             const isEditing = editingId === stage.id;
             const isDocExpanded = expandedDocs === stage.id;
             const stageDocs = docTypes[stage.id] || [];
-            const newDoc = newDocInputs[stage.id] || { nombre: '', descripcion: '', requerido: true };
+            const newDoc = newDocInputs[stage.id] || { nombre: '', descripcion: '', requerido: true, requiere_documento: true, requiere_texto: false };
             const isDragTarget = dragOver === stage.id;
             const assignedProfile = (stage as any).assigned_profile as TeamMember | null;
 
@@ -541,7 +561,7 @@ export default function PipelineConfig() {
                             {isEditingDoc ? (
                               /* ── Modo edición inline ── */
                               <div className="space-y-2">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <input
                                     autoFocus
                                     value={editDocForm.nombre}
@@ -557,8 +577,30 @@ export default function PipelineConfig() {
                                     value={editDocForm.descripcion}
                                     onChange={e => setEditDocForm(f => ({ ...f, descripcion: e.target.value }))}
                                     placeholder="Descripción (opcional)"
-                                    className="w-36 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#4449AA] bg-white"
+                                    className="w-32 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#4449AA] bg-white"
                                   />
+                                  <select
+                                    value={
+                                      editDocForm.requiere_documento && editDocForm.requiere_texto
+                                        ? 'ambos'
+                                        : editDocForm.requiere_texto
+                                        ? 'texto'
+                                        : 'documento'
+                                    }
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setEditDocForm(f => ({
+                                        ...f,
+                                        requiere_documento: val === 'documento' || val === 'ambos',
+                                        requiere_texto: val === 'texto' || val === 'ambos'
+                                      }));
+                                    }}
+                                    className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#4449AA] bg-white text-gray-700 cursor-pointer"
+                                  >
+                                    <option value="documento">Solo Archivo</option>
+                                    <option value="texto">Solo Texto</option>
+                                    <option value="ambos">Archivo + Texto</option>
+                                  </select>
                                   <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer flex-shrink-0 select-none">
                                     <input
                                       type="checkbox"
@@ -588,7 +630,14 @@ export default function PipelineConfig() {
                               /* ── Modo lectura ── */
                               <>
                                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dt.requerido ? 'bg-red-400' : 'bg-gray-300'}`} />
-                                <span className="text-xs font-semibold text-gray-800 flex-1">{dt.nombre}</span>
+                                <span className="text-xs font-semibold text-gray-800 flex-1 flex items-center gap-2">
+                                  {dt.nombre}
+                                  {dt.requiere_texto && (
+                                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 flex-shrink-0">
+                                      {dt.requiere_documento ? 'Archivo + Texto' : 'Solo Texto'}
+                                    </span>
+                                  )}
+                                </span>
                                 {dt.descripcion && (
                                   <span className="text-xs text-gray-400 truncate max-w-[160px]">{dt.descripcion}</span>
                                 )}
@@ -619,7 +668,7 @@ export default function PipelineConfig() {
                     </div>
 
                     {/* Agregar doc */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-gray-100 mt-2">
+                    <div className="flex items-center gap-2 pt-2 border-t border-gray-100 mt-2 flex-wrap">
                       <input
                         value={newDoc.nombre}
                         onChange={e => setNewDocInputs(prev => ({ ...prev, [stage.id]: { ...newDoc, nombre: e.target.value } }))}
@@ -631,8 +680,33 @@ export default function PipelineConfig() {
                         value={newDoc.descripcion}
                         onChange={e => setNewDocInputs(prev => ({ ...prev, [stage.id]: { ...newDoc, descripcion: e.target.value } }))}
                         placeholder="Descripción (opcional)"
-                        className="w-36 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4449AA]/20 bg-white"
+                        className="w-28 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4449AA]/20 bg-white"
                       />
+                      <select
+                        value={
+                          (newDoc.requiere_documento ?? true) && (newDoc.requiere_texto ?? false)
+                            ? 'ambos'
+                            : (newDoc.requiere_texto ?? false)
+                            ? 'texto'
+                            : 'documento'
+                        }
+                        onChange={e => {
+                          const val = e.target.value;
+                          setNewDocInputs(prev => ({
+                            ...prev,
+                            [stage.id]: {
+                              ...newDoc,
+                              requiere_documento: val === 'documento' || val === 'ambos',
+                              requiere_texto: val === 'texto' || val === 'ambos'
+                            }
+                          }));
+                        }}
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-2 focus:outline-none focus:border-[#4449AA] bg-white text-gray-700 cursor-pointer"
+                      >
+                        <option value="documento">Solo Archivo</option>
+                        <option value="texto">Solo Texto</option>
+                        <option value="ambos">Archivo + Texto</option>
+                      </select>
                       <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer flex-shrink-0 select-none">
                         <input
                           type="checkbox"

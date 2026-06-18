@@ -2,9 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Upload, CheckCircle2, Loader2, AlertCircle,
-  ShieldCheck, File, X, Lock, ChevronDown
+  ShieldCheck, File, X, Lock, ChevronDown, Save
 } from 'lucide-react';
-import { clientPortalService } from '../../services/clients';
+import { clientPortalService, clientDocumentsService } from '../../services/clients';
 import type { ClientPortalData, ClientStageDocumentType, ClientDocument } from '../../types/clients';
 import toast from 'react-hot-toast';
 
@@ -34,6 +34,8 @@ export default function ClientPortal() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsExpanded, setTermsExpanded] = useState(false);
   const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const [textValues, setTextValues] = useState<Record<string, string>>({});
+  const [savingText, setSavingText] = useState<Record<string, boolean>>({});
 
   // ── Confetti ─────────────────────────────────────────
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -96,18 +98,71 @@ export default function ClientPortal() {
     }).finally(() => setLoading(false));
   }, [token]);
 
+  // Sync text fields with documents from DB
+  useEffect(() => {
+    if (!data) return;
+    const vals: Record<string, string> = {};
+    data.client.etapa_actual.document_types.forEach(dt => {
+      const doc = localDocs.find(d => d.doc_type_id === dt.id);
+      vals[dt.id] = doc?.valor_texto || '';
+    });
+    setTextValues(vals);
+  }, [localDocs, data]);
+
   // Trigger confetti when all required docs are uploaded
   const prevComplete = useRef(false);
   useEffect(() => {
     if (!data) return;
     const stage = data.client.etapa_actual;
     const docTypes: ClientStageDocumentType[] = stage.document_types || [];
+    const stageDocs = localDocs.filter(d => d.stage_id === stage.id);
+
+    const isReqFilled = (dt: ClientStageDocumentType) => {
+      const reqDoc = dt.requiere_documento ?? true;
+      const reqTxt = dt.requiere_texto ?? false;
+      const doc = stageDocs.find(d => d.doc_type_id === dt.id);
+      const hasDoc = !!doc?.file_path;
+      const hasTxt = !!doc?.valor_texto && doc.valor_texto.trim() !== '';
+      return reqDoc && reqTxt ? (hasDoc && hasTxt) :
+             reqDoc ? hasDoc :
+             reqTxt ? hasTxt : false;
+    };
+
     const required = docTypes.filter(d => d.requerido);
-    const filled = required.filter(d => localDocs.some(doc => doc.doc_type_id === d.id));
-    const complete = required.length > 0 ? filled.length === required.length : localDocs.length === docTypes.length;
+    const filled = required.filter(isReqFilled);
+    const allFilled = docTypes.filter(isReqFilled);
+    const complete = required.length > 0 ? filled.length === required.length : allFilled.length === docTypes.length;
     if (complete && !prevComplete.current) launchConfetti();
     prevComplete.current = complete;
   }, [localDocs, data, launchConfetti]);
+
+  const handleSaveText = async (docType: ClientStageDocumentType, value: string) => {
+    if (!termsAccepted) { toast.error('Acepta los términos primero'); return; }
+    if (!data || !token) return;
+    setSavingText(prev => ({ ...prev, [docType.id]: true }));
+    const doc = localDocs.find(d => d.doc_type_id === docType.id);
+    try {
+      await clientDocumentsService.saveTextResponse(
+        data.client.id,
+        data.client.company_id,
+        data.client.etapa_actual.id,
+        docType.id,
+        value,
+        doc?.id,
+        true
+      );
+      toast.success('Respuesta guardada correctamente');
+      const fresh = await clientPortalService.getByToken(token);
+      if (fresh) {
+        setData(fresh);
+        setLocalDocs((fresh.client.documents || []) as unknown as ClientDocument[]);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error al guardar la respuesta.');
+    } finally {
+      setSavingText(prev => ({ ...prev, [docType.id]: false }));
+    }
+  };
 
   const handleUpload = async (file: File, docType: ClientStageDocumentType) => {
     if (!termsAccepted) { toast.error('Acepta los términos primero'); return; }
@@ -161,10 +216,22 @@ export default function ClientPortal() {
   const stage = client.etapa_actual;
   const docTypes: ClientStageDocumentType[] = stage.document_types || [];
   const stageDocs = localDocs.filter(d => d.stage_id === stage.id);
+
+  const isReqFilled = (dt: ClientStageDocumentType) => {
+    const reqDoc = dt.requiere_documento ?? true;
+    const reqTxt = dt.requiere_texto ?? false;
+    const doc = stageDocs.find(d => d.doc_type_id === dt.id);
+    const hasDoc = !!doc?.file_path;
+    const hasTxt = !!doc?.valor_texto && doc.valor_texto.trim() !== '';
+    return reqDoc && reqTxt ? (hasDoc && hasTxt) :
+           reqDoc ? hasDoc :
+           reqTxt ? hasTxt : false;
+  };
+
   const required = docTypes.filter(d => d.requerido);
   // Progress counts ALL docs (required + optional)
-  const allFilled = docTypes.filter(d => stageDocs.some(doc => doc.doc_type_id === d.id));
-  const filled = required.filter(d => stageDocs.some(doc => doc.doc_type_id === d.id));
+  const allFilled = docTypes.filter(isReqFilled);
+  const filled = required.filter(isReqFilled);
   const pct = docTypes.length > 0 ? Math.round((allFilled.length / docTypes.length) * 100) : 100;
   // Completion card only when ALL required docs are uploaded
   const isComplete = required.length > 0 ? filled.length === required.length : allFilled.length === docTypes.length;
@@ -243,6 +310,11 @@ export default function ClientPortal() {
               hasTerms={hasTerms}
               termsAccepted={termsAccepted}
               handleUpload={handleUpload}
+              handleSaveText={handleSaveText}
+              textValues={textValues}
+              setTextValues={setTextValues}
+              savingText={savingText}
+              isReqFilled={isReqFilled}
             />
 
             {/* T&C */}
@@ -285,7 +357,7 @@ export default function ClientPortal() {
                 {/* Progress block */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">{filled.length} de {required.length} documentos</span>
+                    <span className="text-gray-500">{filled.length} de {required.length} requisitos</span>
                     <span className="font-bold text-gray-800">{pct}%</span>
                   </div>
                   <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -303,7 +375,7 @@ export default function ClientPortal() {
                 <div className="space-y-2">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documentos</p>
                   {docTypes.map((dt, idx) => {
-                    const isFilled = stageDocs.some(d => d.doc_type_id === dt.id);
+                    const isFilled = isReqFilled(dt);
                     const pastels = [
                       { bg: '#fce7f3', text: '#be185d' }, // rose
                       { bg: '#ede9fe', text: '#7c3aed' }, // violet
@@ -366,70 +438,114 @@ export default function ClientPortal() {
 
                 {docTypes.map((dt, idx) => {
                   const uploaded = stageDocs.filter(d => d.doc_type_id === dt.id);
-                  const isFilled = uploaded.length > 0;
+                  const isFilled = isReqFilled(dt);
                   const isLoading = uploading === dt.id;
                   const isDisabled = (hasTerms && !termsAccepted) || isLoading;
+                  const reqDoc = dt.requiere_documento ?? true;
+                  const reqTxt = dt.requiere_texto ?? false;
 
                   return (
-                    <div key={dt.id} className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
-                      isFilled ? 'border-gray-200 bg-gray-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                    <div key={dt.id} className={`flex flex-col gap-3.5 p-4 rounded-xl border transition-all ${
+                      isFilled ? 'border-gray-200 bg-gray-50/50' : 'border-gray-200 bg-white hover:border-gray-300'
                     }`}>
-                      {/* Step with pastel color per index */}
-                      {(() => {
-                        const pastels = [
-                          { bg: '#fce7f3', text: '#be185d' },
-                          { bg: '#ede9fe', text: '#7c3aed' },
-                          { bg: '#fef3c7', text: '#d97706' },
-                          { bg: '#e0f2fe', text: '#0369a1' },
-                          { bg: '#d1fae5', text: '#065f46' },
-                        ];
-                        const p = pastels[idx % pastels.length];
-                        return (
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-black"
-                            style={isFilled
-                              ? { background: '#146EB4', color: 'white' }
-                              : { background: p.bg, color: p.text }
-                            }
-                          >
-                            {isFilled ? '✓' : idx + 1}
+                      <div className="flex items-center gap-4">
+                        {/* Step with pastel color per index */}
+                        {(() => {
+                          const pastels = [
+                            { bg: '#fce7f3', text: '#be185d' },
+                            { bg: '#ede9fe', text: '#7c3aed' },
+                            { bg: '#fef3c7', text: '#d97706' },
+                            { bg: '#e0f2fe', text: '#0369a1' },
+                            { bg: '#d1fae5', text: '#065f46' },
+                          ];
+                          const p = pastels[idx % pastels.length];
+                          return (
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-black"
+                              style={isFilled
+                                ? { background: '#146EB4', color: 'white' }
+                                : { background: p.bg, color: p.text }
+                              }
+                            >
+                              {isFilled ? '✓' : idx + 1}
+                            </div>
+                          );
+                        })()}
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className={`text-sm font-bold ${isFilled ? 'text-gray-400' : 'text-gray-900'}`}>
+                              {dt.nombre}
+                            </p>
+                            {dt.requerido && !isFilled && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">
+                                REQ
+                              </span>
+                            )}
+                            {reqTxt && (
+                              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 flex-shrink-0">
+                                {reqDoc ? 'Archivo + Texto' : 'Solo Texto'}
+                              </span>
+                            )}
                           </div>
-                        );
-                      })()}
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className={`text-sm font-bold ${isFilled ? 'text-gray-400' : 'text-gray-900'}`}>
-                            {dt.nombre}
-                          </p>
-                          {dt.requerido && !isFilled && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">
-                              REQ
-                            </span>
+                          {dt.descripcion && <p className="text-xs text-gray-400 mt-0.5">{dt.descripcion}</p>}
+                          {uploaded.filter(doc => doc.file_path).map(doc => (
+                            <div key={doc.id} className="flex items-center gap-1.5 mt-1.5">
+                              <File className="w-3.5 h-3.5 text-[#4449AA] flex-shrink-0" />
+                              <span className="text-xs text-gray-500 font-medium truncate">{doc.nombre}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Upload */}
+                        {reqDoc && (
+                          <label className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all flex-shrink-0 ${
+                            isDisabled && !isLoading
+                              ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                              : (uploaded[0]?.file_path)
+                              ? 'border border-gray-200 text-gray-500 hover:border-gray-300 cursor-pointer'
+                              : 'bg-gray-900 text-white hover:bg-gray-800 cursor-pointer shadow-sm'
+                          }`}>
+                            {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                            {isLoading ? 'Subiendo' : (uploaded[0]?.file_path) ? 'Cambiar' : 'Subir'}
+                            <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
+                              disabled={isDisabled}
+                              onChange={e => { const f = e.target.files?.[0]; if(f) handleUpload(f,dt); e.target.value=''; }} />
+                          </label>
+                        )}
+                      </div>
+
+                      {/* Text Input for Desktop */}
+                      {reqTxt && (
+                        <div className="pl-12 space-y-2">
+                          <div className="flex items-end gap-2">
+                            <textarea
+                              disabled={isDisabled}
+                              value={textValues[dt.id] || ''}
+                              onChange={e => setTextValues(prev => ({ ...prev, [dt.id]: e.target.value }))}
+                              placeholder="Escribe la información solicitada aquí..."
+                              rows={2}
+                              className="flex-1 text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4449AA]/20 bg-white resize-none"
+                            />
+                            <button
+                              onClick={() => handleSaveText(dt, textValues[dt.id] || '')}
+                              disabled={isDisabled || savingText[dt.id] || (textValues[dt.id] || '').trim() === (uploaded[0]?.valor_texto || '')}
+                              title="Guardar respuesta"
+                              className="p-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
+                            >
+                              {savingText[dt.id] ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Save className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                          {uploaded[0]?.valor_texto && (
+                            <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                              ✓ Respuesta guardada
+                            </p>
                           )}
                         </div>
-                        {dt.descripcion && <p className="text-xs text-gray-400 mt-0.5">{dt.descripcion}</p>}
-                        {uploaded.map(doc => (
-                          <div key={doc.id} className="flex items-center gap-1.5 mt-1.5">
-                            <File className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                            <span className="text-xs text-gray-500 font-medium truncate">{doc.nombre}</span>
-                          </div>
-                        ))}
-                      </div>
-                      {/* Upload */}
-                      <label className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all flex-shrink-0 ${
-                        isDisabled && !isLoading
-                          ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                          : isFilled
-                          ? 'border border-gray-200 text-gray-500 hover:border-gray-300 cursor-pointer'
-                          : 'bg-gray-900 text-white hover:bg-gray-800 cursor-pointer shadow-sm'
-                      }`}>
-                        {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                        {isLoading ? 'Subiendo' : isFilled ? 'Cambiar' : 'Subir'}
-                        <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
-                          disabled={isDisabled}
-                          onChange={e => { const f = e.target.files?.[0]; if(f) handleUpload(f,dt); e.target.value=''; }} />
-                      </label>
+                      )}
                     </div>
                   );
                 })}
@@ -507,13 +623,30 @@ export default function ClientPortal() {
 }
 
 /* ── Mobile sub-components ── */
-function MobileDocList({ docTypes, stageDocs, uploading, hasTerms, termsAccepted, handleUpload }: {
+function MobileDocList({
+  docTypes,
+  stageDocs,
+  uploading,
+  hasTerms,
+  termsAccepted,
+  handleUpload,
+  handleSaveText,
+  textValues,
+  setTextValues,
+  savingText,
+  isReqFilled,
+}: {
   docTypes: ClientStageDocumentType[];
   stageDocs: ClientDocument[];
   uploading: string | null;
   hasTerms: boolean;
   termsAccepted: boolean;
   handleUpload: (file: File, dt: ClientStageDocumentType) => void;
+  handleSaveText: (dt: ClientStageDocumentType, val: string) => void;
+  textValues: Record<string, string>;
+  setTextValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  savingText: Record<string, boolean>;
+  isReqFilled: (dt: ClientStageDocumentType) => boolean;
 }) {
   // Paleta pastel por índice
   const PASTELS = [
@@ -528,10 +661,12 @@ function MobileDocList({ docTypes, stageDocs, uploading, hasTerms, termsAccepted
     <div className="space-y-3">
       {docTypes.map((dt, idx) => {
         const uploaded = stageDocs.filter(d => d.doc_type_id === dt.id);
-        const isFilled = uploaded.length > 0;
+        const isFilled = isReqFilled(dt);
         const isLoading = uploading === dt.id;
         const isDisabled = (hasTerms && !termsAccepted) || isLoading;
         const pastel = PASTELS[idx % PASTELS.length];
+        const reqDoc = dt.requiere_documento ?? true;
+        const reqTxt = dt.requiere_texto ?? false;
 
         return (
           <div key={dt.id} className={`border rounded-2xl overflow-hidden transition-all ${
@@ -560,41 +695,81 @@ function MobileDocList({ docTypes, stageDocs, uploading, hasTerms, termsAccepted
                     {dt.nombre}
                   </p>
                   {isFilled && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">✓ Listo</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-full">✓ Listo</span>
                   )}
                   {dt.requerido && !isFilled && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">REQ</span>
                   )}
+                  {reqTxt && (
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-100 flex-shrink-0">
+                      {reqDoc ? 'Archivo + Texto' : 'Solo Texto'}
+                    </span>
+                  )}
                 </div>
                 {dt.descripcion && <p className="text-xs text-gray-400 mt-0.5">{dt.descripcion}</p>}
-                {uploaded.map(doc => (
+                {uploaded.filter(doc => doc.file_path).map(doc => (
                   <div key={doc.id} className="flex items-center gap-1.5 mt-1.5 bg-gray-100 rounded-lg px-2 py-1">
                     <File className="w-3 h-3 text-gray-400 flex-shrink-0" />
                     <span className="text-xs text-gray-600 font-medium truncate">{doc.nombre}</span>
                   </div>
                 ))}
+
+                {/* Text input for Mobile */}
+                {reqTxt && (
+                  <div className="mt-2.5 space-y-2">
+                    <div className="flex items-end gap-2">
+                      <textarea
+                        disabled={isDisabled}
+                        value={textValues[dt.id] || ''}
+                        onChange={e => setTextValues(prev => ({ ...prev, [dt.id]: e.target.value }))}
+                        placeholder="Escribe la información solicitada aquí..."
+                        rows={2}
+                        className="flex-1 text-xs border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#4449AA]/20 bg-white resize-none"
+                      />
+                      <button
+                        onClick={() => handleSaveText(dt, textValues[dt.id] || '')}
+                        disabled={isDisabled || savingText[dt.id] || (textValues[dt.id] || '').trim() === (uploaded[0]?.valor_texto || '')}
+                        title="Guardar respuesta"
+                        className="p-2.5 rounded-xl bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
+                      >
+                        {savingText[dt.id] ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Save className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                    {uploaded[0]?.valor_texto && (
+                      <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                        ✓ Respuesta guardada
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             {/* Full-width upload button */}
-            <div className="px-4 pb-4">
-              <label className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-bold transition-all select-none cursor-pointer active:scale-[0.98] ${
-                isDisabled && !isLoading
-                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                  : isFilled
-                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-200'
-                  : ''
-              }`}
-              style={(!isDisabled && !isFilled) ? { background: pastel.btnBg, color: pastel.btnText, border: `1.5px solid ${pastel.bg}` } : {}}
-              >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> 
-                  : isFilled ? <CheckCircle2 className="w-5 h-5" />
-                  : <Upload className="w-4 h-4" />}
-                <span>{isLoading ? 'Subiendo...' : isFilled ? 'Cambiar archivo' : 'Subir documento'}</span>
-                <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
-                  disabled={isDisabled}
-                  onChange={e => { const f = e.target.files?.[0]; if(f) handleUpload(f, dt); e.target.value = ''; }} />
-              </label>
-            </div>
+            {reqDoc && (
+              <div className="px-4 pb-4">
+                <label className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-bold transition-all select-none cursor-pointer active:scale-[0.98] ${
+                  isDisabled && !isLoading
+                    ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                    : (uploaded[0]?.file_path)
+                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-200'
+                    : ''
+                }`}
+                style={(!isDisabled && !(uploaded[0]?.file_path)) ? { background: pastel.btnBg, color: pastel.btnText, border: `1.5px solid ${pastel.bg}` } : {}}
+                >
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> 
+                    : (uploaded[0]?.file_path) ? <CheckCircle2 className="w-5 h-5" />
+                    : <Upload className="w-4 h-4" />}
+                  <span>{isLoading ? 'Subiendo...' : (uploaded[0]?.file_path) ? 'Cambiar archivo' : 'Subir documento'}</span>
+                  <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
+                    disabled={isDisabled}
+                    onChange={e => { const f = e.target.files?.[0]; if(f) handleUpload(f, dt); e.target.value = ''; }} />
+                </label>
+              </div>
+            )}
           </div>
         );
       })}

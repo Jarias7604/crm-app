@@ -98,27 +98,64 @@ serve(async (req) => {
       throw new Error('No se pudo generar el enlace de subida');
     }
 
-    // ── Registrar documento en BD ─────────────────────────
-    const { data: docRecord, error: docError } = await supabase
-      .from('client_documents')
-      .insert({
-        company_id: client.company_id,
-        client_id: client.id,
-        stage_id: stage_id || client.etapa_actual_id,
-        doc_type_id: doc_type_id || null,
-        nombre: file_name,
-        file_path: filePath,
-        file_size: file_size || null,
-        file_type: file_type,
-        subido_por_cliente: true,
-        uploaded_by: null,
-      })
-      .select('id')
-      .single();
+    // ── Verificar si ya existe un registro para este doc_type_id ──
+    let existingDoc = null;
+    if (doc_type_id) {
+      const { data: found } = await supabase
+        .from('client_documents')
+        .select('id')
+        .eq('client_id', client.id)
+        .eq('doc_type_id', doc_type_id)
+        .limit(1)
+        .maybeSingle();
+      existingDoc = found;
+    }
 
-    if (docError) {
-      console.error('Error registrando documento:', docError);
-      throw new Error('No se pudo registrar el documento');
+    // ── Registrar o actualizar documento en BD ─────────────────────────
+    let docRecord;
+    if (existingDoc) {
+      const { data, error: docError } = await supabase
+        .from('client_documents')
+        .update({
+          stage_id: stage_id || client.etapa_actual_id,
+          nombre: file_name,
+          file_path: filePath,
+          file_size: file_size || null,
+          file_type: file_type,
+          subido_por_cliente: true,
+        })
+        .eq('id', existingDoc.id)
+        .select('id')
+        .single();
+      
+      if (docError) {
+        console.error('Error updating document:', docError);
+        throw new Error('No se pudo registrar el archivo en el documento existente');
+      }
+      docRecord = data;
+    } else {
+      const { data, error: docError } = await supabase
+        .from('client_documents')
+        .insert({
+          company_id: client.company_id,
+          client_id: client.id,
+          stage_id: stage_id || client.etapa_actual_id,
+          doc_type_id: doc_type_id || null,
+          nombre: file_name,
+          file_path: filePath,
+          file_size: file_size || null,
+          file_type: file_type,
+          subido_por_cliente: true,
+          uploaded_by: null,
+        })
+        .select('id')
+        .single();
+
+      if (docError) {
+        console.error('Error registrando documento:', docError);
+        throw new Error('No se pudo registrar el documento');
+      }
+      docRecord = data;
     }
 
     // ── Respuesta exitosa ─────────────────────────────────
