@@ -2361,7 +2361,10 @@ export default function ProjectManagement() {
             </Button>
             <Button
               type="button"
-              disabled={deleteConfirmInput !== 'ELIMINAR' && deleteConfirmInput !== projectToDelete?.name}
+              disabled={
+                deleteConfirmInput.trim() !== 'ELIMINAR' && 
+                deleteConfirmInput.trim() !== projectToDelete?.name?.trim()
+              }
               onClick={() => {
                 if (projectToDelete) {
                   handleDeleteProject(projectToDelete.id);
@@ -2369,7 +2372,7 @@ export default function ProjectManagement() {
                 }
               }}
               className={`w-full text-white border-0 h-12 text-xs font-bold uppercase tracking-widest rounded-xl transition-all active:scale-[0.98] ${
-                (deleteConfirmInput === 'ELIMINAR' || deleteConfirmInput === projectToDelete?.name)
+                (deleteConfirmInput.trim() === 'ELIMINAR' || deleteConfirmInput.trim() === projectToDelete?.name?.trim())
                   ? 'bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-950/20'
                   : 'bg-gray-300 cursor-not-allowed text-gray-400'
               }`}
