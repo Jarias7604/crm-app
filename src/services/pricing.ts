@@ -144,14 +144,29 @@ class PricingService {
         return data;
     }
 
-    async deletePricingItem(id: string) {
-        // Soft delete: solo marcar como inactivo
-        const { error } = await supabase
+    async deletePricingItem(id: string): Promise<{ deleted: boolean }> {
+        // 1. Intentar borrado físico de la base de datos
+        const { error: deleteError } = await supabase
             .from('pricing_items')
-            .update({ activo: false })
+            .delete()
             .eq('id', id);
 
-        if (error) throw error;
+        if (!deleteError) {
+            return { deleted: true };
+        }
+
+        // Si falla por restricción de llave foránea (está en uso en alguna cotización, código 23503), hacemos soft-delete
+        if (deleteError.code === '23503') {
+            const { error: updateError } = await supabase
+                .from('pricing_items')
+                .update({ activo: false })
+                .eq('id', id);
+
+            if (updateError) throw updateError;
+            return { deleted: false };
+        }
+
+        throw deleteError;
     }
 
     async getAllPricingItems(includeInactive = false): Promise<PricingItem[]> {

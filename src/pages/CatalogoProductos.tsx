@@ -192,14 +192,19 @@ export default function CatalogoProductos() {
 
     const handleDelete = async (id: string) => {
         if (!canEdit) return toast.error('No tienes permisos');
-        if (!confirm('¿Archivar este producto? Dejará de estar disponible para nuevas cotizaciones.')) return;
+        if (!confirm('¿Estás seguro de eliminar este producto? Si nunca ha sido cotizado se borrará por completo. Si ya tiene historial, se archivará automáticamente.')) return;
 
         try {
-            await pricingService.deletePricingItem(id); // Using soft delete approach from service
-            toast.success('Producto archivado');
+            const result = await pricingService.deletePricingItem(id);
+            if (result.deleted) {
+                toast.success('🗑️ Producto eliminado del catálogo permanentemente');
+            } else {
+                toast.success('📦 Producto archivado por seguridad (tiene cotizaciones asociadas)');
+            }
+            resetForm();
             loadItems();
         } catch (error) {
-            toast.error('Error al archivar');
+            toast.error('Error al eliminar el producto');
         }
     };
 
@@ -340,7 +345,17 @@ export default function CatalogoProductos() {
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex flex-col items-center gap-3 relative z-10 ml-4 self-start">
+                            <div className="flex items-center gap-2 relative z-10 ml-4 self-start">
+                                {editingId && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDelete(editingId)}
+                                        className="p-2 bg-red-950/40 text-red-400 hover:text-red-200 hover:bg-red-900/50 rounded-xl transition-all border border-red-900/60 shadow-sm active:scale-95 flex items-center justify-center"
+                                        title="Eliminar producto"
+                                    >
+                                        <Trash2 className="w-5 h-5" />
+                                    </button>
+                                )}
                                 <button
                                     onClick={resetForm}
                                     className="p-2 bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl transition-all border border-slate-700 shadow-sm active:scale-95"
@@ -731,9 +746,6 @@ export default function CatalogoProductos() {
                                                     </button>
                                                     <button onClick={() => handleEdit(item)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
                                                         <Edit className="w-4 h-4" />
-                                                    </button>
-                                                    <button onClick={() => handleDelete(item.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Archivar">
-                                                        <Trash2 className="w-4 h-4" />
                                                     </button>
                                                 </div>
                                             )}
