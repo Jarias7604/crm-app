@@ -54,7 +54,8 @@ export function AIPerformanceChat({ companyId, isOpen, onClose, performanceConte
                     leads_won: u.leads_won,
                     leads_lost: u.leads_lost,
                     win_rate: u.win_rate,
-                    closed_amount: u.closed_amount
+                    closed_amount: u.closed_amount,
+                    leads_without_follow_up: u.leads_without_follow_up
                 })),
                 callSummary: performanceContext?.callSummary?.map((c: any) => ({
                     user_name: performanceContext?.profileNames?.[c.user_id] || 'Usuario Desconocido',

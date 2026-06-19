@@ -34,7 +34,7 @@ async function check() {
     console.log('Querying all profiles...');
     const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name, avatar_url, role');
+        .select('id, email, full_name, avatar_url, role, company_id, is_platform_owner');
 
     if (error) {
         console.error('Error fetching profiles:', error);
@@ -43,7 +43,7 @@ async function check() {
 
     console.log(`Found ${profiles?.length || 0} profiles:`);
     profiles?.forEach(p => {
-        console.log(`- ${p.email} | ${p.full_name} | Role: ${p.role} | Avatar: ${p.avatar_url}`);
+        console.log(`- ${p.email} | ${p.full_name} | Role: ${p.role} | Company: ${p.company_id} | PlatformOwner: ${p.is_platform_owner}`);
     });
 }
 
