@@ -128,7 +128,7 @@ serve(async (req) => {
                 // 3. Fetch call activities in range
                 const { data: calls } = await supabase
                     .from('call_activities')
-                    .select('id, call_date, call_type')
+                    .select('id, call_date, outcome, action_type')
                     .eq('user_id', schedule.advisor_id)
                     .eq('company_id', schedule.company_id)
                     .gte('call_date', start.toISOString())
@@ -136,31 +136,46 @@ serve(async (req) => {
 
                 const callList = calls || [];
                 const actual = callList.length;
-                const actualConnected = callList.filter(c => c.call_type === 'Llamada' || c.call_type === 'connected').length;
+                const actualConnected = callList.filter(c => c.outcome === 'connected').length;
 
                 // 4. Build day grid
                 const elapsedDays = countWorkingDaysElapsed(start, end);
                 const goalUpToDate = dailyGoal * elapsedDays;
 
                 // Build day grid entries
+                const getElSalvadorDateStr = (dateVal: string | Date) => {
+                    const d = typeof dateVal === 'string' ? new Date(dateVal) : dateVal;
+                    const formatter = new Intl.DateTimeFormat('en-US', {
+                        timeZone: 'America/El_Salvador',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                    });
+                    const parts = formatter.formatToParts(d);
+                    const month = parts.find(p => p.type === 'month')?.value;
+                    const day = parts.find(p => p.type === 'day')?.value;
+                    const year = parts.find(p => p.type === 'year')?.value;
+                    return `${year}-${month}-${day}`;
+                };
+
                 const dayMap: Record<string, number> = {};
                 for (const c of callList) {
-                    const d = new Date(c.call_date);
-                    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                    const key = getElSalvadorDateStr(c.call_date);
                     dayMap[key] = (dayMap[key] || 0) + 1;
                 }
 
-                const dayGrid: { label: string; count: number; goal: number; isFuture: boolean }[] = [];
+                const dayGrid: { label: string; count: number; goal: number; isFuture: boolean; date: string }[] = [];
                 const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
                 const cur = new Date(start); cur.setHours(12, 0, 0, 0);
                 while (cur <= end) {
                     if (isWorkingDay(cur)) {
-                        const key = `${cur.getFullYear()}-${cur.getMonth()}-${cur.getDate()}`;
+                        const key = getElSalvadorDateStr(cur);
                         dayGrid.push({
                             label: cur.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }),
                             count: dayMap[key] || 0,
                             goal: dailyGoal,
                             isFuture: cur > todayEnd,
+                            date: cur.toISOString(),
                         });
                     }
                     cur.setDate(cur.getDate() + 1);

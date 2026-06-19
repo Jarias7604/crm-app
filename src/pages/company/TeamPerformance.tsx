@@ -2577,6 +2577,7 @@ function CallActivitySection({
             count: getUserCallsForDate(row.userId, date).length,
             goal: row.dailyGoal,
             isFuture: date > todayEnd,
+            date: date.toISOString(),
         }));
 
         try {
@@ -2686,13 +2687,29 @@ function CallActivitySection({
             return row.dailyGoal > 0 ? c >= row.dailyGoal : c > 0;
         }).length;
 
-        const dayGridHTML = pastDays.map(date => {
-            const count = getUserCallsForDate(userId, date).length;
-            const g = row.dailyGoal;
-            const p = g > 0 ? (count / g) * 100 : 0;
-            const lbl = date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
-            const c = p >= 100 ? '#10b981' : p >= 80 ? '#14b8a6' : p >= 50 ? '#f59e0b' : count > 0 ? '#f97316' : '#ef4444';
-            return `<div style="border:1.5px solid ${c}40;background:${c}0d;border-radius:8px;padding:10px 4px;text-align:center;"><p style="font-size:8px;font-weight:800;color:#64748b;text-transform:uppercase;margin:0 0 4px;letter-spacing:.5px;">${lbl}</p><p style="font-size:20px;font-weight:900;color:${c};margin:0;">${count}</p><p style="font-size:8px;color:#94a3b8;margin:3px 0 0;">/${g}</p></div>`;
+        const weeks = getCalendarWeeks(userDays);
+        const dayGridHTML = weeks.map(week => {
+            const cells = week.map(date => {
+                const dateStr = date.toISOString().split('T')[0];
+                const isInRange = userDays.some(d => d.toISOString().split('T')[0] === dateStr);
+                
+                if (!isInRange) {
+                    return `<td width="14.28%" style="padding:3px;"><div style="border:1.5px dashed #cbd5e1;background:#f8fafc;border-radius:8px;padding:10px 4px;text-align:center;opacity:0.4;"><p style="font-size:8px;font-weight:800;color:#94a3b8;margin:0 0 4px;">${date.getDate()}</p><p style="font-size:20px;font-weight:900;color:#cbd5e1;margin:0;">—</p><p style="font-size:8px;color:transparent;margin:3px 0 0;">/</p></div></td>`;
+                }
+                
+                const count = getUserCallsForDate(userId, date).length;
+                const g = row.dailyGoal;
+                const p = g > 0 ? (count / g) * 100 : 0;
+                const lbl = date.getDate();
+                const isWorking = activeWD.includes(date.getDay());
+                
+                const c = !isWorking ? (count > 0 ? '#6366f1' : '#94a3b8') : p >= 100 ? '#10b981' : p >= 80 ? '#14b8a6' : p >= 50 ? '#f59e0b' : count > 0 ? '#f97316' : '#ef4444';
+                const bg = c + '0d';
+                const border = c + '40';
+                
+                return `<td width="14.28%" style="padding:3px;"><div style="border:1.5px solid ${border};background:${bg};border-radius:8px;padding:10px 4px;text-align:center;"><p style="font-size:8px;font-weight:800;color:#64748b;margin:0 0 4px;letter-spacing:.5px;">${lbl}</p><p style="font-size:20px;font-weight:900;color:${c};margin:0;">${count}</p><p style="font-size:8px;color:#94a3b8;margin:3px 0 0;">${!isWorking ? 'desc.' : `/${g}`}</p></div></td>`;
+            }).join('');
+            return `<tr>${cells}</tr>`;
         }).join('');
 
         const periodLabel = getFormattedDateRange();
@@ -2743,7 +2760,23 @@ function CallActivitySection({
   <div class="kpi"><div class="kpi-label">Abordaje Prom.</div><div class="kpi-val" style="color:${rtColor};font-size:18px;">${row.avgResponseTime > 0 ? row.avgResponseTime <= 1 ? '&lt;1h' : row.avgResponseTime < 24 ? row.avgResponseTime.toFixed(1)+'h' : Math.round(row.avgResponseTime/24)+'d' : 'N/A'}</div><div class="kpi-sub">asignación→primer contacto</div></div>
   <div class="kpi"><div class="kpi-label">Desviación</div><div class="kpi-val" style="color:${devColor}">${devLabel}</div><div class="kpi-sub">meta diaria: ${row.dailyGoal} llamadas</div></div>
 </div>
-${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglose Diario — Solo días transcurridos (${pastDays.length} días laborables)</div><div class="daygrid">${dayGridHTML}</div></div>` : ''}
+${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglose Diario — Solo días transcurridos (${pastDays.length} días laborables)</div>
+<table width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;border-collapse:collapse;margin-top:8px;">
+  <thead>
+    <tr style="text-align:center;font-size:8px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">
+      <th style="padding-bottom:6px;">Lun</th>
+      <th style="padding-bottom:6px;">Mar</th>
+      <th style="padding-bottom:6px;">Mié</th>
+      <th style="padding-bottom:6px;">Jue</th>
+      <th style="padding-bottom:6px;">Vie</th>
+      <th style="padding-bottom:6px;">Sáb</th>
+      <th style="padding-bottom:6px;">Dom</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${dayGridHTML}
+  </tbody>
+</table></div>` : ''}
 <div class="two-col">
   <div class="section"><div class="sec-title">📊 Resumen de Actividad de Llamadas</div>
     <div class="stat"><span class="slabel">Meta diaria configurada</span><span class="sval">${row.dailyGoal} llamadas/día</span></div>
@@ -2937,6 +2970,40 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
         return dates;
     };
 
+    const getCalendarWeeks = (dates: Date[]) => {
+        if (dates.length === 0) return [];
+        
+        const sorted = [...dates].sort((a, b) => a.getTime() - b.getTime());
+        const startDate = sorted[0];
+        const endDate = sorted[sorted.length - 1];
+        
+        const start = new Date(startDate);
+        const startDay = start.getDay();
+        const startDiff = startDay === 0 ? -6 : 1 - startDay;
+        start.setDate(start.getDate() + startDiff);
+        start.setHours(0, 0, 0, 0);
+
+        const end = new Date(endDate);
+        const endDay = end.getDay();
+        const endDiff = endDay === 0 ? 0 : 7 - endDay;
+        end.setDate(end.getDate() + endDiff);
+        end.setHours(23, 59, 59, 999);
+
+        const weeks: Date[][] = [];
+        let currentWeek: Date[] = [];
+        const current = new Date(start);
+
+        while (current <= end) {
+            currentWeek.push(new Date(current));
+            if (currentWeek.length === 7) {
+                weeks.push(currentWeek);
+                currentWeek = [];
+            }
+            current.setDate(current.getDate() + 1);
+        }
+        return weeks;
+    };
+
     const getUserCallsForDate = (userId: string, date: Date) => {
         const year = date.getFullYear();
         const month = date.getMonth();
@@ -2944,7 +3011,6 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
         
         return callLogs.filter(log => {
             if (log.user_id !== userId) return false;
-            if (log.action_type !== 'call') return false;
             const logDate = new Date(log.call_date);
             return logDate.getFullYear() === year &&
                    logDate.getMonth() === month &&
@@ -3274,7 +3340,7 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
             {/* ── Executive Header ─────────────────────────────────── */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest">Actividad de Llamadas</h3>
+                    <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest">Actividad de Seguimientos</h3>
                     <p className="text-[10px] text-slate-400 font-medium mt-0.5">{getFormattedDateRange()} · {days} {days === 1 ? 'día' : 'días'}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -3329,7 +3395,7 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
                 {/* Table header */}
                 <div className="grid grid-cols-12 gap-0 px-5 py-3 bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
                     <div className="col-span-3">Asesor</div>
-                    <div className="col-span-2 text-center">Llamadas</div>
+                    <div className="col-span-2 text-center">Seguimientos</div>
                     <div className="col-span-2 text-center">Meta a la Fecha</div>
                     <div className="col-span-2 text-center">Cumplimiento</div>
                     <div className="col-span-2 text-center">Abordaje</div>
@@ -3374,7 +3440,7 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
                                     <div className="col-span-2 text-center">
                                         <button onClick={(e) => { e.stopPropagation(); handleCallClick(row.userId, 'all'); }} className="group">
                                             <span className="text-base font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{row.actual}</span>
-                                            <span className="text-[9px] text-slate-400 font-medium block">llamadas</span>
+                                            <span className="text-[9px] text-slate-400 font-medium block">seguimientos</span>
                                         </button>
                                     </div>
 
@@ -3453,29 +3519,64 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 print-grid">
-                                                        {userDaysRange.map(date => {
-                                                            const isFuture = date > today;
-                                                            const count = getUserCallsForDate(row.userId, date).length;
-                                                            const goal = row.dailyGoal;
-                                                            const p = goal > 0 ? (count / goal) * 100 : 0;
-                                                            const dateLabel = date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
-                                                            const bg = isFuture
-                                                                ? 'bg-slate-50 border-slate-200/60 text-slate-400 opacity-50'
-                                                                : goal === 0 ? 'bg-slate-50 border-slate-100 text-slate-500'
-                                                                : p >= 100 ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                                                : p >= 80 ? 'bg-teal-50 border-teal-200 text-teal-700'
-                                                                : p >= 50 ? 'bg-amber-50 border-amber-200 text-amber-700'
-                                                                : count > 0 ? 'bg-orange-50 border-orange-200 text-orange-700'
-                                                                : 'bg-rose-50 border-rose-200 text-rose-700';
-                                                            return (
-                                                                <div key={date.getTime()} className={`border ${bg} rounded-lg p-2 text-center`}>
-                                                                    <p className="text-[8px] font-bold uppercase opacity-70 truncate">{dateLabel}</p>
-                                                                    <p className="text-base font-black mt-0.5">{isFuture ? '—' : count}</p>
-                                                                    <p className="text-[8px] opacity-50">{isFuture ? 'pend.' : `/${goal}`}</p>
-                                                                </div>
-                                                            );
-                                                        })}
+                                                    {/* Calendar Headers */}
+                                                    <div className="grid grid-cols-7 gap-1.5 mb-1 text-center font-bold text-[8px] text-slate-400 uppercase tracking-wider">
+                                                        <div>Lun</div>
+                                                        <div>Mar</div>
+                                                        <div>Mié</div>
+                                                        <div>Jue</div>
+                                                        <div>Vie</div>
+                                                        <div>Sáb</div>
+                                                        <div>Dom</div>
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        {getCalendarWeeks(userDaysRange).map((week, wIdx) => (
+                                                            <div key={wIdx} className="grid grid-cols-7 gap-1.5 print-grid">
+                                                                {week.map(date => {
+                                                                    const dateStr = date.toISOString().split('T')[0];
+                                                                    const isInRange = userDaysRange.some(d => d.toISOString().split('T')[0] === dateStr);
+                                                                    
+                                                                    if (!isInRange) {
+                                                                        return (
+                                                                            <div key={date.getTime()} className="bg-slate-50/40 border border-slate-100/50 rounded-lg p-2 text-center opacity-30 select-none">
+                                                                                <p className="text-[8px] font-bold uppercase text-slate-300">{date.getDate()}</p>
+                                                                                <p className="text-base font-black mt-0.5 text-slate-200">—</p>
+                                                                                <p className="text-[8px] text-slate-200 opacity-0">/</p>
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    const isFuture = date > today;
+                                                                    const count = getUserCallsForDate(row.userId, date).length;
+                                                                    const goal = row.dailyGoal;
+                                                                    const p = goal > 0 ? (count / goal) * 100 : 0;
+                                                                    const dateLabel = date.getDate();
+                                                                    
+                                                                    const activeWD = getActiveWeekdaysForUser(companyId, row.userId);
+                                                                    const isWorking = activeWD.includes(date.getDay());
+
+                                                                    const bg = isFuture
+                                                                        ? 'bg-slate-50 border-slate-200/60 text-slate-400 opacity-50'
+                                                                        : !isWorking ? (count > 0 ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-bold' : 'bg-slate-100 border-slate-200 text-slate-400')
+                                                                        : goal === 0 ? 'bg-slate-50 border-slate-100 text-slate-500'
+                                                                        : p >= 100 ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold'
+                                                                        : p >= 80 ? 'bg-teal-50 border-teal-200 text-teal-700 font-bold'
+                                                                        : p >= 50 ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                                                        : count > 0 ? 'bg-orange-50 border-orange-200 text-orange-700'
+                                                                        : 'bg-rose-50 border-rose-200 text-rose-700';
+
+                                                                    return (
+                                                                        <div key={date.getTime()} className={`border ${bg} rounded-lg p-2 text-center`}>
+                                                                            <p className="text-[8px] font-bold uppercase opacity-70 truncate">{dateLabel}</p>
+                                                                            <p className="text-base font-black mt-0.5">{isFuture ? '—' : count}</p>
+                                                                            <p className="text-[8px] opacity-50">
+                                                                                {isFuture ? 'pend.' : !isWorking ? 'desc.' : `/${goal}`}
+                                                                            </p>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 </div>
                                             );
@@ -3828,8 +3929,8 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
                                     <Phone className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
-                                    <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-tight">Metas de Llamadas</h2>
-                                    <p className="text-[9px] text-slate-400 font-medium">Llamadas diarias por asesor</p>
+                                    <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-tight">Metas de Seguimientos</h2>
+                                    <p className="text-[9px] text-slate-400 font-medium">Seguimientos diarios por asesor</p>
                                 </div>
                             </div>
                             <button onClick={() => setIsGoalPanelOpen(false)} className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">

@@ -22,7 +22,7 @@ interface ReportPayload {
     deviation: number;
     percent: number;
     avgResponseTime: number;
-    dayGrid: { label: string; count: number; goal: number; isFuture: boolean }[];
+    dayGrid: { label: string; count: number; goal: number; isFuture: boolean; date?: string }[];
     daysOK: number;
     pastDaysCount: number;
     leadsWithoutFollowUp: number;
@@ -67,53 +67,114 @@ function buildHTML(p: ReportPayload): string {
     const devLabel = p.deviation >= 0 ? `+${p.deviation}` : `${p.deviation}`;
     const devColor = p.deviation >= 0 ? '#10b981' : '#ef4444';
 
-    const pastDays = p.dayGrid.filter(d => !d.isFuture);
-    const weeks = chunk(pastDays, 7);
+    // Parse dates and sort
+    const items = p.dayGrid.map(item => ({
+        ...item,
+        parsedDate: item.date ? new Date(item.date) : new Date(),
+    })).sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
 
-    // Build day grid as pure HTML table — 7 columns per row (email-safe)
-    const dayTableRows = weeks.map(week => {
-        const cells = week.map(d => {
-            const pct = d.goal > 0 ? (d.count / d.goal) * 100 : 0;
-            const c = colorFor(pct, d.count);
-            const bg = c + '15';
-            const border = c + '60';
-            return `<td width="${Math.floor(100/7)}%" style="padding:3px;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border:2px solid ${border};border-radius:8px;">
+    let dayTableRows = '';
+    
+    if (items.length > 0) {
+        const startDate = items[0].parsedDate;
+        const endDate = items[items.length - 1].parsedDate;
+
+        const start = new Date(startDate);
+        const startDay = start.getDay();
+        const startDiff = startDay === 0 ? -6 : 1 - startDay;
+        start.setDate(start.getDate() + startDiff);
+        start.setHours(0, 0, 0, 0);
+
+        const end = new Date(endDate);
+        const endDay = end.getDay();
+        const endDiff = endDay === 0 ? 0 : 7 - endDay;
+        end.setDate(end.getDate() + endDiff);
+        end.setHours(23, 59, 59, 999);
+
+        const calendarWeeks: { date: Date; count?: number; goal?: number; isFuture?: boolean; isInRange: boolean }[][] = [];
+        let currentWeek: typeof calendarWeeks[0] = [];
+        const current = new Date(start);
+
+        while (current <= end) {
+            const currentStr = current.toISOString().split('T')[0];
+            const matchingItem = items.find(item => {
+                if (!item.date) return false;
+                return new Date(item.date).toISOString().split('T')[0] === currentStr;
+            });
+
+            currentWeek.push({
+                date: new Date(current),
+                count: matchingItem?.count,
+                goal: matchingItem?.goal,
+                isFuture: matchingItem ? matchingItem.isFuture : true,
+                isInRange: !!matchingItem,
+            });
+
+            if (currentWeek.length === 7) {
+                calendarWeeks.push(currentWeek);
+                currentWeek = [];
+            }
+            current.setDate(current.getDate() + 1);
+        }
+
+        // Build HTML table rows
+        dayTableRows = calendarWeeks.map(week => {
+            const cells = week.map(d => {
+                if (!d.isInRange) {
+                    return `<td width="14.28%" style="padding:3px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:2px dashed #cbd5e1;border-radius:8px;opacity:0.4;">
     <tr><td style="padding:8px 4px;text-align:center;">
-      <p style="margin:0 0 3px;font-size:7px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.5px;">${d.label}</p>
-      <p style="margin:0 0 2px;font-size:20px;font-weight:900;color:${c};line-height:1;">${d.count}</p>
-      <p style="margin:0;font-size:8px;color:#94a3b8;font-weight:600;">/${d.goal}</p>
+      <p style="margin:0 0 3px;font-size:7px;font-weight:800;color:#cbd5e1;">${d.date.getDate()}</p>
+      <p style="margin:0;font-size:20px;font-weight:900;color:#cbd5e1;line-height:1;">—</p>
+      <p style="margin:3px 0 0;font-size:8px;color:transparent;">/</p>
     </td></tr>
   </table>
 </td>`;
-        });
-        // Pad last row with empty cells
-        while (cells.length < 7) {
-            cells.push(`<td width="${Math.floor(100/7)}%" style="padding:3px;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;border:2px solid #e2e8f0;border-radius:8px;"><tr><td style="padding:8px 4px;text-align:center;"><p style="margin:0;font-size:8px;color:#cbd5e1;">—</p></td></tr></table></td>`);
-        }
-        return `<tr>${cells.join('')}</tr>`;
-    }).join('');
+                }
+
+                const count = d.count || 0;
+                const goal = d.goal || 0;
+                const pct = goal > 0 ? (count / goal) * 100 : 0;
+                const isWorking = d.date.getDay() !== 0;
+
+                const c = !isWorking ? (count > 0 ? '#6366f1' : '#94a3b8') : pct >= 100 ? '#10b981' : pct >= 80 ? '#14b8a6' : pct >= 50 ? '#f59e0b' : count > 0 ? '#f97316' : '#ef4444';
+                const bg = c + '15';
+                const border = c + '60';
+                
+                return `<td width="14.28%" style="padding:3px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border:2px solid ${border};border-radius:8px;">
+    <tr><td style="padding:8px 4px;text-align:center;">
+      <p style="margin:0 0 3px;font-size:7px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.5px;">${d.date.getDate()}</p>
+      <p style="margin:0 0 2px;font-size:20px;font-weight:900;color:${c};line-height:1;">${d.isFuture ? '—' : count}</p>
+      <p style="margin:0;font-size:8px;color:#94a3b8;font-weight:600;">${d.isFuture ? 'pend.' : !isWorking ? 'desc.' : `/${goal}`}</p>
+    </td></tr>
+  </table>
+</td>`;
+            });
+            return `<tr>${cells.join('')}</tr>`;
+        }).join('');
+    }
 
     const kpis = [
-        { label: 'Llamadas Realizadas', value: `${p.actual}`, sub: `de ${p.goalUpToDate} meta`, color: '#4f46e5' },
+        { label: 'Seguimientos Realizados', value: `${p.actual}`, sub: `de ${p.goalUpToDate} meta`, color: '#4f46e5' },
         { label: 'Cumplimiento', value: `${Math.round(p.percent)}%`, sub: `${p.daysOK}/${p.pastDaysCount} días OK`, color: pctColor },
         { label: 'Abordaje Prom.', value: fmtRT(p.avgResponseTime), sub: 'asign. → contacto', color: rtColor },
         { label: 'Desviación', value: devLabel, sub: `meta diaria: ${p.dailyGoal}`, color: devColor },
     ];
 
     const activityRows = [
-        ['Meta diaria', `${p.dailyGoal} llam./día`],
+        ['Meta diaria', `${p.dailyGoal} seg./día`],
         ['Meta del período', `${p.periodGoal}`],
         ['Meta a la fecha', `${p.goalUpToDate}`],
-        ['Realizadas', `${p.actual}`],
-        ['Conectadas', `${p.actualConnected}`],
+        ['Seguimientos real.', `${p.actual}`],
+        ['Conectados', `${p.actualConnected}`],
         ['Días evaluados', `${p.pastDaysCount}`],
         ['Días con meta OK', `${p.daysOK}`],
     ];
 
     const oppRows = p.userConsolidated > 0 ? [
         ['Leads sin contacto', `${p.leadsWithoutFollowUp}`, '#ef4444'],
-        ['Llamadas faltantes', `-${p.deficit}`, '#ef4444'],
+        ['Seguimientos falt.', `-${p.deficit}`, '#ef4444'],
         ['Pérd. negligencia', fmtCur(p.userNeglectLoss), '#ef4444'],
         ['Pérd. inactividad', fmtCur(p.userActivityLoss), '#f59e0b'],
         ['Tasa conversión', `${p.conversionRate.toFixed(1)}%`, '#64748b'],
@@ -164,15 +225,28 @@ function buildHTML(p: ReportPayload): string {
     </td>
   </tr>
 
-  ${pastDays.length > 0 ? `
+  ${p.dayGrid.length > 0 ? `
   <!-- DAY GRID — 7 columns per week, email-safe table layout -->
   <tr>
     <td style="padding:0 20px 16px;">
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
         <tr><td style="padding:14px 14px 8px;">
           <p style="margin:0 0 10px;font-size:8px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;">Desglose Diario &mdash; ${p.pastDaysCount} dias laborables evaluados</p>
-          <table width="100%" cellpadding="0" cellspacing="0">
-            ${dayTableRows}
+          <table width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;border-collapse:collapse;">
+            <thead>
+              <tr style="text-align:center;font-size:7px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;">
+                <th style="padding-bottom:6px;">Lun</th>
+                <th style="padding-bottom:6px;">Mar</th>
+                <th style="padding-bottom:6px;">Mié</th>
+                <th style="padding-bottom:6px;">Jue</th>
+                <th style="padding-bottom:6px;">Vie</th>
+                <th style="padding-bottom:6px;">Sáb</th>
+                <th style="padding-bottom:6px;">Dom</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dayTableRows}
+            </tbody>
           </table>
         </td></tr>
       </table>
@@ -186,7 +260,7 @@ function buildHTML(p: ReportPayload): string {
         <td width="50%" valign="top" style="padding-right:6px;">
           <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
             <tr><td style="padding:14px;">
-              <p style="margin:0 0 10px;font-size:8px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;">Actividad de Llamadas</p>
+              <p style="margin:0 0 10px;font-size:8px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:2px;">Actividad de Seguimientos</p>
               ${activityRows.map(([l, v], i) => `
               <table width="100%" cellpadding="0" cellspacing="0" style="${i < activityRows.length-1 ? 'border-bottom:1px solid #f1f5f9;' : ''}">
                 <tr>
@@ -228,7 +302,7 @@ function buildHTML(p: ReportPayload): string {
         <tr><td style="padding:14px;">
           <p style="margin:0 0 6px;font-size:8px;font-weight:800;color:#3730a3;text-transform:uppercase;letter-spacing:2px;">Metodologia</p>
           <p style="margin:0;font-size:9px;color:#1e40af;line-height:1.6;">
-            <strong>Llamadas:</strong> call_activities del periodo &nbsp;&middot;&nbsp;
+            <strong>Seguimientos:</strong> actividades del periodo &nbsp;&middot;&nbsp;
             <strong>Meta a la fecha:</strong> Meta diaria x dias laborables transcurridos (excluye dias futuros) &nbsp;&middot;&nbsp;
             <strong>Leads sin contacto:</strong> Leads activos sin call_activity en el periodo (excluye Perdidos/Cerrados) &nbsp;&middot;&nbsp;
             <strong>Oportunidad:</strong> Estimacion estadistica basada en tasa de conversion y ticket promedio.
@@ -340,3 +414,4 @@ serve(async (req) => {
         });
     }
 });
+
