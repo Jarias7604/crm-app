@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, AreaChart, Area
+    PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Line
 } from 'recharts';
 import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout, CreditCard, Brain, Sparkles, MessageSquare, Crosshair, Flame, Zap, HelpCircle, UserMinus } from 'lucide-react';
 import { adminService } from '../services/admin';
@@ -1700,7 +1700,7 @@ export default function Dashboard() {
                             </div>
                         ) : salesTrendData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={salesTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                <ComposedChart data={salesTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -1720,26 +1720,61 @@ export default function Dashboard() {
                                         }}
                                     />
                                     <YAxis 
+                                        yAxisId="left"
                                         tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} 
                                         axisLine={false} 
                                         tickLine={false}
                                         tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
                                     />
+                                    <YAxis 
+                                        yAxisId="right"
+                                        orientation="right"
+                                        domain={[0, 100]}
+                                        tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} 
+                                        axisLine={false} 
+                                        tickLine={false}
+                                        tickFormatter={(val) => `${val}%`}
+                                    />
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                     <Tooltip
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '8px 12px' }}
                                         labelStyle={{ fontSize: '10px', fontWeight: 800, color: '#64748b', marginBottom: '4px' }}
-                                        itemStyle={{ fontSize: '12px', fontWeight: 800, color: '#10b981' }}
                                         labelFormatter={(val) => {
                                             try {
                                                 const dateStr = val.includes('T') ? val : `${val}T12:00:00`;
                                                 return format(new Date(dateStr), 'dd MMM yyyy', { locale: es });
                                             } catch(e) { return val; }
                                         }}
-                                        formatter={(value: any) => [`$${value?.toLocaleString() || 0}`, 'Ingresos']}
+                                        formatter={(value: any, name?: string) => {
+                                            const displayName = name || '';
+                                            if (displayName === 'Ingresos') {
+                                                return [`$${value?.toLocaleString() || 0}`, displayName];
+                                            }
+                                            return [`${value}%`, displayName];
+                                        }}
                                     />
-                                    <Area type="monotone" dataKey="amount" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorAmount)" activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} />
-                                </AreaChart>
+                                    <Area 
+                                        yAxisId="left" 
+                                        type="monotone" 
+                                        dataKey="amount" 
+                                        name="Ingresos"
+                                        stroke="#10b981" 
+                                        strokeWidth={3} 
+                                        fillOpacity={1} 
+                                        fill="url(#colorAmount)" 
+                                        activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} 
+                                    />
+                                    <Line 
+                                        yAxisId="right" 
+                                        type="monotone" 
+                                        dataKey="conversionRate" 
+                                        name="Conversión (Mes)"
+                                        stroke="#6366f1" 
+                                        strokeWidth={3} 
+                                        dot={{ r: 2 }} 
+                                        activeDot={{ r: 5 }} 
+                                    />
+                                </ComposedChart>
                             </ResponsiveContainer>
                         ) : (
                             <div className="h-full flex items-center justify-center text-gray-300 font-bold text-[10px] uppercase tracking-widest">Sin datos en este período</div>
