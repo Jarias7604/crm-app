@@ -2536,6 +2536,7 @@ function CallActivitySection({
         frequency: 'weekly' | 'monthly';
         dayOfWeek: number;
         dayOfMonth: number;
+        sendHour: number;
         period: string;
         sending: boolean;
         scheduling: boolean;
@@ -2547,6 +2548,7 @@ function CallActivitySection({
             isOpen: true, advisorId, advisorName, advisorEmail,
             tab: 'now', recipientEmail: advisorEmail,
             frequency: 'weekly', dayOfWeek: 1, dayOfMonth: 1,
+            sendHour: 8,
             period: filters.period || 'month',
             sending: false, scheduling: false, sent: false,
         });
@@ -2645,7 +2647,7 @@ function CallActivitySection({
                 nextSend.setDate(sendReportModal.dayOfMonth);
                 if (nextSend <= now) nextSend.setMonth(nextSend.getMonth() + 1);
             }
-            nextSend.setHours(8, 0, 0, 0);
+            nextSend.setHours(sendReportModal.sendHour, 0, 0, 0);
 
             const { error } = await supabase.from('report_schedules').insert({
                 company_id: companyId,
@@ -2660,7 +2662,7 @@ function CallActivitySection({
                 next_send_at: nextSend.toISOString(),
             });
             if (error) throw error;
-            toast.success(`📅 Reporte programado — próximo envío: ${nextSend.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}`);
+            toast.success(`📅 Reporte programado — próximo envío: ${nextSend.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })} a las ${String(sendReportModal.sendHour).padStart(2,'0')}:00`);
             setSendReportModal(null);
         } catch (err: any) {
             toast.error(err.message || 'Error guardando programación');
@@ -3768,6 +3770,30 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
                                             />
                                         </div>
                                     )}
+                                    {/* Time picker */}
+                                    <div>
+                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1.5">Hora de envío</label>
+                                        <div className="flex gap-1.5 items-center">
+                                            {[6, 8, 10, 12].map(h => (
+                                                <button key={h} onClick={() => setSendReportModal(prev => prev ? { ...prev, sendHour: h } : null)}
+                                                    className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all ${
+                                                        sendReportModal.sendHour === h ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 border border-slate-200'
+                                                    }`}>
+                                                    {h === 12 ? '12PM' : `${h}AM`}
+                                                </button>
+                                            ))}
+                                            <input
+                                                type="number" min={0} max={23}
+                                                value={sendReportModal.sendHour}
+                                                onChange={(e) => setSendReportModal(prev => prev ? { ...prev, sendHour: Math.min(23, Math.max(0, parseInt(e.target.value) || 0)) } : null)}
+                                                className="w-14 border border-slate-200 rounded-lg px-2 py-2 text-[10px] font-bold text-center text-slate-700 focus:border-indigo-400 outline-none"
+                                                title="Hora personalizada (0-23)"
+                                            />
+                                        </div>
+                                        <p className="text-[8px] text-slate-400 mt-1">
+                                            Envío a las <strong className="text-indigo-600">{String(sendReportModal.sendHour).padStart(2,'0')}:00</strong> hora local del servidor (UTC)
+                                        </p>
+                                    </div>
                                     <div className="bg-indigo-50 rounded-xl px-3 py-2.5 border border-indigo-100">
                                         <p className="text-[8px] font-black text-indigo-600 uppercase tracking-wider">Período del reporte automático</p>
                                         <div className="flex gap-2 mt-1.5 flex-wrap">
