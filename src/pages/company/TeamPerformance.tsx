@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Trophy, Users, TrendingUp, TrendingDown, DollarSign, Target, Crown,
     Loader2, ChevronDown, BarChart3, Award, Zap, ArrowUpRight,
     ArrowDownRight, Minus, CalendarDays, CheckCircle, Settings, X, Save,
-    Phone, PhoneCall, Sparkles, Printer,
+    Phone, PhoneCall, Sparkles, Printer, Info, Database, Copy, Mail, Clock, Send,
 } from 'lucide-react';
 import { ActivityDashboard } from '../../components/ActivityDashboard';
 import { AIPerformanceChat } from '../../components/AIPerformanceChat';
@@ -24,6 +24,33 @@ import { performanceGoalsService, type PerformanceGoal } from '../../services/pe
 import { forecastService, type ForecastWithActual } from '../../services/forecastService';
 import { callActivityService, type CallActivitySummary, type CallGoal, type ContactActivitySummary, ACTION_TYPE_CONFIG, type CallActivity } from '../../services/callActivity';
 import { supabase } from '../../services/supabase';
+
+// === WEEKDAY UTILS ===
+const getActiveWeekdaysForUser = (companyId: string, userId: string): number[] => {
+    const stored = localStorage.getItem(`crm_work_weekdays_${companyId}_${userId}`);
+    if (stored) {
+        try {
+            return JSON.parse(stored);
+        } catch (e) {}
+    }
+    return [1, 2, 3, 4, 5, 6]; // Default Monday to Saturday
+};
+
+const getActiveDaysInMonth = (weekdays: number[]) => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    
+    let count = 0;
+    const current = new Date(year, month, 1);
+    while (current.getMonth() === month) {
+        if (weekdays.includes(current.getDay())) {
+            count++;
+        }
+        current.setDate(current.getDate() + 1);
+    }
+    return count || 24;
+};
 
 // === CONSTANTS ===
 const PERIODS = [
@@ -99,6 +126,42 @@ function getGoalPeriodLabel(period: string): string {
     }
 }
 
+function getProjectionScalingFactor(filters: PerformanceFilters): number {
+    if (filters.period === 'all') return 1;
+    
+    const now = new Date();
+    let start: Date | null = null;
+    let end: Date | null = null;
+    
+    if (filters.period === 'custom') {
+        start = filters.date_from ? new Date(filters.date_from) : null;
+        end = filters.date_to ? new Date(filters.date_to + 'T23:59:59') : null;
+    } else {
+        const range = getDateRange(filters);
+        start = range.start;
+        end = range.end;
+    }
+    
+    if (!start || !end) return 1;
+    
+    const totalMs = end.getTime() - start.getTime();
+    if (totalMs <= 0) return 0;
+    
+    // If the period has already ended
+    if (now.getTime() >= end.getTime()) {
+        return 0; // Period is in the past, no future closing possible
+    }
+    
+    // If period is in the future
+    if (now.getTime() <= start.getTime()) {
+        return 1; // 100% of period remains
+    }
+    
+    // Active period
+    const remainingMs = end.getTime() - now.getTime();
+    return Math.max(0, Math.min(1, remainingMs / totalMs));
+}
+
 // === MAIN COMPONENT ===
 export default function TeamPerformancePage() {
     const { profile } = useAuth();
@@ -110,6 +173,24 @@ export default function TeamPerformancePage() {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'users' | 'teams' | 'charts' | 'forecast' | 'calls'>('users');
     const [filters, setFilters] = useState<PerformanceFilters>({ period: 'all' });
+
+    // Conversion rate calculation mode
+    const [conversionMode, setConversionMode] = useState<'real' | 'custom'>(() => {
+        const stored = localStorage.getItem('crm_conversion_mode');
+        return (stored as any) || 'real';
+    });
+    const [customConversionRate, setCustomConversionRate] = useState<number>(() => {
+        const stored = localStorage.getItem('crm_custom_conversion_rate');
+        return stored ? parseFloat(stored) : 15;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('crm_conversion_mode', conversionMode);
+    }, [conversionMode]);
+
+    useEffect(() => {
+        localStorage.setItem('crm_custom_conversion_rate', String(customConversionRate));
+    }, [customConversionRate]);
 
     // Restore state from Leads detail page if coming back
     useEffect(() => {
@@ -371,6 +452,32 @@ export default function TeamPerformancePage() {
                             </div>
                         </div>
                     )}
+
+                    {/* Reference Conversion Mode */}
+                    <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-xl px-3 h-10 shadow-sm">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest shrink-0">Conversión Ref.</span>
+                        <select
+                            value={conversionMode}
+                            onChange={(e) => setConversionMode(e.target.value as any)}
+                            className="text-[11px] font-black text-slate-700 bg-transparent outline-none cursor-pointer border-none py-1"
+                        >
+                            <option value="real">Real del Periodo</option>
+                            <option value="custom">Meta Personalizada</option>
+                        </select>
+                        {conversionMode === 'custom' && (
+                            <div className="flex items-center gap-1 border-l border-gray-200 pl-2 ml-1 shrink-0">
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={100}
+                                    value={customConversionRate}
+                                    onChange={(e) => setCustomConversionRate(Math.min(100, Math.max(1, parseFloat(e.target.value) || 0)))}
+                                    className="w-10 text-center text-[11px] font-black text-indigo-600 outline-none focus:bg-indigo-50 rounded"
+                                />
+                                <span className="text-[10px] font-bold text-gray-400">%</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </header>
 
@@ -442,7 +549,17 @@ export default function TeamPerformancePage() {
 
             {/* Content */}
             {activeTab === 'users' ? (
-                <UserPerformanceTable data={userPerformance} getUserGoal={getUserGoal} periodLabel={periodLabel} companySummary={companySummary} previousData={previousPerformance} />
+                <UserPerformanceTable 
+                    data={userPerformance} 
+                    getUserGoal={getUserGoal} 
+                    periodLabel={periodLabel} 
+                    scale={scale} 
+                    companySummary={companySummary} 
+                    previousData={previousPerformance} 
+                    filters={filters} 
+                    conversionMode={conversionMode}
+                    customConversionRate={customConversionRate}
+                />
             ) : activeTab === 'teams' ? (
                 <TeamPerformanceGrid data={teamPerformance} profileNames={profileNames} profileAvatars={profileAvatars} getTeamGoal={getTeamGoal} periodLabel={periodLabel} />
             ) : activeTab === 'calls' ? (
@@ -460,6 +577,8 @@ export default function TeamPerformancePage() {
                     callLogs={callLogs}
                     userPerformance={userPerformance}
                     getUserGoal={getUserGoal}
+                    conversionMode={conversionMode}
+                    customConversionRate={customConversionRate}
                 />
             ) : activeTab === 'forecast' ? (
                 <ForecastSection companyId={profile?.company_id || ''} isAdmin={isAdmin} />
@@ -520,32 +639,55 @@ function StatCard({ icon: Icon, label, value, bg, iconColor }: { icon: any; labe
 }
 
 // === GOAL PROGRESS BAR ===
-function GoalProgressBar({ actual, goal, type = 'number' }: { actual: number; goal: number; type?: 'number' | 'currency' }) {
+function GoalProgressBar({ actual, goal, goalToDate, type = 'number' }: { actual: number; goal: number; goalToDate?: number; type?: 'number' | 'currency' }) {
     const pct = goal > 0 ? Math.min((actual / goal) * 100, 100) : 0;
     const color = pct >= 80 ? 'from-emerald-400 to-emerald-500' : pct >= 50 ? 'from-amber-400 to-amber-500' : 'from-red-400 to-red-500';
-    const emoji = pct >= 80 ? '🟢' : pct >= 50 ? '🟡' : '🔴';
     const label = type === 'currency' ? formatCurrency(goal) : String(goal);
+    // Deviation vs today's pro-rated goal
+    const deviation = goalToDate != null ? actual - goalToDate : null;
+    const deviationLabel = deviation != null ? (deviation >= 0 ? `+${Math.round(deviation)}` : String(Math.round(deviation))) : null;
+    const deviationColor = deviation != null ? (deviation >= 0 ? 'text-emerald-600' : 'text-rose-500') : '';
 
     return (
         <div className="mt-1">
             <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                 <div className={`h-full bg-gradient-to-r ${color} rounded-full transition-all duration-700`} style={{ width: `${pct}%` }} />
             </div>
-            <p className="text-[7px] font-bold text-gray-400 mt-0.5">
-                {emoji} {pct.toFixed(0)}% de {label}
+            <p className="text-[7px] font-bold text-gray-400 mt-0.5 flex items-center gap-1">
+                <span>{pct.toFixed(0)}% de {label}</span>
+                {deviationLabel && goalToDate != null && goalToDate > 0 && (
+                    <span className={`font-black ${deviationColor}`} title={`Meta a la fecha: ${type === 'currency' ? formatCurrency(goalToDate) : Math.round(goalToDate)}`}>
+                        ({deviationLabel})
+                    </span>
+                )}
             </p>
         </div>
     );
 }
 
-function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary, previousData }: {
+function UserPerformanceTable({ 
+    data, 
+    getUserGoal, 
+    periodLabel, 
+    scale, 
+    companySummary, 
+    previousData, 
+    filters,
+    conversionMode = 'real',
+    customConversionRate = 15
+}: {
     data: UserPerformance[];
     getUserGoal: (userId: string) => { leads: number; value: number } | null;
     periodLabel: string;
+    scale: number;
     companySummary?: CompanySummary;
     previousData?: UserPerformance[] | null;
+    filters: PerformanceFilters;
+    conversionMode?: 'real' | 'custom';
+    customConversionRate?: number;
 }) {
     const navigate = useNavigate();
+    const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
     if (data.length === 0) {
         return (
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-16 flex flex-col items-center text-center">
@@ -573,7 +715,10 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary, 
                 <div className="col-span-1 text-center">Leads</div>
                 <div className="col-span-1 text-center">Ganados</div>
                 <div className="col-span-1 text-center">Perdidos</div>
-                <div className="col-span-1 text-center">Tasa</div>
+                <div className="col-span-1 text-center flex flex-col items-center justify-center">
+                    <span className="text-[7.5px] font-black uppercase tracking-wider text-slate-500">Cierre</span>
+                    <span className="text-[6.5px] text-violet-500 font-bold uppercase tracking-wider">Conv. Real</span>
+                </div>
                 <div className="col-span-1 text-center flex items-center justify-center gap-1">
                     Abordaje
                     <span className="relative group inline-block cursor-help text-gray-400 hover:text-gray-650 transition-colors">
@@ -597,105 +742,324 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary, 
                     // Trend helpers
                     const wonDiff = prev != null ? user.leads_won - prev.leads_won : null;
                     const closingDiff = prev != null ? user.total_closing_amount - prev.total_closing_amount : null;
+                    const isExpanded = expandedUserId === user.user_id;
                     return (
-                        <div key={user.user_id} className="grid grid-cols-12 gap-2 px-6 py-4 items-center hover:bg-gray-50/50 transition-colors group">
-                            {/* Rank */}
-                            <div className="col-span-1 flex justify-center">
-                                {index === 0 ? (
-                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm"><span className="text-[10px] font-black text-white">1</span></div>
-                                ) : index === 1 ? (
-                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center shadow-sm"><span className="text-[10px] font-black text-white">2</span></div>
-                                ) : index === 2 ? (
-                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-600 to-amber-700 flex items-center justify-center shadow-sm"><span className="text-[10px] font-black text-white">3</span></div>
-                                ) : (
-                                    <span className="text-[11px] font-bold text-gray-300">{index + 1}</span>
-                                )}
-                            </div>
-                            {/* User Info — col-span-2 to make room for new columns */}
-                            <div className="col-span-2 flex items-center gap-2 min-w-0">
-                                <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
-                                    {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" alt="" /> : <Users className="w-4 h-4 text-gray-300" />}
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-[11px] font-black text-gray-800 uppercase tracking-tight truncate">{user.full_name}</p>
-                                    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                                        {user.team_names.length > 0 ? user.team_names.map((name, i) => (
-                                            <span key={name} className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase text-white" style={{ backgroundColor: user.team_colors[i] || '#999' }}>{name}</span>
-                                        )) : <span className="text-[9px] text-gray-300 font-medium">Sin equipo</span>}
-                                    </div>
-                                </div>
-                            </div>
-                            {/* Leads */}
-                            <div className="col-span-1 text-center">
-                                {user.total_leads > 0 ? (
-                                    <span className="text-[13px] font-black text-gray-700 cursor-pointer hover:text-blue-600 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }}>{user.total_leads}</span>
-                                ) : <span className="text-[13px] font-black text-gray-700">{user.total_leads}</span>}
-                            </div>
-                            {/* Won + Trend */}
-                            <div className="col-span-1 text-center">
-                                <div className="flex items-center justify-center gap-1">
-                                    {user.leads_won > 0 ? (
-                                        <span className="text-[13px] font-black text-emerald-600 cursor-pointer hover:text-emerald-800 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id, status: ['Cerrado', 'Cliente'] } }); }}>{user.leads_won}</span>
-                                    ) : <span className="text-[13px] font-black text-emerald-600">{user.leads_won}</span>}
-                                    {wonDiff !== null && wonDiff !== 0 && (
-                                        <span className={`text-[8px] font-black ${wonDiff > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                                            {wonDiff > 0 ? `+${wonDiff}` : wonDiff}
-                                        </span>
+                        <Fragment key={user.user_id}>
+                            <div 
+                                onClick={() => setExpandedUserId(isExpanded ? null : user.user_id)}
+                                className={`grid grid-cols-12 gap-2 px-6 py-4 items-center hover:bg-gray-50/50 transition-all duration-200 group cursor-pointer ${
+                                    isExpanded ? 'bg-indigo-50/10 border-l-4 border-indigo-500 pl-5' : ''
+                                }`}
+                            >
+                                {/* Rank */}
+                                <div className="col-span-1 flex justify-center">
+                                    {index === 0 ? (
+                                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm"><span className="text-[10px] font-black text-white">1</span></div>
+                                    ) : index === 1 ? (
+                                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center shadow-sm"><span className="text-[10px] font-black text-white">2</span></div>
+                                    ) : index === 2 ? (
+                                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-600 to-amber-700 flex items-center justify-center shadow-sm"><span className="text-[10px] font-black text-white">3</span></div>
+                                    ) : (
+                                        <span className="text-[11px] font-bold text-gray-300">{index + 1}</span>
                                     )}
                                 </div>
-                                {goal && goal.leads > 0 && <GoalProgressBar actual={user.leads_won} goal={goal.leads} />}
-                            </div>
-                            {/* Lost */}
-                            <div className="col-span-1 text-center">
-                                {user.leads_lost > 0 ? (
-                                    <span className="text-[13px] font-black text-red-400 cursor-pointer hover:text-red-600 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id, status: 'Perdido' } }); }}>{user.leads_lost}</span>
-                                ) : <span className="text-[13px] font-black text-red-400">{user.leads_lost}</span>}
-                            </div>
-                            {/* Win Rate */}
-                            <div className="col-span-1 text-center">
-                                <WinRateBadge rate={user.win_rate} />
-                            </div>
-                            {/* Abordaje */}
-                            <div className="col-span-1 text-center">
-                                <span className={`text-[12px] font-black ${user.avg_response_time && user.avg_response_time > 0 ? (user.avg_response_time <= 2 ? 'text-emerald-650' : user.avg_response_time <= 24 ? 'text-amber-600' : 'text-rose-600') : 'text-gray-300'}`}>
-                                    {formatResponseTime(user.avg_response_time)}
-                                </span>
-                            </div>
-                            {/* Días/Cierre */}
-                            <div className="col-span-1 text-center">
-                                {user.avg_days_to_close > 0 ? (
-                                    <div className="flex flex-col items-center">
-                                        <span className="text-[12px] font-black text-violet-600">{user.avg_days_to_close}d</span>
-                                        <span className="text-[7px] text-gray-400 font-bold">prom. cierre</span>
+                                {/* User Info */}
+                                <div className="col-span-2 flex items-center gap-2 min-w-0">
+                                    <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden shrink-0 border border-gray-200/40">
+                                        {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" alt="" /> : <Users className="w-4 h-4 text-gray-300" />}
                                     </div>
-                                ) : <span className="text-[11px] text-gray-300 font-bold">—</span>}
-                            </div>
-                            {/* Avg Deal */}
-                            <div className="col-span-1 text-right">
-                                {user.avg_deal_size > 0 ? (
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-[11px] font-black text-amber-600">{formatCurrency(user.avg_deal_size)}</span>
-                                        <span className="text-[7px] text-gray-400 font-bold">avg deal</span>
+                                    <div className="min-w-0">
+                                        <p className="text-[11px] font-black text-gray-800 uppercase tracking-tight truncate flex items-center gap-1">
+                                            {user.full_name}
+                                            <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform duration-300 shrink-0 group-hover:text-gray-650 ${isExpanded ? 'rotate-180 text-indigo-500' : ''}`} />
+                                        </p>
+                                        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                            {user.team_names.length > 0 ? user.team_names.map((name, i) => (
+                                                <span key={name} className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase text-white" style={{ backgroundColor: user.team_colors[i] || '#999' }}>{name}</span>
+                                            )) : <span className="text-[9px] text-gray-300 font-medium">Sin equipo</span>}
+                                        </div>
                                     </div>
-                                ) : <span className="text-[11px] text-gray-300">—</span>}
-                            </div>
-                            {/* Pipeline Value */}
-                            <div className="col-span-1 text-right">
-                                <span className="text-[11px] font-black text-gray-500">{formatCurrency(user.total_value)}</span>
-                            </div>
-                            {/* Closing Amount + Trend */}
-                            <div className="col-span-1 text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                    <span className="text-[13px] font-black text-[#4449AA]">{formatCurrency(user.total_closing_amount)}</span>
-                                    {closingDiff !== null && closingDiff !== 0 && (
-                                        <span className={`text-[8px] font-black ${closingDiff > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-                                            {closingDiff > 0 ? `+${formatCurrency(closingDiff)}` : formatCurrency(closingDiff)}
-                                        </span>
+                                </div>
+                                {/* Leads */}
+                                <div className="col-span-1 text-center">
+                                    {user.total_leads > 0 ? (
+                                        <span className="text-[13px] font-black text-gray-700 cursor-pointer hover:text-blue-600 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }}>{user.total_leads}</span>
+                                    ) : <span className="text-[13px] font-black text-gray-700">{user.total_leads}</span>}
+                                </div>
+                                {/* Won */}
+                                <div className="col-span-1 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                        {user.leads_won > 0 ? (
+                                            <span className="text-[13px] font-black text-emerald-600 cursor-pointer hover:text-emerald-800 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id, status: ['Cerrado', 'Cliente'] } }); }}>{user.leads_won}</span>
+                                        ) : <span className="text-[13px] font-black text-emerald-600">{user.leads_won}</span>}
+                                        {goal && goal.leads > 0 && (() => {
+                                            // Deviation vs FULL period goal (how many more wins needed)
+                                            // goal.leads already has scale applied, divide back to get base monthly goal for display
+                                            const baseGoal = scale > 0 ? Math.round(goal.leads / scale) : goal.leads;
+                                            const remaining = user.leads_won - baseGoal;
+                                            const devLabel = remaining >= 0 ? `+${remaining}` : String(remaining);
+                                            const devColor = remaining >= 0 ? 'text-emerald-500' : 'text-rose-500';
+                                            return (
+                                                <span className={`text-[8px] font-black ${devColor}`} title={`Meta mensual: ${baseGoal} cierres`}>
+                                                    {devLabel}
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
+                                    {goal && goal.leads > 0 && (
+                                        <GoalProgressBar
+                                            actual={user.leads_won}
+                                            goal={scale > 0 ? Math.round(goal.leads / scale) : goal.leads}
+                                            goalToDate={undefined}
+                                        />
                                     )}
                                 </div>
-                                {goal && goal.value > 0 && <GoalProgressBar actual={user.total_closing_amount} goal={goal.value} type="currency" />}
+                                {/* Lost */}
+                                <div className="col-span-1 text-center">
+                                    {user.leads_lost > 0 ? (
+                                        <span className="text-[13px] font-black text-red-400 cursor-pointer hover:text-red-600 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id, status: 'Perdido' } }); }}>{user.leads_lost}</span>
+                                    ) : <span className="text-[13px] font-black text-red-400">{user.leads_lost}</span>}
+                                </div>
+                                {/* Win Rate & Conversion Rate */}
+                                <div className="col-span-1 flex flex-col items-center gap-0.5 justify-center">
+                                    <WinRateBadge rate={user.win_rate} />
+                                    <span className="text-[9px] font-bold text-slate-500 bg-slate-50 border border-slate-100/50 rounded px-1.5 py-0.5" title="Conversión de todos los leads asignados">
+                                        {user.conversion_rate.toFixed(1)}% Real
+                                    </span>
+                                </div>
+                                {/* Abordaje */}
+                                <div className="col-span-1 text-center">
+                                    <span className={`text-[12px] font-black ${user.avg_response_time && user.avg_response_time > 0 ? (user.avg_response_time <= 2 ? 'text-emerald-650' : user.avg_response_time <= 24 ? 'text-amber-600' : 'text-rose-600') : 'text-gray-300'}`}>
+                                        {formatResponseTime(user.avg_response_time)}
+                                    </span>
+                                </div>
+                                {/* Días/Cierre */}
+                                <div className="col-span-1 text-center">
+                                    {user.avg_days_to_close > 0 ? (
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-[12px] font-black text-violet-600">{user.avg_days_to_close}d</span>
+                                            <span className="text-[7px] text-gray-400 font-bold">prom. cierre</span>
+                                        </div>
+                                    ) : <span className="text-[11px] text-gray-300 font-bold">—</span>}
+                                </div>
+                                {/* Avg Deal */}
+                                <div className="col-span-1 text-right">
+                                    {user.avg_deal_size > 0 ? (
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[11px] font-black text-amber-600">{formatCurrency(user.avg_deal_size)}</span>
+                                            <span className="text-[7px] text-gray-400 font-bold">avg deal</span>
+                                        </div>
+                                    ) : <span className="text-[11px] text-gray-300">—</span>}
+                                </div>
+                                {/* Pipeline Value */}
+                                <div className="col-span-1 text-right">
+                                    <span className="text-[11px] font-black text-gray-500">{formatCurrency(user.total_value)}</span>
+                                </div>
+                                {/* Closing Amount */}
+                                <div className="col-span-1 text-right">
+                                    <div className="flex items-center justify-end gap-1">
+                                        <span className="text-[13px] font-black text-[#4449AA]">{formatCurrency(user.total_closing_amount)}</span>
+                                        {closingDiff !== null && closingDiff !== 0 && (
+                                            <span className={`text-[8px] font-black ${closingDiff > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                                                {closingDiff > 0 ? `+${formatCurrency(closingDiff)}` : formatCurrency(closingDiff)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {goal && goal.value > 0 && <GoalProgressBar actual={user.total_closing_amount} goal={goal.value} type="currency" />}
+                                </div>
                             </div>
-                        </div>
+
+                            {/* Row Expanded Details Card */}
+                            {isExpanded && (() => {
+                                const totalWon = data.reduce((s, u) => s + u.leads_won, 0);
+                                const totalLeads = data.reduce((s, u) => s + u.total_leads, 0);
+                                const companyConversionRate = totalLeads > 0 ? (totalWon / totalLeads) * 100 : 15;
+                                const realRate = user.conversion_rate > 0 ? user.conversion_rate : companyConversionRate;
+                                const rate = conversionMode === 'custom' ? customConversionRate : realRate;
+
+                                return (
+                                    <div className="col-span-12 px-8 py-6 bg-slate-50/50 border-t border-b border-slate-100 space-y-6">
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            {/* Card 1: Cost of Opportunity (Impacto Negativo) */}
+                                            <div className={`rounded-2xl border p-5 bg-white shadow-sm transition-all duration-300 ${user.leads_without_follow_up > 0 ? 'border-rose-100 hover:shadow-rose-50/30 shadow-rose-100/5' : 'border-slate-100 hover:shadow-slate-100/30'}`}>
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h5 className="text-[10.5px] font-black text-rose-850 uppercase tracking-widest flex items-center gap-1.5">
+                                                        ⚠️ Oportunidad Perdida por Falta de Seguimiento
+                                                    </h5>
+                                                    <span className={`text-[8px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${user.leads_without_follow_up > 0 ? 'bg-rose-50 text-rose-600 border border-rose-100/30' : 'bg-emerald-50 text-emerald-600 border border-emerald-100/30'}`}>
+                                                        {user.leads_without_follow_up > 0 ? 'Pérdidas Detectadas' : 'Eficiencia Máxima'}
+                                                    </span>
+                                                </div>
+                                                {user.leads_without_follow_up > 0 ? (
+                                                    <div className="space-y-4">
+                                                        <p className="text-[11.5px] text-slate-500 font-semibold leading-relaxed">
+                                                            Este asesor tiene <span className="text-slate-850 font-black">{user.leads_without_follow_up} leads sin ningún seguimiento</span>. Al no contactarlos, se asume un impacto negativo en su embudo:
+                                                        </p>
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div className="bg-rose-50/20 border border-rose-100/30 rounded-xl p-3.5">
+                                                                <p className="text-[8.5px] font-bold text-rose-700 uppercase tracking-wider mb-0.5">Cierres Perdidos (Est.)</p>
+                                                                <p className="text-xl font-black text-rose-600">
+                                                                    -{(user.leads_without_follow_up * (rate / 100)).toFixed(1)} <span className="text-[9px] text-rose-450 font-bold">ventas</span>
+                                                                </p>
+                                                            </div>
+                                                            <div className="bg-rose-50/20 border border-rose-100/30 rounded-xl p-3.5">
+                                                                <p className="text-[8.5px] font-bold text-rose-700 uppercase tracking-wider mb-0.5">Monto de Pérdida (Est.)</p>
+                                                                <p className="text-xl font-black text-rose-600">
+                                                                    -{formatCurrency((user.leads_without_follow_up * (rate / 100)) * user.avg_deal_size)} USD
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[11.5px] text-emerald-800 font-semibold leading-relaxed">
+                                                        ¡Excelente! Este asesor no tiene leads activos sin seguimiento. Su costo de oportunidad es <span className="font-extrabold text-emerald-600">$0.00 USD</span>.
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* Card 2: Potential Ideal Scenario (Escenario Ideal con Seguimiento Completo) */}
+                                            <div className="rounded-2xl border p-5 bg-white shadow-sm transition-all duration-300 border-emerald-100 hover:shadow-emerald-50/30 shadow-emerald-100/5">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h5 className="text-[10.5px] font-black text-emerald-850 uppercase tracking-widest flex items-center gap-1.5">
+                                                        🏆 Escenario Ideal (Si Hiciera el 100% de Seguimientos)
+                                                    </h5>
+                                                    <span className="text-[8px] font-black px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100/30 uppercase tracking-wider">
+                                                        Rendimiento Máximo
+                                                    </span>
+                                                </div>
+                                                {(() => {
+                                                    const lostLeadsEst = user.leads_without_follow_up * (rate / 100);
+                                                    const lostRevenueEst = lostLeadsEst * user.avg_deal_size;
+                                                    const potentialLeadsWon = user.leads_won + lostLeadsEst;
+                                                    const potentialRevenue = user.total_closing_amount + lostRevenueEst;
+                                                    const targetLeads = goal?.leads || 0;
+                                                    
+                                                    return (
+                                                        <div className="space-y-4">
+                                                            <p className="text-[11.5px] text-slate-500 font-semibold leading-relaxed">
+                                                                Si se hubieran contactado todos los leads perdidos, su potencial de cierre estimado basado en su tasa de conversión del {rate.toFixed(1)}% sería:
+                                                            </p>
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div className="bg-emerald-50/20 border border-emerald-100/30 rounded-xl p-3.5">
+                                                                    <p className="text-[8.5px] font-bold text-emerald-700 uppercase tracking-wider mb-0.5">Ventas Potenciales</p>
+                                                                    <p className="text-xl font-black text-emerald-600">
+                                                                        {potentialLeadsWon.toFixed(1)} <span className="text-[9px] text-emerald-500 font-bold">cierres</span>
+                                                                    </p>
+                                                                </div>
+                                                                <div className="bg-emerald-50/20 border border-emerald-100/30 rounded-xl p-3.5">
+                                                                    <p className="text-[8.5px] font-bold text-emerald-700 uppercase tracking-wider mb-0.5">Facturación Potencial</p>
+                                                                    <p className="text-xl font-black text-emerald-600">
+                                                                        {formatCurrency(potentialRevenue)} USD
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            {targetLeads > 0 && (
+                                                                <div className="text-[10px] font-bold mt-2">
+                                                                    {potentialLeadsWon >= targetLeads ? (
+                                                                        <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100/30 inline-block">
+                                                                            🎉 ¡Con seguimiento completo habría superado su meta de {targetLeads} cierres! (Logrando {potentialLeadsWon.toFixed(1)})
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-amber-605 bg-amber-50 px-2 py-1 rounded border border-amber-100/30 inline-block">
+                                                                            ⚠ Con seguimiento completo habría cerrado {potentialLeadsWon.toFixed(1)} (brecha de {(targetLeads - potentialLeadsWon).toFixed(1)} vs la meta de {targetLeads}).
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+
+                                            {/* Card 3: Forecast closing (Proyección Realista) */}
+                                            <div className="rounded-2xl border border-slate-100 p-5 bg-white shadow-sm hover:shadow-slate-100/30 transition-all duration-300">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h5 className="text-[10.5px] font-black text-indigo-850 uppercase tracking-widest flex items-center gap-1.5">
+                                                        📈 Proyección Realista al Cierre (Con Embudo Activo)
+                                                    </h5>
+                                                    <span className="text-[8px] font-black px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-650 border border-indigo-100/30 uppercase tracking-wider">
+                                                        Pipeline Proyectado
+                                                    </span>
+                                                </div>
+                                                {(() => {
+                                                    const projectionFactor = getProjectionScalingFactor(filters);
+                                                    const projLeads = Math.round(user.leads_won + (user.leads_active * (rate / 100) * projectionFactor));
+                                                    const projValue = Math.round(user.total_closing_amount + (user.total_value * (rate / 100) * projectionFactor));
+                                                    const targetLeads = goal?.leads || 0;
+                                                    const targetValue = goal?.value || 0;
+                                                    const valueDiff = projValue - targetValue;
+
+                                                    return (
+                                                        <div className="space-y-4">
+                                                            <p className="text-[11.5px] text-slate-500 font-semibold leading-relaxed">
+                                                                Basado en su conversión real ({rate.toFixed(1)}%) aplicada a sus {user.leads_active} leads activos en pipeline (valorados en {formatCurrency(user.total_value)} USD):
+                                                            </p>
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5">
+                                                                    <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Cierres Proyectados</p>
+                                                                    <p className="text-xl font-black text-slate-800">
+                                                                        {projLeads} <span className="text-[9px] text-slate-400 font-bold">de meta {targetLeads}</span>
+                                                                    </p>
+                                                                </div>
+                                                                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5">
+                                                                    <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Monto Proyectado</p>
+                                                                    <p className="text-xl font-black text-slate-800">
+                                                                        {formatCurrency(projValue)} <span className="text-[9px] text-slate-400 font-bold">USD</span>
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            {targetValue > 0 && (
+                                                                <p className="text-[10px] font-bold mt-2">
+                                                                    {valueDiff >= 0 ? (
+                                                                        <span className="text-emerald-600">✓ Superávit proyectado de +{formatCurrency(valueDiff)} USD sobre la meta.</span>
+                                                                    ) : (
+                                                                        <span className="text-rose-600">✗ Brecha proyectada de -{formatCurrency(Math.abs(valueDiff))} USD para la meta.</span>
+                                                                    )}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+
+                                            {/* Card 4: Transparencia y Origen de Datos (Data Provenance) */}
+                                            <div className="rounded-2xl border border-slate-100 p-5 bg-slate-50/40 shadow-sm hover:shadow-slate-100/20 transition-all duration-300 flex flex-col justify-between">
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <h5 className="text-[10.5px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-1.5">
+                                                            <Database className="w-3.5 h-3.5 text-slate-500" />
+                                                            Procedencia y Transparencia de Datos
+                                                        </h5>
+                                                        <span className="text-[8px] font-black px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200/50 uppercase tracking-wider flex items-center gap-1">
+                                                            <Info className="w-3 h-3 text-slate-400" />
+                                                            Datos Reales
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-3 text-[10.5px] text-slate-500 leading-normal">
+                                                        <div>
+                                                            <p className="font-extrabold text-slate-700">🔍 Leads sin Seguimiento:</p>
+                                                            <p>Obtenido en tiempo real filtrando los leads activos asignados al vendedor que no registran llamadas telefónicas ni notas de seguimiento en la bitácora del CRM.</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-extrabold text-slate-700">📊 Tasa de Conversión Real:</p>
+                                                            <p>Calculado del historial de leads del vendedor: <code className="font-mono text-[9px] bg-slate-100 px-1 py-0.5 rounded text-indigo-600">(Ganados / Total Asignados)</code>. Esto mide la probabilidad matemática de cerrar un lead aleatorio.</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-extrabold text-slate-700">🎯 Meta del Periodo ({periodLabel}):</p>
+                                                            <p>Meta mensual configurada de {goal ? (goal.leads / scale).toFixed(0) : 0} cierres, multiplicada proporcionalmente por la escala de tiempo seleccionada ({scale.toFixed(1)}x).</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-4 pt-3 border-t border-slate-200/40 flex items-center justify-between text-[8.5px] font-black text-slate-400 uppercase tracking-wider">
+                                                    <span>Auditoría de Datos Activa</span>
+                                                    <span>Arias CRM Engine</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+                        </Fragment>
                     );
                 })}
                 {/* Unassigned row if there are leads not assigned to any user */}
@@ -1179,15 +1543,50 @@ function GoalConfigModal({
     const [modalTab, setModalTab] = useState<'users' | 'teams'>('users');
     const [saving, setSaving] = useState(false);
 
-    // User goals state
-    const [userGoals, setUserGoals] = useState<Record<string, { leads: number; value: number }>>(() => {
-        const map: Record<string, { leads: number; value: number }> = {};
+    const WEEKDAYS_CONFIG = [
+        { label: 'L', value: 1 },
+        { label: 'M', value: 2 },
+        { label: 'M', value: 3 },
+        { label: 'J', value: 4 },
+        { label: 'V', value: 5 },
+        { label: 'S', value: 6 },
+        { label: 'D', value: 0 }
+    ];
+
+    // Días laborales por usuario
+    const [userWeekdays, setUserWeekdays] = useState<Record<string, number[]>>(() => {
+        const map: Record<string, number[]> = {};
         userPerformance.forEach((u) => {
-            const existing = goals.find((g) => g.user_id === u.user_id && !g.team_id);
-            map[u.user_id] = { leads: existing?.goal_leads || 0, value: Number(existing?.goal_value || 0) };
+            const stored = localStorage.getItem(`crm_work_weekdays_${companyId}_${u.user_id}`);
+            if (stored) {
+                try {
+                    map[u.user_id] = JSON.parse(stored);
+                } catch (e) {
+                    map[u.user_id] = [1, 2, 3, 4, 5, 6];
+                }
+            } else {
+                map[u.user_id] = [1, 2, 3, 4, 5, 6];
+            }
         });
         return map;
     });
+
+    // User goals state
+    const [userGoals, setUserGoals] = useState<Record<string, { monthlyLeads: number; value: number }>>(() => {
+        const map: Record<string, { monthlyLeads: number; value: number }> = {};
+        userPerformance.forEach((u) => {
+            const existing = goals.find((g) => g.user_id === u.user_id && !g.team_id);
+            map[u.user_id] = { monthlyLeads: existing?.goal_leads || 0, value: Number(existing?.goal_value || 0) };
+        });
+        return map;
+    });
+
+    const getUserDailyLeads = (userId: string) => {
+        const monthly = userGoals[userId]?.monthlyLeads || 0;
+        const weekdays = userWeekdays[userId] || [1, 2, 3, 4, 5, 6];
+        const daysInMonth = getActiveDaysInMonth(weekdays);
+        return monthly / daysInMonth;
+    };
 
     // Team goals state
     const [teamGoals, setTeamGoals] = useState<Record<string, { leads: number; value: number }>>(() => {
@@ -1195,16 +1594,6 @@ function GoalConfigModal({
         teams.forEach((t) => {
             const existing = goals.find((g) => g.team_id === t.id && !g.user_id);
             map[t.id] = { leads: existing?.goal_leads || 0, value: Number(existing?.goal_value || 0) };
-        });
-        return map;
-    });
-
-    // Días laborales por usuario
-    const [workingDays, setWorkingDays] = useState<Record<string, number>>(() => {
-        const map: Record<string, number> = {};
-        userPerformance.forEach((u) => {
-            const stored = localStorage.getItem(`crm_working_days_${companyId}_${u.user_id}`);
-            map[u.user_id] = stored ? Number(stored) : 24; // default 24
         });
         return map;
     });
@@ -1219,8 +1608,8 @@ function GoalConfigModal({
         return map;
     });
 
-    const getRecommendedCalls = (userId: string, leadsGoal: number, days: number) => {
-        if (!leadsGoal || days <= 0) return 0;
+    const getRecommendedCalls = (userId: string, dailyLeads: number) => {
+        if (!dailyLeads) return 0;
         const uPerf = userPerformance.find((p) => p.user_id === userId);
         const leadsWon = uPerf ? uPerf.leads_won : 0;
         const summary = callSummary.find((s) => s.user_id === userId);
@@ -1232,24 +1621,34 @@ function GoalConfigModal({
             callsPerClose = globalWon > 0 ? (totalActualCalls / globalWon) : 40;
         }
         callsPerClose = Math.max(10, callsPerClose);
-        return Math.ceil((leadsGoal * callsPerClose) / days);
+        return Math.ceil(dailyLeads * callsPerClose);
     };
 
     const handleSave = async () => {
         setSaving(true);
         try {
             if (modalTab === 'users') {
-                await performanceGoalsService.saveUserGoals(
-                    companyId,
-                    Object.entries(userGoals).map(([user_id, g]) => ({ user_id, goal_leads: g.leads, goal_value: g.value }))
-                );
+                const formattedUserGoals = Object.entries(userGoals).map(([user_id, g]) => {
+                    return {
+                        user_id,
+                        goal_leads: g.monthlyLeads,
+                        goal_value: g.value
+                    };
+                });
+                
+                await performanceGoalsService.saveUserGoals(companyId, formattedUserGoals);
+                
                 const callGoalsArray = Object.entries(callGoalsState).map(([user_id, daily_call_goal]) => ({
                     user_id,
                     daily_call_goal,
                 }));
                 await callActivityService.saveUserGoals(companyId, callGoalsArray);
-                Object.entries(workingDays).forEach(([userId, days]) => {
-                    localStorage.setItem(`crm_working_days_${companyId}_${userId}`, String(days));
+                
+                // Save weekdays and working_days to localStorage
+                Object.entries(userWeekdays).forEach(([userId, weekdaysList]) => {
+                    localStorage.setItem(`crm_work_weekdays_${companyId}_${userId}`, JSON.stringify(weekdaysList));
+                    const daysInMonth = getActiveDaysInMonth(weekdaysList);
+                    localStorage.setItem(`crm_working_days_${companyId}_${userId}`, String(daysInMonth));
                 });
             } else {
                 await performanceGoalsService.saveTeamGoals(
@@ -1270,14 +1669,14 @@ function GoalConfigModal({
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
-            <div className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden animate-in zoom-in-95 fade-in duration-300">
+            <div className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-5xl max-h-[85vh] overflow-hidden animate-in zoom-in-95 fade-in duration-300 flex flex-col">
                 {/* Header */}
-                <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-violet-50 to-indigo-50">
+                <div className="px-8 py-6 border-b border-gray-100 bg-gradient-to-r from-violet-50 to-indigo-50 shrink-0">
                     <div className="flex items-center justify-between">
                         <div>
                             <h2 className="text-xl font-black text-[#4449AA] tracking-tight">🎯 Configurar Metas de Ventas</h2>
                             <p className="text-[11px] text-gray-400 font-bold mt-1">
-                                Las metas son <span className="text-violet-600">mensuales</span> — se escalan automáticamente según el periodo seleccionado
+                                Configura la meta mensual o diaria de cierres y seguimientos, y selecciona los días laborables de cada asesor.
                             </p>
                         </div>
                         <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
@@ -1295,33 +1694,41 @@ function GoalConfigModal({
                 </div>
 
                 {/* Content */}
-                <div className="px-8 py-4 overflow-y-auto max-h-[50vh]">
+                <div className="px-8 py-4 overflow-y-auto flex-1">
                     {modalTab === 'users' ? (
                         <div className="space-y-1">
-                            <div className="grid grid-cols-12 gap-2 py-2 text-[8px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                                <div className="col-span-3">Vendedor</div>
-                                <div className="col-span-2 text-center">Meta Leads/Mes</div>
+                            <div className="grid grid-cols-12 gap-2 py-2 text-[8px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 items-center">
+                                <div className="col-span-2">Vendedor</div>
+                                <div className="col-span-2 text-center">Cierres Meta/Mes</div>
                                 <div className="col-span-2 text-center">Meta Valor ($)/Mes</div>
-                                <div className="col-span-2 text-center">Días Lab.</div>
-                                <div className="col-span-3 text-center">Seguimientos/Día</div>
+                                <div className="col-span-3 text-center">Días Laborables Semanales</div>
+                                <div className="col-span-2 text-center">Seguimientos/Día</div>
+                                <div className="col-span-1 text-center">Copiar</div>
                             </div>
                             {userPerformance.map((u) => (
                                 <div key={u.user_id} className="grid grid-cols-12 gap-2 py-3 items-center hover:bg-gray-50/50 rounded-xl transition-colors">
-                                    <div className="col-span-3 flex items-center gap-2 min-w-0">
+                                    {/* User Info */}
+                                    <div className="col-span-2 flex items-center gap-2 min-w-0">
                                         <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
                                             {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" alt="" /> : <Users className="w-3.5 h-3.5 text-gray-300" />}
                                         </div>
                                         <span className="text-[11px] font-black text-gray-700 truncate leading-tight">{u.full_name}</span>
                                     </div>
-                                    <div className="col-span-2 flex justify-center">
+                                    {/* Monthly Lead Goal */}
+                                    <div className="col-span-2 flex flex-col items-center">
                                         <input
                                             type="number"
                                             min={0}
-                                            value={userGoals[u.user_id]?.leads || ''}
+                                            value={userGoals[u.user_id]?.monthlyLeads || ''}
                                             onChange={(e) => {
-                                                const leads = parseInt(e.target.value) || 0;
-                                                setUserGoals({ ...userGoals, [u.user_id]: { ...userGoals[u.user_id], leads } });
-                                                const rec = getRecommendedCalls(u.user_id, leads, workingDays[u.user_id] || 24);
+                                                const monthlyLeads = parseInt(e.target.value) || 0;
+                                                setUserGoals({ ...userGoals, [u.user_id]: { ...userGoals[u.user_id], monthlyLeads } });
+                                                
+                                                // Calculate daily leads equivalent for call recommendations
+                                                const weekdays = userWeekdays[u.user_id] || [1, 2, 3, 4, 5, 6];
+                                                const daysInMonth = getActiveDaysInMonth(weekdays);
+                                                const dailyLeads = monthlyLeads / daysInMonth;
+                                                const rec = getRecommendedCalls(u.user_id, dailyLeads);
                                                 if (rec > 0 && (callGoalsState[u.user_id] === 0 || !callGoalsState[u.user_id])) {
                                                     setCallGoalsState(prev => ({ ...prev, [u.user_id]: rec }));
                                                 }
@@ -1329,7 +1736,19 @@ function GoalConfigModal({
                                             placeholder="0"
                                             className="w-16 h-9 text-center text-[12px] font-bold text-gray-700 border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all"
                                         />
+                                        {(() => {
+                                            const weekdays = userWeekdays[u.user_id] || [1, 2, 3, 4, 5, 6];
+                                            const daysInMonth = getActiveDaysInMonth(weekdays);
+                                            const monthly = userGoals[u.user_id]?.monthlyLeads || 0;
+                                            const daily = monthly > 0 ? (monthly / daysInMonth).toFixed(2) : '0.00';
+                                            return (
+                                                <span className="text-[7.5px] font-bold text-gray-400 mt-1">
+                                                    ~{daily}/día
+                                                </span>
+                                            );
+                                        })()}
                                     </div>
+                                    {/* Monthly Value Goal */}
                                     <div className="col-span-2 flex justify-center">
                                         <div className="flex items-center gap-0.5 border border-gray-200 rounded-xl px-1.5 h-9 focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-100 transition-all w-20">
                                             <span className="text-[10px] font-bold text-gray-400">$</span>
@@ -1343,25 +1762,43 @@ function GoalConfigModal({
                                             />
                                         </div>
                                     </div>
-                                    <div className="col-span-2 flex justify-center">
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            max={31}
-                                            value={workingDays[u.user_id] || ''}
-                                            onChange={(e) => {
-                                                const d = parseInt(e.target.value) || 24;
-                                                setWorkingDays({ ...workingDays, [u.user_id]: d });
-                                                const rec = getRecommendedCalls(u.user_id, userGoals[u.user_id]?.leads || 0, d);
-                                                if (rec > 0) {
-                                                    setCallGoalsState(prev => ({ ...prev, [u.user_id]: rec }));
-                                                }
-                                            }}
-                                            placeholder="24"
-                                            className="w-14 h-9 text-center text-[12px] font-bold text-gray-700 border border-gray-200 rounded-xl outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition-all"
-                                        />
+                                    {/* Weekdays Config Selector */}
+                                    <div className="col-span-3 flex items-center justify-center gap-1">
+                                        {WEEKDAYS_CONFIG.map((day) => {
+                                            const isActive = (userWeekdays[u.user_id] || []).includes(day.value);
+                                            return (
+                                                <button
+                                                    key={day.value}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const currentDays = userWeekdays[u.user_id] || [];
+                                                        const nextDays = currentDays.includes(day.value)
+                                                            ? currentDays.filter(d => d !== day.value)
+                                                            : [...currentDays, day.value];
+                                                        
+                                                        setUserWeekdays({ ...userWeekdays, [u.user_id]: nextDays });
+                                                        
+                                                        // Update recommended calls if daily leads is configured
+                                                        const dailyLeads = (userGoals[u.user_id]?.monthlyLeads || 0) / getActiveDaysInMonth(nextDays);
+                                                        const rec = getRecommendedCalls(u.user_id, dailyLeads);
+                                                        if (rec > 0) {
+                                                            setCallGoalsState(prev => ({ ...prev, [u.user_id]: rec }));
+                                                        }
+                                                    }}
+                                                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black border transition-all cursor-pointer ${
+                                                        isActive 
+                                                            ? 'bg-[#4449AA] text-white border-transparent shadow-sm' 
+                                                            : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                                                    }`}
+                                                    title={day.value === 0 ? 'Domingo' : day.value === 6 ? 'Sábado' : 'Día Laboral'}
+                                                >
+                                                    {day.label}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
-                                    <div className="col-span-3 flex flex-col items-center justify-center gap-0.5">
+                                    {/* Daily Follow-ups Goal */}
+                                    <div className="col-span-2 flex flex-col items-center justify-center gap-0.5">
                                         <div className="flex items-center gap-1">
                                             <input
                                                 type="number"
@@ -1375,13 +1812,44 @@ function GoalConfigModal({
                                             <span className="text-[9px] text-gray-400 font-bold">/día</span>
                                         </div>
                                         {(() => {
-                                            const rec = getRecommendedCalls(u.user_id, userGoals[u.user_id]?.leads || 0, workingDays[u.user_id] || 24);
+                                            const dailyLeads = getUserDailyLeads(u.user_id);
+                                            const rec = getRecommendedCalls(u.user_id, dailyLeads);
                                             return rec > 0 ? (
                                                 <span className="text-[7.5px] font-black text-emerald-600 bg-emerald-50 px-1 rounded uppercase tracking-wider">
                                                     Sugerido: {rec}
                                                 </span>
                                             ) : null;
                                         })()}
+                                    </div>
+                                    {/* Clone to all button */}
+                                    <div className="col-span-1 flex justify-center">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const sourceGoals = userGoals[u.user_id];
+                                                const sourceWeekdays = userWeekdays[u.user_id] || [1, 2, 3, 4, 5, 6];
+                                                const sourceCallGoal = callGoalsState[u.user_id] || 0;
+                                                
+                                                const nextGoals = { ...userGoals };
+                                                const nextWeekdays = { ...userWeekdays };
+                                                const nextCallGoals = { ...callGoalsState };
+                                                
+                                                userPerformance.forEach(otherUser => {
+                                                    nextGoals[otherUser.user_id] = { ...sourceGoals };
+                                                    nextWeekdays[otherUser.user_id] = [...sourceWeekdays];
+                                                    nextCallGoals[otherUser.user_id] = sourceCallGoal;
+                                                });
+                                                
+                                                setUserGoals(nextGoals);
+                                                setUserWeekdays(nextWeekdays);
+                                                setCallGoalsState(nextCallGoals);
+                                                toast.success(`Configuración de ${u.full_name} aplicada a todos los asesores`);
+                                            }}
+                                            className="p-1.5 hover:bg-violet-50 hover:text-[#4449AA] text-gray-400 rounded-xl transition-colors cursor-pointer"
+                                            title="Aplicar esta configuración a todos los asesores"
+                                        >
+                                            <Copy className="w-3.5 h-3.5" />
+                                        </button>
                                     </div>
                                 </div>
                             ))}
@@ -2032,6 +2500,8 @@ function CallActivitySection({
     callLogs,
     userPerformance,
     getUserGoal,
+    conversionMode = 'real',
+    customConversionRate = 15,
 }: {
     callSummary: CallActivitySummary[];
     callGoals: CallGoal[];
@@ -2046,45 +2516,319 @@ function CallActivitySection({
     callLogs: CallActivity[];
     userPerformance: UserPerformance[];
     getUserGoal: (userId: string) => { leads: number; value: number } | null;
+    conversionMode?: 'real' | 'custom';
+    customConversionRate?: number;
 }) {
     const navigate = useNavigate();
     const [isGoalPanelOpen, setIsGoalPanelOpen] = useState(false);
     const [editGoals, setEditGoals] = useState<Record<string, number>>({});
     const [savingGoals, setSavingGoals] = useState(false);
-    const [subTab, setSubTab] = useState<'dashboard' | 'report'>('dashboard');
+    const [subTab, setSubTab] = useState<'dashboard' | 'report' | 'master_report'>('dashboard');
     const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+    const [printingUserId, setPrintingUserId] = useState<string | null>(null);
+    const [sendReportModal, setSendReportModal] = useState<{
+        isOpen: boolean;
+        advisorId: string;
+        advisorName: string;
+        advisorEmail: string;
+        tab: 'now' | 'schedule';
+        recipientEmail: string;
+        frequency: 'weekly' | 'monthly';
+        dayOfWeek: number;
+        dayOfMonth: number;
+        period: string;
+        sending: boolean;
+        scheduling: boolean;
+        sent: boolean;
+    } | null>(null);
+
+    const openSendModal = (advisorId: string, advisorName: string, advisorEmail: string) => {
+        setSendReportModal({
+            isOpen: true, advisorId, advisorName, advisorEmail,
+            tab: 'now', recipientEmail: advisorEmail,
+            frequency: 'weekly', dayOfWeek: 1, dayOfMonth: 1,
+            period: filters.period || 'month',
+            sending: false, scheduling: false, sent: false,
+        });
+    };
+
+    const handleSendReportNow = async () => {
+        if (!sendReportModal) return;
+        const row = reportData.find(r => r.userId === sendReportModal.advisorId);
+        if (!row) return;
+
+        setSendReportModal(prev => prev ? { ...prev, sending: true } : null);
+
+        // Build day grid data
+        const daysRng = getDatesInRange();
+        const activeWD = getActiveWeekdaysForUser(companyId, row.userId);
+        const userDays = daysRng.filter(d => activeWD.includes(d.getDay()));
+        const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+        const pastDays = userDays.filter(d => d <= todayEnd);
+        const futureDays = userDays.filter(d => d > todayEnd);
+        const daysOK = pastDays.filter(d => {
+            const c = getUserCallsForDate(row.userId, d).length;
+            return row.dailyGoal > 0 ? c >= row.dailyGoal : c > 0;
+        }).length;
+        const dayGrid = userDays.map(date => ({
+            label: date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' }),
+            count: getUserCallsForDate(row.userId, date).length,
+            goal: row.dailyGoal,
+            isFuture: date > todayEnd,
+        }));
+
+        try {
+            const { supabase } = await import('../../services/supabase');
+            const { data: { session } } = await supabase.auth.getSession();
+            const res = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-performance-report`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session?.access_token}`,
+                    },
+                    body: JSON.stringify({
+                        companyId,
+                        advisorId: row.userId,
+                        advisorName: row.userName,
+                        advisorEmail: sendReportModal.advisorEmail,
+                        recipientEmail: sendReportModal.recipientEmail,
+                        periodLabel: getFormattedDateRange(),
+                        generatedAt: new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                        actual: row.actual,
+                        actualConnected: row.actualConnected,
+                        goalUpToDate: row.goalUpToDate,
+                        periodGoal: row.periodGoal,
+                        dailyGoal: row.dailyGoal,
+                        deviation: row.deviation,
+                        percent: row.percent,
+                        avgResponseTime: row.avgResponseTime,
+                        dayGrid,
+                        daysOK,
+                        pastDaysCount: pastDays.length,
+                        leadsWithoutFollowUp: row.leadsWithoutFollowUp,
+                        deficit: row.deficit,
+                        userNeglectLoss: row.userNeglectLoss,
+                        userActivityLoss: row.userActivityLoss,
+                        userConsolidated: row.userConsolidated,
+                        conversionRate: row.conversionRate,
+                        avgDealSize: row.avgDealSize,
+                    }),
+                }
+            );
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Error enviando reporte');
+            }
+            toast.success(`✅ Reporte enviado a ${sendReportModal.recipientEmail}`);
+            setSendReportModal(prev => prev ? { ...prev, sending: false, sent: true } : null);
+            setTimeout(() => setSendReportModal(null), 2000);
+        } catch (err: any) {
+            toast.error(err.message || 'Error enviando reporte');
+            setSendReportModal(prev => prev ? { ...prev, sending: false } : null);
+        }
+    };
+
+    const handleSaveSchedule = async () => {
+        if (!sendReportModal) return;
+        setSendReportModal(prev => prev ? { ...prev, scheduling: true } : null);
+        try {
+            const { supabase } = await import('../../services/supabase');
+            // Compute next_send_at
+            const now = new Date();
+            let nextSend = new Date();
+            if (sendReportModal.frequency === 'weekly') {
+                const diff = (sendReportModal.dayOfWeek - now.getDay() + 7) % 7 || 7;
+                nextSend.setDate(now.getDate() + diff);
+            } else {
+                nextSend.setDate(sendReportModal.dayOfMonth);
+                if (nextSend <= now) nextSend.setMonth(nextSend.getMonth() + 1);
+            }
+            nextSend.setHours(8, 0, 0, 0);
+
+            const { error } = await supabase.from('report_schedules').insert({
+                company_id: companyId,
+                advisor_id: sendReportModal.advisorId,
+                advisor_name: sendReportModal.advisorName,
+                recipient_emails: sendReportModal.recipientEmail,
+                frequency: sendReportModal.frequency,
+                day_of_week: sendReportModal.frequency === 'weekly' ? sendReportModal.dayOfWeek : null,
+                day_of_month: sendReportModal.frequency === 'monthly' ? sendReportModal.dayOfMonth : null,
+                period: sendReportModal.period,
+                is_active: true,
+                next_send_at: nextSend.toISOString(),
+            });
+            if (error) throw error;
+            toast.success(`📅 Reporte programado — próximo envío: ${nextSend.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}`);
+            setSendReportModal(null);
+        } catch (err: any) {
+            toast.error(err.message || 'Error guardando programación');
+            setSendReportModal(prev => prev ? { ...prev, scheduling: false } : null);
+        }
+    };
+
+    const handlePrintUserReport = (userId: string) => {
+        const row = reportData.find(r => r.userId === userId);
+        if (!row) return;
+        setExpandedUserId(userId);
+
+        // Pre-compute day data before opening new window
+        const daysRng = getDatesInRange();
+        const activeWD = getActiveWeekdaysForUser(companyId, userId);
+        const userDays = daysRng.filter(d => activeWD.includes(d.getDay()));
+        const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+        const pastDays = userDays.filter(d => d <= todayEnd);
+        const daysOK = pastDays.filter(d => {
+            const c = getUserCallsForDate(userId, d).length;
+            return row.dailyGoal > 0 ? c >= row.dailyGoal : c > 0;
+        }).length;
+
+        const dayGridHTML = pastDays.map(date => {
+            const count = getUserCallsForDate(userId, date).length;
+            const g = row.dailyGoal;
+            const p = g > 0 ? (count / g) * 100 : 0;
+            const lbl = date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+            const c = p >= 100 ? '#10b981' : p >= 80 ? '#14b8a6' : p >= 50 ? '#f59e0b' : count > 0 ? '#f97316' : '#ef4444';
+            return `<div style="border:1.5px solid ${c}40;background:${c}0d;border-radius:8px;padding:10px 4px;text-align:center;"><p style="font-size:8px;font-weight:800;color:#64748b;text-transform:uppercase;margin:0 0 4px;letter-spacing:.5px;">${lbl}</p><p style="font-size:20px;font-weight:900;color:${c};margin:0;">${count}</p><p style="font-size:8px;color:#94a3b8;margin:3px 0 0;">/${g}</p></div>`;
+        }).join('');
+
+        const periodLabel = getFormattedDateRange();
+        const generatedAt = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const rtColor = row.avgResponseTime === 0 ? '#94a3b8' : row.avgResponseTime <= 2 ? '#10b981' : row.avgResponseTime <= 24 ? '#f59e0b' : '#ef4444';
+        const pctColor = row.percent >= 100 ? '#10b981' : row.percent >= 75 ? '#f59e0b' : '#ef4444';
+        const devLabel = row.deviation >= 0 ? `+${row.deviation}` : `${row.deviation}`;
+        const devColor = row.deviation >= 0 ? '#10b981' : '#ef4444';
+
+        const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Reporte — ${row.userName}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:#f8fafc;color:#1e293b;padding:36px 40px}@media print{body{background:white;padding:24px 28px}}
+.hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:2px solid #e2e8f0;padding-bottom:20px;margin-bottom:24px}
+.brand{font-size:9px;font-weight:900;color:#6366f1;letter-spacing:3px;text-transform:uppercase}
+.advisor-name{font-size:24px;font-weight:900;color:#0f172a;margin:6px 0 0;text-transform:uppercase;letter-spacing:.5px}
+.meta{font-size:11px;color:#64748b;font-weight:600;margin-top:6px;line-height:1.6}
+.avatar{width:60px;height:60px;border-radius:14px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:white;flex-shrink:0}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.kpi{background:white;border:1px solid #e2e8f0;border-radius:14px;padding:16px;position:relative}
+.kpi-label{font-size:8px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px}
+.kpi-val{font-size:24px;font-weight:900;line-height:1}
+.kpi-sub{font-size:9px;color:#94a3b8;font-weight:600;margin-top:5px}
+.section{background:white;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-bottom:16px}
+.sec-title{font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:2px;margin-bottom:14px}
+.daygrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.stat{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #f1f5f9}
+.stat:last-child{border:none}
+.slabel{font-size:10px;color:#64748b;font-weight:600}
+.sval{font-size:12px;font-weight:900;color:#1e293b}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.source-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-top:10px}
+.source-row{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start}
+.source-badge{font-size:8px;font-weight:900;color:white;padding:3px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0}
+.source-text{font-size:9px;color:#64748b;font-weight:500;line-height:1.5}
+.footer{margin-top:24px;padding-top:14px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:9px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:1px}
+.badge-ok{background:#10b981}.badge-warn{background:#f59e0b}.badge-danger{background:#ef4444}.badge-info{background:#6366f1}
+</style></head><body>
+<div class="hdr">
+  <div>
+    <div class="brand">Arias CRM · Reporte Individual de Rendimiento</div>
+    <div class="advisor-name">${row.userName}</div>
+    <div class="meta">📅 Período analizado: <strong>${periodLabel}</strong><br/>🕐 Generado el: ${generatedAt}</div>
+  </div>
+  <div class="avatar">${row.userName.charAt(0)}</div>
+</div>
+<div class="kpis">
+  <div class="kpi"><div class="kpi-label">Llamadas Realizadas</div><div class="kpi-val" style="color:#4f46e5">${row.actual}</div><div class="kpi-sub">de ${row.goalUpToDate} meta a la fecha</div></div>
+  <div class="kpi"><div class="kpi-label">Cumplimiento</div><div class="kpi-val" style="color:${pctColor}">${Math.round(row.percent)}%</div><div class="kpi-sub">${daysOK}/${pastDays.length} días con meta OK</div></div>
+  <div class="kpi"><div class="kpi-label">Abordaje Prom.</div><div class="kpi-val" style="color:${rtColor};font-size:18px;">${row.avgResponseTime > 0 ? row.avgResponseTime <= 1 ? '&lt;1h' : row.avgResponseTime < 24 ? row.avgResponseTime.toFixed(1)+'h' : Math.round(row.avgResponseTime/24)+'d' : 'N/A'}</div><div class="kpi-sub">asignación→primer contacto</div></div>
+  <div class="kpi"><div class="kpi-label">Desviación</div><div class="kpi-val" style="color:${devColor}">${devLabel}</div><div class="kpi-sub">meta diaria: ${row.dailyGoal} llamadas</div></div>
+</div>
+${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglose Diario — Solo días transcurridos (${pastDays.length} días laborables)</div><div class="daygrid">${dayGridHTML}</div></div>` : ''}
+<div class="two-col">
+  <div class="section"><div class="sec-title">📊 Resumen de Actividad de Llamadas</div>
+    <div class="stat"><span class="slabel">Meta diaria configurada</span><span class="sval">${row.dailyGoal} llamadas/día</span></div>
+    <div class="stat"><span class="slabel">Meta total del período</span><span class="sval">${row.periodGoal} llamadas</span></div>
+    <div class="stat"><span class="slabel">Meta proporcional a la fecha</span><span class="sval">${row.goalUpToDate} llamadas</span></div>
+    <div class="stat"><span class="slabel">Llamadas realizadas</span><span class="sval" style="color:${devColor}">${row.actual}</span></div>
+    <div class="stat"><span class="slabel">Llamadas conectadas</span><span class="sval" style="color:#10b981">${row.actualConnected}</span></div>
+    <div class="stat"><span class="slabel">Días laborables evaluados</span><span class="sval">${pastDays.length}</span></div>
+    <div class="stat"><span class="slabel">Días con meta cumplida</span><span class="sval" style="color:#10b981">${daysOK}</span></div>
+  </div>
+  <div class="section"><div class="sec-title">💸 Análisis de Oportunidad Perdida</div>
+    ${row.userConsolidated > 0 ? `
+    <div class="stat"><span class="slabel">Leads activos sin contacto (período)</span><span class="sval" style="color:#ef4444">${row.leadsWithoutFollowUp}</span></div>
+    <div class="stat"><span class="slabel">Llamadas faltantes vs meta</span><span class="sval" style="color:#ef4444">-${row.deficit}</span></div>
+    <div class="stat"><span class="slabel">Pérdida estimada — Negligencia</span><span class="sval" style="color:#ef4444">-$${Math.round(row.userNeglectLoss).toLocaleString()}</span></div>
+    <div class="stat"><span class="slabel">Pérdida estimada — Inactividad</span><span class="sval" style="color:#f59e0b">-$${Math.round(row.userActivityLoss).toLocaleString()}</span></div>
+    <div class="stat"><span class="slabel">Tasa conversión usada</span><span class="sval">${row.conversionRate.toFixed(1)}%</span></div>
+    <div class="stat"><span class="slabel">Ticket promedio usado</span><span class="sval">$${Math.round(row.avgDealSize).toLocaleString()}</span></div>
+    <div class="stat" style="border-top:2px solid #e2e8f0;margin-top:4px;"><span class="slabel" style="font-weight:900;color:#0f172a;">Costo Total Estimado</span><span class="sval" style="color:#ef4444;font-size:15px;">-$${Math.round(row.userConsolidated).toLocaleString()}</span></div>
+    ` : '<p style="font-size:11px;color:#10b981;font-weight:700;padding:12px 0;">✓ Sin oportunidades perdidas detectadas.</p>'}
+  </div>
+</div>
+<div class="section"><div class="sec-title">🔍 Origen y Metodología de los Datos</div>
+  <div class="source-box">
+    <div class="source-row"><span class="source-badge badge-info">Llamadas</span><span class="source-text"><strong>Origen:</strong> Tabla <code>call_activities</code> filtrada por asesor y período seleccionado. Cuenta registros únicos de cualquier tipo de acción (llamada, WhatsApp, cotización, nota).</span></div>
+    <div class="source-row"><span class="source-badge badge-info">Meta a la Fecha</span><span class="source-text"><strong>Fórmula:</strong> Meta diaria configurada × días laborables transcurridos hasta hoy. Excluye días futuros del período.</span></div>
+    <div class="source-row"><span class="source-badge badge-warn">Negligencia</span><span class="source-text"><strong>Origen:</strong> Leads con status activo (excluye Cerrado, Cliente, Perdido, Erróneo) asignados al asesor que NO tienen ninguna <code>call_activity</code> registrada en el período.</span></div>
+    <div class="source-row"><span class="source-badge badge-danger">Oportunidad Perdida</span><span class="source-text"><strong>Fórmula:</strong> (Leads sin contacto × Tasa de conversión × Ticket promedio) + (Llamadas faltantes ÷ Llamadas por cierre × Tasa conversión × Ticket). Estimación estadística, no garantía.</span></div>
+    <div class="source-row"><span class="source-badge badge-ok">Abordaje</span><span class="source-text"><strong>Origen:</strong> Promedio de horas entre <code>assigned_at</code> (o <code>created_at</code>) y <code>first_follow_up_at</code> para leads con ambas fechas registradas.</span></div>
+  </div>
+</div>
+<div class="footer"><span>Arias CRM — Sistema de Rendimiento de Equipos</span><span>Confidencial · Uso interno</span><span>Generado automáticamente</span></div>
+<script>window.onload=function(){setTimeout(function(){window.print();},400);}</script>
+</body></html>`;
+
+        const win = window.open('', '_blank', 'width=960,height=760,scrollbars=yes');
+        if (win) { win.document.write(html); win.document.close(); }
+    };
+
+    const countWorkingDaysInRange = (start: Date, end: Date, activeWeekdays: number[] = [1, 2, 3, 4, 5, 6]) => {
+        let count = 0;
+        const current = new Date(start.getTime());
+        current.setHours(12, 0, 0, 0);
+        const limit = new Date(end.getTime());
+        limit.setHours(12, 0, 0, 0);
+        while (current <= limit) {
+            if (activeWeekdays.includes(current.getDay())) {
+                count++;
+            }
+            current.setDate(current.getDate() + 1);
+        }
+        return count;
+    };
 
     const getPeriodProgress = () => {
         const range = getDateRange(filters);
         const now = new Date();
         if (!range.start || !range.end) {
-            return { elapsed: 30, total: 30, ratio: 1 };
+            return { elapsed: 24, total: 24, ratio: 1 };
         }
+        const defaultWeekdays = [1, 2, 3, 4, 5, 6];
         if (filters.period === 'today') {
-            return { elapsed: 1, total: 1, ratio: 1 };
+            const today = new Date();
+            const isWorking = defaultWeekdays.includes(today.getDay());
+            return { elapsed: isWorking ? 1 : 0, total: isWorking ? 1 : 0, ratio: isWorking ? 1 : 1 };
         }
-        const start = new Date(range.start);
-        const end = new Date(range.end);
-        const totalDays = Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 1;
-        const elapsedDays = Math.max(1, Math.min(totalDays, Math.ceil(Math.abs(Math.min(now.getTime(), end.getTime()) - start.getTime()) / (1000 * 60 * 60 * 24))));
+        const totalDays = countWorkingDaysInRange(range.start, range.end, defaultWeekdays);
+        const effectiveEnd = new Date(Math.min(now.getTime(), range.end.getTime()));
+        const elapsedDays = countWorkingDaysInRange(range.start, effectiveEnd, defaultWeekdays);
         return {
             elapsed: elapsedDays,
             total: totalDays,
-            ratio: elapsedDays / totalDays,
+            ratio: totalDays > 0 ? elapsedDays / totalDays : 1,
         };
     };
 
     const getWorkingDaysInPeriod = (userId: string) => {
-        const userWorkingDaysPerMonth = Number(localStorage.getItem(`crm_working_days_${companyId}_${userId}`) || '24');
-        if (filters.period === 'today') return 1;
+        const activeWeekdays = getActiveWeekdaysForUser(companyId, userId);
+        if (filters.period === 'today') {
+            const today = new Date();
+            return activeWeekdays.includes(today.getDay()) ? 1 : 0;
+        }
         const range = getDateRange(filters);
         if (!range.start || !range.end) {
-            return userWorkingDaysPerMonth;
+            return getActiveDaysInMonth(activeWeekdays);
         }
-        const diffTime = Math.abs(range.end.getTime() - range.start.getTime());
-        const calendarDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
-        const estimatedWorkingDays = (calendarDays / 30) * userWorkingDaysPerMonth;
-        return Math.min(estimatedWorkingDays, calendarDays);
+        return countWorkingDaysInRange(range.start, range.end, activeWeekdays);
     };
 
     const formatCurrency = (val: number) => {
@@ -2149,7 +2893,7 @@ function CallActivitySection({
         }
     };
 
-    const getDatesInRange = () => {
+    const getDatesInRange = (uncapped = false) => {
         const range = getDateRange(filters);
         let start = range.start;
         let end = range.end;
@@ -2171,8 +2915,8 @@ function CallActivitySection({
         const diffTime = Math.abs(end.getTime() - start.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         
-        // Cap at 31 days. If it's more (e.g. quarterly or yearly), show the last 14 days of that period
-        if (diffDays > 31) {
+        // Cap at 31 days if not uncapped. If it's more (e.g. quarterly or yearly), show the last 14 days of that period
+        if (!uncapped && diffDays > 31) {
             const adjustedStart = new Date(end);
             adjustedStart.setDate(adjustedStart.getDate() - 13);
             start = adjustedStart;
@@ -2235,15 +2979,13 @@ function CallActivitySection({
         const elapsedWorkingDays = progress.ratio * days;
         const elapsedWorkingDaysRounded = Math.max(1, Math.round(elapsedWorkingDays));
         
-        let activeDays = 0;
         let metGoalDays = 0;
+        const activeWeekdays = getActiveWeekdaysForUser(companyId, userId);
         daysRange.forEach(date => {
+            if (!activeWeekdays.includes(date.getDay())) return;
             const calls = getUserCallsForDate(userId, date);
-            if (calls.length > 0) {
-                activeDays++;
-                if (calls.length >= dailyGoal) {
-                    metGoalDays++;
-                }
+            if (calls.length >= dailyGoal) {
+                metGoalDays++;
             }
         });
         
@@ -2406,8 +3148,25 @@ function CallActivitySection({
         const userPeriodWorkingDays = getWorkingDaysInPeriod(user.user_id);
         const periodGoal = Math.round(dailyGoal * userPeriodWorkingDays);
         
-        // Pro-rated target to-date
-        const elapsedWorkingDays = progress.ratio * userPeriodWorkingDays;
+        // Pro-rated target to-date based on user-specific elapsed days
+        const activeWeekdays = getActiveWeekdaysForUser(companyId, user.user_id);
+        const range = getDateRange(filters);
+        let elapsedWorkingDays = 0;
+        if (!range.start || !range.end) {
+            // 'all' or no range: count working days from month start to TODAY (not full month)
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            elapsedWorkingDays = countWorkingDaysInRange(monthStart, now, activeWeekdays);
+        } else {
+            if (filters.period === 'today') {
+                const today = new Date();
+                elapsedWorkingDays = activeWeekdays.includes(today.getDay()) ? 1 : 0;
+            } else {
+                const now = new Date();
+                const effectiveEnd = new Date(Math.min(now.getTime(), range.end.getTime()));
+                elapsedWorkingDays = countWorkingDaysInRange(range.start, effectiveEnd, activeWeekdays);
+            }
+        }
         const goalUpToDate = Math.round(dailyGoal * elapsedWorkingDays);
         
         const actual = summary.calls_total;
@@ -2445,893 +3204,449 @@ function CallActivitySection({
     const globalDeviation = totalActualCalls - totalGoalUpToDate;
 
     const globalWon = userPerformance.reduce((s, p) => s + p.leads_won, 0);
+    const globalLost = userPerformance.reduce((s, p) => s + p.leads_lost, 0);
+    const globalLeads = userPerformance.reduce((s, p) => s + p.total_leads, 0);
     const globalClosing = userPerformance.reduce((s, p) => s + p.total_closing_amount, 0);
     const companyCallsPerClose = globalWon > 0 ? (totalActualCalls / globalWon) : 40;
     const companyAvgDealSize = globalWon > 0 ? (globalClosing / globalWon) : 2500;
+    const companyWinRate = (globalWon + globalLost) > 0 ? (globalWon / (globalWon + globalLost)) * 100 : 15;
+    const companyConversionRate = globalLeads > 0 ? (globalWon / globalLeads) * 100 : 15;
 
     const reportData = tempReportData.map(row => {
         const uPerf = userPerformance.find(p => p.user_id === row.userId);
-        const leadsWon = uPerf ? uPerf.leads_won : 0;
-        const totalClosingAmount = uPerf ? uPerf.total_closing_amount : 0;
+        const leadsWithoutFollowUp = uPerf ? uPerf.leads_without_follow_up : 0;
+        const winRate = uPerf && uPerf.win_rate > 0 ? uPerf.win_rate : companyWinRate;
+        const realConversionRate = uPerf && uPerf.conversion_rate > 0 ? uPerf.conversion_rate : companyConversionRate;
+        const conversionRate = conversionMode === 'custom' ? customConversionRate : realConversionRate;
+        const avgDealSize = uPerf && uPerf.avg_deal_size > 0 ? uPerf.avg_deal_size : companyAvgDealSize;
+        const actualWon = uPerf ? uPerf.leads_won : 0;
+        const actualRevenue = uPerf ? uPerf.total_closing_amount : 0;
         
         const deficit = Math.max(0, row.goalUpToDate - row.actual);
-        const callsPerClose = leadsWon > 0 ? (row.actual / leadsWon) : 0;
-        const finalCallsPerClose = callsPerClose > 0 ? Math.max(10, callsPerClose) : Math.max(10, companyCallsPerClose);
-        const avgDealSize = leadsWon > 0 ? (totalClosingAmount / leadsWon) : 0;
-        const finalAvgDealSize = avgDealSize > 0 ? avgDealSize : companyAvgDealSize;
         
-        const lostLeadsEst = deficit > 0 ? (deficit / finalCallsPerClose) : 0;
-        const lostRevenueEst = lostLeadsEst * finalAvgDealSize;
+        let actionsPerClose = actualWon > 0 ? (row.actual / actualWon) : companyCallsPerClose;
+        if (actionsPerClose < 5) {
+            actionsPerClose = companyCallsPerClose;
+        }
+        if (actionsPerClose < 5) {
+            actionsPerClose = 5;
+        }
+
+        const lostSalesNeglect = leadsWithoutFollowUp * (conversionRate / 100);
+        const lostSalesActivity = (deficit / actionsPerClose) * (conversionRate / 100);
+        const userNeglectLoss = lostSalesNeglect * avgDealSize;
+        const userActivityLoss = lostSalesActivity * avgDealSize;
+        const userConsolidated = userNeglectLoss + userActivityLoss;
+
+        const potentialLeadsWon = actualWon + lostSalesActivity + lostSalesNeglect;
+        const potentialRevenue = actualRevenue + userNeglectLoss + userActivityLoss;
 
         return {
             ...row,
             deficit,
-            lostLeadsEst,
-            lostRevenueEst,
+            leadsWithoutFollowUp,
+            winRate,
+            conversionRate,
+            avgDealSize,
+            actualWon,
+            actualRevenue,
+            actionsPerClose,
+            lostSalesNeglect,
+            lostSalesActivity,
+            userNeglectLoss,
+            userActivityLoss,
+            userConsolidated,
+            potentialLeadsWon,
+            potentialRevenue,
+            lostLeadsEst: lostSalesNeglect,
+            lostRevenueEst: userNeglectLoss,
         };
     }).sort((a, b) => b.percent - a.percent);
 
     const totalLostLeadsEst = reportData.reduce((s, r) => s + r.lostLeadsEst, 0);
     const totalLostRevenueEst = reportData.reduce((s, r) => s + r.lostRevenueEst, 0);
+    const totalLeadsWithoutFollowUp = reportData.reduce((s, r) => s + r.leadsWithoutFollowUp, 0);
 
     return (
-        <div className="space-y-6">
-            {/* Sub-tabs for Calls Section */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-white border border-gray-100 p-2 rounded-2xl shadow-sm gap-2">
-                <div className="flex gap-1">
-                    <button
-                        onClick={() => setSubTab('dashboard')}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${subTab === 'dashboard' ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
-                    >
-                        📊 Vista Resumen
-                    </button>
-                    <button
-                        onClick={() => setSubTab('report')}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${subTab === 'report' ? 'bg-gradient-to-r from-teal-500 to-cyan-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
-                    >
-                        📋 Reporte de Cumplimiento vs Meta
-                    </button>
+        <div className="space-y-5">
+            {/* ── Executive Header ─────────────────────────────────── */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-xs font-black text-slate-700 uppercase tracking-widest">Actividad de Llamadas</h3>
+                    <p className="text-[10px] text-slate-400 font-medium mt-0.5">{getFormattedDateRange()} · {days} {days === 1 ? 'día' : 'días'}</p>
                 </div>
-                <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-3 py-1.5 rounded-xl uppercase tracking-wider self-start sm:self-auto">
-                    Rango: {getFormattedDateRange()} ({days} {days === 1 ? 'día' : 'días'})
-                </span>
+                <div className="flex items-center gap-2">
+                    {isAdmin && (
+                        <button
+                            onClick={openGoalPanel}
+                            className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:border-teal-300 hover:text-teal-600 transition-all"
+                        >
+                            <Settings className="w-3 h-3" />
+                            Metas
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {subTab === 'dashboard' ? (
-                <>
-                    {/* Multi-Channel Breakdown */}
-                    {channelBreakdown.length > 0 && (
-                        <div className="bg-white rounded-[2rem] border border-gray-100/50 shadow-sm p-6">
-                            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">
-                                📊 Acciones por Canal — Total: {totalAllActions}
-                            </h3>
-                            <div className="flex gap-2 flex-wrap">
-                                {channelBreakdown.map(ch => (
-                                    <button
-                                        key={ch.type}
-                                        onClick={() => handleChannelClick(ch.type)}
-                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${ch.bgColor} border border-white/50 hover:scale-105 hover:shadow-md transition-all duration-150 cursor-pointer`}
-                                    >
-                                        <span className="text-lg">{ch.icon}</span>
-                                        <div>
-                                            <p className="text-[9px] font-black uppercase tracking-widest text-gray-600">{ch.label}</p>
-                                            <p className="text-lg font-black text-gray-900 leading-tight">{ch.count}</p>
-                                        </div>
-                                        {totalAllActions > 0 && (
-                                            <span className="text-[9px] font-bold text-gray-400 ml-1">
-                                                {Math.round((ch.count / totalAllActions) * 100)}%
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    {/* KPI Summary Cards */}
-                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
-                            <div className="flex items-center gap-4">
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center border border-blue-100/30 shrink-0">
-                                    <Phone className="w-5 h-5 text-blue-600" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Acciones</p>
-                                    <p className="text-2xl lg:text-3xl font-black text-slate-800 tracking-tight leading-none">{totalAllActions || totalCalls}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
-                            <div className="flex items-center gap-4">
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 flex items-center justify-center border border-emerald-100/30 shrink-0">
-                                    <PhoneCall className="w-5 h-5 text-emerald-600" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Conectadas</p>
-                                    <p className="text-2xl lg:text-3xl font-black text-emerald-600 tracking-tight leading-none">{totalConnected}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
-                            <div className="flex items-center gap-4">
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500/10 to-purple-500/10 flex items-center justify-center border border-violet-100/30 shrink-0">
-                                    <TrendingUp className="w-5 h-5 text-violet-600" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tasa Conexión</p>
-                                    <p className="text-2xl lg:text-3xl font-black text-violet-600 tracking-tight leading-none">{overallConnectRate.toFixed(1)}%</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
-                            <div className="flex items-center gap-4">
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 flex items-center justify-center border border-amber-100/30 shrink-0">
-                                    <Target className="w-5 h-5 text-amber-600" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Leads Contactados</p>
-                                    <p className="text-2xl lg:text-3xl font-black text-slate-800 tracking-tight leading-none">{totalUniqueLeads}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
-                            <div className="flex items-center gap-4">
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-500/10 to-red-500/10 flex items-center justify-center border border-rose-100/30 shrink-0">
-                                    <ArrowUpRight className="w-5 h-5 text-rose-600" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cambios de Estado</p>
-                                    <p className="text-2xl lg:text-3xl font-black text-rose-600 tracking-tight leading-none">{totalStatusChanges}</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
-                            <div className="flex items-center gap-4">
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500/10 to-amber-500/10 flex items-center justify-center border border-orange-100/30 shrink-0">
-                                    <Sparkles className="w-5 h-5 text-orange-655 animate-pulse" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5 mb-1">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Abordaje Prom.</p>
-                                        <span className="relative group inline-block cursor-help text-slate-405 hover:text-slate-650 transition-colors">
-                                            <span className="w-3.5 h-3.5 rounded-full border border-slate-305 hover:border-slate-400 flex items-center justify-center text-[9px] font-black leading-none font-sans">!</span>
-                                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
-                                                <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Tiempo de Abordaje Promedio</p>
-                                                <p className="text-white/90 text-left">Tiempo promedio transcurrido desde la asignación del lead hasta registrar el primer seguimiento. Responder rápido evita que el lead se enfríe y optimiza la conversión.</p>
-                                                <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
-                                            </span>
-                                        </span>
-                                    </div>
-                                    <p className={`text-2xl lg:text-3xl font-black tracking-tight leading-none ${globalAvgResponseTime > 0 ? (globalAvgResponseTime <= 2 ? 'text-emerald-600' : globalAvgResponseTime <= 24 ? 'text-amber-600' : 'text-rose-650') : 'text-slate-350'}`}>
-                                        {formatResponseTime(globalAvgResponseTime)}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
+            {/* ── KPI Strip ────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {[
+                    { label: 'Total Acciones', value: totalAllActions || totalCalls, color: 'text-slate-800', sub: 'registradas' },
+                    { label: 'Conectadas', value: totalConnected, color: 'text-emerald-600', sub: `${overallConnectRate.toFixed(1)}% tasa` },
+                    { label: 'Leads Únicos', value: totalUniqueLeads, color: 'text-indigo-600', sub: 'contactados' },
+                    { label: 'Cambios Estado', value: totalStatusChanges, color: 'text-violet-600', sub: 'en pipeline' },
+                    { label: 'Meta Global', value: `${globalPercent.toFixed(0)}%`, color: globalPercent >= 100 ? 'text-emerald-600' : globalPercent >= 75 ? 'text-amber-500' : 'text-rose-600', sub: `${totalActualCalls}/${totalGoalUpToDate} llamadas` },
+                    { label: 'Abordaje Prom.', value: formatResponseTime(globalAvgResponseTime), color: globalAvgResponseTime > 0 ? (globalAvgResponseTime <= 2 ? 'text-emerald-600' : globalAvgResponseTime <= 24 ? 'text-amber-500' : 'text-rose-600') : 'text-slate-400', sub: 'resp. promedio' },
+                ].map((kpi, i) => (
+                    <div key={i} className="bg-white border border-slate-100 rounded-xl p-4 hover:border-slate-200 hover:shadow-sm transition-all">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">{kpi.label}</p>
+                        <p className={`text-xl font-black ${kpi.color} leading-none`}>{kpi.value}</p>
+                        <p className="text-[9px] text-slate-400 mt-1 font-medium">{kpi.sub}</p>
                     </div>
+                ))}
+            </div>
 
-                    {/* Admin: Set Call Goals */}
-                    {isAdmin && (
-                        <div className="flex justify-end">
-                            <button
-                                onClick={openGoalPanel}
-                                className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-teal-200 transition-all"
-                            >
-                                <Settings className="w-3.5 h-3.5" />
-                                Metas de Actividad
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Per-User Call Table */}
-                    <div className="bg-white rounded-[2rem] border border-gray-100/50 shadow-[0_8px_40px_rgb(0,0,0,0.03)] overflow-hidden">
-                        <div className="px-6 py-3 bg-gradient-to-r from-teal-50 to-cyan-50 border-b border-teal-100">
-                            <p className="text-[9px] font-black text-teal-600 uppercase tracking-widest">
-                                📞 Actividad de Llamadas por Vendedor
-                            </p>
-                        </div>
-                        {/* Header */}
-                        <div className="grid grid-cols-12 gap-2 px-6 py-3.5 bg-slate-50/50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            <div className="col-span-1 text-center">#</div>
-                            <div className="col-span-2">Vendedor</div>
-                            <div className="col-span-2 text-center flex items-center justify-center gap-1">
-                                Abordaje
-                                <span className="relative group inline-block cursor-help text-slate-400 hover:text-slate-650 transition-colors">
-                                    <span className="w-3.5 h-3.5 rounded-full border border-slate-305 hover:border-slate-400 flex items-center justify-center text-[9px] font-black leading-none font-sans">!</span>
-                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
-                                        <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Tiempo de Abordaje</p>
-                                        <p className="text-white/90 text-left">Tiempo promedio transcurrido desde la asignación del lead hasta registrar el primer seguimiento. Responder rápido evita que el lead se enfríe y optimiza la conversión.</p>
-                                        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
-                                    </span>
-                                </span>
-                            </div>
-                            <div className="col-span-1 text-center">Llamadas</div>
-                            <div className="col-span-1 text-center">Conectadas</div>
-                            <div className="col-span-1 text-center">Sin Resp.</div>
-                            <div className="col-span-1 text-center">Tasa</div>
-                            <div className="col-span-1 text-center">Leads Únicos</div>
-                            <div className="col-span-2 text-center">Cambios Estado</div>
-                        </div>
-
-                        {/* Rows */}
-                        <div className="divide-y divide-slate-100">
-                            {callSummary
-                                .sort((a, b) => b.calls_total - a.calls_total)
-                                .map((user, index) => {
-                                    const goal = getUserCallGoal(user.user_id);
-                                    const connectRate = user.calls_total > 0 ? (user.calls_connected / user.calls_total) * 100 : 0;
-                                    const userName = profileNames[user.user_id] || 'Desconocido';
-                                    const avatarUrl = profileAvatars[user.user_id];
-                                    const uPerf = userPerformance.find(p => p.user_id === user.user_id);
-                                    const avgResponseTime = uPerf?.avg_response_time || 0;
-
-                                    return (
-                                        <div key={user.user_id} className="grid grid-cols-12 gap-2 px-6 py-5 items-center hover:bg-slate-50/50 transition-colors">
-                                            {/* Rank */}
-                                            <div className="col-span-1 flex justify-center">
-                                                {index === 0 ? (
-                                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow-sm">
-                                                        <span className="text-[10px] font-bold text-white">1</span>
-                                                    </div>
-                                                ) : index === 1 ? (
-                                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center shadow-sm">
-                                                        <span className="text-[10px] font-bold text-white">2</span>
-                                                    </div>
-                                                ) : index === 2 ? (
-                                                    <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-600 to-amber-700 flex items-center justify-center shadow-sm">
-                                                        <span className="text-[10px] font-bold text-white">3</span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs font-bold text-slate-300">{index + 1}</span>
-                                                )}
-                                            </div>
-
-                                            {/* User Info */}
-                                            <div className="col-span-2 flex items-center gap-3 min-w-0">
-                                                <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/40">
-                                                    {avatarUrl ? (
-                                                        <img src={avatarUrl} className="w-full h-full object-cover" alt="" />
-                                                    ) : (
-                                                        <Users className="w-4 h-4 text-slate-400" />
-                                                    )}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-semibold text-slate-800 tracking-tight truncate">{userName}</p>
-                                                    {goal > 0 && (
-                                                        <div className="mt-1">
-                                                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                                <div
-                                                                    className={`h-full rounded-full transition-all duration-700 ${user.calls_total >= goal ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : user.calls_total >= goal * 0.5 ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-red-400 to-red-500'}`}
-                                                                    style={{ width: `${Math.min((user.calls_total / goal) * 100, 100)}%` }}
-                                                                />
-                                                            </div>
-                                                            <p className="text-[8px] font-bold text-slate-400 mt-1">
-                                                                {user.calls_total >= goal ? '🟢' : user.calls_total >= goal * 0.5 ? '🟡' : '🔴'} {Math.round((user.calls_total / goal) * 100)}% de meta diaria ({goal})
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Abordaje */}
-                                            <div className="col-span-2 text-center">
-                                                <span className={`inline-flex items-center justify-center text-xs font-bold px-2.5 py-1 rounded-full ${
-                                                    avgResponseTime === 0 ? 'bg-slate-50 text-slate-400' :
-                                                    avgResponseTime <= 2 ? 'bg-emerald-50 text-emerald-700' :
-                                                    avgResponseTime <= 24 ? 'bg-amber-50 text-amber-700' :
-                                                    'bg-rose-50 text-rose-650'
-                                                }`}>
-                                                    {formatResponseTime(avgResponseTime)}
-                                                </span>
-                                            </div>
-
-                                            {/* Total Calls */}
-                                            <div className="col-span-1 text-center">
-                                                {user.calls_total > 0 ? (
-                                                    <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'all'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-slate-100 transition-all cursor-pointer border border-transparent hover:border-slate-200">
-                                                        <span className="text-[15px] font-bold text-slate-700 group-hover:text-indigo-650 transition-colors">{user.calls_total}</span>
-                                                        <ArrowUpRight className="w-3.5 h-3.5 text-indigo-500 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
-                                                    </button>
-                                                ) : <span className="text-[15px] font-medium text-slate-350">{user.calls_total}</span>}
-                                            </div>
-
-                                            {/* Connected */}
-                                            <div className="col-span-1 text-center">
-                                                {user.calls_connected > 0 ? (
-                                                    <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'connected'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-emerald-50 transition-all cursor-pointer border border-transparent hover:border-emerald-100">
-                                                        <span className="text-[15px] font-bold text-emerald-600 group-hover:text-emerald-700 transition-colors">{user.calls_connected}</span>
-                                                        <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
-                                                    </button>
-                                                ) : <span className="text-[15px] font-medium text-slate-350">{user.calls_connected}</span>}
-                                            </div>
-
-                                            {/* No Answer */}
-                                            <div className="col-span-1 text-center">
-                                                {user.calls_no_answer > 0 ? (
-                                                    <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'no_answer'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-red-50 transition-all cursor-pointer border border-transparent hover:border-red-100">
-                                                        <span className="text-[15px] font-bold text-red-500 group-hover:text-red-600 transition-colors">{user.calls_no_answer}</span>
-                                                        <ArrowUpRight className="w-3.5 h-3.5 text-red-550 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
-                                                    </button>
-                                                ) : <span className="text-[15px] font-medium text-slate-350">{user.calls_no_answer}</span>}
-                                            </div>
-
-                                            {/* Connect Rate */}
-                                            <div className="col-span-1 text-center">
-                                                <span className={`inline-flex items-center justify-center text-xs font-bold px-2.5 py-1 rounded-full ${connectRate >= 50 ? 'bg-emerald-50 text-emerald-700' :
-                                                    connectRate >= 30 ? 'bg-amber-50 text-amber-700' :
-                                                        'bg-rose-50 text-rose-600'
-                                                    }`}>
-                                                    {connectRate.toFixed(0)}%
-                                                </span>
-                                            </div>
-
-                                            {/* Unique Leads */}
-                                            <div className="col-span-1 text-center">
-                                                {user.unique_leads_called > 0 ? (
-                                                    <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'unique'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-slate-100 transition-all cursor-pointer border border-transparent hover:border-slate-200">
-                                                        <span className="text-[15px] font-bold text-slate-700 group-hover:text-indigo-650 transition-colors">{user.unique_leads_called}</span>
-                                                        <ArrowUpRight className="w-3.5 h-3.5 text-indigo-500 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
-                                                    </button>
-                                                ) : <span className="text-[15px] font-medium text-slate-350">{user.unique_leads_called}</span>}
-                                            </div>
-
-                                            {/* Status Changes */}
-                                            <div className="col-span-2 text-center">
-                                                {user.leads_with_status_change > 0 ? (
-                                                    <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'status_change'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-violet-50 transition-all cursor-pointer border border-transparent hover:border-violet-100">
-                                                        <span className="text-[15px] font-bold text-indigo-600 group-hover:text-violet-700 transition-colors">{user.leads_with_status_change}</span>
-                                                        <ArrowUpRight className="w-3.5 h-3.5 text-violet-600 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
-                                                    </button>
-                                                ) : <span className="text-[15px] font-medium text-slate-350">{user.leads_with_status_change}</span>}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                        </div>
-                    </div>
-
-                    {/* Status Evolution */}
-                    {statusEvolution.length > 0 && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                            <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-violet-500" />
-                                Evolución de Estados por Llamadas
-                            </h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                {statusEvolution.map((evo) => (
-                                    <div key={`${evo.from}-${evo.to}`} className="bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100 p-3">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-[9px] font-black text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">
-                                                {evo.from || 'Nuevo'}
-                                            </span>
-                                            <ArrowUpRight className="w-3 h-3 text-violet-500" />
-                                            <span className="text-[9px] font-black text-violet-600 px-1.5 py-0.5 bg-violet-50 rounded">
-                                                {evo.to}
-                                            </span>
-                                        </div>
-                                        <p className="text-lg font-black text-gray-900">{evo.count}</p>
-                                        <p className="text-[7px] font-bold text-gray-400 uppercase tracking-widest">transiciones</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </>
-            ) : (
-                <div className="space-y-6 print-container">
-                    {/* CSS for print mode */}
-                    <style dangerouslySetInnerHTML={{__html: `
-                        @media print {
-                            /* Override scrollable viewport heights and overflow restrictions */
-                            html, body, #root, .min-h-screen, [class*="h-screen"], [class*="overflow-hidden"], main, .main-content {
-                                height: auto !important;
-                                min-height: initial !important;
-                                max-height: initial !important;
-                                overflow: visible !important;
-                                position: static !important;
-                            }
-                            
-                            body {
-                                background: white !important;
-                                color: black !important;
-                            }
-                            aside, nav, header, footer, button, .no-print, [class*="no-print"] {
-                                display: none !important;
-                            }
-                            main, .main-content, .print-container, .space-y-6 {
-                                padding: 0 !important;
-                                margin: 0 !important;
-                                width: 100% !important;
-                                max-width: 100% !important;
-                            }
-                            .print-card {
-                                border: 1px solid #e5e7eb !important;
-                                box-shadow: none !important;
-                                page-break-inside: avoid;
-                                margin-bottom: 20px !important;
-                                padding: 15px !important;
-                                background: white !important;
-                            }
-                            .print-grid {
-                                display: grid !important;
-                                grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
-                                gap: 4px !important;
-                            }
-                        }
-                    `}} />
-
-                    {/* Print Header Actions */}
-                    <div className="flex items-center justify-between bg-white border border-gray-100 p-4 rounded-2xl shadow-sm no-print">
-                        <div>
-                            <h3 className="text-xs font-black text-gray-800 uppercase tracking-wider">Reporte de Desempeño Diario</h3>
-                            <p className="text-[10px] text-gray-400 font-bold">Imprime o exporta a PDF para compartir con el equipo</p>
-                        </div>
+            {/* ── Canal Breakdown (compact chips) ───────────────────── */}
+            {channelBreakdown.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Canales:</span>
+                    {channelBreakdown.map(ch => (
                         <button
-                            onClick={() => window.print()}
-                            className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-teal-200 transition-all cursor-pointer"
+                            key={ch.type}
+                            onClick={() => handleChannelClick(ch.type)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-100 text-[9px] font-bold text-slate-600 hover:border-teal-300 hover:text-teal-700 transition-all cursor-pointer"
                         >
-                            <Printer className="w-3.5 h-3.5" />
-                            Imprimir Reporte / PDF
+                            <span>{ch.icon}</span>{ch.label} <span className="font-black">{ch.count}</span>
                         </button>
-                    </div>
+                    ))}
+                </div>
+            )}
 
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print-card bg-white rounded-2xl border border-slate-100 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                        <div className="border-r border-slate-100 last:border-0 pr-4">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Días del Periodo</p>
-                            <p className="text-2xl font-black text-slate-800">{days} <span className="text-xs text-slate-400 font-semibold">días</span></p>
-                            <p className="text-[10px] text-slate-400 mt-2 font-medium">Rango: {getFormattedDateRange()}</p>
-                        </div>
-                        <div className="border-r border-slate-100 last:border-0 px-4">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Meta del Periodo</p>
-                            <p className="text-2xl font-black text-slate-800">{totalPeriodGoal} <span className="text-xs text-slate-400 font-semibold">llamadas</span></p>
-                            <p className="text-[10px] text-slate-400 mt-2 font-medium">
-                                Meta a la fecha: <span className="font-extrabold text-slate-650">{totalGoalUpToDate}</span>
-                            </p>
-                        </div>
-                        <div className="border-r border-slate-100 last:border-0 px-4">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Llamadas Realizadas</p>
-                            <p className="text-2xl font-black text-indigo-650">{totalActualCalls} <span className="text-xs text-indigo-400 font-semibold">hechas</span></p>
-                            <p className="text-[10px] text-slate-400 mt-2 font-medium">
-                                Desviación a la fecha: <span className={globalDeviation >= 0 ? 'text-emerald-600 font-extrabold' : 'text-rose-600 font-extrabold'}>
-                                    {globalDeviation >= 0 ? `+${globalDeviation}` : globalDeviation}
-                                </span>
-                            </p>
-                        </div>
-                        <div className="px-4">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cumplimiento Global</p>
-                            <div className="flex items-baseline gap-2">
-                                <p className={`text-2xl font-black ${globalPercent >= 100 ? 'text-emerald-600' : globalPercent >= 80 ? 'text-amber-500' : 'text-rose-600'}`}>
-                                    {globalPercent.toFixed(1)}%
-                                </p>
-                            </div>
-                            <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2.5 overflow-hidden">
-                                <div
-                                    className={`h-full rounded-full transition-all duration-700 ${globalPercent >= 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : globalPercent >= 80 ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-red-400 to-red-500'}`}
-                                    style={{ width: `${Math.min(globalPercent, 100)}%` }}
-                                />
-                            </div>
-                            <p className="text-[9px] text-slate-400 mt-2 font-medium">
-                                Medido vs. meta a la fecha
-                            </p>
-                        </div>
-                    </div>
+            {/* ── Advisor Performance Table ─────────────────────────── */}
+            <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
+                {/* Table header */}
+                <div className="grid grid-cols-12 gap-0 px-5 py-3 bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                    <div className="col-span-3">Asesor</div>
+                    <div className="col-span-2 text-center">Llamadas</div>
+                    <div className="col-span-2 text-center">Meta a la Fecha</div>
+                    <div className="col-span-2 text-center">Cumplimiento</div>
+                    <div className="col-span-2 text-center">Abordaje</div>
+                    <div className="col-span-1 text-center">Ver</div>
+                </div>
 
-                    {/* AI Recommendation Summary Banner */}
-                    <div className="bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-indigo-500/10 border border-teal-100/40 rounded-2xl p-6 flex items-start gap-4 print-card">
-                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-md shadow-teal-200/50 shrink-0 no-print">
-                            <Sparkles className="w-5 h-5 text-white animate-pulse" />
-                        </div>
-                        <div>
-                            <h4 className="text-[10px] font-bold text-teal-850 uppercase tracking-wider mb-1">Recomendación General de Sofía AI (Equipo)</h4>
-                            <p className="text-[13px] font-semibold text-slate-700 leading-relaxed">
-                                {getGlobalRecommendation(totalActualCalls, totalGoalUpToDate, totalPeriodGoal)}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Costo de Oportunidad Global Card */}
-                    {totalLostRevenueEst > 0 && (
-                        <div className="bg-gradient-to-r from-red-550/10 via-rose-500/10 to-orange-500/10 border border-rose-100/40 rounded-2xl p-6 flex items-start gap-4 print-card">
-                            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-550 to-orange-600 flex items-center justify-center shadow-md shadow-rose-200/50 shrink-0 no-print">
-                                <TrendingDown className="w-5 h-5 text-white animate-bounce" />
-                            </div>
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <h4 className="text-[10px] font-bold text-rose-850 uppercase tracking-wider">Costo de Oportunidad por Falta de Seguimiento (Equipo)</h4>
-                                    <span className="relative group inline-block cursor-help text-rose-800 hover:text-rose-950 transition-colors">
-                                        <span className="w-3.5 h-3.5 rounded-full border border-rose-300 hover:border-rose-400 flex items-center justify-center text-[9px] font-black leading-none">!</span>
-                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
-                                            <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Fórmula Global del Equipo</p>
-                                            <p className="text-white/90">Suma del costo de oportunidad individual de todos los asesores que tienen déficit de llamadas en el periodo.</p>
-                                            <p className="mt-1.5 font-bold text-amber-300">Parámetros Globales:</p>
-                                            <p className="text-white/90">Llamadas por Cierre Promedio: <span className="font-bold text-emerald-400">{companyCallsPerClose.toFixed(1)}</span></p>
-                                            <p className="text-white/90">Ticket Promedio Global: <span className="font-bold text-emerald-400">{formatCurrency(companyAvgDealSize)} USD</span></p>
-                                            <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
-                                        </span>
-                                    </span>
-                                </div>
-                                <p className="text-[13px] font-bold text-slate-700 leading-relaxed">
-                                    Por no realizar las llamadas de seguimiento programadas ({Math.abs(globalDeviation)} llamadas de déficit a la fecha), el equipo ha dejado de capturar aproximadamente <span className="font-extrabold text-rose-600">{totalLostLeadsEst.toFixed(1)} cierres de venta</span>, lo que representa una pérdida estimada de <span className="font-extrabold text-rose-600">{formatCurrency(totalLostRevenueEst)} USD</span> en facturación para este periodo.
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Proyección Financiera Global de Ventas */}
-                    {(() => {
-                        const totalLeadsGoal = userPerformance.reduce((s, p) => {
-                            const goal = getUserGoal(p.user_id);
-                            return s + (goal?.leads || 0);
-                        }, 0);
-                        
-                        const totalValueGoal = userPerformance.reduce((s, p) => {
-                            const goal = getUserGoal(p.user_id);
-                            return s + (goal?.value || 0);
-                        }, 0);
-                        
-                        // Pipeline-based projection: Already Won + (Active Leads * individual Win Rate)
-                        const projGlobalWon = Math.round(userPerformance.reduce((s, p) => {
-                            const expectedWon = p.leads_active * (p.win_rate / 100);
-                            return s + p.leads_won + expectedWon;
-                        }, 0));
-                        
-                        // Pipeline-based value projection: Already Closed Amount + (Active Value * individual Win Rate)
-                        const projGlobalValue = Math.round(userPerformance.reduce((s, p) => {
-                            const expectedValue = p.total_value * (p.win_rate / 100);
-                            return s + p.total_closing_amount + expectedValue;
-                        }, 0));
-                        
-                        const globalValueDiff = projGlobalValue - totalValueGoal;
-                        
-                        if (totalValueGoal <= 0) return null;
-                        
-                        return (
-                            <div className="bg-gradient-to-r from-indigo-500/5 via-violet-500/5 to-purple-500/5 border border-indigo-100/30 rounded-2xl p-6 flex items-start gap-4 print-card">
-                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-200/50 shrink-0 no-print">
-                                    <TrendingUp className="w-5 h-5 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                    <h4 className="text-[10px] font-bold text-indigo-850 uppercase tracking-wider mb-1">
-                                        📊 Proyección Financiera al Cierre del Periodo (Equipo)
-                                    </h4>
-                                    <p className="text-[13px] font-bold text-slate-700 leading-relaxed">
-                                        En base a la probabilidad de conversión del embudo actual (Tratos Ganados + Tratos Activos × Tasa de Cierre), el equipo proyecta cerrar un total de <span className="font-extrabold text-indigo-650">{projGlobalWon} leads</span> con una facturación estimada de <span className="font-extrabold text-indigo-650">{formatCurrency(projGlobalValue)} USD</span>. 
-                                        {globalValueDiff >= 0 ? (
-                                            <span> ¡Esto representa un <span className="font-extrabold text-emerald-600">superávit proyectado de +{formatCurrency(globalValueDiff)} USD</span> por encima de la meta global ({formatCurrency(totalValueGoal)} USD)!</span>
-                                        ) : (
-                                            <span> Esto representa una <span className="font-extrabold text-red-500">brecha proyectada de -{formatCurrency(Math.abs(globalValueDiff))} USD</span> respecto a la meta global de ventas ({formatCurrency(totalValueGoal)} USD).</span>
-                                        )}
-                                    </p>
-                                    <p className="text-[9.5px] text-slate-400 mt-2 font-bold uppercase tracking-wider">
-                                        * FÓRMULA DE PROYECCIÓN REALISTA: Tratos Ganados + (Tratos Activos × Tasa de Cierre Histórica).
-                                    </p>
-                                </div>
-                            </div>
+                {/* Advisor rows */}
+                <div className="divide-y divide-slate-50">
+                    {reportData.map((row) => {
+                        const daysRange = getDatesInRange();
+                        const uncappedDaysRange = getDatesInRange(true);
+                        const activeWeekdays = getActiveWeekdaysForUser(companyId, row.userId);
+                        const userDaysRange = daysRange.filter(d => activeWeekdays.includes(d.getDay()));
+                        const detailedRecommendationText = getDetailedRecommendation(
+                            row.userName, row.dailyGoal, getWorkingDaysInPeriod(row.userId),
+                            row.goalUpToDate, row.actual, row.actualConnected, uncappedDaysRange, row.userId
                         );
-                    })()}
+                        const isExpanded = expandedUserId === row.userId;
+                        const pct = Math.min(row.percent, 100);
+                        const pctColor = row.percent >= 100 ? 'bg-emerald-500' : row.percent >= 75 ? 'bg-amber-400' : 'bg-rose-500';
+                        const deviationLabel = row.deviation >= 0 ? `+${row.deviation}` : `${row.deviation}`;
 
-                    {/* Individual performance Cards */}
-                    <div className="space-y-4">
-                        {reportData.map((row) => {
-                            const daysRange = getDatesInRange();
-                            const detailedRecommendationText = getDetailedRecommendation(
-                                row.userName,
-                                row.dailyGoal,
-                                getWorkingDaysInPeriod(row.userId),
-                                row.goalUpToDate,
-                                row.actual,
-                                row.actualConnected,
-                                daysRange,
-                                row.userId
-                            );
-                            const isExpanded = expandedUserId === row.userId;
-
-                            return (
-                                <div 
-                                    key={row.userId} 
-                                    className={`bg-white rounded-[2rem] border transition-all duration-300 overflow-hidden ${
-                                        isExpanded 
-                                            ? 'border-indigo-100 shadow-[0_12px_30px_rgba(68,73,170,0.05)]' 
-                                            : 'border-gray-100 shadow-[0_4px_16px_rgba(0,0,0,0.01)] hover:border-gray-200 hover:shadow-[0_8px_24px_rgba(0,0,0,0.02)]'
-                                    } print-card`}
+                        return (
+                            <div key={row.userId} data-user-id={row.userId} className="print-card">
+                                {/* Row */}
+                                <div
+                                    onClick={() => setExpandedUserId(isExpanded ? null : row.userId)}
+                                    className="grid grid-cols-12 gap-0 px-5 py-4 items-center cursor-pointer hover:bg-slate-50/60 transition-colors"
                                 >
-                                    {/* Seller Info Header (Accordion Toggle) */}
-                                    <div 
-                                        onClick={() => setExpandedUserId(isExpanded ? null : row.userId)}
-                                        className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-6 cursor-pointer select-none"
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/40">
-                                                {row.avatarUrl ? (
-                                                    <img src={row.avatarUrl} className="w-full h-full object-cover" alt="" />
-                                                ) : (
-                                                    <Users className="w-5 h-5 text-slate-400" />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <h4 className="text-lg font-bold text-slate-800 uppercase tracking-tight">{row.userName}</h4>
-                                                <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest mt-0.5">Asesor de Ventas</p>
-                                            </div>
+                                    {/* Asesor */}
+                                    <div className="col-span-3 flex items-center gap-3 min-w-0">
+                                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/40">
+                                            {row.avatarUrl ? <img src={row.avatarUrl} className="w-full h-full object-cover" alt="" /> : <Users className="w-4 h-4 text-slate-400" />}
                                         </div>
-
-                                        {/* Cumulative stats badges */}
-                                        <div className="flex flex-wrap items-center gap-3 lg:gap-4">
-                                            <div className="bg-slate-50/70 px-5 py-2.5 rounded-2xl text-center border border-slate-100 min-w-[95px] hover:bg-slate-100/50 transition-colors">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta Diaria</p>
-                                                <p className="text-lg font-extrabold text-slate-700 mt-1">{row.dailyGoal}</p>
-                                            </div>
-                                            <div className="bg-slate-50/70 px-5 py-2.5 rounded-2xl text-center border border-slate-100 min-w-[95px] hover:bg-slate-100/50 transition-colors">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta Periodo</p>
-                                                <p className="text-lg font-extrabold text-slate-700 mt-1">{row.periodGoal}</p>
-                                            </div>
-                                            <div className="bg-slate-50/70 px-5 py-2.5 rounded-2xl text-center border border-slate-100 min-w-[95px] hover:bg-slate-100/50 transition-colors">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta a la Fecha</p>
-                                                <p className="text-lg font-extrabold text-slate-700 mt-1">{row.goalUpToDate}</p>
-                                            </div>
-                                            <div className="bg-indigo-50/40 px-5 py-2.5 rounded-2xl text-center border border-indigo-100/50 min-w-[95px] hover:bg-indigo-50/70 transition-colors">
-                                                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Llamadas Real.</p>
-                                                <p className="text-2xl font-black text-indigo-650 mt-1">{row.actual}</p>
-                                            </div>
-                                            <div className={`${row.deviation >= 0 ? 'bg-emerald-50/40 border-emerald-100/40 hover:bg-emerald-50/60' : 'bg-rose-50/40 border-rose-100/40 hover:bg-rose-50/60'} px-5 py-2.5 rounded-2xl text-center border min-w-[95px] transition-colors`}>
-                                                <p className={`text-[10px] font-bold ${row.deviation >= 0 ? 'text-emerald-500' : 'text-rose-400'} uppercase tracking-wider`}>Desviación</p>
-                                                <p className={`text-2xl font-black ${row.deviation >= 0 ? 'text-emerald-600' : 'text-rose-600'} mt-1`}>
-                                                    {row.deviation >= 0 ? `+${row.deviation}` : row.deviation}
-                                                </p>
-                                            </div>
-                                            <div className="bg-slate-50/70 px-5 py-2.5 rounded-2xl text-center border border-slate-100 min-w-[95px] hover:bg-slate-100/50 transition-colors">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Abordaje</p>
-                                                    <span className="relative group inline-block cursor-help text-slate-400 hover:text-slate-650 transition-colors">
-                                                        <span className="w-3.5 h-3.5 rounded-full border border-slate-300 hover:border-slate-400 flex items-center justify-center text-[8px] font-black leading-none font-sans">!</span>
-                                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
-                                                            <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Tiempo de Respuesta</p>
-                                                            <p className="text-white/90 text-left">Tiempo promedio desde la asignación del lead hasta registrar el primer seguimiento. Responder rápido evita que el lead se enfríe y optimiza la conversión.</p>
-                                                            <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
-                                                        </span>
-                                                    </span>
-                                                </div>
-                                                <p className={`text-lg font-extrabold mt-1 ${
-                                                    row.avgResponseTime === 0 ? 'text-slate-400' :
-                                                    row.avgResponseTime <= 2 ? 'text-emerald-600' :
-                                                    row.avgResponseTime <= 24 ? 'text-amber-600' :
-                                                    'text-rose-650'
-                                                }`}>{formatResponseTime(row.avgResponseTime)}</p>
-                                            </div>
-                                            <div className={`${
-                                                row.dailyGoal === 0 ? 'bg-slate-50 border-slate-100 text-slate-650' :
-                                                row.percent >= 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-sm shadow-emerald-100' :
-                                                row.percent >= 80 ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white border-transparent shadow-sm shadow-amber-100' :
-                                                'bg-gradient-to-r from-rose-500 to-red-500 text-white border-transparent shadow-sm shadow-rose-100'
-                                            } px-5 py-3 rounded-2xl text-center border flex items-center justify-center font-extrabold text-xs min-w-[115px]`}>
-                                                {row.dailyGoal === 0 ? 'SIN META' : `${Math.round(row.percent)}% CUMP. A HOY`}
-                                            </div>
-                                            
-                                            {/* Expand/Collapse Chevron (Hidden in print mode) */}
-                                            <div className="ml-2 no-print">
-                                                <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
-                                            </div>
+                                        <div className="min-w-0">
+                                            <p className="text-[11px] font-black text-slate-800 uppercase tracking-tight truncate">{row.userName}</p>
+                                            {row.dailyGoal > 0 && <p className="text-[9px] text-slate-400 font-medium">Meta diaria: {row.dailyGoal}</p>}
                                         </div>
                                     </div>
 
-                                    {/* Expandable Body (Always visible in print mode) */}
-                                    <div className={`${isExpanded ? 'block' : 'hidden print:block'} border-t border-gray-50 bg-gray-50/10 p-6 space-y-6 animate-in slide-in-from-top-4 duration-300`}>
-                                        {/* Day-by-Day Calendar breakdown */}
-                                        <div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">📅 Desglose de Rendimiento Diario:</p>
-                                            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2 print-grid">
-                                                {daysRange.map(date => {
-                                                    const dayCalls = getUserCallsForDate(row.userId, date);
-                                                    const count = dayCalls.length;
-                                                    const goal = row.dailyGoal;
-                                                    const pct = goal > 0 ? (count / goal) * 100 : 0;
-                                                    const dateLabel = date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
-                                                    
-                                                    let bgClass = 'bg-rose-50/60 border-rose-100 text-rose-700';
-                                                    let dotClass = 'bg-rose-500';
-                                                    if (goal === 0) {
-                                                        bgClass = 'bg-slate-50 border-slate-100 text-slate-500';
-                                                        dotClass = 'bg-slate-400';
-                                                    } else if (pct >= 100) {
-                                                        bgClass = 'bg-emerald-50/60 border-emerald-100 text-emerald-700';
-                                                        dotClass = 'bg-emerald-500';
-                                                    } else if (pct >= 80) {
-                                                        bgClass = 'bg-teal-50/60 border-teal-100 text-teal-700';
-                                                        dotClass = 'bg-teal-500';
-                                                    } else if (pct >= 50) {
-                                                        bgClass = 'bg-amber-50/60 border-amber-100 text-amber-700';
-                                                        dotClass = 'bg-amber-500';
-                                                    } else if (count > 0) {
-                                                        bgClass = 'bg-orange-50/60 border-orange-100 text-orange-700';
-                                                        dotClass = 'bg-orange-500';
-                                                    }
-                                                    
-                                                    return (
-                                                        <div key={date.getTime()} className={`border ${bgClass} rounded-2xl p-4 flex flex-col items-center justify-between text-center transition-all hover:scale-[1.02] hover:shadow-sm`}>
-                                                            <p className="text-[10px] font-bold uppercase tracking-wider opacity-75">{dateLabel}</p>
-                                                            <div className="my-2.5 flex flex-col items-center">
-                                                                <span className="text-xl font-extrabold tracking-tight">{count}</span>
-                                                                <span className="text-[9px] font-medium opacity-50 mt-0.5">meta: {goal}</span>
-                                                            </div>
-                                                            <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
-                                                                {goal > 0 ? `${Math.round(pct)}%` : 'Sin meta'}
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
- 
-                                        {/* Costo de Oportunidad / Pérdida por Seguimiento */}
-                                        <div className={`rounded-2xl border p-5 ${row.deficit > 0 ? 'bg-rose-50/20 border-rose-100/50' : 'bg-emerald-50/15 border-emerald-100/50'}`}>
-                                            <div className="flex items-center justify-between mb-3">
-                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                                                    💰 Costo de Oportunidad por Seguimiento:
-                                                </p>
-                                                <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full ${row.deficit > 0 ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                                                    {row.deficit > 0 ? 'PÉRDIDA DETECTADA' : 'EFICIENCIA MÁXIMA'}
-                                                </span>
-                                            </div>
-                                            {row.deficit > 0 ? (
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs font-bold text-gray-700">
-                                                    <div className="border-r border-slate-100 last:border-0 pr-4">
-                                                        <div className="flex items-center gap-1.5 mb-1">
-                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Llamadas Faltantes</p>
-                                                            <span className="relative group inline-block cursor-help text-slate-400 hover:text-slate-650 transition-colors">
-                                                                <span className="w-3.5 h-3.5 rounded-full border border-slate-300 hover:border-slate-400 flex items-center justify-center text-[9px] font-black leading-none">!</span>
-                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
-                                                                    <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Fórmula & Variables</p>
-                                                                    <p className="text-white/90">Llamadas pendientes para alcanzar el objetivo a la fecha (proporcional a los días laborales transcurridos).</p>
-                                                                    <p className="mt-1.5 font-bold text-amber-300">Cálculo:</p>
-                                                                    <p className="font-mono text-[9px] bg-black/30 p-1 rounded mt-0.5 text-emerald-400">Meta a la Fecha ({row.goalUpToDate}) - Realizadas ({row.actual}) = Déficit ({row.deficit})</p>
-                                                                    <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
-                                                                </span>
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-2xl font-black text-rose-600">{row.deficit} <span className="text-[10px] text-slate-400 font-bold">de meta</span></p>
-                                                    </div>
-                                                    <div className="border-r border-slate-100 last:border-0 px-4">
-                                                        <div className="flex items-center gap-1.5 mb-1">
-                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Leads Perdidos (Est.)</p>
-                                                            <span className="relative group inline-block cursor-help text-slate-400 hover:text-slate-650 transition-colors">
-                                                                <span className="w-3.5 h-3.5 rounded-full border border-slate-300 hover:border-slate-400 flex items-center justify-center text-[9px] font-black leading-none">!</span>
-                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
-                                                                    <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Fórmula & Variables</p>
-                                                                    <p className="text-white/90">Ventas estimadas que se dejaron de concretar por falta de seguimiento.</p>
-                                                                    <p className="mt-1.5 font-bold text-amber-300">Cálculo:</p>
-                                                                    <p className="font-mono text-[9px] bg-black/30 p-1 rounded mt-0.5 text-emerald-400">Déficit de Llamadas ({row.deficit}) / Conversión Histórica ({(() => {
-                                                                        const uPerf = userPerformance.find(p => p.user_id === row.userId);
-                                                                        const leadsWon = uPerf ? uPerf.leads_won : 0;
-                                                                        const callsPerClose = leadsWon > 0 ? (row.actual / leadsWon) : 0;
-                                                                        return (callsPerClose > 0 ? Math.max(10, callsPerClose) : companyCallsPerClose).toFixed(1);
-                                                                    })()} llamadas/cierre)</p>
-                                                                    <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
-                                                                </span>
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-2xl font-black text-rose-600">-{row.lostLeadsEst.toFixed(1)} <span className="text-[10px] text-slate-400 font-bold">cierres</span></p>
-                                                    </div>
-                                                    <div className="px-4">
-                                                        <div className="flex items-center gap-1.5 mb-1">
-                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Impacto Financiero (Est.)</p>
-                                                            <span className="relative group inline-block cursor-help text-slate-400 hover:text-slate-650 transition-colors">
-                                                                <span className="w-3.5 h-3.5 rounded-full border border-slate-300 hover:border-slate-400 flex items-center justify-center text-[9px] font-black leading-none">!</span>
-                                                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
-                                                                    <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Fórmula & Variables</p>
-                                                                    <p className="text-white/90">Monto estimado de facturación perdido debido a los cierres no realizados.</p>
-                                                                    <p className="mt-1.5 font-bold text-amber-300">Cálculo:</p>
-                                                                    <p className="font-mono text-[9px] bg-black/30 p-1 rounded mt-0.5 text-emerald-400">Leads Perdidos ({row.lostLeadsEst.toFixed(1)}) × Ticket Promedio ({formatCurrency(
-                                                                        (() => {
-                                                                            const uPerf = userPerformance.find(p => p.user_id === row.userId);
-                                                                            const leadsWon = uPerf ? uPerf.leads_won : 0;
-                                                                            const totalClosingAmount = uPerf ? uPerf.total_closing_amount : 0;
-                                                                            const avgDealSize = leadsWon > 0 ? (totalClosingAmount / leadsWon) : 0;
-                                                                            return avgDealSize > 0 ? avgDealSize : companyAvgDealSize;
-                                                                        })()
-                                                                    )}) USD</p>
-                                                                    <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
-                                                                </span>
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-2xl font-black text-rose-600">-{formatCurrency(row.lostRevenueEst)} USD</p>
-                                                    </div>
+                                    {/* Llamadas */}
+                                    <div className="col-span-2 text-center">
+                                        <button onClick={(e) => { e.stopPropagation(); handleCallClick(row.userId, 'all'); }} className="group">
+                                            <span className="text-base font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{row.actual}</span>
+                                            <span className="text-[9px] text-slate-400 font-medium block">llamadas</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Meta a la fecha */}
+                                    <div className="col-span-2 text-center">
+                                        <span className="text-base font-black text-slate-600">{row.goalUpToDate}</span>
+                                        <span className={`text-[9px] font-bold block ${row.deviation >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{deviationLabel}</span>
+                                    </div>
+
+                                    {/* Progress bar + % */}
+                                    <div className="col-span-2 px-2">
+                                        {row.dailyGoal > 0 ? (
+                                            <div>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className={`text-[10px] font-black ${row.percent >= 100 ? 'text-emerald-600' : row.percent >= 75 ? 'text-amber-500' : 'text-rose-600'}`}>
+                                                        {Math.round(row.percent)}%
+                                                    </span>
+                                                    <span className="text-[8px] text-slate-400 font-medium">de meta</span>
                                                 </div>
-                                            ) : (
-                                                <p className="text-sm text-emerald-800 font-medium leading-relaxed">
-                                                    Has completado el 100% de tus metas de prospección. Tu costo de oportunidad por inactividad es <span className="font-extrabold text-emerald-700">$0.00 USD</span>. ¡Tu ritmo de trabajo protege activamente las ventas de la empresa!
-                                                </p>
-                                            )}
+                                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div className={`h-full rounded-full transition-all duration-700 ${pctColor}`} style={{ width: `${pct}%` }} />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <span className="text-[9px] text-slate-400 font-medium">Sin meta</span>
+                                        )}
+                                    </div>
+
+                                    {/* Abordaje */}
+                                    <div className="col-span-2 text-center">
+                                        <span className={`text-[10px] font-black ${row.avgResponseTime === 0 ? 'text-slate-400' : row.avgResponseTime <= 2 ? 'text-emerald-600' : row.avgResponseTime <= 24 ? 'text-amber-500' : 'text-rose-600'}`}>
+                                            {formatResponseTime(row.avgResponseTime)}
+                                        </span>
+                                    </div>
+
+                                    {/* Expand */}
+                                    <div className="col-span-1 flex items-center justify-center gap-1">
+                                        <button onClick={(e) => { e.stopPropagation(); handlePrintUserReport(row.userId); }} className="w-6 h-6 rounded-md bg-slate-50 border border-slate-100 flex items-center justify-center hover:bg-slate-100 transition-colors text-slate-400 no-print" title="Imprimir reporte">
+                                            <Printer className="w-3 h-3" />
+                                        </button>
+                                        {isAdmin && (
+                                            <button onClick={(e) => { e.stopPropagation(); const uPerf = userPerformance.find(u => u.user_id === row.userId); openSendModal(row.userId, row.userName, uPerf?.email || ''); }} className="w-6 h-6 rounded-md bg-indigo-50 border border-indigo-100 flex items-center justify-center hover:bg-indigo-100 transition-colors text-indigo-400 no-print" title="Enviar reporte por email">
+                                                <Mail className="w-3 h-3" />
+                                            </button>
+                                        )}
+                                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                                    </div>
+                                </div>
+
+                                {/* Expanded detail */}
+                                {isExpanded && (
+                                    <div className="border-t border-slate-100 bg-slate-50/30 p-5 space-y-5 animate-in slide-in-from-top-2 duration-200">
+                                        {/* Print-only header */}
+                                        <div className="hidden print:block border-b border-slate-200 pb-3 mb-4">
+                                            <h1 className="text-lg font-black text-[#4449AA] uppercase">Reporte: {row.userName}</h1>
+                                            <p className="text-[9px] text-slate-400 font-bold uppercase">Arias CRM · {getFormattedDateRange()}</p>
                                         </div>
 
-                                        {/* Proyección de Cierre de Periodo */}
-                                        {(() => {
-                                            const progress = getPeriodProgress();
-                                            const userSalesGoal = getUserGoal(row.userId);
-                                            const targetLeads = userSalesGoal?.leads || 0;
-                                            const targetValue = userSalesGoal?.value || 0;
-                                            
-                                            const uPerf = userPerformance.find(p => p.user_id === row.userId);
-                                            const leadsWon = uPerf ? uPerf.leads_won : 0;
-                                            const leadsActive = uPerf ? uPerf.leads_active : 0;
-                                            const winRate = uPerf ? uPerf.win_rate : 0;
-                                            const totalClosingAmount = uPerf ? uPerf.total_closing_amount : 0;
-                                            const activeValue = uPerf ? uPerf.total_value : 0;
-                                            
-                                            // Pipeline-based projection: Won + Active * Win Rate
-                                            const projLeads = Math.round(leadsWon + (leadsActive * (winRate / 100)));
-                                            const projValue = Math.round(totalClosingAmount + (activeValue * (winRate / 100)));
-                                            
-                                            const leadsDiff = projLeads - targetLeads;
-                                            const valueDiff = projValue - targetValue;
-                                            
+                                        {/* Day-by-day grid */}
+                                        {userDaysRange.length > 0 && (() => {
+                                            const today = new Date();
+                                            today.setHours(23, 59, 59, 999);
+                                            const pastDays = userDaysRange.filter(d => d <= today);
+                                            const futureDays = userDaysRange.filter(d => d > today);
+                                            const daysCompliant = pastDays.filter(d => {
+                                                const c = getUserCallsForDate(row.userId, d).length;
+                                                return row.dailyGoal > 0 ? c >= row.dailyGoal : c > 0;
+                                            }).length;
                                             return (
-                                                <div className="bg-slate-50/70 border border-slate-100 rounded-2xl p-5 space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                                            <TrendingUp className="w-3.5 h-3.5 text-indigo-500" />
-                                                            Proyección al Cierre (Pipeline + Tratos Ganados):
-                                                        </h5>
-                                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">
-                                                            Fórmula: Ganados + (Activos en Pipeline × Tasa de Cierre {winRate.toFixed(1)}%)
-                                                        </span>
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Desglose diario</p>
+                                                        {row.dailyGoal > 0 && pastDays.length > 0 && (
+                                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${daysCompliant === pastDays.length ? 'bg-emerald-50 text-emerald-600' : daysCompliant >= pastDays.length * 0.7 ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
+                                                                {daysCompliant}/{pastDays.length} días OK {futureDays.length > 0 ? `· ${futureDays.length} pendientes` : ''}
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                        <div className="bg-white border border-slate-100/50 rounded-xl p-3 text-center">
-                                                            <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Leads Ganados Proyectados</p>
-                                                            <p className="text-xl font-black text-slate-800">{projLeads} <span className="text-[10px] text-slate-400 font-bold">cierres</span></p>
-                                                            <p className="text-[9.5px] text-slate-400 font-bold mt-0.5">
-                                                                (Actual: <span className="text-slate-650">{leadsWon}</span> | En Embudo: <span className="text-slate-650">{leadsActive}</span>)
-                                                            </p>
-                                                            <p className={`text-[8.5px] font-bold mt-1 ${leadsDiff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                                {leadsDiff >= 0 ? `+${leadsDiff}` : leadsDiff} vs meta ({targetLeads})
-                                                            </p>
-                                                        </div>
-                                                        <div className="bg-white border border-slate-100/50 rounded-xl p-3 text-center">
-                                                            <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Monto Proyectado</p>
-                                                            <p className="text-xl font-black text-indigo-650">{formatCurrency(projValue)} USD</p>
-                                                            <p className="text-[9.5px] text-slate-400 font-bold mt-0.5">
-                                                                (Cerrado: <span className="text-slate-650">{formatCurrency(totalClosingAmount)}</span> | En Embudo: <span className="text-slate-650">{formatCurrency(activeValue)}</span>)
-                                                            </p>
-                                                            <p className={`text-[8.5px] font-bold mt-1 ${valueDiff >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                                {valueDiff >= 0 ? `+${formatCurrency(valueDiff)}` : `-${formatCurrency(Math.abs(valueDiff))}`} vs meta ({formatCurrency(targetValue)})
-                                                            </p>
-                                                        </div>
-                                                        <div className="bg-white border border-slate-100/50 rounded-xl p-3 flex flex-col items-center justify-center">
-                                                            <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Impacto en Ventas</p>
-                                                            {valueDiff >= 0 ? (
-                                                                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
-                                                                    <ArrowUpRight className="w-3.5 h-3.5" /> Meta Lograda
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-[10px] font-black text-red-500 bg-red-50 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
-                                                                    <ArrowDownRight className="w-3.5 h-3.5" /> Brecha: -{formatCurrency(Math.abs(valueDiff))}
-                                                                </span>
-                                                            )}
-                                                        </div>
+                                                    <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 print-grid">
+                                                        {userDaysRange.map(date => {
+                                                            const isFuture = date > today;
+                                                            const count = getUserCallsForDate(row.userId, date).length;
+                                                            const goal = row.dailyGoal;
+                                                            const p = goal > 0 ? (count / goal) * 100 : 0;
+                                                            const dateLabel = date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric' });
+                                                            const bg = isFuture
+                                                                ? 'bg-slate-50 border-slate-200/60 text-slate-400 opacity-50'
+                                                                : goal === 0 ? 'bg-slate-50 border-slate-100 text-slate-500'
+                                                                : p >= 100 ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                                                : p >= 80 ? 'bg-teal-50 border-teal-200 text-teal-700'
+                                                                : p >= 50 ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                                                : count > 0 ? 'bg-orange-50 border-orange-200 text-orange-700'
+                                                                : 'bg-rose-50 border-rose-200 text-rose-700';
+                                                            return (
+                                                                <div key={date.getTime()} className={`border ${bg} rounded-lg p-2 text-center`}>
+                                                                    <p className="text-[8px] font-bold uppercase opacity-70 truncate">{dateLabel}</p>
+                                                                    <p className="text-base font-black mt-0.5">{isFuture ? '—' : count}</p>
+                                                                    <p className="text-[8px] opacity-50">{isFuture ? 'pend.' : `/${goal}`}</p>
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             );
                                         })()}
- 
-                                        {/* AI Recommendations block */}
-                                        <div className="bg-gradient-to-r from-teal-50/20 to-cyan-50/20 rounded-2xl border border-teal-100/40 p-5 mt-2">
-                                            <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                                                <Sparkles className="w-3.5 h-3.5 text-teal-500" />
-                                                Recomendación y Análisis de Sofía AI:
-                                            </p>
-                                            <p className="text-sm text-slate-700 leading-relaxed font-medium">
-                                                {detailedRecommendationText}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
 
-            {/* Activity Intelligence Dashboard */}
+                                        {/* Stats + Loss row */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {/* Compliance summary */}
+                                            <div className="bg-white border border-slate-100 rounded-xl p-4">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-3">Resumen de Actividad</p>
+                                                <div className="space-y-2">
+                                                    {[
+                                                        { label: 'Meta diaria', val: row.dailyGoal },
+                                                        { label: 'Meta periodo', val: row.periodGoal },
+                                                        { label: 'Meta a la fecha', val: row.goalUpToDate },
+                                                        { label: 'Realizadas', val: row.actual },
+                                                    ].map(s => (
+                                                        <div key={s.label} className="flex items-center justify-between">
+                                                            <span className="text-[9px] text-slate-500 font-medium">{s.label}</span>
+                                                            <span className="text-[11px] font-black text-slate-800">{s.val}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Opportunity cost */}
+                                            <div className={`bg-white border rounded-xl p-4 ${row.userConsolidated > 0 ? 'border-rose-100' : 'border-slate-100'}`}>
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-3">Oportunidad Perdida</p>
+                                                {row.userConsolidated > 0 ? (
+                                                    <div className="space-y-2">
+                                                        <div className="flex justify-between"><span className="text-[9px] text-slate-500">Negligencia ({row.leadsWithoutFollowUp} leads)</span><span className="text-[11px] font-black text-rose-600">-{formatCurrency(row.userNeglectLoss)}</span></div>
+                                                        <div className="flex justify-between"><span className="text-[9px] text-slate-500">Inactividad (-{row.deficit} llam.)</span><span className="text-[11px] font-black text-amber-600">-{formatCurrency(row.userActivityLoss)}</span></div>
+                                                        <div className="flex justify-between pt-2 border-t border-slate-100"><span className="text-[9px] font-bold text-slate-600">Total</span><span className="text-sm font-black text-rose-700">-{formatCurrency(row.userConsolidated)}</span></div>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[10px] text-emerald-600 font-bold">✓ Sin pérdidas detectadas</p>
+                                                )}
+                                            </div>
+
+                                            {/* Sofia AI */}
+                                            <div className="bg-white border border-teal-100/60 rounded-xl p-4">
+                                                <p className="text-[9px] font-black text-teal-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                                    <Sparkles className="w-3 h-3" />Sofía AI
+                                                </p>
+                                                <p className="text-[10px] text-slate-600 leading-relaxed font-medium">{detailedRecommendationText}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* ── Data Transparency ─── */}
+                                        <details className="group">
+                                            <summary className="cursor-pointer list-none flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
+                                                <span className="flex items-center gap-2 text-[9px] font-black text-slate-500 uppercase tracking-wider">
+                                                    <Info className="w-3 h-3 text-slate-400" />
+                                                    Fuentes &amp; Metodología de Datos
+                                                </span>
+                                                <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-open:rotate-180 transition-transform duration-200" />
+                                            </summary>
+                                            <div className="mt-2 space-y-2 px-1">
+                                                {([
+                                                    { badge: 'Llamadas', color: 'bg-indigo-500', text: 'Registros de call_activities del asesor en el período. Incluye llamadas, WhatsApp, cotizaciones y notas.' },
+                                                    { badge: 'Meta a la Fecha', color: 'bg-violet-500', text: `Meta diaria (${row.dailyGoal}) × días laborables transcurridos hasta hoy. Excluye días futuros — evita penalizar al asesor por días que aún no ocurrieron.` },
+                                                    { badge: 'Leads Sin Contacto', color: 'bg-amber-500', text: 'Leads activos asignados al asesor que NO tienen ninguna call_activity registrada en el período seleccionado. No incluye leads Perdidos ni Cerrados.' },
+                                                    { badge: 'Pérd. Negligencia', color: 'bg-rose-500', text: `Leads sin contacto (${row.leadsWithoutFollowUp}) × Tasa conversión (${row.conversionRate.toFixed(1)}%) × Ticket promedio ($${Math.round(row.avgDealSize).toLocaleString()}). Ventas que se pudieron cerrar si se hubieran contactado.` },
+                                                    { badge: 'Pérd. Inactividad', color: 'bg-orange-500', text: `Llamadas faltantes (${row.deficit}) ÷ Llamadas promedio por cierre × Tasa conversión × Ticket. Ventas perdidas por no cumplir la meta de actividad.` },
+                                                    { badge: 'Abordaje', color: 'bg-emerald-500', text: 'Promedio de horas entre la asignación del lead (assigned_at) y el primer seguimiento registrado (first_follow_up_at). Solo leads con ambas fechas.' },
+                                                ] as const).map(item => (
+                                                    <div key={item.badge} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white border border-slate-100">
+                                                        <span className={`text-[7px] font-black text-white px-2 py-1 rounded-md ${item.color} shrink-0 mt-0.5 uppercase tracking-wide`}>{item.badge}</span>
+                                                        <p className="text-[9px] text-slate-500 font-medium leading-relaxed">{item.text}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </details>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* ── Global Recommendation ─────────────────────────────── */}
+            <div className="bg-white border border-slate-100 rounded-xl p-4 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <Sparkles className="w-3.5 h-3.5 text-white" />
+                </div>
+                <div>
+                    <p className="text-[9px] font-black text-teal-600 uppercase tracking-wider mb-1">Sofía AI · Equipo</p>
+                    <p className="text-[11px] text-slate-700 leading-relaxed font-medium">{getGlobalRecommendation(totalActualCalls, totalGoalUpToDate, totalPeriodGoal)}</p>
+                </div>
+            </div>
+
+            {/* ── Consolidated Loss Panel ───────────────────────────── */}
+            {(() => {
+                const totalNeglectLoss = reportData.reduce((s, r) => s + r.userNeglectLoss, 0);
+                const totalActivityLoss = reportData.reduce((s, r) => s + r.userActivityLoss, 0);
+                const consolidatedGlobalLoss = totalNeglectLoss + totalActivityLoss;
+                if (consolidatedGlobalLoss <= 0) return null;
+
+                return (
+                    <div className="bg-white border border-rose-100 rounded-2xl overflow-hidden">
+                        {/* Panel header */}
+                        <div className="px-5 py-3.5 border-b border-rose-100/60 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <TrendingDown className="w-4 h-4 text-rose-500" />
+                                <p className="text-[10px] font-black text-rose-700 uppercase tracking-wider">Control de Oportunidades Perdidas</p>
+                            </div>
+                            <button onClick={() => window.print()} className="flex items-center gap-1.5 text-[9px] font-bold text-slate-500 hover:text-slate-700 border border-slate-200 bg-white px-2.5 py-1 rounded-lg transition-all no-print">
+                                <Printer className="w-3 h-3" />Exportar
+                            </button>
+                        </div>
+
+                        {/* 3 summary cards */}
+                        <div className="grid grid-cols-3 divide-x divide-rose-100/50 p-0">
+                            <div className="p-5">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Por Negligencia</p>
+                                <p className="text-xl font-black text-rose-600">{formatCurrency(totalNeglectLoss)}</p>
+                                <p className="text-[9px] text-slate-400 mt-1">{totalLeadsWithoutFollowUp} leads sin contacto</p>
+                            </div>
+                            <div className="p-5">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Por Inactividad</p>
+                                <p className="text-xl font-black text-amber-600">{formatCurrency(totalActivityLoss)}</p>
+                                <p className="text-[9px] text-slate-400 mt-1">{reportData.reduce((s, r) => s + r.deficit, 0)} llamadas faltantes</p>
+                            </div>
+                            <div className="p-5 bg-rose-50/30">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Pérdida Total</p>
+                                <p className="text-2xl font-black text-rose-700">{formatCurrency(consolidatedGlobalLoss)}</p>
+                                <p className="text-[9px] text-slate-400 mt-1">impacto estimado en USD</p>
+                            </div>
+                        </div>
+
+                        {/* Breakdown table */}
+                        <div className="border-t border-rose-100/50">
+                            <div className="grid grid-cols-12 px-5 py-2 bg-slate-50 text-[8px] font-black text-slate-400 uppercase tracking-wider">
+                                <div className="col-span-3">Asesor</div>
+                                <div className="col-span-2 text-center">Leads Sin Contacto</div>
+                                <div className="col-span-2 text-center">Llamadas (Hecho/Meta)</div>
+                                <div className="col-span-2 text-center">Déficit</div>
+                                <div className="col-span-3 text-right">Pérdida Total</div>
+                            </div>
+                            <div className="divide-y divide-slate-50">
+                                {reportData.sort((a, b) => b.userConsolidated - a.userConsolidated).map(row => (
+                                    <div key={row.userId} className="grid grid-cols-12 px-5 py-3.5 items-center hover:bg-slate-50/50 transition-colors">
+                                        <div className="col-span-3 flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden shrink-0">
+                                                {row.avatarUrl ? <img src={row.avatarUrl} className="w-full h-full object-cover" alt="" /> : <Users className="w-3.5 h-3.5 text-slate-400" />}
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black text-slate-800 uppercase">{row.userName}</p>
+                                                <p className="text-[8px] text-slate-400">Conv: {row.conversionRate.toFixed(1)}%</p>
+                                            </div>
+                                        </div>
+                                        <div className="col-span-2 text-center">
+                                            <span className={`text-[11px] font-black ${row.leadsWithoutFollowUp > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>{row.leadsWithoutFollowUp}</span>
+                                        </div>
+                                        <div className="col-span-2 text-center text-[11px]">
+                                            <span className="font-black text-slate-700">{row.actual}</span>
+                                            <span className="text-slate-300 mx-0.5">/</span>
+                                            <span className="text-slate-400">{row.goalUpToDate}</span>
+                                        </div>
+                                        <div className="col-span-2 text-center">
+                                            {row.deficit > 0 ? <span className="text-[11px] font-black text-rose-600">-{row.deficit}</span> : <span className="text-[11px] font-black text-emerald-600">0</span>}
+                                        </div>
+                                        <div className="col-span-3 text-right font-black text-[11px] text-rose-700">{formatCurrency(row.userConsolidated)}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {/* ── Activity Dashboard ────────────────────────────────── */}
             <ActivityDashboard
                 companyId={companyId}
                 profileNames={profileNames}
@@ -3339,77 +3654,193 @@ function CallActivitySection({
                 availableUserIds={callSummary.map(u => u.user_id)}
             />
 
+            {/* ── Goal Modal ────────────────────────────────────────── */}
 
-            {/* Goal Configuration Modal */}
-            {
-                isGoalPanelOpen && (
-                    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in">
-                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
-                            {/* Header */}
-                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
-                                        <Phone className="w-5 h-5 text-white" />
+            {/* ── Send Report Modal ─────────────────────────────────── */}
+            {sendReportModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <Mail className="w-4 h-4 text-white" />
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-black text-white/70 uppercase tracking-wider">Reporte Individual</p>
+                                    <p className="text-[13px] font-black text-white uppercase tracking-tight">{sendReportModal.advisorName}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setSendReportModal(null)} className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center hover:bg-white/30 transition-colors">
+                                <X className="w-3.5 h-3.5 text-white" />
+                            </button>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="flex border-b border-slate-100">
+                            {([{ id: 'now', label: 'Enviar Ahora', icon: Send }, { id: 'schedule', label: 'Programar', icon: Clock }] as const).map(t => (
+                                <button key={t.id} onClick={() => setSendReportModal(prev => prev ? { ...prev, tab: t.id } : null)}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-[9px] font-black uppercase tracking-wider transition-all ${
+                                        sendReportModal.tab === t.id ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-400 hover:text-slate-600'
+                                    }`}>
+                                    <t.icon className="w-3 h-3" />{t.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            {sendReportModal.tab === 'now' ? (
+                                <>
+                                    <div>
+                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1.5">Enviar a (email)</label>
+                                        <input
+                                            type="email"
+                                            value={sendReportModal.recipientEmail}
+                                            onChange={(e) => setSendReportModal(prev => prev ? { ...prev, recipientEmail: e.target.value } : null)}
+                                            placeholder="email@ejemplo.com"
+                                            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-medium text-slate-700 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 outline-none"
+                                        />
+                                        <p className="text-[8px] text-slate-400 font-medium mt-1">El reporte incluye: KPIs, desglose diario, análisis de oportunidad y metodología.</p>
+                                    </div>
+                                    <div className="bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
+                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider">Período del reporte</p>
+                                        <p className="text-[11px] font-bold text-slate-700 mt-0.5">{getFormattedDateRange()}</p>
+                                    </div>
+                                    {sendReportModal.sent ? (
+                                        <div className="flex items-center justify-center gap-2 py-2">
+                                            <CheckCircle className="w-5 h-5 text-emerald-500" />
+                                            <span className="text-[11px] font-black text-emerald-600">¡Enviado correctamente!</span>
+                                        </div>
+                                    ) : (
+                                        <button onClick={handleSendReportNow} disabled={sendReportModal.sending || !sendReportModal.recipientEmail}
+                                            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-indigo-200 transition-all disabled:opacity-50">
+                                            {sendReportModal.sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                                            {sendReportModal.sending ? 'Enviando...' : 'Enviar Reporte'}
+                                        </button>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <div>
+                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1.5">Destinatario (email)</label>
+                                        <input
+                                            type="email"
+                                            value={sendReportModal.recipientEmail}
+                                            onChange={(e) => setSendReportModal(prev => prev ? { ...prev, recipientEmail: e.target.value } : null)}
+                                            placeholder="email@ejemplo.com"
+                                            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-medium text-slate-700 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 outline-none"
+                                        />
                                     </div>
                                     <div>
-                                        <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight">Metas de Llamadas</h2>
-                                        <p className="text-[10px] text-gray-400 font-bold">Llamadas diarias por vendedor</p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setIsGoalPanelOpen(false)} className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
-                                    <X className="w-4 h-4 text-gray-400" />
-                                </button>
-                            </div>
-
-                            {/* Body */}
-                            <div className="px-6 py-4 overflow-y-auto flex-1 space-y-3">
-                                {callSummary.map(user => (
-                                    <div key={user.user_id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
-                                        <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center overflow-hidden shrink-0">
-                                            {profileAvatars[user.user_id] ? (
-                                                <img src={profileAvatars[user.user_id]!} className="w-full h-full object-cover" alt="" />
-                                            ) : (
-                                                <Users className="w-3.5 h-3.5 text-gray-400" />
-                                            )}
+                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1.5">Frecuencia</label>
+                                        <div className="flex gap-2">
+                                            {([{ id: 'weekly', label: 'Semanal' }, { id: 'monthly', label: 'Mensual' }] as const).map(f => (
+                                                <button key={f.id} onClick={() => setSendReportModal(prev => prev ? { ...prev, frequency: f.id } : null)}
+                                                    className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider border transition-all ${
+                                                        sendReportModal.frequency === f.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-indigo-200'
+                                                    }`}>
+                                                    {f.label}
+                                                </button>
+                                            ))}
                                         </div>
-                                        <p className="text-[11px] font-black text-gray-700 uppercase tracking-tight flex-1 truncate">
-                                            {profileNames[user.user_id] || 'Desconocido'}
-                                        </p>
-                                        <div className="flex items-center gap-1.5">
-                                            <Phone className="w-3.5 h-3.5 text-gray-400" />
-                                            <input
-                                                type="number"
-                                                min={0}
-                                                max={100}
-                                                value={editGoals[user.user_id] || 0}
-                                                onChange={(e) => setEditGoals(prev => ({ ...prev, [user.user_id]: parseInt(e.target.value) || 0 }))}
-                                                className="w-16 h-8 border border-gray-200 rounded-lg text-center text-sm font-bold text-gray-700 focus:border-teal-400 focus:ring-2 focus:ring-teal-50 outline-none transition-all"
-                                                placeholder="0"
+                                    </div>
+                                    {sendReportModal.frequency === 'weekly' ? (
+                                        <div>
+                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1.5">Día de envío</label>
+                                            <div className="flex gap-1">
+                                                {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((d, i) => (
+                                                    <button key={i} onClick={() => setSendReportModal(prev => prev ? { ...prev, dayOfWeek: i } : null)}
+                                                        className={`flex-1 py-2 rounded-lg text-[9px] font-black transition-all ${
+                                                            sendReportModal.dayOfWeek === i ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
+                                                        }`}>
+                                                        {d}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider block mb-1.5">Día del mes</label>
+                                            <input type="number" min={1} max={28}
+                                                value={sendReportModal.dayOfMonth}
+                                                onChange={(e) => setSendReportModal(prev => prev ? { ...prev, dayOfMonth: parseInt(e.target.value) || 1 } : null)}
+                                                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-[11px] font-bold text-slate-700 focus:border-indigo-400 outline-none"
                                             />
-                                            <span className="text-[8px] font-bold text-gray-400">/día</span>
+                                        </div>
+                                    )}
+                                    <div className="bg-indigo-50 rounded-xl px-3 py-2.5 border border-indigo-100">
+                                        <p className="text-[8px] font-black text-indigo-600 uppercase tracking-wider">Período del reporte automático</p>
+                                        <div className="flex gap-2 mt-1.5 flex-wrap">
+                                            {(['week', 'month', 'quarter'] as const).map(p => (
+                                                <button key={p} onClick={() => setSendReportModal(prev => prev ? { ...prev, period: p } : null)}
+                                                    className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase transition-all ${
+                                                        sendReportModal.period === p ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-400 border border-indigo-200'
+                                                    }`}>
+                                                    {p === 'week' ? 'Última semana' : p === 'month' ? 'Este mes' : 'Trimestre'}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-
-                            {/* Footer */}
-                            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3 shrink-0">
-                                <button onClick={() => setIsGoalPanelOpen(false)} className="px-5 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleSaveGoals}
-                                    disabled={savingGoals}
-                                    className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-teal-200 transition-all disabled:opacity-50"
-                                >
-                                    {savingGoals ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                                    Guardar
-                                </button>
-                            </div>
+                                    <button onClick={handleSaveSchedule} disabled={sendReportModal.scheduling || !sendReportModal.recipientEmail}
+                                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-indigo-200 transition-all disabled:opacity-50">
+                                        {sendReportModal.scheduling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
+                                        {sendReportModal.scheduling ? 'Guardando...' : 'Guardar Programación'}
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
-                )
-            }
-        </div >
+                </div>
+            )}
+
+            {isGoalPanelOpen && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col border border-slate-200">
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
+                                    <Phone className="w-4 h-4 text-white" />
+                                </div>
+                                <div>
+                                    <h2 className="text-[11px] font-black text-slate-800 uppercase tracking-tight">Metas de Llamadas</h2>
+                                    <p className="text-[9px] text-slate-400 font-medium">Llamadas diarias por asesor</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsGoalPanelOpen(false)} className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+                                <X className="w-3.5 h-3.5 text-slate-400" />
+                            </button>
+                        </div>
+                        <div className="px-5 py-4 overflow-y-auto flex-1 space-y-2">
+                            {callSummary.map(user => (
+                                <div key={user.user_id} className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3 border border-slate-100">
+                                    <div className="w-7 h-7 rounded-lg bg-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                                        {profileAvatars[user.user_id] ? <img src={profileAvatars[user.user_id]!} className="w-full h-full object-cover" alt="" /> : <Users className="w-3 h-3 text-slate-400" />}
+                                    </div>
+                                    <p className="text-[10px] font-black text-slate-700 uppercase flex-1 truncate">{profileNames[user.user_id] || 'Desconocido'}</p>
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="number" min={0} max={100}
+                                            value={editGoals[user.user_id] || 0}
+                                            onChange={(e) => setEditGoals(prev => ({ ...prev, [user.user_id]: parseInt(e.target.value) || 0 }))}
+                                            className="w-14 h-7 border border-slate-200 rounded-lg text-center text-[11px] font-bold text-slate-700 focus:border-teal-400 focus:ring-2 focus:ring-teal-50 outline-none"
+                                        />
+                                        <span className="text-[8px] font-bold text-slate-400">/día</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                            <button onClick={() => setIsGoalPanelOpen(false)} className="px-4 py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors">
+                                Cancelar
+                            </button>
+                            <button onClick={handleSaveGoals} disabled={savingGoals} className="flex items-center gap-1.5 bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-teal-200 transition-all disabled:opacity-50">
+                                {savingGoals ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

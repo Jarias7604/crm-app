@@ -15,11 +15,13 @@ export interface UserPerformance {
     leads_active: number;
     leads_erroneous: number;
     win_rate: number;
+    conversion_rate: number;
     total_value: number;
     total_closing_amount: number;
     avg_deal_size: number;
     avg_days_to_close: number; // Average days from lead creation to won
     avg_response_time?: number; // Average response time in hours
+    leads_without_follow_up: number;
 }
 
 export interface TeamPerformance {
@@ -314,19 +316,46 @@ export const teamPerformanceService = {
 
         const { data: lostLeads } = await lostQuery;
 
-        // 3d. Get all currently active leads (all-time creation) for active pipeline metrics
+        // 3d. Get all active leads created before or on the end date of the period for pipeline metrics
         let activeLeadsQuery = supabase
             .from('leads')
             .select('id, assigned_to, status, value')
             .eq('company_id', companyId)
             .not('status', 'in', '("Cerrado","Cliente","Perdido","Erróneo")');
 
+        if (end) {
+            activeLeadsQuery = activeLeadsQuery.lte('created_at', end.toISOString());
+        }
         if (teamUserIds) {
             activeLeadsQuery = activeLeadsQuery.in('assigned_to', teamUserIds);
         }
 
         const { data: activeLeads, error: activeError } = await activeLeadsQuery;
         if (activeError) throw activeError;
+
+        // 3e. Get all contact/call activities in the selected period to determine follow-up negligence
+        let activitiesQuery = supabase
+            .from('call_activities')
+            .select('user_id, lead_id')
+            .eq('company_id', companyId);
+
+        if (start) {
+            activitiesQuery = activitiesQuery.gte('call_date', start.toISOString());
+        }
+        if (end) {
+            activitiesQuery = activitiesQuery.lte('call_date', end.toISOString());
+        }
+
+        const { data: activities } = await activitiesQuery;
+
+        const userContactedLeads: Record<string, Set<string>> = {};
+        (activities || []).forEach(act => {
+            if (!act.user_id || !act.lead_id) return;
+            if (!userContactedLeads[act.user_id]) {
+                userContactedLeads[act.user_id] = new Set();
+            }
+            userContactedLeads[act.user_id].add(act.lead_id);
+        });
 
         // 4. Aggregate per user
         const userStats: Record<string, {
@@ -335,6 +364,7 @@ export const teamPerformanceService = {
             totalDaysToClose: number; wonWithDate: number;
             totalResponseTimeHours: number;
             leadsWithResponseTime: number;
+            withoutFollowUp: number;
         }> = {};
 
         const ensureUser = (uid: string) => {
@@ -342,7 +372,8 @@ export const teamPerformanceService = {
                 userStats[uid] = {
                     total: 0, won: 0, lost: 0, active: 0, erroneous: 0,
                     totalValue: 0, totalClosing: 0, totalDaysToClose: 0, wonWithDate: 0,
-                    totalResponseTimeHours: 0, leadsWithResponseTime: 0
+                    totalResponseTimeHours: 0, leadsWithResponseTime: 0,
+                    withoutFollowUp: 0
                 };
             }
         };
@@ -371,7 +402,7 @@ export const teamPerformanceService = {
             }
         });
 
-        // Pipeline metrics from activeLeads query (all-time active leads)
+        // Pipeline metrics from activeLeads query (active leads created before end date)
         (activeLeads || []).forEach(lead => {
             const uid = lead.assigned_to;
             if (!uid) return;
@@ -379,6 +410,12 @@ export const teamPerformanceService = {
 
             userStats[uid].active++;
             userStats[uid].totalValue += Number(lead.value || 0);
+
+            // Neglected in period: if this lead ID is NOT in the set of lead IDs contacted by this user in the period
+            const contactedSet = userContactedLeads[uid];
+            if (!contactedSet || !contactedSet.has(lead.id)) {
+                userStats[uid].withoutFollowUp++;
+            }
         });
 
         // Won metrics from internal_won_date query
@@ -414,11 +451,13 @@ export const teamPerformanceService = {
                 const stats = userStats[p.id] || {
                     total: 0, won: 0, lost: 0, active: 0, erroneous: 0,
                     totalValue: 0, totalClosing: 0, totalDaysToClose: 0, wonWithDate: 0,
-                    totalResponseTimeHours: 0, leadsWithResponseTime: 0
+                    totalResponseTimeHours: 0, leadsWithResponseTime: 0,
+                    withoutFollowUp: 0
                 };
                 // Win rate = won / (won + lost) — only decided deals, same logic as Salesforce/HubSpot
                 const decidedDeals = stats.won + stats.lost;
                 const winRate = decidedDeals > 0 ? (stats.won / decidedDeals) * 100 : 0;
+                const conversionRate = stats.total > 0 ? (stats.won / stats.total) * 100 : 0;
                 const avgDeal = stats.won > 0 ? stats.totalClosing / stats.won : 0;
                 const avgDaysToClose = stats.wonWithDate > 0 ? Math.round(stats.totalDaysToClose / stats.wonWithDate) : 0;
                 const avgResponseTime = stats.leadsWithResponseTime > 0 ? stats.totalResponseTimeHours / stats.leadsWithResponseTime : 0;
@@ -438,11 +477,13 @@ export const teamPerformanceService = {
                     leads_active: stats.active,
                     leads_erroneous: stats.erroneous,
                     win_rate: Math.round(winRate * 10) / 10,
+                    conversion_rate: Math.round(conversionRate * 10) / 10,
                     total_value: stats.totalValue,
                     total_closing_amount: stats.totalClosing,
                     avg_deal_size: Math.round(avgDeal * 100) / 100,
                     avg_days_to_close: avgDaysToClose,
                     avg_response_time: avgResponseTime,
+                    leads_without_follow_up: stats.withoutFollowUp,
                 };
             })
             .sort((a, b) => b.leads_won - a.leads_won || b.win_rate - a.win_rate);
@@ -528,12 +569,16 @@ export const teamPerformanceService = {
 
         const { data: lostLeads } = await lostQuery;
 
-        // 3d. Get all currently active leads (all-time creation) for active pipeline metrics
+        // 3d. Get all active leads created before or on the end date of the period for active pipeline metrics
         let activeLeadsQuery = supabase
             .from('leads')
             .select('id, assigned_to, status, value')
             .eq('company_id', companyId)
             .not('status', 'in', '("Cerrado","Cliente","Perdido","Erróneo")');
+
+        if (end) {
+            activeLeadsQuery = activeLeadsQuery.lte('created_at', end.toISOString());
+        }
 
         const { data: activeLeads } = await activeLeadsQuery;
 
