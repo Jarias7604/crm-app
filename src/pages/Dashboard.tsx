@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Line
+    PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Line, LabelList
 } from 'recharts';
 import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout, CreditCard, Brain, Sparkles, MessageSquare, Crosshair, Flame, Zap, HelpCircle, UserMinus } from 'lucide-react';
 import { adminService } from '../services/admin';
@@ -203,6 +203,8 @@ export default function Dashboard() {
     const [lossStageData, setLossStageData] = useState<any[]>([]);
     const [industryData, setIndustryData] = useState<{ name: string; count: number; percentage: number }[]>([]);
     const [salesTrendData, setSalesTrendData] = useState<any[]>([]);
+    const [trendView, setTrendView] = useState<'day' | 'month'>('day');
+    const [trendSeries, setTrendSeries] = useState<'both' | 'sales' | 'conversion'>('both');
     const [escalationLeads, setEscalationLeads] = useState<any[]>([]);
     const [showEscalation, setShowEscalation] = useState<boolean | 'expanded'>(true);
     const [hotLeads, setHotLeads] = useState<any[]>([]);
@@ -295,8 +297,7 @@ export default function Dashboard() {
 
     // Collaborator filter (admin only — ver perspectiva de un agente)
     const [companyProfiles, setCompanyProfiles] = useState<{ id: string; full_name: string; role: string; avatar_url?: string | null }[]>([]);
-    const [selectedCollabId, setSelectedCollabId] = useState<string | undefined>(undefined);
-    const [selectedCollabName, setSelectedCollabName] = useState<string | null>(null);
+    const [selectedCollabIds, setSelectedCollabIds] = useState<string[]>([]);
     const [isCollabOpen, setIsCollabOpen] = useState(false);
     const collabFilterRef = useRef<HTMLDivElement>(null);
 
@@ -416,7 +417,9 @@ export default function Dashboard() {
     const canViewCompanyDashboard = isAdmin || (profile?.permissions?.['dashboard_view_company'] === true);
     const canViewFinancials = isAdmin || (profile?.permissions?.['view_financials'] === true);
     // Admin: puede ver perspectiva de un colaborador específico; Agent: siempre ve lo suyo
-    const dashboardAssignedTo = canViewCompanyDashboard ? selectedCollabId : profile?.id;
+    const dashboardAssignedTo = canViewCompanyDashboard
+        ? (selectedCollabIds.length === 0 ? undefined : selectedCollabIds.length === 1 ? selectedCollabIds[0] : selectedCollabIds)
+        : profile?.id;
     const isViewingOwnData = !dashboardAssignedTo || dashboardAssignedTo === profile?.id;
     const canViewActiveFinancials = canViewFinancials || isViewingOwnData;
     const averageTicket = stats.wonDeals > 0 ? Math.round((stats.totalWonAmount || stats.totalWonPotential || 0) / stats.wonDeals) : 0;
@@ -1059,35 +1062,47 @@ export default function Dashboard() {
                         </div>
                     )}
 
-                    {/* Responsable Filter — solo admins, igual que en Leads */}
+                    {/* Responsable Filter — multi-select, solo admins */}
                     {isAdmin && (
                         <div className="relative" ref={collabFilterRef}>
                             <button
                                 onClick={() => setIsCollabOpen(!isCollabOpen)}
                                 className={`flex items-center gap-1.5 h-10 px-4 rounded-xl border text-xs font-bold transition-all ${
-                                    selectedCollabId
+                                    selectedCollabIds.length > 0
                                         ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200'
                                         : 'bg-white border-gray-100 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50'
                                 }`}
                             >
                                 <Users className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline max-w-[100px] truncate">
-                                    {selectedCollabName || 'Responsable'}
+                                <span className="hidden sm:inline max-w-[120px] truncate">
+                                    {selectedCollabIds.length === 0
+                                        ? 'Responsable'
+                                        : selectedCollabIds.length === 1
+                                            ? (companyProfiles.find(p => p.id === selectedCollabIds[0])?.full_name || 'Responsable')
+                                            : `${selectedCollabIds.length} seleccionados`
+                                    }
                                 </span>
                                 <ChevronDown className={`w-3 h-3 transition-transform ${isCollabOpen ? 'rotate-180' : ''}`} />
                             </button>
 
                             {isCollabOpen && (
-                                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
-                                    {/* Todos los responsables */}
+                                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                                    {/* Header */}
+                                    <div className="px-4 pb-2 flex items-center justify-between border-b border-slate-100 mb-1">
+                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Filtrar por responsable</span>
+                                        {selectedCollabIds.length > 0 && (
+                                            <button
+                                                onClick={() => setSelectedCollabIds([])}
+                                                className="text-[9px] font-black text-indigo-500 hover:text-indigo-700 uppercase tracking-wider"
+                                            >Limpiar</button>
+                                        )}
+                                    </div>
+
+                                    {/* Todos */}
                                     <button
-                                        onClick={() => {
-                                            setSelectedCollabId(undefined);
-                                            setSelectedCollabName(null);
-                                            setIsCollabOpen(false);
-                                        }}
+                                        onClick={() => setSelectedCollabIds([])}
                                         className={`w-full text-left px-4 py-2 text-[11px] flex items-center gap-2 transition-colors ${
-                                            !selectedCollabId
+                                            selectedCollabIds.length === 0
                                                 ? 'bg-indigo-50 text-indigo-600 font-black'
                                                 : 'text-slate-600 font-bold hover:bg-gray-50'
                                         }`}
@@ -1096,33 +1111,58 @@ export default function Dashboard() {
                                             <Users className="w-3 h-3 text-slate-400" />
                                         </div>
                                         Todos los responsables
-                                        {!selectedCollabId && <CheckCircle className="w-3 h-3 ml-auto shrink-0 text-indigo-600" />}
+                                        {selectedCollabIds.length === 0 && <CheckCircle className="w-3 h-3 ml-auto shrink-0 text-indigo-600" />}
                                     </button>
 
-                                    {/* Lista de colaboradores */}
-                                    {companyProfiles.map(member => (
-                                        <button
-                                            key={member.id}
-                                            onClick={() => {
-                                                setSelectedCollabId(member.id);
-                                                setSelectedCollabName(member.full_name);
-                                                setIsCollabOpen(false);
-                                            }}
-                                            className={`w-full text-left px-4 py-2 text-[11px] flex items-center gap-2 transition-colors ${
-                                                selectedCollabId === member.id
-                                                    ? 'bg-indigo-50 text-indigo-600 font-black'
-                                                    : 'text-slate-600 font-bold hover:bg-gray-50'
-                                            }`}
-                                        >
-                                            <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[9px] font-black text-indigo-600 shrink-0">
-                                                {member.full_name.charAt(0).toUpperCase()}
-                                            </div>
-                                            <span className="truncate flex-1">{member.full_name}</span>
-                                            {selectedCollabId === member.id && (
-                                                <CheckCircle className="w-3 h-3 shrink-0 text-indigo-600" />
-                                            )}
-                                        </button>
-                                    ))}
+                                    {/* Lista con checkboxes */}
+                                    {companyProfiles.map(member => {
+                                        const isChecked = selectedCollabIds.includes(member.id);
+                                        return (
+                                            <button
+                                                key={member.id}
+                                                onClick={() => {
+                                                    setSelectedCollabIds(prev =>
+                                                        isChecked
+                                                            ? prev.filter(id => id !== member.id)
+                                                            : [...prev, member.id]
+                                                    );
+                                                    // Keep dropdown open for multi-select
+                                                }}
+                                                className={`w-full text-left px-4 py-2 text-[11px] flex items-center gap-2 transition-colors ${
+                                                    isChecked
+                                                        ? 'bg-indigo-50 text-indigo-600 font-black'
+                                                        : 'text-slate-600 font-bold hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                {/* Custom checkbox */}
+                                                <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-all ${
+                                                    isChecked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'
+                                                }`}>
+                                                    {isChecked && (
+                                                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    )}
+                                                </div>
+                                                <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[9px] font-black text-indigo-600 shrink-0">
+                                                    {member.full_name.charAt(0).toUpperCase()}
+                                                </div>
+                                                <span className="truncate flex-1">{member.full_name}</span>
+                                            </button>
+                                        );
+                                    })}
+
+                                    {/* Botón Aplicar */}
+                                    {selectedCollabIds.length > 0 && (
+                                        <div className="px-4 pt-2 border-t border-slate-100 mt-1">
+                                            <button
+                                                onClick={() => setIsCollabOpen(false)}
+                                                className="w-full py-2 bg-indigo-600 text-white text-[10px] font-black rounded-xl hover:bg-indigo-700 transition-colors tracking-wider uppercase"
+                                            >
+                                                Aplicar ({selectedCollabIds.length})
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -1676,111 +1716,219 @@ export default function Dashboard() {
                 </div>
 
                 {/* Row 1.5: Sales Trend + Lead Alert KPIs */}
-                <div className="lg:col-span-8 bg-white p-5 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/70 flex flex-col group hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500 relative z-0">
-                    <div className="flex justify-between items-center mb-4">
-                        <div className="flex flex-col">
-                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1">
-                                <TrendingUp className="w-3.5 h-3.5" /> Tendencia de Ventas (Días)
-                                <InfoTip text="Gráfico de ingresos reales cerrados día a día. Un pico indica que hubo muchos cierres ese día. Si la línea es plana, tu equipo no está cerrando ventas." />
-                            </h3>
-                            <p className="text-[10px] text-gray-400 font-medium">Volumen de cierres a lo largo del tiempo</p>
-                        </div>
-                        <div className="bg-emerald-50 px-2 py-0.5 rounded text-[8px] font-black text-emerald-600 tracking-wider">REVENUE</div>
-                    </div>
-                    <div className="flex-grow w-full h-[220px]">
-                        {!canViewActiveFinancials ? (
-                            <div className="flex flex-col items-center justify-center h-full text-center space-y-3 py-10">
-                                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
-                                    <TrendingUp className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <p className="text-xs font-black text-slate-800 uppercase tracking-wider">Gráfico Confidencial</p>
-                                    <p className="text-[10px] text-slate-400 font-medium mt-1 px-4">La tendencia de ingresos solo es visible para administradores o colaboradores con permisos financieros.</p>
-                                </div>
+                {(() => {
+                    // Compute monthly aggregation from daily salesTrendData
+                    const monthlyTrendData = (() => {
+                        const map: Record<string, { date: string; amount: number; count: number; conversionRate: number }> = {};
+                        salesTrendData.forEach((d: any) => {
+                            try {
+                                const dateStr = d.date.includes('T') ? d.date : `${d.date}T12:00:00`;
+                                const monthKey = format(new Date(dateStr), 'yyyy-MM', { locale: es });
+                                if (!map[monthKey]) {
+                                    map[monthKey] = { date: `${monthKey}-01`, amount: 0, count: 0, conversionRate: d.conversionRate || 0 };
+                                }
+                                map[monthKey].amount += d.amount || 0;
+                                map[monthKey].count += d.count || 0;
+                                if (d.conversionRate) map[monthKey].conversionRate = d.conversionRate;
+                            } catch(e) {}
+                        });
+                        return Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
+                    })();
+
+                    const hasMultipleMonths = monthlyTrendData.length > 1;
+                    const activeData = trendView === 'month' ? monthlyTrendData : salesTrendData;
+                    const isMonthView = trendView === 'month';
+
+                    return (
+                    <div className="lg:col-span-8 bg-white p-5 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/70 flex flex-col group hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500 relative z-0">
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex flex-col">
+                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1">
+                                    <TrendingUp className="w-3.5 h-3.5" /> Tendencia de Ventas
+                                    <InfoTip text="Gráfico de ingresos reales cerrados. Vista Día: cada punto es un día con cierres. Vista Mes: agrupa todo por mes para comparar períodos." />
+                                </h3>
+                                <p className="text-[10px] text-gray-400 font-medium">Volumen de cierres a lo largo del tiempo</p>
                             </div>
-                        ) : salesTrendData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={salesTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <XAxis 
-                                        dataKey="date" 
-                                        tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} 
-                                        axisLine={false} 
-                                        tickLine={false}
-                                        tickFormatter={(val) => {
-                                            try {
-                                                const dateStr = val.includes('T') ? val : `${val}T12:00:00`;
-                                                return format(new Date(dateStr), 'dd MMM', { locale: es });
-                                            } catch(e) { return val; }
-                                        }}
-                                    />
-                                    <YAxis 
-                                        yAxisId="left"
-                                        tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} 
-                                        axisLine={false} 
-                                        tickLine={false}
-                                        tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
-                                    />
-                                    <YAxis 
-                                        yAxisId="right"
-                                        orientation="right"
-                                        domain={[0, 100]}
-                                        tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} 
-                                        axisLine={false} 
-                                        tickLine={false}
-                                        tickFormatter={(val) => `${val}%`}
-                                    />
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '8px 12px' }}
-                                        labelStyle={{ fontSize: '10px', fontWeight: 800, color: '#64748b', marginBottom: '4px' }}
-                                        labelFormatter={(val) => {
-                                            try {
-                                                const dateStr = val.includes('T') ? val : `${val}T12:00:00`;
-                                                return format(new Date(dateStr), 'dd MMM yyyy', { locale: es });
-                                            } catch(e) { return val; }
-                                        }}
-                                        formatter={(value: any, name?: string) => {
-                                            const displayName = name || '';
-                                            if (displayName === 'Ingresos') {
-                                                return [`$${value?.toLocaleString() || 0}`, displayName];
-                                            }
-                                            return [`${value}%`, displayName];
-                                        }}
-                                    />
-                                    <Area 
-                                        yAxisId="left" 
-                                        type="monotone" 
-                                        dataKey="amount" 
-                                        name="Ingresos"
-                                        stroke="#10b981" 
-                                        strokeWidth={3} 
-                                        fillOpacity={1} 
-                                        fill="url(#colorAmount)" 
-                                        activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} 
-                                    />
-                                    <Line 
-                                        yAxisId="right" 
-                                        type="monotone" 
-                                        dataKey="conversionRate" 
-                                        name="Conversión (Mes)"
-                                        stroke="#6366f1" 
-                                        strokeWidth={3} 
-                                        dot={{ r: 2 }} 
-                                        activeDot={{ r: 5 }} 
-                                    />
-                                </ComposedChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-gray-300 font-bold text-[10px] uppercase tracking-widest">Sin datos en este período</div>
-                        )}
+                            <div className="flex items-center gap-2 flex-wrap justify-end">
+                                {/* Series selector */}
+                                <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
+                                    <button
+                                        onClick={() => setTrendSeries('both')}
+                                        className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all duration-200 ${
+                                            trendSeries === 'both'
+                                                ? 'bg-white text-slate-700 shadow-sm'
+                                                : 'text-slate-400 hover:text-slate-600'
+                                        }`}
+                                    >Ambas</button>
+                                    <button
+                                        onClick={() => setTrendSeries('sales')}
+                                        className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all duration-200 ${
+                                            trendSeries === 'sales'
+                                                ? 'bg-emerald-500 text-white shadow-sm'
+                                                : 'text-slate-400 hover:text-slate-600'
+                                        }`}
+                                    >Ventas</button>
+                                    <button
+                                        onClick={() => setTrendSeries('conversion')}
+                                        className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all duration-200 ${
+                                            trendSeries === 'conversion'
+                                                ? 'bg-indigo-500 text-white shadow-sm'
+                                                : 'text-slate-400 hover:text-slate-600'
+                                        }`}
+                                    >Conversión</button>
+                                </div>
+                                {/* Day/Month toggle */}
+                                {hasMultipleMonths && (
+                                    <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
+                                        <button
+                                            onClick={() => setTrendView('day')}
+                                            className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all duration-200 ${
+                                                trendView === 'day'
+                                                    ? 'bg-white text-slate-700 shadow-sm'
+                                                    : 'text-slate-400 hover:text-slate-600'
+                                            }`}
+                                        >Día</button>
+                                        <button
+                                            onClick={() => setTrendView('month')}
+                                            className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-wider transition-all duration-200 ${
+                                                trendView === 'month'
+                                                    ? 'bg-white text-slate-600 shadow-sm'
+                                                    : 'text-slate-400 hover:text-slate-600'
+                                            }`}
+                                        >Mes</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex-grow w-full h-[220px]">
+                            {!canViewActiveFinancials ? (
+                                <div className="flex flex-col items-center justify-center h-full text-center space-y-3 py-10">
+                                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+                                        <TrendingUp className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-black text-slate-800 uppercase tracking-wider">Gráfico Confidencial</p>
+                                        <p className="text-[10px] text-slate-400 font-medium mt-1 px-4">La tendencia de ingresos solo es visible para administradores o colaboradores con permisos financieros.</p>
+                                    </div>
+                                </div>
+                            ) : activeData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <ComposedChart data={activeData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <XAxis
+                                            dataKey="date"
+                                            tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tickFormatter={(val) => {
+                                                try {
+                                                    const dateStr = val.includes('T') ? val : `${val}T12:00:00`;
+                                                    return isMonthView
+                                                        ? format(new Date(dateStr), 'MMM yy', { locale: es })
+                                                        : format(new Date(dateStr), 'dd MMM', { locale: es });
+                                                } catch(e) { return val; }
+                                            }}
+                                        />
+                                        {trendSeries !== 'conversion' && (
+                                            <YAxis
+                                                yAxisId="left"
+                                                tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }}
+                                                axisLine={false}
+                                                tickLine={false}
+                                                tickFormatter={(val) => `$${(val / 1000).toFixed(0)}k`}
+                                            />
+                                        )}
+                                        {trendSeries === 'conversion' && (
+                                            <YAxis yAxisId="left" hide />
+                                        )}
+                                        {trendSeries !== 'sales' && (() => {
+                                            // Dynamic domain: min 0, max = highest conversionRate + 20% padding
+                                            const rates = activeData.map((d: any) => d.conversionRate || 0).filter((v: number) => v > 0);
+                                            const maxRate = rates.length > 0 ? Math.max(...rates) : 10;
+                                            const dynamicMax = Math.min(100, Math.ceil(maxRate * 1.4));
+                                            return (
+                                                <YAxis
+                                                    yAxisId="right"
+                                                    orientation="right"
+                                                    domain={[0, dynamicMax]}
+                                                    tick={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }}
+                                                    axisLine={false}
+                                                    tickLine={false}
+                                                    tickFormatter={(val) => `${val}%`}
+                                                />
+                                            );
+                                        })()}
+                                        {trendSeries === 'sales' && (
+                                            <YAxis yAxisId="right" orientation="right" hide />
+                                        )}
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '8px 12px' }}
+                                            labelStyle={{ fontSize: '10px', fontWeight: 800, color: '#64748b', marginBottom: '4px' }}
+                                            labelFormatter={(val) => {
+                                                try {
+                                                    const dateStr = val.includes('T') ? val : `${val}T12:00:00`;
+                                                    return isMonthView
+                                                        ? format(new Date(dateStr), 'MMMM yyyy', { locale: es })
+                                                        : format(new Date(dateStr), 'dd MMM yyyy', { locale: es });
+                                                } catch(e) { return val; }
+                                            }}
+                                            formatter={(value: any, name?: string) => {
+                                                const displayName = name || '';
+                                                if (displayName === 'Ingresos') {
+                                                    return [`$${value?.toLocaleString() || 0}`, displayName];
+                                                }
+                                                return [`${value}%`, displayName];
+                                            }}
+                                        />
+                                        {trendSeries !== 'conversion' && (
+                                            <Area
+                                                yAxisId="left"
+                                                type="monotone"
+                                                dataKey="amount"
+                                                name="Ingresos"
+                                                stroke="#10b981"
+                                                strokeWidth={3}
+                                                fillOpacity={1}
+                                                fill="url(#colorAmount)"
+                                                activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
+                                            />
+                                        )}
+                                        {trendSeries !== 'sales' && (
+                                            <Line
+                                                yAxisId="right"
+                                                type="monotone"
+                                                dataKey="conversionRate"
+                                                name="Conversión"
+                                                stroke="#6366f1"
+                                                strokeWidth={3}
+                                                dot={isMonthView ? { r: 4, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 } : { r: 2 }}
+                                                activeDot={{ r: 5 }}
+                                            >
+                                                {isMonthView && (
+                                                    <LabelList
+                                                        dataKey="conversionRate"
+                                                        position="top"
+                                                        formatter={(v: any) => v > 0 ? `${v}%` : ''}
+                                                        style={{ fontSize: '9px', fontWeight: 800, fill: '#6366f1' }}
+                                                    />
+                                                )}
+                                            </Line>
+                                        )}
+                                    </ComposedChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-gray-300 font-bold text-[10px] uppercase tracking-widest">Sin datos en este período</div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                    );
+                })()}
 
                 {/* ── Lead Health Pulse: 3 KPIs en una sola fila compacta ── */}
                 <div className="lg:col-span-4 flex flex-col h-full">
@@ -2036,8 +2184,14 @@ export default function Dashboard() {
                         <div className="flex flex-col">
                             <h3 className="text-[11px] font-black text-blue-700 uppercase tracking-[0.2em] flex items-center gap-2">
                                 <Clock className="w-3.5 h-3.5 animate-pulse text-amber-500" />
-                                {selectedCollabName ? (
-                                    <span>🔥 Enfoque de {selectedCollabName}</span>
+                                {selectedCollabIds.length > 0 ? (
+                                    <span>
+                                        🔥 Enfoque de {
+                                            selectedCollabIds.length === 1
+                                                ? (companyProfiles.find(p => p.id === selectedCollabIds[0])?.full_name || 'Agente')
+                                                : `${selectedCollabIds.length} agentes`
+                                        }
+                                    </span>
                                 ) : (
                                     <span>🔥 Mi Enfoque de Hoy</span>
                                 )}
