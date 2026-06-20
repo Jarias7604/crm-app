@@ -31,7 +31,7 @@ BEGIN
         l.assigned_to                                         AS user_id,
         l.id                                                  AS lead_id,
         -- Usar updated_at del lead como aproximación de cuándo cambió el estado
-        COALESCE(l.updated_at, l.created_at)                 AS call_date,
+        l.created_at                                          AS call_date,
         'connected'                                           AS outcome,
         'status_change'                                       AS action_type,
         '[Histórico] Estado registrado retroactivamente'      AS notes,
