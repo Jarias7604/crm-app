@@ -1012,6 +1012,13 @@ export default function Leads() {
             // Show specific feedback based on what changed
             if ('status' in cleanUpdates) {
                 toast.success(`Estado cambiado a: ${STATUS_CONFIG[cleanUpdates.status as LeadStatus]?.label || cleanUpdates.status}`);
+                // Auto-log → feeds "Cambios Estado" KPI
+                callActivityService.logStatusChange({
+                    companyId: activeCompanyId,
+                    leadId: selectedLead.id,
+                    statusBefore: selectedLead.status,
+                    statusAfter: cleanUpdates.status as string,
+                }).catch(() => {/* non-blocking */});
             } else if ('priority' in cleanUpdates) {
                 toast.success(`Prioridad cambiada a: ${PRIORITY_CONFIG[cleanUpdates.priority as LeadPriority]?.label || cleanUpdates.priority}`);
             } else if ('assigned_to' in cleanUpdates) {
@@ -1647,8 +1654,17 @@ export default function Leads() {
                                     (old ?? []).map(l => l.id === leadId ? { ...l, status: newStatus } : l)
                                 );
 
+                                const prevStatus = lead.status;
                                 await leadsService.updateLead(leadId, { status: newStatus });
                                 toast.success(`Estado actualizado a ${newStatus}`);
+
+                                // Auto-log status change → feeds "Cambios Estado" KPI
+                                callActivityService.logStatusChange({
+                                    companyId: activeCompanyId,
+                                    leadId,
+                                    statusBefore: prevStatus,
+                                    statusAfter: newStatus,
+                                }).catch(() => {/* non-blocking */});
                             } catch (error) {
                                 // Rollback
                                 queryClient.invalidateQueries({ queryKey: ['leads'] });

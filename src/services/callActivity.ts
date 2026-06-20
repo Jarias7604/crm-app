@@ -200,6 +200,38 @@ export const callActivityService = {
     },
 
     /**
+     * Auto-log a status change as a call_activity record.
+     * Uses action_type='call' (within existing DB constraint).
+     * status_before/status_after fields are what the RPC counts for "Cambios Estado".
+     * Fire-and-forget: never throws, never breaks UI.
+     */
+    async logStatusChange(data: {
+        companyId: string;
+        leadId: string;
+        statusBefore: string;
+        statusAfter: string;
+        notes?: string;
+    }): Promise<void> {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            await supabase.from('call_activities').insert({
+                company_id: data.companyId,
+                user_id: user.id,
+                lead_id: data.leadId,
+                call_date: new Date().toISOString(),
+                outcome: 'connected',
+                action_type: 'call',
+                notes: data.notes || `[Cambio de Estado] ${data.statusBefore} → ${data.statusAfter}`,
+                status_before: data.statusBefore,
+                status_after: data.statusAfter,
+            });
+        } catch (err) {
+            console.warn('[logStatusChange] Error (non-blocking):', err);
+        }
+    },
+
+    /**
      * Get today's call count for the current user (quick KPI)
      */
     async getTodayCallCount(companyId: string): Promise<{ total: number; connected: number; goal: number }> {

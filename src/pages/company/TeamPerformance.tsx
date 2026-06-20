@@ -24,6 +24,7 @@ import { performanceGoalsService, type PerformanceGoal } from '../../services/pe
 import { forecastService, type ForecastWithActual } from '../../services/forecastService';
 import { callActivityService, type CallActivitySummary, type CallGoal, type ContactActivitySummary, ACTION_TYPE_CONFIG, type CallActivity } from '../../services/callActivity';
 import { supabase } from '../../services/supabase';
+import { DEFAULT_TIMEZONE } from '../../utils/timezone';
 
 // === WEEKDAY UTILS ===
 const getActiveWeekdaysForUser = (companyId: string, userId: string): number[] => {
@@ -2543,6 +2544,122 @@ function CallActivitySection({
         sent: boolean;
     } | null>(null);
 
+    // ── Follow-Up Stats (from follow_ups table — same source as Calendar) ──────
+    const [followUpStats, setFollowUpStats] = useState<{
+        scheduled: number;
+        completed: number;
+        overdue: number;
+    }>({ scheduled: 0, completed: 0, overdue: 0 });
+
+    useEffect(() => {
+        if (!companyId) return;
+        const fetchFollowUpStats = async () => {
+            try {
+                // ─── 1. Timezone de la empresa (SaaS: admin configura por país) ───
+                const { data: co } = await supabase
+                    .from('companies')
+                    .select('timezone')
+                    .eq('id', companyId)
+                    .single();
+                const tz: string = (co as any)?.timezone || DEFAULT_TIMEZONE;
+
+                // ─── 2. Helper: UTC ISO → fecha en zona horaria de la empresa ─────
+                // Funciona para El Salvador, Virginia, California, cualquier país
+                const toCompanyDate = (utcStr: string): string =>
+                    new Date(utcStr).toLocaleDateString('en-CA', { timeZone: tz });
+
+                // ─── 3. "Hoy" en la zona horaria de la empresa ───────────────────
+                const now = new Date();
+                const todayInCompanyTZ = now.toLocaleDateString('en-CA', { timeZone: tz });
+
+                // ─── 4. Rango de fechas del período en zona horaria de la empresa ─
+                // Usando Intl para que el mes/trimestre/año sean correctos en el TZ configurado
+                const dtf = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: tz,
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                });
+                const parts = dtf.formatToParts(now);
+                const tzYear  = parseInt(parts.find(p => p.type === 'year')?.value  || '0');
+                const tzMonth = parseInt(parts.find(p => p.type === 'month')?.value || '0'); // 1-based
+                const tzDay   = parseInt(parts.find(p => p.type === 'day')?.value   || '0');
+
+                const pad = (n: number) => String(n).padStart(2, '0');
+                const dStr = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
+                const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate(); // m is 1-based
+
+                let fromDateStr: string | undefined;
+                let toDateStr: string | undefined;
+
+                switch (filters.period) {
+                    case 'today':
+                        fromDateStr = toDateStr = todayInCompanyTZ;
+                        break;
+                    case 'week': {
+                        const w = new Date(now);
+                        w.setDate(w.getDate() - 7);
+                        fromDateStr = w.toLocaleDateString('en-CA', { timeZone: tz });
+                        toDateStr   = todayInCompanyTZ;
+                        break;
+                    }
+                    case 'month':
+                        fromDateStr = dStr(tzYear, tzMonth, 1);
+                        toDateStr   = dStr(tzYear, tzMonth, daysInMonth(tzYear, tzMonth));
+                        break;
+                    case 'quarter': {
+                        const qStart = Math.floor((tzMonth - 1) / 3) * 3 + 1; // first month of quarter (1-based)
+                        const qEnd   = qStart + 2;
+                        fromDateStr  = dStr(tzYear, qStart, 1);
+                        toDateStr    = dStr(tzYear, qEnd, daysInMonth(tzYear, qEnd));
+                        break;
+                    }
+                    case 'year':
+                        fromDateStr = dStr(tzYear, 1, 1);
+                        toDateStr   = dStr(tzYear, 12, 31);
+                        break;
+                    case 'custom':
+                        fromDateStr = filters.date_from;
+                        toDateStr   = filters.date_to;
+                        break;
+                    default: // 'all'
+                        fromDateStr = undefined;
+                        toDateStr   = undefined;
+                }
+
+                // ─── 5. Fetch todos los seguimientos de la empresa ───────────────
+                const { data, error } = await supabase
+                    .from('follow_ups')
+                    .select('date, completed, completed_at')
+                    .eq('company_id', companyId);
+
+                if (error || !data) return;
+
+                // ─── 6. Filtrar usando la zona horaria de la empresa ─────────────
+                const scheduled = data.filter(f => {
+                    const d = toCompanyDate(f.date);
+                    return (!fromDateStr || d >= fromDateStr) && (!toDateStr || d <= toDateStr);
+                }).length;
+
+                const completed = data.filter(f => {
+                    if (!f.completed || !f.completed_at) return false;
+                    const d = toCompanyDate(f.completed_at);
+                    return (!fromDateStr || d >= fromDateStr) && (!toDateStr || d <= toDateStr);
+                }).length;
+
+                const overdue = data.filter(f => {
+                    if (f.completed) return false;
+                    return toCompanyDate(f.date) < todayInCompanyTZ;
+                }).length;
+
+                setFollowUpStats({ scheduled, completed, overdue });
+            } catch (err) {
+                console.warn('[TeamPerformance] Error fetching follow_up stats:', err);
+            }
+        };
+        fetchFollowUpStats();
+    }, [companyId, filters.period, filters.dateFrom, filters.dateTo, userPerformance.length]);
+
     const openSendModal = (advisorId: string, advisorName: string, advisorEmail: string) => {
         setSendReportModal({
             isOpen: true, advisorId, advisorName, advisorEmail,
@@ -3357,7 +3474,7 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
             </div>
 
             {/* ── KPI Strip ────────────────────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-3">
                 {[
                     { label: 'Total Acciones', value: totalAllActions || totalCalls, color: 'text-slate-800', sub: 'registradas' },
                     { label: 'Conectadas', value: totalConnected, color: 'text-emerald-600', sub: `${overallConnectRate.toFixed(1)}% tasa` },
@@ -3365,11 +3482,18 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
                     { label: 'Cambios Estado', value: totalStatusChanges, color: 'text-violet-600', sub: 'en pipeline' },
                     { label: 'Meta Global', value: `${globalPercent.toFixed(0)}%`, color: globalPercent >= 100 ? 'text-emerald-600' : globalPercent >= 75 ? 'text-amber-500' : 'text-rose-600', sub: `${totalActualCalls}/${totalGoalUpToDate} llamadas` },
                     { label: 'Abordaje Prom.', value: formatResponseTime(globalAvgResponseTime), color: globalAvgResponseTime > 0 ? (globalAvgResponseTime <= 2 ? 'text-emerald-600' : globalAvgResponseTime <= 24 ? 'text-amber-500' : 'text-rose-600') : 'text-slate-400', sub: 'resp. promedio' },
+                    { label: '📅 Agendados', value: followUpStats.scheduled, color: 'text-sky-600', sub: 'en el período', link: '/calendar' },
+                    { label: '✅ Completados', value: followUpStats.completed, color: 'text-teal-600', sub: 'seguim. en período', link: '/calendar' },
+                    { label: '⚠️ Vencidos', value: followUpStats.overdue, color: followUpStats.overdue > 0 ? 'text-rose-600' : 'text-slate-400', sub: 'sin completar', link: '/calendar' },
                 ].map((kpi, i) => (
-                    <div key={i} className="bg-white border border-slate-100 rounded-xl p-4 hover:border-slate-200 hover:shadow-sm transition-all">
+                    <div
+                        key={i}
+                        onClick={() => (kpi as any).link && navigate((kpi as any).link)}
+                        className={`bg-white border border-slate-100 rounded-xl p-4 hover:border-slate-200 hover:shadow-sm transition-all ${ (kpi as any).link ? 'cursor-pointer hover:border-sky-200' : ''}`}
+                    >
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">{kpi.label}</p>
                         <p className={`text-xl font-black ${kpi.color} leading-none`}>{kpi.value}</p>
-                        <p className="text-[9px] text-slate-400 mt-1 font-medium">{kpi.sub}</p>
+                        <p className="text-[9px] text-slate-400 mt-1 font-medium">{kpi.sub}{(kpi as any).link && <span className="ml-1 text-sky-400">→</span>}</p>
                     </div>
                 ))}
             </div>

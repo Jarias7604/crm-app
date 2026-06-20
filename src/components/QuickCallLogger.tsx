@@ -113,6 +113,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
     const [notes, setNotes] = useState('');
     const [durationMinutes, setDurationMinutes] = useState<number | ''>('');
     const [isSaving, setIsSaving] = useState(false);
+    const [newStatus, setNewStatus] = useState<string>('');
 
     // Track when this form was opened — used for timer + quality score.
     // If callStartedAt is provided (mobile click-to-call), use that as the real start time.
@@ -218,8 +219,14 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                 actionType: effectiveActionType,
                 notes: notes.trim() || undefined,
                 statusBefore: lead.status,
+                statusAfter: newStatus || undefined,
                 durationSeconds: durationMinutes ? Number(durationMinutes) * 60 : undefined,
             });
+
+            // If asesor selected a new status, update the lead
+            if (newStatus && newStatus !== lead.status) {
+                await leadsService.updateLead(lead.id, { status: newStatus as any });
+            }
 
             // Increment contact_count atomically
             const { data: currentLead } = await supabase.from('leads').select('contact_count').eq('id', lead.id).single();
@@ -248,7 +255,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
             const actionLabel = effectiveLabel;
             toast.success(`${actionLabel} registrada`);
 
-            onCallLogged(false, undefined);
+            onCallLogged(!!(newStatus && newStatus !== lead.status), newStatus ? newStatus as any : undefined);
             onClose();
         } catch (error: any) {
             console.error('Error logging action:', error);
@@ -350,6 +357,53 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                         );
                     })}
                 </div>
+            </div>
+
+            {/* ===== CAMBIO DE ESTADO (Opcional) ===== */}
+            <div className="mb-4">
+                <label className="block text-[9px] font-black uppercase tracking-widest text-gray-500 mb-2 ml-1">
+                    ¿Cambió el estado del lead? <span className="font-normal text-gray-400">(Opcional)</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                    <button
+                        onClick={() => setNewStatus('')}
+                        className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all border ${
+                            newStatus === ''
+                                ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                                : 'bg-white/60 border-gray-200 text-gray-400 hover:border-gray-300'
+                        }`}
+                    >
+                        Sin cambio
+                    </button>
+                    {[
+                        { s: 'Llamada fría', icon: '📲' },
+                        { s: 'Lead calificado', icon: '⭐' },
+                        { s: 'En seguimiento', icon: '📞' },
+                        { s: 'Negociación', icon: '💼' },
+                        { s: 'En Nutrición', icon: '🌱' },
+                        { s: 'Perdido', icon: '❌' },
+                    ]
+                        .filter(({ s }) => s !== lead.status)
+                        .map(({ s, icon }) => (
+                            <button
+                                key={s}
+                                onClick={() => setNewStatus(prev => prev === s ? '' : s)}
+                                className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all border ${
+                                    newStatus === s
+                                        ? 'bg-violet-600 text-white border-violet-600 shadow-sm scale-[1.03]'
+                                        : 'bg-white/60 border-gray-200 text-gray-500 hover:border-violet-300 hover:text-violet-600'
+                                }`}
+                            >
+                                {icon} {s}
+                            </button>
+                        ))
+                    }
+                </div>
+                {newStatus && newStatus !== lead.status && (
+                    <p className="text-[9px] text-violet-600 font-bold mt-1.5 ml-1">
+                        ✓ Se registrará el cambio: <span className="font-black">{lead.status} → {newStatus}</span>
+                    </p>
+                )}
             </div>
 
             {/* ===== INDEPENDENT FOLLOW-UP TOGGLE ===== */}
