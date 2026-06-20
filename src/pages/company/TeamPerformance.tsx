@@ -2555,106 +2555,90 @@ function CallActivitySection({
         if (!companyId) return;
         const fetchFollowUpStats = async () => {
             try {
-                // ─── 1. Timezone de la empresa (SaaS: admin configura por país) ───
+                // 1. Timezone de la empresa (SaaS: El Salvador, NY, California, etc.)
                 const { data: co } = await supabase
-                    .from('companies')
-                    .select('timezone')
-                    .eq('id', companyId)
-                    .single();
-                const tz: string = (co as any)?.timezone || DEFAULT_TIMEZONE;
+                    .from('companies').select('timezone').eq('id', companyId).single();
+                const tz = (co as any)?.timezone || DEFAULT_TIMEZONE;
 
-                // ─── 2. Helper: UTC ISO → fecha en zona horaria de la empresa ─────
-                // Funciona para El Salvador, Virginia, California, cualquier país
-                const toCompanyDate = (utcStr: string): string =>
-                    new Date(utcStr).toLocaleDateString('en-CA', { timeZone: tz });
-
-                // ─── 3. "Hoy" en la zona horaria de la empresa ───────────────────
+                // 2. Hoy en TZ empresa
                 const now = new Date();
-                const todayInCompanyTZ = now.toLocaleDateString('en-CA', { timeZone: tz });
+                const todayInTZ = now.toLocaleDateString('en-CA', { timeZone: tz });
 
-                // ─── 4. Rango de fechas del período en zona horaria de la empresa ─
-                // Usando Intl para que el mes/trimestre/año sean correctos en el TZ configurado
-                const dtf = new Intl.DateTimeFormat('en-CA', {
-                    timeZone: tz,
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                });
-                const parts = dtf.formatToParts(now);
-                const tzYear  = parseInt(parts.find(p => p.type === 'year')?.value  || '0');
-                const tzMonth = parseInt(parts.find(p => p.type === 'month')?.value || '0'); // 1-based
-                const tzDay   = parseInt(parts.find(p => p.type === 'day')?.value   || '0');
+                // 3. Convierte fecha local YYYY-MM-DD a UTC ISO correcto para el TZ
+                // Mide el offset comparando noon UTC vs noon en TZ empresa
+                const localToUTC = (dateStr: string, endOfDay = false): string => {
+                    const sampleUTC = new Date(dateStr + 'T12:00:00Z');
+                    const tzHStr = sampleUTC.toLocaleString('en-US', { timeZone: tz, hour: '2-digit', hour12: false });
+                    const tzH = parseInt(tzHStr === '24' ? '0' : tzHStr);
+                    const offsetMs = (12 - tzH) * 3600000;
+                    const base = new Date(dateStr + (endOfDay ? 'T23:59:59Z' : 'T00:00:00Z'));
+                    return new Date(base.getTime() + offsetMs).toISOString();
+                };
 
-                const pad = (n: number) => String(n).padStart(2, '0');
-                const dStr = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
-                const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate(); // m is 1-based
+                // 4. Rango del periodo en TZ empresa usando Intl
+                const dtParts = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+                }).formatToParts(now);
+                const tzY = parseInt(dtParts.find(p => p.type === 'year')?.value  || '0');
+                const tzM = parseInt(dtParts.find(p => p.type === 'month')?.value || '0');
+                const pad2 = (n: number) => String(n).padStart(2, '0');
+                const ds = (y: number, m: number, d: number) => `${y}-${pad2(m)}-${pad2(d)}`;
+                const dim = (y: number, m: number) => new Date(y, m, 0).getDate();
 
-                let fromDateStr: string | undefined;
-                let toDateStr: string | undefined;
-
+                let fromLocal: string | undefined, toLocal: string | undefined;
                 switch (filters.period) {
-                    case 'today':
-                        fromDateStr = toDateStr = todayInCompanyTZ;
-                        break;
+                    case 'today':   fromLocal = toLocal = todayInTZ; break;
                     case 'week': {
-                        const w = new Date(now);
-                        w.setDate(w.getDate() - 7);
-                        fromDateStr = w.toLocaleDateString('en-CA', { timeZone: tz });
-                        toDateStr   = todayInCompanyTZ;
-                        break;
+                        const w = new Date(now); w.setDate(w.getDate() - 7);
+                        fromLocal = w.toLocaleDateString('en-CA', { timeZone: tz });
+                        toLocal   = todayInTZ; break;
                     }
                     case 'month':
-                        fromDateStr = dStr(tzYear, tzMonth, 1);
-                        toDateStr   = dStr(tzYear, tzMonth, daysInMonth(tzYear, tzMonth));
-                        break;
+                        fromLocal = ds(tzY, tzM, 1);
+                        toLocal   = ds(tzY, tzM, dim(tzY, tzM)); break;
                     case 'quarter': {
-                        const qStart = Math.floor((tzMonth - 1) / 3) * 3 + 1; // first month of quarter (1-based)
-                        const qEnd   = qStart + 2;
-                        fromDateStr  = dStr(tzYear, qStart, 1);
-                        toDateStr    = dStr(tzYear, qEnd, daysInMonth(tzYear, qEnd));
-                        break;
+                        const qs = Math.floor((tzM - 1) / 3) * 3 + 1;
+                        fromLocal = ds(tzY, qs, 1);
+                        toLocal   = ds(tzY, qs + 2, dim(tzY, qs + 2)); break;
                     }
                     case 'year':
-                        fromDateStr = dStr(tzYear, 1, 1);
-                        toDateStr   = dStr(tzYear, 12, 31);
-                        break;
+                        fromLocal = ds(tzY, 1, 1); toLocal = ds(tzY, 12, 31); break;
                     case 'custom':
-                        fromDateStr = filters.date_from;
-                        toDateStr   = filters.date_to;
-                        break;
-                    default: // 'all'
-                        fromDateStr = undefined;
-                        toDateStr   = undefined;
+                        fromLocal = filters.date_from; toLocal = filters.date_to; break;
+                    default: break;
                 }
 
-                // ─── 5. Fetch todos los seguimientos de la empresa ───────────────
-                const { data, error } = await supabase
+                const utcFrom       = fromLocal ? localToUTC(fromLocal, false) : undefined;
+                const utcTo         = toLocal   ? localToUTC(toLocal,   true)  : undefined;
+                const todayUtcStart = localToUTC(todayInTZ, false);
+
+                // 5. COUNT server-side — SIN limite de 1000 filas de Supabase
+                // head:true = solo devuelve el COUNT, cero datos, rapido y preciso
+                const base = () => supabase
                     .from('follow_ups')
-                    .select('date, completed, completed_at')
+                    .select('*', { count: 'exact', head: true })
                     .eq('company_id', companyId);
 
-                if (error || !data) return;
+                let sqQ = base();
+                if (utcFrom) sqQ = sqQ.gte('date', utcFrom);
+                if (utcTo)   sqQ = sqQ.lte('date', utcTo);
 
-                // ─── 6. Filtrar usando la zona horaria de la empresa ─────────────
-                const scheduled = data.filter(f => {
-                    const d = toCompanyDate(f.date);
-                    return (!fromDateStr || d >= fromDateStr) && (!toDateStr || d <= toDateStr);
-                }).length;
+                let cpQ = base().eq('completed', true as any);
+                if (utcFrom) cpQ = cpQ.gte('completed_at', utcFrom);
+                if (utcTo)   cpQ = cpQ.lte('completed_at', utcTo);
 
-                const completed = data.filter(f => {
-                    if (!f.completed || !f.completed_at) return false;
-                    const d = toCompanyDate(f.completed_at);
-                    return (!fromDateStr || d >= fromDateStr) && (!toDateStr || d <= toDateStr);
-                }).length;
+                const ovQ = base()
+                    .eq('completed', false as any)
+                    .lt('date', todayUtcStart);
 
-                const overdue = data.filter(f => {
-                    if (f.completed) return false;
-                    return toCompanyDate(f.date) < todayInCompanyTZ;
-                }).length;
-
-                setFollowUpStats({ scheduled, completed, overdue });
+                const [sqR, cpR, ovR] = await Promise.all([sqQ, cpQ, ovQ]);
+                setFollowUpStats({
+                    scheduled: sqR.count ?? 0,
+                    completed: cpR.count ?? 0,
+                    overdue:   ovR.count ?? 0,
+                });
             } catch (err) {
-                console.warn('[TeamPerformance] Error fetching follow_up stats:', err);
+                console.warn('[TeamPerformance] followUpStats error:', err);
             }
         };
         fetchFollowUpStats();
