@@ -2551,6 +2551,25 @@ function CallActivitySection({
         overdue: number;
     }>({ scheduled: 0, completed: 0, overdue: 0 });
 
+    // Asesores ocultos: persiste en localStorage para no perder la configuracion
+    const hiddenKey = companyId ? `crm_hidden_advisors_${companyId}` : 'crm_hidden_advisors';
+    const [hiddenAdvisorIds, setHiddenAdvisorIds] = useState<Set<string>>(() => {
+        try { return new Set(JSON.parse(localStorage.getItem(hiddenKey) || '[]')); }
+        catch { return new Set(); }
+    });
+    const toggleHideAdvisor = (userId: string) => {
+        setHiddenAdvisorIds(prev => {
+            const next = new Set(prev);
+            if (next.has(userId)) { next.delete(userId); } else { next.add(userId); }
+            try { localStorage.setItem(hiddenKey, JSON.stringify([...next])); } catch {}
+            return next;
+        });
+    };
+    const restoreAllAdvisors = () => {
+        setHiddenAdvisorIds(new Set());
+        try { localStorage.removeItem(hiddenKey); } catch {}
+    };
+
     useEffect(() => {
         if (!companyId) return;
         const fetchFollowUpStats = async () => {
@@ -3432,6 +3451,10 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
         };
     }).sort((a, b) => b.percent - a.percent);
 
+    // Asesores visibles: excluye los ocultos del reporte visual y de los totales
+    const visibleReportData = reportData.filter(r => !hiddenAdvisorIds.has(r.userId));
+    const hiddenCount = hiddenAdvisorIds.size;
+
     const totalLostLeadsEst = reportData.reduce((s, r) => s + r.lostLeadsEst, 0);
     const totalLostRevenueEst = reportData.reduce((s, r) => s + r.lostRevenueEst, 0);
     const totalLeadsWithoutFollowUp = reportData.reduce((s, r) => s + r.leadsWithoutFollowUp, 0);
@@ -3445,6 +3468,16 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
                     <p className="text-[10px] text-slate-400 font-medium mt-0.5">{getFormattedDateRange()} · {days} {days === 1 ? 'día' : 'días'}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {hiddenCount > 0 && (
+                        <button
+                            onClick={restoreAllAdvisors}
+                            className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-amber-100 transition-all"
+                            title="Mostrar todos los asesores ocultos"
+                        >
+                            <span className="w-4 h-4 bg-amber-400 text-white rounded-full text-[9px] flex items-center justify-center font-black">{hiddenCount}</span>
+                            Ocultos
+                        </button>
+                    )}
                     {isAdmin && (
                         <button
                             onClick={openGoalPanel}
@@ -3512,7 +3545,7 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
 
                 {/* Advisor rows */}
                 <div className="divide-y divide-slate-50">
-                    {reportData.map((row) => {
+                    {visibleReportData.map((row) => {
                         const daysRange = getDatesInRange();
                         const uncappedDaysRange = getDatesInRange(true);
                         const activeWeekdays = getActiveWeekdaysForUser(companyId, row.userId);
@@ -3586,6 +3619,13 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
 
                                     {/* Expand */}
                                     <div className="col-span-1 flex items-center justify-center gap-1">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); toggleHideAdvisor(row.userId); }}
+                                            className="w-6 h-6 rounded-md bg-slate-50 border border-slate-100 flex items-center justify-center hover:bg-rose-50 hover:border-rose-200 transition-colors text-slate-400 hover:text-rose-400 no-print"
+                                            title="Ocultar este asesor del reporte"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+                                        </button>
                                         <button onClick={(e) => { e.stopPropagation(); handlePrintUserReport(row.userId); }} className="w-6 h-6 rounded-md bg-slate-50 border border-slate-100 flex items-center justify-center hover:bg-slate-100 transition-colors text-slate-400 no-print" title="Imprimir reporte">
                                             <Printer className="w-3 h-3" />
                                         </button>
