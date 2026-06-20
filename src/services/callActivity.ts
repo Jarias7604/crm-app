@@ -221,7 +221,7 @@ export const callActivityService = {
                 lead_id: data.leadId,
                 call_date: new Date().toISOString(),
                 outcome: 'connected',
-                action_type: 'call',
+                action_type: 'status_change',
                 notes: data.notes || `[Cambio de Estado] ${data.statusBefore} → ${data.statusAfter}`,
                 status_before: data.statusBefore,
                 status_after: data.statusAfter,
