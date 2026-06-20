@@ -2658,7 +2658,7 @@ function CallActivitySection({
             }
         };
         fetchFollowUpStats();
-    }, [companyId, filters.period, filters.dateFrom, filters.dateTo, userPerformance.length]);
+    }, [companyId, filters.period, filters.date_from, filters.date_to, userPerformance.length]);
 
     const openSendModal = (advisorId: string, advisorName: string, advisorEmail: string) => {
         setSendReportModal({
