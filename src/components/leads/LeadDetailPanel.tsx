@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity } from 'lucide-react';
+import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { supabase } from '../../services/supabase';
@@ -88,6 +88,29 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const [isWhatsAppDialogOpen, setIsWhatsAppDialogOpen] = useState(false);
     const [isDocGeneratorOpen, setIsDocGeneratorOpen] = useState(false);
     const [isFollowUpLoggerOpen, setIsFollowUpLoggerOpen] = useState(false);
+    const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+
+    const getWhatsAppLink = (phone: string) => {
+        if (!phone) return '';
+        let cleanPhone = phone.replace(/\D/g, '');
+        if (cleanPhone.length === 8) {
+            cleanPhone = '503' + cleanPhone;
+        }
+        return `https://wa.me/${cleanPhone}`;
+    };
+
+    const copyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text);
+        toast.success('Enlace copiado al portapapeles');
+    };
+
+    const handleOpenQr = () => {
+        if (!lead?.phone) {
+            toast.error('Por favor, ingresa un número de teléfono para el lead.');
+            return;
+        }
+        setIsQrModalOpen(true);
+    };
 
     useEffect(() => {
         if (isOpen && lead) {
@@ -151,7 +174,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             onBlur={(e) => handleUpdateLead({ company_name: e.target.value })}
                                             className="block w-full text-[14px] font-bold text-indigo-200 border-none hover:bg-white/5 focus:bg-white/10 focus:ring-2 focus:ring-indigo-400 rounded-lg px-2 -ml-2 transition-all bg-transparent placeholder-indigo-300/50"
                                         />
-                                        <div className="ml-1 mt-2">
+                                        <div className="ml-1 mt-2 flex items-center gap-2">
                                             <CustomDatePicker
                                                 value={selectedLead.created_at || ''}
                                                 onChange={(date) => {
@@ -163,6 +186,14 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 variant="light"
                                                 className="w-44 text-sm font-bold bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/30 backdrop-blur-sm transition-all shadow-sm"
                                             />
+                                            <button
+                                                onClick={handleOpenQr}
+                                                className="h-[38px] px-3 bg-white/10 text-white border border-white/20 hover:bg-white/20 hover:border-white/30 rounded-lg transition-all backdrop-blur-sm shadow-sm flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                                                title="Código QR de WhatsApp"
+                                            >
+                                                <QrCode className="w-5 h-5" />
+                                                <span className="text-xs font-bold">WhatsApp QR</span>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -193,6 +224,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 <button
                                     onClick={() => setIsDetailOpen(false)}
                                     className="p-2 bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl transition-all border border-slate-700 shadow-sm active:scale-95"
+                                    title="Cerrar panel"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
@@ -733,6 +765,75 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             </div>
                         </div>
                     </div>
+
+                    {/* WhatsApp QR Modal overlay */}
+                    {isQrModalOpen && selectedLead.phone && (
+                        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+                            {/* Backdrop */}
+                            <div 
+                                className="absolute inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity duration-300"
+                                onClick={() => setIsQrModalOpen(false)}
+                            />
+                            
+                            {/* Modal Content */}
+                            <div className="relative bg-white rounded-3xl overflow-hidden shadow-2xl w-full max-w-sm transform transition-all duration-300 scale-100 border border-slate-100 flex flex-col items-center p-6 text-center animate-in fade-in zoom-in-95 duration-200 z-[10001]">
+                                {/* Close button */}
+                                <button
+                                    onClick={() => setIsQrModalOpen(false)}
+                                    className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-650 hover:bg-slate-50 rounded-xl transition-all"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+
+                                {/* Header / Icon */}
+                                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4 mt-2">
+                                    <QrCode className="w-6 h-6 text-emerald-600" />
+                                </div>
+
+                                <h3 className="text-lg font-black text-slate-800 tracking-tight mb-1">
+                                    WhatsApp Express QR
+                                </h3>
+                                
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
+                                    {selectedLead.name}
+                                </p>
+
+                                {/* QR Code Wrapper */}
+                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/50 mb-4 shadow-inner relative">
+                                    <div className="bg-white p-3 rounded-xl shadow-sm">
+                                        <img
+                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(getWhatsAppLink(selectedLead.phone || ''))}`}
+                                            alt="WhatsApp QR Code"
+                                            className="w-48 h-48 block rounded-lg select-none pointer-events-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <p className="text-[13px] text-slate-500 leading-relaxed px-4 mb-6">
+                                    Escanea este código QR con la cámara de tu teléfono para iniciar un chat en WhatsApp con <span className="font-extrabold text-slate-800">{selectedLead.phone}</span> sin guardarlo en tus contactos.
+                                </p>
+
+                                {/* Actions */}
+                                <div className="w-full space-y-2">
+                                    <a
+                                        href={getWhatsAppLink(selectedLead.phone || '')}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full flex items-center justify-center gap-2 py-3 bg-[#25D366] hover:bg-[#20ba56] text-white rounded-xl font-black text-[12px] uppercase tracking-widest shadow-md transition-all active:scale-[0.98] border border-[#22c760]"
+                                    >
+                                        <Smartphone className="w-4 h-4" /> Abrir Chat Directo
+                                    </a>
+                                    
+                                    <button
+                                        onClick={() => copyToClipboard(getWhatsAppLink(selectedLead.phone || ''))}
+                                        className="w-full flex items-center justify-center gap-2 py-3 bg-slate-50 hover:bg-slate-100 text-slate-655 rounded-xl font-bold text-[12px] transition-all border border-slate-200"
+                                    >
+                                        <Copy className="w-4 h-4" /> Copiar Enlace wa.me
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
 };
