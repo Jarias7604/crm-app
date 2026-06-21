@@ -670,8 +670,13 @@ export default function Companies() {
 
                             {/* ── Tab: Licencias ── */}
                             {activeTab === 'license' && (
-                                <div className="space-y-3">
-                                    <p className="text-xs text-slate-500">Selecciona los módulos habilitados para esta empresa. Los módulos desactivados no serán visibles para ningún usuario.</p>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-xs text-slate-500">Módulos habilitados para esta empresa</p>
+                                        <span className="text-[11px] font-bold text-[#4449AA] bg-indigo-50 px-2.5 py-1 rounded-full">
+                                            {formData.allowed_permissions?.length || 0} / {MODULES_CONFIG.length} activos
+                                        </span>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-2">
                                         {MODULES_CONFIG.map((module) => {
                                             const isActive = formData.allowed_permissions?.includes(module.key);
@@ -680,26 +685,40 @@ export default function Companies() {
                                                     key={module.key}
                                                     type="button"
                                                     onClick={() => toggleModule(module.key)}
-                                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                                                    className={`flex items-center gap-3 px-3 py-3 rounded-2xl border text-left transition-all duration-200 ${
                                                         isActive
-                                                            ? 'bg-indigo-50 border-indigo-200'
-                                                            : 'bg-white border-slate-200 hover:bg-slate-50'
+                                                            ? 'bg-white border-[#4449AA]/20 shadow-md shadow-indigo-100/60 ring-1 ring-[#4449AA]/10'
+                                                            : 'bg-slate-50 border-slate-100 hover:bg-white hover:border-slate-200 hover:shadow-sm'
                                                     }`}
                                                 >
-                                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isActive ? `${module.bg}` : 'bg-slate-100'}`}>
-                                                        <module.icon className={`w-3.5 h-3.5 ${isActive ? module.color : 'text-slate-400'}`} />
+                                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-200 ${
+                                                        isActive ? `${module.bg} shadow-sm` : 'bg-white border border-slate-200'
+                                                    }`}>
+                                                        <module.icon className={`w-4 h-4 transition-all ${isActive ? module.color : 'text-slate-300'}`} />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className={`text-xs font-bold truncate ${isActive ? 'text-slate-800' : 'text-slate-500'}`}>{module.label}</p>
+                                                        <p className={`text-[11px] font-bold truncate leading-tight ${
+                                                            isActive ? 'text-slate-800' : 'text-slate-400'
+                                                        }`}>{module.label}</p>
+                                                        <p className={`text-[10px] font-semibold mt-0.5 ${
+                                                            isActive ? 'text-[#4449AA]' : 'text-slate-300'
+                                                        }`}>{isActive ? 'Activo' : 'Inactivo'}</p>
                                                     </div>
-                                                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${isActive ? 'bg-[#4449AA] border-[#4449AA]' : 'border-slate-300'}`}>
-                                                        {isActive && <div className="w-full h-full rounded-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-white rounded-full" /></div>}
+                                                    <div className={`w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center transition-all duration-200 ${
+                                                        isActive
+                                                            ? 'bg-[#4449AA] shadow-md shadow-indigo-200'
+                                                            : 'border-2 border-slate-200 bg-white'
+                                                    }`}>
+                                                        {isActive && (
+                                                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                            </svg>
+                                                        )}
                                                     </div>
                                                 </button>
                                             );
                                         })}
                                     </div>
-                                    <p className="text-[11px] text-slate-400">{formData.allowed_permissions?.length || 0} de {MODULES_CONFIG.length} módulos activos</p>
                                 </div>
                             )}
 
@@ -893,15 +912,41 @@ export default function Companies() {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-500 mb-1">Contraseña {!editingCompanyId && '*'}</label>
-                                                <Input
-                                                    type="password"
-                                                    required={!editingCompanyId}
-                                                    value={formData.admin_password}
-                                                    onChange={e => setFormData({ ...formData, admin_password: e.target.value })}
-                                                    placeholder="Mínimo 6 caracteres"
-                                                    className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
-                                                />
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label className="text-xs font-bold text-slate-500">Contraseña {!editingCompanyId && '*'}</label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const pwd = generatePassword();
+                                                            setFormData(prev => ({ ...prev, admin_password: pwd }));
+                                                            navigator.clipboard.writeText(pwd);
+                                                            toast.success('🔑 Contraseña generada y copiada');
+                                                        }}
+                                                        className="flex items-center gap-1 text-[11px] font-bold text-[#4449AA] hover:text-[#3b3f94] transition-colors"
+                                                    >
+                                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                        Auto-generar
+                                                    </button>
+                                                </div>
+                                                <div className="relative">
+                                                    <Input
+                                                        type="text"
+                                                        required={!editingCompanyId}
+                                                        value={formData.admin_password}
+                                                        onChange={e => setFormData({ ...formData, admin_password: e.target.value })}
+                                                        placeholder="Mínimo 6 caracteres"
+                                                        className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl pr-10 font-mono"
+                                                    />
+                                                    {formData.admin_password && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { navigator.clipboard.writeText(formData.admin_password); toast.success('Copiado'); }}
+                                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                                                        >
+                                                            <Copy className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
