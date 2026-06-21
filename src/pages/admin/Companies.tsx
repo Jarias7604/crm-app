@@ -22,17 +22,18 @@ import {
     XCircle,
     Search,
     Settings,
-    CheckCircle2,
     Users,
     Info,
-    Lock,
-    Mail,
     KeyRound,
     Pencil,
-    ArrowUpDown,
-    Copy,
     Loader2,
-    X
+    X,
+    Trash2,
+    CheckCircle2,
+    Copy,
+    Lock,
+    Mail,
+    ArrowUpDown
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -57,10 +58,6 @@ const MODULES_CONFIG = [
     { key: 'view_financials', label: 'Montos Financieros', icon: CreditCard, color: 'text-rose-700', bg: 'bg-rose-100' },
 ];
 
-// ─── Default module sets by license plan ──────────────────────────────────────
-// When a new company is created, these modules are pre-selected based on their
-// license status. Super admin can still add/remove modules manually.
-// This prevents new tenants from seeing a completely empty CRM.
 const PLAN_DEFAULT_MODULES: Record<string, string[]> = {
     trial:       ['leads', 'quotes', 'calendar', 'loss_reasons'],
     active:      ['leads', 'quotes', 'calendar', 'marketing', 'chat', 'loss_reasons', 'pricing', 'paquetes', 'items', 'proyectos', 'finanzas', 'tickets', 'reports', 'view_financials'],
@@ -93,15 +90,14 @@ export default function Companies() {
     const [statusFilter, setStatusFilter] = useState<LicenseStatus | 'all'>('all');
     const location = useLocation();
 
-    // Password reset panel state (Super Admin)
     const [showPasswordPanel, setShowPasswordPanel] = useState(false);
     const [newPassword, setNewPassword] = useState('');
     const [isResettingPassword, setIsResettingPassword] = useState(false);
     const [isSendingEmailLink, setIsSendingEmailLink] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+    const [deleteConfirm, setDeleteConfirm] = useState<{ company: Company; typedName: string; loading: boolean } | null>(null);
     const { tableRef: companiesTableRef, wrapperRef: companiesWrapperRef } = useAriasTables();
 
-    // Column resize
     const DEFAULT_COL_WIDTHS: Record<string, number> = {
         name: 260, license_status: 140, max_users: 160, allowed_permissions: 260,
     };
@@ -123,15 +119,11 @@ export default function Companies() {
         window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
     };
 
-    // Handle incoming filters from Dashboard
     useEffect(() => {
         if (location.state?.status) {
             setStatusFilter(location.state.status);
-            // Clear location state but keep other possible states if needed, 
-            // though here we just want to avoid re-triggering on history changes
             window.history.replaceState({}, document.title);
         }
-
         if (location.state?.editCompanyId && companies.length > 0) {
             const companyToEdit = companies.find(c => c.id === location.state.editCompanyId);
             if (companyToEdit) {
@@ -150,14 +142,11 @@ export default function Companies() {
                 });
                 setIsModalOpen(true);
             }
-            // Clear state after handling
             window.history.replaceState({}, document.title);
         }
     }, [location.state, companies]);
 
-    useEffect(() => {
-        loadCompanies();
-    }, []);
+    useEffect(() => { loadCompanies(); }, []);
 
     const loadCompanies = async () => {
         try {
@@ -165,8 +154,6 @@ export default function Companies() {
             setCompanies(data);
         } catch (error) {
             console.error('Failed to load companies', error);
-        } finally {
-            // setLoading(false); // Removed unused loading state
         }
     };
 
@@ -177,7 +164,6 @@ export default function Companies() {
                 const { admin_email, admin_password, admin_full_name, ...companyData } = formData;
                 await adminService.updateCompany(editingCompanyId, companyData);
 
-                // If editing an existing member, update their profile directly
                 if (editingMemberId) {
                     const profileUpdates: any = {};
                     if (memberEditData.full_name) profileUpdates.full_name = memberEditData.full_name;
@@ -192,13 +178,11 @@ export default function Companies() {
                         .eq('id', editingMemberId);
                     if (profileError) throw profileError;
 
-                    // Update local state
                     setCompanyMembers(prev => prev.map(m =>
                         m.id === editingMemberId ? { ...m, ...profileUpdates } : m
                     ));
                     toast.success('🎉 Empresa y usuario actualizados correctamente');
                 } else if (admin_email && admin_password) {
-                    // Adding a new admin to the company
                     if (admin_password.length < 6) {
                         toast.error('La contraseña debe tener al menos 6 caracteres');
                         setActiveTab('admin');
@@ -215,7 +199,6 @@ export default function Companies() {
                     toast.success('Empresa actualizada correctamente');
                 }
             } else {
-                // Validate admin fields for new company
                 if (!formData.admin_email || !formData.admin_password) {
                     toast.error('Configura el administrador inicial de la empresa');
                     setActiveTab('admin');
@@ -275,7 +258,6 @@ export default function Companies() {
         });
     };
 
-    // Password helpers (mirrors Team.tsx)
     const generatePassword = () => {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
         return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
@@ -307,7 +289,7 @@ export default function Companies() {
             );
             const result = await response.json();
             if (!response.ok || result.error) throw new Error(result.error || 'Error desconocido');
-            toast.success(`📧 Enlace enviado al correo de ${member?.full_name?.split(' ')[0] || 'usuario'}. Puede crear su propia contraseña.`, { duration: 8000 });
+            toast.success(`📧 Enlace enviado al correo de ${member?.full_name?.split(' ')[0] || 'usuario'}.`, { duration: 8000 });
             setShowPasswordPanel(false);
         } catch (error: any) {
             toast.error(`❌ ${error.message}`, { duration: 10000 });
@@ -365,11 +347,25 @@ export default function Companies() {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'active': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-            case 'expired': return 'bg-rose-100 text-rose-800 border-rose-200';
-            case 'trial': return 'bg-blue-100 text-blue-800 border-blue-200';
-            case 'manual_hold': return 'bg-amber-100 text-amber-800 border-amber-200';
-            default: return 'bg-gray-100 text-gray-800 border-gray-200';
+            case 'active': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+            case 'expired': return 'bg-rose-100 text-rose-700 border-rose-200';
+            case 'trial': return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'manual_hold': return 'bg-amber-100 text-amber-700 border-amber-200';
+            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+        }
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteConfirm) return;
+        setDeleteConfirm(prev => prev ? { ...prev, loading: true } : null);
+        try {
+            await adminService.deleteCompany(deleteConfirm.company.id);
+            toast.success(`Empresa "${deleteConfirm.company.name}" eliminada`);
+            setDeleteConfirm(null);
+            loadCompanies();
+        } catch (error: any) {
+            toast.error('Error al eliminar: ' + (error.message || 'Error desconocido'));
+            setDeleteConfirm(prev => prev ? { ...prev, loading: false } : null);
         }
     };
 
@@ -388,170 +384,177 @@ export default function Companies() {
     });
 
     return (
-        <div className="space-y-6 max-w-[1600px] mx-auto p-6 animate-in fade-in duration-500">
-            {/* Header section with Stats */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/40">
-                <div className="flex gap-6 items-center">
-                    <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[1.5rem] flex items-center justify-center text-white shadow-xl shadow-indigo-100 ring-4 ring-indigo-50">
-                        <Shield className="w-8 h-8" />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">SaaS Command Center</h1>
-                        <div className="flex items-center gap-3 mt-1.5">
-                            <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
-                                <Building className="w-3.5 h-3.5" /> {companies.length} Organizaciones
-                            </span>
-                            <span className="w-1 h-1 rounded-full bg-slate-200"></span>
-                            <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Sistema Operativo
-                            </span>
-                        </div>
-                    </div>
-                </div>
+        <div className="space-y-5 max-w-[1600px] mx-auto p-6">
 
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-64">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            {/* ── Header ── */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                <div>
+                    <h1 className="text-2xl font-black text-slate-900">Empresas</h1>
+                    <p className="text-sm text-slate-400 mt-0.5">{companies.length} organizaciones registradas</p>
+                </div>
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-60">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
                             placeholder="Buscar empresa..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full h-12 pl-11 pr-4 bg-slate-50 border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-bold text-sm"
+                            className="w-full h-10 pl-9 pr-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
                         />
                     </div>
+                    <select
+                        value={statusFilter}
+                        onChange={e => setStatusFilter(e.target.value as LicenseStatus | 'all')}
+                        className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 cursor-pointer"
+                    >
+                        <option value="all">Todos</option>
+                        <option value="active">Activos</option>
+                        <option value="trial">Prueba</option>
+                        <option value="expired">Expirados</option>
+                        <option value="manual_hold">Retenidos</option>
+                    </select>
                     <Button
                         onClick={() => { resetForm(); setIsModalOpen(true); }}
-                        className="bg-[#4449AA] hover:bg-[#3b3f94] text-white font-black px-8 rounded-2xl shadow-2xl shadow-indigo-100 h-12 border-0"
+                        className="bg-[#4449AA] hover:bg-[#3b3f94] text-white font-bold px-5 rounded-xl h-10 border-0 text-sm"
                     >
-                        <Plus className="w-5 h-5 mr-2" />
-                        Registrar
+                        <Plus className="w-4 h-4 mr-1.5" />
+                        Nueva empresa
                     </Button>
                 </div>
             </div>
 
-            {/* Main Table */}
-            <div className="bg-white shadow-2xl shadow-slate-200/60 rounded-[2.5rem] overflow-hidden border border-slate-200/50">
+            {/* ── Table ── */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                 <div ref={companiesWrapperRef} className="arias-table-wrapper">
                     <div ref={companiesTableRef} className="arias-table">
                         <table className="divide-y divide-slate-100 text-left" style={{ tableLayout: 'fixed', width: Object.keys(DEFAULT_COL_WIDTHS).reduce((s, k) => s + (columnWidths[k] ?? DEFAULT_COL_WIDTHS[k]), 160) }}>
-                            <thead className="bg-[#F8FAFC]">
+                            <thead className="bg-slate-50">
                                 <tr>
                                     {[
                                         { key: 'name', label: 'Organización' },
                                         { key: 'license_status', label: 'Suscripción' },
-                                        { key: 'max_users', label: 'Capacidad' },
-                                        { key: 'allowed_permissions', label: 'Módulos / Licencia' },
+                                        { key: 'max_users', label: 'Usuarios' },
+                                        { key: 'allowed_permissions', label: 'Módulos' },
                                     ].map(col => (
-                                        <th key={col.key} style={{ width: columnWidths[col.key] ?? DEFAULT_COL_WIDTHS[col.key] ?? 160, minWidth: 80 }} className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                        <th key={col.key} style={{ width: columnWidths[col.key] ?? DEFAULT_COL_WIDTHS[col.key] ?? 160, minWidth: 80, position: 'relative' }} className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                                             <div
-                                                className="cursor-pointer hover:text-[#4449AA] transition-colors group inline-flex items-center gap-1"
+                                                className="cursor-pointer hover:text-slate-700 inline-flex items-center gap-1"
                                                 onClick={() => setSortConfig({ key: col.key, direction: sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'desc' : 'asc' })}
                                             >
                                                 {col.label}
-                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === col.key ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === col.key ? 'text-[#4449AA]' : 'text-slate-300'}`} />
                                             </div>
-                                            <div onMouseDown={(e) => handleColResizeStart(e, col.key)} onMouseEnter={(e) => { const b = e.currentTarget.querySelector('div') as HTMLElement | null; if (b) b.style.background = '#a5b4fc'; }} onMouseLeave={(e) => { const b = e.currentTarget.querySelector('div') as HTMLElement | null; if (b) b.style.background = 'rgba(203,213,225,0.2)'; }} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 10, cursor: 'col-resize', zIndex: 10, userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 1, height: '50%', borderRadius: 2, background: 'rgba(203,213,225,0.2)', transition: 'background 0.15s' }} /></div>
+                                            <div onMouseDown={(e) => handleColResizeStart(e, col.key)} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 8, cursor: 'col-resize', zIndex: 10, userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <div style={{ width: 1, height: '50%', background: 'rgba(203,213,225,0.5)', borderRadius: 2 }} />
+                                            </div>
                                         </th>
                                     ))}
-                                    <th style={{ width: 160, minWidth: 130 }} className="relative px-8 py-6 text-center font-black text-slate-400 text-[11px] uppercase tracking-[0.2em]">Gestionar</th>
+                                    <th style={{ width: 160, minWidth: 130 }} className="px-5 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-slate-50">
+                            <tbody className="divide-y divide-slate-50">
+                                {filteredCompanies.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="px-5 py-16 text-center text-sm text-slate-400">
+                                            No hay empresas registradas
+                                        </td>
+                                    </tr>
+                                )}
                                 {filteredCompanies.map((company: any) => (
-                                    <tr key={company.id} className="hover:bg-slate-50/50 transition-all duration-300 group">
-                                        <td className="px-8 py-6 overflow-hidden" style={{ maxWidth: columnWidths['name'] ?? 260 }}>
+                                    <tr key={company.id} className="hover:bg-slate-50/60 transition-colors">
+                                        <td className="px-5 py-4 overflow-hidden" style={{ maxWidth: columnWidths['name'] ?? 260 }}>
                                             <div className="flex items-center gap-3 min-w-0">
-                                                <div className="flex-shrink-0 h-14 w-14 bg-indigo-50 rounded-[1.25rem] flex items-center justify-center text-[#4449AA] border border-indigo-100/50 shadow-sm transition-all group-hover:scale-110 group-hover:rotate-3 shadow-indigo-50">
-                                                    <Building className="h-6 w-6" />
+                                                <div className="flex-shrink-0 w-9 h-9 bg-indigo-50 rounded-xl flex items-center justify-center text-[#4449AA] border border-indigo-100">
+                                                    <Building className="w-4 h-4" />
                                                 </div>
-                                                <div className="flex flex-col min-w-0">
-                                                    <div className="text-lg font-black text-slate-900 leading-none mb-1.5 truncate" title={company.name}>{company.name}</div>
-                                                    <div className="flex items-center gap-2 min-w-0">
-                                                        <span className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase truncate">ID: {company.id.slice(0, 8)}</span>
-                                                        <span className="w-1 h-1 rounded-full bg-slate-200 shrink-0"></span>
-                                                        <span className="text-[10px] text-slate-400 font-bold shrink-0">Desde {format(new Date(company.created_at), 'MM/yyyy')}</span>
-                                                    </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-bold text-slate-900 truncate" title={company.name}>{company.name}</div>
+                                                    <div className="text-[11px] text-slate-400 truncate">Desde {format(new Date(company.created_at), 'MM/yyyy')}</div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-6 whitespace-nowrap">
-                                            <span className={`px-4 py-1.5 inline-flex text-[10px] font-black uppercase tracking-[0.1em] rounded-full border shadow-sm ${getStatusColor(company.license_status)}`}>
-                                                {company.license_status === 'active' ? '● Activa' : company.license_status}
+                                        <td className="px-5 py-4 whitespace-nowrap">
+                                            <span className={`px-2.5 py-1 inline-flex text-[10px] font-bold uppercase tracking-wide rounded-full border ${getStatusColor(company.license_status)}`}>
+                                                {company.license_status === 'active' ? 'Activa' : company.license_status}
                                             </span>
                                         </td>
-                                        <td className="px-8 py-6 whitespace-nowrap">
-                                            <div className="flex flex-col gap-2">
-                                                <div className="flex items-center justify-between gap-3 mb-1">
-                                                    <span className="text-xs font-black text-slate-700">{company.user_count || 0} de {company.max_users || 5}</span>
-                                                    <span className="text-[10px] font-bold text-slate-300 uppercase italic">Usuarios</span>
-                                                </div>
-                                                <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+                                        <td className="px-5 py-4 whitespace-nowrap">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-bold text-slate-700">{company.user_count || 0}/{company.max_users || 5}</span>
+                                                <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                                     <div
-                                                        className={`h-full transition-all duration-700 ${(company.user_count || 0) >= (company.max_users || 5) ? 'bg-rose-500' : 'bg-indigo-600 shadow-[0_0_10px_rgba(79,70,229,0.3)]'
-                                                            }`}
+                                                        className={`h-full rounded-full ${(company.user_count || 0) >= (company.max_users || 5) ? 'bg-rose-400' : 'bg-[#4449AA]'}`}
                                                         style={{ width: `${Math.min(100, ((company.user_count || 0) / (company.max_users || 5)) * 100)}%` }}
                                                     />
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-8 py-6">
-                                            <div className="flex flex-wrap gap-1.5 max-w-[240px]">
+                                        <td className="px-5 py-4">
+                                            <div className="flex flex-wrap gap-1 max-w-[220px]">
                                                 {((company.allowed_permissions as string[]) || []).map(p => {
                                                     const config = MODULES_CONFIG.find(m => m.key === p);
                                                     return (
                                                         <div
                                                             key={p}
                                                             title={config?.label || p}
-                                                            className={`w-7 h-7 rounded-lg flex items-center justify-center border shadow-sm transition-transform hover:scale-110 ${config ? 'bg-white border-slate-200' : 'bg-slate-50 border-transparent'
-                                                                }`}
+                                                            className="w-6 h-6 rounded-lg flex items-center justify-center bg-white border border-slate-200"
                                                         >
                                                             {config ? (
-                                                                <config.icon className={`w-3.5 h-3.5 ${config.color}`} />
+                                                                <config.icon className={`w-3 h-3 ${config.color}`} />
                                                             ) : (
-                                                                <span className="text-[8px] font-black text-slate-300">{p.slice(0, 2)}</span>
+                                                                <span className="text-[8px] font-bold text-slate-400">{p.slice(0, 2)}</span>
                                                             )}
                                                         </div>
                                                     );
                                                 })}
                                                 {((company.allowed_permissions as string[]) || []).length === 0 && (
-                                                    <span className="text-[10px] font-bold text-slate-300 italic uppercase">Sin Licencia</span>
+                                                    <span className="text-[11px] text-slate-300 italic">Sin módulos</span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-8 py-6 whitespace-nowrap text-center">
-                                            <button
-                                                onClick={async () => {
-                                                    setEditingCompanyId(company.id);
-                                                    setFormData({
-                                                        name: company.name,
-                                                        license_status: company.license_status,
-                                                        tax_id: company.tax_id || '',
-                                                        phone: company.phone || '',
-                                                        address: company.address || '',
-                                                        max_users: company.max_users || 5,
-                                                        allowed_permissions: Array.isArray(company.allowed_permissions) ? company.allowed_permissions : [],
-                                                        admin_email: '',
-                                                        admin_password: '',
-                                                        admin_full_name: ''
-                                                    });
-                                                    // Solo cargar ADMINS de la empresa (no colaboradores)
-                                                    const { data: members } = await supabase
-                                                        .from('profiles')
-                                                        .select('id, email, full_name, role, phone, address, created_at')
-                                                        .eq('company_id', company.id)
-                                                        .in('role', ['company_admin', 'super_admin'])
-                                                        .eq('status', 'active')
-                                                        .order('created_at', { ascending: true });
-                                                    setCompanyMembers(members || []);
-                                                    setActiveTab('info');
-                                                    setIsModalOpen(true);
-                                                }}
-                                                className="h-12 px-5 group/btn inline-flex items-center justify-center gap-2 bg-slate-50 text-slate-400 hover:text-[#4449AA] hover:bg-indigo-50 rounded-2xl transition-all border border-transparent hover:border-indigo-100 font-black text-[11px] uppercase tracking-widest"
-                                            >
-                                                <Settings className="h-4.5 w-4.5 group-hover/btn:rotate-90 transition-transform duration-500" />
-                                                <span>Editar</span>
-                                            </button>
+                                        <td className="px-5 py-4 text-center whitespace-nowrap">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <button
+                                                    onClick={async () => {
+                                                        setEditingCompanyId(company.id);
+                                                        setFormData({
+                                                            name: company.name,
+                                                            license_status: company.license_status,
+                                                            tax_id: company.tax_id || '',
+                                                            phone: company.phone || '',
+                                                            address: company.address || '',
+                                                            max_users: company.max_users || 5,
+                                                            allowed_permissions: Array.isArray(company.allowed_permissions) ? company.allowed_permissions : [],
+                                                            admin_email: '',
+                                                            admin_password: '',
+                                                            admin_full_name: ''
+                                                        });
+                                                        const { data: members } = await supabase
+                                                            .from('profiles')
+                                                            .select('id, email, full_name, role, phone, address, created_at')
+                                                            .eq('company_id', company.id)
+                                                            .in('role', ['company_admin', 'super_admin'])
+                                                            .eq('status', 'active')
+                                                            .order('created_at', { ascending: true });
+                                                        setCompanyMembers(members || []);
+                                                        setActiveTab('info');
+                                                        setIsModalOpen(true);
+                                                    }}
+                                                    className="h-8 px-3 inline-flex items-center gap-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-500 hover:text-[#4449AA] rounded-lg transition-colors text-[11px] font-bold"
+                                                >
+                                                    <Settings className="w-3.5 h-3.5" />
+                                                    Editar
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDeleteConfirm({ company, typedName: '', loading: false })}
+                                                    className="h-8 w-8 inline-flex items-center justify-center bg-slate-100 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                                                    title="Eliminar empresa"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -561,161 +564,115 @@ export default function Companies() {
                 </div>
             </div>
 
-            {/* Redesigned Modal */}
+            {/* ── Modal ── */}
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                title={editingCompanyId ? 'Administración Comercial & Licencias' : 'Alta de Nueva Empresa'}
-                className="max-w-5xl"
+                title={editingCompanyId ? 'Editar Empresa' : 'Nueva Empresa'}
+                className="max-w-3xl"
             >
-                <div className="flex flex-col h-full max-h-[85vh] -mx-1">
-                    {/* Tabs Header - Premium Design */}
-                    <div className="flex items-center gap-2 bg-slate-100/50 p-2 rounded-2xl mb-8">
-                        <button
-                            onClick={() => setActiveTab('info')}
-                            className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all duration-300 ${activeTab === 'info'
-                                ? 'bg-white text-[#4449AA] shadow-xl shadow-slate-200/50 ring-1 ring-slate-100 translate-y-[-1px]'
-                                : 'text-slate-400 hover:bg-white/80'
+                <div className="flex flex-col max-h-[80vh]">
+                    {/* Tabs */}
+                    <div className="flex gap-1 border-b border-slate-100 mb-5 -mt-1">
+                        {[
+                            { key: 'info', label: 'Información', icon: Info },
+                            { key: 'license', label: 'Licencias', icon: Shield },
+                            { key: 'admin', label: editingCompanyId ? 'Administrador' : 'Admin Inicial', icon: KeyRound },
+                        ].map(tab => (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setActiveTab(tab.key as any)}
+                                className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold transition-all border-b-2 -mb-px ${
+                                    activeTab === tab.key
+                                        ? 'border-[#4449AA] text-[#4449AA]'
+                                        : 'border-transparent text-slate-400 hover:text-slate-600'
                                 }`}
-                        >
-                            <Info className={`w-4 h-4 ${activeTab === 'info' ? 'text-indigo-600' : 'text-slate-300'}`} />
-                            Perfil Corporativo
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('license')}
-                            className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all duration-300 ${activeTab === 'license'
-                                ? 'bg-[#4449AA] text-white shadow-2xl shadow-indigo-200 translate-y-[-1px]'
-                                : 'text-slate-400 hover:bg-white/80'
-                                }`}
-                        >
-                            <Shield className={`w-4 h-4 ${activeTab === 'license' ? 'text-white' : 'text-slate-300'}`} />
-                            Licencia de Módulos
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('admin')}
-                            className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all duration-300 ${activeTab === 'admin'
-                                ? 'bg-emerald-600 text-white shadow-2xl shadow-emerald-200 translate-y-[-1px]'
-                                : 'text-slate-400 hover:bg-white/80'
-                                }`}
-                        >
-                            <KeyRound className={`w-4 h-4 ${activeTab === 'admin' ? 'text-white' : 'text-slate-300'}`} />
-                            {editingCompanyId ? 'Agregar Admin' : 'Admin Inicial'}
-                        </button>
+                            >
+                                <tab.icon className="w-3.5 h-3.5" />
+                                {tab.label}
+                            </button>
+                        ))}
                     </div>
 
-                    <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
-                        <div className="flex-1 overflow-y-auto px-2 space-y-8 pb-4 scroll-smooth">
+                    <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+                        <div className="flex-1 overflow-y-auto space-y-4 pb-2 pr-1">
+
+                            {/* ── Tab: Info ── */}
                             {activeTab === 'info' && (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <div className="grid grid-cols-2 gap-x-6 gap-y-5">
-                                        <div className="col-span-2">
-                                            <div className="flex items-center justify-between mb-2 px-1">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <Building className="w-3.5 h-3.5" /> Nombre Legal
-                                                </label>
-                                                <span className="text-[9px] font-bold text-rose-400 uppercase">* Requerido</span>
-                                            </div>
-                                            <Input
-                                                required
-                                                value={formData.name}
-                                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                placeholder="Ej: Arias Defense Logistics"
-                                                className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white transition-all shadow-sm text-lg"
-                                            />
-                                        </div>
-
-                                        <div className="space-y-5">
-                                            <div>
-                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Plan de Suscripción</label>
-                                                <select
-                                                    value={formData.license_status}
-                                                    onChange={(e) => {
-                                                        const newStatus = e.target.value as LicenseStatus;
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            license_status: newStatus,
-                                                            // Auto-set default modules for NEW companies only
-                                                            // Editing an existing company preserves their current modules
-                                                            ...(!editingCompanyId && {
-                                                                allowed_permissions: PLAN_DEFAULT_MODULES[newStatus] ?? []
-                                                            })
-                                                        }));
-                                                    }}
-                                                    className="w-full h-14 px-5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-black text-sm transition-all focus:bg-white text-slate-700 shadow-sm appearance-none cursor-pointer"
-                                                >
-                                                    <option value="active">🟢 ACTIVA (Full Service)</option>
-                                                    <option value="trial">🔵 PRUEBA (Limitada)</option>
-                                                    <option value="expired">🔴 EXPIRADA (Bloqueada)</option>
-                                                    <option value="manual_hold">🟠 RETENIDO (Revisión)</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Cuota de Usuarios</label>
-                                                <div className="relative">
-                                                    <Users className="absolute left-5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-300" />
-                                                    <Input
-                                                        type="number"
-                                                        required
-                                                        min={1}
-                                                        value={formData.max_users}
-                                                        onChange={(e) => setFormData({ ...formData, max_users: parseInt(e.target.value) })}
-                                                        className="h-14 pl-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white shadow-sm"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-5">
-                                            <div>
-                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Tax ID / RNC</label>
-                                                <Input
-                                                    value={formData.tax_id}
-                                                    onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
-                                                    placeholder="001-XXXXXXX-X"
-                                                    className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 shadow-sm"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Teléfono Corporativo</label>
-                                                <Input
-                                                    value={formData.phone}
-                                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                                    placeholder="+503 XXXX-XXXX"
-                                                    className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 shadow-sm"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="col-span-2">
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Dirección</label>
-                                            <Input
-                                                value={formData.address}
-                                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                                placeholder="Dirección de la empresa"
-                                                className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 shadow-sm"
-                                            />
-                                        </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Nombre de la empresa *</label>
+                                        <Input
+                                            required
+                                            value={formData.name}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            placeholder="Ej: Arias Defense Logistics"
+                                            className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Plan de suscripción</label>
+                                        <select
+                                            value={formData.license_status}
+                                            onChange={(e) => {
+                                                const s = e.target.value as LicenseStatus;
+                                                setFormData(prev => ({ ...prev, license_status: s, ...(!editingCompanyId && { allowed_permissions: PLAN_DEFAULT_MODULES[s] ?? [] }) }));
+                                            }}
+                                            className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                                        >
+                                            <option value="active">🟢 Activa</option>
+                                            <option value="trial">🔵 Prueba</option>
+                                            <option value="expired">🔴 Expirada</option>
+                                            <option value="manual_hold">🟠 Retenida</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Máx. usuarios</label>
+                                        <Input
+                                            type="number"
+                                            required
+                                            min={1}
+                                            value={formData.max_users}
+                                            onChange={(e) => setFormData({ ...formData, max_users: parseInt(e.target.value) })}
+                                            className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Tax ID / RNC</label>
+                                        <Input
+                                            value={formData.tax_id}
+                                            onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                                            placeholder="001-XXXXXXX-X"
+                                            className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Teléfono</label>
+                                        <Input
+                                            value={formData.phone}
+                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                            placeholder="+503 XXXX-XXXX"
+                                            className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">Dirección</label>
+                                        <Input
+                                            value={formData.address}
+                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                            placeholder="Dirección de la empresa"
+                                            className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                        />
                                     </div>
                                 </div>
                             )}
-                            {activeTab === 'license' && (
-                                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <div className="bg-indigo-600 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-100 ring-1 ring-white/10 group">
-                                        <div className="absolute top-[-20%] right-[-10%] w-60 h-60 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
-                                        <div className="relative z-10">
-                                            <div className="flex items-center gap-3 mb-3">
-                                                <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center">
-                                                    <XCircle className="w-6 h-6 text-gray-300" />
-                                                </div>
-                                                <h4 className="text-sm font-black uppercase tracking-[0.2em] opacity-90">Configuración de Acceso Maestro</h4>
-                                            </div>
-                                            <p className="text-[13px] font-bold text-indigo-100 leading-relaxed max-w-lg">
-                                                Selecciona los módulos autorizados para esta licencia. Los módulos bloqueados no serán visibles para ningún usuario, incluyendo administradores locales.
-                                            </p>
-                                        </div>
-                                    </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* ── Tab: Licencias ── */}
+                            {activeTab === 'license' && (
+                                <div className="space-y-3">
+                                    <p className="text-xs text-slate-500">Selecciona los módulos habilitados para esta empresa. Los módulos desactivados no serán visibles para ningún usuario.</p>
+                                    <div className="grid grid-cols-2 gap-2">
                                         {MODULES_CONFIG.map((module) => {
                                             const isActive = formData.allowed_permissions?.includes(module.key);
                                             return (
@@ -723,43 +680,37 @@ export default function Companies() {
                                                     key={module.key}
                                                     type="button"
                                                     onClick={() => toggleModule(module.key)}
-                                                    className={`p-5 rounded-[2rem] border-2 flex items-center gap-5 transition-all duration-300 text-left group/mod ${isActive
-                                                        ? 'bg-white border-indigo-500 shadow-xl shadow-indigo-50 translate-y-[-4px]'
-                                                        : 'bg-slate-50/50 border-slate-100 grayscale hover:grayscale-0 hover:bg-white hover:border-slate-200'
-                                                        }`}
+                                                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                                                        isActive
+                                                            ? 'bg-indigo-50 border-indigo-200'
+                                                            : 'bg-white border-slate-200 hover:bg-slate-50'
+                                                    }`}
                                                 >
-                                                    <div className={`w-14 h-14 rounded-[1.5rem] flex items-center justify-center shrink-0 shadow-lg transition-all duration-500 border-2 ${isActive ? `${module.bg} ${module.color} border-indigo-100 scale-110` : 'bg-white text-slate-300 border-slate-100 group-hover/mod:scale-105'
-                                                        }`}>
-                                                        <module.icon className="w-7 h-7" />
+                                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isActive ? `${module.bg}` : 'bg-slate-100'}`}>
+                                                        <module.icon className={`w-3.5 h-3.5 ${isActive ? module.color : 'text-slate-400'}`} />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className={`text-[13px] font-black uppercase tracking-tight truncate ${isActive ? 'text-slate-900' : 'text-slate-400'}`}>
-                                                            {module.label}
-                                                        </p>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-indigo-500' : 'bg-slate-200'}`}></div>
-                                                            <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'text-indigo-600' : 'text-slate-300 italic'}`}>
-                                                                {isActive ? 'Activo' : 'Desactivado'}
-                                                            </span>
-                                                        </div>
+                                                        <p className={`text-xs font-bold truncate ${isActive ? 'text-slate-800' : 'text-slate-500'}`}>{module.label}</p>
+                                                    </div>
+                                                    <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${isActive ? 'bg-[#4449AA] border-[#4449AA]' : 'border-slate-300'}`}>
+                                                        {isActive && <div className="w-full h-full rounded-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-white rounded-full" /></div>}
                                                     </div>
                                                 </button>
                                             );
                                         })}
                                     </div>
+                                    <p className="text-[11px] text-slate-400">{formData.allowed_permissions?.length || 0} de {MODULES_CONFIG.length} módulos activos</p>
                                 </div>
                             )}
+
+                            {/* ── Tab: Admin ── */}
                             {activeTab === 'admin' && (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    {/* User selector - only when editing existing company */}
+                                <div className="space-y-4">
+                                    {/* Selector de usuario existente */}
                                     {editingCompanyId && companyMembers.length > 0 && (
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between px-1">
-                                                <div className="flex items-center gap-2">
-                                                    <Shield className="w-4 h-4 text-indigo-400" />
-                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Administradores ({companyMembers.length})</h4>
-                                                </div>
-                                                <span className="text-[9px] text-slate-300 font-bold">Colaboradores → Panel Equipo</span>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 mb-2">Administradores ({companyMembers.length})</label>
+                                            <div className="flex flex-wrap gap-2 mb-3">
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -769,25 +720,21 @@ export default function Companies() {
                                                         setFormData(prev => ({ ...prev, admin_full_name: '', admin_email: '', admin_password: '' }));
                                                         setMemberEditData({ full_name: '', email: '', phone: '', role: 'company_admin', address: '' });
                                                     }}
-                                                    className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all ${!editingMemberId
-                                                        ? 'bg-emerald-100 text-emerald-600 ring-2 ring-emerald-200'
-                                                        : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-500'
-                                                        }`}
+                                                    className={`h-7 px-3 rounded-full text-[11px] font-bold border transition-all ${
+                                                        !editingMemberId
+                                                            ? 'bg-[#4449AA] text-white border-[#4449AA]'
+                                                            : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                                                    }`}
                                                 >
-                                                    + Nuevo Admin
+                                                    + Nuevo admin
                                                 </button>
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
                                                 {companyMembers.map(member => (
                                                     <button
                                                         key={member.id}
                                                         type="button"
-                                                         onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
+                                                        onClick={() => {
                                                             setEditingMemberId(member.id);
                                                             setShowPasswordPanel(false);
-                                                            setNewPassword('');
                                                             setFormData(prev => ({
                                                                 ...prev,
                                                                 admin_full_name: member.full_name || '',
@@ -797,317 +744,245 @@ export default function Companies() {
                                                             setMemberEditData({
                                                                 full_name: member.full_name || '',
                                                                 email: member.email || '',
-                                                                phone: (member as any).phone || '',
-                                                                role: member.role,
-                                                                address: (member as any).address || ''
+                                                                phone: '',
+                                                                role: member.role || 'company_admin',
+                                                                address: ''
                                                             });
                                                         }}
-                                                        className={`flex items-center gap-3 rounded-2xl px-4 py-3 border transition-all duration-200 ${editingMemberId === member.id
-                                                            ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-100 shadow-md'
-                                                            : 'bg-slate-50/80 border-slate-100 hover:bg-white hover:border-slate-200 hover:shadow-sm'
-                                                            }`}
+                                                        className={`h-7 px-3 rounded-full text-[11px] font-bold border transition-all ${
+                                                            editingMemberId === member.id
+                                                                ? 'bg-emerald-500 text-white border-emerald-500'
+                                                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                                                        }`}
                                                     >
-                                                        <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                                                            <span className="text-[11px] font-black text-indigo-600">{(member.full_name || member.email || '?')[0].toUpperCase()}</span>
-                                                        </div>
-                                                        <div className="text-left">
-                                                            <p className="text-[12px] font-bold text-slate-800 truncate">{member.full_name || 'Sin nombre'}</p>
-                                                            <p className="text-[10px] text-slate-400 truncate">{member.email}</p>
-                                                        </div>
-                                                        {editingMemberId === member.id && <Pencil className="w-3 h-3 text-indigo-400" />}
+                                                        {member.full_name?.split(' ')[0] || member.email}
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
 
-                                    {/* Title banner */}
-                                    <div className={`${editingMemberId ? 'bg-indigo-600' : 'bg-emerald-600'} rounded-3xl p-6 text-white relative overflow-hidden shadow-2xl ${editingMemberId ? 'shadow-indigo-100' : 'shadow-emerald-100'} ring-1 ring-white/10 group`}>
-                                        <div className="absolute top-[-20%] right-[-10%] w-60 h-60 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
-                                        <div className="relative z-10 flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                                                {editingMemberId ? <Pencil className="w-5 h-5 text-white" /> : <KeyRound className="w-5 h-5 text-white" />}
-                                            </div>
-                                            <div>
-                                                <h4 className="text-sm font-black uppercase tracking-[0.15em] opacity-90">
-                                                    {editingMemberId
-                                                        ? 'Editando Usuario Existente'
-                                                        : editingCompanyId
-                                                            ? 'Agregar Nuevo Administrador'
-                                                            : 'Administrador Inicial'}
-                                                </h4>
-                                                <p className="text-[11px] font-bold opacity-70 mt-0.5">
-                                                    {editingMemberId
-                                                        ? 'Modifica los datos y presiona Guardar abajo.'
-                                                        : editingCompanyId
-                                                            ? 'Deja vacío si no deseas agregar un nuevo admin.'
-                                                            : 'Configura las credenciales del primer administrador.'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Unified form fields */}
-                                    <div className="grid grid-cols-2 gap-x-6 gap-y-5">
-                                        <div className="col-span-2">
-                                            <div className="flex items-center mb-2 px-1">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <User className="w-3.5 h-3.5" /> Nombre Completo
-                                                </label>
-                                            </div>
-                                            <Input
-                                                value={editingMemberId ? memberEditData.full_name : formData.admin_full_name}
-                                                onChange={(e) => {
-                                                    if (editingMemberId) {
-                                                        setMemberEditData(prev => ({ ...prev, full_name: e.target.value }));
-                                                    } else {
-                                                        setFormData({ ...formData, admin_full_name: e.target.value });
-                                                    }
-                                                }}
-                                                placeholder="Ej: Juan Pérez"
-                                                className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white transition-all shadow-sm text-lg"
-                                            />
-                                        </div>
-                                        <div className="col-span-2">
-                                            <div className="flex items-center justify-between mb-2 px-1">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <Mail className="w-3.5 h-3.5" /> Email de Acceso
-                                                </label>
-                                                {!editingMemberId && !editingCompanyId && <span className="text-[9px] font-bold text-rose-400 uppercase">* Requerido</span>}
-                                            </div>
-                                            <Input
-                                                type="email"
-                                                value={editingMemberId ? memberEditData.email : formData.admin_email}
-                                                onChange={(e) => {
-                                                    if (editingMemberId) {
-                                                        setMemberEditData(prev => ({ ...prev, email: e.target.value }));
-                                                    } else {
-                                                        setFormData({ ...formData, admin_email: e.target.value });
-                                                    }
-                                                }}
-                                                placeholder="admin@empresa.com"
-                                                className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white shadow-sm"
-                                            />
-                                        </div>
-                                        {/* Premium password for new admin creation only */}
-                                        {!editingMemberId && (
-                                        <div className="col-span-2">
-                                            <div className="flex items-center justify-between mb-2 px-1">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <Lock className="w-3.5 h-3.5" /> Contraseña
-                                                </label>
-                                                {!editingCompanyId && <span className="text-[9px] font-bold text-rose-400 uppercase">* Requerido</span>}
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={formData.admin_password}
-                                                    onChange={(e) => setFormData({ ...formData, admin_password: e.target.value })}
-                                                    placeholder="Mínimo 6 caracteres..."
-                                                    className="flex-1 h-14 px-5 rounded-2xl bg-slate-50 border border-slate-200 font-mono font-bold text-base text-indigo-700 tracking-widest outline-none focus:border-indigo-300 focus:bg-white transition-all shadow-sm"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setFormData({ ...formData, admin_password: generatePassword() })}
-                                                    className="h-14 px-5 rounded-2xl border border-orange-200 bg-white text-orange-500 hover:bg-orange-50 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest shrink-0 shadow-sm"
-                                                    title="Generar contraseña automática"
-                                                >
-                                                    <KeyRound className="w-3.5 h-3.5" />
-                                                    Auto
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { if (formData.admin_password) { navigator.clipboard.writeText(formData.admin_password); toast.success('¡Contraseña copiada!'); } else { toast.error('Genera una contraseña primero'); } }}
-                                                    className="h-14 px-5 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest shrink-0 shadow-sm"
-                                                    title="Copiar contraseña"
-                                                >
-                                                    <Copy className="w-3.5 h-3.5" />
-                                                    Copiar
-                                                </button>
-                                            </div>
-                                            {formData.admin_password && formData.admin_password.length >= 6 && (
-                                                <p className="text-[10px] text-orange-400 font-medium mt-2 ml-1">
-                                                    ⚠️ Guarda esta contraseña — no podrás verla después de guardar.
-                                                </p>
-                                            )}
-                                        </div>
-                                        )}
-
-                                        {/* Extra fields visible when editing an existing user */}
-                                        {editingMemberId && (
-                                            <>
+                                    {/* Formulario de admin (nuevo o editar existente) */}
+                                    {editingMemberId ? (
+                                        // Editar miembro existente
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-2 gap-3">
                                                 <div>
-                                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Teléfono</label>
+                                                    <label className="block text-xs font-bold text-slate-500 mb-1">Nombre completo</label>
+                                                    <Input
+                                                        value={memberEditData.full_name}
+                                                        onChange={e => setMemberEditData(prev => ({ ...prev, full_name: e.target.value }))}
+                                                        placeholder="Nombre del administrador"
+                                                        className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 mb-1">Email</label>
+                                                    <Input
+                                                        type="email"
+                                                        value={memberEditData.email}
+                                                        onChange={e => setMemberEditData(prev => ({ ...prev, email: e.target.value }))}
+                                                        placeholder="email@empresa.com"
+                                                        className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-500 mb-1">Teléfono</label>
                                                     <Input
                                                         value={memberEditData.phone}
-                                                        onChange={(e) => setMemberEditData(prev => ({ ...prev, phone: e.target.value }))}
-                                                        placeholder="+1 809-000-0000"
-                                                        className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 shadow-sm"
+                                                        onChange={e => setMemberEditData(prev => ({ ...prev, phone: e.target.value }))}
+                                                        placeholder="+503 XXXX-XXXX"
+                                                        className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Rol</label>
+                                                    <label className="block text-xs font-bold text-slate-500 mb-1">Rol</label>
                                                     <select
                                                         value={memberEditData.role}
-                                                        onChange={(e) => setMemberEditData(prev => ({ ...prev, role: e.target.value }))}
-                                                        className="w-full h-14 px-5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-black text-sm transition-all focus:bg-white text-slate-700 shadow-sm appearance-none cursor-pointer"
+                                                        onChange={e => setMemberEditData(prev => ({ ...prev, role: e.target.value }))}
+                                                        className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-100"
                                                     >
-                                                        <option value="company_admin">🛡️ Administrador de Empresa</option>
+                                                        <option value="company_admin">Admin de Empresa</option>
+                                                        <option value="super_admin">Super Admin</option>
                                                     </select>
-                                                    <p className="text-[9px] text-slate-300 font-bold mt-1 ml-1">Colaboradores se gestionan desde el Panel de Equipo</p>
                                                 </div>
-                                                <div className="col-span-2">
-                                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Dirección</label>
-                                                    <Input
-                                                        value={memberEditData.address}
-                                                        onChange={(e) => setMemberEditData(prev => ({ ...prev, address: e.target.value }))}
-                                                        placeholder="Dirección del usuario"
-                                                        className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 shadow-sm"
-                                                    />
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
+                                            </div>
 
-                                    {/* ── Premium Password Reset Panel (existing users only) ── */}
-                                    {editingMemberId && (
-                                        <div className="mt-2">
+                                            {/* Password reset panel */}
                                             {!showPasswordPanel ? (
                                                 <button
                                                     type="button"
                                                     onClick={handleOpenPasswordPanel}
-                                                    className="h-12 px-6 rounded-2xl font-black text-[11px] uppercase tracking-widest border border-orange-200 text-orange-500 hover:bg-orange-50 transition-all flex items-center gap-2"
+                                                    className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-[#4449AA] transition-colors px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 hover:border-indigo-200"
                                                 >
-                                                    <KeyRound className="w-4 h-4" />
-                                                    Cambiar Contraseña
+                                                    <Lock className="w-3.5 h-3.5" />
+                                                    Restablecer contraseña
                                                 </button>
                                             ) : (
-                                                <div className="border border-orange-200 bg-orange-50/50 rounded-2xl p-6 animate-in slide-in-from-bottom-2 duration-200 space-y-5">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center">
-                                                            <KeyRound className="w-4 h-4 text-orange-500" />
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-black text-sm text-gray-900 uppercase tracking-tight">Restablecer Acceso</p>
-                                                            <p className="text-[10px] text-gray-400 font-medium">Elige el método según si el usuario tiene correo electrónico</p>
-                                                        </div>
-                                                        <button type="button" onClick={() => { setShowPasswordPanel(false); setNewPassword(''); }} className="ml-auto p-1.5 hover:bg-orange-100 rounded-lg transition-colors">
-                                                            <X className="w-4 h-4 text-gray-400" />
+                                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-xs font-bold text-slate-600">Nueva contraseña</p>
+                                                        <button type="button" onClick={() => setShowPasswordPanel(false)} className="text-slate-400 hover:text-slate-600">
+                                                            <X className="w-4 h-4" />
                                                         </button>
                                                     </div>
-
-                                                    {/* OPCIÓN A: Email link */}
-                                                    <div className="bg-white rounded-xl border border-green-100 p-4">
-                                                        <div className="flex items-start justify-between gap-4">
-                                                            <div className="flex-1">
-                                                                <p className="text-[11px] font-black text-green-700 uppercase tracking-widest flex items-center gap-1.5 mb-1">
-                                                                    <span className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-[9px] font-black">A</span>
-                                                                    Enviar enlace por correo <span className="text-[9px] text-green-500 font-bold normal-case tracking-normal">(Recomendado)</span>
-                                                                </p>
-                                                                <p className="text-[10px] text-gray-400">El usuario recibe un email y crea su propia contraseña. Más seguro — nadie más la conoce.</p>
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleSendEmailLink}
-                                                                disabled={isSendingEmailLink}
-                                                                className="h-10 px-5 rounded-xl bg-green-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-green-700 transition-all disabled:opacity-50 flex items-center gap-2 shrink-0"
-                                                            >
-                                                                {isSendingEmailLink ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                                                                Enviar Link
-                                                            </button>
-                                                        </div>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={newPassword}
+                                                            onChange={e => setNewPassword(e.target.value)}
+                                                            className="flex-1 h-9 px-3 bg-white border border-slate-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                                                        />
+                                                        <button type="button" onClick={() => setNewPassword(generatePassword())} className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-100">
+                                                            Generar
+                                                        </button>
+                                                        <button type="button" onClick={() => { navigator.clipboard.writeText(newPassword); toast.success('Copiado'); }} className="h-9 w-9 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-500 hover:bg-slate-100">
+                                                            <Copy className="w-3.5 h-3.5" />
+                                                        </button>
                                                     </div>
-
-                                                    {/* Divider */}
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="flex-1 h-px bg-orange-100" />
-                                                        <span className="text-[9px] font-black text-orange-300 uppercase tracking-widest">o si no tiene correo</span>
-                                                        <div className="flex-1 h-px bg-orange-100" />
-                                                    </div>
-
-                                                    {/* OPCIÓN B: Direct */}
-                                                    <div className="bg-white rounded-xl border border-orange-100 p-4 space-y-3">
-                                                        <p className="text-[11px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-1.5">
-                                                            <span className="w-4 h-4 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-[9px] font-black">B</span>
-                                                            Establecer contraseña manualmente
-                                                        </p>
-                                                        <p className="text-[10px] text-gray-400">Para usuarios sin correo electrónico. Comparte la contraseña de forma segura.</p>
-                                                        <div className="flex gap-2">
-                                                            <div className="relative flex-1">
-                                                                <input
-                                                                    type="text"
-                                                                    value={newPassword}
-                                                                    onChange={e => setNewPassword(e.target.value)}
-                                                                    placeholder="Mínimo 6 caracteres..."
-                                                                    className="w-full h-12 px-4 rounded-xl bg-white border border-orange-200 font-mono font-bold text-sm text-indigo-700 tracking-widest outline-none focus:border-orange-400 transition-all"
-                                                                />
-                                                            </div>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setNewPassword(generatePassword())}
-                                                                className="h-12 px-4 rounded-xl border border-orange-200 bg-white text-orange-500 hover:bg-orange-100 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest shrink-0"
-                                                            >
-                                                                <KeyRound className="w-3.5 h-3.5" />
-                                                                Auto
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => { navigator.clipboard.writeText(newPassword); toast.success('¡Copiado al portapapeles!'); }}
-                                                                className="h-12 px-4 rounded-xl border border-orange-200 bg-white text-gray-500 hover:bg-orange-100 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest shrink-0"
-                                                            >
-                                                                <Copy className="w-3.5 h-3.5" />
-                                                                Copiar
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleSaveNewPassword}
-                                                                disabled={isResettingPassword || newPassword.length < 6}
-                                                                className="h-12 px-5 rounded-xl bg-[#4449AA] text-white font-black text-[10px] uppercase tracking-widest hover:translate-y-[-1px] transition-all disabled:opacity-50 flex items-center gap-2 shrink-0"
-                                                            >
-                                                                {isResettingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                                                                {isResettingPassword ? 'Guardando...' : 'Guardar'}
-                                                            </button>
-                                                        </div>
-                                                        <p className="text-[10px] text-orange-400 font-medium mt-3">⚠️ Comparte esta contraseña con {companyMembers.find(m => m.id === editingMemberId)?.full_name?.split(' ')[0] || 'el usuario'} para que pueda ingresar.</p>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleSaveNewPassword}
+                                                            disabled={isResettingPassword}
+                                                            className="flex-1 h-9 bg-[#4449AA] text-white rounded-lg text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                                        >
+                                                            {isResettingPassword ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                                                            Guardar contraseña
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleSendEmailLink}
+                                                            disabled={isSendingEmailLink}
+                                                            className="flex-1 h-9 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1.5 hover:bg-slate-50"
+                                                        >
+                                                            {isSendingEmailLink ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                                                            Enviar por email
+                                                        </button>
                                                     </div>
                                                 </div>
                                             )}
                                         </div>
-                                    )}
-
-                                    {!editingMemberId && (
-                                        <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 flex items-start gap-3">
-                                            <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                            <p className="text-[12px] text-amber-700 font-bold leading-relaxed">
-                                                {editingCompanyId
-                                                    ? <>Deja los campos vacíos si no necesitas agregar un nuevo admin. Los usuarios existentes no serán afectados.</>
-                                                    : <>El administrador recibirá el rol <span className="font-black">Company Admin</span> y tendrá acceso completo a todos los módulos habilitados.</>
-                                                }
-                                            </p>
+                                    ) : (
+                                        // Nuevo admin
+                                        <div className="space-y-3">
+                                            {!editingCompanyId && (
+                                                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-700">
+                                                    <Shield className="w-4 h-4 shrink-0 mt-0.5" />
+                                                    <span>Se creará un administrador inicial para esta empresa. Podrás agregar más usuarios después.</span>
+                                                </div>
+                                            )}
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">Nombre completo</label>
+                                                <Input
+                                                    value={formData.admin_full_name}
+                                                    onChange={e => setFormData({ ...formData, admin_full_name: e.target.value })}
+                                                    placeholder="Nombre del administrador"
+                                                    className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">Email *</label>
+                                                <Input
+                                                    type="email"
+                                                    required={!editingCompanyId}
+                                                    value={formData.admin_email}
+                                                    onChange={e => setFormData({ ...formData, admin_email: e.target.value })}
+                                                    placeholder="admin@empresa.com"
+                                                    className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">Contraseña {!editingCompanyId && '*'}</label>
+                                                <Input
+                                                    type="password"
+                                                    required={!editingCompanyId}
+                                                    value={formData.admin_password}
+                                                    onChange={e => setFormData({ ...formData, admin_password: e.target.value })}
+                                                    placeholder="Mínimo 6 caracteres"
+                                                    className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl"
+                                                />
+                                            </div>
                                         </div>
                                     )}
                                 </div>
                             )}
                         </div>
 
-                        <div className="flex gap-6 pt-10 mt-6 border-t border-slate-100 shrink-0">
+                        {/* Footer */}
+                        <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 mt-4">
                             <button
                                 type="button"
-                                className="flex-1 h-14 rounded-2xl text-[11px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors"
+                                className="h-10 px-5 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-100 transition-colors"
                                 onClick={() => setIsModalOpen(false)}
                             >
                                 Cancelar
                             </button>
                             <Button
                                 type="submit"
-                                className="flex-[2] h-14 rounded-[1.5rem] bg-[#4449AA] hover:bg-[#3b3f94] text-white font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl shadow-indigo-200 border-0 hover:translate-y-[-2px] transition-all"
+                                className="h-10 px-6 rounded-xl bg-[#4449AA] hover:bg-[#3b3f94] text-white font-bold text-sm border-0"
                             >
-                                {editingCompanyId ? "Guardar Configuración Plan" : "Confirmar Alta de Empresa"}
+                                {editingCompanyId ? 'Guardar cambios' : 'Crear empresa'}
                             </Button>
                         </div>
                     </form>
                 </div>
             </Modal>
+
+            {/* ── Delete Confirmation ── */}
+            {deleteConfirm && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6 space-y-4">
+                        <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center shrink-0">
+                                <Trash2 className="w-5 h-5 text-rose-500" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-900">Eliminar empresa</h3>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Esta acción es <strong className="text-rose-600">irreversible</strong>. Escribe el nombre exacto para confirmar.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-200">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Nombre a confirmar</p>
+                            <p className="font-bold text-slate-900 text-sm">{deleteConfirm.company.name}</p>
+                        </div>
+
+                        <input
+                            type="text"
+                            autoFocus
+                            value={deleteConfirm.typedName}
+                            onChange={e => setDeleteConfirm(prev => prev ? { ...prev, typedName: e.target.value } : null)}
+                            onKeyDown={e => { if (e.key === 'Enter' && deleteConfirm.typedName === deleteConfirm.company.name) confirmDelete(); }}
+                            placeholder="Escribe el nombre aquí..."
+                            className="w-full h-10 px-3 bg-white border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-rose-400 transition-colors"
+                        />
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setDeleteConfirm(null)}
+                                disabled={deleteConfirm.loading}
+                                className="flex-1 h-10 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                disabled={deleteConfirm.typedName !== deleteConfirm.company.name || deleteConfirm.loading}
+                                className="flex-[2] h-10 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                            >
+                                {deleteConfirm.loading ? (
+                                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Eliminando...</>
+                                ) : (
+                                    <><Trash2 className="w-3.5 h-3.5" /> Eliminar permanentemente</>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
