@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { adminService } from '../../services/admin';
 import { supabase } from '../../services/supabase';
@@ -855,7 +855,6 @@ export default function Companies() {
                 </div>
             </Modal>
 
-            </Modal>
 
             {/* â”€â”€ Delete Confirmation â”€â”€ */}
             {deleteConfirm && (
@@ -868,7 +867,7 @@ export default function Companies() {
                             <div>
                                 <h3 className="text-sm font-bold text-slate-900">Eliminar empresa</h3>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    Esta acciÃ³n es <strong className="text-rose-600">irreversible</strong>. Escribe el nombre exacto para confirmar.
+                                    Esta acción es <strong className="text-rose-600">irreversible</strong>. Escribe el nombre exacto para confirmar.
                                 </p>
                             </div>
                         </div>
@@ -884,7 +883,7 @@ export default function Companies() {
                             value={deleteConfirm.typedName}
                             onChange={e => setDeleteConfirm(prev => prev ? { ...prev, typedName: e.target.value } : null)}
                             onKeyDown={e => { if (e.key === 'Enter' && deleteConfirm.typedName === deleteConfirm.company.name) confirmDelete(); }}
-                            placeholder="Escribe el nombre aquÃ­..."
+                            placeholder="Escribe el nombre aquí..."
                             className="w-full h-10 px-3 bg-white border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-rose-400 transition-colors"
                         />
 
