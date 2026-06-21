@@ -112,6 +112,15 @@ export const adminService = {
         if (error) throw error;
     },
 
+    async deleteCompany(id: string) {
+        const { error } = await supabase
+            .from('companies')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
     async getPermissionDefinitions() {
         const { data, error } = await supabase
             .from('permission_definitions')

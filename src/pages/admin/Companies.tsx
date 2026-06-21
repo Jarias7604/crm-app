@@ -48,10 +48,10 @@ const MODULES_CONFIG = [
     { key: 'branding', label: 'Marca de Empresa', icon: Building, color: 'text-slate-600', bg: 'bg-slate-50' },
     { key: 'pricing', label: 'Config. CRM', icon: Tag, color: 'text-cyan-600', bg: 'bg-cyan-50' },
     { key: 'paquetes', label: 'Paquetes / CRM', icon: Package, color: 'text-violet-600', bg: 'bg-violet-50' },
-    { key: 'items', label: 'CatÃ¡logo CRM', icon: Layers, color: 'text-sky-600', bg: 'bg-sky-50' },
+    { key: 'items', label: 'Catálogo CRM', icon: Layers, color: 'text-sky-600', bg: 'bg-sky-50' },
     { key: 'financial_rules', label: 'Reglas Financ.', icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { key: 'loss_reasons', label: 'Motivos de PÃ©rdida', icon: XCircle, color: 'text-slate-600', bg: 'bg-slate-50' },
-    { key: 'proyectos', label: 'GestiÃ³n de Proyectos', icon: Layers, color: 'text-indigo-700', bg: 'bg-indigo-50' },
+    { key: 'loss_reasons', label: 'Motivos de Pérdida', icon: XCircle, color: 'text-slate-600', bg: 'bg-slate-50' },
+    { key: 'proyectos', label: 'Gestión de Proyectos', icon: Layers, color: 'text-indigo-700', bg: 'bg-indigo-50' },
     { key: 'finanzas', label: 'Finanzas', icon: CreditCard, color: 'text-emerald-700', bg: 'bg-emerald-100' },
     { key: 'tickets', label: 'Service Hub', icon: Megaphone, color: 'text-orange-600', bg: 'bg-orange-50' },
     { key: 'reports', label: 'Reportes BI', icon: FileText, color: 'text-fuchsia-600', bg: 'bg-fuchsia-50' },
@@ -181,10 +181,10 @@ export default function Companies() {
                     setCompanyMembers(prev => prev.map(m =>
                         m.id === editingMemberId ? { ...m, ...profileUpdates } : m
                     ));
-                    toast.success('ðŸŽ‰ Empresa y usuario actualizados correctamente');
+                    toast.success('🎉 Empresa y usuario actualizados correctamente');
                 } else if (admin_email && admin_password) {
                     if (admin_password.length < 6) {
-                        toast.error('La contraseÃ±a debe tener al menos 6 caracteres');
+                        toast.error('La contraseña debe tener al menos 6 caracteres');
                         setActiveTab('admin');
                         return;
                     }
@@ -194,7 +194,7 @@ export default function Companies() {
                         full_name: admin_full_name || null,
                         company_id: editingCompanyId
                     });
-                    toast.success('ðŸŽ‰ Empresa actualizada y administrador creado');
+                    toast.success('🎉 Empresa actualizada y administrador creado');
                 } else {
                     toast.success('Empresa actualizada correctamente');
                 }
@@ -205,7 +205,7 @@ export default function Companies() {
                     return;
                 }
                 if (formData.admin_password.length < 6) {
-                    toast.error('La contraseÃ±a debe tener al menos 6 caracteres');
+                    toast.error('La contraseña debe tener al menos 6 caracteres');
                     setActiveTab('admin');
                     return;
                 }
@@ -221,7 +221,7 @@ export default function Companies() {
                     admin_password: formData.admin_password,
                     admin_full_name: formData.admin_full_name || null
                 });
-                toast.success('ðŸŽ‰ Empresa y administrador creados correctamente');
+                toast.success('🎉 Empresa y administrador creados correctamente');
             }
             setIsModalOpen(false);
             resetForm();
@@ -230,7 +230,7 @@ export default function Companies() {
             console.error('Failed to save company', error);
             const msg = error.message || '';
             if (msg.includes('users_email_partial_key') || msg.includes('email') && msg.includes('unique')) {
-                toast.error('âš ï¸ Ese email ya estÃ¡ registrado en el sistema. Usa un email diferente.');
+                toast.error('⚠️ Ese email ya está registrado en el sistema. Usa un email diferente.');
                 setActiveTab('admin');
             } else {
                 toast.error('Error: ' + (msg || 'Error al guardar la empresa'));
@@ -274,7 +274,7 @@ export default function Companies() {
         setIsSendingEmailLink(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error('No hay sesiÃ³n activa. Por favor cierra sesiÃ³n y vuelve a entrar.');
+            if (!session) throw new Error('No hay sesión activa. Por favor cierra sesión y vuelve a entrar.');
             const response = await fetch(
                 `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
                 {
@@ -289,10 +289,10 @@ export default function Companies() {
             );
             const result = await response.json();
             if (!response.ok || result.error) throw new Error(result.error || 'Error desconocido');
-            toast.success(`ðŸ“§ Enlace enviado al correo de ${member?.full_name?.split(' ')[0] || 'usuario'}.`, { duration: 8000 });
+            toast.success(`📧 Enlace enviado al correo de ${member?.full_name?.split(' ')[0] || 'usuario'}.`, { duration: 8000 });
             setShowPasswordPanel(false);
         } catch (error: any) {
-            toast.error(`âŒ ${error.message}`, { duration: 10000 });
+            toast.error(`❌ ${error.message}`, { duration: 10000 });
         } finally {
             setIsSendingEmailLink(false);
         }
@@ -300,14 +300,14 @@ export default function Companies() {
 
     const handleSaveNewPassword = async () => {
         if (!editingMemberId || !newPassword || newPassword.length < 6) {
-            toast.error('La contraseÃ±a debe tener al menos 6 caracteres.');
+            toast.error('La contraseña debe tener al menos 6 caracteres.');
             return;
         }
         const member = companyMembers.find(m => m.id === editingMemberId);
         setIsResettingPassword(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error('No hay sesiÃ³n activa. Por favor cierra sesiÃ³n y vuelve a entrar.');
+            if (!session) throw new Error('No hay sesión activa. Por favor cierra sesión y vuelve a entrar.');
             const response = await fetch(
                 `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
                 {
@@ -322,11 +322,11 @@ export default function Companies() {
             );
             const result = await response.json();
             if (!response.ok || result.error) throw new Error(result.error || 'Error desconocido');
-            toast.success(`âœ… Â¡${member?.full_name?.split(' ')[0] || 'Usuario'} ya puede ingresar con la nueva contraseÃ±a!`, { duration: 6000 });
+            toast.success(`✅ ¡${member?.full_name?.split(' ')[0] || 'Usuario'} ya puede ingresar con la nueva contraseña!`, { duration: 6000 });
             setShowPasswordPanel(false);
             setNewPassword('');
         } catch (error: any) {
-            toast.error(`âŒ ${error.message}`, { duration: 10000 });
+            toast.error(`❌ ${error.message}`, { duration: 10000 });
         } finally {
             setIsResettingPassword(false);
         }
@@ -386,7 +386,7 @@ export default function Companies() {
     return (
         <div className="space-y-5 max-w-[1600px] mx-auto p-6">
 
-            {/* â”€â”€ Header â”€â”€ */}
+            {/* ── Header ── */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                 <div>
                     <h1 className="text-2xl font-black text-slate-900">Empresas</h1>
@@ -424,7 +424,7 @@ export default function Companies() {
                 </div>
             </div>
 
-            {/* â”€â”€ Table â”€â”€ */}
+            {/* ── Table ── */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                 <div ref={companiesWrapperRef} className="arias-table-wrapper">
                     <div ref={companiesTableRef} className="arias-table">
@@ -432,10 +432,10 @@ export default function Companies() {
                             <thead className="bg-slate-50">
                                 <tr>
                                     {[
-                                        { key: 'name', label: 'OrganizaciÃ³n' },
-                                        { key: 'license_status', label: 'SuscripciÃ³n' },
+                                        { key: 'name', label: 'Organización' },
+                                        { key: 'license_status', label: 'Suscripción' },
                                         { key: 'max_users', label: 'Usuarios' },
-                                        { key: 'allowed_permissions', label: 'MÃ³dulos' },
+                                        { key: 'allowed_permissions', label: 'Módulos' },
                                     ].map(col => (
                                         <th key={col.key} style={{ width: columnWidths[col.key] ?? DEFAULT_COL_WIDTHS[col.key] ?? 160, minWidth: 80, position: 'relative' }} className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                                             <div
@@ -509,7 +509,7 @@ export default function Companies() {
                                                     );
                                                 })}
                                                 {((company.allowed_permissions as string[]) || []).length === 0 && (
-                                                    <span className="text-[11px] text-slate-300 italic">Sin mÃ³dulos</span>
+                                                    <span className="text-[11px] text-slate-300 italic">Sin módulos</span>
                                                 )}
                                             </div>
                                         </td>
@@ -564,7 +564,7 @@ export default function Companies() {
                 </div>
             </div>
 
-            {/* â”€â”€ Modal â”€â”€ */}
+            {/* ── Modal ── */}
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
@@ -574,7 +574,7 @@ export default function Companies() {
                 {/* Split layout */}
                 <div className="flex -mx-6 -mb-6 -mt-2 min-h-[500px] overflow-hidden rounded-b-2xl">
 
-                    {/* â”€â”€ Left Panel â”€â”€ */}
+                    {/* ── Left Panel ── */}
                     <div className="w-[200px] flex-shrink-0 bg-gradient-to-b from-[#4449AA] to-[#2d3178] flex flex-col items-center justify-between py-7 px-4 relative overflow-hidden">
                         <div className="absolute top-[-30px] right-[-30px] w-28 h-28 rounded-full bg-white/5" />
                         <div className="absolute bottom-[-20px] left-[-15px] w-24 h-24 rounded-full bg-white/5" />
@@ -603,21 +603,20 @@ export default function Companies() {
                                     formData.license_status === 'expired' ? 'bg-rose-400/20 text-rose-200' :
                                     'bg-amber-400/20 text-amber-200'
                                 }`}>
-                                    {formData.license_status === 'active' ? 'â— Activa' :
-                                     formData.license_status === 'trial' ? 'â— Prueba' :
-                                     formData.license_status === 'expired' ? 'â— Expirada' : 'â— Retenida'}
+                                    {formData.license_status === 'active' ? '● Activa' :
+                                     formData.license_status === 'trial' ? '● Prueba' :
+                                     formData.license_status === 'expired' ? '● Expirada' : '● Retenida'}
                                 </span>
                             </div>
                             {/* Stats */}
                             {editingCompanyId && (
                                 <div className="w-full space-y-1.5">
                                     <div className="bg-white/10 rounded-xl px-3 py-1.5 flex items-center justify-between">
-                                        <span className="text-white/50 text-[10px] font-bold uppercase">MÃ³dulos</span>
+                                        <span className="text-white/50 text-[10px] font-bold uppercase">Módulos</span>
                                         <span className="text-white font-black text-sm">{formData.allowed_permissions?.length || 0}</span>
                                     </div>
                                     <div className="bg-white/10 rounded-xl px-3 py-1.5 flex items-center justify-between">
                                         <span className="text-white/50 text-[10px] font-bold uppercase">Usuarios</span>
-                                        <span className="text-white font-black text-sm">{formData.max_users}</span>
                                     </div>
                                 </div>
                             )}
@@ -641,7 +640,7 @@ export default function Companies() {
                         </div>
                     </div>
 
-                    {/* â”€â”€ Right Panel: Form â”€â”€ */}
+                    {/* ── Right Panel: Form ── */}
                     <div className="flex-1 flex flex-col overflow-hidden">
                         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
                             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
@@ -649,18 +648,18 @@ export default function Companies() {
                                 {/* Section header */}
                                 <div>
                                     <h2 className="text-sm font-black text-slate-900">
-                                        {activeTab === 'info' ? 'InformaciÃ³n de la empresa' :
-                                         activeTab === 'license' ? 'ConfiguraciÃ³n de mÃ³dulos' :
-                                         editingCompanyId ? 'GestiÃ³n de administrador' : 'Administrador inicial'}
+                                        {activeTab === 'info' ? 'Información de la empresa' :
+                                         activeTab === 'license' ? 'Configuración de módulos' :
+                                         editingCompanyId ? 'Gestión de administrador' : 'Administrador inicial'}
                                     </h2>
                                     <p className="text-[11px] text-slate-400 mt-0.5">
                                         {activeTab === 'info' ? 'Datos generales y plan' :
-                                         activeTab === 'license' ? 'MÃ³dulos desactivados no son visibles para nadie' :
+                                         activeTab === 'license' ? 'Módulos desactivados no son visibles para nadie' :
                                          editingCompanyId ? 'Edita o agrega administradores' : 'Primer acceso a esta empresa'}
                                     </p>
                                 </div>
 
-                                {/* â”€â”€ Tab: Info â”€â”€ */}
+                                {/* ── Tab: Info ── */}
                                 {activeTab === 'info' && (
                                     <div className="space-y-3">
                                         <div>
@@ -669,16 +668,16 @@ export default function Companies() {
                                         </div>
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-500 mb-1">Plan de suscripciÃ³n</label>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">Plan de suscripción</label>
                                                 <select value={formData.license_status} onChange={(e) => { const s = e.target.value as LicenseStatus; setFormData(prev => ({ ...prev, license_status: s, ...(!editingCompanyId && { allowed_permissions: PLAN_DEFAULT_MODULES[s] ?? [] }) })); }} className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100">
-                                                    <option value="active">ðŸŸ¢ Activa</option>
-                                                    <option value="trial">ðŸ”µ Prueba</option>
-                                                    <option value="expired">ðŸ”´ Expirada</option>
-                                                    <option value="manual_hold">ðŸŸ  Retenida</option>
+                                                    <option value="active">🟢 Activa</option>
+                                                    <option value="trial">🔵 Prueba</option>
+                                                    <option value="expired">🔴 Expirada</option>
+                                                    <option value="manual_hold">🟠 Retenida</option>
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-500 mb-1">MÃ¡x. usuarios</label>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">Máx. usuarios</label>
                                                 <Input type="number" required min={1} value={formData.max_users} onChange={(e) => setFormData({ ...formData, max_users: parseInt(e.target.value) })} className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl" />
                                             </div>
                                         </div>
@@ -688,22 +687,22 @@ export default function Companies() {
                                                 <Input value={formData.tax_id} onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })} placeholder="001-XXXXXXX-X" className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl" />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-500 mb-1">TelÃ©fono</label>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1">Teléfono</label>
                                                 <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+503 XXXX-XXXX" className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl" />
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-slate-500 mb-1">DirecciÃ³n</label>
-                                            <Input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="DirecciÃ³n de la empresa" className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl" />
+                                            <label className="block text-xs font-bold text-slate-500 mb-1">Dirección</label>
+                                            <Input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="Dirección de la empresa" className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl" />
                                         </div>
                                     </div>
                                 )}
 
-                                {/* â”€â”€ Tab: Licencias â”€â”€ */}
+                                {/* ── Tab: Licencias ── */}
                                 {activeTab === 'license' && (
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <p className="text-[11px] text-slate-400">Activa o desactiva los mÃ³dulos de esta empresa</p>
+                                            <p className="text-[11px] text-slate-400">Activa o desactiva los módulos de esta empresa</p>
                                             <span className="text-[11px] font-bold text-[#4449AA] bg-indigo-50 px-2 py-0.5 rounded-full">{formData.allowed_permissions?.length || 0}/{MODULES_CONFIG.length}</span>
                                         </div>
                                         <div className="grid grid-cols-2 gap-1.5">
@@ -735,7 +734,7 @@ export default function Companies() {
                                     </div>
                                 )}
 
-                                {/* â”€â”€ Tab: Admin â”€â”€ */}
+                                {/* ── Tab: Admin ── */}
                                 {activeTab === 'admin' && (
                                     <div className="space-y-4">
                                         {editingCompanyId && companyMembers.length > 0 && (
@@ -767,7 +766,7 @@ export default function Companies() {
                                                         <Input type="email" value={memberEditData.email} onChange={e => setMemberEditData(prev => ({ ...prev, email: e.target.value }))} placeholder="email@empresa.com" className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl" />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-xs font-bold text-slate-500 mb-1">TelÃ©fono</label>
+                                                        <label className="block text-xs font-bold text-slate-500 mb-1">Teléfono</label>
                                                         <Input value={memberEditData.phone} onChange={e => setMemberEditData(prev => ({ ...prev, phone: e.target.value }))} placeholder="+503 XXXX-XXXX" className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl" />
                                                     </div>
                                                     <div>
@@ -780,12 +779,12 @@ export default function Companies() {
                                                 </div>
                                                 {!showPasswordPanel ? (
                                                     <button type="button" onClick={handleOpenPasswordPanel} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-[#4449AA] transition-colors px-3 py-2 bg-slate-50 rounded-xl border border-slate-200 hover:border-indigo-200">
-                                                        <Lock className="w-3.5 h-3.5" /> Restablecer contraseÃ±a
+                                                        <Lock className="w-3.5 h-3.5" /> Restablecer contraseña
                                                     </button>
                                                 ) : (
                                                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
                                                         <div className="flex items-center justify-between">
-                                                            <p className="text-xs font-bold text-slate-600">Nueva contraseÃ±a</p>
+                                                            <p className="text-xs font-bold text-slate-600">Nueva contraseña</p>
                                                             <button type="button" onClick={() => setShowPasswordPanel(false)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
                                                         </div>
                                                         <div className="flex gap-2">
@@ -795,7 +794,7 @@ export default function Companies() {
                                                         </div>
                                                         <div className="flex gap-2">
                                                             <button type="button" onClick={handleSaveNewPassword} disabled={isResettingPassword} className="flex-1 h-9 bg-[#4449AA] text-white rounded-lg text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1.5">
-                                                                {isResettingPassword ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />} Guardar contraseÃ±a
+                                                                {isResettingPassword ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />} Guardar contraseña
                                                             </button>
                                                             <button type="button" onClick={handleSendEmailLink} disabled={isSendingEmailLink} className="flex-1 h-9 bg-white border border-slate-200 text-slate-600 rounded-lg text-xs font-bold disabled:opacity-50 flex items-center justify-center gap-1.5 hover:bg-slate-50">
                                                                 {isSendingEmailLink ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Enviar por email
@@ -809,7 +808,7 @@ export default function Companies() {
                                                 {!editingCompanyId && (
                                                     <div className="flex items-start gap-2 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-700">
                                                         <Shield className="w-4 h-4 shrink-0 mt-0.5" />
-                                                        <span>Se crearÃ¡ el primer administrador para esta empresa.</span>
+                                                        <span>Se creará el primer administrador para esta empresa.</span>
                                                     </div>
                                                 )}
                                                 <div>
@@ -822,14 +821,14 @@ export default function Companies() {
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center justify-between mb-1">
-                                                        <label className="text-xs font-bold text-slate-500">ContraseÃ±a {!editingCompanyId && '*'}</label>
-                                                        <button type="button" onClick={() => { const pwd = generatePassword(); setFormData(prev => ({ ...prev, admin_password: pwd })); navigator.clipboard.writeText(pwd); toast.success('ðŸ”‘ Generada y copiada'); }} className="flex items-center gap-1 text-[11px] font-bold text-[#4449AA] hover:text-[#3b3f94] transition-colors">
+                                                        <label className="text-xs font-bold text-slate-500">Contraseña {!editingCompanyId && '*'}</label>
+                                                        <button type="button" onClick={() => { const pwd = generatePassword(); setFormData(prev => ({ ...prev, admin_password: pwd })); navigator.clipboard.writeText(pwd); toast.success('🔑 Generada y copiada'); }} className="flex items-center gap-1 text-[11px] font-bold text-[#4449AA] hover:text-[#3b3f94] transition-colors">
                                                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                                                             Auto-generar
                                                         </button>
                                                     </div>
                                                     <div className="relative">
-                                                        <Input type="text" required={!editingCompanyId} value={formData.admin_password} onChange={e => setFormData({ ...formData, admin_password: e.target.value })} placeholder="MÃ­nimo 6 caracteres" className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl pr-10 font-mono" />
+                                                        <Input type="text" required={!editingCompanyId} value={formData.admin_password} onChange={e => setFormData({ ...formData, admin_password: e.target.value })} placeholder="Mínimo 6 caracteres" className="h-10 text-sm bg-slate-50 border-slate-200 rounded-xl pr-10 font-mono" />
                                                         {formData.admin_password && (
                                                             <button type="button" onClick={() => { navigator.clipboard.writeText(formData.admin_password); toast.success('Copiado'); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                                                                 <Copy className="w-3.5 h-3.5" />
@@ -866,23 +865,23 @@ export default function Companies() {
                             <div>
                                 <h3 className="text-sm font-bold text-slate-900">Eliminar empresa</h3>
                                 <p className="text-xs text-slate-500 mt-1">
-                                    Esta acciÃ³n es <strong className="text-rose-600">irreversible</strong>. Escribe el nombre exacto para confirmar.
-                                </p>
-                            </div>
+                                Esta acción es <strong className="text-rose-600">irreversible</strong>. Escribe el nombre exacto para confirmar.
+                            </p>
                         </div>
+                    </div>
 
-                        <div className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-200">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Nombre a confirmar</p>
-                            <p className="font-bold text-slate-900 text-sm">{deleteConfirm.company.name}</p>
-                        </div>
+                    <div className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-200">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Nombre a confirmar</p>
+                        <p className="font-bold text-slate-900 text-sm">{deleteConfirm.company.name}</p>
+                    </div>
 
-                        <input
-                            type="text"
-                            autoFocus
-                            value={deleteConfirm.typedName}
-                            onChange={e => setDeleteConfirm(prev => prev ? { ...prev, typedName: e.target.value } : null)}
-                            onKeyDown={e => { if (e.key === 'Enter' && deleteConfirm.typedName === deleteConfirm.company.name) confirmDelete(); }}
-                            placeholder="Escribe el nombre aquÃ­..."
+                    <input
+                        type="text"
+                        autoFocus
+                        value={deleteConfirm.typedName}
+                        onChange={e => setDeleteConfirm(prev => prev ? { ...prev, typedName: e.target.value } : null)}
+                        onKeyDown={e => { if (e.key === 'Enter' && deleteConfirm.typedName === deleteConfirm.company.name) confirmDelete(); }}
+                        placeholder="Escribe el nombre aquí..."
                             className="w-full h-10 px-3 bg-white border-2 border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-rose-400 transition-colors"
                         />
 
