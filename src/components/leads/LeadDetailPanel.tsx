@@ -89,6 +89,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const [isDocGeneratorOpen, setIsDocGeneratorOpen] = useState(false);
     const [isFollowUpLoggerOpen, setIsFollowUpLoggerOpen] = useState(false);
     const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+    const [customMessage, setCustomMessage] = useState('');
 
     const getWhatsAppLink = (phone: string) => {
         if (!phone) return '';
@@ -96,7 +97,11 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
         if (cleanPhone.length === 8) {
             cleanPhone = '503' + cleanPhone;
         }
-        return `https://wa.me/${cleanPhone}`;
+        let url = `https://wa.me/${cleanPhone}`;
+        if (customMessage.trim()) {
+            url += `?text=${encodeURIComponent(customMessage.trim())}`;
+        }
+        return url;
     };
 
     const copyToClipboard = (text: string) => {
@@ -797,6 +802,20 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">
                                     {selectedLead.name}
                                 </p>
+
+                                {/* Pre-filled message input */}
+                                <div className="w-full text-left mb-4 px-2">
+                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">
+                                        Mensaje Inicial (Opcional)
+                                    </label>
+                                    <textarea
+                                        value={customMessage}
+                                        onChange={(e) => setCustomMessage(e.target.value)}
+                                        placeholder="Escribe el mensaje que se enviará automáticamente..."
+                                        rows={2}
+                                        className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 focus:bg-white transition-all outline-none resize-none placeholder-slate-400 font-medium"
+                                    />
+                                </div>
 
                                 {/* QR Code Wrapper */}
                                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/50 mb-4 shadow-inner relative">
