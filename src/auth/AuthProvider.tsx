@@ -273,6 +273,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                     let simPermissions: any = {};
                     let effectiveCompanyId = simCompanyId || data.company_id;
+                    let effectiveRole = simRole;
+
+                    // SECURITY: If the user is NOT a real super_admin or platform_owner, they can NEVER simulate super_admin!
+                    const isRealSuperUser = data.role === 'super_admin' || data.is_platform_owner === true;
+                    if (simRole === 'super_admin' && !isRealSuperUser) {
+                        console.warn('🛡️ Access Denied: non-superuser cannot simulate super_admin role.');
+                        effectiveRole = null;
+                        localStorage.removeItem('simulated_role');
+                        setSimulatedRole(null);
+                    }
 
                     // SECURITY: If company_admin is simulating, they can only switch to child companies of their own company
                     if (data.role === 'company_admin' && simCompanyId && simCompanyId !== data.company_id) {
@@ -296,7 +306,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     }
 
                     // Load permissions for the simulated role from the actual role_permissions table
-                    if (effectiveCompanyId && simRole) {
+                    if (effectiveCompanyId && effectiveRole) {
                         try {
                             // 1. Load the company license FIRST
                             const { data: companyData } = await supabase
@@ -311,7 +321,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 : [];
 
                             // 2. ADMIN LOGIC: If simulating an Admin, grant FULL license access immediately.
-                            if (simRole === 'company_admin' || simRole === 'super_admin') {
+                            if (effectiveRole === 'company_admin' || effectiveRole === 'super_admin') {
                                 simPermissions = {};
 
                                 // Infrastructure permissions
@@ -333,7 +343,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                     .from('custom_roles')
                                     .select('id, name, company_id')
                                     .or(`company_id.eq.${effectiveCompanyId},company_id.eq.00000000-0000-0000-0000-000000000000`)
-                                    .eq('base_role', simRole)
+                                    .eq('base_role', effectiveRole)
                                     .order('company_id', { ascending: false });
 
                                 const simRoleData = simRolesData?.find(r => r.company_id === effectiveCompanyId)
@@ -368,7 +378,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                         finalProfile = {
                             ...finalProfile,
-                            role: (simRole as any) || finalProfile.role,
+                            role: (effectiveRole as any) || finalProfile.role,
                             company_id: effectiveCompanyId || finalProfile.company_id,
                             permissions: simPermissions
                         };
@@ -402,10 +412,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signOut = async () => {
-        // Clear all cached queries before signing out
+        // Clear all cached queries and simulation state before signing out
         // This ensures the next user who logs in starts with a clean slate
         queryClient.clear();
         prevUserIdRef.current = null;
+        localStorage.removeItem('simulated_role');
+        localStorage.removeItem('simulated_company_id');
+        setSimulatedRole(null);
+        setSimulatedCompanyId(null);
         await supabase.auth.signOut();
     };
 
