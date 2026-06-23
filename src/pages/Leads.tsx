@@ -10,7 +10,7 @@ import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { leadsService } from '../services/leads';
-import type { Lead, LeadStatus, LeadPriority, FollowUp, LossReason, Industry } from '../types';
+import type { Lead, LeadStatus, LeadPriority, FollowUp, LossReason, Industry, LeadProduct } from '../types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -31,6 +31,7 @@ import { callActivityService, ACTION_TYPE_CONFIG, CALL_OUTCOME_CONFIG } from '..
 import type { CallActivity } from '../services/callActivity';
 import { lossReasonsService } from '../services/lossReasons';
 import { industriesService } from '../services/industries';
+import { leadProductsService } from '../services/leadProducts';
 import { CustomDatePicker } from '../components/ui/CustomDatePicker';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { GripVertical } from 'lucide-react';
@@ -135,12 +136,13 @@ export default function Leads() {
         { id: 'last_follow_up_at', label: 'Último Seguimiento',  icon: '🕐' },
         { id: 'internal_won_date', label: 'Fecha Cierre',        icon: '✅' },
         { id: 'created_at',        label: 'Creado el',           icon: '📅' },
+        { id: 'interested_product_id', label: 'Producto',        icon: '📦' },
     ];
 
     // Column order persistence
     const [columnOrder, setColumnOrder] = useState<string[]>(() => {
         const saved = localStorage.getItem('lead_column_order');
-        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at'];
+        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at', 'interested_product_id'];
         if (saved) {
             const parsed = JSON.parse(saved);
             const newCols = defaultCols.filter(c => !parsed.includes(c));
@@ -155,7 +157,7 @@ export default function Leads() {
             const saved = localStorage.getItem('lead_visible_columns');
             if (saved) return JSON.parse(saved);
         } catch {}
-        return ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at'];
+        return ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at', 'interested_product_id'];
     });
     const [showColumnModal, setShowColumnModal] = useState(false);
     const columnModalRef = useRef<HTMLDivElement>(null);
@@ -183,6 +185,7 @@ export default function Leads() {
         name: 200, email: 180, phone: 140, status: 140,
         priority: 120, source: 130, value: 110, assigned_to: 140,
         last_follow_up_at: 145, internal_won_date: 130, created_at: 120,
+        interested_product_id: 140,
     };
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
         try {
@@ -247,6 +250,8 @@ export default function Leads() {
     const [sourceFilter, setSourceFilter] = useState<string | 'all' | string[]>('all');
     const [lossReasonFilter, setLossReasonFilter] = useState<string | 'all' | string[]>('all');
     const [lostAtStageFilter, setLostAtStageFilter] = useState<string | 'all' | string[]>('all');
+    const [productFilter, setProductFilter] = useState<string | 'all'>('all');
+    const [products, setProducts] = useState<LeadProduct[]>([]);
     const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
     const [isAssignedFilterOpen, setIsAssignedFilterOpen] = useState(false);
     const assignedFilterRef = useRef<HTMLDivElement>(null);
@@ -560,12 +565,17 @@ export default function Leads() {
             // Filter by minimum contact count (from escalation widget)
             if (minContactCountFilter && (lead.contact_count || 0) < minContactCountFilter) return false;
 
+            // Filter by product of interest
+            if (productFilter !== 'all') {
+                if (lead.interested_product_id !== productFilter) return false;
+            }
+
             return true;
         });
 
         // Apply pipeline intelligence filter on top of standard filters
         return applyPipelineFilter(base, pipelineFilter, profile?.company_id);
-    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, pipelineFilter]);
+    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, pipelineFilter]);
 
     // Leads that have passed ALL filters EXCEPT the pipeline chip filter.
     // Used so chip counters respect the active date/status/priority filters.
@@ -638,7 +648,8 @@ export default function Leads() {
         loadTeamMembers();
         loadLossReasons();
         loadIndustries();
-    }, []);
+        loadProducts();
+    }, [activeCompanyId]);
 
     // ── "Listos para Comprar" URL param handler ────────────────────────────
     // Triggered by the sidebar button (/leads?ready=1)
@@ -712,6 +723,15 @@ export default function Leads() {
             setIndustries(data);
         } catch (error) {
             logger.error('Failed to load industries', error, { action: 'loadIndustries' });
+        }
+    };
+
+    const loadProducts = async () => {
+        try {
+            const data = await leadProductsService.getProducts();
+            setProducts(data);
+        } catch (error) {
+            logger.error('Failed to load products', error, { action: 'loadProducts' });
         }
     };
 
@@ -1171,6 +1191,9 @@ export default function Leads() {
                 cameFromRef={cameFromRef}
                 setMinContactCountFilter={setMinContactCountFilter}
                 csvHelper={csvHelper}
+                productFilter={productFilter}
+                setProductFilter={setProductFilter}
+                products={products}
             />
 {/* VIEW SELECTOR & MAIN CONTENT - Mobile Cards (only for Grid mode) */}
                 {viewMode === 'grid' && (
@@ -1510,6 +1533,7 @@ export default function Leads() {
                                             handleDeleteLead={handleDeleteLead}
                                             storageService={storageService}
                                             navigate={navigate}
+                                            products={products}
                                         />
                                     </div>
                                 </div>
@@ -1694,7 +1718,10 @@ export default function Leads() {
             {/* Create Lead Fullscreen */}
             <CreateLeadFullscreen
                 isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    loadProducts();
+                }}
                 formData={formData}
                 setFormData={(data) => setFormData(prev => ({ ...prev, ...data }))}
                 teamMembers={teamMembers}
@@ -1702,12 +1729,17 @@ export default function Leads() {
                 onSubmit={handleSubmit}
                 followUpTime={followUpTime}
                 setFollowUpTime={setFollowUpTime}
+                products={products}
+                loadProducts={loadProducts}
             />
 
             {/* Lead Detail Slide-Over */}
             <LeadDetailPanel
                 isOpen={isDetailOpen}
-                onClose={() => setIsDetailOpen(false)}
+                onClose={() => {
+                    setIsDetailOpen(false);
+                    loadProducts();
+                }}
                 lead={selectedLead!}
                 handleUpdateLead={handleUpdateLead}
                 teamMembers={teamMembers}
@@ -1727,6 +1759,8 @@ export default function Leads() {
                 handleDeleteLead={handleDeleteLead}
                 StatusBadge={StatusBadge}
                 PriorityBadge={PriorityBadge}
+                products={products}
+                loadProducts={loadProducts}
             />
 
             {/* Won Modal */}

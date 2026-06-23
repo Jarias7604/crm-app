@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode } from 'lucide-react';
+import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode, Box } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { leadProductsService } from '../../services/leadProducts';
+import { ManageProductsModal } from './ManageProductsModal';
+import type { LeadProduct } from '../../types';
 import { supabase } from '../../services/supabase';
 import { leadsService } from '../../services/leads';
 import { callActivityService, ACTION_TYPE_CONFIG, CALL_OUTCOME_CONFIG } from '../../services/callActivity';
@@ -41,13 +44,16 @@ interface LeadDetailPanelProps {
 
     StatusBadge: React.FC<{ status: any }>;
     PriorityBadge: React.FC<{ priority: any }>;
+    products: LeadProduct[];
+    loadProducts: () => Promise<void>;
 }
 
 export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     isOpen,
     onClose,
     lead,
-    
+    products,
+    loadProducts,
     teamMembers,
     profile,
     isAdmin,
@@ -82,6 +88,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
 
     const [activeTab, setActiveTab] = useState<'activity' | 'info' | 'quotes'>('activity');
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+    const [isManageModalOpen, setIsManageModalOpen] = useState(false);
     
     // Dialog states
     const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
@@ -401,6 +408,29 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 options={[
                                                     { value: '', label: 'Sin especificar' },
                                                     ...industries.map(ind => ({ value: ind.name, label: ind.name }))
+                                                ]}
+                                                placeholder="Sin especificar"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center justify-between">
+                                            <span>Producto</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsManageModalOpen(true)}
+                                                className="text-indigo-600 hover:text-indigo-800 font-bold text-[9px] lowercase tracking-wide cursor-pointer font-black"
+                                            >
+                                                + gestionar
+                                            </button>
+                                        </label>
+                                        <div className="relative">
+                                            <CustomSelect
+                                                value={selectedLead.interested_product_id || ''}
+                                                onChange={(val) => handleUpdateLead({ interested_product_id: val || null })}
+                                                options={[
+                                                    { value: '', label: 'Sin especificar', icon: '📦' },
+                                                    ...products.map(p => ({ value: p.id, label: p.name, icon: '📦' }))
                                                 ]}
                                                 placeholder="Sin especificar"
                                             />
@@ -853,6 +883,11 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             </div>
                         </div>
                     )}
+                    <ManageProductsModal
+                        isOpen={isManageModalOpen}
+                        onClose={() => setIsManageModalOpen(false)}
+                        onProductsChanged={loadProducts}
+                    />
                 </div>
             );
 };

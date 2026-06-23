@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Plus, Building2, Phone, MapPin, DollarSign, Globe, UserCheck, StickyNote, ChevronDown, CheckCircle, Mail, Clock } from 'lucide-react';
-import type { Lead, LeadStatus, LeadPriority, Profile, Industry } from '../types';
+import { X, Plus, Building2, Phone, MapPin, DollarSign, Globe, UserCheck, StickyNote, ChevronDown, CheckCircle, Mail, Clock, Box } from 'lucide-react';
+import type { Lead, LeadStatus, LeadPriority, Profile, Industry, LeadProduct } from '../types';
 import { STATUS_CONFIG, SOURCE_CONFIG, PRIORITY_CONFIG } from '../types';
 import { CustomDatePicker } from './ui/CustomDatePicker';
 import { format } from 'date-fns';
+import { leadProductsService } from '../services/leadProducts';
+import { ManageProductsModal } from './leads/ManageProductsModal';
 
 // 12h time slots (every 30 min) — 6:00 AM to 9:00 PM
 const TIME_SLOTS = (() => {
@@ -31,6 +33,8 @@ interface CreateLeadFullscreenProps {
     onSubmit: (e: React.FormEvent) => void;
     followUpTime: string;
     setFollowUpTime: (time: string) => void;
+    products: LeadProduct[];
+    loadProducts: () => Promise<void>;
 }
 
 /* ─── Premium Dropdown ─── */
@@ -120,7 +124,9 @@ function PremiumSelect({
     );
 }
 
-export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, teamMembers, industries, onSubmit, followUpTime, setFollowUpTime }: CreateLeadFullscreenProps) {
+export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, teamMembers, industries, onSubmit, followUpTime, setFollowUpTime, products, loadProducts }: CreateLeadFullscreenProps) {
+    const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+
     if (!isOpen) return null;
 
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -371,8 +377,32 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                                     />
                                 </div>
 
-                                {/* Responsable — Premium Dropdown, spans 2 cols on desktop */}
-                                <div className="md:col-span-2">
+                                {/* Producto de Interés — Premium Dropdown */}
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] mb-1.5 flex items-center justify-between">
+                                        <span>Producto</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsManageModalOpen(true)}
+                                            className="text-indigo-600 hover:text-indigo-800 font-bold text-[9px] lowercase tracking-wide cursor-pointer font-black"
+                                        >
+                                            + gestionar
+                                        </button>
+                                    </label>
+                                    <PremiumSelect
+                                        value={formData.interested_product_id || ''}
+                                        onChange={(v) => setFormData({ ...formData, interested_product_id: v || null })}
+                                        options={[
+                                            { value: '', label: 'Sin especificar', icon: '📦' },
+                                            ...products.map(p => ({ value: p.id, label: p.name, icon: '📦' }))
+                                        ]}
+                                        placeholder="Seleccionar producto..."
+                                        icon={Box}
+                                    />
+                                </div>
+
+                                {/* Responsable — Premium Dropdown */}
+                                <div>
                                     <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] mb-1.5">Responsable Principal *</label>
                                     <PremiumSelect
                                         value={formData.assigned_to || ''}
@@ -477,6 +507,11 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                     </div>
                 </form>
             </div>
+            <ManageProductsModal
+                isOpen={isManageModalOpen}
+                onClose={() => setIsManageModalOpen(false)}
+                onProductsChanged={loadProducts}
+            />
         </div>
     );
 }

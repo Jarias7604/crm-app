@@ -3,7 +3,7 @@ import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, Slid
 import { Button } from '../ui/Button';
 import { CustomDatePicker } from '../ui/CustomDatePicker';
 import { PRIORITY_CONFIG, STATUS_CONFIG, SOURCE_CONFIG } from '../../types';
-import type { Lead, LeadStatus, LeadPriority, LossReason } from '../../types';
+import type { Lead, LeadStatus, LeadPriority, LossReason, LeadProduct } from '../../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -47,6 +47,9 @@ interface LeadToolbarProps {
     setCompletedLeadIds: (v: string[] | null) => void;
     calendarDateLabel: string | null;
     setCalendarDateLabel: (v: string | null) => void;
+    productFilter: string | 'all';
+    setProductFilter: (v: string | 'all') => void;
+    products: LeadProduct[];
     
     // Actions
     handleDownloadTemplate: () => void;
@@ -68,6 +71,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     startDateFilter, setStartDateFilter, endDateFilter, setEndDateFilter,
     filteredLeadId, setFilteredLeadId, filteredLeadIds, setFilteredLeadIds,
     completedLeadIds, setCompletedLeadIds, calendarDateLabel, setCalendarDateLabel,
+    productFilter, setProductFilter, products,
     handleDownloadTemplate, handleImportCSV, isImporting, setIsModalOpen,
     navigate, cameFromRef, setMinContactCountFilter, csvHelper
 }) => {
@@ -79,6 +83,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     const [isLossReasonFilterOpen, setIsLossReasonFilterOpen] = useState(false);
     const [isLostAtStageFilterOpen, setIsLostAtStageFilterOpen] = useState(false);
     const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
+    const [isProductFilterOpen, setIsProductFilterOpen] = useState(false);
 
     const statusFilterRef = useRef<HTMLDivElement>(null);
     const priorityFilterRef = useRef<HTMLDivElement>(null);
@@ -86,6 +91,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     const lossReasonFilterRef = useRef<HTMLDivElement>(null);
     const lostAtStageFilterRef = useRef<HTMLDivElement>(null);
     const dateRangeRef = useRef<HTMLDivElement>(null);
+    const productFilterRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -95,6 +101,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
             if (lostAtStageFilterRef.current && !lostAtStageFilterRef.current.contains(event.target as Node)) setIsLostAtStageFilterOpen(false);
             if (statusFilterRef.current && !statusFilterRef.current.contains(event.target as Node)) setIsStatusFilterOpen(false);
             if (dateRangeRef.current && !dateRangeRef.current.contains(event.target as Node)) setIsDateRangeOpen(false);
+            if (productFilterRef.current && !productFilterRef.current.contains(event.target as Node)) setIsProductFilterOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -267,6 +274,43 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                                 {config.label}
                             </button>
                         ))}
+                </div>
+            )}
+        </div>
+    );
+
+
+    const ProductDropdown = () => (
+        <div className="relative" ref={productFilterRef}>
+            <button
+                onClick={() => setIsProductFilterOpen(!isProductFilterOpen)}
+                className={`flex items-center gap-2 bg-white border px-3 py-2 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all shadow-sm h-9 min-w-[140px] justify-between ${productFilter !== 'all' ? 'border-indigo-300 text-indigo-600 bg-indigo-50/30' : 'border-gray-200 text-gray-600'}`}
+            >
+                <div className="flex items-center gap-1.5">
+                    <Filter className="h-3.5 w-3.5 opacity-60" />
+                    <span className="truncate max-w-[110px]">{productFilter === 'all' ? 'Producto' : products.find(p => p.id === productFilter)?.name || 'Producto'}</span>
+                </div>
+                <ChevronDown className={`h-3.5 w-3.5 opacity-40 transition-transform duration-300 ${isProductFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isProductFilterOpen && (
+                <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                    <button
+                        onClick={() => { setProductFilter('all'); setIsProductFilterOpen(false); }}
+                        className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors ${productFilter === 'all' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        Todos los productos
+                    </button>
+                    <div className="border-t border-gray-100 my-1" />
+                    {products.map(prod => (
+                        <button
+                            key={prod.id}
+                            onClick={() => { setProductFilter(prod.id); setIsProductFilterOpen(false); }}
+                            className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors ${productFilter === prod.id ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            {prod.name}
+                        </button>
+                    ))}
                 </div>
             )}
         </div>
@@ -750,6 +794,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                             </div>
                         )}
                     </div>
+                    <ProductDropdown />
                     <div className="w-px h-4 bg-gray-200 mx-1" />
                     <LossReasonDropdown />
                     <LossStageDropdown />
@@ -868,7 +913,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                 </div>
 
                 {/* ROW 3: Active filter chips */}
-                {(filteredLeadId || filteredLeadIds || calendarDateLabel || statusFilter !== 'all' || priorityFilter !== 'all' || assignedFilter !== 'all' || sourceFilter !== 'all' || lossReasonFilter !== 'all' || lostAtStageFilter !== 'all' || startDateFilter || endDateFilter) && (
+                {(filteredLeadId || filteredLeadIds || calendarDateLabel || statusFilter !== 'all' || priorityFilter !== 'all' || assignedFilter !== 'all' || sourceFilter !== 'all' || lossReasonFilter !== 'all' || lostAtStageFilter !== 'all' || productFilter !== 'all' || startDateFilter || endDateFilter) && (
                     <div className="hidden md:flex items-center gap-2 flex-wrap animate-in fade-in slide-in-from-top-1 duration-200">
                         <span className="text-[11px] text-gray-400 font-medium">Activos:</span>
                         {calendarDateLabel && (
@@ -887,6 +932,12 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                             <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
                                 Prioridad: {Array.isArray(priorityFilter) ? `${priorityFilter.length} sel.` : (PRIORITY_CONFIG as any)[priorityFilter]?.label || priorityFilter}
                                 <button onClick={() => { setPriorityFilter('all'); setFilteredLeadId(null); }} className="hover:text-indigo-900 ml-0.5"><X className="w-3 h-3" /></button>
+                            </span>
+                        )}
+                        {productFilter !== 'all' && (
+                            <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
+                                Producto: {products.find(p => p.id === productFilter)?.name || 'Producto'}
+                                <button onClick={() => setProductFilter('all')} className="hover:text-indigo-900 ml-0.5"><X className="w-3 h-3" /></button>
                             </span>
                         )}
                         {assignedFilter !== 'all' && (
@@ -951,6 +1002,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                                 setStatusFilter('all'); setPriorityFilter('all'); setAssignedFilter('all');
                                 setSourceFilter('all'); setLossReasonFilter('all'); setLostAtStageFilter('all');
                                 setStartDateFilter(null); setEndDateFilter(null); setMinContactCountFilter(null);
+                                setProductFilter('all');
                             }}
                             className="text-xs font-semibold text-gray-400 hover:text-red-500 transition-colors ml-1 flex items-center gap-1"
                         >

@@ -119,7 +119,7 @@ export interface Lead {
     first_follow_up_at?: string | null;   // First time a follow-up was registered
     assigned_at?: string | null;          // Time when lead was assigned
     created_at: string;
-
+    interested_product_id?: string | null;
 }
 
 export interface FollowUp {
@@ -157,6 +157,16 @@ export interface Industry {
     name: string;
     is_active: boolean;
     display_order: number;
+    created_at: string;
+    updated_at?: string;
+}
+
+export interface LeadProduct {
+    id: string;
+    company_id: string;
+    name: string;
+    description: string | null;
+    is_active: boolean;
     created_at: string;
     updated_at?: string;
 }

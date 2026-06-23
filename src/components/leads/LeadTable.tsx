@@ -4,7 +4,7 @@ import { GripVertical, ArrowUpDown, Shield, ChevronRight, Trash2, CheckCircle, T
 import { format, differenceInHours, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SOURCE_CONFIG } from '../../types';
-import type { Lead } from '../../types';
+import type { Lead, LeadProduct } from '../../types';
 import { StatusBadge } from './StatusBadge';
 import { PriorityBadge } from './PriorityBadge';
 import { LeadScoreBadge } from './LeadScoreBadge';
@@ -30,6 +30,7 @@ interface LeadTableProps {
     handleDeleteLead: (id: string, name: string) => void;
     storageService: any;
     navigate: any;
+    products: LeadProduct[];
 }
 
 export const LeadTable: React.FC<LeadTableProps> = ({
@@ -52,6 +53,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
     handleDeleteLead,
     storageService,
     navigate,
+    products,
 }) => {
     return (
         <table
@@ -252,6 +254,19 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                                     >
                                                                                         Asignado
                                                                                         <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'assigned_to' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {colId === 'interested_product_id' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'interested_product_id' as keyof Lead,
+                                                                                            direction: sortConfig?.key === 'interested_product_id' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Producto
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'interested_product_id' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
                                                                             </div>
@@ -459,6 +474,17 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                         <span>{lead.internal_won_date ? (() => { try { return format(new Date(lead.internal_won_date.substring(0, 10) + 'T12:00:00'), 'dd MMM yyyy', { locale: es }).toUpperCase(); } catch { return '—'; } })() : '—'}</span>
                                                                     </div>
                                                                 )}
+
+                                                                {colId === 'interested_product_id' && (() => {
+                                                                    const prod = products.find(p => p.id === lead.interested_product_id);
+                                                                    return prod ? (
+                                                                        <span className="text-[11px] font-bold text-slate-600 truncate max-w-[120px] inline-block" title={prod.name}>
+                                                                            {prod.name}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-gray-300">-</span>
+                                                                    );
+                                                                })()}
                                                             </td>
                                                         ))}
 
