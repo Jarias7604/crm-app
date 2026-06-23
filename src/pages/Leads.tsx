@@ -465,15 +465,18 @@ export default function Leads() {
             // Filter by search term
             if (searchTerm.trim()) {
                 const term = searchTerm.toLowerCase().trim();
+                const prodName = products.find(p => p.id === lead.interested_product_id)?.name || '';
                 const matchesSearch =
                     lead.name?.toLowerCase().includes(term) ||
                     lead.email?.toLowerCase().includes(term) ||
                     lead.company_name?.toLowerCase().includes(term) ||
                     lead.phone?.toLowerCase().includes(term) ||
-                    lead.next_action_notes?.toLowerCase().includes(term);
+                    lead.next_action_notes?.toLowerCase().includes(term) ||
+                    prodName.toLowerCase().includes(term);
 
                 if (!matchesSearch) return false;
             }
+
 
             // Filter by priority
             if (priorityFilter !== 'all') {
