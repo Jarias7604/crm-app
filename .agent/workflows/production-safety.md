@@ -163,6 +163,17 @@ Si hay resultados → recrear CADA política listada en la misma migración ANTE
 
 ---
 
+## REGLA 12 — RLS Obligatorio en TODAS las nuevas tablas
+
+**PROHIBIDO:** Crear o modificar tablas en el esquema público sin activar Row-Level Security (RLS) y definir políticas de aislamiento multi-tenant específicas.
+
+**OBLIGATORIO:** Toda nueva tabla en `public` debe habilitar RLS explícitamente mediante `ALTER TABLE public.<tabla> ENABLE ROW LEVEL SECURITY;` y añadir sus correspondientes políticas de aislamiento por `company_id`.
+
+**Incidente real (2026-06-23):** Las tablas `lead_marketing_stats` y `login_attempts` fueron creadas por el agente en sesiones previas sin activar RLS, lo que provocó una alerta de vulnerabilidad grave de Supabase al dejar los datos expuestos públicamente.
+
+---
+
+
 ## Historial de incidentes
 
 | Fecha | Causa | Horas perdidas | Regla que lo previene |
@@ -176,3 +187,5 @@ Si hay resultados → recrear CADA política listada en la misma migración ANTE
 | 2026-06-08 | `get_auth_company_id()` fue reescrita para leer del JWT en vez de `profiles`. JWT sin `company_id` → BD invisible para todos | ~3 días | Regla 9 |
 | 2026-06-11 | Agente aplicó fix en producción sin autorización explícita del usuario | horas de tensión | Regla 5 — Gate de autorización |
 | 2026-06-14 | `git checkout` accidental borró cambios avanzados sin confirmar | ~2 horas (reconstrucción) | Regla 11 |
+| 2026-06-23 | Agente creó tablas `lead_marketing_stats` y `login_attempts` sin habilitar RLS | vulnerabilidad de datos | Regla 12 — RLS Obligatorio |
+
