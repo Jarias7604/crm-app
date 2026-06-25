@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Zap, Building2, CreditCard, Palette, PartyPopper, ChevronRight, ArrowRight, Shield, Users, Bot, Webhook, CheckCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../services/supabase';
+import Logo from '../components/ui/Logo';
 import { storageService } from '../services/storage';
 import { useAuth } from '../auth/AuthProvider';
 import toast from 'react-hot-toast';
@@ -470,10 +471,7 @@ export default function OnboardingWizard() {
   const StepHeader = () => (
     <div className="w-full bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-indigo-600 rounded-[14px] flex items-center justify-center shadow-md">
-          <Zap size={20} className="text-white" />
-        </div>
-        <span className="text-xl font-black text-slate-900 tracking-tight">Arias CRM</span>
+        <Logo height={36} />
       </div>
       <div className="hidden sm:flex items-center gap-8">
         {STEPS.map((s, i) => {

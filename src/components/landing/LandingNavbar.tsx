@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, Globe, Phone, Headset, Menu, X, Sparkles, Zap, Shield, HelpCircle, HeartHandshake } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useTranslation } from 'react-i18next';
+import Logo from '../ui/Logo';
 
 // ─── SVG BRAND ICONS FOR DROPDOWN ───────────────────────────────────────────
 const WhatsAppMin = () => (
@@ -85,11 +86,8 @@ export default function LandingNavbar({ onLoginClick, onProductClick }: { onLogi
           
           {/* Logo & Links */}
           <div className="flex items-center gap-10">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shrink-0 shadow-lg shadow-blue-600/35">
-                <Globe className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-black text-white tracking-tight">Arias CRM</span>
+            <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+              <Logo mode="dark" height={56} />
             </Link>
 
             <div className="hidden lg:flex items-center gap-8">

@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { Shield, Target, Zap, Bot, MessageSquare, Sparkles } from 'lucide-react';
+import Logo from '../components/ui/Logo';
 
 export default function AuthLayout() {
     return (
@@ -21,17 +22,7 @@ export default function AuthLayout() {
                 <div className="mx-auto w-full max-w-md">
                     {/* Arias Premium Logo */}
                     <div className="text-left mb-10">
-                        <div className="flex items-center gap-3">
-                            <div className="w-11 h-11 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25 border border-blue-400/20">
-                                <Sparkles className="w-5.5 h-5.5 text-white animate-pulse" />
-                            </div>
-                            <div>
-                                <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-1.5">
-                                    Arias <span className="text-blue-500">CRM</span>
-                                </h2>
-                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">SALES INTEL ENGINE</p>
-                            </div>
-                        </div>
+                        <Logo mode="dark" height={56} />
                     </div>
 
                     {/* Form Outlet */}

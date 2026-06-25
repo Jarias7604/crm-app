@@ -1,5 +1,6 @@
 import { Globe, Twitter, Linkedin, Facebook, Youtube } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import Logo from '../ui/Logo';
 
 export default function LandingFooter() {
   const { i18n } = useTranslation();
@@ -11,10 +12,7 @@ export default function LandingFooter() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 lg:gap-12 mb-14">
           <div className="col-span-2 lg:col-span-1">
             <div className="flex items-center gap-2 mb-5 text-white">
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shrink-0">
-                <Globe className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold tracking-tight">Arias CRM</span>
+              <Logo mode="dark" height={48} />
             </div>
             <p className="text-sm text-slate-400 mb-5">
               {en ? 'The #1 Agentic AI CRM. Humans with Agents drive customer success together.' : 'El CRM con IA Agéntica #1. Humanos y Agentes impulsan el éxito del cliente juntos.'}
