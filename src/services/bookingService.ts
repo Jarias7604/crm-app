@@ -422,7 +422,12 @@ export const bookingService = {
             return [];
         }
 
-        const d = new Date(date + 'T00:00:00');
+        const parts = date.split('-');
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        const dayVal = parseInt(parts[2], 10);
+
+        const d = new Date(y, m, dayVal, 0, 0, 0);
         const dayOfWeek = d.getDay(); // 0=Sun...6=Sat
         const avail = availability.find(a => a.day === dayOfWeek);
         if (!avail) return [];
@@ -431,9 +436,9 @@ export const bookingService = {
         const [endH, endM]     = avail.end.split(':').map(Number);
 
         const slots: string[] = [];
-        let cursor = new Date(date + 'T00:00:00');
+        let cursor = new Date(y, m, dayVal, 0, 0, 0);
         cursor.setHours(startH, startM, 0, 0);
-        const dayEnd = new Date(date + 'T00:00:00');
+        const dayEnd = new Date(y, m, dayVal, 0, 0, 0);
         dayEnd.setHours(endH, endM, 0, 0);
 
         const now = new Date();

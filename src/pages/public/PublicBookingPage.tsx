@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { bookingService, type BookingLink } from '../../services/bookingService';
 import { Clock, MapPin, ChevronLeft, ChevronRight, Check, Loader2, User, Mail, Phone, Building2, MessageSquare, ArrowLeft, Globe, Calendar as CalIcon, Shield, Video } from 'lucide-react';
@@ -32,6 +32,7 @@ export default function PublicBookingPage() {
     const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
     const [slots, setSlots] = useState<string[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
+    const slotsRef = useRef<HTMLDivElement>(null);
 
     const [form, setForm] = useState({ name: '', email: '', phone: '', company: '', notes: '' });
     const [submitting, setSubmitting] = useState(false);
@@ -83,6 +84,13 @@ export default function PublicBookingPage() {
             setSlots(s);
             setSelectedSlot(null);
             setLoadingSlots(false);
+            
+            // Auto scroll to slots on mobile/tablets
+            if (window.innerWidth < 768 && slotsRef.current) {
+                setTimeout(() => {
+                    slotsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }, 100);
+            }
         });
     }, [link, selectedDate]);
 
@@ -440,7 +448,7 @@ export default function PublicBookingPage() {
                                 </div>
 
                                 {/* RIGHT — Time Slots — always visible */}
-                                <div className="md:w-[220px] shrink-0 py-6 px-5 flex flex-col justify-start">
+                                <div ref={slotsRef} className="md:w-[220px] shrink-0 py-6 px-5 flex flex-col justify-start">
                                     {!selectedDate ? (
                                         <div className="flex flex-col items-center justify-center h-full text-center py-16">
                                             <CalIcon className="w-8 h-8 text-gray-100 mb-2" />
