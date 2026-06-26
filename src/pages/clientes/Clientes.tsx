@@ -283,8 +283,10 @@ export default function Clientes() {
 
                   {/* Name */}
                   <div className="w-40 flex-shrink-0">
-                    <p className="text-sm font-bold text-gray-900 truncate">{client.nombre}</p>
-                    <p className="text-xs text-gray-400 truncate">{client.contacto || '—'}</p>
+                    <p className="text-sm font-bold text-gray-900 truncate" title={client.nombre}>{client.nombre}</p>
+                    <span className="text-xs text-blue-600 font-bold truncate block" title={client.company_name_lead || (client.contacto !== client.nombre ? client.contacto : undefined) || 'Individual'}>
+                      {client.company_name_lead || (client.contacto !== client.nombre ? client.contacto : null) || 'Individual'}
+                    </span>
                   </div>
 
                   {/* Pipeline stepper */}

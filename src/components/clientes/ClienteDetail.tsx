@@ -205,7 +205,9 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
             ) : (
               <>
                 <h2 className="text-lg font-black text-gray-900">{client?.nombre}</h2>
-                <p className="text-sm text-gray-500 mt-0.5">{client?.contacto}</p>
+                <p className="text-xs text-blue-600 font-bold mt-0.5">
+                   {client?.company_name_lead || (client?.contacto !== client?.nombre ? client?.contacto : null) || 'Individual'}
+                </p>
                 <div className="flex flex-wrap items-center gap-3 mt-1.5">
                   {client?.telefono && (
                     <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">

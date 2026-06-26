@@ -55,6 +55,8 @@ export interface Client {
   stage_history?: { stage_id: string; entered_at: string; exited_at: string | null }[];
   // fecha real de cierre del trato (viene del lead asociado)
   fecha_cierre_lead?: string | null;
+  // nombre de la empresa del lead asociado
+  company_name_lead?: string | null;
 }
 
 export interface ClientDocument {

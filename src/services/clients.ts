@@ -123,7 +123,7 @@ export const clientsService = {
           assigned_profile:profiles(id, full_name, email),
           doc_count:client_documents(count),
           stage_history:client_stage_history(stage_id, entered_at, exited_at),
-          lead:leads(fecha_cierre)
+          lead:leads(fecha_cierre, company_name)
         `)
     ).order('created_at', { ascending: false });
 
@@ -139,6 +139,7 @@ export const clientsService = {
       ...c,
       doc_count: c.doc_count?.[0]?.count ?? 0,
       fecha_cierre_lead: c.lead?.fecha_cierre ?? null,
+      company_name_lead: c.lead?.company_name ?? null,
     })) as unknown as Client[];
   },
 
@@ -150,12 +151,16 @@ export const clientsService = {
         etapa_actual:client_pipeline_stages(*, document_types:client_stage_document_types(*)),
         assigned_profile:profiles(id, full_name, email),
         documents:client_documents(*, doc_type:client_stage_document_types(*), uploader:profiles(full_name, email)),
-        stage_history:client_stage_history(stage_id, entered_at, exited_at)
+        stage_history:client_stage_history(stage_id, entered_at, exited_at),
+        lead:leads(company_name)
       `)
       .eq('id', id)
       .single();
     if (error) throw error;
-    return data as unknown as Client;
+    return {
+      ...data,
+      company_name_lead: data.lead?.company_name ?? null,
+    } as unknown as Client;
   },
 
   async create(input: CreateClientInput): Promise<Client> {
