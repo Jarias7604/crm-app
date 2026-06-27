@@ -151,9 +151,28 @@ async function urlToBase64(url: string): Promise<string> {
   }
 }
 
-function getThematicImages(prompt: string): string[] {
-  const lower = prompt.toLowerCase();
+function getThematicImages(prompt: string, industry?: string): string[] {
+  const lower = (prompt + ' ' + (industry || '')).toLowerCase();
   
+  if (/\b(crm|software|saas|aplicaci[oó]n|sistema|tecnolog[íi]a|digital|embudos|pipeline|automatizaci[oó]n|analytics|plataforma|startup|desarrollador|programaci[oó]n|ecommerce|inteligencia artificial)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1504639725590-34d0984388bd?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1551434678-e076c223a692?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1560472355-536de3962603?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1553877522-43269d4ea984?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
   if (/\b(pizza|comida|restaurante|food|pupusa|pupusas|taco|tacos|burger|hamburguesa|sushi)\b/i.test(lower)) {
     return [
       'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1080&q=80',
@@ -230,7 +249,7 @@ function getThematicImages(prompt: string): string[] {
       'https://images.unsplash.com/photo-1614064641938-3bbee52942c7?auto=format&fit=crop&w=1080&q=80'
     ];
   }
-  if (/\b(taller|auto|carro|veh[íi]culo|mec[aá]nico|motor)\b/i.test(lower)) {
+  if (/\b(taller|carro|carros|veh[íi]culo|mec[aá]nico|automotriz|repuestos)\b/i.test(lower)) {
     return [
       'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=1080&q=80',
       'https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=1080&q=80',
@@ -1086,7 +1105,7 @@ export default function FlyerStudio() {
     } catch (e: any) {
       console.warn('AI generation failed, applying premium stock fallback:', e);
       // Fallback: search for keywords in the prompt to match beautiful Unsplash stock images
-      const fallbackImgs = getThematicImages(prompt);
+      const fallbackImgs = getThematicImages(prompt, selectedIndustry);
       let shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
       if (currentImg && fallbackImgs.length > 1) {
         let attempts = 0;
@@ -1154,7 +1173,7 @@ export default function FlyerStudio() {
       console.warn('AI photo search failed, using local theme fallback:', err);
       toast.dismiss(searchToastId);
       
-      const pool = getThematicImages(prompt);
+      const pool = getThematicImages(prompt, selectedIndustry);
       if (pool.length === 0) {
         toast.error('No se encontraron imágenes para esta descripción.');
         return;
