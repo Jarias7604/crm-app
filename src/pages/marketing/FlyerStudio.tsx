@@ -602,6 +602,7 @@ export default function FlyerStudio() {
   const [industries, setIndustries] = useState<any[]>([]);
   const [selectedIndustry, setSelectedIndustry] = useState<string>('auto');
   const [isIndustryDropdownOpen, setIsIndustryDropdownOpen] = useState(false);
+  const [industrySearchQuery, setIndustrySearchQuery] = useState('');
   // Saved designs states
   const [savedFlyers, setSavedFlyers] = useState<any[]>([]);
   const [loadingSavedFlyers, setLoadingSavedFlyers] = useState(false);
@@ -613,6 +614,10 @@ export default function FlyerStudio() {
   const [loadedFlyerName, setLoadedFlyerName] = useState<string | null>(null);
   const [editingFlyerId, setEditingFlyerId] = useState<string | null>(null);
   const [editingFlyerName, setEditingFlyerName] = useState('');
+
+  const filteredIndustries = industries.filter(ind =>
+    (ind.name || '').toLowerCase().includes(industrySearchQuery.toLowerCase())
+  );
 
   const updateFont = (val: string, element: 'title' | 'subtitle' | 'benefits' | 'cta' | 'contact') => {
     if (syncFonts) {
@@ -992,6 +997,7 @@ export default function FlyerStudio() {
   useEffect(() => {
     setIsFontDropdownOpen(false);
     setIsIndustryDropdownOpen(false);
+    setIndustrySearchQuery('');
   }, [editingElement]);
 
   // Load dynamic industries configured in settings
@@ -1836,6 +1842,7 @@ export default function FlyerStudio() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setIsIndustryDropdownOpen(false);
+                        setIndustrySearchQuery('');
                       }} 
                     />
                     {/* Custom Options List */}
@@ -1850,7 +1857,7 @@ export default function FlyerStudio() {
                       borderRadius: '10px',
                       boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
                       zIndex: 10000,
-                      maxHeight: 280,
+                      maxHeight: 380,
                       overflowY: 'auto',
                       padding: 4,
                       display: 'flex',
@@ -1858,59 +1865,47 @@ export default function FlyerStudio() {
                       gap: 2,
                       boxSizing: 'border-box'
                     }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedIndustry('auto');
-                          setIsIndustryDropdownOpen(false);
-                          if (variants.length > 0) {
-                            setVariants([]);
-                            setSelected(0);
-                            setPreviewMode('template');
-                          }
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '10px 12px',
-                          fontSize: '12px',
-                          fontWeight: selectedIndustry === 'auto' ? 800 : 600,
-                          textAlign: 'left',
-                          border: 'none',
-                          borderRadius: '8px',
-                          background: selectedIndustry === 'auto' ? '#f5f3ff' : 'transparent',
-                          color: selectedIndustry === 'auto' ? '#6366f1' : '#334155',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          transition: 'all 0.15s ease',
-                          boxSizing: 'border-box'
-                        }}
-                        onMouseEnter={e => {
-                          if (selectedIndustry !== 'auto') {
-                            e.currentTarget.style.background = '#f8fafc';
-                          }
-                        }}
-                        onMouseLeave={e => {
-                          if (selectedIndustry !== 'auto') {
-                            e.currentTarget.style.background = 'transparent';
-                          }
-                        }}
-                      >
-                        ✨ Detectar Automáticamente con IA
-                      </button>
+                      {/* Search Bar */}
+                      <div style={{
+                        position: 'sticky',
+                        top: 0,
+                        background: '#ffffff',
+                        padding: '4px 4px 8px 4px',
+                        borderBottom: '1px solid #f1f5f9',
+                        marginBottom: 4,
+                        zIndex: 10001
+                      }}>
+                        <input
+                          type="text"
+                          placeholder="🔍 Buscar rubro/industria..."
+                          value={industrySearchQuery}
+                          onChange={e => setIndustrySearchQuery(e.target.value)}
+                          onClick={e => e.stopPropagation()} // Prevent close
+                          style={{
+                            width: '100%',
+                            border: '1.5px solid #cbd5e1',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            fontSize: '12px',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                            fontFamily: 'inherit',
+                            transition: 'border-color 0.15s'
+                          }}
+                          onFocus={e => e.target.style.borderColor = '#7c3aed'}
+                          onBlur={e => e.target.style.borderColor = '#cbd5e1'}
+                        />
+                      </div>
 
-                      <div style={{ height: '1px', background: '#f1f5f9', margin: '4px 8px' }} />
-
-                      {industries.map(ind => {
-                        const isSelected = selectedIndustry === ind.name;
-                        return (
+                      {/* If search query is empty, show 'Detectar Automáticamente con IA' */}
+                      {!industrySearchQuery.trim() && (
+                        <>
                           <button
-                            key={ind.id}
                             type="button"
                             onClick={() => {
-                              setSelectedIndustry(ind.name);
+                              setSelectedIndustry('auto');
                               setIsIndustryDropdownOpen(false);
+                              setIndustrySearchQuery('');
                               if (variants.length > 0) {
                                 setVariants([]);
                                 setSelected(0);
@@ -1919,33 +1914,90 @@ export default function FlyerStudio() {
                             }}
                             style={{
                               width: '100%',
-                              padding: '10px 12px',
+                              padding: '5px 10px',
                               fontSize: '12px',
-                              fontWeight: isSelected ? 800 : 600,
+                              fontWeight: selectedIndustry === 'auto' ? 800 : 600,
                               textAlign: 'left',
                               border: 'none',
                               borderRadius: '8px',
-                              background: isSelected ? '#eff6ff' : 'transparent',
-                              color: isSelected ? '#1d4ed8' : '#334155',
+                              background: selectedIndustry === 'auto' ? '#f5f3ff' : 'transparent',
+                              color: selectedIndustry === 'auto' ? '#6366f1' : '#334155',
                               cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
                               transition: 'all 0.15s ease',
                               boxSizing: 'border-box'
                             }}
                             onMouseEnter={e => {
-                              if (!isSelected) {
+                              if (selectedIndustry !== 'auto') {
                                 e.currentTarget.style.background = '#f8fafc';
                               }
                             }}
                             onMouseLeave={e => {
-                              if (!isSelected) {
+                              if (selectedIndustry !== 'auto') {
                                 e.currentTarget.style.background = 'transparent';
                               }
                             }}
                           >
-                            {ind.name}
+                            ✨ Detectar Automáticamente con IA
                           </button>
-                        );
-                      })}
+
+                          <div style={{ height: '1px', background: '#f1f5f9', margin: '4px 8px' }} />
+                        </>
+                      )}
+
+                      {filteredIndustries.length === 0 ? (
+                        <div style={{ padding: '8px 12px', fontSize: '11px', color: '#64748b', textAlign: 'center' }}>
+                          No se encontraron rubros
+                        </div>
+                      ) : (
+                        filteredIndustries.map(ind => {
+                          const isSelected = selectedIndustry === ind.name;
+                          return (
+                            <button
+                              key={ind.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedIndustry(ind.name);
+                                setIsIndustryDropdownOpen(false);
+                                setIndustrySearchQuery('');
+                                if (variants.length > 0) {
+                                  setVariants([]);
+                                  setSelected(0);
+                                  setPreviewMode('template');
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '5px 10px',
+                                fontSize: '12px',
+                                fontWeight: isSelected ? 800 : 600,
+                                textAlign: 'left',
+                                border: 'none',
+                                borderRadius: '8px',
+                                background: isSelected ? '#eff6ff' : 'transparent',
+                                color: isSelected ? '#1d4ed8' : '#334155',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                boxSizing: 'border-box'
+                              }}
+                              onMouseEnter={e => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = '#f8fafc';
+                                }
+                              }}
+                              onMouseLeave={e => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.background = 'transparent';
+                                }
+                              }}
+                            >
+                              {ind.name}
+                            </button>
+                          );
+                        })
+                      )}
                     </div>
                   </>
                 )}
