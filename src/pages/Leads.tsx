@@ -778,6 +778,12 @@ export default function Leads() {
     const handleFileDownload = async () => {
         if (!selectedLead?.document_path) return;
         try {
+            if (selectedLead.document_path.startsWith('cotizacion:')) {
+                const cotId = selectedLead.document_path.replace('cotizacion:', '');
+                navigate(`/cotizaciones/${cotId}`);
+                setIsDetailOpen(false);
+                return;
+            }
             const url = await storageService.getDownloadUrl(selectedLead.document_path);
             const a = document.createElement('a');
             a.href = url;
@@ -798,7 +804,9 @@ export default function Leads() {
         if (!confirm('¿Estás seguro de eliminar este documento?')) return;
 
         try {
-            await storageService.deleteFile(selectedLead.document_path);
+            if (!selectedLead.document_path.startsWith('cotizacion:')) {
+                await storageService.deleteFile(selectedLead.document_path);
+            }
             await leadsService.updateLead(selectedLead.id, { document_path: null });
             setSelectedLead({ ...selectedLead, document_path: null });
             queryClient.invalidateQueries({ queryKey: ['leads'] });

@@ -514,8 +514,12 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 <FileText className="w-5 h-5 text-blue-600" />
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-xs font-bold text-blue-900 truncate">Documento del Lead.pdf</p>
-                                                <p className="text-[10px] text-blue-600 uppercase">PDF Adjunto</p>
+                                                <p className="text-xs font-bold text-blue-900 truncate">
+                                                    {selectedLead.document_path.startsWith('cotizacion:') ? 'Propuesta Comercial (CRM).pdf' : 'Documento del Lead.pdf'}
+                                                </p>
+                                                <p className="text-[10px] text-blue-600 uppercase">
+                                                    {selectedLead.document_path.startsWith('cotizacion:') ? 'Cotización CRM' : 'PDF Adjunto'}
+                                                </p>
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
