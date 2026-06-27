@@ -1165,8 +1165,11 @@ export default function FlyerStudio() {
         throw new Error(error?.message || 'No se obtuvieron suficientes fotos');
       }
       
+      // Shuffle so each click shows a different order
+      const shuffled = [...data.photos].sort(() => Math.random() - 0.5);
       toast.success('¡Imágenes encontradas!', { id: searchToastId });
-      setFreePhotosPool(data.photos);
+      setFreePhotosPool(shuffled);
+
       setFreePhotoIndex(0);
       setIsFreePhotoModalOpen(true);
     } catch (err: any) {
