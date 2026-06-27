@@ -1105,14 +1105,41 @@ export default function FlyerStudio() {
 
   async function generateFree() {
     if (!prompt.trim()) { toast.error('Describe qué quieres promocionar'); return; }
-    const pool = getThematicImages(prompt);
-    if (pool.length === 0) {
-      toast.error('No se encontraron imágenes para esta descripción.');
-      return;
+    
+    setGenerating(true);
+    const searchToastId = toast.loading('Buscando imágenes sugeridas por la IA...');
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('flyer-recommend', {
+        body: {
+          action: 'search-photos',
+          prompt: prompt
+        }
+      });
+      
+      if (error || !data?.photos || data.photos.length < 4) {
+        throw new Error(error?.message || 'No se obtuvieron suficientes fotos');
+      }
+      
+      toast.success('¡Imágenes encontradas!', { id: searchToastId });
+      setFreePhotosPool(data.photos);
+      setFreePhotoIndex(0);
+      setIsFreePhotoModalOpen(true);
+    } catch (err: any) {
+      console.warn('AI photo search failed, using local theme fallback:', err);
+      toast.dismiss(searchToastId);
+      
+      const pool = getThematicImages(prompt);
+      if (pool.length === 0) {
+        toast.error('No se encontraron imágenes para esta descripción.');
+        return;
+      }
+      setFreePhotosPool(pool);
+      setFreePhotoIndex(0);
+      setIsFreePhotoModalOpen(true);
+    } finally {
+      setGenerating(false);
     }
-    setFreePhotosPool(pool);
-    setFreePhotoIndex(0);
-    setIsFreePhotoModalOpen(true);
   }
 
   async function handleSelectFreePhoto(selectedPhoto: string) {

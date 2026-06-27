@@ -16,7 +16,98 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { industria, oferta, tono, idioma = 'es', images } = await req.json();
+    const body = await req.json();
+    const { action, prompt, industria, oferta, tono, idioma = 'es', images } = body;
+
+    const openaiKey = Deno.env.get('OPENAI_API_KEY') || '';
+
+    // Handle dynamic photo search
+    if (action === 'search-photos') {
+      if (!prompt) {
+        return new Response(JSON.stringify({ error: 'Falta el prompt de búsqueda' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!openaiKey) {
+        return new Response(JSON.stringify({ error: 'Falta la configuración de OpenAI Key' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Translate/extract optimal English search keywords
+      const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an AI that translates creative briefs into 1 or 2 search terms in English for stock photos (e.g. Unsplash). Output ONLY the comma-separated search terms, nothing else. No punctuation, no quotes, no markdown.'
+            },
+            {
+              role: 'user',
+              content: `Extract search terms for: "${prompt}"`
+            }
+          ],
+          temperature: 0.3
+        })
+      });
+
+      if (!gptRes.ok) {
+        throw new Error('OpenAI keyword extraction failed');
+      }
+
+      const gptData = await gptRes.json();
+      const keywords = gptData.choices?.[0]?.message?.content?.trim() || 'marketing';
+
+      // Search Unsplash by fetching public search page
+      let uniquePhotos = [];
+      try {
+        const searchUrl = `https://unsplash.com/s/photos/${encodeURIComponent(keywords)}`;
+        const res = await fetch(searchUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          }
+        });
+
+        if (res.ok) {
+          const html = await res.text();
+          const matches = html.match(/https:\/\/images\.unsplash\.com\/photo-[a-zA-Z0-9_-]+/g) || [];
+          uniquePhotos = Array.from(new Set(matches))
+            .slice(0, 18)
+            .map(url => `${url}?auto=format&fit=crop&w=1080&q=80`);
+        } else {
+          console.warn(`Unsplash returned non-200 status: ${res.status} ${res.statusText}`);
+        }
+      } catch (err) {
+        console.warn('Unsplash fetch failed, using LoremFlickr fallback:', err.message);
+      }
+
+      // Fallback robusto a LoremFlickr si no pudimos extraer fotos de Unsplash
+      if (uniquePhotos.length < 4) {
+        const words = keywords
+          .toLowerCase()
+          .replace(/[^a-z0-9, ]/g, '')
+          .split(/[\s,]+/)
+          .filter(w => w.length > 2);
+        const tags = words.slice(0, 2).join(',');
+
+        uniquePhotos = Array.from({ length: 15 }, (_, i) => 
+          `https://loremflickr.com/1080/1080/${tags || 'business'}?random=${i + 1}`
+        );
+      }
+
+      return new Response(JSON.stringify({ photos: uniquePhotos }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     if (!oferta) {
       return new Response(JSON.stringify({ error: 'Falta la descripción de la oferta' }), {
@@ -25,7 +116,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const openaiKey = Deno.env.get('OPENAI_API_KEY') || '';
     if (!openaiKey) {
       // Fallback local robusto por si no hay API key configurada
       return new Response(JSON.stringify({ ideas: getFallbackIdeas(industria, oferta, tono) }), {
@@ -33,7 +123,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const prompt = `Analiza la oferta comercial y el rubro provisto por el usuario y genera exactamente 3 ideas diferentes, creativas y altamente persuasivas para flyers publicitarios de redes sociales.
+    const gptPrompt = `Analiza la oferta comercial y el rubro provisto por el usuario y genera exactamente 3 ideas diferentes, creativas y altamente persuasivas para flyers publicitarios de redes sociales.
     
     Rubro/Industria: ${industria}
     Oferta Comercial: ${oferta}
@@ -50,7 +140,7 @@ Deno.serve(async (req) => {
 
     Devuelve la respuesta estrictamente como un objeto JSON con la clave "ideas" que contenga un arreglo de 3 objetos con las propiedades indicadas. No agregues explicaciones externas ni markdown de código.`;
 
-    const userContent: any[] = [{ type: 'text', text: prompt }];
+    const userContent: any[] = [{ type: 'text', text: gptPrompt }];
 
     if (images && Array.isArray(images)) {
       for (const img of images) {
