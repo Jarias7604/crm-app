@@ -186,17 +186,17 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
     const firstLine = lines[0];
     const firstLineWords = firstLine.split(/\s+/);
     
-    if (firstLineWords.length <= 14) {
-      // If the first line is reasonably short (<= 14 words), keep it entirely as h1
+    if (firstLineWords.length <= 6) {
+      // If the first line is reasonably short (<= 6 words), keep it entirely as h1
       h1 = cleanPhrase(firstLine);
       if (!h2 && lines.length > 1) {
         h2 = cleanPhrase(lines[1]);
       }
     } else {
-      // If the first line is long (> 14 words), split it dynamically using connectors
+      // If the first line is long (> 6 words), split it dynamically using connectors
       let splitIdx = -1;
-      // Search for a connector to split before, ideally between word 4 and 9
-      for (let i = 4; i <= 9 && i < firstLineWords.length; i++) {
+      // Search for a connector to split before, ideally between word 3 and 6
+      for (let i = 3; i <= 6 && i < firstLineWords.length; i++) {
         if (isConnector(firstLineWords[i])) {
           splitIdx = i;
           break;
@@ -209,8 +209,8 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
           h2 = cleanPhrase(firstLineWords.slice(splitIdx).join(' '));
         }
       } else {
-        // Fallback split in the middle (between 6 and 8 words)
-        const mid = Math.min(8, Math.max(5, Math.floor(firstLineWords.length / 2)));
+        // Fallback split in the middle (between 3 and 5 words)
+        const mid = Math.min(5, Math.max(3, Math.floor(firstLineWords.length / 2)));
         h1 = cleanPhrase(firstLineWords.slice(0, mid).join(' '));
         if (!h2) {
           h2 = cleanPhrase(firstLineWords.slice(mid).join(' '));
@@ -224,7 +224,7 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
     const parts = prompt.split(/[—|•]|\s{2,}/);
     if (parts.length > 1) {
       const firstPartWords = parts[0].trim().split(/\s+/);
-      if (firstPartWords.length <= 14) {
+      if (firstPartWords.length <= 6) {
         h1 = cleanPhrase(parts[0]);
         if (!h2) {
           h2 = cleanPhrase(parts[1]);
@@ -236,12 +236,12 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
   // 4. Fallbacks if h1 is still empty
   if (!h1) {
     const words = prompt.trim().split(/\s+/);
-    if (words.length <= 12) {
+    if (words.length <= 6) {
       h1 = cleanPhrase(prompt);
     } else {
       // Try to find a connector to split on
       let splitIdx = -1;
-      for (let i = 4; i <= 9 && i < words.length; i++) {
+      for (let i = 3; i <= 6 && i < words.length; i++) {
         if (isConnector(words[i])) {
           splitIdx = i;
           break;
@@ -253,7 +253,10 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
           h2 = cleanPhrase(words.slice(splitIdx).join(' '));
         }
       } else {
-        h1 = cleanPhrase(words.slice(0, 8).join(' '));
+        h1 = cleanPhrase(words.slice(0, 4).join(' '));
+        if (!h2) {
+          h2 = cleanPhrase(words.slice(4).join(' '));
+        }
       }
     }
   }
@@ -265,8 +268,13 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
     if (words.length > h1WordsCount) {
       h2 = cleanPhrase(words.slice(h1WordsCount, h1WordsCount + 12).join(' '));
     } else {
-      h2 = `${company} — Innovación a tu alcance`;
+      h2 = `${company} — Soluciones Profesionales`;
     }
+  }
+
+  // Clean-up if h2 is identical or subset of h1 to ensure meaningful subtitles
+  if (h2 && h1.toLowerCase().includes(h2.toLowerCase())) {
+    h2 = `${company} — Soluciones Profesionales`;
   }
 
   // Capitalize first letter of each sentence
