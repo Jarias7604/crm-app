@@ -30,71 +30,10 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (!openaiKey) {
-        return new Response(JSON.stringify({ error: 'Falta la configuración de OpenAI Key' }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Translate/extract optimal English search keywords
-      const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are an AI that translates creative briefs into 1 or 2 high-quality, professional, business-appropriate search terms in English for stock photos. The terms must reflect a professional workspace, corporate environment, technology, or business success. Avoid casual social terms (like "conversations", "chats", "whatsapp", "friends") that yield casual, non-business photos. Instead, use professional keywords (like "office", "business", "technology", "marketing", "analytics", "collaboration"). Output ONLY the comma-separated search terms, nothing else. No punctuation, no quotes, no markdown.'
-            },
-            {
-              role: 'user',
-              content: `Target business industry: "${industry || 'General'}"
-Creative brief: "${prompt}"
-
-Translate the target industry and creative brief, and extract 1 or 2 high-quality, professional English search terms for stock photos.`
-            }
-          ],
-          temperature: 0.3
-        })
-      });
-
-      if (!gptRes.ok) {
-        throw new Error('OpenAI keyword extraction failed');
-      }
-
-      const gptData = await gptRes.json();
-      const keywords = gptData.choices?.[0]?.message?.content?.trim() || 'marketing';
-
-      // Search Unsplash by fetching public search page
-      let uniquePhotos = [];
-      try {
-        const searchUrl = `https://unsplash.com/s/photos/${encodeURIComponent(keywords)}`;
-        const res = await fetch(searchUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-          }
-        });
-
-        if (res.ok) {
-          const html = await res.text();
-          const matches = html.match(/https:\/\/images\.unsplash\.com\/photo-[a-zA-Z0-9_-]+/g) || [];
-          uniquePhotos = Array.from(new Set(matches))
-            .slice(0, 18)
-            .map(url => `${url}?auto=format&fit=crop&w=1080&q=80`);
-        } else {
-          console.warn(`Unsplash returned non-200 status: ${res.status} ${res.statusText}`);
-        }
-      } catch (err) {
-        console.warn('Unsplash fetch failed, using LoremFlickr fallback:', err.message);
-      }
-
-      // Fallback robusto a Unsplash curados de alta calidad si no pudimos extraer fotos de Unsplash
-      if (uniquePhotos.length < 4) {
+      // Use curated category matching directly — Unsplash HTML scraping is unreliable
+      // (returns random page images, not search results). Categories cover all major industries.
+      let uniquePhotos: string[] = [];
+      {
         const categories: Record<string, string[]> = {
           food: [
             'photo-1513104890138-7c749659a591',
@@ -384,31 +323,48 @@ Translate the target industry and creative brief, and extract 1 or 2 high-qualit
             'photo-1497215728101-856f4ea42174',
             'photo-1504384308090-c894fdcc538d',
             'photo-1517245386807-bb43f82c33c4'
+          ],
+          tech: [
+            'photo-1518770660439-4636190af475',
+            'photo-1488590528505-98d2b5aba04b',
+            'photo-1461749280684-dccba630e2f6',
+            'photo-1504639725590-34d0984388bd',
+            'photo-1551434678-e076c223a692',
+            'photo-1522071820081-009f0129c71c',
+            'photo-1542744173-8e7e53415bb0',
+            'photo-1486312338219-ce68d2c6f44d',
+            'photo-1498050108023-c5249f4df085',
+            'photo-1531297484001-80022131f5a1',
+            'photo-1519389950473-47ba0277781c',
+            'photo-1600880292203-757bb62b4baf',
+            'photo-1560472355-536de3962603',
+            'photo-1553877522-43269d4ea984',
+            'photo-1573164713714-d95e436ab8d6'
           ]
         };
 
-        const lower = (keywords + ' ' + (industry || '')).toLowerCase();
+        const lower = ((prompt || '') + ' ' + (industry || '')).toLowerCase();
         let chosenCategory = 'general';
 
         if (/\b(pizza|comida|restaurante|food|pupusa|pupusas|taco|tacos|burger|hamburguesa|sushi)\b/i.test(lower)) {
           chosenCategory = 'food';
-        } else if (/\b(dentista|dental|diente|dientes|cl[íi]nica|odontolog[íi]a)\b/i.test(lower)) {
+        } else if (/\b(crm|software|saas|aplicaci[oó]n|app|sistema|tecnolog[íi]a|digital|ventas en l[íi]nea|marketing digital|embudos|pipeline|automatizaci[oó]n|analytics|plataforma|startup|desarrollador|programaci[oó]n|web|ecommerce|e-commerce|inteligencia artificial|ia)\b/i.test(lower)) {
+          chosenCategory = 'tech';
+        } else if (/\b(dentista|dental|diente|dientes|cl[íi]nica dental|odontolog[íi]a)\b/i.test(lower)) {
           chosenCategory = 'dental';
-        } else if (/\b(doctor|doctores|m[eé]dico|m[eé]dicos|farmacia|farmacias|medicina|medicinas|salud|hospital|hospitales|cl[íi]nica|cl[íi]nicas|medical|consultorio|pediatra|terapia|enfermera)\b/i.test(lower)) {
+        } else if (/\b(doctor|doctores|m[eé]dico|m[eé]dicos|farmacia|farmacias|medicina|medicinas|salud|hospital|hospitales|cl[íi]nica|medical|consultorio|pediatra|terapia|enfermera)\b/i.test(lower)) {
           chosenCategory = 'medical';
-        } else if (/\b(defensa|seguridad|karate|marciales|taekwondo)\b/i.test(lower)) {
+        } else if (/\b(defensa|karate|marciales|taekwondo)\b/i.test(lower)) {
           chosenCategory = 'defense';
-        } else if (/\b(taller|auto|carro|veh[íi]culo|mec[aá]nico|motor|repuestos)\b/i.test(lower)) {
-          chosenCategory = 'auto';
         } else if (/\b(belleza|salon|sal[oó]n|u[ñn]as|spa|maquillaje|cabello|peluquer[íi]a)\b/i.test(lower)) {
           chosenCategory = 'beauty';
         } else if (/\b(gym|gimnasio|fit|fitness|ejercicio|entrenamiento)\b/i.test(lower)) {
           chosenCategory = 'gym';
-        } else if (/\b(abogado|legal|firma|consultor[íi]a|leyes|derecho)\b/i.test(lower)) {
+        } else if (/\b(abogado|legal|firma|leyes|derecho)\b/i.test(lower)) {
           chosenCategory = 'legal';
         } else if (/\b(cafe|café|panaderia|panader[íi]a|reposter[íi]a|dulce|cafeter[íi]a)\b/i.test(lower)) {
           chosenCategory = 'cafe';
-        } else if (/\b(casa|inmobiliaria|apartamento|hogar|propiedad|real estate|construccion|construcci[oó]n)\b/i.test(lower)) {
+        } else if (/\b(casa|inmobiliaria|apartamento|hogar|propiedad|real estate|construcci[oó]n)\b/i.test(lower)) {
           chosenCategory = 'realestate';
         } else if (/\b(perro|gato|mascota|veterinario|veterinaria|animal)\b/i.test(lower)) {
           chosenCategory = 'pets';
@@ -416,12 +372,14 @@ Translate the target industry and creative brief, and extract 1 or 2 high-qualit
           chosenCategory = 'education';
         } else if (/\b(limpieza|lavado|limpiar|planchado|orden)\b/i.test(lower)) {
           chosenCategory = 'cleaning';
-        } else if (/\b(yoga|wellness|meditacion|meditaci[oó]n|relajacion|relajaci[oó]n)\b/i.test(lower)) {
+        } else if (/\b(yoga|wellness|meditaci[oó]n|relajaci[oó]n)\b/i.test(lower)) {
           chosenCategory = 'yoga';
         } else if (/\b(contable|finanzas|dinero|taxes|impuestos|accounting)\b/i.test(lower)) {
           chosenCategory = 'accounting';
-        } else if (/\b(ferreter[íi]a|ferreter[íi]as|herramienta|herramientas|tornillo|tornillos|martillo|carpinter[íi]a|pintura|brocha|brochas|tools)\b/i.test(lower)) {
+        } else if (/\b(ferreter[íi]a|herramienta|herramientas|tornillo|martillo|carpinter[íi]a|brocha|tools)\b/i.test(lower)) {
           chosenCategory = 'hardware';
+        } else if (/\b(taller|carro|carros|veh[íi]culo|mec[aá]nico|repuestos|automotriz)\b/i.test(lower)) {
+          chosenCategory = 'auto';
         }
 
         const photoIds = categories[chosenCategory] || categories.general;
