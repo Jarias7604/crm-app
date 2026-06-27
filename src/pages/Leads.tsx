@@ -779,11 +779,19 @@ export default function Leads() {
         if (!selectedLead?.document_path) return;
         try {
             const url = await storageService.getDownloadUrl(selectedLead.document_path);
-            window.open(url, '_blank');
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = selectedLead.document_path.split('/').pop() || 'documento.pdf';
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         } catch (error: any) {
             toast.error('Error al descargar: ' + error.message);
         }
     };
+
 
     const handleFileDelete = async () => {
         if (!selectedLead?.document_path) return;
