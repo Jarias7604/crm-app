@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { action, prompt, industria, oferta, tono, idioma = 'es', images } = body;
+    const { action, prompt, industria, oferta, tono, idioma = 'es', images, industry } = body;
 
     const openaiKey = Deno.env.get('OPENAI_API_KEY') || '';
 
@@ -53,7 +53,10 @@ Deno.serve(async (req) => {
             },
             {
               role: 'user',
-              content: `Extract search terms for: "${prompt}"`
+              content: `Target business industry: "${industry || 'General'}"
+Creative brief: "${prompt}"
+
+Translate the target industry and creative brief, and extract 1 or 2 high-quality, professional English search terms for stock photos.`
             }
           ],
           temperature: 0.3

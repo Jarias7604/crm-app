@@ -19,6 +19,7 @@ import type { FlyerData } from './FlyerTemplates';
 import { FlyerTemplateA, FlyerTemplateB, parsePrompt, deriveHeadline, deriveFeatures, derivePrice, deriveCta } from '../../components/flyers/FlyerTemplates';
 import { brandingService } from '../../services/branding';
 import { storageService } from '../../services/storage';
+import { industriesService } from '../../services/industries';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const FORMATS = [
@@ -598,6 +599,8 @@ export default function FlyerStudio() {
   const [contactFont, setContactFont] = useState('Outfit');
   const [syncFonts, setSyncFonts] = useState(false);
   const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
+  const [industries, setIndustries] = useState<any[]>([]);
+  const [selectedIndustry, setSelectedIndustry] = useState<string>('auto');
   // Saved designs states
   const [savedFlyers, setSavedFlyers] = useState<any[]>([]);
   const [loadingSavedFlyers, setLoadingSavedFlyers] = useState(false);
@@ -989,6 +992,19 @@ export default function FlyerStudio() {
     setIsFontDropdownOpen(false);
   }, [editingElement]);
 
+  // Load dynamic industries configured in settings
+  useEffect(() => {
+    async function loadIndustries() {
+      try {
+        const list = await industriesService.getIndustries();
+        setIndustries(list || []);
+      } catch (err) {
+        console.error('Failed to load industries in FlyerStudio:', err);
+      }
+    }
+    loadIndustries();
+  }, []);
+
   // Auto-optimize debounced effect removed to prevent overriding user typing. A manual button is now used instead.
 
   function toggleColor(hex: string) {
@@ -1113,7 +1129,8 @@ export default function FlyerStudio() {
       const { data, error } = await supabase.functions.invoke('flyer-recommend', {
         body: {
           action: 'search-photos',
-          prompt: prompt
+          prompt: prompt,
+          industry: selectedIndustry
         }
       });
       
@@ -1772,6 +1789,31 @@ export default function FlyerStudio() {
           </div>
 
           <div className="flyer-studio-col" style={css.colBody}>
+            {/* Rubro / Industria Selector */}
+            <div style={css.section}>
+              <label style={css.label}>Rubro / Industria del Negocio</label>
+              <select
+                id="select-industry"
+                value={selectedIndustry}
+                onChange={e => {
+                  setSelectedIndustry(e.target.value);
+                  if (variants.length > 0) {
+                    setVariants([]);
+                    setSelected(0);
+                    setPreviewMode('template');
+                  }
+                }}
+                style={css.select}
+              >
+                <option value="auto">✨ Detectar Automáticamente con IA</option>
+                {industries.map(ind => (
+                  <option key={ind.id} value={ind.name}>
+                    {ind.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Prompt */}
             <div style={css.section}>
               <label style={css.label}>¿Qué quieres promocionar? *</label>
