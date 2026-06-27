@@ -1038,15 +1038,15 @@ export const pdfService = {
             // ── BYPASS UPLOAD IF NO SESSION (CLIENT/ANONYMOUS VIEW) ──
             // Anonymous clients on public pages do not have storage upload permissions.
             // Bypassing upload prevents RLS/403 errors and returns a local blob URL immediately.
-            let session = null;
+            let hasSession = false;
             try {
                 const sessionRes = await supabase.auth.getSession();
-                session = sessionRes?.data?.session;
+                hasSession = !!sessionRes?.data?.session;
             } catch (authErr) {
                 console.warn('[PDF Service] Error checking session, defaulting to anonymous:', authErr);
             }
 
-            if (!session) {
+            if (!hasSession) {
                 console.log('[PDF Service] No authenticated session. Skipping storage upload, returning local blob URL.');
                 return URL.createObjectURL(pdfBlob);
             }
