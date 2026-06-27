@@ -601,6 +601,7 @@ export default function FlyerStudio() {
   const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
   const [industries, setIndustries] = useState<any[]>([]);
   const [selectedIndustry, setSelectedIndustry] = useState<string>('auto');
+  const [isIndustryDropdownOpen, setIsIndustryDropdownOpen] = useState(false);
   // Saved designs states
   const [savedFlyers, setSavedFlyers] = useState<any[]>([]);
   const [loadingSavedFlyers, setLoadingSavedFlyers] = useState(false);
@@ -987,9 +988,10 @@ export default function FlyerStudio() {
     const derivedCta = parsed.cta || deriveCta(prompt) || 'CONTACTAR AHORA';
     setCta(derivedCta);
   }, [prompt, companyName, keepCustomText]);
-  // Reset font dropdown open state when switching edit elements or closing modals
+  // Reset dropdown open states when switching edit elements or closing modals
   useEffect(() => {
     setIsFontDropdownOpen(false);
+    setIsIndustryDropdownOpen(false);
   }, [editingElement]);
 
   // Load dynamic industries configured in settings
@@ -1792,26 +1794,162 @@ export default function FlyerStudio() {
             {/* Rubro / Industria Selector */}
             <div style={css.section}>
               <label style={css.label}>Rubro / Industria del Negocio</label>
-              <select
-                id="select-industry"
-                value={selectedIndustry}
-                onChange={e => {
-                  setSelectedIndustry(e.target.value);
-                  if (variants.length > 0) {
-                    setVariants([]);
-                    setSelected(0);
-                    setPreviewMode('template');
-                  }
-                }}
-                style={css.select}
-              >
-                <option value="auto">✨ Detectar Automáticamente con IA</option>
-                {industries.map(ind => (
-                  <option key={ind.id} value={ind.name}>
-                    {ind.name}
-                  </option>
-                ))}
-              </select>
+              <div style={{ position: 'relative', width: '100%' }}>
+                <button
+                  type="button"
+                  id="btn-select-industry"
+                  onClick={() => setIsIndustryDropdownOpen(!isIndustryDropdownOpen)}
+                  style={{
+                    width: '100%',
+                    border: isIndustryDropdownOpen ? '1.5px solid #7c3aed' : '1.5px solid #cbd5e1',
+                    borderRadius: '10px',
+                    padding: '10px 14px',
+                    fontSize: '13px',
+                    color: '#0f172a',
+                    outline: 'none',
+                    background: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontWeight: 700,
+                    boxShadow: isIndustryDropdownOpen ? '0 0 0 3px rgba(124, 58, 237, 0.1)' : 'none',
+                    transition: 'all 0.15s ease',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {selectedIndustry === 'auto' ? (
+                      <>✨ <span style={{ color: '#6366f1' }}>Detectar con IA (Automático)</span></>
+                    ) : (
+                      selectedIndustry
+                    )}
+                  </span>
+                  <ChevronDown size={15} style={{ color: '#64748b', transform: isIndustryDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+
+                {isIndustryDropdownOpen && (
+                  <>
+                    {/* Invisible backdrop to catch outside clicks */}
+                    <div 
+                      style={{ position: 'fixed', inset: 0, zIndex: 9999, cursor: 'default' }} 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsIndustryDropdownOpen(false);
+                      }} 
+                    />
+                    {/* Custom Options List */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      marginTop: 6,
+                      background: '#ffffff',
+                      border: '1.5px solid #cbd5e1',
+                      borderRadius: '10px',
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)',
+                      zIndex: 10000,
+                      maxHeight: 280,
+                      overflowY: 'auto',
+                      padding: 4,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      boxSizing: 'border-box'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedIndustry('auto');
+                          setIsIndustryDropdownOpen(false);
+                          if (variants.length > 0) {
+                            setVariants([]);
+                            setSelected(0);
+                            setPreviewMode('template');
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          fontSize: '12px',
+                          fontWeight: selectedIndustry === 'auto' ? 800 : 600,
+                          textAlign: 'left',
+                          border: 'none',
+                          borderRadius: '8px',
+                          background: selectedIndustry === 'auto' ? '#f5f3ff' : 'transparent',
+                          color: selectedIndustry === 'auto' ? '#6366f1' : '#334155',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          transition: 'all 0.15s ease',
+                          boxSizing: 'border-box'
+                        }}
+                        onMouseEnter={e => {
+                          if (selectedIndustry !== 'auto') {
+                            e.currentTarget.style.background = '#f8fafc';
+                          }
+                        }}
+                        onMouseLeave={e => {
+                          if (selectedIndustry !== 'auto') {
+                            e.currentTarget.style.background = 'transparent';
+                          }
+                        }}
+                      >
+                        ✨ Detectar Automáticamente con IA
+                      </button>
+
+                      <div style={{ height: '1px', background: '#f1f5f9', margin: '4px 8px' }} />
+
+                      {industries.map(ind => {
+                        const isSelected = selectedIndustry === ind.name;
+                        return (
+                          <button
+                            key={ind.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedIndustry(ind.name);
+                              setIsIndustryDropdownOpen(false);
+                              if (variants.length > 0) {
+                                setVariants([]);
+                                setSelected(0);
+                                setPreviewMode('template');
+                              }
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              fontSize: '12px',
+                              fontWeight: isSelected ? 800 : 600,
+                              textAlign: 'left',
+                              border: 'none',
+                              borderRadius: '8px',
+                              background: isSelected ? '#eff6ff' : 'transparent',
+                              color: isSelected ? '#1d4ed8' : '#334155',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              boxSizing: 'border-box'
+                            }}
+                            onMouseEnter={e => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background = '#f8fafc';
+                              }
+                            }}
+                            onMouseLeave={e => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background = 'transparent';
+                              }
+                            }}
+                          >
+                            {ind.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Prompt */}
