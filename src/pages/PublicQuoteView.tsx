@@ -186,7 +186,16 @@ export default function PublicQuoteView() {
                 selectedPlan,
                 allPlans.length > 0 ? allPlans : undefined
             );
-            window.open(pdfUrl, '_blank');
+            // Use anchor download — window.open() is blocked on iOS/Android mobile browsers
+            const a = document.createElement('a');
+            a.href = pdfUrl;
+            a.download = `Propuesta_${cotizacion.nombre_cliente?.replace(/\W/g, '_') || 'CRM'}.pdf`;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
         } catch (error) {
             toast.error('Error al descargar PDF');
         } finally {
