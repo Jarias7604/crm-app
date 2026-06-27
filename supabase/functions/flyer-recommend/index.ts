@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: 'You are an AI that translates creative briefs into 1 or 2 search terms in English for stock photos (e.g. Unsplash). Output ONLY the comma-separated search terms, nothing else. No punctuation, no quotes, no markdown.'
+              content: 'You are an AI that translates creative briefs into 1 or 2 high-quality, professional, business-appropriate search terms in English for stock photos. The terms must reflect a professional workspace, corporate environment, technology, or business success. Avoid casual social terms (like "conversations", "chats", "whatsapp", "friends") that yield casual, non-business photos. Instead, use professional keywords (like "office", "business", "technology", "marketing", "analytics", "collaboration"). Output ONLY the comma-separated search terms, nothing else. No punctuation, no quotes, no markdown.'
             },
             {
               role: 'user',
