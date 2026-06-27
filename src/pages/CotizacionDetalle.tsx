@@ -170,7 +170,17 @@ export default function CotizacionDetalle() {
         setIsGeneratingPDF(true);
         try {
             const pdfUrl = await pdfService.generateAndUploadQuotePDF(cotizacion, financingPlan || undefined, allPlans.length > 0 ? allPlans : undefined);
-            window.open(pdfUrl, '_blank');
+            
+            if (pdfUrl.startsWith('blob:')) {
+                const a = document.createElement('a');
+                a.href = pdfUrl;
+                a.download = `Propuesta_${(cotizacion.nombre_cliente || 'CRM').replace(/\W/g, '_')}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } else {
+                window.open(pdfUrl, '_blank');
+            }
             toast.success('PDF generado correctamente');
         } catch (error) {
             console.error('Error generating PDF:', error);

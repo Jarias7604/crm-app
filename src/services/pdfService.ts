@@ -1034,11 +1034,35 @@ export const pdfService = {
 
             // Save & Return
             const pdfBlob = doc.output('blob');
-            const fileName = `Cotizacion_${cotizacion.nombre_cliente.replace(/\W/g, '_')}_${Date.now()}.pdf`;
-            const { error } = await supabase.storage.from('quotations').upload(fileName, pdfBlob);
-            if (error) throw error;
 
-            return supabase.storage.from('quotations').getPublicUrl(fileName).data.publicUrl;
+            // ── BYPASS UPLOAD IF NO SESSION (CLIENT/ANONYMOUS VIEW) ──
+            // Anonymous clients on public pages do not have storage upload permissions.
+            // Bypassing upload prevents RLS/403 errors and returns a local blob URL immediately.
+            let session = null;
+            try {
+                const sessionRes = await supabase.auth.getSession();
+                session = sessionRes?.data?.session;
+            } catch (authErr) {
+                console.warn('[PDF Service] Error checking session, defaulting to anonymous:', authErr);
+            }
+
+            if (!session) {
+                console.log('[PDF Service] No authenticated session. Skipping storage upload, returning local blob URL.');
+                return URL.createObjectURL(pdfBlob);
+            }
+
+            const fileName = `Cotizacion_${cotizacion.nombre_cliente.replace(/\W/g, '_')}_${Date.now()}.pdf`;
+            try {
+                const { error } = await supabase.storage.from('quotations').upload(fileName, pdfBlob);
+                if (error) {
+                    console.warn('[PDF Service] Supabase storage upload failed, using local Blob URL fallback:', error);
+                    return URL.createObjectURL(pdfBlob);
+                }
+                return supabase.storage.from('quotations').getPublicUrl(fileName).data.publicUrl;
+            } catch (storageErr) {
+                console.warn('[PDF Service] Supabase storage upload threw error, using local Blob URL fallback:', storageErr);
+                return URL.createObjectURL(pdfBlob);
+            }
 
         } catch (err: any) {
             console.error('PDF Generation failed:', err);

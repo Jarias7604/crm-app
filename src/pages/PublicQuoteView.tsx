@@ -186,22 +186,40 @@ export default function PublicQuoteView() {
                 selectedPlan,
                 allPlans.length > 0 ? allPlans : undefined
             );
-            // Use anchor download — window.open() is blocked on iOS/Android mobile browsers
-            const a = document.createElement('a');
-            a.href = pdfUrl;
-            a.download = `Propuesta_${cotizacion.nombre_cliente?.replace(/\W/g, '_') || 'CRM'}.pdf`;
-            a.target = '_blank';
-            a.rel = 'noopener noreferrer';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-
+            
+            // If pdfUrl is already a local blob URL, download it directly
+            if (pdfUrl.startsWith('blob:')) {
+                const a = document.createElement('a');
+                a.href = pdfUrl;
+                a.download = `Propuesta_${(cotizacion.nombre_cliente || 'CRM').replace(/\W/g, '_')}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } else {
+                // Fetch as blob to bypass iOS Safari cross-origin download restriction
+                try {
+                    const response = await fetch(pdfUrl);
+                    const blob = await response.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = `Propuesta_${(cotizacion.nombre_cliente || 'CRM').replace(/\W/g, '_')}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+                } catch {
+                    // Fallback for browsers that block blob fetch: open in new tab
+                    window.location.href = pdfUrl;
+                }
+            }
         } catch (error) {
             toast.error('Error al descargar PDF');
         } finally {
             setIsGeneratingPDF(false);
         }
     };
+
 
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
