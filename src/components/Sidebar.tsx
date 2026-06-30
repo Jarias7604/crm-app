@@ -45,6 +45,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const [debugOpen, setDebugOpen] = useState(false);
     const [hotLeadCount, setHotLeadCount] = useState(0);
     const [companiesList, setCompaniesList] = useState<Company[]>([]);
+    const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
 
     useEffect(() => {
         const isEligible = profile?.id === 'c9c01b04-4160-4e4c-9718-15298c961e9b' || 
@@ -137,6 +138,29 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         fetchHotLeads();
         const interval = setInterval(fetchHotLeads, 60000);
         return () => clearInterval(interval);
+    }, [profile?.company_id]);
+
+    // 📅 Fetch trial days remaining
+    useEffect(() => {
+        if (!profile?.company_id) return;
+        const fetchTrial = async () => {
+            try {
+                const { data } = await supabase
+                    .from('company_subscriptions')
+                    .select('status, trial_ends_at')
+                    .eq('company_id', profile.company_id)
+                    .single();
+                if (data?.status === 'trialing' && data?.trial_ends_at) {
+                    const days = Math.max(0, Math.ceil(
+                        (new Date(data.trial_ends_at).getTime() - Date.now()) / 86400000
+                    ));
+                    setTrialDaysLeft(days);
+                } else {
+                    setTrialDaysLeft(null);
+                }
+            } catch { /* silent */ }
+        };
+        fetchTrial();
     }, [profile?.company_id]);
 
     // Reload branding when wizard or branding page saves changes
@@ -714,8 +738,57 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             )}
                         </div>
                     )}
+
+                    {/* 🔒 Locked Pro Modules — only for trial companies */}
+                    {trialDaysLeft !== null && !isCollapsed && (
+                        <div className="mt-4 pt-3 border-t border-[#1e293b]/60">
+                            <p className="px-4 mb-2 text-[9px] font-black text-gray-600 uppercase tracking-widest flex items-center gap-1.5">
+                                <span>🔒</span> Módulos Pro
+                            </p>
+                            {[
+                                { name: 'Marketing Hub', icon: Megaphone },
+                                { name: 'Chat & Mensajes', icon: MessageSquare },
+                                { name: 'AI Agents', icon: Bot },
+                                { name: 'Social Media', icon: Globe },
+                            ].map(item => (
+                                <div
+                                    key={item.name}
+                                    title="Disponible en plan Pro"
+                                    className="flex items-center px-4 py-2.5 rounded-xl text-gray-600 cursor-not-allowed select-none opacity-50"
+                                >
+                                    <item.icon className="h-5 w-5 mr-3 shrink-0" />
+                                    <span className="text-sm font-semibold flex-1">{item.name}</span>
+                                    <span className="text-[8px] font-black bg-amber-500/15 text-amber-500 border border-amber-500/25 px-1.5 py-0.5 rounded-full">
+                                        PRO
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </nav>
             </div>
+
+            {/* Trial Banner */}
+            {trialDaysLeft !== null && !isCollapsed && (
+                <div className="mx-3 mb-2 p-3 bg-gradient-to-br from-amber-500/10 to-orange-600/10 border border-amber-500/20 rounded-xl">
+                    <div className="flex items-center gap-1.5 mb-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse inline-block" />
+                        <span className="text-[9px] font-black text-amber-400 uppercase tracking-widest">Trial Activo</span>
+                    </div>
+                    <p className="text-[11px] text-gray-300 leading-snug">
+                        {trialDaysLeft > 0
+                            ? <><span className="text-amber-400 font-black">{trialDaysLeft} días</span> restantes de prueba</>  
+                            : <span className="text-red-400 font-bold">Tu trial ha expirado</span>
+                        }
+                    </p>
+                    <Link
+                        to="/company/billing"
+                        className="mt-2 flex items-center justify-center gap-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 hover:text-amber-300 text-[9px] font-black uppercase tracking-widest rounded-lg py-1.5 transition-all w-full"
+                    >
+                        Activar Plan Pro →
+                    </Link>
+                </div>
+            )}
 
             {/* Footer */}
             <div className="flex-shrink-0 flex border-t border-[#1e293b] p-4 flex-col gap-3 bg-[#0f172a]">
