@@ -29,27 +29,22 @@ export default function SignUp() {
             if (authError) throw authError;
 
             if (authData.user) {
+                // Detect existing email: Supabase returns identities: [] for already-registered users
+                if (authData.user.identities && authData.user.identities.length === 0) {
+                    setError('Este correo ya está registrado. Por favor inicia sesión en lugar de registrarte.');
+                    setLoading(false);
+                    return;
+                }
+
                 // Save companyName so AuthProvider can provision the tenant
                 // after the user confirms their email and returns to the app.
-                // This works for BOTH flows:
-                //   - Email confirmation ON: session is null, localStorage bridges the gap
-                //   - Email confirmation OFF: session exists, AuthProvider picks it up immediately
                 localStorage.setItem('pending_company_name', companyName.trim());
 
-                // Supabase anti-enumeration: when email already exists with confirmation ON,
-                // it returns a user object but with identities = [] (empty array).
-                // This is the only way to detect a duplicate email in this flow.
-                const isAlreadyRegistered = Array.isArray(authData.user?.identities) && authData.user.identities.length === 0;
-
-                if (isAlreadyRegistered) {
-                    setError('__ALREADY_REGISTERED__');
-                    setLoading(false);
-                } else if (authData.session) {
-                    // Auto-confirm is ON — user is already logged in, AuthProvider
-                    // will detect pending_company_name and call register_new_tenant.
+                if (authData.session) {
+                    // Auto-confirm is ON — user is already logged in
                     navigate('/');
                 } else {
-                    // Email confirmation required — show a clear, friendly message.
+                    // Email confirmation required
                     setError('__EMAIL_SENT__');
                     setLoading(false);
                 }
@@ -79,22 +74,10 @@ export default function SignUp() {
 
             <form className="space-y-5" onSubmit={handleSignUp}>
                 {error === '__EMAIL_SENT__' ? (
-                    <div className="bg-emerald-500/10 border-l-4 border-emerald-500 p-4 rounded-r-xl space-y-1">
+                    <div className="bg-emerald-500/10 border-l-4 border-emerald-500 p-4 rounded-r-xl">
                         <p className="text-xs text-emerald-400 font-semibold">
                             ✅ ¡Revisa tu correo! Te enviamos un enlace de confirmación a <strong>{email}</strong>.
                             Haz clic en el enlace y tu cuenta quedará lista automáticamente.
-                        </p>
-                        <p className="text-xs text-slate-400">
-                            ¿No ves el correo? Revisa tu carpeta de spam o correo no deseado.
-                        </p>
-                    </div>
-                ) : error === '__ALREADY_REGISTERED__' ? (
-                    <div className="bg-yellow-500/10 border-l-4 border-yellow-500 p-4 rounded-r-xl space-y-1">
-                        <p className="text-xs text-yellow-400 font-semibold">
-                            ⚠️ Este correo ya está registrado en el sistema.
-                        </p>
-                        <p className="text-xs text-slate-400">
-                            ¿Ya tienes una cuenta? <Link to="/login" className="text-blue-400 underline">Inicia sesión aquí</Link>. Si olvidaste tu contraseña, usa la opción de recuperación en el login.
                         </p>
                     </div>
                 ) : error ? (
