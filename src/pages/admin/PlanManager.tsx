@@ -72,6 +72,7 @@ export default function PlanManager() {
       max_users: 1,
       max_leads: 100,
       max_ai_tokens: 1000,
+      trial_days: 14,
       features: ['Característica 1'],
       is_active: true,
       sort_order: plans.length + 1
@@ -274,6 +275,14 @@ export default function PlanManager() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Trial days badge */}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Trial gratuito</span>
+                      <span className="text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                        {plan.trial_days ?? 14} días
+                      </span>
+                    </div>
                   </div>
 
                   {/* Included Features */}
@@ -455,7 +464,7 @@ export default function PlanManager() {
               {/* Limits and Tokens */}
               <div>
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Límites Operacionales</h4>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-4 gap-4">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1"><Users className="w-3.5 h-3.5" /> Max Asesores</label>
                     <input 
@@ -481,6 +490,17 @@ export default function PlanManager() {
                       value={editingPlan.max_ai_tokens} 
                       onChange={e => setEditingPlan({...editingPlan, max_ai_tokens: Number(e.target.value)})} 
                       className="w-full rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm font-bold p-2.5" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">⏱ Días de Trial</label>
+                    <input 
+                      type="number" 
+                      min={1}
+                      max={90}
+                      value={editingPlan.trial_days ?? 14} 
+                      onChange={e => setEditingPlan({...editingPlan, trial_days: Number(e.target.value)})} 
+                      className="w-full rounded-xl border-amber-200 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm font-black p-2.5 bg-amber-50/40" 
                     />
                   </div>
                 </div>
