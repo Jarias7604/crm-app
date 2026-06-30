@@ -182,11 +182,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             // ✨ AUTO-PROVISION TENANT
-            // If the user has no company_id (just confirmed their email from /register),
-            // check if SignUp.tsx left a pending_company_name in localStorage and
-            // call register_new_tenant to create the company + subscription atomically.
+            // Reads company name from BOTH localStorage (same-tab flow)
+            // AND session.user_metadata (cross-browser/cross-tab confirmation flow)
             if (!data?.company_id) {
-                const pendingCompanyName = localStorage.getItem('pending_company_name');
+                const pendingCompanyName =
+                    localStorage.getItem('pending_company_name') ||
+                    session?.user?.user_metadata?.pending_company_name ||
+                    '';
                 if (pendingCompanyName) {
                     console.info('[AuthProvider] Provisioning new tenant:', pendingCompanyName);
                     const { error: rpcError } = await supabase.rpc('register_new_tenant', {
@@ -196,6 +198,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         console.error('[AuthProvider] register_new_tenant failed:', rpcError);
                     } else {
                         localStorage.removeItem('pending_company_name');
+                        // Also clear from user_metadata
+                        await supabase.auth.updateUser({ data: { pending_company_name: null } });
                         // Re-fetch profile so company_id is now populated
                         const { data: updatedProfile } = await supabase
                             .from('profiles')
