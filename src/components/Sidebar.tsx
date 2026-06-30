@@ -178,11 +178,13 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         return profile.permissions?.[key] === true;
     };
 
+    const isSuperOrAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+
     const navigation: NavItem[] = [
         { name: t('sidebar.dashboard'), href: '/dashboard', icon: LayoutDashboard, current: location.pathname === '/' || location.pathname === '/dashboard' }
     ];
 
-    if (canAccess('leads')) {
+    if (canAccess('leads') || isSuperOrAdmin) {
         navigation.push({
             id: 'leads',
             name: t('sidebar.leads'),
@@ -210,7 +212,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: t('sidebar.projects'), href: '/proyectos', icon: Layers, current: location.pathname.startsWith('/proyectos') });
     }
 
-    if (canAccess('quotes')) {
+    if (canAccess('quotes') || isSuperOrAdmin) {
         navigation.push({ name: t('sidebar.quotes'), href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
     }
 
@@ -222,7 +224,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: t('sidebar.finances'), href: '/finanzas', icon: CreditCard, current: location.pathname.startsWith('/finanzas') });
     }
 
-    if (canAccess('calendar')) {
+    if (canAccess('calendar') || isSuperOrAdmin) {
         const calendarSubItems: any[] = [
             { name: t('sidebar.calendar'), href: '/calendar', icon: Calendar },
         ];
@@ -313,7 +315,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         { name: t('sidebar.callBotAi'), href: '/admin/call-bot', icon: PhoneCall, current: location.pathname === '/admin/call-bot', permissionKey: 'pipeline.admin' },
     ];
 
-    const isSuperOrAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+
     const configSubItems = configSubItemsRaw.filter(item => {
         // Ocultar módulos devOnly en producción
         if ((item as any).devOnly && !isCallBotEnabled) return false;
