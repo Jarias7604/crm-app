@@ -140,9 +140,14 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         return () => clearInterval(interval);
     }, [profile?.company_id]);
 
-    // 📅 Fetch trial days remaining
+    // 📅 Fetch trial days remaining (only for company_admin on trial companies)
     useEffect(() => {
         if (!profile?.company_id) return;
+        // Super admins and platform owners always have full access — skip trial logic
+        if (profile?.role === 'super_admin' || (profile as any)?.is_platform_owner) {
+            setTrialDaysLeft(null);
+            return;
+        }
         const fetchTrial = async () => {
             try {
                 const { data } = await supabase
@@ -739,8 +744,8 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                         </div>
                     )}
 
-                    {/* 🔒 Locked Pro Modules — only for trial companies */}
-                    {trialDaysLeft !== null && !isCollapsed && (
+                    {/* 🔒 Locked Pro Modules — only for trial company_admins */}
+                    {trialDaysLeft !== null && !isCollapsed && profile?.role !== 'super_admin' && !(profile as any)?.is_platform_owner && (
                         <div className="mt-4 pt-3 border-t border-[#1e293b]/60">
                             <p className="px-4 mb-2 text-[9px] font-black text-gray-600 uppercase tracking-widest flex items-center gap-1.5">
                                 <span>🔒</span> Módulos Pro
@@ -769,7 +774,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             </div>
 
             {/* Trial Banner */}
-            {trialDaysLeft !== null && !isCollapsed && (
+            {trialDaysLeft !== null && !isCollapsed && profile?.role !== 'super_admin' && !(profile as any)?.is_platform_owner && (
                 <div className="mx-3 mb-2 p-3 bg-gradient-to-br from-amber-500/10 to-orange-600/10 border border-amber-500/20 rounded-xl">
                     <div className="flex items-center gap-1.5 mb-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse inline-block" />
