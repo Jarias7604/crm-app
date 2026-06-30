@@ -3,6 +3,8 @@ import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Ma
 import type { Client, ClientPipelineStage, ClientDocument, ClientStageDocumentType } from '../../types/clients';
 import { clientsService, pipelineStagesService } from '../../services/clients';
 import StageDocumentUpload from './StageDocumentUpload';
+import { notificationsService } from '../../services/notifications';
+import { auditLogService } from '../../services/auditLog';
 import PagosPanel from './PagosPanel';
 import { usePermissions } from '../../hooks/usePermissions';
 import { supabase } from '../../services/supabase';
@@ -33,6 +35,8 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
   const [activeTab, setActiveTab] = useState<'pipeline' | 'pagos'>('pipeline');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const load = useCallback(async () => {
     if (!clientId) return;
@@ -59,6 +63,7 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
     // Cargar equipo de la empresa
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
+      setCurrentUser(user);
       const simId = localStorage.getItem('simulated_company_id');
       let companyId = simId;
       if (!companyId) {
@@ -127,8 +132,36 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
 
   const handleDeleteClient = async () => {
     if (!client || !canManage) return;
+    if (confirmText.trim().toUpperCase() !== 'ELIMINAR') {
+      toast.error('Escribe ELIMINAR para confirmar la eliminación.');
+      return;
+    }
     setDeleting(true);
     try {
+      // Enviar notificación a los administradores
+      if (currentUser?.company_id) {
+        await notificationsService.notifyAdminsOfClientReversion(
+          currentUser.company_id,
+          client.lead_id || '',
+          client.nombre,
+          currentUser.email || 'agente',
+          'deleted'
+        );
+      }
+
+      // Guardar evento de auditoría
+      try {
+        await auditLogService.logEvent(
+          'CLIENT_MANUALLY_DELETED',
+          'client',
+          client.id,
+          client.nombre,
+          `Cliente "${client.nombre}" eliminado manualmente por ${currentUser?.email || 'usuario'}.`
+        );
+      } catch (logErr) {
+        console.error('Failed to log audit event:', logErr);
+      }
+
       await clientsService.delete(client.id);
       toast.success('Cliente eliminado correctamente');
       onUpdated();
@@ -139,6 +172,7 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
     } finally {
       setDeleting(false);
       setIsDeleteDialogOpen(false);
+      setConfirmText('');
     }
   };
 
@@ -261,12 +295,29 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-black text-gray-900 mb-2">¿Eliminar Cliente?</h3>
-              <p className="text-sm text-gray-500 mb-6">
+              <p className="text-sm text-gray-500 mb-4">
                 Esta acción es irreversible. Se eliminarán permanentemente todos los datos, documentos y pagos asociados a <strong className="text-gray-700">{client?.nombre}</strong>.
               </p>
+              
+              <div className="mb-4 text-left">
+                <label className="text-[10px] font-black uppercase tracking-wider text-rose-600 block mb-1">
+                  Escribe <strong className="font-bold">ELIMINAR</strong> para confirmar:
+                </label>
+                <input
+                  type="text"
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  placeholder="ELIMINAR"
+                  className="w-full rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 text-xs font-black p-2.5 bg-gray-50/50"
+                />
+              </div>
+
               <div className="flex gap-3">
                 <button
-                  onClick={() => setIsDeleteDialogOpen(false)}
+                  onClick={() => {
+                    setIsDeleteDialogOpen(false);
+                    setConfirmText('');
+                  }}
                   disabled={deleting}
                   className="flex-1 px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
                 >
@@ -274,8 +325,8 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
                 </button>
                 <button
                   onClick={handleDeleteClient}
-                  disabled={deleting}
-                  className="flex-1 px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 rounded-xl text-sm font-bold shadow-md shadow-rose-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  disabled={deleting || confirmText.trim().toUpperCase() !== 'ELIMINAR'}
+                  className="flex-1 px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 rounded-xl text-sm font-bold shadow-md shadow-rose-200 transition-colors disabled:opacity-50 disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sí, eliminar'}
                 </button>

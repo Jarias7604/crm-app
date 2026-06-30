@@ -10,6 +10,9 @@ import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { leadsService } from '../services/leads';
+import { clientsService } from '../services/clients';
+import { auditLogService } from '../services/auditLog';
+import { notificationsService } from '../services/notifications';
 import type { Lead, LeadStatus, LeadPriority, FollowUp, LossReason, Industry, LeadProduct } from '../types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
 import { Button } from '../components/ui/Button';
@@ -278,6 +281,10 @@ export default function Leads() {
         lost_reason_id: '',
         lost_notes: ''
     });
+    const [associatedClient, setAssociatedClient] = useState<{ id: string; nombre: string } | null>(null);
+    const [confirmText, setConfirmText] = useState('');
+    const [isRevertModalOpen, setIsRevertModalOpen] = useState(false);
+    const [pendingRevertStatus, setPendingRevertStatus] = useState<LeadStatus | null>(null);
 
     const [isWonModalOpen, setIsWonModalOpen] = useState(false);
     const [wonData, setWonData] = useState({
@@ -422,6 +429,30 @@ export default function Leads() {
             loadFollowUps(selectedLead.id);
         }
     }, [selectedLead?.id]); // Use .id to prevent re-running on every re-render
+
+    // Consultar si hay un cliente de onboarding asociado al lead
+    useEffect(() => {
+        const checkAssociatedClient = async () => {
+            if ((isLossModalOpen || isRevertModalOpen) && selectedLead?.id) {
+                try {
+                    const { data, error } = await supabase
+                        .from('clients')
+                        .select('id, nombre')
+                        .eq('lead_id', selectedLead.id)
+                        .maybeSingle();
+                    if (error) throw error;
+                    setAssociatedClient(data || null);
+                } catch (err) {
+                    console.error('Error checking associated client:', err);
+                    setAssociatedClient(null);
+                }
+            } else {
+                setAssociatedClient(null);
+            }
+            setConfirmText('');
+        };
+        checkAssociatedClient();
+    }, [isLossModalOpen, isRevertModalOpen, selectedLead?.id]);
 
     const toggleLeadSelection = (id: string) => {
         setSelectedLeadIds(prev =>
@@ -1014,7 +1045,28 @@ export default function Leads() {
             // Proceed with the update but preserve internal_won_date (don't erase it)
         }
 
-        // Intercept status change to 'Perdido'
+        // Intercept status change to non-won status if there is a client onboarding
+        if ('status' in updates && newStatus !== 'Cerrado' && newStatus !== 'Cliente') {
+            const { data: clientData } = await supabase
+                .from('clients')
+                .select('id, nombre')
+                .eq('lead_id', selectedLead.id)
+                .maybeSingle();
+
+            if (clientData) {
+                setAssociatedClient(clientData);
+                setConfirmText('');
+                if (newStatus === 'Perdido') {
+                    setIsLossModalOpen(true);
+                } else {
+                    setPendingRevertStatus(newStatus);
+                    setIsRevertModalOpen(true);
+                }
+                return;
+            }
+        }
+
+        // Intercept status change to 'Perdido' (no client case)
         if ('status' in updates && updates.status === 'Perdido') {
             setIsLossModalOpen(true);
             return;
@@ -1077,7 +1129,41 @@ export default function Leads() {
             return;
         }
 
+        if (associatedClient && confirmText.trim().toLowerCase() !== 'perdido') {
+            toast.error('Escribe "Perdido" para confirmar');
+            return;
+        }
+
         try {
+            if (associatedClient) {
+                // Enviar alertas
+                if (profile?.company_id) {
+                    await notificationsService.notifyAdminsOfClientReversion(
+                        profile.company_id,
+                        selectedLead.id,
+                        associatedClient.nombre,
+                        profile.email || 'agente',
+                        'reverted',
+                        'Perdido'
+                    );
+                }
+
+                // Loguear en auditoría
+                try {
+                    await auditLogService.logEvent(
+                        'CLIENT_AUTO_DELETED_BY_LEAD_LOSS',
+                        'client',
+                        associatedClient.id,
+                        associatedClient.nombre,
+                        `Cliente "${associatedClient.nombre}" eliminado automáticamente al marcar lead "${selectedLead.name}" como perdido.`
+                    );
+                } catch (logErr) {
+                    console.error('Failed to log audit event:', logErr);
+                }
+
+                await clientsService.delete(associatedClient.id);
+            }
+
             // Capture the stage where the lead was lost
             const lost_at_stage = selectedLead.status;
             const reasonText = lossReasons.find(r => r.id === lossData.lost_reason_id)?.reason || 'Motivo no especificado';
@@ -1105,11 +1191,76 @@ export default function Leads() {
 
             setIsLossModalOpen(false);
             setLossData({ lost_reason_id: '', lost_notes: '' });
+            setConfirmText('');
 
             toast.success('Lead marcado como perdido');
         } catch (error: any) {
             logger.error('Failed to mark as lost', error, { action: 'handleConfirmLoss', leadId: selectedLead.id });
             toast.error(`Error: ${error.message}`);
+        }
+    };
+
+    const handleConfirmRevert = async () => {
+        if (!selectedLead || !pendingRevertStatus) return;
+
+        const targetStatusLabel = STATUS_CONFIG[pendingRevertStatus]?.label || pendingRevertStatus;
+
+        if (associatedClient && confirmText.trim().toLowerCase() !== targetStatusLabel.toLowerCase()) {
+            toast.error(`Escribe "${targetStatusLabel}" para confirmar`);
+            return;
+        }
+
+        try {
+            if (associatedClient) {
+                // Enviar alertas
+                if (profile?.company_id) {
+                    await notificationsService.notifyAdminsOfClientReversion(
+                        profile.company_id,
+                        selectedLead.id,
+                        associatedClient.nombre,
+                        profile.email || 'agente',
+                        'reverted',
+                        targetStatusLabel
+                    );
+                }
+
+                // Loguear en auditoría
+                try {
+                    await auditLogService.logEvent(
+                        'CLIENT_AUTO_DELETED_BY_LEAD_REVERSION',
+                        'client',
+                        associatedClient.id,
+                        associatedClient.nombre,
+                        `Cliente "${associatedClient.nombre}" eliminado automáticamente al revertir estado del lead "${selectedLead.name}" a "${targetStatusLabel}".`
+                    );
+                } catch (logErr) {
+                    console.error('Failed to log audit event:', logErr);
+                }
+
+                await clientsService.delete(associatedClient.id);
+            }
+
+            const updatedLead = await leadsService.updateLead(selectedLead.id, {
+                status: pendingRevertStatus
+            });
+            setSelectedLead({ ...selectedLead, ...updatedLead });
+            loadLeads();
+
+            // Auto-log status change → feeds "Cambios Estado" KPI
+            callActivityService.logStatusChange({
+                companyId: activeCompanyId,
+                leadId: selectedLead.id,
+                statusBefore: selectedLead.status,
+                statusAfter: pendingRevertStatus,
+            }).catch(() => {/* non-blocking */});
+
+            setIsRevertModalOpen(false);
+            setPendingRevertStatus(null);
+            setConfirmText('');
+            toast.success(`Estado revertido a: ${targetStatusLabel}`);
+        } catch (error: any) {
+            logger.error('Revert status failed', error, { action: 'handleConfirmRevert', leadId: selectedLead.id });
+            toast.error(`Error al revertir: ${error.message}`);
         }
     };
 
@@ -1675,7 +1826,29 @@ export default function Leads() {
                             const lead = leads.find(l => l.id === leadId);
                             if (!lead) return;
 
-                            // Intercept status change to 'Perdido' - Open Loss Modal
+                            // Intercept status change to non-won status if there is a client onboarding
+                            if (newStatus !== 'Cerrado' && newStatus !== 'Cliente') {
+                                const { data: clientData } = await supabase
+                                    .from('clients')
+                                    .select('id, nombre')
+                                    .eq('lead_id', leadId)
+                                    .maybeSingle();
+
+                                if (clientData) {
+                                    setSelectedLead(lead);
+                                    setAssociatedClient(clientData);
+                                    setConfirmText('');
+                                    if (newStatus === 'Perdido') {
+                                        setIsLossModalOpen(true);
+                                    } else {
+                                        setPendingRevertStatus(newStatus);
+                                        setIsRevertModalOpen(true);
+                                    }
+                                    return;
+                                }
+                            }
+
+                            // Intercept status change to 'Perdido' - Open Loss Modal (no client case)
                             if (newStatus === 'Perdido') {
                                 setSelectedLead(lead);
                                 setIsLossModalOpen(true);
@@ -1896,6 +2069,30 @@ export default function Leads() {
                                     </div>
                                 </div>
 
+                                {associatedClient && (
+                                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-900 space-y-3">
+                                        <p className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 text-red-800">
+                                            ⚠️ ¡ATENCIÓN: CLIENTE DE ONBOARDING DETECTADO!
+                                        </p>
+                                        <p className="text-xs font-semibold leading-relaxed text-red-700">
+                                            Este lead tiene un proceso de cliente/onboarding activo llamado <strong className="font-black">{associatedClient.nombre}</strong>.
+                                            Marcar este lead como perdido eliminará permanentemente su proceso de onboarding, sus documentos subidos y sus pagos pendientes/cobrados.
+                                        </p>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black uppercase tracking-wider text-red-600 block">
+                                                Escribe <strong className="font-bold">Perdido</strong> para confirmar:
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={confirmText}
+                                                onChange={(e) => setConfirmText(e.target.value)}
+                                                placeholder="Perdido"
+                                                className="w-full rounded-xl border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-xs font-black p-2.5 bg-white"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="space-y-2">
                                     <label className="text-xs font-black text-gray-700 uppercase tracking-wider block">
                                         Motivo de Pérdida <span className="text-red-500">*</span>
@@ -1932,6 +2129,7 @@ export default function Leads() {
                                     onClick={() => {
                                         setIsLossModalOpen(false);
                                         setLossData({ lost_reason_id: '', lost_notes: '' });
+                                        setConfirmText('');
                                     }}
                                     className="px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider text-gray-600 hover:bg-gray-100 transition-all"
                                 >
@@ -1939,10 +2137,93 @@ export default function Leads() {
                                 </button>
                                 <button
                                     onClick={handleConfirmLoss}
-                                    disabled={!lossData.lost_reason_id}
+                                    disabled={!lossData.lost_reason_id || (!!associatedClient && confirmText.trim().toLowerCase() !== 'perdido')}
                                     className="px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
                                 >
                                     Confirmar Pérdida
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Revert Client Onboarding Modal */}
+            {isRevertModalOpen && selectedLead && pendingRevertStatus && associatedClient && (
+                <div className="fixed inset-0 z-[10000] overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity bg-black/50" onClick={() => {
+                            setIsRevertModalOpen(false);
+                            setPendingRevertStatus(null);
+                            setConfirmText('');
+                        }} />
+                        <div className="inline-block align-bottom bg-white rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10">
+                            <div className="bg-gradient-to-br from-amber-50 to-orange-50 px-6 py-5 border-b border-amber-100">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center shadow-lg">
+                                        <SlidersHorizontal className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-gray-900">Revertir Estado de Cliente</h3>
+                                        <p className="text-sm font-medium text-gray-500 mt-0.5">El lead volverá a un estado previo</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white px-6 py-6 space-y-5">
+                                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1">Lead Actual</p>
+                                    <p className="text-lg font-black text-gray-900">{selectedLead.name}</p>
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <span className="text-xs font-bold text-gray-400">Cambio:</span>
+                                        <span className="text-xs font-black px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                                            {selectedLead.status}
+                                        </span>
+                                        <span className="text-xs font-bold text-gray-400">→</span>
+                                        <span className="text-xs font-black px-2 py-0.5 rounded bg-amber-100 text-amber-800">
+                                            {STATUS_CONFIG[pendingRevertStatus]?.label || pendingRevertStatus}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-900 space-y-3">
+                                    <p className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 text-red-800">
+                                        ⚠️ ¡ADVERTENCIA: SE ELIMINARÁ EL ONBOARDING!
+                                    </p>
+                                    <p className="text-xs font-semibold leading-relaxed text-red-700">
+                                        Este lead tiene un proceso de cliente/onboarding activo llamado <strong className="font-black">{associatedClient.nombre}</strong>.
+                                        Mover este lead a <strong className="font-black">{STATUS_CONFIG[pendingRevertStatus]?.label || pendingRevertStatus}</strong> eliminará permanentemente su proceso de onboarding, sus documentos subidos y sus pagos.
+                                    </p>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-red-600 block">
+                                            Escribe <strong className="font-bold">{STATUS_CONFIG[pendingRevertStatus]?.label || pendingRevertStatus}</strong> para confirmar:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={confirmText}
+                                            onChange={(e) => setConfirmText(e.target.value)}
+                                            placeholder={STATUS_CONFIG[pendingRevertStatus]?.label || pendingRevertStatus}
+                                            className="w-full rounded-xl border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 text-xs font-black p-2.5 bg-white"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 px-6 py-4 flex gap-3 justify-end border-t border-gray-100">
+                                <button
+                                    onClick={() => {
+                                        setIsRevertModalOpen(false);
+                                        setPendingRevertStatus(null);
+                                        setConfirmText('');
+                                    }}
+                                    className="px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider text-gray-600 hover:bg-gray-100 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleConfirmRevert}
+                                    disabled={confirmText.trim().toLowerCase() !== (STATUS_CONFIG[pendingRevertStatus]?.label || pendingRevertStatus).toLowerCase()}
+                                    className="px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider bg-amber-600 text-white hover:bg-amber-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+                                >
+                                    Confirmar Reversión
                                 </button>
                             </div>
                         </div>

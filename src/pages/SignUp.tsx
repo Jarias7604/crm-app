@@ -20,7 +20,7 @@ export default function SignUp() {
         setError(null);
 
         try {
-            // 1. Sign Up user
+            // 1. Register user with Supabase Auth
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email,
                 password,
@@ -29,33 +29,35 @@ export default function SignUp() {
             if (authError) throw authError;
 
             if (authData.user) {
-                // 2. Call RPC to create company and assign role
-                // We wait a moment to ensure trigger created the profile first (usually fast)
-                // Ideally the trigger runs synchronously within transaction of signup? No, supabase triggers are usually immediate.
-                // We can call the RPC now.
+                // Save companyName so AuthProvider can provision the tenant
+                // after the user confirms their email and returns to the app.
+                // This works for BOTH flows:
+                //   - Email confirmation ON: session is null, localStorage bridges the gap
+                //   - Email confirmation OFF: session exists, AuthProvider picks it up immediately
+                localStorage.setItem('pending_company_name', companyName.trim());
 
-                // Note: The user might not be "signed in" immediately depending on email confirmation settings.
-                // If "Enable Email Confirmations" is ON (default), the user can't login yet, so RPC will fail if it requires auth.
-                // However, standard Supabase dev projects often have email confirmation OFF or we need to warn user.
-                // For this demo, let's assume auto-confirm or session exists.
-
-                // If session exists (auto-confirm is on usually for dev):
                 if (authData.session) {
-                    const { error: rpcError } = await supabase.rpc('register_new_tenant', {
-                        company_name: companyName
-                    });
-
-                    if (rpcError) throw rpcError;
-
+                    // Auto-confirm is ON — user is already logged in, AuthProvider
+                    // will detect pending_company_name and call register_new_tenant.
                     navigate('/');
                 } else {
-                    // Email confirmation required
-                    setError('Check your email to confirm account, then login.');
+                    // Email confirmation required — show a clear, friendly message.
+                    setError('__EMAIL_SENT__');
                     setLoading(false);
                 }
             }
         } catch (err: any) {
-            setError(err.message);
+            // Translate common Supabase errors to Spanish
+            const msg: string = err.message || '';
+            if (msg.includes('email rate limit') || msg.includes('rate limit')) {
+                setError('Demasiados intentos de registro. Espera unos minutos e intenta de nuevo.');
+            } else if (msg.includes('already registered') || msg.includes('User already registered')) {
+                setError('Este correo ya está registrado. Intenta iniciar sesión.');
+            } else if (msg.includes('Password should be at least')) {
+                setError('La contraseña debe tener al menos 6 caracteres.');
+            } else {
+                setError(msg);
+            }
             setLoading(false);
         }
     };
@@ -68,11 +70,18 @@ export default function SignUp() {
             </div>
 
             <form className="space-y-5" onSubmit={handleSignUp}>
-                {error && (
+                {error === '__EMAIL_SENT__' ? (
+                    <div className="bg-emerald-500/10 border-l-4 border-emerald-500 p-4 rounded-r-xl">
+                        <p className="text-xs text-emerald-400 font-semibold">
+                            ✅ ¡Revisa tu correo! Te enviamos un enlace de confirmación a <strong>{email}</strong>.
+                            Haz clic en el enlace y tu cuenta quedará lista automáticamente.
+                        </p>
+                    </div>
+                ) : error ? (
                     <div className="bg-red-500/10 border-l-4 border-red-500 p-4 rounded-r-xl">
                         <p className="text-xs text-red-400 font-semibold">{error}</p>
                     </div>
-                )}
+                ) : null}
 
                 <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">

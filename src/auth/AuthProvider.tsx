@@ -181,6 +181,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
+            // ✨ AUTO-PROVISION TENANT
+            // If the user has no company_id (just confirmed their email from /register),
+            // check if SignUp.tsx left a pending_company_name in localStorage and
+            // call register_new_tenant to create the company + subscription atomically.
+            if (!data?.company_id) {
+                const pendingCompanyName = localStorage.getItem('pending_company_name');
+                if (pendingCompanyName) {
+                    console.info('[AuthProvider] Provisioning new tenant:', pendingCompanyName);
+                    const { error: rpcError } = await supabase.rpc('register_new_tenant', {
+                        company_name: pendingCompanyName
+                    });
+                    if (rpcError) {
+                        console.error('[AuthProvider] register_new_tenant failed:', rpcError);
+                    } else {
+                        localStorage.removeItem('pending_company_name');
+                        // Re-fetch profile so company_id is now populated
+                        const { data: updatedProfile } = await supabase
+                            .from('profiles')
+                            .select('id, email, role, company_id, full_name, phone, status, created_at, custom_role_id, permissions, is_platform_owner')
+                            .eq('id', userId)
+                            .single();
+                        if (updatedProfile) {
+                            // Use the freshly provisioned profile, skip the rest of this run
+                            setProfile({ ...updatedProfile, permissions: {} } as Profile);
+                            setLoading(false);
+                            return;
+                        }
+                    }
+                }
+            }
+
             // 🛑 PLATFORM OWNER BYPASS (Reemplaza el antiguo hardcodeo inseguro)
             if (data?.is_platform_owner) {
                 console.warn('⚡ LIBERANDO INTERFAZ (PLATFORM OWNER BYPASS)');

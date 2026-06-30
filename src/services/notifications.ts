@@ -174,4 +174,107 @@ export const notificationsService = {
 
     return channel;
   },
+
+  async notifyAdminsOfClientReversion(
+    companyId: string,
+    leadId: string,
+    clientName: string,
+    agentEmail: string,
+    action: 'reverted' | 'deleted',
+    newStatusLabel?: string
+  ): Promise<void> {
+    try {
+      // 1. Obtener perfiles de administradores (super_admin, admin)
+      const { data: admins, error: adminsError } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('company_id', companyId)
+        .in('role', ['super_admin', 'admin']);
+
+      if (adminsError) throw adminsError;
+      if (!admins || admins.length === 0) return;
+
+      const dateStr = new Date().toLocaleString('es-ES', { timeZone: 'America/El_Salvador' });
+      const title = `⚠️ Alerta: Onboarding ${action === 'reverted' ? 'Revertido' : 'Eliminado'}`;
+      const body = `El agente ${agentEmail} ha ${action === 'reverted' ? 'revertido' : 'eliminado'} el onboarding de "${clientName}" ${action === 'reverted' ? `a la etapa: ${newStatusLabel}` : ''} el ${dateStr}.`;
+
+      // 2. Insertar notificación en tiempo real (In-app) para cada administrador
+      const notificationsToInsert = admins.map(admin => ({
+        user_id: admin.id,
+        type: 'alert',
+        title,
+        body,
+        read: false,
+        scheduled_for: new Date().toISOString()
+      }));
+
+      await supabase.from('notifications').insert(notificationsToInsert);
+
+      // 3. Insertar correo en la cola de mensajería (marketing_message_queue)
+      const emailHtml = `
+        <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 10px; margin-top: 0;">⚠️ ALERTA DE SEGURIDAD</h2>
+          <p style="font-size: 16px; line-height: 1.5;">Se ha realizado un cambio crítico en el proceso de clientes:</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+            <tr style="background-color: #f9fafb;">
+              <td style="padding: 10px; font-weight: bold; width: 180px;">Cliente:</td>
+              <td style="padding: 10px;">${clientName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; font-weight: bold;">Acción:</td>
+              <td style="padding: 10px; color: #b91c1c; font-weight: bold;">Onboarding ${action === 'reverted' ? 'Revertido' : 'Eliminado'}</td>
+            </tr>
+            ${action === 'reverted' ? `
+            <tr style="background-color: #f9fafb;">
+              <td style="padding: 10px; font-weight: bold;">Nuevo Estado:</td>
+              <td style="padding: 10px; font-weight: bold; color: #2563eb;">${newStatusLabel}</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td style="padding: 10px; font-weight: bold;">Realizado por:</td>
+              <td style="padding: 10px;">${agentEmail}</td>
+            </tr>
+            <tr style="background-color: #f9fafb;">
+              <td style="padding: 10px; font-weight: bold;">Fecha y Hora:</td>
+              <td style="padding: 10px;">${dateStr}</td>
+            </tr>
+          </table>
+          <p style="font-size: 14px; color: #666; margin-top: 30px; border-top: 1px solid #eee; padding-top: 15px;">
+            Este es un correo automático de seguridad generado por Arias CRM Professional.
+          </p>
+        </div>
+      `;
+
+      // Enviar correos a todos los administradores insertando en la cola
+      const emailsToQueue = admins.map(admin => {
+        if (!admin.email) return null;
+        return {
+          company_id: companyId,
+          lead_id: leadId,
+          channel: 'email',
+          subject: `⚠️ ALERTA CRM: Onboarding ${action === 'reverted' ? 'Revertido' : 'Eliminado'} - ${clientName}`,
+          content: emailHtml,
+          status: 'pending',
+          scheduled_at: new Date().toISOString(),
+          retry_count: 0
+        };
+      }).filter(Boolean);
+
+      if (emailsToQueue.length > 0) {
+        const { error: queueError } = await supabase
+          .from('marketing_message_queue')
+          .insert(emailsToQueue);
+
+        if (queueError) throw queueError;
+
+        // Desencadenar el procesador de cola en segundo plano (fire-and-forget)
+        supabase.functions.invoke('process-message-queue').catch(err => {
+          console.warn('[Queue] Fail to trigger process-message-queue:', err);
+        });
+      }
+
+    } catch (error) {
+      console.error('[Notification] Error sending admin alert:', error);
+    }
+  },
 };
