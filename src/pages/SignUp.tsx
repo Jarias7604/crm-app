@@ -24,6 +24,13 @@ export default function SignUp() {
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email,
                 password,
+                options: {
+                    data: {
+                        // Store in user_metadata so it survives cross-browser/cross-tab
+                        // email confirmation (localStorage is unreliable in those cases)
+                        pending_company_name: companyName.trim()
+                    }
+                }
             });
 
             if (authError) throw authError;
