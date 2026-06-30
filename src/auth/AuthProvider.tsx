@@ -204,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             .single();
                         if (updatedProfile) {
                             // Use the freshly provisioned profile, skip the rest of this run
-                            setProfile({ ...updatedProfile, permissions: {} } as Profile);
+                            setProfile({ ...updatedProfile, permissions: (updatedProfile.permissions as Record<string, boolean>) || {} } as Profile);
                             setLoading(false);
                             return;
                         }
