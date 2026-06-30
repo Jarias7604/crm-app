@@ -29,19 +29,22 @@ export default function SignUp() {
             if (authError) throw authError;
 
             if (authData.user) {
+                // Detect existing email: Supabase returns identities: [] for already-registered users
+                if (authData.user.identities && authData.user.identities.length === 0) {
+                    setError('Este correo ya está registrado. Por favor inicia sesión en lugar de registrarte.');
+                    setLoading(false);
+                    return;
+                }
+
                 // Save companyName so AuthProvider can provision the tenant
                 // after the user confirms their email and returns to the app.
-                // This works for BOTH flows:
-                //   - Email confirmation ON: session is null, localStorage bridges the gap
-                //   - Email confirmation OFF: session exists, AuthProvider picks it up immediately
                 localStorage.setItem('pending_company_name', companyName.trim());
 
                 if (authData.session) {
-                    // Auto-confirm is ON — user is already logged in, AuthProvider
-                    // will detect pending_company_name and call register_new_tenant.
+                    // Auto-confirm is ON — user is already logged in
                     navigate('/');
                 } else {
-                    // Email confirmation required — show a clear, friendly message.
+                    // Email confirmation required
                     setError('__EMAIL_SENT__');
                     setLoading(false);
                 }
