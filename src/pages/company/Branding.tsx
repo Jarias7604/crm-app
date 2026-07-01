@@ -133,71 +133,71 @@ export default function Branding() {
     );
 
     return (
-        <div className="max-w-7xl mx-auto space-y-3 animate-in fade-in duration-500">
-            <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+        <div className="max-w-7xl mx-auto space-y-4 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
                 <div>
-                    <h1 className="text-base font-black text-[#0f172a] tracking-tight">Marca Corporativa</h1>
+                    <h1 className="text-lg font-black text-[#0f172a] tracking-tight">Marca Corporativa</h1>
                     <p className="text-gray-500 text-xs font-medium">Gestiona tu identidad visual y términos legales globales.</p>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                 {/* Form Section */}
                 <div className="lg:col-span-7 xl:col-span-8 space-y-3">
-                    <form onSubmit={handleSubmit} className="bg-white p-4 rounded-xl border border-gray-100 shadow-md space-y-4 relative overflow-hidden">
+                    <form onSubmit={handleSubmit} className="bg-white p-5 rounded-xl border border-gray-100 shadow-md space-y-4 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/30 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
 
-                        <div className="space-y-3 relative z-10">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div className="space-y-4 relative z-10">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div className="space-y-1">
-                                    <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Nombre Comercial</label>
+                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Nombre Comercial</label>
                                     <div className="relative group">
                                         <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                                         <Input
                                             required
                                             value={formData.name}
                                             onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                            className="pl-7 h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
+                                            className="pl-7 h-9 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
                                             placeholder="Tu Empresa S.A."
                                         />
                                     </div>
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Sitio Web Oficial</label>
+                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Sitio Web Oficial</label>
                                     <div className="relative group">
                                         <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                                         <Input
                                             value={formData.website}
                                             onChange={e => setFormData({ ...formData, website: e.target.value })}
-                                            className="pl-7 h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
+                                            className="pl-7 h-9 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
                                             placeholder="https://www.tusitio.com"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div className="space-y-1">
-                                    <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Teléfono Contacto</label>
+                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Teléfono Contacto</label>
                                     <div className="relative group">
                                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">📞</div>
                                         <Input
                                             value={formData.phone}
                                             onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                            className="pl-7 h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
+                                            className="pl-7 h-9 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
                                             placeholder="+503 2200-0000"
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Dirección Física</label>
+                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Dirección Física</label>
                                     <div className="relative group">
                                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">📍</div>
                                         <Input
                                             value={formData.address}
                                             onChange={e => setFormData({ ...formData, address: e.target.value })}
-                                            className="pl-7 h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
+                                            className="pl-7 h-9 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
                                             placeholder="Ciudad, País"
                                         />
                                     </div>
@@ -281,7 +281,7 @@ export default function Branding() {
                             {/* Localization Section */}
                             <div className="space-y-2">
                                 <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Configuración de Localización (Fechas y Horas)</label>
-                                <div className="p-3 border border-slate-100 rounded-xl bg-indigo-50/30 space-y-3">
+                                <div className="p-3.5 border border-slate-100 rounded-xl bg-indigo-50/30 space-y-3">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <div className="space-y-1">
                                             <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Fecha</label>
