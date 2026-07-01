@@ -133,71 +133,71 @@ export default function Branding() {
     );
 
     return (
-        <div className="max-w-7xl mx-auto space-y-4 animate-in fade-in duration-500">
-            <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+        <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                 <div>
-                    <h1 className="text-lg font-black text-[#0f172a] tracking-tight">Marca Corporativa</h1>
-                    <p className="text-gray-500 text-xs font-medium">Gestiona tu identidad visual y términos legales globales.</p>
+                    <h1 className="text-2xl font-black text-[#0f172a] tracking-tight">Marca Corporativa</h1>
+                    <p className="text-gray-500 text-sm font-medium mt-0.5">Gestiona tu identidad visual y términos legales globales.</p>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Form Section */}
-                <div className="lg:col-span-7 xl:col-span-8 space-y-3">
-                    <form onSubmit={handleSubmit} className="bg-white p-5 rounded-xl border border-gray-100 shadow-md space-y-4 relative overflow-hidden">
+                <div className="lg:col-span-7 xl:col-span-8 space-y-4">
+                    <form onSubmit={handleSubmit} className="bg-white p-7 rounded-2xl border border-gray-100 shadow-md space-y-6 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/30 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
 
-                        <div className="space-y-4 relative z-10">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-5 relative z-10">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Nombre Comercial</label>
+                                    <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Nombre Comercial</label>
                                     <div className="relative group">
-                                        <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                                         <Input
                                             required
                                             value={formData.name}
                                             onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                            className="pl-7 h-9 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
+                                            className="pl-8 h-11 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm shadow-sm"
                                             placeholder="Tu Empresa S.A."
                                         />
                                     </div>
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Sitio Web Oficial</label>
+                                    <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Sitio Web Oficial</label>
                                     <div className="relative group">
-                                        <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                                         <Input
                                             value={formData.website}
                                             onChange={e => setFormData({ ...formData, website: e.target.value })}
-                                            className="pl-7 h-9 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
+                                            className="pl-8 h-11 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm shadow-sm"
                                             placeholder="https://www.tusitio.com"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Teléfono Contacto</label>
+                                    <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Teléfono Contacto</label>
                                     <div className="relative group">
                                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">📞</div>
                                         <Input
                                             value={formData.phone}
                                             onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                            className="pl-7 h-9 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
+                                            className="pl-8 h-11 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm shadow-sm"
                                             placeholder="+503 2200-0000"
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Dirección Física</label>
+                                    <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Dirección Física</label>
                                     <div className="relative group">
                                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">📍</div>
                                         <Input
                                             value={formData.address}
                                             onChange={e => setFormData({ ...formData, address: e.target.value })}
-                                            className="pl-7 h-9 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
+                                            className="pl-8 h-11 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm shadow-sm"
                                             placeholder="Ciudad, País"
                                         />
                                     </div>
@@ -280,30 +280,30 @@ export default function Branding() {
 
                             {/* Localization Section */}
                             <div className="space-y-2">
-                                <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Configuración de Localización (Fechas y Horas)</label>
-                                <div className="p-3.5 border border-slate-100 rounded-xl bg-indigo-50/30 space-y-3">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Fecha</label>
-                                            <select value={formData.date_format} onChange={e => setFormData({ ...formData, date_format: e.target.value })} className="w-full h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs text-slate-700 bg-white shadow-sm transition-all outline-none px-2.5">
+                                <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Configuración de Localización (Fechas y Horas)</label>
+                                <div className="p-5 border border-slate-100 rounded-xl bg-indigo-50/30 space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Fecha</label>
+                                            <select value={formData.date_format} onChange={e => setFormData({ ...formData, date_format: e.target.value })} className="w-full h-11 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm text-slate-700 bg-white shadow-sm transition-all outline-none px-3">
                                                 <option value="DD/MM/YYYY">DD/MM/YYYY (Ej: 30/01/2026)</option>
                                                 <option value="MM/DD/YYYY">MM/DD/YYYY (Ej: 01/30/2026)</option>
                                                 <option value="YYYY-MM-DD">YYYY-MM-DD (Ej: 2026-01-30)</option>
                                                 <option value="dd MMM, yyyy">30 Ene, 2026</option>
                                             </select>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Hora</label>
-                                            <select value={formData.time_format} onChange={e => setFormData({ ...formData, time_format: e.target.value })} className="w-full h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs text-slate-700 bg-white shadow-sm transition-all outline-none px-2.5">
+                                        <div className="space-y-1.5">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Hora</label>
+                                            <select value={formData.time_format} onChange={e => setFormData({ ...formData, time_format: e.target.value })} className="w-full h-11 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm text-slate-700 bg-white shadow-sm transition-all outline-none px-3">
                                                 <option value="24h">24 Horas (Ej: 17:00)</option>
                                                 <option value="12h">12 Horas (Ej: 05:00 PM)</option>
                                             </select>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-1">
-                                        <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Zona Horaria de Operación</label>
-                                        <select value={formData.timezone} onChange={e => setFormData({ ...formData, timezone: e.target.value })} className="w-full h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs text-slate-700 bg-white shadow-sm transition-all outline-none px-2.5">
+                                    <div className="space-y-1.5">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Zona Horaria de Operación</label>
+                                        <select value={formData.timezone} onChange={e => setFormData({ ...formData, timezone: e.target.value })} className="w-full h-11 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm text-slate-700 bg-white shadow-sm transition-all outline-none px-3">
                                             <option value="America/El_Salvador">El Salvador (CST)</option>
                                             <option value="America/Mexico_City">México (CST)</option>
                                             <option value="America/Bogota">Colombia (EST)</option>
@@ -316,9 +316,9 @@ export default function Branding() {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Logotipo Corporativo</label>
-                                <div className="flex flex-col md:flex-row items-center gap-4 p-4 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 group hover:border-blue-400 hover:bg-blue-50/30 transition-all duration-300">
-                                    <div className="w-24 h-24 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-500 relative">
+                                <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Logotipo Corporativo</label>
+                                <div className="flex flex-col md:flex-row items-center gap-5 p-5 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50 group hover:border-blue-400 hover:bg-blue-50/30 transition-all duration-300">
+                                    <div className="w-28 h-28 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-500 relative">
                                         {formData.logo_url ? (
                                             <img src={formData.logo_url} alt="Logo" className="w-full h-full object-contain p-3" />
                                         ) : (
@@ -329,12 +329,12 @@ export default function Branding() {
                                     <div className="flex-1 space-y-3 text-center md:text-left">
                                         <div>
                                             <p className="text-base font-black text-[#0f172a] tracking-tight">Actualiza tu Identidad</p>
-                                            <p className="text-xs text-gray-500 mt-1 leading-relaxed">Recomendamos un archivo PNG con fondo transparente.<br />El sistema permite recortar para un ajuste perfecto.</p>
+                                            <p className="text-sm text-gray-500 mt-1 leading-relaxed">Recomendamos PNG con fondo transparente.<br />El sistema permite recortar para un ajuste perfecto.</p>
                                         </div>
                                         <div className="relative inline-block">
                                             <input type="file" accept="image/*" onChange={handleFileSelect} disabled={uploading} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
-                                            <Button type="button" variant="outline" disabled={uploading} className="rounded-xl border-gray-300 hover:border-blue-500 hover:text-blue-600 bg-white shadow-sm font-black text-xs h-9 px-5 relative z-10 transition-all">
-                                                <Upload className="w-3.5 h-3.5 mr-2" />
+                                            <Button type="button" variant="outline" disabled={uploading} className="rounded-xl border-gray-300 hover:border-blue-500 hover:text-blue-600 bg-white shadow-sm font-black text-xs h-10 px-6 relative z-10 transition-all">
+                                                <Upload className="w-4 h-4 mr-2" />
                                                 {uploading ? 'Cargando...' : 'Seleccionar Nuevo Logo'}
                                             </Button>
                                         </div>
@@ -343,8 +343,8 @@ export default function Branding() {
                             </div>
                         </div>
 
-                        <div className="pt-3 border-t border-gray-100 relative z-10">
-                            <Button type="submit" disabled={saving} className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black shadow-md shadow-blue-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-xs py-2">
+                        <div className="pt-4 border-t border-gray-100 relative z-10">
+                            <Button type="submit" disabled={saving} className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-md shadow-blue-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm py-2.5">
                                 {saving ? (
                                     <div className="flex items-center gap-2">
                                         <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
