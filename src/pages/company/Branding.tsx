@@ -442,16 +442,52 @@ export default function Branding() {
                                 </div>
                             </div>
                             <div className="p-4 space-y-3">
-                                <div className="h-2.5 w-3/4 bg-gray-100 rounded-full"></div>
-                                <div className="h-2.5 w-1/2 bg-gray-100 rounded-full"></div>
-                                <div className="pt-3 grid grid-cols-2 gap-3">
-                                    <div className="h-12 bg-gray-50 rounded-xl border border-gray-100"></div>
-                                    <div className="h-12 bg-gray-50 rounded-xl border border-gray-100"></div>
+                                {/* Cliente */}
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest">Cliente</p>
+                                        <p className="text-xs font-bold text-slate-700">Empresa Ejemplo S.A.</p>
+                                        <p className="text-[9px] text-gray-400">contacto@ejemplo.com</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[8px] text-gray-400 font-black uppercase tracking-widest">Fecha</p>
+                                        <p className="text-[9px] font-bold text-slate-600">30/06/2026</p>
+                                    </div>
                                 </div>
-                                <div className="mt-2 pt-4 border-t border-gray-50 flex justify-between items-center">
-                                    <div className="h-8 w-8 rounded-lg bg-blue-100/50"></div>
+                                {/* Items */}
+                                <div className="border border-gray-100 rounded-xl overflow-hidden">
+                                    <div className="bg-slate-50 grid grid-cols-3 px-3 py-1.5">
+                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider col-span-2">Descripción</p>
+                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-wider text-right">Total</p>
+                                    </div>
+                                    {[
+                                        { desc: 'Servicio de Seguridad A', total: '$1,200.00' },
+                                        { desc: 'Instalación de Equipo B', total: '$850.00' },
+                                        { desc: 'Mantenimiento Anual', total: '$480.00' },
+                                    ].map((item, i) => (
+                                        <div key={i} className={`grid grid-cols-3 px-3 py-2 ${i % 2 === 1 ? 'bg-gray-50/50' : ''}`}>
+                                            <p className="text-[9px] text-slate-600 font-medium col-span-2">{item.desc}</p>
+                                            <p className="text-[9px] font-bold text-slate-700 text-right">{item.total}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Totals */}
+                                <div className="flex flex-col items-end gap-1 pt-1">
+                                    <div className="flex gap-6 text-[9px] text-gray-400">
+                                        <span>Subtotal</span><span className="font-bold text-slate-600">$2,530.00</span>
+                                    </div>
+                                    <div className="flex gap-6 text-[9px] text-gray-400">
+                                        <span>IVA 13%</span><span className="font-bold text-slate-600">$328.90</span>
+                                    </div>
+                                    <div className="flex gap-4 text-[10px] font-black text-[#0f172a] border-t border-gray-200 pt-1 mt-0.5">
+                                        <span>TOTAL</span><span>$2,858.90</span>
+                                    </div>
+                                </div>
+                                {/* Footer */}
+                                <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+                                    <p className="text-[8px] text-gray-400 italic">Válido por 30 días desde emisión.</p>
                                     <div className="h-6 w-20 bg-[#0f172a] rounded-lg flex items-center justify-center">
-                                        <div className="h-1.5 w-10 bg-white/20 rounded-full"></div>
+                                        <span className="text-[8px] text-white font-black">APROBADO</span>
                                     </div>
                                 </div>
                             </div>
