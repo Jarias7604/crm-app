@@ -1,26 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
+import { Building2, Mail, Phone, Printer, FileText } from 'lucide-react';
 import { format } from 'date-fns';
-import { Building2, Mail, Phone, ArrowLeft, Trash2, Printer, CheckCircle, AlertTriangle, XCircle, CreditCard, Share2, X, Copy, Check, MessageSquare, Send, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { invoicesService, type Invoice } from '../services/invoices';
 import toast from 'react-hot-toast';
-import { useAuth } from '../auth/AuthProvider';
 
-export default function FacturaDetalle() {
+export default function PublicInvoiceView() {
     const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
-    const { profile } = useAuth();
-    const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
-
     const [invoice, setInvoice] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
-    const [showShareModal, setShowShareModal] = useState(false);
-    const [copied, setCopied] = useState(false);
-
-    const shareUrl = invoice ? `${window.location.origin}/factura/publica/${invoice.id}` : '';
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (id) {
@@ -31,10 +21,20 @@ export default function FacturaDetalle() {
     async function fetchInvoice() {
         try {
             setLoading(true);
-            const data = await invoicesService.getInvoice(id!);
+            const { data, error } = await supabase
+                .from('facturas')
+                .select(`
+                    *,
+                    company:companies(id, name, logo_url, website, address, phone, industry)
+                `)
+                .eq('id', id)
+                .single();
+
+            if (error) throw error;
             setInvoice(data);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching invoice:', error);
+            setError(error.message || 'Error al cargar la factura');
             toast.error('No se pudo cargar la factura');
         } finally {
             setLoading(false);
@@ -44,75 +44,6 @@ export default function FacturaDetalle() {
     const handlePrint = () => {
         window.print();
     };
-
-    const handleUpdateStatus = async (newStatus: 'paid' | 'void' | 'unpaid') => {
-        if (!invoice) return;
-        const confirmMsg = newStatus === 'paid' 
-            ? '¿Estás seguro de marcar esta factura como PAGADA?' 
-            : newStatus === 'void' 
-                ? '¿Estás seguro de ANULAR esta factura?' 
-                : '¿Estás seguro de marcar esta factura como PENDIENTE?';
-        
-        if (!window.confirm(confirmMsg)) return;
-
-        setIsUpdatingStatus(true);
-        try {
-            await invoicesService.updateInvoice(invoice.id, { status: newStatus });
-            toast.success(`Factura actualizada a ${newStatus === 'paid' ? 'Pagada' : newStatus === 'void' ? 'Anulada' : 'Pendiente'}`);
-            fetchInvoice();
-        } catch (error) {
-            console.error('Error updating invoice status:', error);
-            toast.error('No se pudo actualizar el estado');
-        } finally {
-            setIsUpdatingStatus(false);
-        }
-    };
-
-    const handleDelete = async () => {
-        if (!invoice) return;
-        if (!window.confirm('¿Estás seguro de eliminar esta factura permanentemente?')) return;
-
-        try {
-            await invoicesService.deleteInvoice(invoice.id);
-            toast.success('Factura eliminada');
-            navigate('/facturas');
-        } catch (error) {
-            console.error('Error deleting invoice:', error);
-            toast.error('No se pudo eliminar la factura');
-        }
-    };
-
-    const handleShareTelegram = () => {
-        if (!invoice) return;
-        const text = `Hola ${invoice.nombre_cliente}! Te comparto la factura #${invoice.numero_factura} por un monto de $${Number(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`;
-        window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`, '_blank');
-        setShowShareModal(false);
-    };
-
-    const handleShareWhatsApp = () => {
-        if (!invoice) return;
-        const text = `Hola ${invoice.nombre_cliente}! 👋\n\nTe comparto la factura *#${invoice.numero_factura}* por un monto de *$${Number(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*.\n\nPuedes revisarla aquí:\n${shareUrl}`;
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-        setShowShareModal(false);
-    };
-
-    const handleShareEmail = () => {
-        if (!invoice) return;
-        const subject = `Factura #${invoice.numero_factura} — ${invoice.nombre_cliente}`;
-        const body = `Hola ${invoice.nombre_cliente},\n\nLe comparto la factura #${invoice.numero_factura} por un total de $${Number(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.\n\nPuede revisarla en:\n${shareUrl}\n\nSaludos.`;
-        window.open(`mailto:${invoice.email_cliente || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
-        setShowShareModal(false);
-    };
-
-    const handleCopyLink = async () => {
-        await navigator.clipboard.writeText(shareUrl);
-        setCopied(true);
-        toast.success('Link copiado al portapapeles');
-        setTimeout(() => setCopied(false), 2500);
-    };
-
-    if (loading) return <div className="p-8 text-center">Cargando factura...</div>;
-    if (!invoice) return <div className="p-8 text-center text-red-500">Factura no encontrada</div>;
 
     const getStatusText = (status: string) => {
         switch (status) {
@@ -125,32 +56,45 @@ export default function FacturaDetalle() {
         }
     };
 
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4449AA]"></div>
+            </div>
+        );
+    }
+
+    if (!invoice) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md">
+                    <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FileText className="w-8 h-8" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-slate-800">Factura no encontrada</h1>
+                    <p className="text-slate-500 mt-2 text-sm leading-relaxed">El enlace puede haber expirado o es incorrecto.</p>
+                    {error && <p className="mt-4 text-xs text-red-400 font-mono">ERROR: {error}</p>}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen bg-gray-50/50 pb-20 print:bg-white print:pb-0">
             {/* Action Bar */}
             <div className="sticky top-0 z-40 bg-white border-b border-gray-200 w-full shadow-sm print:hidden">
-                <div className="h-16 sm:h-20 px-4 sm:px-12 flex justify-between items-center w-full">
-                    <div className="flex items-center gap-2 sm:gap-6">
-                        <Button
-                            variant="ghost"
-                            onClick={() => navigate('/facturas')}
-                            className="text-gray-400 hover:text-gray-900 group flex items-center gap-1 sm:gap-2 px-0 hover:bg-transparent"
-                        >
-                            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                            <span className="text-sm font-bold uppercase tracking-widest hidden sm:inline">Volver</span>
-                        </Button>
-
-                        <div className="h-8 w-px bg-gray-100 hidden sm:block"></div>
-
+                <div className="h-16 sm:h-20 px-4 sm:px-12 flex justify-between items-center w-full max-w-7xl mx-auto">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-[#4449AA] flex items-center justify-center text-white font-black text-xs sm:text-sm shadow-lg shadow-[#4449AA]/20">
+                            {invoice.company?.name?.charAt(0) || 'A'}
+                        </div>
                         <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] leading-none mb-1">Factura</span>
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-sm sm:text-base font-black text-slate-900 leading-none">{invoice.numero_factura}</span>
-                            </div>
+                            <span className="text-xs sm:text-base font-black text-slate-900 leading-none">FACTURA {invoice.numero_factura}</span>
+                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">COMPARTIDA POR EL PROVEEDOR</span>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-4">
+                    <div className="flex items-center gap-2">
                         <Button
                             variant="default"
                             onClick={handlePrint}
@@ -159,129 +103,30 @@ export default function FacturaDetalle() {
                             <Printer className="w-4 h-4" />
                             <span className="hidden sm:inline">Imprimir / Guardar PDF</span>
                         </Button>
-
-                        <Button
-                            variant="default"
-                            onClick={() => setShowShareModal(true)}
-                            className="h-10 sm:h-12 px-3 sm:px-5 bg-white border border-gray-200 text-slate-800 hover:bg-gray-50 hover:border-[#4449AA]/30 font-bold text-[11px] uppercase tracking-widest rounded-xl shadow-sm flex items-center gap-2 transition-all"
-                        >
-                            <Share2 className="w-4 h-4 text-[#4449AA]" />
-                            <span className="hidden sm:inline">Compartir</span>
-                        </Button>
-
-                        {/* Admin actions to update invoice status */}
-                        {isAdmin && invoice.status !== 'paid' && invoice.status !== 'void' && (
-                            <Button
-                                variant="default"
-                                onClick={() => handleUpdateStatus('paid')}
-                                disabled={isUpdatingStatus}
-                                className="h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-lg shadow-emerald-600/20 flex items-center gap-2"
-                            >
-                                <CheckCircle className="w-4 h-4" />
-                                <span>Marcar Pagada</span>
-                            </Button>
-                        )}
-
-                        {isAdmin && invoice.status === 'paid' && (
-                            <div className="h-12 px-6 flex items-center gap-2 bg-green-50 text-green-600 font-black text-[11px] uppercase tracking-widest rounded-xl border border-green-200">
-                                <CheckCircle className="w-4 h-4" />
-                                Pagada
-                            </div>
-                        )}
-
-                        {isAdmin && invoice.status !== 'void' && (
-                            <Button
-                                variant="default"
-                                onClick={() => handleUpdateStatus('void')}
-                                disabled={isUpdatingStatus}
-                                className="h-12 px-6 bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 font-black text-[11px] uppercase tracking-widest rounded-xl flex items-center gap-2"
-                            >
-                                <XCircle className="w-4 h-4" />
-                                <span>Anular Factura</span>
-                            </Button>
-                        )}
-
-                        {invoice.status === 'void' && (
-                            <div className="h-12 px-6 flex items-center gap-2 bg-red-50 text-red-600 font-black text-[11px] uppercase tracking-widest rounded-xl border border-red-200">
-                                <XCircle className="w-4 h-4" />
-                                Anulada
-                            </div>
-                        )}
-
-                        {isAdmin && (
-                            <>
-                                <div className="h-8 w-px bg-gray-100 hidden md:block mx-1"></div>
-                                <Button
-                                    variant="ghost"
-                                    onClick={handleDelete}
-                                    className="hidden md:flex h-12 w-12 p-0 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
-                                >
-                                    <Trash2 className="w-5 h-5" />
-                                </Button>
-                            </>
-                        )}
                     </div>
                 </div>
             </div>
 
-            {/* Print styling injection */}
-            <style dangerouslySetInnerHTML={{__html: `
-                @media print {
-                    body {
-                        background-color: white !important;
-                        color: black !important;
-                    }
-                    .print\\:hidden {
-                        display: none !important;
-                    }
-                    .print\\:shadow-none {
-                        box-shadow: none !important;
-                    }
-                    .print\\:border-none {
-                        border: none !important;
-                    }
-                    .print\\:m-0 {
-                        margin: 0 !important;
-                        padding: 0 !important;
-                    }
-                    .min-h-screen {
-                        min-height: auto !important;
-                    }
-                }
-            `}} />
-
-            <div className="max-w-5xl mx-auto mt-6 px-4 print:mt-0 print:px-0">
-                {/* Invoice Document */}
-                <div className="bg-white shadow-2xl rounded-3xl overflow-hidden border border-gray-100 print:shadow-none print:border-none print:m-0">
-                    {/* Visual Header */}
-                    <div className="bg-[#0f172a] py-6 px-8 md:py-8 md:px-12 text-white border-b border-gray-800 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-blue-900/20 to-transparent"></div>
-
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
-                            <div className="flex flex-col gap-4">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-6">
+                <div className="bg-white rounded-[2.5rem] border border-slate-200/60 overflow-hidden shadow-xl print:border-none print:shadow-none">
+                    {/* Header: Dark banner with company logo and invoice summary */}
+                    <div className="bg-[#0f172a] p-6 sm:p-10 md:p-14 text-white relative overflow-hidden print:bg-[#0f172a] print:text-white">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[100px] -mr-32 -mt-32"></div>
+                        <div className="relative z-10 flex flex-col md:flex-row justify-between gap-8">
+                            <div className="space-y-4">
                                 <div className="h-16 flex items-center">
                                     {invoice.company?.logo_url ? (
                                         <img src={invoice.company.logo_url} alt="" className="max-h-full object-contain" />
                                     ) : (
                                         <div className="flex items-center gap-2 text-blue-400">
                                             <Building2 className="w-10 h-10" />
-                                            <span className="text-2xl font-black uppercase tracking-tighter">BRAND</span>
+                                            <span className="text-2xl font-black uppercase tracking-tighter italic">{invoice.company?.name || 'MI EMPRESA'}</span>
                                         </div>
                                     )}
                                 </div>
-                                <div>
-                                    <h2 className="text-xl font-black tracking-tight leading-none text-white uppercase opacity-95">
-                                        {invoice.company?.name || 'SU EMPRESA'}
-                                    </h2>
-                                    <div className="flex flex-col text-[10px] text-gray-500 font-bold uppercase tracking-widest mt-1.5 gap-0.5">
-                                        <p className="opacity-80 flex items-center gap-2">
-                                            {invoice.company?.address || 'Dirección de la Empresa'}
-                                            {invoice.company?.phone && <><span className="w-1 h-1 rounded-full bg-gray-700"></span> {invoice.company.phone}</>}
-                                        </p>
-                                        <p className="text-blue-400 font-extrabold">
-                                            {invoice.company?.website?.replace(/^https?:\/\//, '') || 'WWW.SUWEBSITE.COM'}
-                                        </p>
-                                    </div>
+                                <div className="space-y-1">
+                                    <h2 className="text-xl font-black uppercase tracking-tight opacity-90">{invoice.company?.name || ''}</h2>
+                                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-[0.2em]">{invoice.company?.website?.replace(/^https?:\/\//, '') || ''}</p>
                                 </div>
                             </div>
 
@@ -308,7 +153,7 @@ export default function FacturaDetalle() {
                     </div>
 
                     <div className="p-4 sm:p-8 md:p-14 space-y-10 bg-white text-slate-900">
-                        {/* Section 1: Customer Info & Status */}
+                        {/* Customer Info & Status */}
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
                             <div className="md:col-span-7 space-y-4">
                                 <div>
@@ -360,7 +205,7 @@ export default function FacturaDetalle() {
                             </div>
                         </div>
 
-                        {/* Section 2: US style Invoice Meta Table */}
+                        {/* Invoice Meta Table */}
                         <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-xs border-collapse">
@@ -407,7 +252,7 @@ export default function FacturaDetalle() {
                             </div>
                         </div>
 
-                        {/* Section 3: Dual Addresses (Bill To & Ship To) */}
+                        {/* Dual Addresses */}
                         {(invoice.bill_to_address || invoice.ship_to_address) && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                                 {invoice.bill_to_address ? (
@@ -434,7 +279,7 @@ export default function FacturaDetalle() {
                             </div>
                         )}
 
-                        {/* Section 4: Items Table */}
+                        {/* Items Table */}
                         <div className="space-y-4 pt-4">
                             <div className="flex items-center justify-between border-b-2 border-slate-900 pb-2">
                                 <h3 className="text-xs font-black uppercase tracking-widest text-[#4449AA]">Detalle de Ítems</h3>
@@ -478,7 +323,7 @@ export default function FacturaDetalle() {
                             </div>
                         </div>
 
-                        {/* Section 5: Totals & Notes */}
+                        {/* Totals & Notes */}
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pt-6 border-t border-slate-200">
                             <div className="md:col-span-7">
                                 {invoice.notas && (
@@ -516,106 +361,25 @@ export default function FacturaDetalle() {
                     </div>
                 </div>
             </div>
-            {/* Share Modal */}
-            {showShareModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-4" onClick={() => setShowShareModal(false)}>
-                    <div
-                        className="bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300"
-                        style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
-                        onClick={e => e.stopPropagation()}
-                    >
-                        {/* Drag handle */}
-                        <div className="flex justify-center pt-2 pb-1">
-                            <div className="w-10 h-1 bg-slate-200 rounded-full" />
-                        </div>
 
-                        {/* Header */}
-                        <div className="flex justify-between items-center px-5 py-2 border-b border-slate-100">
-                            <div>
-                                <h3 className="text-base font-black text-slate-900">Compartir Factura</h3>
-                                <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                                    Enlace público para el cliente
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase ${invoice.status === 'paid' ? 'bg-green-100 text-green-700' :
-                                    invoice.status === 'unpaid' ? 'bg-amber-100 text-amber-700' :
-                                        'bg-slate-100 text-slate-700'
-                                    }`}>{getStatusText(invoice.status)}</span>
-                                <button
-                                    onClick={() => setShowShareModal(false)}
-                                    className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-100"
-                                >
-                                    <X className="w-3.5 h-3.5 text-slate-500" />
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* URL copy */}
-                        <div className="flex gap-2 px-4 py-2 border-b border-slate-100">
-                            <div className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Link del cliente</p>
-                                <p className="text-xs text-slate-600 truncate font-mono">{shareUrl}</p>
-                            </div>
-                            <button
-                                onClick={handleCopyLink}
-                                className={`flex-shrink-0 flex flex-col items-center justify-center gap-1 px-4 rounded-xl transition-all ${copied ? 'bg-green-50 border border-green-200' : 'bg-slate-100 hover:bg-slate-200'
-                                    }`}
-                            >
-                                {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5 text-slate-600" />}
-                                <span className={`text-[9px] font-black ${copied ? 'text-green-600' : 'text-slate-600'}`}>
-                                    {copied ? 'Copiado' : 'Copiar'}
-                                </span>
-                            </button>
-                        </div>
-
-                        {/* Channel list — vertical iOS rows */}
-                        <div className="px-4 py-2 space-y-1.5">
-                            <button
-                                onClick={handleShareWhatsApp}
-                                className="w-full flex items-center gap-3 p-3 bg-green-50 active:bg-green-100 border border-green-100 rounded-2xl transition-all active:scale-[0.98]"
-                            >
-                                <div className="w-11 h-11 bg-[#25D366] rounded-2xl flex items-center justify-center shadow-md shadow-green-400/20 flex-shrink-0">
-                                    <MessageSquare className="w-6 h-6 text-white" />
-                                </div>
-                                <div className="flex-1 text-left">
-                                    <p className="font-black text-slate-900 text-sm">WhatsApp</p>
-                                    <p className="text-[11px] text-slate-500 font-medium">Enviar mensaje + link directo</p>
-                                </div>
-                                <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
-                            </button>
-
-                            <button
-                                onClick={handleShareTelegram}
-                                className="w-full flex items-center gap-3 p-3 bg-sky-50 active:bg-sky-100 border border-sky-100 rounded-2xl transition-all active:scale-[0.98]"
-                            >
-                                <div className="w-11 h-11 bg-[#0088cc] rounded-2xl flex items-center justify-center shadow-md shadow-sky-400/20 flex-shrink-0">
-                                    <Send className="w-6 h-6 text-white" />
-                                </div>
-                                <div className="flex-1 text-left">
-                                    <p className="font-black text-slate-900 text-sm">Telegram</p>
-                                    <p className="text-[11px] text-slate-500 font-medium">Compartir por Telegram</p>
-                                </div>
-                                <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
-                            </button>
-
-                            <button
-                                onClick={handleShareEmail}
-                                className="w-full flex items-center gap-3 p-3 bg-slate-50 active:bg-slate-100 border border-slate-100 rounded-2xl transition-all active:scale-[0.98]"
-                            >
-                                <div className="w-11 h-11 bg-slate-800 rounded-2xl flex items-center justify-center shadow-md shadow-slate-400/20 flex-shrink-0">
-                                    <Mail className="w-6 h-6 text-white" />
-                                </div>
-                                <div className="flex-1 text-left">
-                                    <p className="font-black text-slate-900 text-sm">Email</p>
-                                    <p className="text-[11px] text-slate-500 font-medium">Enviar por correo</p>
-                                </div>
-                                <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Print styling injection */}
+            <style dangerouslySetInnerHTML={{__html: `
+                @media print {
+                    body {
+                        background-color: white !important;
+                        color: black !important;
+                    }
+                    .print\\:hidden {
+                        display: none !important;
+                    }
+                    .print\\:shadow-none {
+                        box-shadow: none !important;
+                    }
+                    .print\\:border-none {
+                        border: none !important;
+                    }
+                }
+            `}} />
         </div>
     );
 }
