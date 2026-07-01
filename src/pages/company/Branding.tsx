@@ -3,7 +3,7 @@ import { brandingService } from '../../services/branding';
 import { storageService } from '../../services/storage';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Building2, Save, Upload, Globe, Image as ImageIcon, CheckCircle2, X, Maximize2, Square, FileText } from 'lucide-react';
+import { Building2, Save, Upload, Globe, Image as ImageIcon, CheckCircle2, X, Maximize2, Square, FileText, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Company } from '../../types';
 import Cropper from 'react-easy-crop';
@@ -16,6 +16,7 @@ export default function Branding() {
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [tcPreview, setTcPreview] = useState(false);
+    const [tcOpen, setTcOpen] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         website: '',
@@ -203,53 +204,78 @@ export default function Branding() {
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Términos y Condiciones Predeterminados</label>
-                                <div className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-start gap-2">
-                                            <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                                                <FileText className="w-3.5 h-3.5" />
-                                            </div>
-                                            <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                                                Define el marco legal. Usa <code className="bg-blue-100 px-1.5 py-0.5 rounded text-blue-700 font-black">**texto**</code> para resaltar en negrita.
+                            <div className="space-y-1.5">
+                                {/* T&C Accordion Header */}
+                                <button
+                                    type="button"
+                                    onClick={() => setTcOpen(!tcOpen)}
+                                    className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all duration-200 group"
+                                >
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-100 transition-colors">
+                                            <FileText className="w-3.5 h-3.5" />
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Términos y Condiciones Predeterminados</p>
+                                            <p className="text-[9px] text-slate-400 font-medium mt-0.5">
+                                                {formData.terminos_condiciones
+                                                    ? `${formData.terminos_condiciones.length} caracteres configurados`
+                                                    : 'Sin configurar — haz clic para editar'}
                                             </p>
                                         </div>
-                                        <div className="flex bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm">
-                                            <button type="button" onClick={() => setTcPreview(false)} className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase transition-all ${!tcPreview ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>Editar</button>
-                                            <button type="button" onClick={() => setTcPreview(true)} className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase transition-all ${tcPreview ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>Vista Previa</button>
-                                        </div>
                                     </div>
+                                    <div className="flex items-center gap-2">
+                                        {formData.terminos_condiciones ? (
+                                            <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-wide border border-emerald-100">
+                                                <CheckCircle2 className="w-2.5 h-2.5" />
+                                                Configurado
+                                            </span>
+                                        ) : (
+                                            <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full text-[9px] font-black uppercase tracking-wide border border-amber-100">Pendiente</span>
+                                        )}
+                                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${tcOpen ? 'rotate-180' : ''}`} />
+                                    </div>
+                                </button>
 
-                                    {!tcPreview ? (
-                                        <textarea
-                                            value={formData.terminos_condiciones}
-                                            onChange={e => setFormData({ ...formData, terminos_condiciones: e.target.value })}
-                                            className="w-full min-h-[180px] p-4 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-medium text-xs text-slate-600 shadow-inner bg-white leading-relaxed resize-none transition-all"
-                                            placeholder="**Artículo 1: Objeto...**&#10;Este contrato establece los términos para el uso de...&#10;&#10;**Artículo 2: Pagos**..."
-                                        />
-                                    ) : (
-                                        <div className="w-full min-h-[180px] p-4 rounded-xl bg-white border border-slate-200 shadow-inner overflow-y-auto space-y-3">
-                                            {(formData.terminos_condiciones || '').split('\n\n').filter(p => p.trim()).map((para, idx) => (
-                                                <div key={idx} className="flex gap-4 items-start">
-                                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-black mt-0.5">
-                                                        {idx + 1}
-                                                    </span>
-                                                    <p className="text-sm text-slate-600 leading-relaxed font-medium flex-1">
-                                                        {para.trim().split(/(\*\*.*?\*\*)/).map((part, i) =>
-                                                            part.startsWith('**') && part.endsWith('**')
-                                                                ? <strong key={i} className="text-slate-900 font-black">{part.slice(2, -2)}</strong>
-                                                                : part
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                            {!formData.terminos_condiciones && (
-                                                <p className="text-slate-400 italic text-center py-20">No hay contenido para mostrar.</p>
-                                            )}
+                                {/* T&C Expanded Editor */}
+                                {tcOpen && (
+                                    <div className="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-sm">
+                                        <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-100">
+                                            <p className="text-[9px] text-slate-400 font-medium">Usa <code className="bg-blue-100 px-1 rounded text-blue-700 font-black">**texto**</code> para negrita</p>
+                                            <div className="flex bg-white p-0.5 rounded-lg border border-slate-200">
+                                                <button type="button" onClick={() => setTcPreview(false)} className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase transition-all ${!tcPreview ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>Editar</button>
+                                                <button type="button" onClick={() => setTcPreview(true)} className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase transition-all ${tcPreview ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>Vista Previa</button>
+                                            </div>
                                         </div>
-                                    )}
-                                </div>
+                                        {!tcPreview ? (
+                                            <textarea
+                                                value={formData.terminos_condiciones}
+                                                onChange={e => setFormData({ ...formData, terminos_condiciones: e.target.value })}
+                                                className="w-full min-h-[160px] p-3 border-0 font-medium text-xs text-slate-600 bg-white leading-relaxed resize-none transition-all focus:outline-none focus:ring-0"
+                                                placeholder="**Artículo 1: Objeto...**&#10;Este contrato establece los términos para el uso de...&#10;&#10;**Artículo 2: Pagos**..."
+                                                autoFocus
+                                            />
+                                        ) : (
+                                            <div className="w-full min-h-[160px] p-3 overflow-y-auto space-y-2">
+                                                {(formData.terminos_condiciones || '').split('\n\n').filter(p => p.trim()).map((para, idx) => (
+                                                    <div key={idx} className="flex gap-2.5 items-start">
+                                                        <span className="flex-shrink-0 w-4 h-4 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[8px] font-black mt-0.5">{idx + 1}</span>
+                                                        <p className="text-xs text-slate-600 leading-relaxed font-medium flex-1">
+                                                            {para.trim().split(/(\*\*.*?\*\*)/).map((part, i) =>
+                                                                part.startsWith('**') && part.endsWith('**')
+                                                                    ? <strong key={i} className="text-slate-900 font-black">{part.slice(2, -2)}</strong>
+                                                                    : part
+                                                            )}
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                                {!formData.terminos_condiciones && (
+                                                    <p className="text-slate-400 italic text-center py-10 text-xs">No hay contenido para mostrar.</p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Localization Section */}
