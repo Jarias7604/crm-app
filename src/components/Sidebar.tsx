@@ -341,13 +341,17 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         { name: t('sidebar.financialManagement'), href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
         { name: t('sidebar.lossReasons'), href: '/loss-reasons', icon: XCircle, current: location.pathname === '/loss-reasons', permissionKey: 'loss_reasons' },
         { name: t('sidebar.industries'), href: '/industries', icon: Building2, current: location.pathname === '/industries', permissionKey: 'loss_reasons' },
-        { name: t('sidebar.callBotAi'), href: '/admin/call-bot', icon: PhoneCall, current: location.pathname === '/admin/call-bot', permissionKey: 'pipeline.admin' },
+        { name: t('sidebar.callBotAi'), href: '/admin/call-bot', icon: PhoneCall, current: location.pathname === '/admin/call-bot', permissionKey: 'pipeline.admin', proOnly: true },
     ];
 
 
     const configSubItems = configSubItemsRaw.filter(item => {
         // Ocultar módulos devOnly en producción
         if ((item as any).devOnly && !isCallBotEnabled) return false;
+        // Ocultar módulos proOnly para empresas en trial
+        if ((item as any).proOnly && trialDaysLeft !== null && profile?.role !== 'super_admin') return false;
+        // Branding siempre visible para company_admin (necesitan cambiar nombre/logo)
+        if (item.permissionKey === 'branding' && (profile?.role === 'company_admin' || profile?.role === 'super_admin')) return true;
         return canAccess(item.permissionKey!) || (isSuperOrAdmin && item.permissionKey === 'pipeline.admin');
     });
 
