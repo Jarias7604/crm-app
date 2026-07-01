@@ -123,6 +123,7 @@ export default function Calendar() {
     
     // Google Calendar Event Modal
     const [selectedGoogleEvent, setSelectedGoogleEvent] = useState<any | null>(null);
+    const [selectedCrmEvent, setSelectedCrmEvent] = useState<CalendarEvent | null>(null);
     const [editGoogleEvent, setEditGoogleEvent] = useState<any | null>(null);
 
     // Google Meet Scheduler modal
@@ -320,6 +321,23 @@ export default function Calendar() {
             toast.error('Error al actualizar seguimiento');
         }
     }, [queryClient]);
+
+    // Delete follow-up and update React Query cache
+    const handleDeleteFollowUp = useCallback(async (evId: string) => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar este seguimiento?')) return;
+        try {
+            await leadsService.deleteFollowUp(evId);
+            queryClient.setQueryData<CalendarEvent[]>(['calendar-follow-ups', windowStart, windowEnd, selectedCalendarCollabId], (prev) =>
+                (prev ?? []).filter(ev => ev.id !== evId)
+            );
+            // Also invalidate queries to ensure consistency
+            queryClient.invalidateQueries({ queryKey: ['calendar-follow-ups'] });
+            setSelectedCrmEvent(null);
+            toast.success('🗑️ Seguimiento eliminado');
+        } catch (err) {
+            toast.error('Error al eliminar seguimiento');
+        }
+    }, [queryClient, windowStart, windowEnd, selectedCalendarCollabId]);
 
     // ─── Pre-indexed event map — O(n) once, O(1) per cell lookup ──────────────
     // BEFORE: getDailyEvents filtered ALL events for EACH of 42 grid cells
@@ -842,7 +860,7 @@ export default function Calendar() {
                                                     e.stopPropagation();
                                                     if (ev.action_type === 'google_calendar') { setSelectedGoogleEvent(ev); return; }
                                                     if (ev.action_type === 'outlook_calendar') { return; }
-                                                    ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } });
+                                                    setSelectedCrmEvent(ev);
                                                 }}
                                                 title={`${ev.lead?.name ?? ev.notes ?? 'Reunión'} · ${timeStr}${ev.completed ? ' ✅' : isOverdue ? ' ⚠️ Vencido' : ''}`}
                                                 className={`w-full text-left px-1.5 py-1 rounded-md transition-all flex items-center gap-1 ${
@@ -980,7 +998,7 @@ export default function Calendar() {
                                 return (
                                     <div 
                                         key={ev.id}
-                                        onClick={(e) => { e.stopPropagation(); if (ev.action_type === 'google_calendar') { setSelectedGoogleEvent(ev); return; } ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
+                                        onClick={(e) => { e.stopPropagation(); if (ev.action_type === 'google_calendar') { setSelectedGoogleEvent(ev); return; } if (ev.action_type === 'outlook_calendar') { return; } setSelectedCrmEvent(ev); }}
                                         className={`absolute rounded-xl p-2 text-[10px] leading-snug overflow-hidden cursor-pointer hover:z-20 transition-all hover:scale-[1.02] hover:shadow-md border flex flex-col justify-between ${
                                             ev.completed 
                                                 ? 'opacity-55 bg-gray-50 border-gray-200 text-gray-400' 
@@ -1051,7 +1069,7 @@ export default function Calendar() {
                             return (
                                 <div 
                                     key={ev.id}
-                                    onClick={(e) => { e.stopPropagation(); if (ev.action_type === 'google_calendar') { setSelectedGoogleEvent(ev); return; } ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
+                                    onClick={(e) => { e.stopPropagation(); if (ev.action_type === 'google_calendar') { setSelectedGoogleEvent(ev); return; } if (ev.action_type === 'outlook_calendar') { return; } setSelectedCrmEvent(ev); }}
                                     className={`absolute left-24 right-4 rounded-2xl p-3.5 cursor-pointer shadow-sm hover:shadow-md hover:scale-[1.005] transition-all flex flex-col justify-between border ${
                                         ev.completed 
                                             ? 'opacity-55 bg-gray-50 border-gray-200 text-gray-400 font-medium' 
@@ -1199,7 +1217,7 @@ export default function Calendar() {
 
                                     {/* Card */}
                                     <div
-                                        onClick={() => ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } })}
+                                        onClick={() => { if (ev.action_type === 'google_calendar') { setSelectedGoogleEvent(ev); return; } if (ev.action_type === 'outlook_calendar') { return; } setSelectedCrmEvent(ev); }}
                                         className={`relative p-4 rounded-2xl border shadow-sm active:scale-[0.98] transition-transform cursor-pointer ${
                                             ev.completed
                                                 ? 'bg-emerald-50/50 border-emerald-200'
@@ -1561,6 +1579,124 @@ export default function Calendar() {
                     </div>
                 );
             })()}
+
+            
+            {/* CRM EVENT DETAIL MODAL */}
+            {selectedCrmEvent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setSelectedCrmEvent(null)}>
+                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-[520px] flex flex-col relative overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        
+                        {/* Premium Header */}
+                        <div className="bg-gradient-to-br from-indigo-900 to-indigo-800 p-6 text-white shrink-0 relative">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider text-white" style={{ backgroundColor: getActionCfg(selectedCrmEvent.action_type).dotColor.replace('bg-', '') || '#6366f1' }}>
+                                    {getActionCfg(selectedCrmEvent.action_type).label}
+                                </span>
+                                {selectedCrmEvent.completed ? (
+                                    <span className="bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
+                                        Completado
+                                    </span>
+                                ) : (
+                                    <span className="bg-amber-500/20 border border-amber-500/30 text-amber-300 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
+                                        Pendiente
+                                    </span>
+                                )}
+                            </div>
+                            <h2 className="text-lg font-black text-white leading-snug tracking-tight pr-8">
+                                {selectedCrmEvent.notes || `Seguimiento: ${getActionCfg(selectedCrmEvent.action_type).label}`}
+                            </h2>
+                            <button 
+                                onClick={() => setSelectedCrmEvent(null)} 
+                                className="absolute top-4 right-4 p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Scrollable details body */}
+                        <div className="p-6 space-y-5 overflow-y-auto max-h-[55vh]">
+                            {/* Date & Time Row */}
+                            <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                                    <Clock className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha & Hora</p>
+                                    <p className="text-sm font-bold text-slate-800 leading-snug mt-0.5">
+                                        {selectedCrmEvent.date ? format(utcToLocalDate(selectedCrmEvent.date, companyTimezone), "EEEE, d 'de' MMMM · h:mm a", { locale: es }) : ''}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Lead Information */}
+                            {selectedCrmEvent.lead && (
+                                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-2">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 pl-0.5">
+                                        <Users className="w-4 h-4 text-slate-500" />
+                                        Prospecto / Cliente
+                                    </p>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-800">{selectedCrmEvent.lead.name}</p>
+                                            {selectedCrmEvent.lead.company_name && (
+                                                <p className="text-xs text-slate-400 mt-0.5">{selectedCrmEvent.lead.company_name}</p>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                setSelectedCrmEvent(null);
+                                                navigate('/leads', { state: { leadId: selectedCrmEvent.lead?.id } });
+                                            }}
+                                            className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl font-bold text-xs transition-all"
+                                        >
+                                            Ver Detalles
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Responsible Profile */}
+                            {selectedCrmEvent.assigned_profile && (
+                                <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-2xl p-4">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-md font-black ring-2 ring-white shadow-sm shrink-0">
+                                        {(selectedCrmEvent.assigned_profile.full_name || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Asignado a</p>
+                                        <p className="text-sm font-bold text-slate-800 leading-snug mt-0.5">
+                                            {selectedCrmEvent.assigned_profile.full_name || 'Asignado'}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Actions Footer */}
+                        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex gap-3 shrink-0">
+                            <button
+                                onClick={() => {
+                                    handleToggleComplete(selectedCrmEvent.id, selectedCrmEvent.completed);
+                                    setSelectedCrmEvent(null);
+                                }}
+                                className={`flex-1 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-sm border ${
+                                    selectedCrmEvent.completed
+                                        ? 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
+                                        : 'bg-emerald-500 border-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-200/50 shadow-md'
+                                }`}
+                            >
+                                {selectedCrmEvent.completed ? '↩️ Marcar Pendiente' : '✅ Completar'}
+                            </button>
+                            <button
+                                onClick={() => handleDeleteFollowUp(selectedCrmEvent.id)}
+                                className="flex-1 py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-rose-200/50"
+                            >
+                                🗑️ Eliminar
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
+            )}
 
             {/* GOOGLE EVENT MODAL */}
             {selectedGoogleEvent && (

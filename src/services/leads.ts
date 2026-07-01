@@ -849,6 +849,15 @@ export const leadsService = {
         if (error) throw error;
     },
 
+    // Delete a follow-up by ID
+    async deleteFollowUp(followUpId: string) {
+        const { error } = await supabase
+            .from('follow_ups')
+            .delete()
+            .eq('id', followUpId);
+        if (error) throw error;
+    },
+
     // Get chat messages for a lead
     async getLeadMessages(leadId: string) {
         // 1. Get conversations for this lead
