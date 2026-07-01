@@ -337,7 +337,7 @@ Reunión modificada desde Arias CRM.`;
             }
 
             // Normal or recurrent creation logic
-            const occurrences = [];
+            const occurrences: { start: string; end: string; index: number }[] = [];
             const count = recurrenceType !== 'none' ? recurrenceCount : 1;
             const startMs = new Date(startISO).getTime();
             const endMs = new Date(endISO).getTime();
