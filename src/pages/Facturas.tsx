@@ -18,6 +18,7 @@ export default function Facturas() {
 
     // Create Invoice Modal State
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [activeStep, setActiveStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Form Fields
@@ -292,7 +293,7 @@ export default function Facturas() {
                     </div>
                     {isAdmin && (
                         <Button
-                            onClick={() => setIsCreateModalOpen(true)}
+                            onClick={() => { setIsCreateModalOpen(true); setActiveStep(1); }}
                             className="h-[46px] px-5 bg-[#4449AA] hover:bg-[#353985] text-white font-black text-[11px] uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 shadow-sm transition-all"
                         >
                             <Plus className="w-4 h-4" />
@@ -467,403 +468,484 @@ export default function Facturas() {
 
             {/* Manual Invoice Creation Modal */}
             {isCreateModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white w-full max-w-4xl rounded-[28px] shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto flex flex-col animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-4xl rounded-[32px] shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto flex flex-col animate-in zoom-in-95 duration-200">
                         {/* Modal Header */}
-                        <div className="sticky top-0 bg-white z-10 px-8 py-5 border-b border-slate-100 flex justify-between items-center">
+                        <div className="sticky top-0 bg-white/80 backdrop-blur-md z-10 px-8 py-6 border-b border-slate-100 flex justify-between items-center">
                             <div>
-                                <h2 className="text-xl font-black text-slate-900">Crear Factura Directa</h2>
+                                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Crear Factura Directa</h2>
                                 <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
                                     Genera una factura manual sin asociar una cotización previa
                                 </p>
                             </div>
                             <button
                                 onClick={() => setIsCreateModalOpen(false)}
-                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-all"
+                                className="p-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-2xl transition-all"
                             >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
+                        {/* Modern Stepper Indicator */}
+                        <div className="px-8 py-5 bg-slate-50/50 border-b border-slate-100 flex items-center justify-between text-xs select-none">
+                            {[
+                                { number: 1, label: 'Cliente' },
+                                { number: 2, label: 'Referencias' },
+                                { number: 3, label: 'Direcciones' },
+                                { number: 4, label: 'Ítems y Notas' }
+                            ].map((step, idx) => (
+                                <div key={step.number} className="flex items-center flex-1 last:flex-initial">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-[10px] transition-all duration-300 ${
+                                            activeStep === step.number 
+                                                ? 'bg-[#4449AA] text-white ring-4 ring-[#4449AA]/10' 
+                                                : activeStep > step.number 
+                                                    ? 'bg-green-600 text-white' 
+                                                    : 'bg-slate-200 text-slate-500'
+                                        }`}>
+                                            {activeStep > step.number ? '✓' : step.number}
+                                        </div>
+                                        <span className={`font-black uppercase tracking-wider text-[9px] transition-colors duration-300 ${
+                                            activeStep === step.number ? 'text-[#4449AA]' : 'text-slate-400'
+                                        }`}>
+                                            {step.label}
+                                        </span>
+                                    </div>
+                                    {idx < 3 && (
+                                        <div className={`h-0.5 flex-1 mx-4 rounded-full transition-all duration-300 ${
+                                            activeStep > step.number ? 'bg-green-600' : 'bg-slate-200'
+                                        }`} />
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
                         {/* Modal Body / Form */}
                         <form onSubmit={handleCreateInvoiceSubmit} className="p-8 space-y-8 flex-1">
-                            {/* Section 1: Customer Details */}
-                            <div className="space-y-4">
-                                <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest border-b border-blue-50 pb-1">
-                                    1. Datos del Cliente
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nombre del Cliente *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={nombreCliente}
-                                            onChange={(e) => setNombreCliente(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-xs focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all"
-                                            placeholder="Ej. Juan Pérez"
-                                        />
+                            {/* Step 1: Customer Details */}
+                            {activeStep === 1 && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-300">
+                                    <div className="border-b border-slate-100 pb-3">
+                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">
+                                            1. Datos del Cliente
+                                        </h3>
+                                        <p className="text-[10px] text-slate-400">Ingresa la información básica de contacto del comprador</p>
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nombre de Empresa</label>
-                                        <input
-                                            type="text"
-                                            value={empresaCliente}
-                                            onChange={(e) => setEmpresaCliente(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-xs focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all"
-                                            placeholder="Ej. Arias Defense LLC"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Correo Electrónico</label>
-                                        <input
-                                            type="email"
-                                            value={emailCliente}
-                                            onChange={(e) => setEmailCliente(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-xs focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all"
-                                            placeholder="cliente@correo.com"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Teléfono</label>
-                                        <input
-                                            type="text"
-                                            value={telefonoCliente}
-                                            onChange={(e) => setTelefonoCliente(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-xs focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all"
-                                            placeholder="+503 7000-0000"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 2: Order Metadata */}
-                            <div className="space-y-4">
-                                <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest border-b border-blue-50 pb-1">
-                                    2. Datos del Envío y Referencia (US Standards)
-                                </h3>
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Customer PO</label>
-                                        <input
-                                            type="text"
-                                            value={customerPo}
-                                            onChange={(e) => setCustomerPo(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-xs focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all"
-                                            placeholder="PO-XXXX"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Work Order</label>
-                                        <input
-                                            type="text"
-                                            value={workorder}
-                                            onChange={(e) => setWorkorder(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-xs focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all"
-                                            placeholder="WO-XXXX"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Ship Via / Truck</label>
-                                        <input
-                                            type="text"
-                                            value={shipVia}
-                                            onChange={(e) => setShipVia(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-xs focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all"
-                                            placeholder="Ej. FedEx / DHL"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Vendedor</label>
-                                        <input
-                                            type="text"
-                                            value={salesperson}
-                                            onChange={(e) => setSalesperson(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-xs focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all"
-                                            placeholder="Vendedor asignado"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Vencimiento</label>
-                                        <input
-                                            type="date"
-                                            value={dueDate}
-                                            onChange={(e) => setDueDate(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-xs focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha Envío</label>
-                                        <input
-                                            type="date"
-                                            value={dateShipped}
-                                            onChange={(e) => setDateShipped(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-xs focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Section 3: Billing & Shipping Addresses */}
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center border-b border-blue-50 pb-1">
-                                    <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest">
-                                        3. Facturación (Bill To) y Envío (Ship To)
-                                    </h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setBillToName(nombreCliente);
-                                            setBillToCompany(empresaCliente);
-                                            setShipToName(nombreCliente);
-                                            setShipToCompany(empresaCliente);
-                                        }}
-                                        className="text-[10px] font-black text-[#4449AA] hover:underline uppercase tracking-wider"
-                                    >
-                                        Autocompletar con cliente
-                                    </button>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Bill To Card */}
-                                    <div className="p-5 rounded-2xl border border-slate-100 bg-slate-50/30 space-y-3">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Facturar A (Bill To)</p>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-black text-slate-400 uppercase">Nombre</label>
-                                                <input
-                                                    type="text"
-                                                    value={billToName}
-                                                    onChange={(e) => setBillToName(e.target.value)}
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-xs"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-black text-slate-400 uppercase">Empresa</label>
-                                                <input
-                                                    type="text"
-                                                    value={billToCompany}
-                                                    onChange={(e) => setBillToCompany(e.target.value)}
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-xs"
-                                                />
-                                            </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Nombre del Cliente *</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={nombreCliente}
+                                                onChange={(e) => setNombreCliente(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all shadow-sm"
+                                                placeholder="Ej. Juan Pérez"
+                                            />
                                         </div>
-                                        <div className="grid grid-cols-1 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Nombre de Empresa</label>
+                                            <input
+                                                type="text"
+                                                value={empresaCliente}
+                                                onChange={(e) => setEmpresaCliente(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all shadow-sm"
+                                                placeholder="Ej. Arias Defense LLC"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Correo Electrónico</label>
+                                            <input
+                                                type="email"
+                                                value={emailCliente}
+                                                onChange={(e) => setEmailCliente(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all shadow-sm"
+                                                placeholder="cliente@correo.com"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Teléfono</label>
+                                            <input
+                                                type="text"
+                                                value={telefonoCliente}
+                                                onChange={(e) => setTelefonoCliente(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all shadow-sm"
+                                                placeholder="+503 7000-0000"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 2: Order Metadata */}
+                            {activeStep === 2 && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-300">
+                                    <div className="border-b border-slate-100 pb-3">
+                                        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">
+                                            2. Datos del Envío y Referencia (US Standards)
+                                        </h3>
+                                        <p className="text-[10px] text-slate-400">Campos clave para el seguimiento logístico y de producción corporativo</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Customer PO</label>
+                                            <input
+                                                type="text"
+                                                value={customerPo}
+                                                onChange={(e) => setCustomerPo(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all shadow-sm"
+                                                placeholder="PO-XXXX"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Work Order</label>
+                                            <input
+                                                type="text"
+                                                value={workorder}
+                                                onChange={(e) => setWorkorder(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all shadow-sm"
+                                                placeholder="WO-XXXX"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Ship Via / Truck</label>
+                                            <input
+                                                type="text"
+                                                value={shipVia}
+                                                onChange={(e) => setShipVia(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all shadow-sm"
+                                                placeholder="Ej. FedEx / DHL"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Vendedor</label>
+                                            <input
+                                                type="text"
+                                                value={salesperson}
+                                                onChange={(e) => setSalesperson(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all shadow-sm"
+                                                placeholder="Vendedor asignado"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Vencimiento</label>
+                                            <input
+                                                type="date"
+                                                value={dueDate}
+                                                onChange={(e) => setDueDate(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all shadow-sm"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Fecha Envío</label>
+                                            <input
+                                                type="date"
+                                                value={dateShipped}
+                                                onChange={(e) => setDateShipped(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all shadow-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Step 3: Billing & Shipping Addresses */}
+                            {activeStep === 3 && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-300">
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                        <div>
+                                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">
+                                                3. Facturación (Bill To) y Envío (Ship To)
+                                            </h3>
+                                            <p className="text-[10px] text-slate-400">Detalles de direcciones de facturación y destino físico</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setBillToName(nombreCliente);
+                                                setBillToCompany(empresaCliente);
+                                                setShipToName(nombreCliente);
+                                                setShipToCompany(empresaCliente);
+                                                toast.success('Direcciones autocompletadas con datos del cliente');
+                                            }}
+                                            className="px-3.5 py-2 text-[10px] font-black text-[#4449AA] hover:bg-[#4449AA]/5 border border-[#4449AA]/20 rounded-xl uppercase tracking-wider transition-all"
+                                        >
+                                            Autocompletar con cliente
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        {/* Bill To Card */}
+                                        <div className="p-6 rounded-3xl border border-slate-100 bg-slate-50/40 space-y-4 shadow-sm">
+                                            <p className="text-[10px] font-black text-[#4449AA] uppercase tracking-widest border-b border-slate-100 pb-1">Facturar A (Bill To)</p>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-slate-400 uppercase">Nombre</label>
+                                                    <input
+                                                        type="text"
+                                                        value={billToName}
+                                                        onChange={(e) => setBillToName(e.target.value)}
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs focus:ring-1 focus:ring-[#4449AA]"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-slate-400 uppercase">Empresa</label>
+                                                    <input
+                                                        type="text"
+                                                        value={billToCompany}
+                                                        onChange={(e) => setBillToCompany(e.target.value)}
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs focus:ring-1 focus:ring-[#4449AA]"
+                                                    />
+                                                </div>
+                                            </div>
                                             <div className="space-y-1">
                                                 <label className="text-[9px] font-black text-slate-400 uppercase">Cuenta Cliente</label>
                                                 <input
                                                     type="text"
                                                     value={billToAccount}
                                                     onChange={(e) => setBillToAccount(e.target.value)}
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-xs"
+                                                    className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs focus:ring-1 focus:ring-[#4449AA]"
                                                     placeholder="Ej. ACC-987"
                                                 />
                                             </div>
                                             <div className="space-y-1">
                                                 <label className="text-[9px] font-black text-slate-400 uppercase">Dirección de Facturación</label>
                                                 <textarea
-                                                    rows={2}
+                                                    rows={3}
                                                     value={billToAddress}
                                                     onChange={(e) => setBillToAddress(e.target.value)}
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-xs focus:outline-none"
+                                                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-white text-xs focus:outline-none focus:ring-1 focus:ring-[#4449AA]"
+                                                    placeholder="Calle, Ciudad, Estado, ZIP"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Ship To Card */}
+                                        <div className="p-6 rounded-3xl border border-slate-100 bg-slate-50/40 space-y-4 shadow-sm">
+                                            <p className="text-[10px] font-black text-[#4449AA] uppercase tracking-widest border-b border-slate-100 pb-1">Enviar A (Ship To)</p>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-slate-400 uppercase">Nombre Receptor</label>
+                                                    <input
+                                                        type="text"
+                                                        value={shipToName}
+                                                        onChange={(e) => setShipToName(e.target.value)}
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs focus:ring-1 focus:ring-[#4449AA]"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-black text-slate-400 uppercase">Empresa Destino</label>
+                                                    <input
+                                                        type="text"
+                                                        value={shipToCompany}
+                                                        onChange={(e) => setShipToCompany(e.target.value)}
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs focus:ring-1 focus:ring-[#4449AA]"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase">Dirección de Envío</label>
+                                                <textarea
+                                                    rows={5}
+                                                    value={shipToAddress}
+                                                    onChange={(e) => setShipToAddress(e.target.value)}
+                                                    className="w-full px-3 py-2.5 border border-slate-200 rounded-xl bg-white text-xs focus:outline-none focus:ring-1 focus:ring-[#4449AA]"
                                                     placeholder="Calle, Ciudad, Estado, ZIP"
                                                 />
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            )}
 
-                                    {/* Ship To Card */}
-                                    <div className="p-5 rounded-2xl border border-slate-100 bg-slate-50/30 space-y-3">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Enviar A (Ship To)</p>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-black text-slate-400 uppercase">Nombre Receptor</label>
-                                                <input
-                                                    type="text"
-                                                    value={shipToName}
-                                                    onChange={(e) => setShipToName(e.target.value)}
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-xs"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-black text-slate-400 uppercase">Empresa Destino</label>
-                                                <input
-                                                    type="text"
-                                                    value={shipToCompany}
-                                                    onChange={(e) => setShipToCompany(e.target.value)}
-                                                    className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-xs"
-                                                />
-                                            </div>
+                            {/* Step 4: Invoice Items */}
+                            {activeStep === 4 && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-300">
+                                    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                        <div>
+                                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">
+                                                4. Detalle de Ítems e Impuestos
+                                            </h3>
+                                            <p className="text-[10px] text-slate-400">Ingresa los productos o servicios, stock numbers y precios unitarios</p>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[9px] font-black text-slate-400 uppercase">Dirección de Envío</label>
+                                        <button
+                                            type="button"
+                                            onClick={handleAddRow}
+                                            className="px-4 py-2 text-[10px] font-black text-white bg-slate-900 rounded-xl hover:bg-slate-800 uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-sm"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            <span>Agregar Ítem</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                                        <table className="w-full text-left text-xs border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                                                    <th className="px-4 py-3">Stock #</th>
+                                                    <th className="px-4 py-3">Tag #</th>
+                                                    <th className="px-4 py-3 w-[50%]">Descripción del Ítem *</th>
+                                                    <th className="px-4 py-3 text-right">Inversión (USD)</th>
+                                                    <th className="px-4 py-3 text-center w-12"></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50">
+                                                {formItems.map((item, idx) => (
+                                                    <tr key={idx} className="bg-white hover:bg-slate-50/20">
+                                                        <td className="px-4 py-3">
+                                                            <input
+                                                                type="text"
+                                                                value={item.stock_number}
+                                                                onChange={(e) => handleItemChange(idx, 'stock_number', e.target.value)}
+                                                                className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50/30 text-xs font-mono focus:ring-1 focus:ring-[#4449AA]"
+                                                                placeholder="Stock #"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <input
+                                                                type="text"
+                                                                value={item.tag_number}
+                                                                onChange={(e) => handleItemChange(idx, 'tag_number', e.target.value)}
+                                                                className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50/30 text-xs font-mono focus:ring-1 focus:ring-[#4449AA]"
+                                                                placeholder="Tag #"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <input
+                                                                type="text"
+                                                                value={item.item_detail}
+                                                                onChange={(e) => handleItemChange(idx, 'item_detail', e.target.value)}
+                                                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-extrabold focus:ring-1 focus:ring-[#4449AA]"
+                                                                placeholder="Ej. Mantenimiento Preventivo"
+                                                                required
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                value={item.amount}
+                                                                onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
+                                                                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-black text-right focus:ring-1 focus:ring-[#4449AA]"
+                                                                placeholder="0.00"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemoveRow(idx)}
+                                                                disabled={formItems.length === 1}
+                                                                className="p-2 text-slate-300 hover:text-rose-500 disabled:opacity-30 rounded-xl transition-all"
+                                                            >
+                                                                <Trash className="w-4 h-4" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Totals, Taxes & Notes */}
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pt-4">
+                                        <div className="md:col-span-7 space-y-2">
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Notas de la Factura</label>
                                             <textarea
                                                 rows={4}
-                                                value={shipToAddress}
-                                                onChange={(e) => setShipToAddress(e.target.value)}
-                                                className="w-full px-3 py-2 border border-slate-200 rounded-lg bg-white text-xs focus:outline-none"
-                                                placeholder="Calle, Ciudad, Estado, ZIP"
+                                                value={notas}
+                                                onChange={(e) => setNotas(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-1 focus:ring-[#4449AA]"
+                                                placeholder="Términos y condiciones, detalles de pago..."
                                             />
+                                        </div>
+
+                                        <div className="md:col-span-5 p-6 rounded-3xl bg-slate-50/50 border border-slate-100 space-y-4 text-xs shadow-sm">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-bold text-slate-400 uppercase">Subtotal</span>
+                                                <span className="font-extrabold text-slate-700">
+                                                    ${formItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-center gap-4">
+                                                <span className="font-bold text-slate-400 uppercase">Tasa de IVA (%)</span>
+                                                <input
+                                                    type="number"
+                                                    value={ivaPercent}
+                                                    onChange={(e) => setIvaPercent(Number(e.target.value) || 0)}
+                                                    className="w-16 px-2.5 py-1.5 border border-slate-200 rounded-lg text-right font-black"
+                                                />
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-bold text-slate-400 uppercase">IVA Calculado</span>
+                                                <span className="font-extrabold text-slate-700">
+                                                    ${(formItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) * (ivaPercent / 100)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            <div className="h-px bg-slate-200 my-1"></div>
+                                            <div className="flex justify-between items-center text-sm font-black">
+                                                <span className="text-slate-900 uppercase">Total Facturado</span>
+                                                <span className="text-[#4449AA]">
+                                                    ${(formItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) * (1 + ivaPercent / 100)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            {/* Section 4: Invoice Items */}
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center border-b border-blue-50 pb-1">
-                                    <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest">
-                                        4. Detalle de Ítems
-                                    </h3>
-                                    <button
-                                        type="button"
-                                        onClick={handleAddRow}
-                                        className="text-[10px] font-black text-white bg-slate-900 px-3 py-1.5 rounded-xl hover:bg-slate-800 uppercase tracking-wider flex items-center gap-1.5"
-                                    >
-                                        <Plus className="w-3.5 h-3.5" />
-                                        <span>Agregar Ítem</span>
-                                    </button>
-                                </div>
-
-                                <div className="border border-slate-100 rounded-2xl overflow-hidden">
-                                    <table className="w-full text-left text-xs border-collapse">
-                                        <thead>
-                                            <tr className="bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
-                                                <th className="px-4 py-2.5">Stock #</th>
-                                                <th className="px-4 py-2.5">Tag #</th>
-                                                <th className="px-4 py-2.5 w-[50%]">Descripción del Ítem *</th>
-                                                <th className="px-4 py-2.5 text-right">Inversión (USD)</th>
-                                                <th className="px-4 py-2.5 text-center w-12"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {formItems.map((item, idx) => (
-                                                <tr key={idx} className="bg-white hover:bg-slate-50/10">
-                                                    <td className="px-4 py-2.5">
-                                                        <input
-                                                            type="text"
-                                                            value={item.stock_number}
-                                                            onChange={(e) => handleItemChange(idx, 'stock_number', e.target.value)}
-                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded-lg bg-slate-50/30 text-xs font-mono"
-                                                            placeholder="Stock #"
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-2.5">
-                                                        <input
-                                                            type="text"
-                                                            value={item.tag_number}
-                                                            onChange={(e) => handleItemChange(idx, 'tag_number', e.target.value)}
-                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded-lg bg-slate-50/30 text-xs font-mono"
-                                                            placeholder="Tag #"
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-2.5">
-                                                        <input
-                                                            type="text"
-                                                            value={item.item_detail}
-                                                            onChange={(e) => handleItemChange(idx, 'item_detail', e.target.value)}
-                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-extrabold"
-                                                            placeholder="Ej. Servicio de Mantenimiento de Turbina"
-                                                            required
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-2.5">
-                                                        <input
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={item.amount}
-                                                            onChange={(e) => handleItemChange(idx, 'amount', e.target.value)}
-                                                            className="w-full px-2 py-1.5 border border-slate-200 rounded-lg text-xs font-black text-right"
-                                                            placeholder="0.00"
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-center">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemoveRow(idx)}
-                                                            disabled={formItems.length === 1}
-                                                            className="p-1.5 text-slate-300 hover:text-rose-500 disabled:opacity-30 rounded-lg transition-all"
-                                                        >
-                                                            <Trash className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            {/* Section 5: Totals, Taxes & Notes */}
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 pt-4">
-                                <div className="md:col-span-7 space-y-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Notas de la Factura</label>
-                                        <textarea
-                                            rows={4}
-                                            value={notas}
-                                            onChange={(e) => setNotas(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50/50 text-xs focus:outline-none"
-                                            placeholder="Términos y condiciones, detalles de pago..."
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="md:col-span-5 p-5 rounded-2xl bg-slate-50/50 border border-slate-100 space-y-3 text-xs">
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-bold text-slate-400 uppercase">Subtotal</span>
-                                        <span className="font-extrabold text-slate-700">
-                                            ${formItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center gap-4">
-                                        <span className="font-bold text-slate-400 uppercase">Tasa de IVA (%)</span>
-                                        <input
-                                            type="number"
-                                            value={ivaPercent}
-                                            onChange={(e) => setIvaPercent(Number(e.target.value) || 0)}
-                                            className="w-16 px-2 py-1 border border-slate-200 rounded-lg text-right font-black"
-                                        />
-                                    </div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-bold text-slate-400 uppercase">IVA Calculado</span>
-                                        <span className="font-extrabold text-slate-700">
-                                            ${(formItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) * (ivaPercent / 100)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                    </div>
-                                    <div className="h-px bg-slate-200 my-1"></div>
-                                    <div className="flex justify-between items-center text-sm font-black">
-                                        <span className="text-slate-900 uppercase">Total Facturado</span>
-                                        <span className="text-[#4449AA]">
-                                            ${(formItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0) * (1 + ivaPercent / 100)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
+                            )}
 
                             {/* Modal Footer */}
-                            <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCreateModalOpen(false)}
-                                    className="px-5 py-2.5 border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-black uppercase tracking-wider text-slate-500"
-                                >
-                                    Cancelar
-                                </button>
-                                <Button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="px-6 py-2.5 bg-[#4449AA] hover:bg-[#353985] text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2"
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                            <span>Guardando...</span>
-                                        </>
+                            <div className="flex justify-between items-center pt-6 border-t border-slate-100">
+                                <div>
+                                    {activeStep > 1 ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setActiveStep(prev => prev - 1)}
+                                            className="px-6 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 text-xs font-black uppercase tracking-wider text-slate-500 transition-all"
+                                        >
+                                            Atrás
+                                        </button>
                                     ) : (
-                                        <span>Crear Factura</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsCreateModalOpen(false)}
+                                            className="px-6 py-3 border border-slate-200 rounded-2xl hover:bg-slate-50 text-xs font-black uppercase tracking-wider text-slate-500 transition-all"
+                                        >
+                                            Cancelar
+                                        </button>
                                     )}
-                                </Button>
+                                </div>
+                                <div>
+                                    {activeStep < 4 ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (activeStep === 1 && !nombreCliente.trim()) {
+                                                    toast.error('El nombre del cliente es requerido');
+                                                    return;
+                                                }
+                                                setActiveStep(prev => prev + 1);
+                                            }}
+                                            className="px-6 py-3 bg-[#4449AA] hover:bg-[#353985] text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all"
+                                        >
+                                            Siguiente
+                                        </button>
+                                    ) : (
+                                        <Button
+                                            type="submit"
+                                            disabled={isSubmitting}
+                                            className="px-8 py-3 bg-[#4449AA] hover:bg-[#353985] text-white rounded-2xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all shadow-sm"
+                                        >
+                                            {isSubmitting ? (
+                                                <>
+                                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                    <span>Guardando...</span>
+                                                </>
+                                            ) : (
+                                                <span>Crear Factura</span>
+                                            )}
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </form>
                     </div>
