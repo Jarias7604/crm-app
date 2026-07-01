@@ -42,6 +42,7 @@ import { useAriasTables } from '../../hooks/useAriasTables';
 const MODULES_CONFIG = [
     { key: 'leads', label: 'Leads (CRM)', icon: User, color: 'text-blue-600', bg: 'bg-blue-50' },
     { key: 'quotes', label: 'Cotizaciones', icon: FileText, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { key: 'invoices', label: 'Facturación', icon: FileText, color: 'text-blue-700', bg: 'bg-blue-50' },
     { key: 'calendar', label: 'Agenda Global', icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
     { key: 'marketing', label: 'Marketing Hub', icon: Megaphone, color: 'text-rose-600', bg: 'bg-rose-50' },
     { key: 'chat', label: 'Chat Omnicanal', icon: MessageSquare, color: 'text-green-600', bg: 'bg-green-50' },

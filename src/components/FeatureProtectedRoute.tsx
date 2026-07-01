@@ -2,7 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 
 interface FeatureProtectedRouteProps {
-    feature: 'leads' | 'quotes' | 'calendar' | 'marketing' | 'chat';
+    feature: 'leads' | 'quotes' | 'calendar' | 'marketing' | 'chat' | 'invoices' | 'facturas';
     allowedRoles?: string[];
 }
 

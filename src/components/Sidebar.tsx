@@ -245,6 +245,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: t('sidebar.quotes'), href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
     }
 
+    if (canAccess('invoices') || profile?.role === 'super_admin') {
+        navigation.push({ name: 'Facturas', href: '/facturas', icon: FileText, current: location.pathname.startsWith('/facturas') });
+    }
+
     if (profile?.role === 'super_admin') {
         navigation.push({ name: t('sidebar.billing'), href: '/company/billing', icon: CreditCard, current: location.pathname.startsWith('/company/billing') });
     }

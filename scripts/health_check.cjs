@@ -15,9 +15,14 @@ const supabase = createClient(
 );
 
 const KNOWN_COMPANIES = {
-  '7a582ba5-f7d0-4ae3-9985-35788deb1c30': 'Arias Defense Components LLC',
+  '7a582ba5-f7d0-4ae3-9985-35788deb1c30': 'Arias Defense Components LLC El Salvador',
   'ec88dff0-94a2-4544-ad2e-1f93a8163366': 'Ensivar S.A. de C.V.',
   '00000000-0000-0000-0000-000000000000': 'Sistema Arias Defense',
+  'ee91c9f0-3e3a-44b6-8907-42a4af518f4b': 'Abogados y Asociados Consulting S.A. de C.V.',
+  'd5d1e049-f00b-45b2-aa81-194ddae76fb2': 'Invoices Trial',
+  '82493cf1-6c2d-4727-9d2e-3ed7713f41be': 'iclesia llc ',
+  'e046ceb0-f9ee-4e8b-9218-2fae36bc0378': 'Demo Trial Company',
+  'a63cbe46-4042-4812-803c-8922a24d0e8c': 'Arias Defense Components, LLC. ',
 };
 
 async function healthCheck() {
@@ -29,8 +34,27 @@ async function healthCheck() {
 
   // CHECK 1: Leads count per company
   console.log('CHECK 1: Leads por empresa');
-  const { data: leads, error: leadsErr } = await supabase
-    .from('leads').select('company_id');
+  let leads = [];
+  let leadsErr = null;
+  let from = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('leads')
+      .select('id, company_id')
+      .range(from, from + 999);
+    if (error) {
+      leadsErr = error;
+      hasMore = false;
+    } else {
+      leads = leads.concat(data || []);
+      if (!data || data.length < 1000) {
+        hasMore = false;
+      } else {
+        from += 1000;
+      }
+    }
+  }
 
   if (leadsErr) {
     console.log('  ❌ Error leyendo leads:', leadsErr.message);
@@ -65,8 +89,7 @@ async function healthCheck() {
 
   // CHECK 2: Leads without valid company_id
   console.log('\nCHECK 2: Leads sin empresa válida');
-  const { data: allLeads } = await supabase.from('leads').select('id, company_id');
-  const orphaned = allLeads?.filter(l => !l.company_id) || [];
+  const orphaned = leads?.filter(l => !l.company_id) || [];
   if (orphaned.length > 0) {
     console.log(`  ❌ ${orphaned.length} leads sin company_id`);
     allPassed = false;
@@ -98,9 +121,32 @@ async function healthCheck() {
 
   // CHECK 5: No cross-tenant data in marketing conversations
   console.log('\nCHECK 5: Conversaciones de marketing aisladas');
-  const { data: convos } = await supabase
-    .from('marketing_conversations').select('company_id');
-  if (convos) {
+  let convos = [];
+  let convosErr = null;
+  let cFrom = 0;
+  let cHasMore = true;
+  while (cHasMore) {
+    const { data, error } = await supabase
+      .from('marketing_conversations')
+      .select('company_id')
+      .range(cFrom, cFrom + 999);
+    if (error) {
+      convosErr = error;
+      cHasMore = false;
+    } else {
+      convos = convos.concat(data || []);
+      if (!data || data.length < 1000) {
+        cHasMore = false;
+      } else {
+        cFrom += 1000;
+      }
+    }
+  }
+
+  if (convosErr) {
+    console.log('  ❌ Error leyendo conversaciones:', convosErr.message);
+    allPassed = false;
+  } else if (convos) {
     const convoCounts = {};
     convos.forEach(c => { convoCounts[c.company_id] = (convoCounts[c.company_id] || 0) + 1; });
     Object.entries(convoCounts).forEach(([cid, count]) => {
