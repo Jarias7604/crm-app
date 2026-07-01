@@ -17,6 +17,7 @@ export default function Branding() {
     const [uploading, setUploading] = useState(false);
     const [tcPreview, setTcPreview] = useState(false);
     const [tcOpen, setTcOpen] = useState(false);
+    const [logoDarkBg, setLogoDarkBg] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         website: '',
@@ -317,19 +318,55 @@ export default function Branding() {
 
                             <div className="space-y-2">
                                 <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Logotipo Corporativo</label>
-                                <div className="flex flex-col md:flex-row items-center gap-5 p-5 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50 group hover:border-blue-400 hover:bg-blue-50/30 transition-all duration-300">
-                                    <div className="w-28 h-28 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-500 relative">
-                                        {formData.logo_url ? (
-                                            <img src={formData.logo_url} alt="Logo" className="w-full h-full object-contain p-3" />
-                                        ) : (
-                                            <ImageIcon className="w-10 h-10 text-gray-300" />
-                                        )}
-                                        <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                                <div className="flex flex-col md:flex-row items-center gap-6 p-5 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50 hover:border-blue-400 transition-all duration-300">
+
+                                    {/* Logo preview box with dark/light toggle */}
+                                    <div className="flex flex-col items-center gap-2 shrink-0">
+                                        <div className={`w-44 h-44 rounded-2xl shadow-lg border flex items-center justify-center overflow-hidden transition-colors duration-300 relative ${
+                                            logoDarkBg ? 'bg-[#0f172a] border-slate-700' : 'bg-white border-gray-100'
+                                        }`}>
+                                            {formData.logo_url ? (
+                                                <img src={formData.logo_url} alt="Logo" className="w-full h-full object-contain p-4" />
+                                            ) : (
+                                                <ImageIcon className={`w-14 h-14 ${logoDarkBg ? 'text-slate-600' : 'text-gray-300'}`} />
+                                            )}
+                                        </div>
+                                        {/* Dark/Light toggle */}
+                                        <div className="flex bg-white rounded-xl border border-gray-200 shadow-sm p-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => setLogoDarkBg(false)}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${
+                                                    !logoDarkBg ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-600'
+                                                }`}
+                                            >
+                                                ☀️ Claro
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setLogoDarkBg(true)}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide transition-all ${
+                                                    logoDarkBg ? 'bg-[#0f172a] text-white' : 'text-gray-400 hover:text-gray-600'
+                                                }`}
+                                            >
+                                                🌙 Oscuro
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex-1 space-y-3 text-center md:text-left">
+
+                                    {/* Right side text & upload */}
+                                    <div className="flex-1 space-y-4 md:pl-2">
                                         <div>
                                             <p className="text-base font-black text-[#0f172a] tracking-tight">Actualiza tu Identidad</p>
-                                            <p className="text-sm text-gray-500 mt-1 leading-relaxed">Recomendamos PNG con fondo transparente.<br />El sistema permite recortar para un ajuste perfecto.</p>
+                                            <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">Recomendamos PNG con fondo transparente.<br />El sistema permite recortar para un ajuste perfecto.</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Formatos aceptados</p>
+                                            <div className="flex gap-2">
+                                                {['PNG', 'SVG', 'JPG', 'WEBP'].map(fmt => (
+                                                    <span key={fmt} className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[10px] font-black border border-blue-100">{fmt}</span>
+                                                ))}
+                                            </div>
                                         </div>
                                         <div className="relative inline-block">
                                             <input type="file" accept="image/*" onChange={handleFileSelect} disabled={uploading} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
