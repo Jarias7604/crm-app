@@ -132,104 +132,92 @@ export default function Branding() {
     );
 
     return (
-        <div className="max-w-7xl mx-auto space-y-5 animate-in fade-in duration-500">
-            <div className="flex justify-between items-center bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
-                <div className="space-y-0.5">
-                    <h1 className="text-2xl font-black text-[#0f172a] tracking-tight">Marca Corporativa</h1>
-                    <p className="text-gray-500 text-sm font-medium">Gestiona tu identidad visual y términos legales globales.</p>
+        <div className="max-w-7xl mx-auto space-y-3 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                <div>
+                    <h1 className="text-base font-black text-[#0f172a] tracking-tight">Marca Corporativa</h1>
+                    <p className="text-gray-500 text-xs font-medium">Gestiona tu identidad visual y términos legales globales.</p>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                 {/* Form Section */}
-                <div className="lg:col-span-7 xl:col-span-8 space-y-4">
-                    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xl shadow-gray-200/40 space-y-6 relative overflow-hidden">
+                <div className="lg:col-span-7 xl:col-span-8 space-y-3">
+                    <form onSubmit={handleSubmit} className="bg-white p-4 rounded-xl border border-gray-100 shadow-md space-y-4 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/30 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none"></div>
 
-                        <div className="space-y-5 relative z-10">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Nombre Comercial</label>
+                        <div className="space-y-3 relative z-10">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Nombre Comercial</label>
                                     <div className="relative group">
-                                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                                        <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                                         <Input
                                             required
                                             value={formData.name}
                                             onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                            className="pl-9 h-10 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm shadow-sm"
+                                            className="pl-7 h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
                                             placeholder="Tu Empresa S.A."
                                         />
                                     </div>
                                 </div>
 
-                                <div className="space-y-1.5">
-                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Sitio Web Oficial</label>
+                                <div className="space-y-1">
+                                    <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Sitio Web Oficial</label>
                                     <div className="relative group">
-                                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                                        <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
                                         <Input
                                             value={formData.website}
                                             onChange={e => setFormData({ ...formData, website: e.target.value })}
-                                            className="pl-9 h-10 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm shadow-sm"
+                                            className="pl-7 h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
                                             placeholder="https://www.tusitio.com"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Teléfono Contacto</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Teléfono Contacto</label>
                                     <div className="relative group">
                                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">📞</div>
                                         <Input
                                             value={formData.phone}
                                             onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                            className="pl-9 h-10 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm shadow-sm"
+                                            className="pl-7 h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
                                             placeholder="+503 2200-0000"
                                         />
                                     </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Dirección Física</label>
+                                <div className="space-y-1">
+                                    <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Dirección Física</label>
                                     <div className="relative group">
                                         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">📍</div>
                                         <Input
                                             value={formData.address}
                                             onChange={e => setFormData({ ...formData, address: e.target.value })}
-                                            className="pl-9 h-10 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm shadow-sm"
+                                            className="pl-7 h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs shadow-sm"
                                             placeholder="Ciudad, País"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Términos y Condiciones Predeterminados</label>
-                                <div className="p-4 border-2 border-slate-100 rounded-2xl bg-slate-50/50 space-y-4">
+                            <div className="space-y-2">
+                                <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Términos y Condiciones Predeterminados</label>
+                                <div className="p-3 border border-slate-100 rounded-xl bg-slate-50/50 space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-start gap-4">
-                                            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                                                <FileText className="w-5 h-5" />
+                                        <div className="flex items-start gap-2">
+                                            <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                                                <FileText className="w-3.5 h-3.5" />
                                             </div>
-                                            <p className="text-sm text-slate-500 leading-relaxed font-medium">
+                                            <p className="text-xs text-slate-500 leading-relaxed font-medium">
                                                 Define el marco legal. Usa <code className="bg-blue-100 px-1.5 py-0.5 rounded text-blue-700 font-black">**texto**</code> para resaltar en negrita.
                                             </p>
                                         </div>
-                                        <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-                                            <button
-                                                type="button"
-                                                onClick={() => setTcPreview(false)}
-                                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${!tcPreview ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}
-                                            >
-                                                Editar
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setTcPreview(true)}
-                                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${tcPreview ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}
-                                            >
-                                                Vista Previa
-                                            </button>
+                                        <div className="flex bg-white p-0.5 rounded-lg border border-slate-200 shadow-sm">
+                                            <button type="button" onClick={() => setTcPreview(false)} className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase transition-all ${!tcPreview ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>Editar</button>
+                                            <button type="button" onClick={() => setTcPreview(true)} className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase transition-all ${tcPreview ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>Vista Previa</button>
                                         </div>
                                     </div>
 
@@ -237,11 +225,11 @@ export default function Branding() {
                                         <textarea
                                             value={formData.terminos_condiciones}
                                             onChange={e => setFormData({ ...formData, terminos_condiciones: e.target.value })}
-                                            className="w-full min-h-[350px] p-8 rounded-[2rem] border-gray-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-medium text-slate-600 shadow-inner bg-white leading-relaxed resize-none transition-all"
+                                            className="w-full min-h-[180px] p-4 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-medium text-xs text-slate-600 shadow-inner bg-white leading-relaxed resize-none transition-all"
                                             placeholder="**Artículo 1: Objeto...**&#10;Este contrato establece los términos para el uso de...&#10;&#10;**Artículo 2: Pagos**..."
                                         />
                                     ) : (
-                                        <div className="w-full min-h-[350px] p-8 rounded-[2rem] bg-white border border-slate-200 shadow-inner overflow-y-auto space-y-6">
+                                        <div className="w-full min-h-[180px] p-4 rounded-xl bg-white border border-slate-200 shadow-inner overflow-y-auto space-y-3">
                                             {(formData.terminos_condiciones || '').split('\n\n').filter(p => p.trim()).map((para, idx) => (
                                                 <div key={idx} className="flex gap-4 items-start">
                                                     <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-black mt-0.5">
@@ -265,86 +253,62 @@ export default function Branding() {
                             </div>
 
                             {/* Localization Section */}
-                            <div className="space-y-3">
-                                <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Configuración de Localización (Fechas y Horas)</label>
-                                <div className="p-4 border-2 border-slate-100 rounded-2xl bg-indigo-50/30 space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Fecha</label>
-                                            <select
-                                                value={formData.date_format}
-                                                onChange={e => setFormData({ ...formData, date_format: e.target.value })}
-                                                className="w-full h-10 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm text-slate-700 bg-white shadow-sm transition-all outline-none px-3"
-                                            >
+                            <div className="space-y-2">
+                                <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Configuración de Localización (Fechas y Horas)</label>
+                                <div className="p-3 border border-slate-100 rounded-xl bg-indigo-50/30 space-y-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Fecha</label>
+                                            <select value={formData.date_format} onChange={e => setFormData({ ...formData, date_format: e.target.value })} className="w-full h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs text-slate-700 bg-white shadow-sm transition-all outline-none px-2.5">
                                                 <option value="DD/MM/YYYY">DD/MM/YYYY (Ej: 30/01/2026)</option>
                                                 <option value="MM/DD/YYYY">MM/DD/YYYY (Ej: 01/30/2026)</option>
                                                 <option value="YYYY-MM-DD">YYYY-MM-DD (Ej: 2026-01-30)</option>
                                                 <option value="dd MMM, yyyy">30 Ene, 2026</option>
                                             </select>
                                         </div>
-
-                                        <div className="space-y-2">
-                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Hora</label>
-                                            <select
-                                                value={formData.time_format}
-                                                onChange={e => setFormData({ ...formData, time_format: e.target.value })}
-                                                className="w-full h-10 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm text-slate-700 bg-white shadow-sm transition-all outline-none px-3"
-                                            >
+                                        <div className="space-y-1">
+                                            <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Hora</label>
+                                            <select value={formData.time_format} onChange={e => setFormData({ ...formData, time_format: e.target.value })} className="w-full h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs text-slate-700 bg-white shadow-sm transition-all outline-none px-2.5">
                                                 <option value="24h">24 Horas (Ej: 17:00)</option>
                                                 <option value="12h">12 Horas (Ej: 05:00 PM)</option>
                                             </select>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Zona Horaria de Operación</label>
-                                        <select
-                                            value={formData.timezone}
-                                            onChange={e => setFormData({ ...formData, timezone: e.target.value })}
-                                            className="w-full h-10 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm text-slate-700 bg-white shadow-sm transition-all outline-none px-3"
-                                        >
+                                    <div className="space-y-1">
+                                        <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider ml-1">Zona Horaria de Operación</label>
+                                        <select value={formData.timezone} onChange={e => setFormData({ ...formData, timezone: e.target.value })} className="w-full h-8 rounded-lg border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-xs text-slate-700 bg-white shadow-sm transition-all outline-none px-2.5">
                                             <option value="America/El_Salvador">El Salvador (CST)</option>
                                             <option value="America/Mexico_City">México (CST)</option>
                                             <option value="America/Bogota">Colombia (EST)</option>
                                             <option value="America/New_York">New York (EST)</option>
                                             <option value="Europe/Madrid">Madrid (CET)</option>
                                         </select>
-                                        <p className="text-[10px] text-slate-400 font-medium ml-1 mt-1">
-                                            * Esta configuración afectará cómo se registran y muestran las fechas en el sistema para todos los usuarios.
-                                        </p>
+                                        <p className="text-[9px] text-slate-400 font-medium ml-1 mt-0.5">* Afecta cómo se registran y muestran las fechas para todos los usuarios.</p>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="space-y-3">
-                                <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest px-1">Logotipo Corporativo</label>
-                                <div className="flex flex-col md:flex-row items-center gap-5 p-5 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50 group hover:border-blue-400 hover:bg-blue-50/30 transition-all duration-300">
-                                    <div className="w-28 h-28 bg-white rounded-2xl shadow-xl border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-500 relative">
+                            <div className="space-y-2">
+                                <label className="block text-[9px] font-black text-blue-600 uppercase tracking-widest px-1">Logotipo Corporativo</label>
+                                <div className="flex flex-col md:flex-row items-center gap-4 p-4 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50 group hover:border-blue-400 hover:bg-blue-50/30 transition-all duration-300">
+                                    <div className="w-24 h-24 bg-white rounded-2xl shadow-lg border border-gray-100 flex items-center justify-center overflow-hidden shrink-0 group-hover:scale-105 transition-transform duration-500 relative">
                                         {formData.logo_url ? (
-                                            <img src={formData.logo_url} alt="Logo" className="w-full h-full object-contain p-4" />
+                                            <img src={formData.logo_url} alt="Logo" className="w-full h-full object-contain p-3" />
                                         ) : (
-                                            <ImageIcon className="w-16 h-16 text-gray-300" />
+                                            <ImageIcon className="w-10 h-10 text-gray-300" />
                                         )}
                                         <div className="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                                     </div>
-                                    <div className="flex-1 space-y-6 text-center md:text-left">
+                                    <div className="flex-1 space-y-3 text-center md:text-left">
                                         <div>
-                                            <p className="text-lg font-black text-[#0f172a] tracking-tight">Actualiza tu Identidad</p>
-                                            <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-                                                Recomendamos un archivo PNG con fondo transparente. <br />
-                                                El sistema permite recortar para un ajuste perfecto.
-                                            </p>
+                                            <p className="text-base font-black text-[#0f172a] tracking-tight">Actualiza tu Identidad</p>
+                                            <p className="text-xs text-gray-500 mt-1 leading-relaxed">Recomendamos un archivo PNG con fondo transparente.<br />El sistema permite recortar para un ajuste perfecto.</p>
                                         </div>
                                         <div className="relative inline-block">
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handleFileSelect}
-                                                disabled={uploading}
-                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                                            />
-                                            <Button type="button" variant="outline" disabled={uploading} className="rounded-2xl border-gray-300 hover:border-blue-500 hover:text-blue-600 bg-white shadow-sm font-black text-xs h-14 px-8 relative z-10 transition-all group-active:scale-95">
-                                                <Upload className="w-5 h-5 mr-3" />
+                                            <input type="file" accept="image/*" onChange={handleFileSelect} disabled={uploading} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
+                                            <Button type="button" variant="outline" disabled={uploading} className="rounded-xl border-gray-300 hover:border-blue-500 hover:text-blue-600 bg-white shadow-sm font-black text-xs h-9 px-5 relative z-10 transition-all">
+                                                <Upload className="w-3.5 h-3.5 mr-2" />
                                                 {uploading ? 'Cargando...' : 'Seleccionar Nuevo Logo'}
                                             </Button>
                                         </div>
@@ -353,18 +317,15 @@ export default function Branding() {
                             </div>
                         </div>
 
-                        <div className="pt-5 border-t border-gray-100 relative z-10">
-                            <Button type="submit" disabled={saving} className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-lg shadow-blue-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-3 text-sm py-3">
+                        <div className="pt-3 border-t border-gray-100 relative z-10">
+                            <Button type="submit" disabled={saving} className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-black shadow-md shadow-blue-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-xs py-2">
                                 {saving ? (
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                        <span>Guardando Cambios...</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        <span>Guardando...</span>
                                     </div>
                                 ) : (
-                                    <>
-                                        <Save className="w-6 h-6" />
-                                        Guardar Configuración
-                                    </>
+                                    <><Save className="w-3.5 h-3.5" />Guardar Configuración</>
                                 )}
                             </Button>
                         </div>
@@ -372,8 +333,8 @@ export default function Branding() {
                 </div>
 
                 {/* Preview Section */}
-                <div className="lg:col-span-5 xl:col-span-4 space-y-8">
-                    <div className="sticky top-10 space-y-8">
+                <div className="lg:col-span-5 xl:col-span-4 space-y-4">
+                    <div className="sticky top-6 space-y-4">
                         <div className="flex items-center justify-between px-4">
                             <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Vista Previa Real</h3>
                             <div className="flex gap-2">
@@ -382,77 +343,62 @@ export default function Branding() {
                             </div>
                         </div>
 
-                        {/* Actual Quotation Header Preview */}
-                        <div className="bg-white rounded-[2.5rem] overflow-hidden shadow-2xl border border-gray-100 transition-all hover:shadow-blue-500/10">
-                            {/* Header Black Bar */}
-                            <div className="bg-[#0f172a] p-8 text-white relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
-
-                                <div className="space-y-6 relative z-10">
-                                    <div className="flex flex-col items-start gap-5">
-                                        <div className="w-64 h-20 flex items-center justify-start overflow-hidden group/logo">
+                        <div className="bg-white rounded-2xl overflow-hidden shadow-xl border border-gray-100">
+                            <div className="bg-[#0f172a] p-4 text-white relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                                <div className="space-y-3 relative z-10">
+                                    <div className="flex flex-col items-start gap-3">
+                                        <div className="w-40 h-12 flex items-center justify-start overflow-hidden">
                                             {formData.logo_url ? (
                                                 <img src={formData.logo_url} alt="Logo" className="max-h-full max-w-full object-contain" />
                                             ) : (
-                                                <div className="flex items-center gap-2 px-3 text-white/40">
-                                                    <Building2 className="w-6 h-6" />
-                                                    <span className="text-sm font-black uppercase tracking-tighter">BRAND LOGO</span>
+                                                <div className="flex items-center gap-1.5 px-2 text-white/40">
+                                                    <Building2 className="w-4 h-4" />
+                                                    <span className="text-xs font-black uppercase tracking-tighter">BRAND LOGO</span>
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="space-y-1">
-                                            <p className="text-xl font-black leading-none text-white uppercase tracking-tight">
-                                                {formData.name || 'TU EMPRESA'}
-                                            </p>
-                                            <div className="flex flex-col text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-2 space-y-1">
-                                                {formData.phone && <span className="flex items-center gap-2">TEL: {formData.phone}</span>}
-                                                {formData.address && <span className="truncate max-w-[200px]">{formData.address}</span>}
+                                        <div className="space-y-0.5">
+                                            <p className="text-sm font-black leading-none text-white uppercase tracking-tight">{formData.name || 'TU EMPRESA'}</p>
+                                            <div className="flex flex-col text-[8px] text-gray-400 font-bold uppercase tracking-widest mt-1 space-y-0.5">
+                                                {formData.phone && <span>TEL: {formData.phone}</span>}
+                                                {formData.address && <span className="truncate max-w-[160px]">{formData.address}</span>}
                                                 <span className="text-blue-400 font-extrabold">{formData.website.replace(/^https?:\/\//, '') || 'WWW.TUEMPRESA.COM'}</span>
                                             </div>
                                         </div>
                                     </div>
-
-                                    <div className="pt-6 border-t border-white/10 flex items-end justify-between">
-                                        <div className="space-y-1">
-                                            <p className="text-[8px] text-gray-500 font-black uppercase tracking-[0.3em]">Cotización No.</p>
-                                            <p className="text-2xl font-light text-white tracking-widest">Q-827BF1</p>
+                                    <div className="pt-3 border-t border-white/10 flex items-end justify-between">
+                                        <div className="space-y-0.5">
+                                            <p className="text-[7px] text-gray-500 font-black uppercase tracking-[0.3em]">Cotización No.</p>
+                                            <p className="text-base font-light text-white tracking-widest">Q-827BF1</p>
                                         </div>
-                                        <div className="bg-white p-2 rounded-xl shadow-2xl group-hover:scale-110 transition-transform duration-500">
-                                            <img
-                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(formData.website || 'https://-')}`}
-                                                alt="QR"
-                                                className="w-10 h-10"
-                                            />
+                                        <div className="bg-white p-1.5 rounded-lg shadow-xl">
+                                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(formData.website || 'https://-')}`} alt="QR" className="w-7 h-7" />
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Sample Content */}
-                            <div className="p-8 space-y-4">
-                                <div className="h-4 w-3/4 bg-gray-100 rounded-full"></div>
-                                <div className="h-4 w-1/2 bg-gray-100 rounded-full"></div>
-                                <div className="pt-4 grid grid-cols-2 gap-4">
-                                    <div className="h-20 bg-gray-50 rounded-2xl border border-gray-100"></div>
-                                    <div className="h-20 bg-gray-50 rounded-2xl border border-gray-100"></div>
+                            <div className="p-4 space-y-3">
+                                <div className="h-2.5 w-3/4 bg-gray-100 rounded-full"></div>
+                                <div className="h-2.5 w-1/2 bg-gray-100 rounded-full"></div>
+                                <div className="pt-3 grid grid-cols-2 gap-3">
+                                    <div className="h-12 bg-gray-50 rounded-xl border border-gray-100"></div>
+                                    <div className="h-12 bg-gray-50 rounded-xl border border-gray-100"></div>
                                 </div>
-                                <div className="mt-4 pt-6 border-t border-gray-50 flex justify-between items-center">
-                                    <div className="h-12 w-12 rounded-xl bg-blue-100/50"></div>
-                                    <div className="h-10 w-32 bg-[#0f172a] rounded-xl flex items-center justify-center">
-                                        <div className="h-2 w-16 bg-white/20 rounded-full"></div>
+                                <div className="mt-2 pt-4 border-t border-gray-50 flex justify-between items-center">
+                                    <div className="h-8 w-8 rounded-lg bg-blue-100/50"></div>
+                                    <div className="h-6 w-20 bg-[#0f172a] rounded-lg flex items-center justify-center">
+                                        <div className="h-1.5 w-10 bg-white/20 rounded-full"></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="bg-blue-600/5 p-8 rounded-[2rem] border border-blue-600/10 flex gap-5 relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-600/5 rounded-full blur-2xl -mr-12 -mt-12 group-hover:bg-blue-600/10 transition-colors"></div>
-                            <CheckCircle2 className="w-8 h-8 text-blue-600 shrink-0" />
-                            <div className="space-y-2 relative z-10">
-                                <p className="text-sm font-black text-[#0f172a] uppercase tracking-wider">Despliegue Instantáneo</p>
-                                <p className="text-xs text-gray-500 leading-relaxed font-medium">
-                                    Tu nueva marca se propagará automáticamente en todas las propuestas, PDFs comerciales y el panel de control.
-                                </p>
+                        <div className="bg-blue-600/5 p-4 rounded-xl border border-blue-600/10 flex gap-3 relative overflow-hidden group">
+                            <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                            <div className="space-y-1">
+                                <p className="text-xs font-black text-[#0f172a] uppercase tracking-wider">Despliegue Instantáneo</p>
+                                <p className="text-[10px] text-gray-500 leading-relaxed font-medium">Tu nueva marca se propagará en todas las propuestas, PDFs y el panel de control.</p>
                             </div>
                         </div>
                     </div>
