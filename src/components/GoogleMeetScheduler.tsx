@@ -148,6 +148,10 @@ export default function GoogleMeetScheduler({
         html_link: string;
     } | null>(null);
 
+    // Recurrence states
+    const [recurrenceType, setRecurrenceType] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
+    const [recurrenceCount, setRecurrenceCount] = useState<number>(5);
+
     // Custom modern Spanish Date Picker States
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [currentMonth, setCurrentMonth] = useState(() => parseISO(format(initialDate || new Date(), 'yyyy-MM-dd')));
@@ -329,49 +333,88 @@ Reunión modificada desde Arias CRM.`;
                     throw new Error(data?.error || error?.message || 'Error al actualizar reunión en Google Calendar');
                 }
 
-                return { isEdit: true, meetResult: null };
+                return { isEdit: true, meetResult: null, isRecurrent: false, recurrenceCount: 1 };
             }
 
-            let followUpId: string | undefined;
+            // Normal or recurrent creation logic
+            const occurrences = [];
+            const count = recurrenceType !== 'none' ? recurrenceCount : 1;
+            const startMs = new Date(startISO).getTime();
+            const endMs = new Date(endISO).getTime();
 
-            // Only create a CRM follow-up if a lead is linked.
-            if (initialLeadId) {
-                const followUp = await leadsService.createFollowUp({
-                    lead_id: initialLeadId,
-                    date: startISO,
-                    notes: description || `Reunión: ${title}`,
-                    action_type: 'meeting',
-                    company_id: localStorage.getItem('simulated_company_id') || profile?.company_id,
-                }, profile?.id);
-                followUpId = followUp.id;
+            for (let i = 0; i < count; i++) {
+                let occStart: string;
+                let occEnd: string;
+
+                if (recurrenceType === 'daily') {
+                    occStart = new Date(startMs + i * 24 * 60 * 60 * 1000).toISOString();
+                    occEnd = new Date(endMs + i * 24 * 60 * 60 * 1000).toISOString();
+                } else if (recurrenceType === 'weekly') {
+                    occStart = new Date(startMs + i * 7 * 24 * 60 * 60 * 1000).toISOString();
+                    occEnd = new Date(endMs + i * 7 * 24 * 60 * 60 * 1000).toISOString();
+                } else if (recurrenceType === 'monthly') {
+                    const sD = new Date(startISO);
+                    sD.setMonth(sD.getMonth() + i);
+                    occStart = sD.toISOString();
+                    
+                    const eD = new Date(endISO);
+                    eD.setMonth(eD.getMonth() + i);
+                    occEnd = eD.toISOString();
+                } else {
+                    occStart = startISO;
+                    occEnd = endISO;
+                }
+
+                occurrences.push({ start: occStart, end: occEnd, index: i + 1 });
             }
 
-            // Create Google Calendar event (with or without a linked follow-up)
-            if (googleIntegration && addMeetLink) {
-                // Enrich meeting description with Organizer Profile details
-                const hostName = profile?.full_name || 'Administrador del CRM';
-                const hostEmail = profile?.email || '';
-                const enrichedDescription = `${description ? description + '\n\n' : ''}---
+            let firstMeetResult: any = null;
+
+            for (const occ of occurrences) {
+                let followUpId: string | undefined;
+
+                // Create follow-up in CRM
+                if (initialLeadId) {
+                    const suffix = count > 1 ? ` (${occ.index}/${count})` : '';
+                    const followUp = await leadsService.createFollowUp({
+                        lead_id: initialLeadId,
+                        date: occ.start,
+                        notes: description || `Reunión: ${title}${suffix}`,
+                        action_type: 'meeting',
+                        company_id: localStorage.getItem('simulated_company_id') || profile?.company_id,
+                    }, profile?.id);
+                    followUpId = followUp.id;
+                }
+
+                // Create Google Calendar event (with or without a linked follow-up)
+                if (googleIntegration && addMeetLink) {
+                    const hostName = profile?.full_name || 'Administrador del CRM';
+                    const hostEmail = profile?.email || '';
+                    const suffix = count > 1 ? ` (Sesión ${occ.index} de ${count})` : '';
+                    const enrichedDescription = `${description ? description + '\n\n' : ''}---
 Organizador: ${hostName}
 Email: ${hostEmail}
-Reunión programada automáticamente desde Arias CRM.`;
+Reunión programada automáticamente desde Arias CRM${suffix}.`;
 
-                const result = await leadsService.createGoogleMeeting({
-                    integrationId: googleIntegration.id,
-                    followUpId,
-                    title,
-                    description: enrichedDescription,
-                    start: startISO,
-                    end: endISO,
-                    attendees,
-                    addMeetLink: true,
-                    sendInvites: finalSendInvites,
-                    timezone: selectedTimezone,
-                });
-                return { isEdit: false, meetResult: result };
+                    const result = await leadsService.createGoogleMeeting({
+                        integrationId: googleIntegration.id,
+                        followUpId,
+                        title: count > 1 ? `${title} (${occ.index}/${count})` : title,
+                        description: enrichedDescription,
+                        start: occ.start,
+                        end: occ.end,
+                        attendees,
+                        addMeetLink: true,
+                        sendInvites: finalSendInvites,
+                        timezone: selectedTimezone,
+                    });
+                    if (occ.index === 1) {
+                        firstMeetResult = result;
+                    }
+                }
             }
 
-            return { isEdit: false, meetResult: null };
+            return { isEdit: false, meetResult: firstMeetResult, isRecurrent: recurrenceType !== 'none', recurrenceCount: count };
         },
         onSuccess: (res) => {
             queryClient.invalidateQueries({ queryKey: ['calendar-follow-ups'] });
@@ -384,7 +427,11 @@ Reunión programada automáticamente desde Arias CRM.`;
                 if (res.meetResult?.meet_link) {
                     setCreatedMeet(res.meetResult);
                 } else {
-                    toast.success('✅ Reunión agendada en el calendario');
+                    if (res.isRecurrent) {
+                        toast.success(`✅ ${res.recurrenceCount} reuniones agendadas en el calendario`);
+                    } else {
+                        toast.success('✅ Reunión agendada en el calendario');
+                    }
                     onClose();
                 }
             }
@@ -411,9 +458,15 @@ Reunión programada automáticamente desde Arias CRM.`;
                         <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                             <Check className="w-8 h-8 text-white" strokeWidth={2.5} />
                         </div>
-                        <h2 className="text-2xl font-black text-white">¡Reunión creada!</h2>
+                        <h2 className="text-2xl font-black text-white">
+                            {mutation.data?.isRecurrent ? '¡Reunión recurrente creada!' : '¡Reunión creada!'}
+                        </h2>
                         <p className="text-emerald-100 mt-1 text-sm font-medium">
-                            {format(parseISO(startISO), "EEEE d 'de' MMMM", { locale: es })} · {formatTimeInZone(startISO, selectedTimezone)} — {formatTimeInZone(endISO, selectedTimezone)}
+                            {mutation.data?.isRecurrent ? (
+                                <span>{mutation.data.recurrenceCount} reuniones agendadas en total (primer link abajo)</span>
+                            ) : (
+                                <span>{format(parseISO(startISO), "EEEE d 'de' MMMM", { locale: es })} · {formatTimeInZone(startISO, selectedTimezone)} — {formatTimeInZone(endISO, selectedTimezone)}</span>
+                            )}
                         </p>
                     </div>
 
@@ -702,6 +755,49 @@ Reunión programada automáticamente desde Arias CRM.`;
                             </div>
                         </div>
                     </div>
+
+                    {/* Recurrence Selection */}
+                    {!isEditMode && (
+                        <div className="grid grid-cols-2 gap-4 bg-indigo-50/20 rounded-2xl border border-indigo-100/60 p-4">
+                            <div>
+                                <label className="text-xs font-black text-indigo-700 uppercase tracking-widest block mb-1.5 flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                                    Repetir reunión
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        value={recurrenceType}
+                                        onChange={e => setRecurrenceType(e.target.value as any)}
+                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all appearance-none bg-white cursor-pointer"
+                                    >
+                                        <option value="none">No repetir</option>
+                                        <option value="daily">Diariamente</option>
+                                        <option value="weekly">Semanalmente</option>
+                                        <option value="monthly">Mensualmente</option>
+                                    </select>
+                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                </div>
+                            </div>
+
+                            {recurrenceType !== 'none' && (
+                                <div>
+                                    <label className="text-xs font-black text-indigo-700 uppercase tracking-widest block mb-1.5 flex items-center gap-1.5">
+                                        <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                                        Número de repeticiones
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min={2}
+                                        max={20}
+                                        value={recurrenceCount}
+                                        onChange={e => setRecurrenceCount(Math.min(20, Math.max(2, parseInt(e.target.value) || 2)))}
+                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all"
+                                    />
+                                    <span className="text-[10px] text-gray-400 mt-1 block">Máx. 20 repeticiones</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Timezone Selector */}
                     <div>
