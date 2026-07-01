@@ -560,21 +560,21 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
             {/* Navigation */}
             <div className={cn(
-                "flex-1 flex flex-col pt-6 px-3 custom-scrollbar",
+                "flex-1 flex flex-col pt-4 px-3 custom-scrollbar",
                 isCollapsed ? "overflow-visible" : "overflow-y-auto"
             )}>
-                <nav className="flex-1 space-y-1.5 focus:outline-none">
+                <nav className="flex-1 space-y-1 focus:outline-none">
                     {/* OMNI SEARCH BUTTON */}
                     <button
                         onClick={() => window.dispatchEvent(new CustomEvent('open-global-search'))}
                         className={cn(
-                            'group flex items-center justify-between rounded-xl transition-all duration-200 focus:outline-none mb-4 w-full bg-[#1e293b]/50 border border-gray-800 hover:bg-[#1e293b] hover:border-gray-700',
-                            isCollapsed ? "p-3" : "px-4 py-2.5"
+                            'group flex items-center justify-between rounded-xl transition-all duration-200 focus:outline-none mb-3 w-full bg-[#1e293b]/50 border border-gray-800 hover:bg-[#1e293b] hover:border-gray-700',
+                            isCollapsed ? "p-2.5" : "px-3 py-2"
                         )}
                         title={`${t('sidebar.omniSearch')} (Cmd+K)`}
                     >
                         <div className="flex items-center text-gray-400 group-hover:text-white transition-colors">
-                            <Search className={cn("h-5 w-5 shrink-0 transition-colors", !isCollapsed && "mr-3")} />
+                            <Search className={cn("h-4 w-4 shrink-0 transition-colors", !isCollapsed && "mr-2.5")} />
                             {!isCollapsed && <span className="text-xs font-bold tracking-wide">{t('sidebar.omniSearch')}</span>}
                         </div>
                         {!isCollapsed && (
@@ -586,22 +586,22 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                     </button>
 
                     {navigation.map((item) => (
-                        <div key={item.name} className="space-y-1">
+                        <div key={item.name} className="space-y-0.5">
                             {item.subItems && !isCollapsed ? (
                                 <>
                                     <button
                                         onClick={() => setOpenAccordion(openAccordion === item.id ? null : item.id!)}
                                         className={cn(
                                             item.current ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
-                                            'group flex items-center justify-between w-full rounded-xl transition-all duration-200 focus:outline-none p-3 px-4'
+                                            'group flex items-center justify-between w-full rounded-xl transition-all duration-200 focus:outline-none p-2.5 px-3'
                                         )}
                                     >
                                         <div className="flex items-center">
                                             <item.icon className={cn(
                                                 item.current ? 'text-white' : 'text-gray-400 group-hover:text-white',
-                                                "h-5 w-5 transition-colors shrink-0 mr-3"
+                                                "h-4 w-4 transition-colors shrink-0 mr-2.5"
                                             )} aria-hidden="true" />
-                                            <span className="text-sm font-semibold tracking-wide truncate">{item.name}</span>
+                                            <span className="text-xs font-semibold tracking-wide truncate">{item.name}</span>
                                         </div>
                                         {openAccordion === item.id ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
                                     </button>
@@ -611,12 +611,12 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                                 const isActive = location.pathname === sub.href && !(sub as any).onClick;
                                                 const baseClass = cn(
                                                     isActive ? 'text-blue-400 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300 hover:bg-[#1e293b]/50',
-                                                    'group flex items-center justify-between rounded-lg transition-all duration-200 px-3 py-2 text-xs font-bold w-full text-left'
+                                                    'group flex items-center justify-between rounded-lg transition-all duration-200 px-3 py-1.5 text-[11px] font-bold w-full text-left'
                                                 );
                                                 const inner = (
                                                     <>
                                                         <div className="flex items-center">
-                                                            <sub.icon className={cn(isActive ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300', "h-4 w-4 mr-3")} />
+                                                            <sub.icon className={cn(isActive ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300', "h-3.5 w-3.5 mr-2.5")} />
                                                             <span className="truncate">{sub.name}</span>
                                                         </div>
                                                         {sub.badge != null && sub.badge > 0 && (
@@ -643,17 +643,17 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                             ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
                                             : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
                                         'group flex items-center rounded-xl transition-all duration-200 focus:outline-none relative',
-                                        isCollapsed ? "justify-center p-3" : "px-4 py-3"
+                                        isCollapsed ? "justify-center p-2.5" : "px-3 py-2"
                                     )}
                                 >
                                     <item.icon className={cn(
                                         item.current ? 'text-white' : 'text-gray-400 group-hover:text-white',
-                                        "h-5 w-5 transition-colors shrink-0",
-                                        !isCollapsed && "mr-3"
+                                        "h-4 w-4 transition-colors shrink-0",
+                                        !isCollapsed && "mr-2.5"
                                     )} aria-hidden="true" />
 
                                     {!isCollapsed ? (
-                                        <span className="text-sm font-semibold tracking-wide truncate">{item.name}</span>
+                                        <span className="text-xs font-semibold tracking-wide truncate">{item.name}</span>
                                     ) : (
                                         /* Premium Dark Tooltip (Floating Label) */
                                         <div className="absolute left-full ml-4 px-3.5 py-2.5 bg-[#0f172a]/95 backdrop-blur-xl text-white text-[11px] font-bold rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 translate-x-[-12px] group-hover:translate-x-0 z-[100] whitespace-nowrap border border-white/10 ring-1 ring-white/5">
