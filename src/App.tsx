@@ -83,6 +83,8 @@ const BookingSettings   = lazy(() => import('./pages/calendar/BookingSettings'))
 const PublicBookingPage = lazy(() => import('./pages/public/PublicBookingPage'));
 const PrivacyPolicy     = lazy(() => import('./pages/public/PrivacyPolicy'));
 const Workspaces        = lazy(() => import('./pages/company/Workspaces'));
+const Facturas          = lazy(() => import('./pages/Facturas'));
+const FacturaDetalle    = lazy(() => import('./pages/FacturaDetalle'));
 
 
 // ─── Skeleton Screen (técnica Netflix) ───────────────────────────────────────
@@ -287,6 +289,12 @@ function App() {
 
                   {/* Clientes Module */}
                   <Route path="/clientes" element={<Clientes />} />
+
+                  {/* Facturación Module */}
+                  <Route element={<FeatureProtectedRoute feature="invoices" />}>
+                    <Route path="/facturas" element={<Facturas />} />
+                    <Route path="/facturas/:id" element={<FacturaDetalle />} />
+                  </Route>
 
                   {/* Proyectos Module */}
                   <Route path="/proyectos" element={<ProjectManagement />} />

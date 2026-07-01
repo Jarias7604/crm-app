@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <!-- Vibrant Blue-Cyan Gradient -->
+    <linearGradient id="blue-cyan-grad" x1="10%" y1="10%" x2="90%" y2="90%">
+      <stop offset="0%" stop-color="#00C2FF" />
+      <stop offset="100%" stop-color="#0047FF" />
+    </linearGradient>
+  </defs>
+  <!-- Standalone Logo Icon -->
+  <!-- Outer Arc -->
+  <path d="M 310,108 A 148,148 0 0,1 310,404" stroke="url(#blue-cyan-grad)" stroke-width="48" stroke-linecap="round" />
+  <!-- Main Chevron "A" -->
+  <path d="M 135,365 L 235,185 L 285,270" stroke="url(#blue-cyan-grad)" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Inner Circle/Dot -->
+  <circle cx="256" cy="360" r="35" fill="url(#blue-cyan-grad)" />
+</svg>

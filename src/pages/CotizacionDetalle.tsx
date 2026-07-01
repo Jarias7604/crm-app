@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { format } from 'date-fns';
-import { Building2, Mail, Phone, Package, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CheckCircle2, Share2, Copy, Check, Eye, X, ChevronRight } from 'lucide-react';
+import { Building2, Mail, Phone, Package, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CheckCircle2, Share2, Copy, Check, Eye, X, ChevronRight, Receipt } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { pdfService } from '../services/pdfService';
 import { parseModules, calculateQuoteFinancialsV2, type CotizacionData } from '../utils/quoteUtils';
 import toast from 'react-hot-toast';
+import { useAuth } from '../auth/AuthProvider';
+import { invoicesService } from '../services/invoices';
 
 interface FinancingPlan {
     id: string;
@@ -25,6 +27,7 @@ interface FinancingPlan {
 export default function CotizacionDetalle() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { profile } = useAuth();
     const [cotizacion, setCotizacion] = useState<CotizacionData | null>(null);
     const [financingPlan, setFinancingPlan] = useState<FinancingPlan | null>(null);
     const [allPlans, setAllPlans] = useState<FinancingPlan[]>([]);
@@ -37,6 +40,8 @@ export default function CotizacionDetalle() {
     const [acceptorName, setAcceptorName] = useState('');
     const [agreedToTerms, setAgreedToTerms] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [convertedInvoice, setConvertedInvoice] = useState<{ id: string; numero_factura: string } | null>(null);
+    const [isConverting, setIsConverting] = useState(false);
 
     useEffect(() => {
         fetchCotizacion();
@@ -153,9 +158,23 @@ export default function CotizacionDetalle() {
 
                 if (planItem?.descripcion) {
                     setPlanDescripcion(planItem.descripcion);
-                } else {
-
                 }
+            }
+
+            // Check for converted invoice
+            try {
+                const { data: invData } = await supabase
+                    .from('facturas')
+                    .select('id, numero_factura')
+                    .eq('cotizacion_id', id)
+                    .maybeSingle();
+                if (invData) {
+                    setConvertedInvoice(invData);
+                } else {
+                    setConvertedInvoice(null);
+                }
+            } catch (err) {
+                console.error('Error fetching converted invoice:', err);
             }
         } catch (error: any) {
             console.error('Error fetching cotizacion:', error);
@@ -296,6 +315,25 @@ export default function CotizacionDetalle() {
         }
     };
 
+    const handleConvertToInvoice = async () => {
+        if (!cotizacion || !profile?.company_id) {
+            toast.error('No se pudo identificar la empresa actual o la cotización.');
+            return;
+        }
+        if (!window.confirm('¿Deseas convertir esta cotización en una factura oficial?')) return;
+        setIsConverting(true);
+        try {
+            const inv = await invoicesService.convertQuoteToInvoice(cotizacion.id, profile.company_id);
+            toast.success(`¡Factura ${inv.numero_factura} creada correctamente!`);
+            navigate(`/facturas/${inv.id}`);
+        } catch (error: any) {
+            console.error('Error converting quote to invoice:', error);
+            toast.error('Error al convertir la cotización: ' + (error?.message || error));
+        } finally {
+            setIsConverting(false);
+        }
+    };
+
     if (loading) return <div className="p-8 text-center">Cargando cotización...</div>;
     if (!cotizacion) return <div className="p-8 text-center text-red-500">Cotización no encontrada</div>;
 
@@ -396,6 +434,38 @@ export default function CotizacionDetalle() {
                                     Aceptada
                                 </div>
                             </>
+                        )}
+
+                        {cotizacion.estado === 'aceptada' && (profile?.permissions?.invoices === true || profile?.role === 'super_admin') && (
+                            convertedInvoice ? (
+                                <Button
+                                    variant="default"
+                                    onClick={() => navigate(`/facturas/${convertedInvoice.id}`)}
+                                    className="h-12 px-6 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-lg shadow-blue-500/20 flex items-center gap-2"
+                                >
+                                    <Receipt className="w-4 h-4" />
+                                    <span>Ver Factura ({convertedInvoice.numero_factura})</span>
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="default"
+                                    onClick={handleConvertToInvoice}
+                                    disabled={isConverting}
+                                    className="h-12 px-6 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-lg shadow-blue-500/20 flex items-center gap-2"
+                                >
+                                    {isConverting ? (
+                                        <>
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            <span>Convirtiendo...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Receipt className="w-4 h-4" />
+                                            <span>Convertir a Factura</span>
+                                        </>
+                                    )}
+                                </Button>
+                            )
                         )}
 
                         <div className="h-8 w-px bg-gray-100 hidden md:block mx-1"></div>

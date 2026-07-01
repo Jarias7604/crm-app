@@ -244,7 +244,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     'tickets', 'inventory', 'team_manage', 'team_view_assigned', 
                     'dashboard_full', 'pricing', 'paquetes', 'financial_rules', 'items', 
                     'calendar', 'loss_reasons', 'chat', 'branding', 'dashboard_filter_dates', 
-                    'ai_agents', 'admin_companies', 'onboarding', 'reports', 'view_financials'
+                    'ai_agents', 'admin_companies', 'onboarding', 'reports', 'view_financials',
+                    'invoices', 'facturas'
                 ];
                 
                 allPerms.forEach(p => { 
@@ -332,6 +333,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 else if (baseModule === 'reports' || baseModule === 'dashboard_full' || baseModule === 'dashboard') isAllowed = companyLicense.includes('reports');
                                 else if (baseModule === 'view_financials') isAllowed = companyLicense.includes('view_financials');
                                 else if (baseModule === 'clientes' || baseModule === 'clients') isAllowed = companyLicense.includes('leads');
+                                else if (baseModule === 'invoices' || baseModule === 'facturas') isAllowed = companyLicense.includes('invoices');
                                 else {
                                     // Infraestructura general (team, onboarding, workspaces, pipeline) siempre se permite
                                     isAllowed = true;

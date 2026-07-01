@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 220" fill="none" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <!-- Vibrant Blue-Cyan Gradient -->
+    <linearGradient id="blue-cyan-grad" x1="10%" y1="10%" x2="90%" y2="90%">
+      <stop offset="0%" stop-color="#00C2FF" />
+      <stop offset="100%" stop-color="#0047FF" />
+    </linearGradient>
+  </defs>
+  <!-- Logo Icon on the left -->
+  <g transform="translate(15, 10)">
+    <path d="M 134,51 A 69,69 0 0,1 134,189" stroke="url(#blue-cyan-grad)" stroke-width="22" stroke-linecap="round" />
+    <path d="M 53,170 L 99,89 L 122,128" stroke="url(#blue-cyan-grad)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" />
+    <circle cx="109" cy="168" r="16" fill="url(#blue-cyan-grad)" />
+  </g>
+  <!-- Pure Vector paths for ARIAS -->
+  <g stroke="#FFFFFF" stroke-width="5" stroke-linecap="butt" stroke-linejoin="miter" fill="none">
+    <path d="M 245,155 L 261,75 L 277,155" />
+    <path d="M 305,155 L 305,75" />
+    <path d="M 305,75 L 325,75 A 18,18 0 0,1 325,111 L 305,111" />
+    <path d="M 314,111 L 336,155" />
+    <path d="M 364,155 L 364,75" />
+    <path d="M 392,155 L 408,75 L 424,155" />
+    <path d="M 482,85 C 466,72 450,76 450,96 C 450,118 482,114 482,134 C 482,154 466,158 450,145" />
+  </g>
+  <!-- Pure Vector paths for CRM -->
+  <g stroke="url(#blue-cyan-grad)" stroke-width="20" stroke-linecap="butt" stroke-linejoin="miter" fill="none">
+    <path d="M 560,81.5 A 33.5,33.5 0 0,0 560,148.5" />
+    <path d="M 599,148.5 L 599,81.5" />
+    <path d="M 599,81.5 L 620,81.5 A 16.75,16.75 0 0,1 620,115 L 599,115" />
+    <path d="M 610,115 L 634,148.5" />
+    <path d="M 676,148.5 L 676,81.5 L 700,115 L 724,81.5 L 724,148.5" />
+  </g>
+</svg>
