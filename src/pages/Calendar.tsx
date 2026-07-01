@@ -290,7 +290,12 @@ export default function Calendar() {
 
     // Role-based filtering: collaborators ven solo los suyos; admins pueden filtrar
     const filteredEvents = useMemo(() => {
-        let baseEvents = showCrmEvents ? calendarEvents : [];
+        let baseEvents = calendarEvents.filter(ev => {
+            if (ev.action_type === 'meeting') {
+                return showCrmEvents || showGoogleEvents;
+            }
+            return showCrmEvents;
+        });
         let events = [...baseEvents, ...mockGoogleEvents];
         if (isAdmin) {
             if (selectedCalendarCollabId) return events.filter(ev => ev.assigned_to === selectedCalendarCollabId);
