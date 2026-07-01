@@ -203,7 +203,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     // --- PERMISSION LOGIC ---
     const canAccess = (key: string) => {
         if (!profile) return false;
-        // console.log(`≡ƒöì Sidebar Check: ${key} = ${profile.permissions?.[key]}`);
+        // console.log(`🔍 Sidebar Check: ${key} = ${profile.permissions?.[key]}`);
         return profile.permissions?.[key] === true;
     };
 
@@ -547,7 +547,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                         >
                             {workspaces.map(w => (
                                 <option key={w.id} value={w.id} className="bg-[#0f172a] text-white font-bold py-2">
-                                    {w.parent_company_id ? `≡ƒÅó ${w.name}` : `≡ƒææ ${w.name} (Principal)`}
+                                    {w.parent_company_id ? `🏢 ${w.name}` : `👑 ${w.name} (Principal)`}
                                 </option>
                             ))}
                         </select>
@@ -564,26 +564,6 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 isCollapsed ? "overflow-visible" : "overflow-y-auto"
             )}>
                 <nav className="flex-1 space-y-1.5 focus:outline-none">
-                    {/* OMNI SEARCH BUTTON */}
-                    <button
-                        onClick={() => window.dispatchEvent(new CustomEvent('open-global-search'))}
-                        className={cn(
-                            'group flex items-center justify-between rounded-xl transition-all duration-200 focus:outline-none mb-4 w-full bg-[#1e293b]/50 border border-gray-800 hover:bg-[#1e293b] hover:border-gray-700',
-                            isCollapsed ? "p-3" : "px-4 py-2.5"
-                        )}
-                        title={`${t('sidebar.omniSearch')} (Cmd+K)`}
-                    >
-                        <div className="flex items-center text-gray-400 group-hover:text-white transition-colors">
-                            <Search className={cn("h-5 w-5 shrink-0 transition-colors", !isCollapsed && "mr-3")} />
-                            {!isCollapsed && <span className="text-xs font-bold tracking-wide">{t('sidebar.omniSearch')}</span>}
-                        </div>
-                        {!isCollapsed && (
-                            <div className="flex items-center gap-1">
-                                <kbd className="bg-black/50 border border-white/10 rounded px-1.5 py-0.5 text-[9px] font-mono text-gray-500 group-hover:text-gray-400">Γîÿ</kbd>
-                                <kbd className="bg-black/50 border border-white/10 rounded px-1.5 py-0.5 text-[9px] font-mono text-gray-500 group-hover:text-gray-400">K</kbd>
-                            </div>
-                        )}
-                    </button>
 
                     {navigation.map((item) => (
                         <div key={item.name} className="space-y-1">
@@ -748,11 +728,11 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                         </div>
                     )}
 
-                    {/* ≡ƒöÆ Locked Pro Modules ΓÇö only for trial company_admins */}
+                    {/* 🔒 Locked Pro Modules — only for trial company_admins */}
                     {trialDaysLeft !== null && !isCollapsed && profile?.role !== 'super_admin' && !(profile as any)?.is_platform_owner && (
                         <div className="mt-4 pt-3 border-t border-[#1e293b]/60">
                             <p className="px-4 mb-2 text-[9px] font-black text-gray-600 uppercase tracking-widest flex items-center gap-1.5">
-                                <span>≡ƒöÆ</span> M├│dulos Pro
+                                <span>🔒</span> Módulos Pro
                             </p>
                             {[
                                 { name: 'Marketing Hub', icon: Megaphone },
