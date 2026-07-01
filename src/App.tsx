@@ -49,6 +49,7 @@ const AgentNetworkMap   = lazy(() => import('./pages/marketing/AgentNetworkMap')
 const MarketingSettings = lazy(() => import('./pages/marketing/MarketingSettings'));
 const ChatHub           = lazy(() => import('./pages/marketing/ChatHub'));
 const PublicQuoteView   = lazy(() => import('./pages/PublicQuoteView'));
+const PublicInvoiceView = lazy(() => import('./pages/PublicInvoiceView'));
 const AuditLog          = lazy(() => import('./pages/admin/AuditLog'));
 const Teams             = lazy(() => import('./pages/company/Teams'));
 const TeamPerformance   = lazy(() => import('./pages/company/TeamPerformance'));
@@ -312,6 +313,7 @@ function App() {
               {/* Public routes (no auth required) */}
               <Route path="/test-flyer" element={<TestFlyer />} />
               <Route path="/propuesta/:id" element={<PublicQuoteView />} />
+              <Route path="/factura/publica/:id" element={<PublicInvoiceView />} />
               <Route path="/portal/cliente/:token" element={<ClientPortal />} />
               <Route path="/book/:slug" element={<PublicBookingPage />} />
               <Route path="/update-password" element={<UpdatePassword />} />
