@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
@@ -213,7 +213,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         { name: t('sidebar.dashboard'), href: '/dashboard', icon: LayoutDashboard, current: location.pathname === '/' || location.pathname === '/dashboard' }
     ];
 
-    if (canAccess('leads') || isSuperOrAdmin) {
+    if (canAccess('leads') || profile?.role === 'super_admin') {
         navigation.push({
             id: 'leads',
             name: t('sidebar.leads'),
@@ -233,15 +233,15 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         });
     }
 
-    if (canAccess('clientes') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+    if (canAccess('clientes') || profile?.role === 'super_admin') {
         navigation.push({ name: t('sidebar.clients'), href: '/clientes', icon: UserCheck, current: location.pathname.startsWith('/clientes') });
     }
 
-    if (canAccess('proyectos') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+    if (canAccess('proyectos') || profile?.role === 'super_admin') {
         navigation.push({ name: t('sidebar.projects'), href: '/proyectos', icon: Layers, current: location.pathname.startsWith('/proyectos') });
     }
 
-    if (canAccess('quotes') || isSuperOrAdmin) {
+    if (canAccess('quotes') || profile?.role === 'super_admin') {
         navigation.push({ name: t('sidebar.quotes'), href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
     }
 
@@ -249,11 +249,11 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: t('sidebar.billing'), href: '/company/billing', icon: CreditCard, current: location.pathname.startsWith('/company/billing') });
     }
 
-    if (canAccess('finanzas') || profile?.role === 'super_admin' || profile?.role === 'company_admin') { 
+    if (canAccess('finanzas') || profile?.role === 'super_admin') { 
         navigation.push({ name: t('sidebar.finances'), href: '/finanzas', icon: CreditCard, current: location.pathname.startsWith('/finanzas') });
     }
 
-    if (canAccess('calendar') || isSuperOrAdmin) {
+    if (canAccess('calendar') || profile?.role === 'super_admin') {
         const calendarSubItems: any[] = [
             { name: t('sidebar.calendar'), href: '/calendar', icon: Calendar },
         ];
@@ -270,11 +270,11 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         });
     }
 
-    if (canAccess('dashboard_full') || canAccess('reports') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+    if (canAccess('dashboard_full') || canAccess('reports') || profile?.role === 'super_admin') {
         navigation.push({ name: t('sidebar.reportsBi'), href: '/reports', icon: BarChart3, current: location.pathname.startsWith('/reports') });
     }
 
-    if (canAccess('tickets') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+    if (canAccess('tickets') || profile?.role === 'super_admin') {
         // Support Platform
         navigation.push({
             id: 'service_hub',

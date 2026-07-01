@@ -287,9 +287,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     .single();
                 activePerms = (roleData?.permissions as Record<string, boolean>) || {};
                 console.info('✅ Permisos cargados desde custom_role (fuente única de verdad)');
-            } else {
-                // 3. Sin rol personalizado → usar permisos del perfil como fallback
-                activePerms = (data?.permissions as Record<string, boolean>) || {};
+            }
+
+            // ─────────────────────────────────────────────────────────────────
+            // 4. INTERSECT WITH COMPANY LICENSE (allowed_permissions)
+            // Para usuarios no-superadmin, limitar los permisos cargados
+            // a los que la empresa tiene permitidos en su columna 'allowed_permissions'.
+            // ─────────────────────────────────────────────────────────────────
+            if (data && data.role !== 'super_admin' && data.company_id) {
+                try {
+                    const { data: companyData } = await supabase
+                        .from('companies')
+                        .select('allowed_permissions')
+                        .eq('id', data.company_id)
+                        .single();
+
+                    if (companyData) {
+                        const rawLicense = companyData.allowed_permissions;
+                        const companyLicense: string[] = Array.isArray(rawLicense)
+                            ? rawLicense.map(k => String(k).trim().toLowerCase())
+                            : [];
+
+                        const filteredPerms: Record<string, boolean> = {};
+                        Object.keys(activePerms).forEach(key => {
+                            if (activePerms[key] === true) {
+                                const baseModule = key.split(/[._:]/)[0].toLowerCase();
+                                
+                                // Mapear claves de permisos a los nombres de módulos en Companies/AllowedPermissions
+                                let isAllowed = false;
+                                if (baseModule === 'leads') isAllowed = companyLicense.includes('leads');
+                                else if (baseModule === 'quotes') isAllowed = companyLicense.includes('quotes');
+                                else if (baseModule === 'calendar') isAllowed = companyLicense.includes('calendar');
+                                else if (baseModule === 'marketing' || baseModule === 'ai_agents' || baseModule === 'mkt') isAllowed = companyLicense.includes('marketing');
+                                else if (baseModule === 'chat') isAllowed = companyLicense.includes('chat');
+                                else if (baseModule === 'branding') isAllowed = companyLicense.includes('branding');
+                                else if (baseModule === 'pricing') isAllowed = companyLicense.includes('pricing');
+                                else if (baseModule === 'paquetes') isAllowed = companyLicense.includes('paquetes');
+                                else if (baseModule === 'items') isAllowed = companyLicense.includes('items');
+                                else if (baseModule === 'financial_rules') isAllowed = companyLicense.includes('financial_rules');
+                                else if (baseModule === 'loss_reasons' || baseModule === 'loss') isAllowed = companyLicense.includes('loss_reasons');
+                                else if (baseModule === 'proyectos') isAllowed = companyLicense.includes('proyectos');
+                                else if (baseModule === 'finanzas') isAllowed = companyLicense.includes('finanzas');
+                                else if (baseModule === 'tickets') isAllowed = companyLicense.includes('tickets');
+                                else if (baseModule === 'reports' || baseModule === 'dashboard_full' || baseModule === 'dashboard') isAllowed = companyLicense.includes('reports');
+                                else if (baseModule === 'view_financials') isAllowed = companyLicense.includes('view_financials');
+                                else if (baseModule === 'clientes' || baseModule === 'clients') isAllowed = companyLicense.includes('leads');
+                                else {
+                                    // Infraestructura general (team, onboarding, workspaces, pipeline) siempre se permite
+                                    isAllowed = true;
+                                }
+
+                                if (isAllowed) {
+                                    filteredPerms[key] = true;
+                                }
+                            }
+                        });
+                        activePerms = filteredPerms;
+                        console.info('🛡️ Permisos del usuario filtrados por la licencia de la empresa (allowed_permissions)');
+                    }
+                } catch (e) {
+                    console.error('Error al aplicar intersección de licencia de empresa:', e);
+                }
             }
 
             let finalProfile = { ...data, permissions: activePerms } as Profile;
