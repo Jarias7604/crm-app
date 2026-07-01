@@ -844,7 +844,7 @@ export default function Calendar() {
                                                     if (ev.action_type === 'outlook_calendar') { return; }
                                                     ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } });
                                                 }}
-                                                title={`${ev.lead?.name ?? 'Lead'} · ${timeStr}${ev.completed ? ' ✅' : isOverdue ? ' ⚠️ Vencido' : ''}`}
+                                                title={`${ev.lead?.name ?? ev.notes ?? 'Reunión'} · ${timeStr}${ev.completed ? ' ✅' : isOverdue ? ' ⚠️ Vencido' : ''}`}
                                                 className={`w-full text-left px-1.5 py-1 rounded-md transition-all flex items-center gap-1 ${
                                                     ev.completed
                                                         ? 'bg-emerald-50 text-emerald-600 border-l-2 border-emerald-400 opacity-70'
@@ -859,7 +859,7 @@ export default function Calendar() {
                                                     <Circle className="w-3 h-3 text-red-400 shrink-0" />
                                                 ) : null}
                                                 <span className={`text-[10px] font-medium leading-tight flex-1 truncate ${ev.completed ? 'line-through' : ''}`}>
-                                                    {ev.lead?.name ?? 'Lead'}
+                                                    {ev.lead?.name ?? ev.notes ?? 'Reunión'}
                                                 </span>
                                                 {/* Meet link badge — shows if event has a Google Meet link */}
                                                 {(ev as any).meet_link && (
@@ -995,11 +995,11 @@ export default function Calendar() {
                                             width: `calc(${100 / 8}% - 6px)`,
                                             zIndex: 10 + evIdx
                                         }}
-                                        title={`${ev.lead?.name || 'Evento'} - ${formatTimeInZone(ev.date, companyTimezone)}`}
+                                        title={`${ev.lead?.name || ev.notes || 'Evento'} - ${formatTimeInZone(ev.date, companyTimezone)}`}
                                     >
                                         <div className="flex items-center gap-1 min-w-0">
                                             <Icon className="w-2.5 h-2.5 shrink-0 opacity-80" />
-                                            <span className="font-extrabold truncate flex-1 leading-tight">{ev.lead?.name || 'Evento'}</span>
+                                            <span className="font-extrabold truncate flex-1 leading-tight">{ev.lead?.name || ev.notes || 'Evento'}</span>
                                         </div>
                                         <div className="flex items-center justify-between text-[8px] font-bold opacity-75 mt-0.5">
                                             <span>{formatTimeInZone(ev.date, companyTimezone)}</span>
@@ -1071,11 +1071,13 @@ export default function Calendar() {
                                             </div>
                                             <div className="min-w-0">
                                                 <div className="font-extrabold text-sm truncate text-gray-900 leading-tight">
-                                                    {ev.lead?.name || 'Evento'} {ev.lead?.company_name ? ` · ${ev.lead.company_name}` : ''}
+                                                    {ev.lead?.name || ev.notes || cfg.label} {ev.lead?.company_name ? ` · ${ev.lead.company_name}` : ''}
                                                 </div>
-                                                <div className="text-[11px] mt-0.5 opacity-85 truncate font-medium text-gray-500">
-                                                    {ev.notes || cfg.label}
-                                                </div>
+                                                {ev.lead?.name && ev.notes && (
+                                                    <div className="text-[11px] mt-0.5 opacity-85 truncate font-medium text-gray-500">
+                                                        {ev.notes}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
@@ -1225,12 +1227,12 @@ export default function Calendar() {
 
                                         {/* Lead info */}
                                         <h4 className={`font-black text-base leading-tight mb-0.5 ${ev.completed ? 'text-emerald-800 line-through opacity-70' : 'text-gray-900'}`}>
-                                            {ev.lead?.name ?? '—'}
+                                            {ev.lead?.name ?? ev.notes ?? '—'}
                                         </h4>
                                         {ev.lead?.company_name && (
                                             <p className="text-xs text-gray-400 font-medium mb-2">{ev.lead.company_name}</p>
                                         )}
-                                        {ev.notes && (
+                                        {ev.lead?.name && ev.notes && (
                                             <p className="text-xs text-gray-400 italic bg-gray-50 rounded-lg px-2.5 py-1.5 mt-2 truncate">
                                                 "{ev.notes}"
                                             </p>

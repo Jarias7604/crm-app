@@ -380,18 +380,16 @@ Reunión modificada desde Arias CRM.`;
             for (const occ of occurrences) {
                 let followUpId: string | undefined;
 
-                // Create follow-up in CRM
-                if (initialLeadId) {
-                    const suffix = count > 1 ? ` (${occ.index}/${count})` : '';
-                    const followUp = await leadsService.createFollowUp({
-                        lead_id: initialLeadId,
-                        date: occ.start,
-                        notes: description || `Reunión: ${title}${suffix}`,
-                        action_type: 'meeting',
-                        company_id: localStorage.getItem('simulated_company_id') || profile?.company_id,
-                    }, profile?.id);
-                    followUpId = followUp.id;
-                }
+                // Create follow-up in CRM (always create it so it appears on the calendar, even if not linked to a lead)
+                const suffix = count > 1 ? ` (${occ.index}/${count})` : '';
+                const followUp = await leadsService.createFollowUp({
+                    lead_id: initialLeadId || undefined,
+                    date: occ.start,
+                    notes: description || `Reunión: ${title}${suffix}`,
+                    action_type: 'meeting',
+                    company_id: localStorage.getItem('simulated_company_id') || profile?.company_id,
+                }, profile?.id);
+                followUpId = followUp.id;
 
                 // Create Google Calendar event (with or without a linked follow-up)
                 if (googleIntegration && addMeetLink) {
