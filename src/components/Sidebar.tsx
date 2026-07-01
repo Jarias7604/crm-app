@@ -433,7 +433,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: 'Facturas', href: '/facturas', icon: FileText, current: location.pathname.startsWith('/facturas') });
     }
 
-    if (profile?.role === 'super_admin') {
+    if (profile?.role === 'super_admin' || profile?.role === 'company_admin') {
         navigation.push({ name: t('sidebar.billing'), href: '/company/billing', icon: CreditCard, current: location.pathname.startsWith('/company/billing') });
     }
 
