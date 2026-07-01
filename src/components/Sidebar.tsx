@@ -786,7 +786,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                     </div>
                     <p className="text-[11px] text-gray-300 leading-snug">
                         {trialDaysLeft > 0
-                            ? <><span className="text-amber-400 font-black">{trialDaysLeft} d├¡as</span> restantes de prueba</>  
+                            ? <><span className="text-amber-400 font-black">{trialDaysLeft} días</span> restantes de prueba</>  
                             : <span className="text-red-400 font-bold">Tu trial ha expirado</span>
                         }
                     </p>
@@ -794,7 +794,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                         to="/company/billing"
                         className="mt-2 flex items-center justify-center gap-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 hover:text-amber-300 text-[9px] font-black uppercase tracking-widest rounded-lg py-1.5 transition-all w-full"
                     >
-                        Activar Plan Pro ΓåÆ
+                        Activar Plan Pro →
                     </Link>
                 </div>
             )}
