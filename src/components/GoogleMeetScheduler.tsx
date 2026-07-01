@@ -150,6 +150,7 @@ export default function GoogleMeetScheduler({
 
     // Recurrence states
     const [recurrenceType, setRecurrenceType] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
+    const [recurrenceLimitType, setRecurrenceLimitType] = useState<'limit' | 'infinite'>('limit');
     const [recurrenceCount, setRecurrenceCount] = useState<number>(5);
 
     // Custom modern Spanish Date Picker States
@@ -338,7 +339,10 @@ Reunión modificada desde Arias CRM.`;
 
             // Normal or recurrent creation logic
             const occurrences: { start: string; end: string; index: number }[] = [];
-            const count = recurrenceType !== 'none' ? recurrenceCount : 1;
+            const isInfinite = recurrenceType !== 'none' && recurrenceLimitType === 'infinite';
+            const count = recurrenceType !== 'none'
+                ? (isInfinite ? 24 : recurrenceCount)
+                : 1;
             const startMs = new Date(startISO).getTime();
             const endMs = new Date(endISO).getTime();
 
@@ -428,7 +432,10 @@ Reunión programada automáticamente desde Arias CRM${suffix}.`;
                     setCreatedMeet(res.meetResult);
                 } else {
                     if (res.isRecurrent) {
-                        toast.success(`✅ ${res.recurrenceCount} reuniones agendadas en el calendario`);
+                        const countText = recurrenceLimitType === 'infinite'
+                            ? 'Reuniones programadas sin fin (primeras 24 agendadas)'
+                            : `${res.recurrenceCount} reuniones agendadas`;
+                        toast.success(`✅ ${countText}`);
                     } else {
                         toast.success('✅ Reunión agendada en el calendario');
                     }
@@ -459,11 +466,11 @@ Reunión programada automáticamente desde Arias CRM${suffix}.`;
                             <Check className="w-8 h-8 text-white" strokeWidth={2.5} />
                         </div>
                         <h2 className="text-2xl font-black text-white">
-                            {mutation.data?.isRecurrent ? '¡Reunión recurrente creada!' : '¡Reunión creada!'}
+                            {mutation.data?.isRecurrent ? (recurrenceLimitType === 'infinite' ? '¡Reunión sin fin creada!' : '¡Reunión recurrente creada!') : '¡Reunión creada!'}
                         </h2>
                         <p className="text-emerald-100 mt-1 text-sm font-medium">
                             {mutation.data?.isRecurrent ? (
-                                <span>{mutation.data.recurrenceCount} reuniones agendadas en total (primer link abajo)</span>
+                                <span>{recurrenceLimitType === 'infinite' ? 'Serie sin fin agendada (primeras 24 sesiones creadas)' : `${mutation.data.recurrenceCount} reuniones agendadas en total (primer link abajo)`}</span>
                             ) : (
                                 <span>{format(parseISO(startISO), "EEEE d 'de' MMMM", { locale: es })} · {formatTimeInZone(startISO, selectedTimezone)} — {formatTimeInZone(endISO, selectedTimezone)}</span>
                             )}
@@ -758,42 +765,89 @@ Reunión programada automáticamente desde Arias CRM${suffix}.`;
 
                     {/* Recurrence Selection */}
                     {!isEditMode && (
-                        <div className="grid grid-cols-2 gap-4 bg-indigo-50/20 rounded-2xl border border-indigo-100/60 p-4">
+                        <div className="bg-indigo-50/20 rounded-2xl border border-indigo-100/60 p-4 space-y-4">
                             <div>
-                                <label className="text-xs font-black text-indigo-700 uppercase tracking-widest block mb-1.5 flex items-center gap-1.5">
+                                <label className="text-xs font-black text-indigo-700 uppercase tracking-widest block mb-2 flex items-center gap-1.5">
                                     <Calendar className="w-3.5 h-3.5 text-indigo-600" />
                                     Repetir reunión
                                 </label>
-                                <div className="relative">
-                                    <select
-                                        value={recurrenceType}
-                                        onChange={e => setRecurrenceType(e.target.value as any)}
-                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all appearance-none bg-white cursor-pointer"
-                                    >
-                                        <option value="none">No repetir</option>
-                                        <option value="daily">Diariamente</option>
-                                        <option value="weekly">Semanalmente</option>
-                                        <option value="monthly">Mensualmente</option>
-                                    </select>
-                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                <div className="flex bg-gray-100 p-1 rounded-xl">
+                                    {[
+                                        { value: 'none', label: 'No repetir' },
+                                        { value: 'daily', label: 'Diario' },
+                                        { value: 'weekly', label: 'Semanal' },
+                                        { value: 'monthly', label: 'Mensual' }
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => setRecurrenceType(opt.value as any)}
+                                            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                recurrenceType === opt.value
+                                                    ? 'bg-white text-indigo-600 shadow-sm'
+                                                    : 'text-gray-500 hover:text-gray-900'
+                                            }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
                             {recurrenceType !== 'none' && (
-                                <div>
-                                    <label className="text-xs font-black text-indigo-700 uppercase tracking-widest block mb-1.5 flex items-center gap-1.5">
-                                        <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                                        Número de repeticiones
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min={2}
-                                        max={20}
-                                        value={recurrenceCount}
-                                        onChange={e => setRecurrenceCount(Math.min(20, Math.max(2, parseInt(e.target.value) || 2)))}
-                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all"
-                                    />
-                                    <span className="text-[10px] text-gray-400 mt-1 block">Máx. 20 repeticiones</span>
+                                <div className="grid grid-cols-2 gap-4 pt-1 animate-in fade-in slide-in-from-top-1">
+                                    <div>
+                                        <label className="text-xs font-black text-indigo-700 uppercase tracking-widest block mb-2">
+                                            Límite de repeticiones
+                                        </label>
+                                        <div className="flex bg-gray-100 p-1 rounded-xl">
+                                            {[
+                                                { value: 'limit', label: 'Número fijo' },
+                                                { value: 'infinite', label: 'Sin fin' }
+                                            ].map(opt => (
+                                                <button
+                                                    key={opt.value}
+                                                    type="button"
+                                                    onClick={() => setRecurrenceLimitType(opt.value as any)}
+                                                    className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+                                                        recurrenceLimitType === opt.value
+                                                            ? 'bg-white text-indigo-600 shadow-sm'
+                                                            : 'text-gray-500 hover:text-gray-900'
+                                                    }`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        {recurrenceLimitType === 'limit' ? (
+                                            <>
+                                                <label className="text-xs font-black text-indigo-700 uppercase tracking-widest block mb-1.5 flex items-center gap-1.5">
+                                                    <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                                                    Repeticiones
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min={2}
+                                                    max={24}
+                                                    value={recurrenceCount}
+                                                    onChange={e => setRecurrenceCount(Math.min(24, Math.max(2, parseInt(e.target.value) || 2)))}
+                                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all bg-white"
+                                                />
+                                            </>
+                                        ) : (
+                                            <div className="flex flex-col justify-center h-full pt-1.5">
+                                                <span className="text-xs font-bold text-indigo-600 flex items-center gap-1">
+                                                    ♾️ Modo Sin Fin
+                                                </span>
+                                                <span className="text-[10px] text-gray-500 mt-0.5 leading-tight">
+                                                    Se programarán las primeras 24 sesiones.
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -805,19 +859,27 @@ Reunión programada automáticamente desde Arias CRM${suffix}.`;
                             <Globe className="w-3.5 h-3.5 text-[#4285F4]" />
                             Zona Horaria
                         </label>
-                        <div className="relative">
-                            <select
-                                value={selectedTimezone}
-                                onChange={e => setSelectedTimezone(e.target.value)}
-                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all appearance-none bg-white cursor-pointer"
-                            >
-                                {COMMON_TIMEZONES.map(tz => (
-                                    <option key={tz.value} value={tz.value}>
-                                        {tz.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {COMMON_TIMEZONES.map(tz => {
+                                const isSelected = selectedTimezone === tz.value;
+                                return (
+                                    <button
+                                        key={tz.value}
+                                        type="button"
+                                        onClick={() => setSelectedTimezone(tz.value)}
+                                        className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border text-left flex flex-col justify-between h-14 ${
+                                            isSelected
+                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm ring-1 ring-indigo-200'
+                                                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        <span className="block truncate">{tz.label.split(' (')[0]}</span>
+                                        <span className="text-[10px] text-gray-400 font-medium leading-none">
+                                            {tz.label.includes('(') ? tz.label.substring(tz.label.indexOf('(')) : ''}
+                                        </span>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
 
