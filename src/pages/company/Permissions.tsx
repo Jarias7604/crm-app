@@ -73,6 +73,7 @@ export default function Permissions() {
                     // Mapeos especiales manuales para asegurar visibilidad
                     if (d.permission_key.startsWith('mkt_') && allowed.includes('marketing')) return true;
                     if (d.permission_key.startsWith('cotizaciones.') && allowed.includes('quotes')) return true;
+                    if ((d.permission_key.startsWith('clientes.') || d.permission_key === 'clientes') && allowed.includes('leads')) return true;
 
                     return false;
                 });

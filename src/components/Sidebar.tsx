@@ -203,8 +203,15 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     // --- PERMISSION LOGIC ---
     const canAccess = (key: string) => {
         if (!profile) return false;
-        // console.log(`🔍 Sidebar Check: ${key} = ${profile.permissions?.[key]}`);
-        return profile.permissions?.[key] === true;
+        if (profile.permissions?.[key] === true) return true;
+        
+        // Si es una clave base (ej: 'clientes'), permitir si tiene algún permiso granular
+        const hasGranular = Object.keys(profile.permissions || {}).some(
+            k => k.startsWith(`${key}.`) && profile.permissions?.[k] === true
+        );
+        if (hasGranular) return true;
+        
+        return false;
     };
 
     const isSuperOrAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
