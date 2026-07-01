@@ -116,6 +116,17 @@ class InvoicesService {
         if (error) throw error;
     }
 
+    async getNextInvoiceNumber(companyId: string): Promise<string> {
+        const { count, error: countErr } = await supabase
+            .from('facturas')
+            .select('*', { count: 'exact', head: true })
+            .eq('company_id', companyId);
+        
+        if (countErr) throw countErr;
+        const nextNum = 1000 + (count || 0) + 1;
+        return `INV-${nextNum}`;
+    }
+
     async convertQuoteToInvoice(quoteId: string, companyId: string) {
         // 1. Fetch Quote
         const { data: quote, error: quoteErr } = await supabase
