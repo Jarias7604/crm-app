@@ -225,6 +225,7 @@ function App() {
                     <Route path="/company/team" element={<Team />} />
                     <Route path="/company/permissions" element={<Permissions />} />
                     <Route path="/company/branding" element={<Branding />} />
+                    <Route path="/company/billing" element={<Billing />} />
                     <Route path="/company/teams" element={<Teams />} />
                     <Route path="/company/performance" element={<TeamPerformance />} />
                     <Route path="/company/workspaces" element={<Workspaces />} />
@@ -248,7 +249,6 @@ function App() {
                     <Route path="/admin/observatory" element={<Observatory />} />
                     <Route path="/admin/plans" element={<PlanManager />} />
                     <Route path="/admin/billing" element={<BillingManager />} />
-                    <Route path="/company/billing" element={<Billing />} />
                   </Route>
 
                   {/* Company Admin Routes */}
