@@ -148,6 +148,14 @@ export default function GoogleMeetScheduler({
         html_link: string;
     } | null>(null);
 
+    // Recurrence states
+    const [recurrenceType, setRecurrenceType] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
+    const [recurrenceLimitType, setRecurrenceLimitType] = useState<'limit' | 'infinite'>('limit');
+    const [recurrenceCount, setRecurrenceCount] = useState<number>(5);
+
+    // Timezone selector state
+    const [isOpenTimezone, setIsOpenTimezone] = useState(false);
+
     // Custom modern Spanish Date Picker States
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [currentMonth, setCurrentMonth] = useState(() => parseISO(format(initialDate || new Date(), 'yyyy-MM-dd')));
@@ -329,49 +337,89 @@ Reunión modificada desde Arias CRM.`;
                     throw new Error(data?.error || error?.message || 'Error al actualizar reunión en Google Calendar');
                 }
 
-                return { isEdit: true, meetResult: null };
+                return { isEdit: true, meetResult: null, isRecurrent: false, recurrenceCount: 1 };
             }
 
-            let followUpId: string | undefined;
+            // Normal or recurrent creation logic
+            const occurrences: { start: string; end: string; index: number }[] = [];
+            const isInfinite = recurrenceType !== 'none' && recurrenceLimitType === 'infinite';
+            const count = recurrenceType !== 'none'
+                ? (isInfinite ? 24 : recurrenceCount)
+                : 1;
+            const startMs = new Date(startISO).getTime();
+            const endMs = new Date(endISO).getTime();
 
-            // Only create a CRM follow-up if a lead is linked.
-            if (initialLeadId) {
+            for (let i = 0; i < count; i++) {
+                let occStart: string;
+                let occEnd: string;
+
+                if (recurrenceType === 'daily') {
+                    occStart = new Date(startMs + i * 24 * 60 * 60 * 1000).toISOString();
+                    occEnd = new Date(endMs + i * 24 * 60 * 60 * 1000).toISOString();
+                } else if (recurrenceType === 'weekly') {
+                    occStart = new Date(startMs + i * 7 * 24 * 60 * 60 * 1000).toISOString();
+                    occEnd = new Date(endMs + i * 7 * 24 * 60 * 60 * 1000).toISOString();
+                } else if (recurrenceType === 'monthly') {
+                    const sD = new Date(startISO);
+                    sD.setMonth(sD.getMonth() + i);
+                    occStart = sD.toISOString();
+                    
+                    const eD = new Date(endISO);
+                    eD.setMonth(eD.getMonth() + i);
+                    occEnd = eD.toISOString();
+                } else {
+                    occStart = startISO;
+                    occEnd = endISO;
+                }
+
+                occurrences.push({ start: occStart, end: occEnd, index: i + 1 });
+            }
+
+            let firstMeetResult: any = null;
+
+            for (const occ of occurrences) {
+                let followUpId: string | undefined;
+
+                // Create follow-up in CRM (always create it so it appears on the calendar, even if not linked to a lead)
+                const suffix = count > 1 ? ` (${occ.index}/${count})` : '';
                 const followUp = await leadsService.createFollowUp({
-                    lead_id: initialLeadId,
-                    date: startISO,
-                    notes: description || `Reunión: ${title}`,
+                    lead_id: initialLeadId || undefined,
+                    date: occ.start,
+                    notes: description || `Reunión: ${title}${suffix}`,
                     action_type: 'meeting',
                     company_id: localStorage.getItem('simulated_company_id') || profile?.company_id,
                 }, profile?.id);
                 followUpId = followUp.id;
-            }
 
-            // Create Google Calendar event (with or without a linked follow-up)
-            if (googleIntegration && addMeetLink) {
-                // Enrich meeting description with Organizer Profile details
-                const hostName = profile?.full_name || 'Administrador del CRM';
-                const hostEmail = profile?.email || '';
-                const enrichedDescription = `${description ? description + '\n\n' : ''}---
+                // Create Google Calendar event (with or without a linked follow-up)
+                if (googleIntegration && addMeetLink) {
+                    const hostName = profile?.full_name || 'Administrador del CRM';
+                    const hostEmail = profile?.email || '';
+                    const suffix = count > 1 ? ` (Sesión ${occ.index} de ${count})` : '';
+                    const enrichedDescription = `${description ? description + '\n\n' : ''}---
 Organizador: ${hostName}
 Email: ${hostEmail}
-Reunión programada automáticamente desde Arias CRM.`;
+Reunión programada automáticamente desde Arias CRM${suffix}.`;
 
-                const result = await leadsService.createGoogleMeeting({
-                    integrationId: googleIntegration.id,
-                    followUpId,
-                    title,
-                    description: enrichedDescription,
-                    start: startISO,
-                    end: endISO,
-                    attendees,
-                    addMeetLink: true,
-                    sendInvites: finalSendInvites,
-                    timezone: selectedTimezone,
-                });
-                return { isEdit: false, meetResult: result };
+                    const result = await leadsService.createGoogleMeeting({
+                        integrationId: googleIntegration.id,
+                        followUpId,
+                        title: count > 1 ? `${title} (${occ.index}/${count})` : title,
+                        description: enrichedDescription,
+                        start: occ.start,
+                        end: occ.end,
+                        attendees,
+                        addMeetLink: true,
+                        sendInvites: finalSendInvites,
+                        timezone: selectedTimezone,
+                    });
+                    if (occ.index === 1) {
+                        firstMeetResult = result;
+                    }
+                }
             }
 
-            return { isEdit: false, meetResult: null };
+            return { isEdit: false, meetResult: firstMeetResult, isRecurrent: recurrenceType !== 'none', recurrenceCount: count };
         },
         onSuccess: (res) => {
             queryClient.invalidateQueries({ queryKey: ['calendar-follow-ups'] });
@@ -384,7 +432,14 @@ Reunión programada automáticamente desde Arias CRM.`;
                 if (res.meetResult?.meet_link) {
                     setCreatedMeet(res.meetResult);
                 } else {
-                    toast.success('✅ Reunión agendada en el calendario');
+                    if (res.isRecurrent) {
+                        const countText = recurrenceLimitType === 'infinite'
+                            ? 'Reuniones programadas sin fin (primeras 24 agendadas)'
+                            : `${res.recurrenceCount} reuniones agendadas`;
+                        toast.success(`✅ ${countText}`);
+                    } else {
+                        toast.success('✅ Reunión agendada en el calendario');
+                    }
                     onClose();
                 }
             }
@@ -411,9 +466,15 @@ Reunión programada automáticamente desde Arias CRM.`;
                         <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
                             <Check className="w-8 h-8 text-white" strokeWidth={2.5} />
                         </div>
-                        <h2 className="text-2xl font-black text-white">¡Reunión creada!</h2>
+                        <h2 className="text-2xl font-black text-white">
+                            {mutation.data?.isRecurrent ? (recurrenceLimitType === 'infinite' ? '¡Reunión sin fin creada!' : '¡Reunión recurrente creada!') : '¡Reunión creada!'}
+                        </h2>
                         <p className="text-emerald-100 mt-1 text-sm font-medium">
-                            {format(parseISO(startISO), "EEEE d 'de' MMMM", { locale: es })} · {formatTimeInZone(startISO, selectedTimezone)} — {formatTimeInZone(endISO, selectedTimezone)}
+                            {mutation.data?.isRecurrent ? (
+                                <span>{recurrenceLimitType === 'infinite' ? 'Serie sin fin agendada (primeras 24 sesiones creadas)' : `${mutation.data.recurrenceCount} reuniones agendadas en total (primer link abajo)`}</span>
+                            ) : (
+                                <span>{format(parseISO(startISO), "EEEE d 'de' MMMM", { locale: es })} · {formatTimeInZone(startISO, selectedTimezone)} — {formatTimeInZone(endISO, selectedTimezone)}</span>
+                            )}
                         </p>
                     </div>
 
@@ -703,26 +764,145 @@ Reunión programada automáticamente desde Arias CRM.`;
                         </div>
                     </div>
 
+                    {/* Recurrence Selection */}
+                    {!isEditMode && (
+                        <div className="bg-indigo-50/20 rounded-2xl border border-indigo-100/60 p-4 space-y-4">
+                            <div>
+                                <label className="text-xs font-black text-indigo-700 uppercase tracking-widest block mb-2 flex items-center gap-1.5">
+                                    <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                                    Repetir reunión
+                                </label>
+                                <div className="flex bg-gray-100 p-1 rounded-xl">
+                                    {[
+                                        { value: 'none', label: 'No repetir' },
+                                        { value: 'daily', label: 'Diario' },
+                                        { value: 'weekly', label: 'Semanal' },
+                                        { value: 'monthly', label: 'Mensual' }
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => setRecurrenceType(opt.value as any)}
+                                            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                recurrenceType === opt.value
+                                                    ? 'bg-white text-indigo-600 shadow-sm'
+                                                    : 'text-gray-500 hover:text-gray-900'
+                                            }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {recurrenceType !== 'none' && (
+                                <div className="grid grid-cols-2 gap-4 pt-1 animate-in fade-in slide-in-from-top-1">
+                                    <div>
+                                        <label className="text-xs font-black text-indigo-700 uppercase tracking-widest block mb-2">
+                                            Límite de repeticiones
+                                        </label>
+                                        <div className="flex bg-gray-100 p-1 rounded-xl">
+                                            {[
+                                                { value: 'limit', label: 'Número fijo' },
+                                                { value: 'infinite', label: 'Sin fin' }
+                                            ].map(opt => (
+                                                <button
+                                                    key={opt.value}
+                                                    type="button"
+                                                    onClick={() => setRecurrenceLimitType(opt.value as any)}
+                                                    className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+                                                        recurrenceLimitType === opt.value
+                                                            ? 'bg-white text-indigo-600 shadow-sm'
+                                                            : 'text-gray-500 hover:text-gray-900'
+                                                    }`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        {recurrenceLimitType === 'limit' ? (
+                                            <>
+                                                <label className="text-xs font-black text-indigo-700 uppercase tracking-widest block mb-1.5 flex items-center gap-1.5">
+                                                    <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                                                    Repeticiones
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min={2}
+                                                    max={24}
+                                                    value={recurrenceCount}
+                                                    onChange={e => setRecurrenceCount(Math.min(24, Math.max(2, parseInt(e.target.value) || 2)))}
+                                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all bg-white"
+                                                />
+                                            </>
+                                        ) : (
+                                            <div className="flex flex-col justify-center h-full pt-1.5">
+                                                <span className="text-xs font-bold text-indigo-600 flex items-center gap-1">
+                                                    ♾️ Modo Sin Fin
+                                                </span>
+                                                <span className="text-[10px] text-gray-500 mt-0.5 leading-tight">
+                                                    Se programarán las primeras 24 sesiones.
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* Timezone Selector */}
-                    <div>
+                    <div className="relative">
                         <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5 flex items-center gap-1.5">
                             <Globe className="w-3.5 h-3.5 text-[#4285F4]" />
                             Zona Horaria
                         </label>
-                        <div className="relative">
-                            <select
-                                value={selectedTimezone}
-                                onChange={e => setSelectedTimezone(e.target.value)}
-                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all appearance-none bg-white cursor-pointer"
-                            >
-                                {COMMON_TIMEZONES.map(tz => (
-                                    <option key={tz.value} value={tz.value}>
-                                        {tz.label}
-                                    </option>
-                                ))}
-                            </select>
-                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setIsOpenTimezone(!isOpenTimezone)}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 hover:border-gray-300 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all bg-white flex items-center justify-between shadow-sm"
+                        >
+                            <span className="truncate">
+                                {COMMON_TIMEZONES.find(tz => tz.value === selectedTimezone)?.label || selectedTimezone}
+                            </span>
+                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpenTimezone ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isOpenTimezone && (
+                            <>
+                                {/* Click-away overlay overlay */}
+                                <div 
+                                    className="fixed inset-0 z-30" 
+                                    onClick={() => setIsOpenTimezone(false)} 
+                                />
+                                <div className="absolute left-0 right-0 mt-1.5 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-2xl shadow-xl z-40 p-1.5 space-y-0.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                                    {COMMON_TIMEZONES.map(tz => {
+                                        const isSelected = selectedTimezone === tz.value;
+                                        return (
+                                            <button
+                                                key={tz.value}
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedTimezone(tz.value);
+                                                    setIsOpenTimezone(false);
+                                                }}
+                                                className={`w-full px-3 py-2.5 rounded-xl text-xs font-semibold text-left transition-all flex items-center justify-between ${
+                                                    isSelected
+                                                        ? 'bg-indigo-50 text-indigo-700'
+                                                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                                }`}
+                                            >
+                                                <span>{tz.label}</span>
+                                                {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Duration quick buttons */}
