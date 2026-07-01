@@ -18,6 +18,7 @@ export default function Branding() {
     const [tcPreview, setTcPreview] = useState(false);
     const [tcOpen, setTcOpen] = useState(false);
     const [logoDarkBg, setLogoDarkBg] = useState(false);
+    const [selectedTheme, setSelectedTheme] = useState<string>('slate');
     const [formData, setFormData] = useState({
         name: '',
         website: '',
@@ -46,6 +47,7 @@ export default function Branding() {
             setLoading(true);
             const data = await brandingService.getMyCompany();
             setCompany(data);
+            setSelectedTheme((data.features as any)?.sidebar_theme || 'slate');
             setFormData({
                 name: data.name,
                 website: data.website || '',
@@ -107,7 +109,11 @@ export default function Branding() {
         e.preventDefault();
         try {
             setSaving(true);
-            await brandingService.updateBranding({
+            const updatedFeatures = {
+                ...(company?.features || {}),
+                sidebar_theme: selectedTheme
+            };
+            const updatedCompany = await brandingService.updateBranding({
                 name: formData.name,
                 website: formData.website,
                 address: formData.address,
@@ -116,8 +122,12 @@ export default function Branding() {
                 terminos_condiciones: formData.terminos_condiciones,
                 date_format: formData.date_format,
                 time_format: formData.time_format,
-                timezone: formData.timezone
+                timezone: formData.timezone,
+                features: updatedFeatures as any
             });
+            setCompany(updatedCompany);
+            // Dispatch event so that Sidebar reloads its branding instantly
+            window.dispatchEvent(new CustomEvent('company-branding-updated'));
             toast.success('Configuración global actualizada');
         } catch (error: any) {
             console.error('Error saving branding:', error);
@@ -313,6 +323,46 @@ export default function Branding() {
                                         </select>
                                         <p className="text-[9px] text-slate-400 font-medium ml-1 mt-0.5">* Afecta cómo se registran y muestran las fechas para todos los usuarios.</p>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Estilo del Sidebar */}
+                            <div className="space-y-2">
+                                <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Estilo del Menú Lateral (Sidebar)</label>
+                                <p className="text-xs text-gray-500 font-medium px-1">Elige un tema que resalte tu logotipo. Ofrecemos estilos claros, oscuros y premium.</p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-4 border border-slate-100 rounded-xl bg-gray-50/50">
+                                    {[
+                                        { id: 'slate', name: '🌌 Slate Oscuro', desc: 'Azul pizarra clásico (Recomendado)', bg: 'bg-[#0f172a] border-[#1e293b]', activeBg: 'bg-blue-600', isDark: true },
+                                        { id: 'carbon', name: '🖤 Gris Carbón', desc: 'Negro puro ultra-premium', bg: 'bg-[#121212] border-[#262626]', activeBg: 'bg-white', isDark: true },
+                                        { id: 'indigo', name: '🔮 Deep Indigo', desc: 'Púrpura y cobalto elegante', bg: 'bg-[#0b0f19] border-[#1a2035]', activeBg: 'bg-[#4449AA]', isDark: true },
+                                        { id: 'salesforce_dark', name: '☁️ Arias Navy', desc: 'Azul corporativo premium Arias', bg: 'bg-[#032d60] border-[#011e41]', activeBg: 'bg-[#0176d3]', isDark: true },
+                                        { id: 'salesforce_light', name: '⚡ Arias Lightning', desc: 'Gris y azul de alto contraste', bg: 'bg-[#f3f2f1] border-[#dddbda]', activeBg: 'bg-[#0176d3]', isDark: false },
+                                        { id: 'light_minimal', name: '☀️ Claro Pizarra', desc: 'Blanco azulado limpio y profesional', bg: 'bg-[#f8fafc] border-[#e2e8f0]', activeBg: 'bg-blue-600', isDark: false },
+                                        { id: 'nordic_sand', name: '🏜️ Arena Nórdica', desc: 'Crema y piedra minimalista', bg: 'bg-[#fafaf9] border-[#e7e5e4]', activeBg: 'bg-stone-900', isDark: false },
+                                        { id: 'mint_sage', name: '🌿 Menta Mínimal', desc: 'Verde salvia fresco y natural', bg: 'bg-[#f4f7f5] border-[#d1ded6]', activeBg: 'bg-emerald-800', isDark: false },
+                                        { id: 'lilac_mist', name: '🔮 Bruma Lavanda', desc: 'Lavanda y lila moderno', bg: 'bg-[#fafafc] border-[#e5e5f0]', activeBg: 'bg-indigo-600', isDark: false }
+                                    ].map(t => (
+                                        <button
+                                            key={t.id}
+                                            type="button"
+                                            onClick={() => setSelectedTheme(t.id)}
+                                            className={`flex flex-col text-left p-3 rounded-2xl border-2 transition-all hover:scale-[1.01] ${
+                                                selectedTheme === t.id
+                                                    ? 'border-blue-600 bg-blue-50/50 shadow-md shadow-blue-500/10'
+                                                    : 'border-slate-200 bg-white hover:border-slate-300'
+                                            }`}
+                                        >
+                                            <div className={`w-full h-12 rounded-lg border ${t.bg} flex items-center justify-start px-2 gap-1.5 relative overflow-hidden mb-2 shadow-inner`}>
+                                                <div className={`w-2.5 h-2.5 rounded-full ${t.activeBg} shrink-0`} />
+                                                <div className="flex flex-col gap-1 w-full">
+                                                    <div className={`h-1.5 rounded w-2/3 ${t.isDark ? 'bg-white/20' : 'bg-slate-300'}`} />
+                                                    <div className={`h-1 rounded w-1/2 ${t.isDark ? 'bg-white/10' : 'bg-slate-200'}`} />
+                                                </div>
+                                            </div>
+                                            <span className="text-[11px] font-black text-slate-800">{t.name}</span>
+                                            <span className="text-[9px] text-slate-400 font-bold leading-tight mt-1">{t.desc}</span>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 

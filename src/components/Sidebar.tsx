@@ -10,6 +10,175 @@ import { supabase } from '../services/supabase';
 import type { Company } from '../types';
 import toast from 'react-hot-toast';
 
+interface SidebarTheme {
+    bg: string;
+    border: string;
+    headerBg: string;
+    text: string;
+    textHover: string;
+    bgHover: string;
+    activeBg: string;
+    activeText: string;
+    activeShadow: string;
+    subText: string;
+    logoText: string;
+    subActive: string;
+    subInactive: string;
+}
+
+const THEMES: Record<string, SidebarTheme> = {
+    slate: {
+        bg: 'bg-[#0f172a]',
+        border: 'border-[#1e293b]',
+        headerBg: 'bg-[#0f172a]',
+        text: 'text-gray-400',
+        textHover: 'text-white hover:text-white',
+        bgHover: 'hover:bg-[#1e293b]',
+        activeBg: 'bg-blue-600',
+        activeText: 'text-white',
+        activeShadow: 'shadow-lg shadow-blue-900/40',
+        subText: 'text-gray-500',
+        logoText: 'text-white',
+        subActive: 'text-blue-400 bg-blue-500/5',
+        subInactive: 'text-gray-500 hover:text-gray-300 hover:bg-[#1e293b]/50'
+    },
+    carbon: {
+        bg: 'bg-[#121212]',
+        border: 'border-[#262626]',
+        headerBg: 'bg-[#121212]',
+        text: 'text-neutral-400',
+        textHover: 'text-white hover:text-white',
+        bgHover: 'hover:bg-[#262626]',
+        activeBg: 'bg-white',
+        activeText: 'text-black',
+        activeShadow: 'shadow-lg shadow-white/10',
+        subText: 'text-neutral-500',
+        logoText: 'text-white',
+        subActive: 'text-white bg-white/5',
+        subInactive: 'text-neutral-500 hover:text-neutral-200 hover:bg-[#262626]/50'
+    },
+    indigo: {
+        bg: 'bg-[#0b0f19]',
+        border: 'border-[#1a2035]',
+        headerBg: 'bg-[#0b0f19]',
+        text: 'text-indigo-200/60',
+        textHover: 'text-white hover:text-white',
+        bgHover: 'hover:bg-[#1e293b]/50',
+        activeBg: 'bg-[#4449AA]',
+        activeText: 'text-white',
+        activeShadow: 'shadow-lg shadow-[#4449AA]/40',
+        subText: 'text-indigo-300/40',
+        logoText: 'text-white',
+        subActive: 'text-indigo-400 bg-indigo-50/5',
+        subInactive: 'text-indigo-300/40 hover:text-indigo-100 hover:bg-[#1a2035]/50'
+    },
+    light_minimal: {
+        bg: 'bg-[#f8fafc]',
+        border: 'border-[#e2e8f0]',
+        headerBg: 'bg-[#f8fafc]',
+        text: 'text-slate-600',
+        textHover: 'text-slate-900 hover:text-slate-900',
+        bgHover: 'hover:bg-slate-100',
+        activeBg: 'bg-blue-600',
+        activeText: 'text-white',
+        activeShadow: 'shadow-lg shadow-blue-500/25',
+        subText: 'text-slate-500',
+        logoText: 'text-slate-900',
+        subActive: 'text-blue-600 bg-blue-50',
+        subInactive: 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+    },
+    nordic_sand: {
+        bg: 'bg-[#fafaf9]',
+        border: 'border-[#e7e5e4]',
+        headerBg: 'bg-[#fafaf9]',
+        text: 'text-stone-600',
+        textHover: 'text-stone-900 hover:text-stone-900',
+        bgHover: 'hover:bg-stone-100/70',
+        activeBg: 'bg-stone-900',
+        activeText: 'text-white',
+        activeShadow: 'shadow-md shadow-stone-900/10',
+        subText: 'text-stone-500',
+        logoText: 'text-stone-900',
+        subActive: 'text-stone-900 bg-stone-100',
+        subInactive: 'text-stone-500 hover:text-stone-800 hover:bg-stone-100/50'
+    },
+    mint_sage: {
+        bg: 'bg-[#f4f7f5]',
+        border: 'border-[#d1ded6]',
+        headerBg: 'bg-[#f4f7f5]',
+        text: 'text-emerald-900/70',
+        textHover: 'text-emerald-950 hover:text-emerald-950',
+        bgHover: 'hover:bg-emerald-950/5',
+        activeBg: 'bg-emerald-800',
+        activeText: 'text-white',
+        activeShadow: 'shadow-md shadow-emerald-800/15',
+        subText: 'text-emerald-700/60',
+        logoText: 'text-emerald-950',
+        subActive: 'text-emerald-800 bg-emerald-950/5',
+        subInactive: 'text-emerald-600 hover:text-emerald-800 hover:bg-emerald-950/5'
+    },
+    lilac_mist: {
+        bg: 'bg-[#fafafc]',
+        border: 'border-[#e5e5f0]',
+        headerBg: 'bg-[#fafafc]',
+        text: 'text-indigo-950/60',
+        textHover: 'text-indigo-950 hover:text-indigo-950',
+        bgHover: 'hover:bg-indigo-950/5',
+        activeBg: 'bg-indigo-600',
+        activeText: 'text-white',
+        activeShadow: 'shadow-md shadow-indigo-600/20',
+        subText: 'text-indigo-900/50',
+        logoText: 'text-indigo-950',
+        subActive: 'text-indigo-650 bg-indigo-50',
+        subInactive: 'text-indigo-600 hover:text-indigo-950 hover:bg-indigo-950/5'
+    },
+    salesforce_light: {
+        bg: 'bg-[#f3f2f1]',
+        border: 'border-[#dddbda]',
+        headerBg: 'bg-[#f3f2f1]',
+        text: 'text-[#180808]/70',
+        textHover: 'text-[#080707] hover:text-[#080707]',
+        bgHover: 'hover:bg-[#eae8e5]',
+        activeBg: 'bg-[#0176d3]',
+        activeText: 'text-white',
+        activeShadow: 'shadow-md shadow-[#0176d3]/25',
+        subText: 'text-[#514f4d]',
+        logoText: 'text-[#080707]',
+        subActive: 'text-[#0176d3] bg-[#eae8e5]',
+        subInactive: 'text-[#514f4d] hover:text-[#080707] hover:bg-[#eae8e5]'
+    },
+    salesforce_dark: {
+        bg: 'bg-[#032d60]',
+        border: 'border-[#011e41]',
+        headerBg: 'bg-[#032d60]',
+        text: 'text-blue-100/70',
+        textHover: 'text-white hover:text-white',
+        bgHover: 'hover:bg-[#011e41]/50',
+        activeBg: 'bg-[#0176d3]',
+        activeText: 'text-white',
+        activeShadow: 'shadow-md shadow-[#0176d3]/35',
+        subText: 'text-blue-200/60',
+        logoText: 'text-white',
+        subActive: 'text-white bg-[#011e41]',
+        subInactive: 'text-blue-100/60 hover:text-white hover:bg-[#011e41]/45'
+    },
+    pure_white: {
+        bg: 'bg-white',
+        border: 'border-slate-100',
+        headerBg: 'bg-white',
+        text: 'text-gray-600',
+        textHover: 'text-gray-900 hover:text-gray-900',
+        bgHover: 'hover:bg-gray-50',
+        activeBg: 'bg-[#4449AA]',
+        activeText: 'text-white',
+        activeShadow: 'shadow-lg shadow-[#4449AA]/25',
+        subText: 'text-gray-500',
+        logoText: 'text-gray-900',
+        subActive: 'text-[#4449AA] bg-indigo-50',
+        subInactive: 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+    }
+};
+
 export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean, onToggle: () => void }) {
     const { profile, signOut, setSimulatedCompanyId, setSimulatedRole, simulatedCompanyId, revertSimulation } = useAuth();
     const location = useLocation();
@@ -179,7 +348,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         try {
             // SECURITY: Only apply simulatedCompanyId when the user is super_admin.
             // If simulatedCompanyId is in localStorage from a previous super_admin session,
-            // a company_admin must NEVER inherit it ΓÇö always use their own profile.company_id.
+            // a company_admin must NEVER inherit it — always use their own profile.company_id.
             const isSuperAdmin = profile?.role === 'super_admin';
             const effectiveCompanyId = (isSuperAdmin && simulatedCompanyId) 
                 ? simulatedCompanyId 
@@ -194,7 +363,15 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 .single();
 
             if (error) throw error;
-            if (data) setCompany(data as Company);
+            if (data) {
+                setCompany(data as Company);
+                if (data.features && typeof data.features === 'object') {
+                    const themeVal = (data.features as any).sidebar_theme;
+                    if (themeVal) {
+                        localStorage.setItem(`sidebar_theme_${effectiveCompanyId}`, themeVal);
+                    }
+                }
+            }
         } catch (error) {
             console.error('Error loading company branding for sidebar:', error);
         }
@@ -398,13 +575,28 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         return t('roles.user');
     };
 
+    const effectiveCompanyIdForTheme = (profile?.role === 'super_admin' && simulatedCompanyId) 
+        ? simulatedCompanyId 
+        : profile?.company_id;
+    const cachedThemeGlobal = effectiveCompanyIdForTheme ? localStorage.getItem(`sidebar_theme_${effectiveCompanyIdForTheme}`) : null;
+    const themeKey = (company?.features as any)?.sidebar_theme || cachedThemeGlobal || 'slate';
+    const theme = THEMES[themeKey] || THEMES.slate;
+    const isLightTheme = themeKey === 'light_minimal' || 
+                        themeKey === 'nordic_sand' || 
+                        themeKey === 'mint_sage' || 
+                        themeKey === 'lilac_mist' || 
+                        themeKey === 'salesforce_light' || 
+                        themeKey === 'pure_white';
+
     return (
         <div className={cn(
-            "flex flex-col bg-[#0f172a] h-screen fixed left-0 top-0 z-50 transition-all duration-300 ease-in-out border-r border-[#1e293b] group/sidebar",
+            "flex flex-col h-screen fixed left-0 top-0 z-50 transition-all duration-300 ease-in-out border-r group/sidebar",
+            theme.bg,
+            theme.border,
             isCollapsed ? "w-20 overflow-visible" : "w-64"
         )}>
             {/* Header / Brand */}
-            <div className="relative flex flex-col items-center justify-center min-h-[6.5rem] border-b border-[#1e293b] bg-[#0f172a] px-4 py-2">
+            <div className={cn("relative flex flex-col items-center justify-center min-h-[6.5rem] border-b px-4 py-2", theme.border, theme.headerBg)}>
                 {window.location.hostname === 'localhost' && (
                     <div className="absolute top-2 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-md">
                         <p className="text-[8px] font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1">
@@ -420,7 +612,8 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 <button
                     onClick={onToggle}
                     className={cn(
-                        "absolute -right-3.5 top-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-[#0f172a]/80 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.4)] transition-all duration-300 hover:border-blue-500/50 hover:shadow-[0_0_15px_rgba(59,130,246,0.4)] active:scale-95 group/toggle z-50",
+                        "absolute -right-3.5 top-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.4)] transition-all duration-300 hover:border-blue-500/50 hover:shadow-[0_0_15px_rgba(59,130,246,0.4)] active:scale-95 group/toggle z-50",
+                        theme.bg,
                         isCollapsed ? "rotate-180" : ""
                     )}
                 >
@@ -438,7 +631,8 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                         <img src={company.logo_url} alt={company.name} className={cn("max-h-full max-w-full object-contain transition-all", isCollapsed ? "scale-110" : "")} />
                     ) : company?.name ? (
                         <div className={cn(
-                            "flex items-center gap-3 text-white shrink-0 transition-all",
+                            "flex items-center gap-3 shrink-0 transition-all",
+                            theme.logoText,
                             isCollapsed ? "justify-center" : "flex-col text-center"
                         )}>
                             <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shrink-0 border border-blue-400/30 shadow-lg shadow-blue-900/20">
@@ -446,7 +640,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             </div>
                             {!isCollapsed && (
                                 <div className="flex flex-col min-w-0 max-w-[180px]">
-                                    <span className="text-[13px] font-black tracking-tight uppercase truncate text-white leading-tight">
+                                    <span className={cn("text-[13px] font-black tracking-tight uppercase truncate leading-tight", theme.logoText)}>
                                         {company.name}
                                     </span>
                                     <span className="text-[8px] font-black text-blue-400 uppercase tracking-[0.25em] mt-0.5 opacity-80">SaaS Business</span>
@@ -468,7 +662,11 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                 <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", localStorage.getItem('simulated_role') ? "bg-amber-500" : "bg-blue-500")} />
                                 <span className={cn(
                                     "text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border",
-                                    localStorage.getItem('simulated_role') ? "text-amber-500 bg-amber-500/10 border-amber-500/20" : "text-gray-400 bg-gray-900/50 border-gray-800/10"
+                                    localStorage.getItem('simulated_role')
+                                        ? "text-amber-500 bg-amber-500/10 border-amber-500/20"
+                                        : isLightTheme
+                                            ? "text-slate-600 bg-slate-100 border-slate-200"
+                                            : "text-gray-400 bg-gray-900/50 border-gray-800/10"
                                 )}>
                                     {getRoleTitle()} {localStorage.getItem('simulated_role') && " (SIM)"}
                                 </span>
@@ -476,7 +674,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             {localStorage.getItem('simulated_role') && (
                                 <button
                                     onClick={revertSimulation}
-                                    className="text-[8px] font-black text-amber-500/60 hover:text-amber-500 uppercase tracking-[0.2em] transition-all"
+                                    className={cn(
+                                        "text-[8px] font-black uppercase tracking-[0.2em] transition-all",
+                                        isLightTheme ? "text-amber-600 hover:text-amber-700" : "text-amber-500/60 hover:text-amber-500"
+                                    )}
                                 >
                                     [ Revertir Maestro ]
                                 </button>
@@ -486,25 +687,35 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                         <div className="mt-2 w-full px-2">
                             <button
                                 onClick={() => setDebugOpen(!debugOpen)}
-                                className="w-full flex items-center justify-between p-1.5 bg-black/20 rounded-lg border border-white/5 hover:bg-white/5 transition-colors group mb-2"
+                                className={cn(
+                                    "w-full flex items-center justify-between p-1.5 rounded-lg border transition-colors group mb-2 focus:outline-none",
+                                    isLightTheme
+                                        ? 'bg-slate-100 border-slate-200/50 hover:bg-slate-200/80 text-slate-700'
+                                        : 'bg-black/20 border-white/5 hover:bg-white/5 text-gray-400'
+                                )}
                             >
-                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest group-hover:text-gray-300">Debugger</span>
+                                <span className={cn("text-[9px] font-bold uppercase tracking-widest", isLightTheme ? 'text-slate-500 group-hover:text-slate-700' : 'text-gray-500 group-hover:text-gray-300')}>Debugger</span>
                                 {debugOpen ? <ChevronDown className="w-3 h-3 text-gray-500" /> : <ChevronRight className="w-3 h-3 text-gray-500" />}
                             </button>
 
                             {debugOpen && (
-                                <div className="mb-2 bg-black/20 rounded-lg p-2 border border-white/5 animate-in fade-in slide-in-from-top-1 duration-200">
-                                    <div className="grid grid-cols-2 gap-1 text-[7px] font-mono text-gray-400">
+                                <div className={cn(
+                                    "mb-2 rounded-lg p-2 border animate-in fade-in slide-in-from-top-1 duration-200",
+                                    isLightTheme
+                                        ? 'bg-slate-50 border-slate-200 text-slate-600'
+                                        : 'bg-black/20 border-white/5 text-gray-400'
+                                )}>
+                                    <div className="grid grid-cols-2 gap-1 text-[7px] font-mono">
                                         <span className="opacity-50">ROLE:</span>
-                                        <span className="text-blue-400 truncate">{profile?.role}</span>
+                                        <span className="text-blue-500 truncate font-bold">{profile?.role}</span>
                                         <span className="opacity-50">COMP:</span>
-                                        <span className="text-amber-400 truncate">{profile?.company_id?.substring(0, 8)}...</span>
+                                        <span className="text-amber-600 truncate font-bold">{profile?.company_id?.substring(0, 8)}...</span>
                                         <span className="opacity-50">LS_R:</span>
-                                        <span className="text-emerald-400 truncate">{localStorage.getItem('simulated_role') || 'none'}</span>
+                                        <span className="text-emerald-600 truncate font-bold">{localStorage.getItem('simulated_role') || 'none'}</span>
                                     </div>
-                                    <div className="mt-2 border-t border-white/5 pt-1">
+                                    <div className="mt-2 border-t border-slate-200/50 pt-1">
                                         <p className="text-[6px] text-gray-500 uppercase tracking-tighter mb-0.5 font-black">Active Perms (Debug):</p>
-                                        <div className="text-[6px] text-gray-400 font-mono leading-tight break-words">
+                                        <div className="text-[6px] text-gray-600 font-mono leading-tight break-words">
                                             {Object.keys(profile?.permissions || {}).filter(k => profile?.permissions?.[k]).join(', ')}
                                         </div>
                                     </div>
@@ -512,7 +723,12 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             )}
 
                             <select
-                                className="w-full bg-[#1e293b]/50 border border-gray-800 shadow-inner rounded-lg px-2 py-1.5 text-[10px] font-bold text-gray-300 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all cursor-pointer hover:bg-[#1e293b]"
+                                className={cn(
+                                    "w-full shadow-inner rounded-lg px-2 py-1.5 text-[10px] font-bold focus:ring-1 focus:ring-blue-500/50 outline-none transition-all cursor-pointer mb-1 border",
+                                    isLightTheme
+                                        ? 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/80'
+                                        : 'bg-[#1e293b]/50 border-gray-800 text-gray-300 hover:bg-[#1e293b]'
+                                )}
                                 value={profile?.company_id || ''}
                                 onChange={(e) => {
                                     setSimulatedCompanyId(e.target.value || null);
@@ -525,7 +741,12 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             </select>
 
                             <select
-                                className="w-full bg-[#1e293b]/50 border border-gray-800 shadow-inner rounded-lg px-2 py-1.5 text-[10px] font-bold text-gray-300 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all cursor-pointer hover:bg-[#1e293b]"
+                                className={cn(
+                                    "w-full shadow-inner rounded-lg px-2 py-1.5 text-[10px] font-bold focus:ring-1 focus:ring-blue-500/50 outline-none transition-all cursor-pointer border",
+                                    isLightTheme
+                                        ? 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200/80'
+                                        : 'bg-[#1e293b]/50 border-gray-800 text-gray-300 hover:bg-[#1e293b]'
+                                )}
                                 value={localStorage.getItem('simulated_role') || 'super_admin'}
                                 onChange={(e) => setSimulatedRole(e.target.value as any)}
                             >
@@ -540,13 +761,18 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
             {/* Workspace Switcher */}
             {!isCollapsed && workspaces.length > 1 && (
-                <div className="px-4 py-3 border-b border-[#1e293b] bg-black/10">
+                <div className={cn("px-4 py-3 border-b bg-black/10", theme.border)}>
                     <label className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5">
                         Workspace Activo
                     </label>
                     <div className="relative">
                         <select
-                            className="w-full bg-[#1e293b]/70 border border-gray-800 rounded-xl px-3 py-2 text-xs font-black text-white focus:ring-2 focus:ring-blue-500/50 outline-none transition-all cursor-pointer hover:bg-[#1e293b] appearance-none"
+                            className={cn(
+                                "w-full border rounded-xl px-3 py-2 text-xs font-black focus:ring-2 focus:ring-blue-500/50 outline-none transition-all cursor-pointer appearance-none",
+                                isLightTheme
+                                    ? 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100'
+                                    : 'bg-[#1e293b]/70 border-gray-800 text-white hover:bg-[#1e293b]'
+                            )}
                             value={profile?.company_id || ''}
                             onChange={(e) => {
                                 const val = e.target.value;
@@ -557,7 +783,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             }}
                         >
                             {workspaces.map(w => (
-                                <option key={w.id} value={w.id} className="bg-[#0f172a] text-white font-bold py-2">
+                                <option key={w.id} value={w.id} className={cn("font-bold py-2", isLightTheme ? 'bg-white text-slate-900' : 'bg-[#0f172a] text-white')}>
                                     {w.parent_company_id ? `🏢 ${w.name}` : `👑 ${w.name} (Principal)`}
                                 </option>
                             ))}
@@ -583,13 +809,13 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                     <button
                                         onClick={() => setOpenAccordion(openAccordion === item.id ? null : item.id!)}
                                         className={cn(
-                                            item.current ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
+                                            item.current ? cn(theme.activeBg, theme.activeText, theme.activeShadow) : cn(theme.text, theme.bgHover, theme.textHover),
                                             'group flex items-center justify-between w-full rounded-xl transition-all duration-200 focus:outline-none p-3 px-4'
                                         )}
                                     >
                                         <div className="flex items-center">
                                             <item.icon className={cn(
-                                                item.current ? 'text-white' : 'text-gray-400 group-hover:text-white',
+                                                item.current ? theme.activeText : theme.text,
                                                 "h-5 w-5 transition-colors shrink-0 mr-3"
                                             )} aria-hidden="true" />
                                             <span className="text-sm font-semibold tracking-wide truncate">{item.name}</span>
@@ -597,17 +823,17 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                         {openAccordion === item.id ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
                                     </button>
                                     {openAccordion === item.id && (
-                                    <div className="ml-4 pl-4 border-l border-gray-800/50 pt-1 space-y-1">
+                                    <div className={cn("ml-4 pl-4 border-l pt-1 space-y-1", theme.border === 'border-slate-100' || theme.border === 'border-slate-200' ? 'border-slate-200' : 'border-gray-800/50')}>
                                             {item.subItems.map((sub) => {
                                                 const isActive = location.pathname === sub.href && !(sub as any).onClick;
                                                 const baseClass = cn(
-                                                    isActive ? 'text-blue-400 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300 hover:bg-[#1e293b]/50',
+                                                    isActive ? theme.subActive : theme.subInactive,
                                                     'group flex items-center justify-between rounded-lg transition-all duration-200 px-3 py-2 text-xs font-bold w-full text-left'
                                                 );
                                                 const inner = (
                                                     <>
                                                         <div className="flex items-center">
-                                                            <sub.icon className={cn(isActive ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300', "h-4 w-4 mr-3")} />
+                                                            <sub.icon className="h-4 w-4 mr-3 text-current shrink-0" />
                                                             <span className="truncate">{sub.name}</span>
                                                         </div>
                                                         {sub.badge != null && sub.badge > 0 && (
@@ -631,14 +857,14 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                     to={item.href}
                                     className={cn(
                                         item.current
-                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                                            : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
+                                            ? cn(theme.activeBg, theme.activeText, theme.activeShadow)
+                                            : cn(theme.text, theme.bgHover, theme.textHover),
                                         'group flex items-center rounded-xl transition-all duration-200 focus:outline-none relative',
                                         isCollapsed ? "justify-center p-3" : "px-4 py-3"
                                     )}
                                 >
                                     <item.icon className={cn(
-                                        item.current ? 'text-white' : 'text-gray-400 group-hover:text-white',
+                                        item.current ? theme.activeText : theme.text,
                                         "h-5 w-5 transition-colors shrink-0",
                                         !isCollapsed && "mr-3"
                                     )} aria-hidden="true" />
@@ -647,8 +873,16 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                         <span className="text-sm font-semibold tracking-wide truncate">{item.name}</span>
                                     ) : (
                                         /* Premium Dark Tooltip (Floating Label) */
-                                        <div className="absolute left-full ml-4 px-3.5 py-2.5 bg-[#0f172a]/95 backdrop-blur-xl text-white text-[11px] font-bold rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 translate-x-[-12px] group-hover:translate-x-0 z-[100] whitespace-nowrap border border-white/10 ring-1 ring-white/5">
-                                            <div className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-2 h-2 bg-[#0f172a] rotate-45 border-l border-b border-white/10" />
+                                        <div className={cn(
+                                            "absolute left-full ml-4 px-3.5 py-2.5 backdrop-blur-xl text-[11px] font-bold rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 translate-x-[-12px] group-hover:translate-x-0 z-[100] whitespace-nowrap border ring-1 ring-white/5",
+                                            isLightTheme
+                                                ? 'bg-slate-900 text-white border-slate-800'
+                                                : 'bg-[#0f172a]/95 text-white border-white/10'
+                                        )}>
+                                            <div className={cn(
+                                                "absolute left-[-4px] top-1/2 -translate-y-1/2 w-2 h-2 rotate-45 border-l border-b",
+                                                isLightTheme ? 'bg-slate-900 border-slate-800' : 'bg-[#0f172a] border-white/10'
+                                            )} />
                                             <div className="flex items-center gap-2">
                                                 <div className="w-1 h-1 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
                                                 {item.name}
@@ -666,14 +900,14 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             <button
                                 onClick={() => !isCollapsed && setConfigOpen(!configOpen)}
                                 className={cn(
-                                    configPaths.some(path => location.pathname === path) ? 'text-white' : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
+                                    configPaths.some(path => location.pathname === path) ? cn(theme.activeBg, theme.activeText, theme.activeShadow) : cn(theme.text, theme.bgHover, theme.textHover),
                                     'group flex items-center justify-between w-full rounded-xl transition-all duration-200 outline-none p-3',
                                     !isCollapsed && "px-4"
                                 )}
                             >
                                 <div className="flex items-center">
                                     <Settings className={cn(
-                                        configPaths.some(path => location.pathname === path) ? 'text-white' : 'text-gray-400 group-hover:text-white',
+                                        configPaths.some(path => location.pathname === path) ? theme.activeText : theme.text,
                                         "h-5 w-5 transition-colors shrink-0",
                                         !isCollapsed && "mr-3"
                                     )} />
@@ -684,7 +918,12 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
                             {/* Flyout Menu (Only when collapsed) */}
                             {isCollapsed ? (
-                                <div className="absolute left-full bottom-0 ml-1 w-56 bg-[#0f172a]/95 backdrop-blur-2xl rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 opacity-0 group-hover/config:opacity-100 pointer-events-none group-hover/config:pointer-events-auto transition-all duration-300 translate-x-[-12px] group-hover/config:translate-x-0 z-[100] overflow-hidden mb-[-8px]">
+                                <div className={cn(
+                                    "absolute left-full bottom-0 ml-1 w-56 backdrop-blur-2xl rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border opacity-0 group-hover/config:opacity-100 pointer-events-none group-hover/config:pointer-events-auto transition-all duration-300 translate-x-[-12px] group-hover/config:translate-x-0 z-[100] overflow-hidden mb-[-8px]",
+                                    isLightTheme
+                                        ? 'bg-slate-900 text-white border-slate-800'
+                                        : 'bg-[#0f172a]/95 text-white border-white/10'
+                                )}>
                                     {/* Invisible Hover Bridge */}
                                     <div className="absolute left-[-40px] top-[-100px] w-[40px] h-[300px]" />
 
@@ -716,20 +955,17 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             ) : (
                                 /* Regular Accordion (When expanded) */
                                 configOpen && (
-                                    <div className="ml-4 pl-4 border-l border-gray-800/50 pt-1 space-y-1">
+                                    <div className={cn("ml-4 pl-4 border-l pt-1 space-y-1", theme.border === 'border-slate-100' || theme.border === 'border-slate-200' ? 'border-slate-200' : 'border-gray-800/50')}>
                                         {configSubItems.map((subItem) => (
                                             <Link
                                                 key={subItem.name}
                                                 to={subItem.href}
                                                 className={cn(
-                                                    subItem.current ? 'text-blue-400 bg-blue-500/5 shadow-sm' : 'text-gray-500 hover:text-gray-300 hover:bg-[#1e293b]/50',
+                                                    subItem.current ? theme.subActive : theme.subInactive,
                                                     'group flex items-center rounded-lg transition-all duration-200 px-3 py-2 text-xs font-bold'
                                                 )}
                                             >
-                                                <subItem.icon className={cn(
-                                                    subItem.current ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300',
-                                                    "h-4 w-4 mr-3"
-                                                )} />
+                                                <subItem.icon className="h-4 w-4 mr-3 text-current shrink-0" />
                                                 <span className="truncate">{subItem.name}</span>
                                             </Link>
                                         ))}
@@ -791,27 +1027,42 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             )}
 
             {/* Footer */}
-            <div className="flex-shrink-0 flex border-t border-[#1e293b] p-4 flex-col gap-3 bg-[#0f172a]">
+            <div className={cn("flex-shrink-0 flex border-t p-4 flex-col gap-3", theme.border, theme.headerBg)}>
                 {!isCollapsed && <LanguageSwitcher />}
-
                 <div
                     className={cn(
                         "flex items-center w-full rounded-xl transition-all hover:bg-red-500/10 cursor-pointer group/logout relative",
-                        isCollapsed ? "justify-center p-3" : "p-3 bg-[#1e293b]/40 border border-gray-800/50 shadow-inner"
+                        isCollapsed
+                            ? "justify-center p-3"
+                            : isLightTheme
+                                ? "p-3 bg-slate-100 border border-slate-200 shadow-inner"
+                                : "p-3 bg-[#1e293b]/40 border border-gray-800/50 shadow-inner"
                     )}
                     onClick={signOut}
                 >
                     <div className="flex items-center min-w-0">
                         <LogOut className={cn(
                             "h-5 w-5 transition-colors shrink-0",
-                            isCollapsed ? "text-gray-400 group-hover/logout:text-red-500" : "text-gray-500 group-hover/logout:text-red-400"
+                            isCollapsed
+                                ? "text-gray-400 group-hover/logout:text-red-500"
+                                : isLightTheme
+                                    ? "text-slate-400 group-hover/logout:text-red-500"
+                                    : "text-gray-500 group-hover/logout:text-red-400"
                         )} />
                         {!isCollapsed ? (
                             <div className="ml-3 min-w-0">
-                                <p className="text-[11px] font-black text-gray-200 truncate leading-none mb-1">
+                                <p className={cn(
+                                    "text-[11px] font-black truncate leading-none mb-1",
+                                    isLightTheme ? "text-slate-800" : "text-gray-200"
+                                )}>
                                     {company?.name || profile?.email?.split('@')[0]}
                                 </p>
-                                <p className="text-[9px] font-black text-gray-500 group-hover/logout:text-red-400/80 uppercase tracking-widest transition-colors">
+                                <p className={cn(
+                                    "text-[9px] font-black uppercase tracking-widest transition-colors",
+                                    isLightTheme
+                                        ? "text-slate-400 group-hover/logout:text-red-500"
+                                        : "text-gray-500 group-hover/logout:text-red-400/80"
+                                )}>
                                     {t('sidebar.signOut')}
                                 </p>
                             </div>
