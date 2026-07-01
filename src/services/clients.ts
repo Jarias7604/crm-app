@@ -193,11 +193,32 @@ export const clientsService = {
   },
 
   async promoteToActive(clientId: string): Promise<void> {
+    // 1. Obtener el lead_id del cliente
+    const { data: client, error: fetchErr } = await supabase
+      .from('clients')
+      .select('lead_id')
+      .eq('id', clientId)
+      .single();
+    
+    if (fetchErr) throw fetchErr;
+
+    // 2. Actualizar el cliente a activo
     const { error } = await supabase
       .from('clients')
       .update({ es_activo: true, updated_at: new Date().toISOString() })
       .eq('id', clientId);
     if (error) throw error;
+
+    // 3. Si hay un lead_id asociado, actualizar su estado en leads a 'Cliente'
+    if (client?.lead_id) {
+      const { error: leadErr } = await supabase
+        .from('leads')
+        .update({ status: 'Cliente' })
+        .eq('id', client.lead_id);
+      if (leadErr) {
+        console.error('Error al actualizar el estado del lead a Cliente:', leadErr);
+      }
+    }
   },
 
   /** Genera el link del portal para enviar al cliente */
