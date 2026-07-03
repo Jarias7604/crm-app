@@ -134,7 +134,25 @@ export default function PublicFlyerView() {
     logoX: settings.logoX ?? 50,
     logoY: settings.logoY ?? 10,
     textY: settings.textY ?? 30,
-    textAlign: settings.textAlign || 'center'
+    textAlign: settings.textAlign || 'center',
+    // Interactive Callbacks
+    onCtaClick: () => {
+      if (waLink) {
+        window.open(waLink, '_blank');
+      } else if (cleanNumber) {
+        window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(waMessage)}`, '_blank');
+      } else if (flyer.company?.website) {
+        const url = flyer.company.website;
+        window.open(url.startsWith('http') ? url : `https://${url}`, '_blank');
+      }
+    },
+    onContactClick: () => {
+      if (waLink) {
+        window.open(waLink, '_blank');
+      } else if (cleanNumber) {
+        window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(waMessage)}`, '_blank');
+      }
+    }
   };
 
   // QR Position Styles overlayed on top of the relative flyer container (1080x1080)
