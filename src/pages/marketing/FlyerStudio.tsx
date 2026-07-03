@@ -164,11 +164,14 @@ function getThematicImages(prompt: string, industry?: string): string[] {
   const GYM = ['photo-1517838277536-f5f99be501cd','photo-1534438327276-14e5300c3a48','photo-1571902943202-507ec2618e8f','photo-1526506118085-60ce8714f8c5','photo-1549719386-74dfcbf7dbed','photo-1584735935682-2f2b69dff9d2'].map(U);
   const LEGAL = ['photo-1589829545856-d10d557cf95f','photo-1521587760476-6c12a4b040da','photo-1521791136368-1a46827d06e5','photo-1507679799987-c73779587ccf','photo-1551836022-d5d88e9218df'].map(U);
   const CAFE = ['photo-1501339847302-ac426a4a7cbb','photo-1495474472287-4d71bcdd2085','photo-1509042239860-f550ce710b93','photo-1442512595331-e89e73853f31','photo-1554118811-1e0d58224f24'].map(U);
-  const REALESTATE = ['photo-1560518883-ce09059eeffa','photo-1512917774080-9991f1c4c750','photo-1564013799919-ab600027ffc6','photo-1600585154340-be6161a56a0c','photo-1600607687939-ce8a6c25118c'].map(U);
+  const REALESTATE = ['photo-1560518883-ce09059eeffa','photo-1512917774080-9991f1c4c750','photo-1564013799919-ab600027ffc6','photo-1600585154340-be6161a56a0c','photo-1600607687939-ce8a6c25118c','photo-1582407947304-fd86f028f716','photo-1558618666-fcd25c85cd64','photo-1523217582562-09d0def993a6','photo-1484154218962-a197022b5858','photo-1502672260266-1c1ef2d93688'].map(U);
+  // Beach / Vacation / Resort / Lots
+  const BEACH = ['photo-1507525428034-b723cf961d3e','photo-1510414842594-a61c69b5ae57','photo-1544551763-46a013bb70d5','photo-1559494007-9f5847c49d94','photo-1571003123894-1f0594d2b5d9','photo-1527489377706-5bf97e608852','photo-1501785888041-af3ef285b470','photo-1506953823976-52e1fdc0149a','photo-1573843981267-be1999ff37cd','photo-1540202404-a2f29016b523','photo-1469474968028-56623f02e42e','photo-1582610116397-edb72e9b9b4e','photo-1596178065887-1198b6148b2b','photo-1561731216-c3a4d99437d5','photo-1519046904884-53103b34b206'].map(U);
   const AUTO = ['photo-1486006920555-c77dce18193b','photo-1619642751034-765dfdf7c58e','photo-1568605117036-5fe5e7bab0b7','photo-1492144534655-ae79c964c9d7','photo-1525609004556-c46c7d6cf0a3'].map(U);
   const DEFENSE = ['photo-1555597673-b21d5c935865','photo-1509198397868-475647b2a1e5','photo-1563986768609-322da13575f3','photo-1614064641938-3bbee52942c7'].map(U);
   const GENERAL = ['photo-1460925895917-afdab827c52f','photo-1519389950473-47ba0277781c','photo-1522071820081-009f0129c71c','photo-1531403009284-440f080d1e12','photo-1486406146926-c627a92ad1ab','photo-1522202176988-66273c2fd55f','photo-1504384308090-c894fdcc538d','photo-1517245386807-bb43f82c33c4'].map(U);
   function pick(t: string) {
+    if (/playa|lotes?|terreno|vacaci[óo]n|vacaciones|resort|turismo|para[ío]so|club privado|sol y|arena|oc[ée]ano|caribe|tropical|frente al mar|vista al mar|costa|riviera|bungal/i.test(t)) return BEACH;
     if (/laboratorio|cl[íi]nica|m[eé]dic|farmacia|salud|hospital|doctor|odontolog|dental|dentista|pediatr|enfermer/i.test(t)) return /dental|dentista|odontolog/i.test(t)?DENTAL:MEDICAL;
     if (/restaurante|comida|food|pizza|taco|burger|hamburgues|sushi|pupusa/i.test(t)) return FOOD;
     if (/cafeter[íi]a|caf[eé]|panadería|panaderia/i.test(t)) return CAFE;
@@ -176,7 +179,7 @@ function getThematicImages(prompt: string, industry?: string): string[] {
     if (/belleza|salon|uñas|spa|maquillaje|cabello|peluquer/i.test(t)) return BEAUTY;
     if (/gym|gimnasio|fitness|deporte|entrenamiento/i.test(t)) return GYM;
     if (/abogado|legal|firma|leyes|derecho/i.test(t)) return LEGAL;
-    if (/casa|inmobiliaria|apartamento|propiedad|construcci/i.test(t)) return REALESTATE;
+    if (/casa|inmobiliaria|apartamento|propiedad|construcci|bienes ra[íi]ces/i.test(t)) return REALESTATE;
     if (/taller|automotriz|mec[aá]nico|veh[íi]culo|repuesto|carro/i.test(t)) return AUTO;
     if (/defensa|karate|marciales|taekwondo/i.test(t)) return DEFENSE;
     return null;
