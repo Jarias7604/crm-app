@@ -68,6 +68,7 @@ function buildImagePrompt(params: {
   tone?: string;
   variantSeed?: string;
   mode?: 'full' | 'background';
+  visualScene?: string;
   structuredText?: { headline?: string; subheadline?: string; features?: string[]; cta?: string; price?: string };
 }): string {
   const { prompt, company_name, colors, tone, variantSeed, mode = 'background', structuredText } = params;
@@ -117,19 +118,22 @@ ${textInstructions}
 Instructions: Generate a complete, ready-to-publish marketing flyer. The image itself MUST include beautifully integrated typography, catchy headings, promotional callouts, and an eye-catching layout that clearly communicates the promotion. Make it look like a premium agency-designed social media flyer. Ultra-high details, photorealistic, pixel-perfect.`;
   }
 
-  return `Design a STUNNING, HIGH-FIDELITY commercial advertising background. 
+  // Use the English visual scene description if available, otherwise fall back to raw prompt
+  const sceneDescription = params.visualScene || prompt;
+
+  return `Design a STUNNING, HIGH-FIDELITY commercial advertising background image.
+Scene: ${sceneDescription}.
 Style theme: ${selectedStyle}.
-Topic/Sector details: "${prompt}".
-Visual mood: Professional commercial studio photography, ${isDark ? 'elegant dark and golden lighting, premium luxury mood' : 'bright and vibrant lighting, clean high-key illumination, colorful and inviting aesthetic'}.
+Visual mood: Professional commercial photography, ${isDark ? 'elegant dark and golden lighting, premium luxury mood' : 'bright and vibrant lighting, clean high-key illumination, colorful and inviting aesthetic'}.
 Brand colors to integrate: ${primaryColor} and ${secondaryColor}.
-Composition: Perfect B2B backdrop with a lot of clean negative space, designed as an advertising canvas to overlay HTML text and product dashboard mockups.
+Composition: Perfect advertising backdrop with clean negative space, designed as a canvas to overlay HTML text and graphics.
 
 CRITICAL MANDATORY RULES:
-1. STRICTLY NO TEXT, NO LETTERS, NO WORDS, NO WRITING, NO TYPOS, NO ALPHABET, NO CHARACTERS. The image must be 100% clean and free of any text.
-2. NO TEXT ON SCREENS: Laptops, office hardware, and screens are allowed. Their screens must display a beautiful, bright, colorful abstract gradient, a vibrant glowing chart pattern, or a clean modern visual background. Strictly avoid any text, letters, numbers, or readable user interface elements, but make the screen content look bright, colorful, and active.
-3. Clean empty space. Maintain large solid/gradient areas with soft light so that text can be easily read when overlayed.
-4. No blur, sharp high-fidelity rendering, pixel-perfect.
-5. ${isDark ? 'Rich dark textures are allowed.' : 'AVOID gloomy, muddy, or excessively dark/black background layouts. Ensure the composition feels open, bright, and highly professional.'}`;
+1. STRICTLY NO TEXT, NO LETTERS, NO WORDS, NO WRITING, NO TYPOS, NO ALPHABET, NO CHARACTERS. The image must be 100% clean and free of any text or typography.
+2. NO TEXT ON SCREENS: Any screens shown must display beautiful abstract gradients or colorful patterns only — no readable UI or text.
+3. Maintain large clean areas so overlaid text is readable.
+4. Sharp, high-fidelity rendering, pixel-perfect, no blur.
+5. ${isDark ? 'Rich dark textures are allowed.' : 'AVOID dark, gloomy, or muddy backgrounds. Keep the image open, bright, and highly professional.'}`;
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
@@ -215,32 +219,40 @@ Deno.serve(async (req) => {
           messages: [
             {
               role: 'system',
-              content: `You are an expert copywriter. Your task is to extract and optimize advertising copy in Spanish from a raw prompt description. 
-You MUST return a JSON object with this exact structure:
+              content: `You are an expert copywriter AND visual art director. Your task is to:
+1. Extract and optimize advertising copy in Spanish from a raw prompt description.
+2. Generate a vivid English visual scene description for DALL-E image generation.
+
+You MUST return a JSON object with this EXACT structure:
 {
-  "headline": "A short, ultra-catchy 3-8 word main title in Spanish",
-  "subheadline": "A supporting slogan or dynamic offer of 4-8 words in Spanish",
+  "headline": "A short, ultra-catchy 3-8 word main title in PERFECT Spanish (zero typos)",
+  "subheadline": "A supporting slogan or dynamic offer of 4-8 words in PERFECT Spanish",
   "features": ["Feature 1 (max 4 words)", "Feature 2 (max 4 words)", "Feature 3 (max 4 words)", "Feature 4 (max 4 words)"],
-  "cta": "WhatsApp / Call to action button text (max 3 words)",
-  "price": "Clean price text if mentioned (e.g. '$18.95/mes' or 'Desde $12.95'), otherwise empty",
-  "highlight_title": "A catchy question or statement for the mid-section in Spanish (max 8 words)",
-  "highlight_desc": "A supporting sentence/description for the mid-section in Spanish (max 12 words)",
+  "cta": "Call to action button text in Spanish (max 3 words)",
+  "price": "Clean price text if mentioned (e.g. '$18.95/mes'), otherwise empty string",
+  "highlight_title": "A catchy question or statement in PERFECT Spanish (max 8 words)",
+  "highlight_desc": "A supporting sentence in PERFECT Spanish (max 12 words)",
   "benefits": [
-    {"title": "Benefit 1 title (max 3 words in Spanish)", "desc": "Benefit 1 description (max 8 words in Spanish)", "icon": "emoji"},
-    {"title": "Benefit 2 title (max 3 words in Spanish)", "desc": "Benefit 2 description (max 8 words in Spanish)", "icon": "emoji"},
-    {"title": "Benefit 3 title (max 3 words in Spanish)", "desc": "Benefit 3 description (max 8 words in Spanish)", "icon": "emoji"}
+    {"title": "Benefit 1 title in Spanish (max 3 words)", "desc": "Benefit 1 description in Spanish (max 8 words)", "icon": "relevant emoji"},
+    {"title": "Benefit 2 title in Spanish (max 3 words)", "desc": "Benefit 2 description in Spanish (max 8 words)", "icon": "relevant emoji"},
+    {"title": "Benefit 3 title in Spanish (max 3 words)", "desc": "Benefit 3 description in Spanish (max 8 words)", "icon": "relevant emoji"}
   ],
   "mockup_info": {
-    "title": "Title of the mockup dashboard in Spanish (e.g. 'Control K9', 'Menú Digital') (max 3 words)",
+    "title": "Dashboard title in Spanish (max 3 words)",
     "kpis": [
-      {"label": "KPI 1 label (max 2 words)", "val": "KPI 1 value (e.g. '180+', '$2,400', '98%')"},
-      {"label": "KPI 2 label (max 2 words)", "val": "KPI 2 value"},
-      {"label": "KPI 3 label (max 2 words)", "val": "KPI 3 value"},
-      {"label": "KPI 4 label (max 2 words)", "val": "KPI 4 value"}
+      {"label": "KPI label (max 2 words)", "val": "KPI value (e.g. '180+', '$2,400', '98%')"},
+      {"label": "KPI label (max 2 words)", "val": "KPI value"},
+      {"label": "KPI label (max 2 words)", "val": "KPI value"},
+      {"label": "KPI label (max 2 words)", "val": "KPI value"}
     ]
-  }
+  },
+  "visual_scene": "A vivid, detailed English description (2-3 sentences) of the IDEAL photorealistic background image for this flyer. Describe the physical scene, location, atmosphere, lighting, colors, and subjects. This will be sent directly to DALL-E to generate the background image — make it specific, cinematic, and coherent with the product or service being advertised."
 }
-CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clean accents. Do not include markdown formatting, just raw JSON.`,
+
+CRITICAL RULES:
+- Spanish fields: PERFECT spelling, zero typos, correct accent marks.
+- visual_scene: Write in fluent, descriptive ENGLISH only. Be specific about what should appear in the image.
+- Return raw JSON only, no markdown code blocks.`,
             },
             {
               role: 'user',
@@ -267,6 +279,10 @@ CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clea
             mockup_info: content.mockup_info || { title: '', kpis: [] }
           };
         }
+        // Store the English visual scene for DALL-E (key fix for coherent images)
+        if (content.visual_scene) {
+          (structuredText as any).visual_scene = content.visual_scene;
+        }
       }
     } catch (chatErr) {
       console.error('Chat completions copywriting failed:', chatErr);
@@ -285,8 +301,18 @@ CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clea
     for (const seed of variantSeeds) {
       try {
         const imagePrompt = buildImagePrompt({
-          prompt, company_name, tagline, cta, colors, format, tone, variantSeed: seed, mode,
-          structuredText: mode === 'full' ? structuredText : undefined
+          prompt,
+          company_name,
+          tagline,
+          cta,
+          colors,
+          format,
+          tone,
+          variantSeed: seed,
+          mode,
+          structuredText,
+          // Use the English visual scene so DALL-E gets a coherent, properly translated description
+          visualScene: (structuredText as any).visual_scene || undefined,
         });
 
         // ── Try gpt-image-1 first ────────────────────────────────────────────
