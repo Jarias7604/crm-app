@@ -258,6 +258,7 @@ export default function SocialHub() {
   const [showIntelligence, setShowIntelligence] = useState(false);
   const [openIntelSection, setOpenIntelSection] = useState<string | null>('score');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [associatedFlyerId, setAssociatedFlyerId] = useState<string | null>(null);
 
   // Per-platform selected account
   const [selectedAccounts, setSelectedAccounts] = useState<Record<string, SocialAccount | null>>({
@@ -306,6 +307,9 @@ export default function SocialHub() {
         try {
           const meta = JSON.parse(prefillMeta);
           sessionStorage.removeItem('socialhub_prefill_meta');
+          if (meta.flyerId) {
+            setAssociatedFlyerId(meta.flyerId);
+          }
           const context = meta.title 
             ? `Flyer titulado "${meta.title}" con diseño: ${meta.prompt || ''}`
             : (meta.prompt || 'Facturación instantánea y declaraciones para PYMEs');
@@ -315,7 +319,11 @@ export default function SocialHub() {
             socialPublishService.generateCaption('facebook', context, selectedTone, profile.company_id),
             socialPublishService.generateCaption('instagram', context, selectedTone, profile.company_id)
           ]).then(([fbText, igText]) => {
-            setCaptions({ facebook: fbText, instagram: igText });
+            const link = meta.flyerId ? `\n\n${window.location.origin}/public/flyer/${meta.flyerId}` : '';
+            setCaptions({ 
+              facebook: fbText + link, 
+              instagram: igText + link 
+            });
             toast.success('¡Copy publicitario creado con IA!');
           }).catch(err => {
             console.error('Error generating captions from prefill meta:', err);
@@ -478,7 +486,8 @@ export default function SocialHub() {
         selectedTone,
         profile?.company_id || ''
       );
-      setCaptions(prev => ({ ...prev, [platform]: text }));
+      const link = associatedFlyerId ? `\n\n${window.location.origin}/public/flyer/${associatedFlyerId}` : '';
+      setCaptions(prev => ({ ...prev, [platform]: text + link }));
       toast.success(`✨ Copy de ${platform} optimizado con IA`);
     } catch (err: any) {
       // Restore the original text — NEVER leave the user with an empty field
@@ -837,6 +846,54 @@ export default function SocialHub() {
                   lineHeight: 1.6
                 }}
               />
+              {associatedFlyerId && (
+                <div style={{
+                  padding: '10px 14px',
+                  background: 'rgba(99, 102, 241, 0.05)',
+                  borderTop: '1px solid rgba(99, 102, 241, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 13 }}>🔗</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#4f46e5' }}>
+                      Flyer interactivo vinculado
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const link = `${window.location.origin}/public/flyer/${associatedFlyerId}`;
+                      const currentVal = captions[previewPlatform] || '';
+                      if (!currentVal.includes(link)) {
+                        setCaptions(prev => ({
+                          ...prev,
+                          [previewPlatform]: (currentVal.trim() + '\n\n' + link).trim()
+                        }));
+                        toast.success('¡Enlace del Flyer agregado al caption!');
+                      } else {
+                        toast.error('El enlace ya está incluido en el caption');
+                      }
+                    }}
+                    style={{
+                      background: '#4f46e5',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '4px 10px',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(79, 70, 229, 0.2)',
+                      transition: 'background 0.2s'
+                    }}
+                  >
+                    Insertar Enlace
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

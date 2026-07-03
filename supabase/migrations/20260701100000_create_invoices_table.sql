@@ -56,10 +56,12 @@ CREATE TABLE IF NOT EXISTS public.facturas (
 ALTER TABLE public.facturas ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies (using get_auth_company_id() for consistency)
+DROP POLICY IF EXISTS "facturas_company_isolation" ON public.facturas;
 CREATE POLICY "facturas_company_isolation" ON public.facturas FOR ALL TO authenticated
   USING (company_id = (select get_auth_company_id()))
   WITH CHECK (company_id = (select get_auth_company_id()));
 
 -- Allow public read of facturas so clients can view their bills online
+DROP POLICY IF EXISTS "facturas_public_read" ON public.facturas;
 CREATE POLICY "facturas_public_read" ON public.facturas FOR SELECT TO anon, authenticated
   USING (true);

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -319,6 +320,21 @@ export default function FlyerStudio() {
   const [loadedFlyerName, setLoadedFlyerName] = useState<string | null>(null);
   const [editingFlyerId, setEditingFlyerId] = useState<string | null>(null);
   const [editingFlyerName, setEditingFlyerName] = useState('');
+
+  // ── WhatsApp CTA & QR states ────────────────────────────────────────────────
+  const [waEnabled, setWaEnabled] = useState(false);
+  const [waNumberSource, setWaNumberSource] = useState<'chatbot' | 'custom'>('chatbot');
+  const [waChatbotNumber, setWaChatbotNumber] = useState('');
+  const [waCustomNumber, setWaCustomNumber] = useState('');
+  const [waMessage, setWaMessage] = useState('Hola, vi su flyer y me gustaría recibir más información.');
+  const [waShowQr, setWaShowQr] = useState(false);
+  const [waQrPosition, setWaQrPosition] = useState<'bottom-right' | 'bottom-left'>('bottom-right');
+
+  // Computed effective WA phone
+  const waEffectivePhone = waNumberSource === 'chatbot' ? waChatbotNumber : waCustomNumber;
+  const waLink = waEnabled && waEffectivePhone
+    ? `https://wa.me/${waEffectivePhone.replace(/[^\d+]/g, '').replace('+', '')}?text=${encodeURIComponent(waMessage)}`
+    : '';
 
   const filteredIndustries = industries.filter(ind =>
     (ind.name || '').toLowerCase().includes(industrySearchQuery.toLowerCase())
@@ -1000,6 +1016,23 @@ export default function FlyerStudio() {
   useEffect(() => {
     if (profile?.company_id) {
       fetchSavedFlyers();
+      // Load chatbot WhatsApp number from marketing_integrations
+      (async () => {
+        try {
+          const { data: intData } = await supabase
+            .from('marketing_integrations')
+            .select('settings')
+            .eq('company_id', profile.company_id)
+            .eq('provider', 'whatsapp')
+            .eq('is_active', true)
+            .maybeSingle();
+          if (intData?.settings?.phone) {
+            setWaChatbotNumber(intData.settings.phone);
+          }
+        } catch (e) {
+          // Silently fail — admin can enter number manually
+        }
+      })();
     }
   }, [profile]);
 
@@ -1143,7 +1176,16 @@ export default function FlyerStudio() {
         website,
         syncFonts,
         keepCustomText,
-        isLogoCustomized
+        isLogoCustomized,
+        // WhatsApp CTA settings
+        whatsapp: {
+          enabled: waEnabled,
+          numberSource: waNumberSource,
+          customNumber: waCustomNumber,
+          message: waMessage,
+          showQr: waShowQr,
+          qrPosition: waQrPosition
+        }
       };
 
       const currentImg = bgUploadPreview || (variants.length > 0 ? variants[selected] : lastGeneratedImg.current);
@@ -1252,6 +1294,15 @@ export default function FlyerStudio() {
       if (s.syncFonts !== undefined) setSyncFonts(s.syncFonts);
       if (s.keepCustomText !== undefined) setKeepCustomText(s.keepCustomText);
       if (s.isLogoCustomized !== undefined) setIsLogoCustomized(s.isLogoCustomized);
+      // WhatsApp CTA
+      if (s.whatsapp) {
+        setWaEnabled(s.whatsapp.enabled ?? false);
+        setWaNumberSource(s.whatsapp.numberSource ?? 'chatbot');
+        setWaCustomNumber(s.whatsapp.customNumber ?? '');
+        setWaMessage(s.whatsapp.message ?? 'Hola, vi su flyer y me gustaría recibir más información.');
+        setWaShowQr(s.whatsapp.showQr ?? false);
+        setWaQrPosition(s.whatsapp.qrPosition ?? 'bottom-right');
+      }
 
       // Handle background image in variants
       if (flyer.bg_image_url) {
@@ -1358,6 +1409,7 @@ export default function FlyerStudio() {
         prompt,
         title: prompt.split('—')[0]?.trim() || '',
         colors,
+        flyerId: loadedFlyerId || null
       };
       sessionStorage.setItem('socialhub_prefill_meta', JSON.stringify(meta));
 
@@ -2403,6 +2455,234 @@ export default function FlyerStudio() {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════
+                WHATSAPP CTA & QR CODE SECTION
+            ═══════════════════════════════════════════════════════════════ */}
+            <div style={{
+              marginBottom: 16,
+              background: waEnabled
+                ? 'linear-gradient(135deg, #f0fdf4, #dcfce7)'
+                : '#f8fafc',
+              border: waEnabled ? '1.5px solid #86efac' : '1.5px solid #e2e8f0',
+              borderRadius: 14,
+              overflow: 'hidden',
+              transition: 'all 0.3s ease'
+            }}>
+              {/* Header Toggle */}
+              <div style={{
+                padding: '12px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer'
+              }} onClick={() => setWaEnabled(v => !v)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 8,
+                    background: waEnabled ? '#22c55e' : '#e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.25s'
+                  }}>
+                    <span style={{ fontSize: 15 }}>💬</span>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: waEnabled ? '#15803d' : '#334155' }}>
+                      Botón & QR de WhatsApp
+                    </div>
+                    <div style={{ fontSize: 9, color: waEnabled ? '#16a34a' : '#94a3b8', fontWeight: 600 }}>
+                      {waEnabled ? 'Activo — Los clientes podrán contactarte' : 'Añade un QR y link directo a WhatsApp'}
+                    </div>
+                  </div>
+                </div>
+                {/* Toggle switch */}
+                <div style={{
+                  width: 38,
+                  height: 22,
+                  borderRadius: 11,
+                  background: waEnabled ? '#22c55e' : '#cbd5e1',
+                  position: 'relative',
+                  transition: 'background 0.25s',
+                  flexShrink: 0
+                }}>
+                  <div style={{
+                    position: 'absolute',
+                    top: 3,
+                    left: waEnabled ? 19 : 3,
+                    width: 16,
+                    height: 16,
+                    borderRadius: '50%',
+                    background: '#fff',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                    transition: 'left 0.25s cubic-bezier(0.4,0,0.2,1)'
+                  }} />
+                </div>
+              </div>
+
+              {/* Expanded controls */}
+              {waEnabled && (
+                <div style={{ padding: '0 14px 14px 14px', display: 'flex', flexDirection: 'column', gap: 10, borderTop: '1px solid #bbf7d0' }}>
+
+                  {/* Number source selector */}
+                  <div style={{ paddingTop: 10 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Número de WhatsApp</div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {(['chatbot', 'custom'] as const).map(src => (
+                        <button
+                          key={src}
+                          type="button"
+                          onClick={() => setWaNumberSource(src)}
+                          style={{
+                            flex: 1,
+                            padding: '7px 10px',
+                            borderRadius: 8,
+                            border: waNumberSource === src ? '1.5px solid #22c55e' : '1.5px solid #e2e8f0',
+                            background: waNumberSource === src ? '#dcfce7' : '#fff',
+                            color: waNumberSource === src ? '#15803d' : '#64748b',
+                            fontSize: 10,
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          {src === 'chatbot' ? '🤖 Chatbot de empresa' : '✏️ Número personalizado'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {waNumberSource === 'chatbot' && (
+                      <div style={{ marginTop: 6, padding: '6px 10px', background: '#f0fdf4', borderRadius: 8, fontSize: 11, color: '#15803d', fontWeight: 700, border: '1px solid #bbf7d0' }}>
+                        {waChatbotNumber
+                          ? <span>✓ Detectado: <strong>+{waChatbotNumber.replace(/[^\d]/g, '')}</strong></span>
+                          : <span style={{ color: '#f59e0b' }}>⚠️ Sin chatbot configurado — usa número personalizado</span>
+                        }
+                      </div>
+                    )}
+
+                    {waNumberSource === 'custom' && (
+                      <input
+                        type="tel"
+                        placeholder="Ej: +50379710911"
+                        value={waCustomNumber}
+                        onChange={e => setWaCustomNumber(e.target.value)}
+                        style={{
+                          ...css.input,
+                          marginTop: 6,
+                          borderRadius: 8,
+                          fontSize: 12,
+                          borderColor: '#bbf7d0',
+                          background: '#fff'
+                        }}
+                        onFocus={e => e.target.style.borderColor = '#22c55e'}
+                        onBlur={e => e.target.style.borderColor = '#bbf7d0'}
+                      />
+                    )}
+                  </div>
+
+                  {/* Welcome message */}
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Mensaje de Bienvenida</div>
+                    <textarea
+                      value={waMessage}
+                      onChange={e => setWaMessage(e.target.value)}
+                      placeholder="Ej: Hola, vi su flyer y me gustaría recibir más información."
+                      rows={2}
+                      style={{
+                        ...css.textarea,
+                        minHeight: 58,
+                        fontSize: 12,
+                        borderRadius: 8,
+                        borderColor: '#bbf7d0',
+                        resize: 'none'
+                      }}
+                      onFocus={e => e.target.style.borderColor = '#22c55e'}
+                      onBlur={e => e.target.style.borderColor = '#bbf7d0'}
+                    />
+                  </div>
+
+                  {/* QR toggle */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', background: '#fff', borderRadius: 8, border: '1px solid #bbf7d0', cursor: 'pointer' }}
+                    onClick={() => setWaShowQr(v => !v)}
+                  >
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#334155' }}>Mostrar Código QR en imagen</div>
+                      <div style={{ fontSize: 9, color: '#64748b' }}>Se incrusta al descargar el flyer</div>
+                    </div>
+                    <div style={{
+                      width: 34, height: 20, borderRadius: 10,
+                      background: waShowQr ? '#22c55e' : '#cbd5e1',
+                      position: 'relative', transition: 'background 0.25s', flexShrink: 0
+                    }}>
+                      <div style={{
+                        position: 'absolute', top: 2, left: waShowQr ? 16 : 2,
+                        width: 16, height: 16, borderRadius: '50%',
+                        background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                        transition: 'left 0.25s'
+                      }} />
+                    </div>
+                  </div>
+
+                  {/* QR position */}
+                  {waShowQr && (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Posición del QR</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {([['bottom-right', '↘ Inferior Derecha'], ['bottom-left', '↙ Inferior Izquierda']] as const).map(([pos, label]) => (
+                          <button
+                            key={pos}
+                            type="button"
+                            onClick={() => setWaQrPosition(pos)}
+                            style={{
+                              flex: 1,
+                              padding: '6px 8px',
+                              borderRadius: 7,
+                              border: waQrPosition === pos ? '1.5px solid #22c55e' : '1.5px solid #e2e8f0',
+                              background: waQrPosition === pos ? '#dcfce7' : '#fff',
+                              color: waQrPosition === pos ? '#15803d' : '#64748b',
+                              fontSize: 10,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Preview link */}
+                  {waLink && (
+                    <a
+                      href={waLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        padding: '8px 12px',
+                        background: '#22c55e',
+                        color: '#fff',
+                        borderRadius: 8,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        textDecoration: 'none',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      <span>💬</span> Probar enlace de WhatsApp
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════════════
                 AI GENERATION BUTTONS — Primary: Autocorrected Flyer
             ═══════════════════════════════════════════════════════════════ */}
             <div style={{
@@ -2858,6 +3138,26 @@ export default function FlyerStudio() {
                             🔍 Vista Previa Completa
                           </div>
                         </div>
+                        {/* WhatsApp QR overlay */}
+                        {waEnabled && waShowQr && waLink && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: 10,
+                            ...(waQrPosition === 'bottom-right' ? { right: 10 } : { left: 10 }),
+                            background: '#fff',
+                            padding: 6,
+                            borderRadius: 8,
+                            boxShadow: '0 2px 12px rgba(0,0,0,0.22)',
+                            zIndex: 20,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 3
+                          }}>
+                            <QRCodeSVG value={waLink} size={56} level="M" />
+                            <span style={{ fontSize: 6, fontWeight: 800, color: '#25d366', letterSpacing: '0.02em', textTransform: 'uppercase' }}>WhatsApp</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     {/* Badge */}
@@ -2962,6 +3262,26 @@ export default function FlyerStudio() {
                                   onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
                                   onResize={(s) => setLogoSize(s)}
                                 />
+                              )}
+                              {/* WhatsApp QR overlay on Template A */}
+                              {waEnabled && waShowQr && waLink && (
+                                <div style={{
+                                  position: 'absolute',
+                                  bottom: 20,
+                                  ...(waQrPosition === 'bottom-right' ? { right: 20 } : { left: 20 }),
+                                  background: '#fff',
+                                  padding: 10,
+                                  borderRadius: 12,
+                                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                                  zIndex: 20,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}>
+                                  <QRCodeSVG value={waLink} size={80} level="M" />
+                                  <span style={{ fontSize: 10, fontWeight: 800, color: '#25d366', letterSpacing: '0.04em', textTransform: 'uppercase' }}>WhatsApp</span>
+                                </div>
                               )}
                             </div>
                           ) : selectedTemplate === 'B' ? (
