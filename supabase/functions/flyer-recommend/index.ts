@@ -63,14 +63,18 @@ Deno.serve(async (req) => {
 
       const unsplashKey = Deno.env.get('UNSPLASH_ACCESS_KEY') || '';
 
-      // Clean prompt — remove structural labels so GPT sees the real topic
+      // Clean prompt — remove structural labels before sending to GPT
       const cleanPrompt = prompt
         .replace(/titulo:|subtitulo:|sub.?titulo:|cta:|incluye:|precio:|beneficios:|descripcion:|gancho:|oferta:/gi, '')
         .replace(/\s+/g, ' ').trim().substring(0, 300);
 
-      // Step 1: GPT-4o-mini ALWAYS runs first — works for ANY topic in ANY language
-      let searchTerms = '';
-      if (openaiKey) {
+      // Step 1: Regex detects known categories FIRST (fast, guaranteed correct)
+      // This covers beach, food, gym, etc. regardless of how the brief is worded
+      const detectedCat = regexCategory(cleanPrompt + ' ' + (industry || ''));
+      let searchTerms = detectedCat !== 'general' ? REGEX_TERMS[detectedCat] : '';
+
+      // Step 2: GPT only for truly unknown topics (galaxia, hormiga, lapiz, etc.)
+      if (!searchTerms && openaiKey) {
         try {
           const r = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -80,7 +84,7 @@ Deno.serve(async (req) => {
               messages: [
                 {
                   role: 'system',
-                  content: 'Extract 3-4 English keywords for Unsplash photo search that match the visual theme. Fix spelling errors. Translate to English. Return ONLY keywords. Examples: "lotes de playa" → "tropical beach ocean", "hormiga" → "ant insect macro", "galaxia" → "galaxy stars space", "lapiz" → "pencils colorful stationery".',
+                  content: 'Extract 3-4 English keywords for Unsplash photo search that match the visual theme. Return ONLY the keywords. Examples: "hormiga" → "ant insect macro", "galaxia" → "galaxy stars space", "lapiz" → "pencils colorful art".',
                 },
                 { role: 'user', content: cleanPrompt }
               ],
@@ -95,11 +99,8 @@ Deno.serve(async (req) => {
         } catch (_) {}
       }
 
-      // Step 2: Regex backup if GPT failed
-      if (!searchTerms) {
-        const cat = regexCategory((prompt || '') + ' ' + (industry || ''));
-        searchTerms = REGEX_TERMS[cat] || REGEX_TERMS.general;
-      }
+      // Step 3: Final fallback if everything failed
+      if (!searchTerms) searchTerms = REGEX_TERMS.general;
 
       // Step 3: Unsplash Search API
       let photos: string[] = [];
