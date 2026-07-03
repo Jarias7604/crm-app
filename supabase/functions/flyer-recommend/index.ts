@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
 
     const openaiKey = Deno.env.get('OPENAI_API_KEY') || '';
 
-    // Handle dynamic photo search
+    // Handle dynamic photo search — uses Unsplash Search API with GPT-4o-mini keyword extraction
     if (action === 'search-photos') {
       if (!prompt) {
         return new Response(JSON.stringify({ error: 'Falta el prompt de búsqueda' }), {
@@ -30,9 +30,67 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Use curated category matching directly — Unsplash HTML scraping is unreliable
-      // (returns random page images, not search results). Categories cover all major industries.
+      const unsplashKey = Deno.env.get('UNSPLASH_ACCESS_KEY') || '';
+
+      // ── Step 1: Use GPT-4o-mini to extract clean English search keywords ────
+      let searchQuery = prompt.trim();
+      if (openaiKey) {
+        try {
+          const kwRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are a visual search expert. Given any text in any language (possibly with spelling errors), extract 3-5 English keywords ideal for searching high-quality photos on Unsplash. 
+Rules:
+- Fix spelling errors before translating
+- Translate everything to English
+- Focus on the most visual/concrete nouns (objects, places, scenes, nature, animals, etc.)
+- Return ONLY the keywords as a single search string, no explanation, no punctuation
+- Examples:
+  "lotes de playa privados El Salvador" → "tropical beach private lots ocean"
+  "galaxia con estrellas" → "galaxy stars space nebula"
+  "hormiga" → "ant macro insect"
+  "lapiz de colores" → "colored pencils art stationery"
+  "gym fitness para mujeres" → "women gym fitness workout"`,
+                },
+                { role: 'user', content: `Extract English photo search keywords from: "${prompt}"` }
+              ],
+              max_tokens: 30,
+              temperature: 0.2,
+            }),
+          });
+          if (kwRes.ok) {
+            const kwData = await kwRes.json();
+            const extracted = kwData.choices?.[0]?.message?.content?.trim();
+            if (extracted && extracted.length > 2) searchQuery = extracted;
+          }
+        } catch (_e) { /* keep original prompt */ }
+      }
+
+      // ── Step 2: Search Unsplash with the clean English keywords ─────────────
       let uniquePhotos: string[] = [];
+      if (unsplashKey) {
+        try {
+          const encoded = encodeURIComponent(searchQuery);
+          const unsplashRes = await fetch(
+            `https://api.unsplash.com/search/photos?query=${encoded}&per_page=15&orientation=landscape&content_filter=high`,
+            { headers: { 'Authorization': `Client-ID ${unsplashKey}` } }
+          );
+          if (unsplashRes.ok) {
+            const unsplashData = await unsplashRes.json();
+            uniquePhotos = (unsplashData.results || []).map((photo: any) =>
+              `${photo.urls.regular}&w=1080&q=80`
+            );
+          }
+        } catch (_e) { /* fall through to hardcoded categories */ }
+      }
+
+      // ── Step 3: Fallback to hardcoded categories if Unsplash fails ──────────
+      if (uniquePhotos.length < 4) {
       {
         const categories: Record<string, string[]> = {
           food: [
@@ -404,9 +462,10 @@ Deno.serve(async (req) => {
 
         const photoIds = categories[chosenCategory] || categories.general;
         uniquePhotos = photoIds.map(id => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1080&q=80`);
-      }
+      } // end fallback categories block
+      } // end if uniquePhotos.length < 4
 
-      return new Response(JSON.stringify({ photos: uniquePhotos }), {
+      return new Response(JSON.stringify({ photos: uniquePhotos, source: uniquePhotos.length > 0 ? 'unsplash' : 'fallback' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
