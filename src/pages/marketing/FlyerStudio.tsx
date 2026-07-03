@@ -3344,50 +3344,92 @@ export default function FlyerStudio() {
                                   onResize={(s) => setLogoSize(s)}
                                 />
                               )}
+                              {/* WhatsApp QR overlay */}
+                              {waEnabled && waShowQr && waLink && (
+                                <div style={{
+                                  position: 'absolute',
+                                  bottom: 20,
+                                  ...(waQrPosition === 'bottom-right' ? { right: 20 } : { left: 20 }),
+                                  background: '#fff',
+                                  padding: 10,
+                                  borderRadius: 12,
+                                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                                  zIndex: 20,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}>
+                                  <QRCodeSVG value={waLink} size={80} level="M" />
+                                  <span style={{ fontSize: 10, fontWeight: 800, color: '#25d366', letterSpacing: '0.04em', textTransform: 'uppercase' }}>WhatsApp</span>
+                                </div>
+                              )}
                             </div>
                           ) : (
-                            <RenderFlyer d={{
-                              title: manualTitle || 'TU OFERTA',
-                              subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
-                              cta: cta || 'CONTACTAR AHORA',
-                              beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
-                              accent: colors[0] || '#0070d2',
-                              bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
-                              logoUrl: logoPreview || null,
-                              industria: companyName || 'Mi Empresa',
-                              phone, website, templateId: selectedTemplate,
-                              containerW: 1080, containerH: canvasH,
-                              logoSize, logoX, logoY,
-                              flyerFont,
-                              titleFont,
-                              subtitleFont,
-                              benefitsFont,
-                              ctaFont,
-                              contactFont,
-                              textScale,
-                              subtitleScale,
-                              benefitsScale,
-                              titleColor,
-                              highlightColor,
-                              subtitleColor,
-                              benefitsColor,
-                              cardBgColor,
-                              ctaBgColor,
-                              ctaTextColor,
-                              textY,
-                              textAlign,
-                              onTitleClick: () => setEditingElement('title'),
-                              onSubtitleClick: () => setEditingElement('subtitle'),
-                              onBenefitsClick: () => setEditingElement('benefits'),
-                              onCtaClick: () => setEditingElement('cta'),
-                              onLogoClick: () => setEditingElement('logo'),
-                              onBgClick: () => setEditingElement('background'),
-                              subtitleBold,
-                              benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact'),
-                              titleX, subtitleX, benefitsX, ctaX, contactX, contactColor }}
-                            onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
-                            onLogoResize={(s) => setLogoSize(s)}
-                            />
+                            <div style={{ position: 'relative', width: 1080, height: canvasH }}>
+                              <RenderFlyer d={{
+                                title: manualTitle || 'TU OFERTA',
+                                subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
+                                cta: cta || 'CONTACTAR AHORA',
+                                beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                                accent: colors[0] || '#0070d2',
+                                bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
+                                logoUrl: logoPreview || null,
+                                industria: companyName || 'Mi Empresa',
+                                phone, website, templateId: selectedTemplate,
+                                containerW: 1080, containerH: canvasH,
+                                logoSize, logoX, logoY,
+                                flyerFont,
+                                titleFont,
+                                subtitleFont,
+                                benefitsFont,
+                                ctaFont,
+                                contactFont,
+                                textScale,
+                                subtitleScale,
+                                benefitsScale,
+                                titleColor,
+                                highlightColor,
+                                subtitleColor,
+                                benefitsColor,
+                                cardBgColor,
+                                ctaBgColor,
+                                ctaTextColor,
+                                textY,
+                                textAlign,
+                                onTitleClick: () => setEditingElement('title'),
+                                onSubtitleClick: () => setEditingElement('subtitle'),
+                                onBenefitsClick: () => setEditingElement('benefits'),
+                                onCtaClick: () => setEditingElement('cta'),
+                                onLogoClick: () => setEditingElement('logo'),
+                                onBgClick: () => setEditingElement('background'),
+                                subtitleBold,
+                                benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact'),
+                                titleX, subtitleX, benefitsX, ctaX, contactX, contactColor }}
+                              onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
+                              onLogoResize={(s) => setLogoSize(s)}
+                              />
+                              {/* WhatsApp QR overlay */}
+                              {waEnabled && waShowQr && waLink && (
+                                <div style={{
+                                  position: 'absolute',
+                                  bottom: 20,
+                                  ...(waQrPosition === 'bottom-right' ? { right: 20 } : { left: 20 }),
+                                  background: '#fff',
+                                  padding: 10,
+                                  borderRadius: 12,
+                                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                                  zIndex: 20,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: 4
+                                }}>
+                                  <QRCodeSVG value={waLink} size={80} level="M" />
+                                  <span style={{ fontSize: 10, fontWeight: 800, color: '#25d366', letterSpacing: '0.04em', textTransform: 'uppercase' }}>WhatsApp</span>
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                         {/* Interactive Drag & Resize Overlay Box */}
@@ -3597,6 +3639,26 @@ export default function FlyerStudio() {
           {logoPreview && (
             <FreeLogo d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'A', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY }} />
           )}
+          {/* WhatsApp QR overlay (Hidden Render) */}
+          {waEnabled && waShowQr && waLink && (
+            <div style={{
+              position: 'absolute',
+              bottom: 20,
+              ...(waQrPosition === 'bottom-right' ? { right: 20 } : { left: 20 }),
+              background: '#fff',
+              padding: 10,
+              borderRadius: 12,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+              zIndex: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 4
+            }}>
+              <QRCodeSVG value={waLink} size={80} level="M" />
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#25d366', letterSpacing: '0.04em', textTransform: 'uppercase' }}>WhatsApp</span>
+            </div>
+          )}
         </div>
 
         <div ref={templateRefB} style={{ position: 'relative', width: 1080, height: canvasH }}>
@@ -3661,9 +3723,29 @@ export default function FlyerStudio() {
           {logoPreview && (
             <FreeLogo d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'B', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY }} />
           )}
+          {/* WhatsApp QR overlay (Hidden Render) */}
+          {waEnabled && waShowQr && waLink && (
+            <div style={{
+              position: 'absolute',
+              bottom: 20,
+              ...(waQrPosition === 'bottom-right' ? { right: 20 } : { left: 20 }),
+              background: '#fff',
+              padding: 10,
+              borderRadius: 12,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+              zIndex: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 4
+            }}>
+              <QRCodeSVG value={waLink} size={80} level="M" />
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#25d366', letterSpacing: '0.04em', textTransform: 'uppercase' }}>WhatsApp</span>
+            </div>
+          )}
         </div>
 
-        <div ref={templateRefMarketing}>
+        <div ref={templateRefMarketing} style={{ position: 'relative', width: 1080, height: canvasH }}>
           <RenderFlyer d={{
             title: manualTitle || 'TU OFERTA',
             subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
@@ -3712,6 +3794,26 @@ export default function FlyerStudio() {
             contactX,
             contactColor
           }} />
+          {/* WhatsApp QR overlay (Hidden Render) */}
+          {waEnabled && waShowQr && waLink && (
+            <div style={{
+              position: 'absolute',
+              bottom: 20,
+              ...(waQrPosition === 'bottom-right' ? { right: 20 } : { left: 20 }),
+              background: '#fff',
+              padding: 10,
+              borderRadius: 12,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+              zIndex: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 4
+            }}>
+              <QRCodeSVG value={waLink} size={80} level="M" />
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#25d366', letterSpacing: '0.04em', textTransform: 'uppercase' }}>WhatsApp</span>
+            </div>
+          )}
         </div>
       </div>
 
