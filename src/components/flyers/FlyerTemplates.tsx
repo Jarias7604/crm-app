@@ -261,6 +261,27 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
     }
   }
 
+  // Post-processing to keep h1 short and punchy, and make h2 relevant
+  if (h1 && h1.length > 45) {
+    // Try to split by punctuation like !, ?, ., or ,
+    const splitMatch = h1.match(/^([^!,?.:\n]+[!,?.:\n]+)\s*(.+)$/);
+    if (splitMatch && splitMatch[1] && splitMatch[2]) {
+      const candidateH1 = cleanPhrase(splitMatch[1]);
+      const candidateH2 = cleanPhrase(splitMatch[2]);
+      if (candidateH1.length >= 5 && candidateH2.length >= 5) {
+        h1 = candidateH1;
+        h2 = candidateH2;
+      }
+    } else {
+      // Fallback: split by words if no punctuation is found
+      const words = h1.split(/\s+/);
+      if (words.length > 5) {
+        h1 = cleanPhrase(words.slice(0, 5).join(' '));
+        h2 = cleanPhrase(words.slice(5).join(' '));
+      }
+    }
+  }
+
   // Fallback for h2 if still empty
   if (!h2) {
     const words = prompt.trim().split(/\s+/);
@@ -268,13 +289,13 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
     if (words.length > h1WordsCount) {
       h2 = cleanPhrase(words.slice(h1WordsCount, h1WordsCount + 12).join(' '));
     } else {
-      h2 = `${company} — Soluciones Profesionales`;
+      h2 = "¡Aprovecha esta increíble oportunidad hoy mismo!";
     }
   }
 
   // Clean-up if h2 is identical or subset of h1 to ensure meaningful subtitles
   if (h2 && h1.toLowerCase().includes(h2.toLowerCase())) {
-    h2 = `${company} — Soluciones Profesionales`;
+    h2 = "¡Aprovecha esta increíble oportunidad hoy mismo!";
   }
 
   // Capitalize first letter of each sentence

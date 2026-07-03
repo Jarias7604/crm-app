@@ -3214,7 +3214,7 @@ export default function FlyerStudio() {
                                 containerH: canvasH,
                                 prompt, cta: cta || 'CONTACTAR AHORA',
                                 headline: manualTitle || 'OFERTA INCREÍBLE',
-                                subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                                subheadline: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
                                 features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                                 price: manualPrice || '¡Precios de Locura!',
                                 highlight_title: aiOptimizedText?.highlight_title,
@@ -3292,7 +3292,7 @@ export default function FlyerStudio() {
                                 containerH: canvasH,
                                 prompt, cta: cta || 'CONTACTAR AHORA',
                                 headline: manualTitle || 'OFERTA INCREÍBLE',
-                                subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                                subheadline: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
                                 features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                                 price: manualPrice || '¡Precios de Locura!',
                                 highlight_title: aiOptimizedText?.highlight_title,
@@ -3345,7 +3345,7 @@ export default function FlyerStudio() {
                           ) : (
                             <RenderFlyer d={{
                               title: manualTitle || 'TU OFERTA',
-                              subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                              subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
                               cta: cta || 'CONTACTAR AHORA',
                               beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                               accent: colors[0] || '#0070d2',
@@ -3538,7 +3538,7 @@ export default function FlyerStudio() {
             prompt,
             cta: cta || 'CONTACTAR AHORA',
             headline: manualTitle || 'OFERTA INCREÍBLE',
-            subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+            subheadline: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
             features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
             price: manualPrice || '¡Precios de Locura!',
             highlight_title: aiOptimizedText?.highlight_title,
@@ -3602,7 +3602,7 @@ export default function FlyerStudio() {
             prompt,
             cta: cta || 'CONTACTAR AHORA',
             headline: manualTitle || 'OFERTA INCREÍBLE',
-            subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+            subheadline: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
             features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
             price: manualPrice || '¡Precios de Locura!',
             highlight_title: aiOptimizedText?.highlight_title,
@@ -3663,7 +3663,7 @@ export default function FlyerStudio() {
         <div ref={templateRefMarketing}>
           <RenderFlyer d={{
             title: manualTitle || 'TU OFERTA',
-            subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+            subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
             cta: cta || 'CONTACTAR AHORA',
             beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
             accent: colors[0] || '#0070d2',
@@ -3810,7 +3810,7 @@ export default function FlyerStudio() {
                         <FlyerTemplateA data={{
                           company_name: companyName || 'Mi Empresa', prompt,
                           cta: cta || 'CONTACTAR AHORA',
-                          headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                          headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
                           features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'], price: manualPrice || '¡Precios de Locura!',
                           highlight_title: aiOptimizedText?.highlight_title,
                           highlight_desc: aiOptimizedText?.highlight_desc,
@@ -3855,7 +3855,7 @@ export default function FlyerStudio() {
                         <FlyerTemplateB data={{
                           company_name: companyName || 'Mi Empresa', prompt,
                           cta: cta || 'CONTACTAR AHORA',
-                          headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                          headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
                           features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'], price: manualPrice || '¡Precios de Locura!',
                           highlight_title: aiOptimizedText?.highlight_title,
                           highlight_desc: aiOptimizedText?.highlight_desc,
@@ -3898,7 +3898,7 @@ export default function FlyerStudio() {
                     ) : (
                       <RenderFlyer d={{
                         title: manualTitle || 'TU OFERTA',
-                        subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                        subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
                         cta: cta || 'CONTACTAR AHORA',
                         beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                         accent: colors[0] || '#0070d2',
@@ -4747,7 +4747,7 @@ export default function FlyerStudio() {
                                     containerH: canvasH,
                                     prompt, cta: cta || 'CONTACTAR AHORA',
                                     headline: manualTitle || 'OFERTA INCREÍBLE',
-                                    subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                                    subheadline: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
                                     features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                                     price: manualPrice || '¡Precios de Locura!',
                                     highlight_title: aiOptimizedText?.highlight_title,
@@ -4827,7 +4827,7 @@ export default function FlyerStudio() {
                                     containerH: canvasH,
                                     prompt, cta: cta || 'CONTACTAR AHORA',
                                     headline: manualTitle || 'OFERTA INCREÍBLE',
-                                    subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                                    subheadline: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
                                     features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                                     price: manualPrice || '¡Precios de Locura!',
                                     highlight_title: aiOptimizedText?.highlight_title,
@@ -4907,7 +4907,7 @@ export default function FlyerStudio() {
                               <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: canvasH, pointerEvents: 'none' }}>
                                 <RenderFlyer d={{
                                   title: manualTitle || 'TU OFERTA',
-                                  subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                                  subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
                                   cta: cta || 'CONTACTAR AHORA',
                                   beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                                   accent: colors[0] || '#0070d2',
