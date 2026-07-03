@@ -188,6 +188,23 @@ Deno.serve(async (req) => {
             'photo-1498804103079-a6351b050096',
             'photo-1558961309-dbdf000a127b'
           ],
+          beach: [
+            'photo-1507525428034-b723cf961d3e',
+            'photo-1510414842594-a61c69b5ae57',
+            'photo-1544551763-46a013bb70d5',
+            'photo-1559494007-9f5847c49d94',
+            'photo-1571003123894-1f0594d2b5d9',
+            'photo-1527489377706-5bf97e608852',
+            'photo-1501785888041-af3ef285b470',
+            'photo-1506953823976-52e1fdc0149a',
+            'photo-1573843981267-be1999ff37cd',
+            'photo-1540202404-a2f29016b523',
+            'photo-1469474968028-56623f02e42e',
+            'photo-1519046904884-53103b34b206',
+            'photo-1596178065887-1198b6148b2b',
+            'photo-1561731216-c3a4d99437d5',
+            'photo-1582610116397-edb72e9b9b4e'
+          ],
           realestate: [
             'photo-1560518883-ce09059eeffa',
             'photo-1512917774080-9991f1c4c750',
@@ -346,25 +363,28 @@ Deno.serve(async (req) => {
         const lower = ((prompt || '') + ' ' + (industry || '')).toLowerCase();
         let chosenCategory = 'general';
 
-        if (/\b(pizza|comida|restaurante|food|pupusa|pupusas|taco|tacos|burger|hamburguesa|sushi)\b/i.test(lower)) {
+        // Beach / vacation / resort / lots — FIRST priority, most specific
+        if (/playa|lotes?|terreno|vacaci[oó]n|vacaciones|resort|turismo|para[ií]so|club privado|sol y|arena|oc[eé]ano|caribe|tropical|frente al mar|vista al mar|costa|riviera|bungal/i.test(lower)) {
+          chosenCategory = 'beach';
+        } else if (/\b(pizza|comida|restaurante|food|pupusa|pupusas|taco|tacos|burger|hamburguesa|sushi)\b/i.test(lower)) {
           chosenCategory = 'food';
-        } else if (/\b(crm|software|saas|aplicaci[oó]n|app|sistema|tecnolog[íi]a|digital|ventas en l[íi]nea|marketing digital|embudos|pipeline|automatizaci[oó]n|analytics|plataforma|startup|desarrollador|programaci[oó]n|web|ecommerce|e-commerce|inteligencia artificial|ia)\b/i.test(lower)) {
+        } else if (/\b(crm|software|saas|aplicaci[oó]n|app|sistema|tecnolog[ií]a|digital|ventas en l[ií]nea|marketing digital|embudos|pipeline|automatizaci[oó]n|analytics|plataforma|startup|desarrollador|programaci[oó]n|web|ecommerce|e-commerce|inteligencia artificial|ia)\b/i.test(lower)) {
           chosenCategory = 'tech';
-        } else if (/\b(dentista|dental|diente|dientes|cl[íi]nica dental|odontolog[íi]a)\b/i.test(lower)) {
+        } else if (/\b(dentista|dental|diente|dientes|cl[ií]nica dental|odontolog[ií]a)\b/i.test(lower)) {
           chosenCategory = 'dental';
-        } else if (/\b(doctor|doctores|m[eé]dico|m[eé]dicos|farmacia|farmacias|medicina|medicinas|salud|hospital|hospitales|cl[íi]nica|medical|consultorio|pediatra|terapia|enfermera)\b/i.test(lower)) {
+        } else if (/\b(doctor|doctores|m[eé]dico|m[eé]dicos|farmacia|farmacias|medicina|medicinas|salud|hospital|hospitales|cl[ií]nica|medical|consultorio|pediatra|terapia|enfermera)\b/i.test(lower)) {
           chosenCategory = 'medical';
         } else if (/\b(defensa|karate|marciales|taekwondo)\b/i.test(lower)) {
           chosenCategory = 'defense';
-        } else if (/\b(belleza|salon|sal[oó]n|u[ñn]as|spa|maquillaje|cabello|peluquer[íi]a)\b/i.test(lower)) {
+        } else if (/\b(belleza|salon|sal[oó]n|u[ñn]as|spa|maquillaje|cabello|peluquer[ií]a)\b/i.test(lower)) {
           chosenCategory = 'beauty';
         } else if (/\b(gym|gimnasio|fit|fitness|ejercicio|entrenamiento)\b/i.test(lower)) {
           chosenCategory = 'gym';
         } else if (/\b(abogado|legal|firma|leyes|derecho)\b/i.test(lower)) {
           chosenCategory = 'legal';
-        } else if (/\b(cafe|café|panaderia|panader[íi]a|reposter[íi]a|dulce|cafeter[íi]a)\b/i.test(lower)) {
+        } else if (/\b(cafe|caf[eé]|panaderia|panader[ií]a|reposter[ií]a|dulce|cafeter[ií]a)\b/i.test(lower)) {
           chosenCategory = 'cafe';
-        } else if (/\b(casa|inmobiliaria|apartamento|hogar|propiedad|real estate|construcci[oó]n)\b/i.test(lower)) {
+        } else if (/\b(casa|inmobiliaria|apartamento|hogar|propiedad|real estate|construcci[oó]n|bienes ra[ií]ces)\b/i.test(lower)) {
           chosenCategory = 'realestate';
         } else if (/\b(perro|gato|mascota|veterinario|veterinaria|animal)\b/i.test(lower)) {
           chosenCategory = 'pets';
@@ -376,9 +396,9 @@ Deno.serve(async (req) => {
           chosenCategory = 'yoga';
         } else if (/\b(contable|finanzas|dinero|taxes|impuestos|accounting)\b/i.test(lower)) {
           chosenCategory = 'accounting';
-        } else if (/\b(ferreter[íi]a|herramienta|herramientas|tornillo|martillo|carpinter[íi]a|brocha|tools)\b/i.test(lower)) {
+        } else if (/\b(ferreter[ií]a|herramienta|herramientas|tornillo|martillo|carpinter[ií]a|brocha|tools)\b/i.test(lower)) {
           chosenCategory = 'hardware';
-        } else if (/\b(taller|carro|carros|veh[íi]culo|mec[aá]nico|repuestos|automotriz)\b/i.test(lower)) {
+        } else if (/\b(taller|carro|carros|veh[ií]culo|mec[aá]nico|repuestos|automotriz)\b/i.test(lower)) {
           chosenCategory = 'auto';
         }
 
