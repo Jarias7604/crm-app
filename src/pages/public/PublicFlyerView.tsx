@@ -251,6 +251,22 @@ export default function PublicFlyerView() {
 
           </div>
 
+          {/* Direct WhatsApp Action Button */}
+          {isWaEnabled && (
+            <div className="w-full max-w-[550px] mt-6 z-10">
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-3 w-full py-4 px-6 bg-[#25D366] hover:bg-[#20ba5a] active:bg-[#1ea851] text-white rounded-2xl font-black text-sm sm:text-base uppercase tracking-wider shadow-lg shadow-green-950/50 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 animate-pulse"
+                style={{ animationDuration: '2.5s' }}
+              >
+                <Phone className="w-4 h-4 sm:w-5 sm:h-5 fill-white" />
+                <span>📲 CLIC AQUÍ Y HABLA CON NOSOTROS</span>
+              </a>
+            </div>
+          )}
+
           {/* Business Info Block below Flyer */}
           <div className="w-full max-w-[550px] mt-6 flex flex-col gap-4 text-center sm:text-left bg-slate-950/40 border border-slate-900 p-5 rounded-2xl">
             <h3 className="text-base font-bold text-slate-200">
@@ -290,11 +306,11 @@ export default function PublicFlyerView() {
             href={waLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-3 w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg shadow-emerald-900/40 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 animate-pulse"
-            style={{ animationDuration: '3s' }}
+            className="flex items-center justify-center gap-3 w-full py-5 px-6 bg-[#25D366] hover:bg-[#20ba5a] active:bg-[#1ea851] text-white rounded-2xl font-black text-base uppercase tracking-wider shadow-lg shadow-green-900/40 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 animate-bounce"
+            style={{ animationDuration: '2s' }}
           >
-            <MessageSquare className="w-5 h-5 fill-white" />
-            <span>{settings.cta || 'Contactar por WhatsApp'}</span>
+            <Phone className="w-5 h-5 fill-white animate-pulse" />
+            <span>📲 CLIC AQUÍ Y HABLA CON NOSOTROS</span>
           </a>
         </div>
       )}
