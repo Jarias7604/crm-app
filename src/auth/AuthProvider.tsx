@@ -207,6 +207,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             .eq('id', userId)
                             .single();
                         if (updatedProfile) {
+                            // 🎉 Fire welcome email (non-blocking — never breaks signup flow)
+                            if (updatedProfile.company_id && updatedProfile.email) {
+                                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+                                const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+                                fetch(`${supabaseUrl}/functions/v1/transactional-email`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'apikey': supabaseKey,
+                                        'Authorization': `Bearer ${supabaseKey}`,
+                                    },
+                                    body: JSON.stringify({
+                                        type: 'welcome',
+                                        companyId: updatedProfile.company_id,
+                                        adminEmail: updatedProfile.email,
+                                        adminName: updatedProfile.full_name || updatedProfile.email,
+                                        companyName: pendingCompanyName,
+                                        trialDays: 14,
+                                    }),
+                                }).then(r => {
+                                    if (r.ok) console.info('[AuthProvider] ✅ Welcome email sent to', updatedProfile.email);
+                                    else r.text().then(e => console.warn('[AuthProvider] Welcome email failed (non-critical):', e));
+                                }).catch(e => console.warn('[AuthProvider] Welcome email error (non-critical):', e));
+                            }
                             // Use the freshly provisioned profile, skip the rest of this run
                             setProfile({ ...updatedProfile, permissions: (updatedProfile.permissions as Record<string, boolean>) || {} } as Profile);
                             setLoading(false);

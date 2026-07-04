@@ -1,6 +1,28 @@
 ---
 description: Pendientes priorizados del CRM — retomar en próxima sesión
 ---
+
+# ✅ Sesión: Alineación de Ambientes — COMPLETADA (Julio 4, 2026)
+
+**Estado final de los 3 ambientes:**
+| Ambiente | Project Ref | Estado |
+|---|---|---|
+| 🟢 **PRODUCCIÓN** | `mtxqqamitglhehaktgxm` | Activo. Datos reales Arias Defense. Diana/Patricia/Gerson/Melvin. |
+| 🟢 **LOCAL/TESTING** | `ubqscyfefgfbmndnypbp` | ✅ SINCRONIZADO — 100/100 migraciones aplicadas, 34/34 Edge Functions desplegadas |
+| 🗄️ **Edge Fn Hub** | `ikofyypxphrqkncimszt` | Solo para Edge Functions legacy. Sin datos CRM. |
+
+**`.env.local` apunta a Testing** — correcto. Nunca tocar producción desde local.
+
+**Qué se hizo:**
+1. ✅ Verificado: Testing ya tenía 100/100 migraciones iguales a Producción (schema idéntico)
+2. ✅ Deploadas 16 Edge Functions faltantes a Testing: `admin-reset-password, auto-followup, dispatch-webhooks, search-businesses, marketing-engine, publish-facebook, publish-instagram, stripe-webhook, score-leads, on-user-login, lead-nurture, tracking, setup-telegram, process-message-queue, ai-chat-processor, meta-oauth`
+3. ✅ Sincronizado secret `GOOGLE_PLACES_API_KEY` en Testing
+4. ✅ `npm run dev` → localhost:5174 funciona, sin errores de consola
+
+**PRÓXIMOS PENDIENTES (si aplica):**
+- Crear un usuario de prueba en Testing para desarrollar sin tocar datos de producción
+- Continuar con features normales del CRM
+
 # Sesión: Pipeline Clientes — Bug Fix + Inline Edit (Abril 6, 2026)
 
 **Logros de la Sesión:**

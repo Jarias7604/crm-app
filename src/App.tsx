@@ -84,6 +84,7 @@ const BillingManager    = lazy(() => import('./pages/admin/BillingManager'));
 const BookingSettings   = lazy(() => import('./pages/calendar/BookingSettings'));
 const PublicBookingPage = lazy(() => import('./pages/public/PublicBookingPage'));
 const PrivacyPolicy     = lazy(() => import('./pages/public/PrivacyPolicy'));
+const TrialExpired      = lazy(() => import('./pages/public/TrialExpired'));
 const Workspaces        = lazy(() => import('./pages/company/Workspaces'));
 const Facturas          = lazy(() => import('./pages/Facturas'));
 const FacturaDetalle    = lazy(() => import('./pages/FacturaDetalle'));
@@ -321,6 +322,7 @@ function App() {
               <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="/support/manual" element={<ManualPage />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/trial-expired" element={<TrialExpired />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
