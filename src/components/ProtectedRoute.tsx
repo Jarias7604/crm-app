@@ -21,7 +21,7 @@ export default function ProtectedRoute() {
             return;
         }
 
-        supabase.rpc('get_company_subscription').then(({ data }) => {
+        Promise.resolve(supabase.rpc('get_company_subscription')).then(({ data }) => {
             if (data && data[0]) {
                 const sub = data[0];
                 const now = new Date();

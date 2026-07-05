@@ -209,14 +209,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         if (updatedProfile) {
                             // 🎉 Fire welcome email (non-blocking — never breaks signup flow)
                             if (updatedProfile.company_id && updatedProfile.email) {
-                                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-                                const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+                                const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+                                const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
                                 fetch(`${supabaseUrl}/functions/v1/transactional-email`, {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',
-                                        'apikey': supabaseKey,
-                                        'Authorization': `Bearer ${supabaseKey}`,
+                                        'apikey': supabaseKey ?? '',
+                                        'Authorization': `Bearer ${supabaseKey ?? ''}`,
                                     },
                                     body: JSON.stringify({
                                         type: 'welcome',
