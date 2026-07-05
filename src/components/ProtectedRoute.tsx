@@ -10,8 +10,8 @@ export default function ProtectedRoute() {
     const [subChecked, setSubChecked] = useState(false);
 
     useEffect(() => {
-        // Super admins and platform owners are never blocked
-        if (!profile?.company_id || profile?.role === 'super_admin') {
+        // Super admins, platform owners, and users without company_id yet are never blocked
+        if (!profile?.company_id || profile?.role === 'super_admin' || (profile as any)?.is_platform_owner) {
             setSubChecked(true);
             return;
         }
@@ -50,7 +50,7 @@ export default function ProtectedRoute() {
         }).catch(() => setSubChecked(true)); // On error, let through — never block on network issues
     }, [profile?.company_id, profile?.role, location.pathname]);
 
-    if (loading) {
+    if (loading || !subChecked) {
         return <div className="flex items-center justify-center min-h-screen bg-[#07070c]">
             <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
         </div>;
@@ -60,7 +60,7 @@ export default function ProtectedRoute() {
         return <Navigate to="/login" replace />;
     }
 
-    if (subChecked && trialExpired) {
+    if (trialExpired) {
         return <Navigate to="/trial-expired" replace />;
     }
 
