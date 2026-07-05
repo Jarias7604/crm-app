@@ -100,7 +100,7 @@ class LeadDiscoveryService {
             email: lead.email || null,
             phone: lead.phone || null,
             source: 'Lead Hunter AI',
-            status: 'Prospecto' as const,
+            status: 'prospecto' as const,
             company_id: companyId,
             google_place_id: lead.id,
             next_action_notes: `Prospecto de Lead Hunter. Dirección: ${lead.address}. Rating: ${lead.rating?.toFixed(1)}${lead.website ? `. Web: ${this.cleanDomain(lead.website)}` : ''}`
@@ -128,7 +128,7 @@ class LeadDiscoveryService {
                     email: lead.email || null,
                     phone: lead.phone || null,
                     source: 'Lead Hunter AI',
-                    status: 'Prospecto' as const,
+                    status: 'prospecto' as const,
                     company_id: companyId,
                     google_place_id: lead.id,
                     next_action_notes: `Importación masiva. Dirección: ${lead.address}. Rating: ${lead.rating?.toFixed(1)}${lead.website ? `. Web: ${this.cleanDomain(lead.website)}` : ''}`
