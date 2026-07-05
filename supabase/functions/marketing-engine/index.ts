@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
         if (filters.specificIds && filters.specificIds.length > 0) {
             query = query.in(filters.idType || 'id', filters.specificIds);
         } else {
-            if (filters.status?.length > 0) query = query.in("status", filters.status);
+            if (filters.status?.length > 0) query = query.in("status", filters.status.map((s: string) => s.toLowerCase()));
             if (filters.priority && filters.priority !== 'all') query = query.eq("priority", filters.priority);
             if (filters.dateRange === "new") {
                 const d = new Date(); d.setDate(d.getDate() - 30);

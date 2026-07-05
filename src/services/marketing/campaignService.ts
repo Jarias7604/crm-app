@@ -186,7 +186,10 @@ export const campaignService = {
                 query = query.gte('created_at', thirtyDaysAgo.toISOString());
             }
             if (filters.status && filters.status.length > 0) {
-                query = query.in('status', filters.status);
+                // Normalize to lowercase — DB stores statuses in lowercase (prospecto, cliente, etc.)
+                // This fixes the mismatch when campaigns stored statuses capitalized (Prospecto)
+                const normalizedStatuses = filters.status.map(s => s.toLowerCase());
+                query = query.in('status', normalizedStatuses);
             }
             if (filters.priority && filters.priority !== 'all') {
                 query = query.eq('priority', filters.priority);

@@ -111,7 +111,19 @@ export default function CampaignBuilder() {
         } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    const possibleStatuses = ["Prospecto", "Llamada fría", "En Nutrición", "Lead calificado", "En seguimiento", "Negociación", "Cerrado", "Cliente", "Perdido"];
+    // NOTE: These values must match the actual DB status values (case-insensitive normalized to lowercase)
+    const possibleStatuses = ["prospecto", "llamada fría", "en nutrición", "lead calificado", "en seguimiento", "negociación", "cerrado", "cliente", "perdido"];
+    const statusLabels: Record<string, string> = {
+        "prospecto": "Prospecto",
+        "llamada fría": "Llamada Fría",
+        "en nutrición": "En Nutrición",
+        "lead calificado": "Lead Calificado",
+        "en seguimiento": "En Seguimiento",
+        "negociación": "Negociación",
+        "cerrado": "Cerrado",
+        "cliente": "Cliente",
+        "perdido": "Perdido",
+    };
     const [availableIndustries, setAvailableIndustries] = useState<string[]>([]);
     const [showIndustryModal, setShowIndustryModal] = useState(false);
     const [industrySearch, setIndustrySearch] = useState('');
@@ -596,19 +608,25 @@ export default function CampaignBuilder() {
                                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Estado</label>
                                 <div className="flex flex-wrap gap-2">
                                     {possibleStatuses.map(status => {
-                                        const isSelected = formData.audience_filter.status.includes(status);
+                                        // Support both old saved campaigns (capitalized) and new (lowercase)
+                                        const isSelected = formData.audience_filter.status.some(
+                                            s => s.toLowerCase() === status.toLowerCase()
+                                        );
                                         return (
                                             <button
                                                 key={status}
                                                 onClick={() => {
                                                     const current = formData.audience_filter?.status || [];
-                                                    const newStatus = isSelected ? current.filter(s => s !== status) : [...current, status];
+                                                    // Always store lowercase to match DB
+                                                    const newStatus = isSelected
+                                                        ? current.filter(s => s.toLowerCase() !== status.toLowerCase())
+                                                        : [...current.filter(s => s.toLowerCase() !== status.toLowerCase()), status];
                                                     setFormData({ ...formData, audience_filter: { ...formData.audience_filter, status: newStatus } });
                                                 }}
                                                 className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all border ${isSelected ? 'bg-indigo-600 text-white border-transparent shadow-md' : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50'
                                                     }`}
                                             >
-                                                {status}
+                                                {statusLabels[status] || status}
                                             </button>
                                         );
                                     })}
