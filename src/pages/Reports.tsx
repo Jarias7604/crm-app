@@ -35,7 +35,8 @@ const THEME = {
 const COLORS = [THEME.primary, THEME.secondary, THEME.success, THEME.accent, THEME.purple, THEME.danger];
 
 export default function Reports() {
-    const { profile } = useAuth();
+    const { profile, simulatedCompanyId } = useAuth();
+    const activeCompanyId = simulatedCompanyId || profile?.company_id || '';
     const [activeTab, setActiveTab] = useState<TabType>('bi');
     
     // Export State
@@ -69,7 +70,7 @@ export default function Reports() {
         if (activeTab !== 'campaigns') return;
         setLoadingCampaigns(true);
         Promise.all([
-            campaignService.getCampaigns(),
+            campaignService.getCampaigns(activeCompanyId),
             marketingStatsService.getHeatmapLeads()
         ]).then(([c, h]) => {
             setCampaigns(c);

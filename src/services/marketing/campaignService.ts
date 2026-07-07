@@ -25,10 +25,11 @@ export interface Campaign {
 }
 
 export const campaignService = {
-    async getCampaigns() {
+    async getCampaigns(companyId: string) {
         const { data: campaigns, error } = await simGuard(
             supabase.from('marketing_campaigns').select('*')
-        ).order('created_at', { ascending: false });
+        ).eq('company_id', companyId)  // Always scope to current company — prevents cross-tenant leak in platform owner mode
+        .order('created_at', { ascending: false });
 
         if (error) throw error;
 

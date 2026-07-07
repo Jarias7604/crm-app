@@ -19,11 +19,14 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { campaignService, type Campaign } from '../../services/marketing/campaignService';
+import { useAuth } from '../../auth/AuthProvider';
 import { cn } from '../../lib/utils';
 import toast from 'react-hot-toast';
 
 export default function EmailCampaigns() {
     const navigate = useNavigate();
+    const { profile, simulatedCompanyId } = useAuth();
+    const activeCompanyId = simulatedCompanyId || profile?.company_id || '';
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -50,7 +53,7 @@ export default function EmailCampaigns() {
     const loadCampaigns = async () => {
         try {
             setLoading(true);
-            const data = await campaignService.getCampaigns();
+            const data = await campaignService.getCampaigns(activeCompanyId);
             setCampaigns(data);
         } catch (error) {
             console.error('Error loading campaigns:', error);
