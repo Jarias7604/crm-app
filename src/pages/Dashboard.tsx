@@ -1739,6 +1739,25 @@ export default function Dashboard() {
                     const activeData = trendView === 'month' ? monthlyTrendData : salesTrendData;
                     const isMonthView = trendView === 'month';
 
+                    // Navigate to leads filtered by clicked date range
+                    const handleTrendPointClick = (rawDate: string) => {
+                        const dateStr = rawDate.includes('T') ? rawDate.substring(0, 10) : rawDate;
+                        let startDate: string;
+                        let endDate: string;
+                        if (isMonthView) {
+                            const d = new Date(dateStr + 'T12:00:00');
+                            startDate = format(startOfMonth(d), 'yyyy-MM-dd');
+                            const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+                            endDate = format(lastDay, 'yyyy-MM-dd');
+                        } else {
+                            startDate = dateStr;
+                            endDate = dateStr;
+                        }
+                        navigate('/leads', {
+                            state: { status: ['Cerrado', 'Cliente'] as any, startDate, endDate }
+                        });
+                    };
+
                     return (
                     <div className="lg:col-span-8 bg-white p-5 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/70 flex flex-col group hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500 relative z-0">
                         <div className="flex justify-between items-center mb-4">
@@ -1814,35 +1833,15 @@ export default function Dashboard() {
                             ) : activeData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <ComposedChart
-                                    data={activeData}
-                                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                                    style={{ cursor: 'pointer' }}
-                                    onClick={(chartData: any) => {
-                                        if (!chartData?.activePayload?.[0]?.payload?.date) return;
-                                        const raw = chartData.activePayload[0].payload.date as string;
-                                        const dateStr = raw.includes('T') ? raw.substring(0, 10) : raw;
-                                        let startDate: string;
-                                        let endDate: string;
-                                        if (isMonthView) {
-                                            // Month view: full month range
-                                            const d = new Date(dateStr + 'T12:00:00');
-                                            startDate = format(startOfMonth(d), 'yyyy-MM-dd');
-                                            const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-                                            endDate = format(lastDay, 'yyyy-MM-dd');
-                                        } else {
-                                            // Day view: just that day
-                                            startDate = dateStr;
-                                            endDate = dateStr;
-                                        }
-                                        navigate('/leads', {
-                                            state: {
-                                                status: ['Cerrado', 'Cliente'] as any,
-                                                startDate,
-                                                endDate,
-                                            }
-                                        });
-                                    }}
-                                >
+                                        data={activeData}
+                                        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                                        style={{ cursor: 'pointer' }}
+                                        onClick={(chartData: any) => {
+                                            const raw = chartData?.activePayload?.[0]?.payload?.date
+                                                ?? chartData?.activeLabel;
+                                            if (raw) handleTrendPointClick(raw);
+                                        }}
+                                    >
                                         <defs>
                                             <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -1925,7 +1924,7 @@ export default function Dashboard() {
                                                 strokeWidth={3}
                                                 fillOpacity={1}
                                                 fill="url(#colorAmount)"
-                                                activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }}
+                                                activeDot={{ r: 8, fill: '#10b981', stroke: '#fff', strokeWidth: 2, style: { cursor: 'pointer' }, onClick: (_: any, payload: any) => { if (payload?.payload?.date) handleTrendPointClick(payload.payload.date); } } as any}
                                             />
                                         )}
                                         {trendSeries !== 'sales' && (
@@ -1937,7 +1936,7 @@ export default function Dashboard() {
                                                 stroke="#6366f1"
                                                 strokeWidth={3}
                                                 dot={isMonthView ? { r: 4, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 } : { r: 2 }}
-                                                activeDot={{ r: 5 }}
+                                                activeDot={{ r: 7, stroke: '#fff', strokeWidth: 2, style: { cursor: 'pointer' }, onClick: (_: any, payload: any) => { if (payload?.payload?.date) handleTrendPointClick(payload.payload.date); } } as any}
                                             >
                                                 {isMonthView && (
                                                     <LabelList
