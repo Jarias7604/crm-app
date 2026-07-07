@@ -585,9 +585,11 @@ export default function Leads() {
                     ? (statusFilter.includes('Cerrado') || statusFilter.includes('Cliente'))
                     : (statusFilter === 'Cerrado' || statusFilter === 'Cliente');
 
-                const dateToCompare = (isWonFilter && (lead.status === 'Cerrado' || lead.status === 'Cliente') && lead.internal_won_date)
-                    ? new Date(lead.internal_won_date)
-                    : new Date(lead.created_at);
+                // Parse date at noon to avoid UTC-midnight shifting to previous day in local timezone
+                const rawWonDate = (isWonFilter && (lead.status === 'Cerrado' || lead.status === 'Cliente') && lead.internal_won_date)
+                    ? lead.internal_won_date.substring(0, 10) + 'T12:00:00'
+                    : null;
+                const dateToCompare = rawWonDate ? new Date(rawWonDate) : new Date(lead.created_at);
 
                 // Direct comparison — use T12:00:00 for yyyy-MM-dd to avoid UTC midnight timezone shifts
                 const startBound = startDateFilter ? new Date(startDateFilter + 'T00:00:00') : null;
@@ -625,9 +627,11 @@ export default function Leads() {
                     const isWonFilter = Array.isArray(statusFilter)
                         ? (statusFilter.includes('Cerrado') || statusFilter.includes('Cliente'))
                         : (statusFilter === 'Cerrado' || statusFilter === 'Cliente');
-                    const dateToCompare = (isWonFilter && (lead.status === 'Cerrado' || lead.status === 'Cliente') && lead.internal_won_date)
-                        ? new Date(lead.internal_won_date)
-                        : new Date(lead.created_at);
+                    // Parse date at noon to avoid UTC-midnight shifting to previous day in local timezone
+                    const rawWonDate2 = (isWonFilter && (lead.status === 'Cerrado' || lead.status === 'Cliente') && lead.internal_won_date)
+                        ? lead.internal_won_date.substring(0, 10) + 'T12:00:00'
+                        : null;
+                    const dateToCompare = rawWonDate2 ? new Date(rawWonDate2) : new Date(lead.created_at);
                     const startBound = startDateFilter ? new Date(startDateFilter + 'T00:00:00') : null;
                     const endBound = endDateFilter ? new Date(endDateFilter + 'T23:59:59') : null;
                     if (startBound && dateToCompare < startBound) return false;
