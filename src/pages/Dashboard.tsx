@@ -1813,7 +1813,36 @@ export default function Dashboard() {
                                 </div>
                             ) : activeData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={activeData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                    <ComposedChart
+                                    data={activeData}
+                                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={(chartData: any) => {
+                                        if (!chartData?.activePayload?.[0]?.payload?.date) return;
+                                        const raw = chartData.activePayload[0].payload.date as string;
+                                        const dateStr = raw.includes('T') ? raw.substring(0, 10) : raw;
+                                        let startDate: string;
+                                        let endDate: string;
+                                        if (isMonthView) {
+                                            // Month view: full month range
+                                            const d = new Date(dateStr + 'T12:00:00');
+                                            startDate = format(startOfMonth(d), 'yyyy-MM-dd');
+                                            const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+                                            endDate = format(lastDay, 'yyyy-MM-dd');
+                                        } else {
+                                            // Day view: just that day
+                                            startDate = dateStr;
+                                            endDate = dateStr;
+                                        }
+                                        navigate('/leads', {
+                                            state: {
+                                                status: ['Cerrado', 'Cliente'] as any,
+                                                startDate,
+                                                endDate,
+                                            }
+                                        });
+                                    }}
+                                >
                                         <defs>
                                             <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
