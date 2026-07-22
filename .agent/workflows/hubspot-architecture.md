@@ -2,7 +2,38 @@
 description: Pendientes priorizados del CRM — retomar en próxima sesión
 ---
 
-# ✅ Sesión: Alineación de Ambientes — COMPLETADA (Julio 4, 2026)
+# 🟡 PENDIENTE — WhatsApp Onboarding Simple (Julio 22, 2026)
+
+**Objetivo:** Dejar el proceso de conectar WhatsApp tan fácil como HubSpot para admins no técnicos.
+
+## Qué se hizo en esta sesión ✅
+- Logo + nombre "Arias Defense Components" subido al perfil de WhatsApp Business
+- Badge 🟢/⚪ de estado WhatsApp en tarjetas de Workspaces
+- Wizard embebido con guía paso a paso (Paso 1 Meta → Paso 2 Token → Paso 3 Elegir número)
+- Auto-descubrimiento de números desde el token (cliente no necesita Phone Number ID)
+- Fix botón "Nuevo Workspace" visible para super_admin
+- App Review de Meta enviada (`business_management`) — en revisión 1-4 semanas
+
+## Qué falta — HACER LA PRÓXIMA SESIÓN
+
+### Sesión 1 (próxima — ~2-3 horas de trabajo)
+1. **Fix crear workspace NUEVO + wizard** — Al crear workspace nuevo, el wizard falla porque no hay ID aún. Separar: crear workspace → obtener ID → abrir wizard
+2. **Auto-suscripción webhook** — Después de pegar el token, llamar `POST /{waba_id}/subscribed_apps` automáticamente. El cliente no tendrá que ir a Meta Developers
+3. **Wizard en MarketingSettings** — Reemplazar el formulario manual antiguo en `/marketing/settings` WhatsApp tab con el `WhatsAppConnectWizard`
+
+### Sesión 2 (cuando Meta apruebe — 1-4 semanas)
+4. **Meta Embedded Signup** — 1 clic → popup Meta → selecciona número → Done. Componente `EmbeddedSignupButton.tsx` + Edge Function `whatsapp-oauth`
+
+## Datos técnicos clave
+- **Meta App ID:** `1187621119804509` ("Arias Defense Components") — en revisión
+- **Webhook URL:** `https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/meta-webhook`
+- **Verify Token:** `crm_secure_verify`
+- **Routing:** edge function identifica empresa por `phoneNumberId` → `marketing_integrations` → `company_id`
+- **Cliente con 3 números:** Crear 3 workspaces, conectar 1 número por workspace
+
+---
+
+
 
 **Estado final de los 3 ambientes:**
 | Ambiente | Project Ref | Estado |
