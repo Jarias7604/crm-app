@@ -49,6 +49,7 @@ Este proyecto NO es y NO debe contener nada de los siguientes proyectos hermanos
 | **ERP El Salvador**   | Keywords: `DTE`, `plan_de_cuentas`, `libro_iva`, `partidas_contables`, `Renta`, `NIIF` |
 | **GlobalAds AI OS**   | Keywords: `BigVU`, `meta-insights`, `ad-creative`, `video-studio` |
 | **VisionSaaS**        | Keywords: `compras`, `proveedores`, `reception`, `purchase_book` |
+| **Ecclesia / Iclesia**| Keywords: `Ecclesia`, `miembros`, `pastoral`, `diezmos`, `congregación`, `at risk members` |
 
 ---
 
@@ -90,6 +91,6 @@ Antes de aplicar CUALQUIER migración SQL, edge function o ajuste de código, el
 
 ## ⚠️ REGLA DE ORO
 
-> **Si en la conversación se menciona DTE, plan de cuentas, IVA en contexto fiscal ERP, módulo de compras, NIIF, BigVU, video-studio, o GlobalAds → DETENER y preguntar si es el proyecto correcto antes de tocar nada.**
+> **Si en la conversación se menciona DTE, plan de cuentas, IVA en contexto fiscal ERP, módulo de compras, NIIF, BigVU, video-studio, GlobalAds, o Ecclesia / Iclesia (miembros, diezmos, pastoral) → DETENER y preguntar si es el proyecto correcto antes de tocar nada.**
 
 Última actualización: 2026-03-16

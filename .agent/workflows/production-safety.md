@@ -174,6 +174,49 @@ Si hay resultados → recrear CADA política listada en la misma migración ANTE
 ---
 
 
+---
+
+## REGLA 13 — PROHIBIDO ABSOLUTO: Normalizar valores de `leads.status`
+
+**CONTEXTO:** El campo `leads.status` usa TitleCase estricto (`Prospecto`, `Cerrado`, `Cliente`, `Perdido`, `Erróneo`, `En Nutrición`, `Lead calificado`, `En seguimiento`, `Negociación`, `Llamada fría`). Este formato es requerido simultáneamente por:
+- El trigger `fn_auto_set_internal_won_date` (que registra la fecha real de cierre)
+- La función RPC `get_dashboard_stats` (que agrega el embudo de ventas)
+- El componente `STATUS_CONFIG` en el frontend (que renderiza los colores y etiquetas)
+
+**PROHIBIDO ABSOLUTO:**
+```sql
+-- NUNCA ejecutar esto — rompe triggers, embudo y tendencia de ventas
+UPDATE leads SET status = lower(status);
+UPDATE leads SET status = upper(status);
+UPDATE leads SET status = 'cerrado' WHERE ...;
+```
+
+**SI UN CLIENTE PIDE "normalizar" statuses:** El valor correcto siempre es TitleCase. Verificar contra `STATUS_CONFIG` en `src/types/index.ts` y el CHECK CONSTRAINT en la base de datos antes de ejecutar cualquier UPDATE de status.
+
+**CHECK CONSTRAINT EN PRODUCCIÓN (instalado 2026-07-07):**
+```sql
+-- Este constraint hace IMPOSIBLE poner status inválido — cualquier UPDATE con valor incorrecto falla con error
+CONSTRAINT check_leads_status_valid CHECK (status IN (
+    'Prospecto', 'Llamada fría', 'En Nutrición', 'Lead calificado',
+    'En seguimiento', 'Negociación', 'Cerrado', 'Cliente', 'Perdido', 'Erróneo'
+))
+```
+
+**PROTOCOLO OBLIGATORIO antes de cualquier UPDATE masivo en `leads`:**
+1. Ejecutar primero un `SELECT COUNT(*)` con el mismo WHERE — confirmar cuántas filas afecta
+2. Mostrar al usuario una muestra de filas afectadas (`SELECT name, status, ... LIMIT 10`)
+3. Obtener confirmación explícita del usuario antes de ejecutar
+4. Ejecutar el UPDATE
+5. Ejecutar SELECT COUNT(*) post-update para confirmar
+
+**Incidente real (2026-07-04/05):** El agente ejecutó `UPDATE leads SET status = lower(status)` sin previa autorización para "arreglar filtros de marketing". Esto silenciosamente:
+- Rompió el trigger de `internal_won_date` → fechas de cierre erróneas para 182 leads
+- Vació el embudo de ventas del dashboard (el RPC usa TitleCase estricto)
+- Corrompió la gráfica "Tendencia de Ventas" con datos incorrectos
+- Requirió 4+ horas de diagnóstico y corrección manual con riesgo legal
+
+---
+
 ## Historial de incidentes
 
 | Fecha | Causa | Horas perdidas | Regla que lo previene |
@@ -188,4 +231,5 @@ Si hay resultados → recrear CADA política listada en la misma migración ANTE
 | 2026-06-11 | Agente aplicó fix en producción sin autorización explícita del usuario | horas de tensión | Regla 5 — Gate de autorización |
 | 2026-06-14 | `git checkout` accidental borró cambios avanzados sin confirmar | ~2 horas (reconstrucción) | Regla 11 |
 | 2026-06-23 | Agente creó tablas `lead_marketing_stats` y `login_attempts` sin habilitar RLS | vulnerabilidad de datos | Regla 12 — RLS Obligatorio |
+| **2026-07-04** | **Agente normalizó `leads.status` a minúscula sin autorización. Rompió trigger `internal_won_date`, embudo de ventas y tendencia de ingresos para 182 leads. Requirió corrección manual con riesgo legal para el cliente.** | **~1 día** | **Regla 13 — Status TitleCase** |
 
