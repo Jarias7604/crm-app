@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
-    Building2, Plus, Edit2, Key, Loader2, X, ChevronRight, Check,
-    LayoutGrid, Settings, ShieldAlert, ArrowLeftRight, ExternalLink
+    Building2, Plus, Key, Loader2, X, Check,
+    Settings, ShieldAlert, ArrowLeftRight, Wifi, WifiOff, CheckCircle2, XCircle, RefreshCw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
@@ -27,6 +27,11 @@ export default function Workspaces() {
         allowed_permissions: [] as string[]
     });
     const [isSaving, setIsSaving] = useState(false);
+    const [verifyStatus, setVerifyStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+    const [verifyDetails, setVerifyDetails] = useState<string>('');
+
+    // WhatsApp status per workspace: { [companyId]: 'active' | 'inactive' | 'loading' }
+    const [waStatus, setWaStatus] = useState<Record<string, 'active' | 'inactive' | 'loading'>>({});
 
     // Parent allowed permissions (to constrain child feature selection)
     const [parentPermissions, setParentPermissions] = useState<string[]>([]);
@@ -67,7 +72,28 @@ export default function Workspaces() {
                 .order('name');
 
             if (error) throw error;
-            setWorkspaces(listData || []);
+            const ws = listData || [];
+            setWorkspaces(ws);
+
+            // Load WhatsApp integration status for each workspace
+            if (ws.length > 0) {
+                const ids = ws.map((w: Company) => w.id);
+                const { data: integrations } = await supabase
+                    .from('marketing_integrations')
+                    .select('company_id, is_active, settings')
+                    .in('company_id', ids)
+                    .eq('provider', 'whatsapp')
+                    .eq('is_active', true);
+
+                const statusMap: Record<string, 'active' | 'inactive'> = {};
+                ids.forEach((id: string) => { statusMap[id] = 'inactive'; });
+                (integrations || []).forEach((i: any) => {
+                    if (i.settings?.token && i.settings?.phoneNumberId) {
+                        statusMap[i.company_id] = 'active';
+                    }
+                });
+                setWaStatus(statusMap);
+            }
         } catch (err) {
             console.error('Error loading workspaces:', err);
             toast.error('Error al cargar workspaces');
@@ -105,11 +131,35 @@ export default function Workspaces() {
 
     const openEditModal = (workspace: Company) => {
         setEditingWorkspace(workspace);
-        // Load metadata settings or fields if saved in metadata or direct cols
-        // Note: For WhatsApp WABA ID, phone number ID, and token, we read from marketing_integrations table
-        // of that workspace. Let's fetch the integration data first.
+        setVerifyStatus('idle');
+        setVerifyDetails('');
         setShowModal(true);
         fetchIntegrationDetails(workspace);
+    };
+
+    const handleVerifyConnection = async () => {
+        if (!formData.whatsapp_token || !formData.phone_number_id) {
+            toast.error('Ingresa el Token y el Phone Number ID primero');
+            return;
+        }
+        setVerifyStatus('loading');
+        setVerifyDetails('');
+        try {
+            const res = await fetch(
+                `https://graph.facebook.com/v19.0/${formData.phone_number_id}?fields=display_phone_number,verified_name,status,quality_rating&access_token=${formData.whatsapp_token}`
+            );
+            const data = await res.json();
+            if (data.error) {
+                setVerifyStatus('error');
+                setVerifyDetails(`Error ${data.error.code}: ${data.error.message}`);
+            } else {
+                setVerifyStatus('ok');
+                setVerifyDetails(`✅ ${data.display_phone_number} — ${data.verified_name} | Estado: ${data.status} | Calidad: ${data.quality_rating}`);
+            }
+        } catch (e: any) {
+            setVerifyStatus('error');
+            setVerifyDetails('No se pudo conectar con Meta. Verifica el token.');
+        }
     };
 
     const fetchIntegrationDetails = async (workspace: Company) => {
@@ -307,6 +357,7 @@ export default function Workspaces() {
                 {workspaces.map(w => {
                     const isCurrent = w.id === profile?.company_id;
                     const isParent = !w.parent_company_id;
+                    const waSt = waStatus[w.id];
 
                     return (
                         <div
@@ -331,8 +382,8 @@ export default function Workspaces() {
                                     }`}>
                                         {isParent ? '👑' : '🏢'}
                                     </div>
-                                    <div>
-                                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight truncate">
                                             {w.name}
                                         </h3>
                                         <span className={`inline-block text-[8px] font-black uppercase tracking-wider mt-0.5 px-2 py-0.5 rounded-full ${
@@ -343,7 +394,7 @@ export default function Workspaces() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2.5 text-[11px] text-gray-500 font-bold border-t border-gray-50 pt-4 mb-6">
+                                <div className="space-y-2.5 text-[11px] text-gray-500 font-bold border-t border-gray-50 pt-4 mb-4">
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">Estado de Licencia:</span>
                                         <span className="text-emerald-600 uppercase tracking-wider text-[10px]">{w.license_status}</span>
@@ -351,6 +402,21 @@ export default function Workspaces() {
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">Fecha de Creación:</span>
                                         <span>{new Date(w.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                    {/* WhatsApp Status Badge */}
+                                    <div className="flex justify-between items-center pt-1">
+                                        <span className="text-gray-400">WhatsApp:</span>
+                                        {waSt === 'active' ? (
+                                            <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[9px] font-black rounded-full border border-emerald-200">
+                                                <Wifi className="w-2.5 h-2.5" /> Conectado
+                                            </span>
+                                        ) : waSt === 'inactive' ? (
+                                            <span className="flex items-center gap-1 px-2 py-0.5 bg-gray-50 text-gray-400 text-[9px] font-black rounded-full border border-gray-200">
+                                                <WifiOff className="w-2.5 h-2.5" /> Sin configurar
+                                            </span>
+                                        ) : (
+                                            <span className="w-12 h-4 bg-gray-100 rounded-full animate-pulse" />
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -419,14 +485,53 @@ export default function Workspaces() {
 
                             {/* WhatsApp API Configuration */}
                             <div className="space-y-4 bg-gray-50/50 p-6 rounded-2xl border border-gray-100">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
-                                        <Key className="w-4 h-4" />
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
+                                            <Key className="w-4 h-4" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xs font-black text-gray-900 uppercase tracking-tight">API de WhatsApp Cloud</h3>
+                                            <p className="text-[10px] text-gray-400 font-medium">Asigna un número de WhatsApp dedicado a este departamento</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <h3 className="text-xs font-black text-gray-900 uppercase tracking-tight">API de WhatsApp Cloud</h3>
-                                        <p className="text-[10px] text-gray-400 font-medium">Asigna un número de WhatsApp dedicado a este departamento</p>
+                                    {/* Verify Button */}
+                                    <button
+                                        type="button"
+                                        onClick={handleVerifyConnection}
+                                        disabled={verifyStatus === 'loading' || !formData.whatsapp_token || !formData.phone_number_id}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all disabled:opacity-40 disabled:cursor-not-allowed
+                                            border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100"
+                                    >
+                                        {verifyStatus === 'loading'
+                                            ? <RefreshCw className="w-3 h-3 animate-spin" />
+                                            : verifyStatus === 'ok'
+                                            ? <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                            : verifyStatus === 'error'
+                                            ? <XCircle className="w-3 h-3 text-red-500" />
+                                            : <Wifi className="w-3 h-3" />}
+                                        {verifyStatus === 'loading' ? 'Verificando...' : 'Verificar'}
+                                    </button>
+                                </div>
+
+                                {/* Verify Result */}
+                                {verifyStatus !== 'idle' && verifyStatus !== 'loading' && verifyDetails && (
+                                    <div className={`text-[10px] font-bold px-3 py-2 rounded-lg ${
+                                        verifyStatus === 'ok'
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                            : 'bg-red-50 text-red-600 border border-red-200'
+                                    }`}>
+                                        {verifyDetails}
                                     </div>
+                                )}
+
+                                {/* Webhook reminder */}
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[10px] text-amber-800 font-medium">
+                                    <span className="font-black">⚠️ Webhook requerido:</span> En Meta Developers, el Callback URL debe ser{' '}
+                                    <code className="bg-amber-100 px-1 rounded text-[9px] font-mono break-all">
+                                        https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/meta-webhook
+                                    </code>
+                                    {' '}con Verify Token: <code className="bg-amber-100 px-1 rounded text-[9px] font-mono">crm_secure_verify</code>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -441,7 +546,7 @@ export default function Workspaces() {
                                     </div>
 
                                     <div className="space-y-1.5">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Identificador de Número de Teléfono (Phone ID)</label>
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Phone Number ID</label>
                                         <input
                                             value={formData.phone_number_id}
                                             onChange={e => setFormData({ ...formData, phone_number_id: e.target.value })}
@@ -451,20 +556,20 @@ export default function Workspaces() {
                                     </div>
 
                                     <div className="space-y-1.5">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Número Remitente Visible</label>
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Número Visible (con código de país)</label>
                                         <input
                                             value={formData.sender_phone_number}
                                             onChange={e => setFormData({ ...formData, sender_phone_number: e.target.value })}
-                                            placeholder="Ej: +521234567890"
+                                            placeholder="Ej: +50372690007"
                                             className="w-full h-11 px-3 rounded-lg bg-white border border-gray-200 focus:border-green-500/30 outline-none font-medium text-xs transition-all"
                                         />
                                     </div>
 
                                     <div className="space-y-1.5 md:col-span-2">
-                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Token de Acceso de WhatsApp</label>
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Access Token (System User — Sin fecha de expiración)</label>
                                         <input
                                             value={formData.whatsapp_token}
-                                            onChange={e => setFormData({ ...formData, whatsapp_token: e.target.value })}
+                                            onChange={e => { setFormData({ ...formData, whatsapp_token: e.target.value }); setVerifyStatus('idle'); }}
                                             placeholder="EAAQ4Ipb5..."
                                             className="w-full h-11 px-3 rounded-lg bg-white border border-gray-200 focus:border-green-500/30 outline-none font-mono text-[10px] transition-all"
                                         />

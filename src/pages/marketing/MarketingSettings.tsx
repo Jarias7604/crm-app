@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Mail, ArrowLeft, CheckCircle, Server, Shield, Cloud, MessageSquare, Bot, Globe, Smartphone, Send } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle, Server, Shield, Cloud, MessageSquare, Bot, Globe, Smartphone, Send, Wifi, CheckCircle2, XCircle, RefreshCw, Copy, ExternalLink } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { integrationService, type MarketingIntegration } from '../../services/marketing/integrationService';
 import { supabase } from '../../services/supabase';
@@ -16,6 +16,8 @@ export default function MarketingSettings() {
     const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
     const [formData, setFormData] = useState<any>({});
     const [isLoading, setIsLoading] = useState(false);
+    const [verifyStatus, setVerifyStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+    const [verifyDetails, setVerifyDetails] = useState('');
 
     useEffect(() => {
         if (location.state?.tab) {
@@ -97,6 +99,8 @@ export default function MarketingSettings() {
 
             toast.success('¡Conexión guardada con éxito!');
             setSelectedProvider(null);
+            setVerifyStatus('idle');
+            setVerifyDetails('');
             loadIntegrations();
         } catch (error: any) {
             console.error(error);
@@ -120,6 +124,39 @@ export default function MarketingSettings() {
     };
 
     const currentActive = getActiveIntegrationForTab(activeTab);
+
+    const handleVerifyMeta = async () => {
+        if (!formData.token || !formData.phoneNumberId) {
+            toast.error('Ingresa el Access Token y el Phone Number ID primero');
+            return;
+        }
+        setVerifyStatus('loading');
+        setVerifyDetails('');
+        try {
+            const res = await fetch(
+                `https://graph.facebook.com/v19.0/${formData.phoneNumberId}?fields=display_phone_number,verified_name,status,quality_rating&access_token=${formData.token}`
+            );
+            const data = await res.json();
+            if (data.error) {
+                setVerifyStatus('error');
+                setVerifyDetails(`Error ${data.error.code}: ${data.error.message}`);
+            } else {
+                setVerifyStatus('ok');
+                setVerifyDetails(`${data.display_phone_number} — ${data.verified_name} | ${data.status} | Calidad: ${data.quality_rating}`);
+            }
+        } catch {
+            setVerifyStatus('error');
+            setVerifyDetails('No se pudo conectar con Meta. Verifica el token.');
+        }
+    };
+
+    const WEBHOOK_URL = 'https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/meta-webhook';
+    const VERIFY_TOKEN = 'crm_secure_verify';
+
+    const copyToClipboard = (text: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        toast.success(`${label} copiado`);
+    };
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
@@ -287,7 +324,7 @@ export default function MarketingSettings() {
                         </button>
 
                         <h2 className="text-3xl font-black text-gray-900 mb-8 flex items-center gap-3 capitalize">
-                            Configurar {selectedProvider}
+                            Configurar {selectedProvider === 'meta' ? 'WhatsApp (Meta Cloud API)' : selectedProvider}
                         </h2>
 
                         <form onSubmit={handleSave} className="space-y-6">
@@ -337,8 +374,47 @@ export default function MarketingSettings() {
 
                             {selectedProvider === 'meta' && (
                                 <>
-                                    <InputBlock label="Access Token" type="password" value={formData.token} onChange={(v: string) => setFormData({ ...formData, token: v })} placeholder="EAAB..." />
-                                    <InputBlock label="Phone Number ID" type="text" value={formData.phoneNumberId} onChange={(v: string) => setFormData({ ...formData, phoneNumberId: v })} placeholder="12345..." />
+                                    <InputBlock
+                                        label="Access Token (System User — Sin expiración)"
+                                        type="password"
+                                        value={formData.token}
+                                        onChange={(v: string) => { setFormData({ ...formData, token: v }); setVerifyStatus('idle'); }}
+                                        placeholder="EAAQ4Ipb5RF0..."
+                                        hint="Genéralo en Meta Business Suite → Configuración → Usuarios del Sistema."
+                                    />
+                                    <InputBlock
+                                        label="Phone Number ID"
+                                        type="text"
+                                        value={formData.phoneNumberId}
+                                        onChange={(v: string) => { setFormData({ ...formData, phoneNumberId: v }); setVerifyStatus('idle'); }}
+                                        placeholder="Ej: 1128590870346279"
+                                        hint="Encuéntralo en Meta Developers → WhatsApp → API Setup."
+                                    />
+
+                                    {/* Verify button */}
+                                    <button
+                                        type="button"
+                                        onClick={handleVerifyMeta}
+                                        disabled={verifyStatus === 'loading' || !formData.token || !formData.phoneNumberId}
+                                        className="w-full py-3 rounded-2xl border-2 font-black text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-40
+                                            border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100"
+                                    >
+                                        {verifyStatus === 'loading' ? <RefreshCw className="w-4 h-4 animate-spin" /> :
+                                         verifyStatus === 'ok' ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> :
+                                         verifyStatus === 'error' ? <XCircle className="w-4 h-4 text-red-500" /> :
+                                         <Wifi className="w-4 h-4" />}
+                                        {verifyStatus === 'loading' ? 'Verificando con Meta...' : 'Verificar Conexión'}
+                                    </button>
+
+                                    {verifyStatus !== 'idle' && verifyStatus !== 'loading' && verifyDetails && (
+                                        <div className={`text-sm font-bold px-4 py-3 rounded-2xl ${
+                                            verifyStatus === 'ok'
+                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                : 'bg-red-50 text-red-600 border border-red-200'
+                                        }`}>
+                                            {verifyStatus === 'ok' ? '✅ ' : '❌ '}{verifyDetails}
+                                        </div>
+                                    )}
                                 </>
                             )}
 
@@ -374,38 +450,96 @@ export default function MarketingSettings() {
 
                     {/* Guide */}
                     <div className="bg-gray-50 p-8 rounded-3xl border border-gray-100">
-                        <h3 className="text-xl font-black text-gray-900 mb-8 flex items-center gap-2">
+                        <h3 className="text-xl font-black text-gray-900 mb-6 flex items-center gap-2">
                             <Globe className="w-6 h-6 text-blue-500" />
-                            ¿Dónde consigo esto?
+                            ¿Cómo obtener las credenciales?
                         </h3>
-                        <div className="space-y-6 text-gray-600 font-medium">
-                            {selectedProvider === 'twilio' ? (
-                                <ul className="space-y-4 list-disc list-inside">
+                        <div className="space-y-5">
+                            {selectedProvider === 'meta' ? (
+                                <div className="space-y-4">
+                                    {/* Step 1 */}
+                                    <div className="flex gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-[#0f172a] text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">1</div>
+                                        <div>
+                                            <p className="text-sm font-black text-gray-800">Crea tu app en Meta Developers</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">Ve a <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="text-blue-500 underline">developers.facebook.com</a> → <strong>Mis apps</strong> → <strong>Crear app</strong> → Tipo: <strong>Negocios</strong></p>
+                                        </div>
+                                    </div>
+                                    {/* Step 2 */}
+                                    <div className="flex gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-[#0f172a] text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">2</div>
+                                        <div>
+                                            <p className="text-sm font-black text-gray-800">Agrega WhatsApp a tu app</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">En tu app → <strong>Productos</strong> → Busca <strong>WhatsApp</strong> → clic en <strong>Configurar</strong></p>
+                                        </div>
+                                    </div>
+                                    {/* Step 3 */}
+                                    <div className="flex gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-[#0f172a] text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">3</div>
+                                        <div>
+                                            <p className="text-sm font-black text-gray-800">Copia el Phone Number ID</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">WhatsApp → <strong>Configuración de API</strong> → copia el <strong>Identificador de número de teléfono</strong></p>
+                                        </div>
+                                    </div>
+                                    {/* Step 4 */}
+                                    <div className="flex gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-[#0f172a] text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">4</div>
+                                        <div>
+                                            <p className="text-sm font-black text-gray-800">Genera un Token Permanente</p>
+                                            <p className="text-xs text-gray-500 mt-0.5"><a href="https://business.facebook.com/settings/system-users" target="_blank" rel="noreferrer" className="text-blue-500 underline">business.facebook.com</a> → Configuración → <strong>Usuarios del Sistema</strong> → Generar Token → marca <code className="bg-gray-100 px-1 rounded">whatsapp_business_messaging</code></p>
+                                        </div>
+                                    </div>
+                                    {/* Step 5 — Webhook */}
+                                    <div className="flex gap-3">
+                                        <div className="w-6 h-6 rounded-full bg-green-600 text-white text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">5</div>
+                                        <div className="flex-1">
+                                            <p className="text-sm font-black text-gray-800">Configura el Webhook en Meta</p>
+                                            <p className="text-xs text-gray-500 mt-0.5 mb-2">En tu app → WhatsApp → <strong>Configuración</strong> → Webhook:</p>
+                                            <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-2">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-gray-400 uppercase">Callback URL</p>
+                                                        <p className="text-[10px] font-mono text-gray-700 break-all">{WEBHOOK_URL}</p>
+                                                    </div>
+                                                    <button type="button" onClick={() => copyToClipboard(WEBHOOK_URL, 'Webhook URL')} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 shrink-0">
+                                                        <Copy className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-gray-400 uppercase">Verify Token</p>
+                                                        <p className="text-[10px] font-mono text-gray-700">{VERIFY_TOKEN}</p>
+                                                    </div>
+                                                    <button type="button" onClick={() => copyToClipboard(VERIFY_TOKEN, 'Verify Token')} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 shrink-0">
+                                                        <Copy className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-gray-400 mt-1.5">Suscribe el campo <strong>messages</strong> y haz clic en <strong>Verificar y guardar</strong>.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : selectedProvider === 'twilio' ? (
+                                <ul className="space-y-4 list-disc list-inside text-gray-600 font-medium">
                                     <li>Crea una cuenta en <b>Twilio.com</b>.</li>
                                     <li>Encuentra tu <b>Account SID</b> en el Console Dashboard.</li>
                                     <li>Copia el <b>Auth Token</b> (haz clic en 'Show').</li>
                                 </ul>
-                            ) : selectedProvider === 'meta' ? (
-                                <ul className="space-y-4 list-disc list-inside">
-                                    <li>Ve a <b>developers.facebook.com</b>.</li>
-                                    <li>Configura la app de WhatsApp.</li>
-                                    <li>Genera un <b>Permanent Token</b> en los ajustes.</li>
-                                </ul>
                             ) : selectedProvider === 'telegram' ? (
-                                <ul className="space-y-4 list-disc list-inside">
+                                <ul className="space-y-4 list-disc list-inside text-gray-600 font-medium">
                                     <li>Busca a <b>@BotFather</b> en Telegram.</li>
                                     <li>Envía el comando <code>/newbot</code>.</li>
                                     <li>Sigue los pasos y copia el <b>API Token</b>.</li>
                                     <li>Asegúrate de que el bot no esté en modo privado si quieres recibir mensajes.</li>
                                 </ul>
                             ) : selectedProvider === 'openai' ? (
-                                <ul className="space-y-4 list-disc list-inside">
+                                <ul className="space-y-4 list-disc list-inside text-gray-600 font-medium">
                                     <li>Inicia sesión en <b>platform.openai.com</b>.</li>
                                     <li>Ve a la sección <b>API Keys</b>.</li>
                                     <li>Crea una nueva "Secret Key".</li>
                                 </ul>
                             ) : (
-                                <p>Sigue las instrucciones oficiales del proveedor para generar credenciales de acceso seguro API.</p>
+                                <p className="text-gray-600 font-medium">Sigue las instrucciones oficiales del proveedor para generar credenciales de acceso seguro API.</p>
                             )}
                         </div>
                     </div>
