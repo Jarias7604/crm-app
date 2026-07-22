@@ -363,7 +363,7 @@ export default function Workspaces() {
                         </p>
                     </div>
                 </div>
-                {profile?.role === 'company_admin' && (
+                {(profile?.role === 'company_admin' || profile?.role === 'super_admin') && (
                     <button
                         onClick={openCreateModal}
                         className="flex items-center gap-2 px-6 py-3 bg-[#4449AA] text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-indigo-200 hover:translate-y-[-1px] active:scale-95 transition-all"
