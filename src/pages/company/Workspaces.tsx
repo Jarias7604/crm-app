@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Building2, Plus, Key, Loader2, X, Check,
-    Settings, ShieldAlert, ArrowLeftRight, Wifi, WifiOff, CheckCircle2, XCircle, RefreshCw
+    Settings, ShieldAlert, ArrowLeftRight, Wifi, WifiOff, CheckCircle2, XCircle, RefreshCw, Zap
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import type { Company } from '../../types';
+import WhatsAppConnectWizard from '../../components/marketing/WhatsAppConnectWizard';
 
 export default function Workspaces() {
     const { profile, setSimulatedCompanyId } = useAuth();
@@ -29,6 +30,7 @@ export default function Workspaces() {
     const [isSaving, setIsSaving] = useState(false);
     const [verifyStatus, setVerifyStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
     const [verifyDetails, setVerifyDetails] = useState<string>('');
+    const [showWizard, setShowWizard] = useState(true); // default: show simple wizard
 
     // WhatsApp status per workspace: { [companyId]: 'active' | 'inactive' | 'loading' }
     const [waStatus, setWaStatus] = useState<Record<string, 'active' | 'inactive' | 'loading'>>({});
@@ -118,13 +120,14 @@ export default function Workspaces() {
 
     const openCreateModal = () => {
         setEditingWorkspace(null);
+        setShowWizard(true);
         setFormData({
             name: '',
             waba_id: '',
             phone_number_id: '',
             sender_phone_number: '',
             whatsapp_token: '',
-            allowed_permissions: [...parentPermissions] // inherits all parent permissions by default
+            allowed_permissions: [...parentPermissions]
         });
         setShowModal(true);
     };
@@ -133,8 +136,40 @@ export default function Workspaces() {
         setEditingWorkspace(workspace);
         setVerifyStatus('idle');
         setVerifyDetails('');
+        setShowWizard(true);
         setShowModal(true);
         fetchIntegrationDetails(workspace);
+    };
+
+    // Called by the WhatsAppConnectWizard when the user completes the flow
+    const handleWizardSave = async (data: { token: string; phoneNumberId: string; wabaId: string; phone: string }) => {
+        const targetCompanyId = editingWorkspace?.id;
+        if (!targetCompanyId) throw new Error('No workspace seleccionado');
+
+        const settingsPayload = {
+            token: data.token,
+            phoneNumberId: data.phoneNumberId,
+            wabaId: data.wabaId,
+            phone: data.phone,
+        };
+
+        const { data: existing } = await supabase
+            .from('marketing_integrations')
+            .select('id')
+            .eq('company_id', targetCompanyId)
+            .eq('provider', 'whatsapp')
+            .maybeSingle();
+
+        if (existing) {
+            await supabase.from('marketing_integrations').update({ settings: settingsPayload, is_active: true }).eq('id', existing.id);
+        } else {
+            await supabase.from('marketing_integrations').insert({ company_id: targetCompanyId, provider: 'whatsapp', settings: settingsPayload, is_active: true });
+        }
+
+        // Update badge
+        setWaStatus(prev => ({ ...prev, [targetCompanyId]: 'active' }));
+        toast.success(`✅ WhatsApp ${data.phone} conectado al workspace`);
+        window.dispatchEvent(new CustomEvent('refresh-workspaces'));
     };
 
     const handleVerifyConnection = async () => {
@@ -485,16 +520,32 @@ export default function Workspaces() {
 
                             {/* WhatsApp API Configuration */}
                             <div className="space-y-4 bg-gray-50/50 p-6 rounded-2xl border border-gray-100">
-                                <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
                                         <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
                                             <Key className="w-4 h-4" />
                                         </div>
                                         <div>
-                                            <h3 className="text-xs font-black text-gray-900 uppercase tracking-tight">API de WhatsApp Cloud</h3>
-                                            <p className="text-[10px] text-gray-400 font-medium">Asigna un número de WhatsApp dedicado a este departamento</p>
+                                            <h3 className="text-xs font-black text-gray-900 uppercase tracking-tight">WhatsApp de este Workspace</h3>
+                                            <p className="text-[10px] text-gray-400 font-medium">Conecta un número de WhatsApp dedicado a este departamento</p>
                                         </div>
                                     </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowWizard(!showWizard)}
+                                        className="text-[9px] font-black text-indigo-500 hover:text-indigo-700 uppercase tracking-widest transition-colors"
+                                    >
+                                        {showWizard ? 'Modo avanzado' : 'Modo simple'}
+                                    </button>
+                                </div>
+
+                                {showWizard ? (
+                                    <WhatsAppConnectWizard
+                                        onSave={handleWizardSave}
+                                        onCancel={() => { /* stay in modal, just close wizard */ }}
+                                        initialToken={formData.whatsapp_token}
+                                    />
+                                ) : (
                                     {/* Verify Button */}
                                     <button
                                         type="button"
@@ -553,9 +604,7 @@ export default function Workspaces() {
                                             placeholder="Ej: 1128590870346279"
                                             className="w-full h-11 px-3 rounded-lg bg-white border border-gray-200 focus:border-green-500/30 outline-none font-medium text-xs transition-all"
                                         />
-                                    </div>
-
-                                    <div className="space-y-1.5">
+                                                            <div className="space-y-1.5">
                                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Número Visible (con código de país)</label>
                                         <input
                                             value={formData.sender_phone_number}
@@ -575,7 +624,9 @@ export default function Workspaces() {
                                         />
                                     </div>
                                 </div>
+                                )}
                             </div>
+                     </div>
 
                             {/* Features Permissions */}
                             <div className="space-y-4">
