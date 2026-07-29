@@ -2246,17 +2246,19 @@ export default function Leads() {
             )}
 
             {/* ── BULK ASSIGN MODAL ────────────────────────────────────── */}
-            <BulkAssignModal
-                isOpen={isBulkAssignOpen}
-                onClose={() => setIsBulkAssignOpen(false)}
-                filteredLeadIds={filteredLeads.map(l => l.id)}
-                preSelectedIds={selectedLeadIds.length > 0 ? selectedLeadIds : []}
-                teamMembers={teamMembers}
-                onSuccess={() => {
-                    setSelectedLeadIds([]);
-                    loadLeads();
-                }}
-            />
+            {isBulkAssignOpen && (
+                <BulkAssignModal
+                    isOpen={isBulkAssignOpen}
+                    onClose={() => setIsBulkAssignOpen(false)}
+                    filteredLeadIds={filteredLeads.map(l => l.id)}
+                    preSelectedIds={selectedLeadIds.length > 0 ? selectedLeadIds : []}
+                    teamMembers={teamMembers}
+                    onSuccess={() => {
+                        setSelectedLeadIds([]);
+                        loadLeads();
+                    }}
+                />
+            )}
         </>
     );
 }
