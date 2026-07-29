@@ -1783,48 +1783,54 @@ export default function Leads() {
                         {/* Floating Bulk Actions Bar */}
                         {selectedLeadIds.length > 0 && (
                             <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-5 duration-300">
-                                <div className="bg-white px-6 py-4 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 flex items-center gap-6">
-                                    <div className="flex items-center gap-2 pr-6 border-r border-gray-100">
-                                        <div className="w-6 h-6 bg-[#4449AA] rounded-full flex items-center justify-center text-[10px] font-black text-white">
+                                <div className="bg-white px-5 py-3 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 flex items-center gap-4">
+                                    {/* Counter */}
+                                    <div className="flex items-center gap-2 pr-4 border-r border-gray-100">
+                                        <div className="w-7 h-7 bg-[#4449AA] rounded-full flex items-center justify-center text-[11px] font-black text-white shrink-0">
                                             {selectedLeadIds.length}
                                         </div>
-                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Seleccionados</span>
+                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">Seleccionados</span>
                                     </div>
-                                    <div className="flex items-center gap-4">
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-2">
+                                        {/* Cancelar — text link */}
                                         <button
                                             onClick={() => setSelectedLeadIds([])}
-                                            className="text-xs font-black text-gray-400 hover:text-gray-600 uppercase tracking-widest transition-colors"
+                                            className="text-xs font-black text-gray-400 hover:text-gray-600 uppercase tracking-widest transition-colors px-2"
                                         >
                                             Cancelar
                                         </button>
-                                        {/* ── BULK ASSIGN ── */}
+
+                                        <div className="w-px h-5 bg-gray-100" />
+
+                                        {/* PRIMARY: Asignar — full text + icon */}
                                         <button
                                             onClick={() => setIsBulkAssignOpen(true)}
-                                            className="flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-200"
+                                            className="flex items-center gap-2 bg-[#4449AA] text-white hover:bg-indigo-700 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-md shadow-indigo-200 whitespace-nowrap"
                                         >
-                                            <User className="w-3.5 h-3.5" />
-                                            Asignar a...
+                                            <User className="w-3.5 h-3.5 shrink-0" />
+                                            Asignar agente
                                         </button>
+
+                                        {/* SECONDARY: Preparar Mensaje — icon only + tooltip */}
                                         <button
-                                            onClick={() => {
-                                                navigate('/marketing/campaign/new', {
-                                                    state: {
-                                                        preSelectedLeads: selectedLeadIds,
-                                                        campaignSource: 'leads-bulk'
-                                                    }
-                                                });
-                                            }}
-                                            className="flex items-center gap-2 bg-indigo-50 text-indigo-600 hover:bg-[#4449AA] hover:text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
+                                            title="Preparar Mensaje masivo"
+                                            onClick={() => navigate('/marketing/campaign/new', {
+                                                state: { preSelectedLeads: selectedLeadIds, campaignSource: 'leads-bulk' }
+                                            })}
+                                            className="w-9 h-9 flex items-center justify-center bg-indigo-50 text-indigo-600 hover:bg-[#4449AA] hover:text-white rounded-xl transition-all active:scale-95 shrink-0"
                                         >
-                                            <Send className="w-3.5 h-3.5" />
-                                            Preparar Mensaje
+                                            <Send className="w-4 h-4" />
                                         </button>
+
+                                        {/* SECONDARY: Eliminar — icon only + tooltip */}
                                         <button
+                                            title="Eliminar seleccionados"
                                             onClick={handleBulkDelete}
-                                            className="flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
+                                            className="w-9 h-9 flex items-center justify-center bg-rose-50 text-rose-500 hover:bg-rose-600 hover:text-white rounded-xl transition-all active:scale-95 shrink-0"
                                         >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                            Eliminar Seleccionados
+                                            <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
                                 </div>
