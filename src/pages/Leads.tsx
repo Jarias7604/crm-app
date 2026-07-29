@@ -6,6 +6,7 @@ import { LeadToolbar } from '../components/leads/LeadToolbar';
 import { LeadDetailPanel } from '../components/leads/LeadDetailPanel';
 import { StatusBadge } from '../components/leads/StatusBadge';
 import { PriorityBadge } from '../components/leads/PriorityBadge';
+import { BulkAssignModal } from '../components/leads/BulkAssignModal';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -124,6 +125,7 @@ export default function Leads() {
 
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('list');
     const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+    const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: keyof Lead | 'value'; direction: 'asc' | 'desc' } | null>(null);
 
     // All available columns with labels
@@ -1795,6 +1797,14 @@ export default function Leads() {
                                         >
                                             Cancelar
                                         </button>
+                                        {/* ── BULK ASSIGN ── */}
+                                        <button
+                                            onClick={() => setIsBulkAssignOpen(true)}
+                                            className="flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-200"
+                                        >
+                                            <User className="w-3.5 h-3.5" />
+                                            Asignar a...
+                                        </button>
                                         <button
                                             onClick={() => {
                                                 navigate('/marketing/campaign/new', {
@@ -2234,10 +2244,19 @@ export default function Leads() {
                     </div>
                 </div>
             )}
+
+            {/* ── BULK ASSIGN MODAL ────────────────────────────────────── */}
+            <BulkAssignModal
+                isOpen={isBulkAssignOpen}
+                onClose={() => setIsBulkAssignOpen(false)}
+                filteredLeadIds={filteredLeads.map(l => l.id)}
+                preSelectedIds={selectedLeadIds.length > 0 ? selectedLeadIds : []}
+                teamMembers={teamMembers}
+                onSuccess={() => {
+                    setSelectedLeadIds([]);
+                    loadLeads();
+                }}
+            />
         </>
     );
 }
-
-
-
-

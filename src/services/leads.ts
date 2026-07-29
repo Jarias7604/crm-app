@@ -624,6 +624,21 @@ export const leadsService = {
         if (error) throw error;
     },
 
+    // Bulk assign leads to an agent — single SQL UPDATE (not N individual calls)
+    // Used by: Leads page bulk action bar + Lead Hunter post-import assignment
+    async bulkAssignLeads(leadIds: string[], agentId: string): Promise<number> {
+        if (!leadIds.length) return 0;
+
+        const { data, error } = await supabase
+            .from('leads')
+            .update({ assigned_to: agentId })
+            .in('id', leadIds)
+            .select('id');
+
+        if (error) throw error;
+        return data?.length ?? 0;
+    },
+
     // Get follow-ups for a lead
     async getFollowUps(leadId: string) {
         const { data, error } = await supabase

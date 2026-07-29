@@ -1,8 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap } from 'lucide-react';
+import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap, Users } from 'lucide-react';
 import { leadDiscoveryService, type DiscoveredLead } from '../../services/marketing/leadDiscovery';
+import { leadsService } from '../../services/leads';
 import { useAuth } from '../../auth/AuthProvider';
+import { BulkAssignModal } from '../../components/leads/BulkAssignModal';
 import toast from 'react-hot-toast';
 
 export default function LeadHunter() {
@@ -15,7 +17,13 @@ export default function LeadHunter() {
     const [isLoading, setIsLoading] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [isStartingCampaign, setIsStartingCampaign] = useState(false);
+    const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
+    const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [results, setResults] = useState<DiscoveredLead[]>([]);
+
+    useEffect(() => {
+        leadsService.getTeamMembers().then(data => setTeamMembers(data || [])).catch(() => {});
+    }, []);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     // Filters State
@@ -178,6 +186,17 @@ export default function LeadHunter() {
                         <Filter className="w-5 h-5" />
                         Filtros Avanzados
                     </button>
+
+                    {/* Asignar por % — appears when results are loaded */}
+                    {filteredResults.length > 0 && !isLoading && (
+                        <button
+                            onClick={() => setIsBulkAssignOpen(true)}
+                            className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all flex items-center gap-2 font-bold text-sm"
+                        >
+                            <Users className="w-5 h-5" />
+                            Asignar Leads
+                        </button>
+                    )}
 
                     {selectedIds.size > 0 && (
                         <div className="flex items-center gap-4 bg-[#0f172a] p-1.5 pl-6 rounded-2xl animate-in fade-in slide-in-from-right-4 duration-300">
@@ -422,6 +441,28 @@ export default function LeadHunter() {
                             : 'Selecciona una categoría y ubicación para empezar a llenar tu CRM de prospectos.'}
                     </p>
                 </div>
+            )}
+
+            {/* ── BULK ASSIGN MODAL (Lead Hunter) ──────────────────────── */}
+            {isBulkAssignOpen && (
+                <BulkAssignModal
+                    isOpen={isBulkAssignOpen}
+                    onClose={() => setIsBulkAssignOpen(false)}
+                    filteredLeadIds={filteredResults
+                        .filter(r => r.is_imported)
+                        .map(r => r.id)
+                        .concat(
+                            // Also include all visible results (they may already be in DB)
+                            filteredResults.filter(r => !r.is_imported).map(r => r.id)
+                        )
+                    }
+                    preSelectedIds={Array.from(selectedIds)}
+                    teamMembers={teamMembers}
+                    onSuccess={() => {
+                        setSelectedIds(new Set());
+                        toast.success('Leads asignados — ve a /leads para verlos.');
+                    }}
+                />
             )}
         </div>
     );
