@@ -118,6 +118,7 @@ export interface Lead {
     last_follow_up_at?: string | null;    // Last time any follow-up was registered
     first_follow_up_at?: string | null;   // First time a follow-up was registered
     assigned_at?: string | null;          // Time when lead was assigned
+    google_place_id?: string | null;       // Google Places ID — used by Lead Hunter AI for deduplication
     created_at: string;
     interested_product_id?: string | null;
 }

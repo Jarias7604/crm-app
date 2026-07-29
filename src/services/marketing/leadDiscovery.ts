@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import type { LeadStatus } from '../../types';
 
 export interface DiscoveredLead {
     id: string;
@@ -94,24 +95,36 @@ class LeadDiscoveryService {
     }
 
     async importLead(lead: DiscoveredLead, companyId: string): Promise<void> {
-        const newLead = {
+        const newLead: {
+            name: string;
+            company_name: string;
+            email: string | null;
+            phone: string | null;
+            source: string;
+            status: LeadStatus;          // TypeScript enforces valid TitleCase status
+            company_id: string;
+            google_place_id: string;
+            next_action_notes: string;
+        } = {
             name: lead.business_name,
             company_name: lead.business_name,
             email: lead.email || null,
             phone: lead.phone || null,
             source: 'Lead Hunter AI',
-            status: 'Prospecto' as const,
+            status: 'Prospecto',         // LeadStatus — TitleCase enforced by type
             company_id: companyId,
             google_place_id: lead.id,
             next_action_notes: `Prospecto de Lead Hunter. Dirección: ${lead.address}. Rating: ${lead.rating?.toFixed(1)}${lead.website ? `. Web: ${this.cleanDomain(lead.website)}` : ''}`
         };
 
-        // 2. Insertar en Supabase con prevención de duplicados
         const { error } = await supabase
             .from('leads')
             .upsert(newLead, { onConflict: 'google_place_id' });
 
-        if (error) throw error;
+        if (error) {
+            console.error('[LeadHunter] importLead error:', error.code, error.message, error.details);
+            throw error;
+        }
     }
 
     async importLeadsBulk(leads: DiscoveredLead[], companyId: string): Promise<{ success: number; failed: number }> {
@@ -122,13 +135,23 @@ class LeadDiscoveryService {
 
         for (const lead of leads) {
             try {
-                const newLead = {
+                const newLead: {
+                    name: string;
+                    company_name: string;
+                    email: string | null;
+                    phone: string | null;
+                    source: string;
+                    status: LeadStatus;  // TypeScript enforces valid TitleCase status
+                    company_id: string;
+                    google_place_id: string;
+                    next_action_notes: string;
+                } = {
                     name: lead.business_name,
                     company_name: lead.business_name,
                     email: lead.email || null,
                     phone: lead.phone || null,
                     source: 'Lead Hunter AI',
-                    status: 'Prospecto' as const,
+                    status: 'Prospecto',     // LeadStatus — TitleCase enforced by type
                     company_id: companyId,
                     google_place_id: lead.id,
                     next_action_notes: `Importación masiva. Dirección: ${lead.address}. Rating: ${lead.rating?.toFixed(1)}${lead.website ? `. Web: ${this.cleanDomain(lead.website)}` : ''}`
@@ -139,17 +162,18 @@ class LeadDiscoveryService {
                     .upsert(newLead, { onConflict: 'google_place_id' });
 
                 if (error) {
-                    // If duplicate email/phone, skip silently
+                    // Duplicate by google_place_id = expected, skip silently
                     if (error.code === '23505') {
                         failed++;
                     } else {
-                        console.error(`Error importing ${lead.business_name}:`, error);
+                        console.error(`[LeadHunter] bulk import error for "${lead.business_name}":`, error.code, error.message, error.details);
                         failed++;
                     }
                 } else {
                     success++;
                 }
             } catch (err) {
+                console.error(`[LeadHunter] unexpected error for "${lead.business_name}":`, err);
                 failed++;
             }
         }
