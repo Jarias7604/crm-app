@@ -204,33 +204,41 @@ export function PipelineIntelligenceBar({ leads, activeFilter, onFilterChange, c
 
               {/* Settings Panel */}
               {showSettings && (
-                <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-4 animate-in fade-in slide-in-from-top-2">
+                <div className="absolute right-0 top-full mt-2 w-[520px] bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-5 animate-in fade-in slide-in-from-top-2">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest">Configurar Pipeline</h3>
-                    <button onClick={() => setShowSettings(false)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400"><X className="w-3.5 h-3.5" /></button>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">Configurar Pipeline</h3>
+                      <p className="text-[10px] text-gray-400 mt-0.5">Las métricas se calculan sobre los leads activos visibles</p>
+                    </div>
+                    <button onClick={() => setShowSettings(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400"><X className="w-4 h-4" /></button>
                   </div>
 
-                  <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
 
                     {/* ── Sin contactar ── */}
                     <div className="rounded-xl border border-red-100 overflow-hidden">
                       <div className="flex items-center justify-between px-3 py-2 bg-red-50">
-                        <span className="text-[11px] font-black text-red-700 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Sin contactar</span>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
+                        <div>
+                          <span className="text-[11px] font-black text-red-700 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Sin contactar</span>
+                          <p className="text-[9px] text-red-400 mt-0.5">Leads sin seguimiento humano o AI en X días (usa último contacto o fecha de creación)</p>
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer shrink-0 ml-2">
                           <span className="text-[10px] text-red-500">{draft.enableNeverContacted ? 'Activo' : 'Oculto'}</span>
                           <input type="checkbox" checked={draft.enableNeverContacted} onChange={e => setDraft(d => ({ ...d, enableNeverContacted: e.target.checked }))} className="w-3.5 h-3.5 accent-red-600" />
                         </label>
                       </div>
-                      <div className="px-3 py-2.5 bg-white space-y-2">
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-500 mb-1">Texto del chip</p>
-                          <input type="text" value={draft.neverContactedLabel} onChange={e => setDraft(d => ({ ...d, neverContactedLabel: e.target.value }))} placeholder="Ej: Sin contactar" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-red-400" />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-500 mb-1">Días sin contacto para activar alerta</p>
-                          <div className="flex items-center gap-2">
-                            <input type="number" min={1} max={365} value={draft.neverContactedDays} onChange={e => setDraft(d => ({ ...d, neverContactedDays: +e.target.value }))} className="w-20 text-sm px-2 py-1.5 rounded-lg border border-gray-200 text-center font-black focus:outline-none focus:ring-1 focus:ring-red-400" />
-                            <span className="text-[11px] text-gray-500 font-bold">días sin contacto</span>
+                      <div className="px-3 py-2.5 bg-white">
+                        <div className="flex items-end gap-4">
+                          <div className="flex-1">
+                            <p className="text-[10px] font-bold text-gray-500 mb-1">Texto del chip</p>
+                            <input type="text" value={draft.neverContactedLabel} onChange={e => setDraft(d => ({ ...d, neverContactedLabel: e.target.value }))} placeholder="Sin contactar" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-red-400" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-500 mb-1">Días umbral</p>
+                            <div className="flex items-center gap-2">
+                              <input type="number" min={1} max={365} value={draft.neverContactedDays} onChange={e => setDraft(d => ({ ...d, neverContactedDays: +e.target.value }))} className="w-20 text-sm px-2 py-1.5 rounded-lg border border-gray-200 text-center font-black focus:outline-none focus:ring-1 focus:ring-red-400" />
+                              <span className="text-[11px] text-gray-500 font-bold whitespace-nowrap">días</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -239,27 +247,32 @@ export function PipelineIntelligenceBar({ leads, activeFilter, onFilterChange, c
                     {/* ── En riesgo ── */}
                     <div className="rounded-xl border border-amber-100 overflow-hidden">
                       <div className="flex items-center justify-between px-3 py-2 bg-amber-50">
-                        <span className="text-[11px] font-black text-amber-700 flex items-center gap-1.5"><AlertTriangle className="w-3 h-3" /> En riesgo</span>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
+                        <div>
+                          <span className="text-[11px] font-black text-amber-700 flex items-center gap-1.5"><AlertTriangle className="w-3 h-3" /> En riesgo</span>
+                          <p className="text-[9px] text-amber-400 mt-0.5">Leads en estados críticos sin contacto en X horas — recomendado: Cotizado, Negociación</p>
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer shrink-0 ml-2">
                           <span className="text-[10px] text-amber-500">{draft.enableAtRisk ? 'Activo' : 'Oculto'}</span>
                           <input type="checkbox" checked={draft.enableAtRisk} onChange={e => setDraft(d => ({ ...d, enableAtRisk: e.target.checked }))} className="w-3.5 h-3.5 accent-amber-600" />
                         </label>
                       </div>
-                      <div className="px-3 py-2.5 bg-white space-y-2">
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-500 mb-1">Texto del chip</p>
-                          <input type="text" value={draft.staleCotizadoLabel} onChange={e => setDraft(d => ({ ...d, staleCotizadoLabel: e.target.value }))} placeholder="Ej: Cotizados en riesgo" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-amber-400" />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-500 mb-1">Horas sin contacto para activar alerta</p>
-                          <div className="flex items-center gap-2">
-                            <input type="number" min={1} max={720} value={draft.staleCotizadoHours} onChange={e => setDraft(d => ({ ...d, staleCotizadoHours: +e.target.value }))} className="w-20 text-sm px-2 py-1.5 rounded-lg border border-gray-200 text-center font-black focus:outline-none focus:ring-1 focus:ring-amber-400" />
-                            <span className="text-[11px] text-gray-500 font-bold">horas sin contacto</span>
+                      <div className="px-3 py-2.5 bg-white space-y-2.5">
+                        <div className="flex items-end gap-4">
+                          <div className="flex-1">
+                            <p className="text-[10px] font-bold text-gray-500 mb-1">Texto del chip</p>
+                            <input type="text" value={draft.staleCotizadoLabel} onChange={e => setDraft(d => ({ ...d, staleCotizadoLabel: e.target.value }))} placeholder="Cotizados en riesgo" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-500 mb-1">Horas umbral</p>
+                            <div className="flex items-center gap-2">
+                              <input type="number" min={1} max={720} value={draft.staleCotizadoHours} onChange={e => setDraft(d => ({ ...d, staleCotizadoHours: +e.target.value }))} className="w-20 text-sm px-2 py-1.5 rounded-lg border border-gray-200 text-center font-black focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                              <span className="text-[11px] text-gray-500 font-bold whitespace-nowrap">horas</span>
+                            </div>
                           </div>
                         </div>
                         <div>
-                          <p className="text-[10px] font-bold text-gray-500 mb-1.5">Estados que cuentan como "en riesgo"</p>
-                          <div className="grid grid-cols-2 gap-1">
+                          <p className="text-[10px] font-bold text-gray-500 mb-1.5">Estados que cuentan como "en riesgo" <span className="text-amber-500 font-normal">(⚠️ evita seleccionar Prospecto — inflará el contador)</span></p>
+                          <div className="grid grid-cols-3 gap-1">
                             {ALL_STATUSES.filter(s => !['Cerrado','Cliente','Perdido','Erróneo'].includes(s)).map(status => {
                               const isSelected = (Array.isArray(draft.atRiskStatuses) ? draft.atRiskStatuses : []).includes(status);
                               const cfg = STATUS_CONFIG[status];
@@ -288,37 +301,45 @@ export function PipelineIntelligenceBar({ leads, activeFilter, onFilterChange, c
                     {/* ── Alta prioridad ── */}
                     <div className="rounded-xl border border-violet-100 overflow-hidden">
                       <div className="flex items-center justify-between px-3 py-2 bg-violet-50">
-                        <span className="text-[11px] font-black text-violet-700 flex items-center gap-1.5"><TrendingUp className="w-3 h-3" /> Alta prioridad fríos</span>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
+                        <div>
+                          <span className="text-[11px] font-black text-violet-700 flex items-center gap-1.5"><TrendingUp className="w-3 h-3" /> Alta prioridad fríos</span>
+                          <p className="text-[9px] text-violet-400 mt-0.5">Leads con prioridad Alta o Muy Alta sin seguimiento en más de X días</p>
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer shrink-0 ml-2">
                           <span className="text-[10px] text-violet-500">{draft.enableHighPriority ? 'Activo' : 'Oculto'}</span>
                           <input type="checkbox" checked={draft.enableHighPriority} onChange={e => setDraft(d => ({ ...d, enableHighPriority: e.target.checked }))} className="w-3.5 h-3.5 accent-violet-600" />
                         </label>
                       </div>
                       <div className="px-3 py-2.5 bg-white">
                         <p className="text-[10px] font-bold text-gray-500 mb-1">Texto del chip</p>
-                        <input type="text" value={draft.highPriorityLabel} onChange={e => setDraft(d => ({ ...d, highPriorityLabel: e.target.value }))} placeholder="Ej: Alta prioridad fríos" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                        <input type="text" value={draft.highPriorityLabel} onChange={e => setDraft(d => ({ ...d, highPriorityLabel: e.target.value }))} placeholder="Alta prioridad fríos" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-400" />
                       </div>
                     </div>
 
                     {/* ── Activos ── */}
                     <div className="rounded-xl border border-emerald-100 overflow-hidden">
                       <div className="flex items-center justify-between px-3 py-2 bg-emerald-50">
-                        <span className="text-[11px] font-black text-emerald-700 flex items-center gap-1.5"><Zap className="w-3 h-3" /> Activos</span>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
+                        <div>
+                          <span className="text-[11px] font-black text-emerald-700 flex items-center gap-1.5"><Zap className="w-3 h-3" /> Activos esta semana</span>
+                          <p className="text-[9px] text-emerald-400 mt-0.5">Leads con seguimiento registrado en los últimos X días (requiere al menos 1 seguimiento)</p>
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer shrink-0 ml-2">
                           <span className="text-[10px] text-emerald-500">{draft.enableActive ? 'Activo' : 'Oculto'}</span>
                           <input type="checkbox" checked={draft.enableActive} onChange={e => setDraft(d => ({ ...d, enableActive: e.target.checked }))} className="w-3.5 h-3.5 accent-emerald-600" />
                         </label>
                       </div>
-                      <div className="px-3 py-2.5 bg-white space-y-2">
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-500 mb-1">Texto del chip</p>
-                          <input type="text" value={draft.activeLabel} onChange={e => setDraft(d => ({ ...d, activeLabel: e.target.value }))} placeholder="Ej: Activos esta semana" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-emerald-400" />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-500 mb-1">Lead activo si fue contactado en los últimos</p>
-                          <div className="flex items-center gap-2">
-                            <input type="number" min={1} max={90} value={draft.activeContactDays} onChange={e => setDraft(d => ({ ...d, activeContactDays: +e.target.value }))} className="w-20 text-sm px-2 py-1.5 rounded-lg border border-gray-200 text-center font-black focus:outline-none focus:ring-1 focus:ring-emerald-400" />
-                            <span className="text-[11px] text-gray-500 font-bold">días</span>
+                      <div className="px-3 py-2.5 bg-white">
+                        <div className="flex items-end gap-4">
+                          <div className="flex-1">
+                            <p className="text-[10px] font-bold text-gray-500 mb-1">Texto del chip</p>
+                            <input type="text" value={draft.activeLabel} onChange={e => setDraft(d => ({ ...d, activeLabel: e.target.value }))} placeholder="Activos esta semana" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-500 mb-1">Días umbral</p>
+                            <div className="flex items-center gap-2">
+                              <input type="number" min={1} max={90} value={draft.activeContactDays} onChange={e => setDraft(d => ({ ...d, activeContactDays: +e.target.value }))} className="w-20 text-sm px-2 py-1.5 rounded-lg border border-gray-200 text-center font-black focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                              <span className="text-[11px] text-gray-500 font-bold whitespace-nowrap">días</span>
+                            </div>
                           </div>
                         </div>
                       </div>
