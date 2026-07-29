@@ -108,14 +108,34 @@ export function PipelineIntelligenceBar({ leads, activeFilter, onFilterChange, c
     const total = active.length;
     if (total === 0) return null;
 
-    const neverContacted = active.filter(l => !l.last_follow_up_at && daysSince(l.created_at) >= t.neverContactedDays);
+    // ── Sin contactar ────────────────────────────────────────────────────
+    // Use last_follow_up_at if exists, else created_at
+    // A lead with a follow-up 65 days ago and threshold=60 days → APPEARS
+    const neverContacted = active.filter(l => {
+      const ref = l.last_follow_up_at ?? l.created_at;
+      return daysSince(ref) >= t.neverContactedDays;
+    });
+
+    // ── En riesgo ────────────────────────────────────────────────────────
+    // Status matches atRiskStatuses AND no contact in X hours
     const atRiskQuoted = active.filter(l =>
       atRiskStatusList.some(s => l.status?.toLowerCase().includes(s.toLowerCase())) &&
       hoursSince(l.last_follow_up_at ?? l.created_at) >= t.staleCotizadoHours
     );
-    const activeThisWeek = active.filter(l => daysSince(l.last_follow_up_at) <= t.activeContactDays);
+
+    // ── Activos esta semana ────────────────────────────────────────────
+    // MUST have a real follow-up date (last_follow_up_at != null)
+    // A lead with no follow-up is NOT "active", even if recently created
+    const activeThisWeek = active.filter(l =>
+      l.last_follow_up_at != null &&
+      daysSince(l.last_follow_up_at) <= t.activeContactDays
+    );
+
+    // ── Alta prioridad fríos ────────────────────────────────────────────
+    // High/very_high priority, inactive longer than activeContactDays
     const highPriorityStale = active.filter(l =>
-      l.priority === 'high' && daysSince(l.last_follow_up_at ?? l.created_at) > t.activeContactDays
+      (l.priority === 'high' || l.priority === 'very_high') &&
+      daysSince(l.last_follow_up_at ?? l.created_at) > t.activeContactDays
     );
 
     const withFirstContact = active.filter(l => l.first_follow_up_at);
@@ -374,10 +394,32 @@ export function applyPipelineFilter(leads: Lead[], filter: PipelineFilter, compa
   const atRisk = Array.isArray(s.atRiskStatuses) ? s.atRiskStatuses : [];
 
   switch (filter) {
-    case 'never_contacted': return leads.filter(l => !l.last_follow_up_at && !['Cerrado','Cliente','Perdido'].includes(l.status??'') && daysSince(l.created_at) >= s.neverContactedDays);
-    case 'at_risk_quoted': return leads.filter(l => atRisk.some(x => l.status?.toLowerCase().includes(x.toLowerCase())) && hoursSince(l.last_follow_up_at??l.created_at) >= s.staleCotizadoHours);
-    case 'active_this_week': return leads.filter(l => daysSince(l.last_follow_up_at) <= s.activeContactDays);
-    case 'high_priority_stale': return leads.filter(l => l.priority==='high' && !['Cerrado','Cliente','Perdido'].includes(l.status??'') && daysSince(l.last_follow_up_at??l.created_at) > s.activeContactDays);
+    // ── Sin contactar: use last_follow_up_at if exists, else created_at ──
+    case 'never_contacted': return leads.filter(l => {
+      if (['Cerrado','Cliente','Perdido'].includes(l.status ?? '')) return false;
+      const ref = l.last_follow_up_at ?? l.created_at;
+      return daysSince(ref) >= s.neverContactedDays;
+    });
+
+    // ── En riesgo: at-risk status + no contact in X hours ──
+    case 'at_risk_quoted': return leads.filter(l =>
+      atRisk.some(x => l.status?.toLowerCase().includes(x.toLowerCase())) &&
+      hoursSince(l.last_follow_up_at ?? l.created_at) >= s.staleCotizadoHours
+    );
+
+    // ── Activos: MUST have real follow-up within X days ──
+    case 'active_this_week': return leads.filter(l =>
+      l.last_follow_up_at != null &&
+      daysSince(l.last_follow_up_at) <= s.activeContactDays
+    );
+
+    // ── Alta prioridad fríos: high/very_high + inactive > X days ──
+    case 'high_priority_stale': return leads.filter(l =>
+      (l.priority === 'high' || l.priority === 'very_high') &&
+      !['Cerrado','Cliente','Perdido'].includes(l.status ?? '') &&
+      daysSince(l.last_follow_up_at ?? l.created_at) > s.activeContactDays
+    );
+
     default: return leads;
   }
 }
