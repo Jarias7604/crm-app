@@ -701,9 +701,25 @@ export const leadsService = {
                 .from('leads')
                 .update({
                     next_followup_date: followUp.date,
-                    next_followup_assignee: assignedTo || null
+                    next_followup_assignee: assignedTo || null,
+                    // ── CRITICAL: update last_follow_up_at so Pipeline Intelligence metrics are accurate ──
+                    last_follow_up_at: new Date().toISOString(),
                 })
                 .eq('id', followUp.lead_id);
+
+            // Also set first_follow_up_at if this is the very first follow-up for this lead
+            const { data: leadData } = await supabase
+                .from('leads')
+                .select('first_follow_up_at')
+                .eq('id', followUp.lead_id)
+                .single();
+
+            if (!leadData?.first_follow_up_at) {
+                await supabase
+                    .from('leads')
+                    .update({ first_follow_up_at: new Date().toISOString() })
+                    .eq('id', followUp.lead_id);
+            }
         }
 
         return data as FollowUp;
