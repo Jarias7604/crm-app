@@ -1409,7 +1409,7 @@ export default function Leads() {
                             {leads.filter(l => {
                                 if (!canViewAllLeads && l.assigned_to !== profile?.id) return false;
                                 if (assignedFilter !== 'all') {
-                                    if (Array.isArray(assignedFilter)) { if (!assignedFilter.includes(l.assigned_to)) return false; }
+                                    if (Array.isArray(assignedFilter)) { if (!assignedFilter.includes(l.assigned_to ?? '')) return false; }
                                     else if (assignedFilter === 'unassigned') { if (l.assigned_to) return false; }
                                     else if (l.assigned_to !== assignedFilter) return false;
                                 }
@@ -1432,7 +1432,7 @@ export default function Leads() {
                             {leads.filter(l => {
                                 if (!canViewAllLeads && l.assigned_to !== profile?.id) return false;
                                 if (assignedFilter !== 'all') {
-                                    if (Array.isArray(assignedFilter)) { if (!assignedFilter.includes(l.assigned_to)) return false; }
+                                    if (Array.isArray(assignedFilter)) { if (!assignedFilter.includes(l.assigned_to ?? '')) return false; }
                                     else if (assignedFilter === 'unassigned') { if (l.assigned_to) return false; }
                                     else if (l.assigned_to !== assignedFilter) return false;
                                 }
