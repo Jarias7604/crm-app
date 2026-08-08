@@ -344,6 +344,14 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                                         Cotizado
                                                                                     </span>
                                                                                 )}
+                                                                                {lead.reengaged_at && (
+                                                                                    <span
+                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 uppercase tracking-widest shrink-0"
+                                                                                        title={`♻️ Recuperado desde "${lead.reengaged_from}" vía ${lead.reengaged_via?.toUpperCase()} — ${lead.reengaged_at ? new Date(lead.reengaged_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}`}
+                                                                                    >
+                                                                                        ♻️ Recuperado
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                             <span className="text-xs text-blue-600 font-bold truncate" title={lead.company_name || 'Individual'}>{lead.company_name || 'Individual'}</span>
                                                                         </div>
