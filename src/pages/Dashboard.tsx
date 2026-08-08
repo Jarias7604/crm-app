@@ -2120,25 +2120,25 @@ export default function Dashboard() {
                 {/* ── Recovery Intelligence (Reemplaza Lead Health Pulse) ── */}
                 <div className="lg:col-span-4 flex flex-col h-full">
                     <div className="bg-white rounded-[24px] border border-slate-200/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] transition-all duration-500 overflow-hidden flex flex-col h-full">
-                        {/* Header */}
+                        {/* Header con Gradiente Esmeralda -> Verde Mar -> Azul Cyan -> Violeta */}
                         <div 
                             onClick={() => navigate('/leads', { state: { pipelineView: 'all', statusFilter: 'all' } })}
-                            className="px-4 py-3 border-b border-slate-100/80 flex items-center justify-between bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 cursor-pointer group select-none"
+                            className="px-4 py-3.5 border-b border-slate-100/80 flex items-center justify-between bg-gradient-to-r from-emerald-400 via-teal-500 via-cyan-500 via-blue-600 to-indigo-600 cursor-pointer group select-none shadow-sm"
                         >
                             <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-sm">
+                                <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/30 shadow-sm">
                                     <RefreshCw className="w-4 h-4 text-white" />
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-1.5">
-                                        <span className="text-[9px] font-black text-emerald-100 uppercase tracking-[0.2em]">Recovery Intelligence</span>
-                                        <span className="bg-emerald-500/40 text-white text-[8px] font-extrabold px-1.5 py-0.2 rounded-full border border-white/20">Auto-Reactivación</span>
+                                        <span className="text-[9px] font-black text-white/90 uppercase tracking-[0.2em]">Recovery Intelligence</span>
+                                        <span className="bg-white/20 backdrop-blur-md text-white text-[8px] font-extrabold px-2 py-0.2 rounded-full border border-white/30">Auto-Reactivación</span>
                                     </div>
-                                    <p className="text-white font-black text-xs leading-tight">Leads Recuperados del Pool de Campañas</p>
+                                    <p className="text-white font-black text-xs leading-tight drop-shadow-xs">Leads Recuperados del Pool de Campañas</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <span className="text-2xl font-black text-white">{recoveryStats?.thisMonth || 0}</span>
+                                <span className="text-2xl font-black text-white drop-shadow-xs">{recoveryStats?.thisMonth || 0}</span>
                                 <ArrowRight className="w-4 h-4 text-white/80 group-hover:translate-x-1 transition-transform" />
                             </div>
                         </div>
@@ -2151,7 +2151,7 @@ export default function Dashboard() {
                                     <span className="text-xs">💬</span>
                                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">WhatsApp</span>
                                 </div>
-                                <span className="text-2xl font-black text-emerald-600">{recoveryStats?.byChannel.whatsapp || 0}</span>
+                                <span className="text-2xl font-black text-teal-600">{recoveryStats?.byChannel.whatsapp || 0}</span>
                                 <span className="text-[9px] font-bold text-slate-400 mt-0.5">respuestas automáticas</span>
                             </div>
 
@@ -2190,7 +2190,7 @@ export default function Dashboard() {
                         <div className="flex-1 p-3 flex flex-col justify-between bg-slate-50/50">
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Últimos Leads Reactivados</span>
-                                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/50">En tiempo real</span>
+                                <span className="text-[9px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200/50">En tiempo real</span>
                             </div>
 
                             {recoveryStats?.recentLeads && recoveryStats.recentLeads.length > 0 ? (
@@ -2199,12 +2199,12 @@ export default function Dashboard() {
                                         <div 
                                             key={lead.id} 
                                             onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
-                                            className="bg-white p-2.5 rounded-xl border border-slate-200/70 flex items-center justify-between shadow-2xs hover:border-emerald-400 transition-colors cursor-pointer group/item"
+                                            className="bg-white p-2.5 rounded-xl border border-slate-200/70 flex items-center justify-between shadow-2xs hover:border-teal-400 transition-colors cursor-pointer group/item"
                                         >
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-1.5">
-                                                    <p className="text-xs font-bold text-slate-900 truncate group-hover/item:text-emerald-600 transition-colors">{lead.name}</p>
-                                                    <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded-md shrink-0">♻️ Recuperado</span>
+                                                    <p className="text-xs font-bold text-slate-900 truncate group-hover/item:text-teal-600 transition-colors">{lead.name}</p>
+                                                    <span className="text-[9px] font-extrabold text-teal-800 bg-teal-100/80 px-1.5 py-0.2 rounded-md shrink-0">♻️ Recuperado</span>
                                                 </div>
                                                 <p className="text-[9px] text-slate-400 font-medium truncate mt-0.5">
                                                     Desde <span className="font-bold text-slate-600">{lead.reengaged_from || 'Llamada fría'}</span> · vía {lead.reengaged_via?.toUpperCase() || 'WHATSAPP'}
@@ -2225,10 +2225,10 @@ export default function Dashboard() {
 
                             <button
                                 onClick={() => navigate('/leads', { state: { pipelineView: 'all', statusFilter: 'all' } })}
-                                className="mt-3 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 uppercase tracking-wider"
+                                className="mt-3 w-full py-2.5 bg-gradient-to-r from-emerald-400 via-teal-500 via-cyan-500 via-blue-600 to-indigo-600 hover:opacity-95 text-white text-[10px] font-black rounded-xl transition-all shadow-md shadow-cyan-500/20 flex items-center justify-center gap-1.5 uppercase tracking-wider"
                             >
                                 Ver todos los recuperados en Leads
-                                <ArrowRight className="w-3 h-3" />
+                                <ArrowRight className="w-3.5 h-3.5" />
                             </button>
                         </div>
                     </div>
