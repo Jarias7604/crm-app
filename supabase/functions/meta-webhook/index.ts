@@ -227,15 +227,41 @@ serve(async (req) => {
                                 // Más robusto: no depende de marketing_conversations.lead_id.
                                 try {
                                     const BACKGROUND_STATUSES = ['Llamada fría', 'En Nutrición'];
-                                    // msg.from viene como "17039459240" (sin +), leads guardan "+17039459240" o "17039459240"
-                                    const { data: matchedLead } = await supabase
+                                    // chatId = msg.from = "15713709774" (sin +)
+                                    // leads pueden guardar "+15713709774" o "15713709774"
+                                    // Usamos filter() con ilike en vez de .or() para evitar encoding issues con %
+                                    const phoneWithPlus    = `+${chatId}`;
+                                    const phoneWithoutPlus = chatId;
+
+                                    let matchedLead: any = null;
+
+                                    // Intento 1: con prefijo +
+                                    const { data: lead1 } = await supabase
                                         .from('leads')
                                         .select('id, status, reengaged_at')
                                         .eq('company_id', companyId)
-                                        .or(`phone.ilike.%${chatId}%,phone.ilike.+${chatId}`)
+                                        .eq('phone', phoneWithPlus)
                                         .in('status', BACKGROUND_STATUSES)
                                         .is('reengaged_at', null)
+                                        .limit(1)
                                         .maybeSingle();
+
+                                    if (lead1) {
+                                        matchedLead = lead1;
+                                    } else {
+                                        // Intento 2: sin prefijo +
+                                        const { data: lead2 } = await supabase
+                                            .from('leads')
+                                            .select('id, status, reengaged_at')
+                                            .eq('company_id', companyId)
+                                            .eq('phone', phoneWithoutPlus)
+                                            .in('status', BACKGROUND_STATUSES)
+                                            .is('reengaged_at', null)
+                                            .limit(1)
+                                            .maybeSingle();
+                                        if (lead2) matchedLead = lead2;
+                                    }
+
 
                                     if (matchedLead) {
                                         const now = new Date().toISOString();
