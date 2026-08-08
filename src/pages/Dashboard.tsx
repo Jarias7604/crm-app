@@ -1074,6 +1074,18 @@ export default function Dashboard() {
                                                                 setEscalationThreshold(escalationThresholdInput);
                                                                 setShowEscalationConfig(false);
                                                                 toast.success(`Umbral actualizado a ${escalationThresholdInput} intentos`);
+                                                                // Re-fetch escalation leads with the new threshold immediately
+                                                                let refetchQuery = supabase
+                                                                    .from('leads')
+                                                                    .select('id, name, company_name, phone, email, contact_count, created_at, assigned_to')
+                                                                    .eq('company_id', profile.company_id)
+                                                                    .eq('status', 'Llamada fría')
+                                                                    .gte('contact_count', escalationThresholdInput)
+                                                                    .order('contact_count', { ascending: false })
+                                                                    .limit(10);
+                                                                if (dashboardAssignedTo) refetchQuery = refetchQuery.eq('assigned_to', dashboardAssignedTo);
+                                                                const { data: refreshed } = await refetchQuery;
+                                                                setEscalationLeads(refreshed || []);
                                                             } catch (err) {
                                                                 toast.error('No se pudo guardar');
                                                             } finally {
