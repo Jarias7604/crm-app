@@ -1406,7 +1406,15 @@ export default function Leads() {
                         <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${
                             pipelineView === 'active' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-600'
                         }`}>
-                            {leads.filter(l => !(BACKGROUND_STATUSES as readonly string[]).includes(l.status) && l.status !== 'Erróneo' && l.status !== 'Perdido').length}
+                            {leads.filter(l => {
+                                if (!canViewAllLeads && l.assigned_to !== profile?.id) return false;
+                                if (assignedFilter !== 'all') {
+                                    if (Array.isArray(assignedFilter)) { if (!assignedFilter.includes(l.assigned_to)) return false; }
+                                    else if (assignedFilter === 'unassigned') { if (l.assigned_to) return false; }
+                                    else if (l.assigned_to !== assignedFilter) return false;
+                                }
+                                return !(BACKGROUND_STATUSES as readonly string[]).includes(l.status) && l.status !== 'Erróneo' && l.status !== 'Perdido';
+                            }).length}
                         </span>
                     </button>
                     <button
@@ -1421,7 +1429,15 @@ export default function Leads() {
                         <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${
                             pipelineView === 'pool' ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-600'
                         }`}>
-                            {leads.filter(l => (BACKGROUND_STATUSES as readonly string[]).includes(l.status)).length}
+                            {leads.filter(l => {
+                                if (!canViewAllLeads && l.assigned_to !== profile?.id) return false;
+                                if (assignedFilter !== 'all') {
+                                    if (Array.isArray(assignedFilter)) { if (!assignedFilter.includes(l.assigned_to)) return false; }
+                                    else if (assignedFilter === 'unassigned') { if (l.assigned_to) return false; }
+                                    else if (l.assigned_to !== assignedFilter) return false;
+                                }
+                                return (BACKGROUND_STATUSES as readonly string[]).includes(l.status);
+                            }).length}
                         </span>
                     </button>
                     <button
