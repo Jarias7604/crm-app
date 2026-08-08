@@ -269,6 +269,12 @@ export default function Leads() {
     const [minContactCountFilter, setMinContactCountFilter] = useState<number | null>(null);
     const [pipelineFilter, setPipelineFilter] = useState<PipelineFilter>(null);
     const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+    // ── Pipeline Segments — 'active' | 'pool' | 'all' ─────────────────────────
+    // 'active' = hide Llamada fría + En Nutrición (default for agents)
+    // 'pool'   = show ONLY Llamada fría + En Nutrición (campaign targets)
+    // 'all'    = no segment filter (legacy behaviour)
+    const [pipelineView, setPipelineView] = useState<'active' | 'pool' | 'all'>('active');
+    const BACKGROUND_STATUSES = ['Llamada fría', 'En Nutrición'] as const;
 
     const [isUploading, setIsUploading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -539,10 +545,23 @@ export default function Leads() {
             if (statusFilter === 'all') {
                 // EXCEPTION: If we are coming from a specific dashboard link (filteredLeadIds), don't auto-hide
                 if (filteredLeadIds || filteredLeadId) {
-                    // Stay visible
+                    // Stay visible — coming from a direct link, show the specific lead regardless of segment
                 } else {
-                    // Auto-hide Erroneous, Lost, and Nurturing by default from general list ONLY if not explicitly filtering for them
-                    if (lead.status === 'Erróneo' || lead.status === 'Perdido' || lead.status === 'En Nutrición') return false;
+                    // Always auto-hide Erroneous and Lost from the general list
+                    if (lead.status === 'Erróneo' || lead.status === 'Perdido') return false;
+
+                    // ── Pipeline Segment logic ────────────────────────────────
+                    if (pipelineView === 'active') {
+                        // Active pipeline: hide background statuses (Llamada fría + En Nutrición)
+                        if ((BACKGROUND_STATUSES as readonly string[]).includes(lead.status)) return false;
+                    } else if (pipelineView === 'pool') {
+                        // Campaign pool: show ONLY background statuses
+                        if (!(BACKGROUND_STATUSES as readonly string[]).includes(lead.status)) return false;
+                    } else {
+                        // 'all': keep old behaviour — hide En Nutrición but NOT Llamada fría
+                        if (lead.status === 'En Nutrición') return false;
+                    }
+                    // ─────────────────────────────────────────────────────────
                 }
             } else {
                 if (Array.isArray(statusFilter)) {
@@ -613,7 +632,7 @@ export default function Leads() {
 
         // Apply pipeline intelligence filter on top of standard filters
         return applyPipelineFilter(base, pipelineFilter, profile?.company_id);
-    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, pipelineFilter]);
+    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, pipelineFilter, pipelineView]);
 
     // Leads that have passed ALL filters EXCEPT the pipeline chip filter.
     // Used so chip counters respect the active date/status/priority filters.
@@ -1371,6 +1390,47 @@ export default function Leads() {
                 setProductFilter={setProductFilter}
                 products={products}
             />
+            {/* ── Pipeline Segment Toggle Banner ─────────────────────────────────── */}
+            {statusFilter === 'all' && !filteredLeadId && !filteredLeadIds && (
+                <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-2xl px-3 py-2 shadow-sm">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-1 hidden sm:block">Vista:</span>
+                    <button
+                        onClick={() => { setPipelineView('active'); }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
+                            pipelineView === 'active'
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                                : 'text-gray-500 hover:bg-gray-50'
+                        }`}
+                    >
+                        🎯 <span>Pipeline Activo</span>
+                    </button>
+                    <button
+                        onClick={() => { setPipelineView('pool'); }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
+                            pipelineView === 'pool'
+                                ? 'bg-orange-500 text-white shadow-md shadow-orange-200'
+                                : 'text-gray-500 hover:bg-gray-50'
+                        }`}
+                    >
+                        📦 <span>Pool de Campañas</span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${
+                            pipelineView === 'pool' ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-600'
+                        }`}>
+                            {leads.filter(l => (BACKGROUND_STATUSES as readonly string[]).includes(l.status)).length}
+                        </span>
+                    </button>
+                    <button
+                        onClick={() => { setPipelineView('all'); }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
+                            pipelineView === 'all'
+                                ? 'bg-gray-700 text-white shadow-md shadow-gray-200'
+                                : 'text-gray-500 hover:bg-gray-50'
+                        }`}
+                    >
+                        👁 <span className="hidden sm:inline">Todos</span>
+                    </button>
+                </div>
+            )}
 {/* VIEW SELECTOR & MAIN CONTENT - Mobile Cards (only for Grid mode) */}
                 {viewMode === 'grid' && (
                     <div className="space-y-4 md:hidden">
