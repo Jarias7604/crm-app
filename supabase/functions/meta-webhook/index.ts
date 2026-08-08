@@ -221,58 +221,54 @@ serve(async (req) => {
 
                             if (error) {
                                 console.error('RPC Error saving WhatsApp msg:', error);
-                            } else if (convId) {
+                            } else {
                                 // ── Recovery Intelligence ─────────────────────────────
-                                // If the lead is in a background-pool status (Llamada fría / En Nutrición),
-                                // re-engage them: move to active pipeline + record attribution.
+                                // Busca el lead directamente por teléfono.
+                                // Más robusto: no depende de marketing_conversations.lead_id.
                                 try {
                                     const BACKGROUND_STATUSES = ['Llamada fría', 'En Nutrición'];
-                                    const { data: conv } = await supabase
-                                        .from('marketing_conversations')
-                                        .select('lead_id')
-                                        .eq('id', convId)
+                                    // msg.from viene como "17039459240" (sin +), leads guardan "+17039459240" o "17039459240"
+                                    const { data: matchedLead } = await supabase
+                                        .from('leads')
+                                        .select('id, status, reengaged_at')
+                                        .eq('company_id', companyId)
+                                        .or(`phone.ilike.%${chatId}%,phone.ilike.+${chatId}`)
+                                        .in('status', BACKGROUND_STATUSES)
+                                        .is('reengaged_at', null)
                                         .maybeSingle();
 
-                                    if (conv?.lead_id) {
-                                        const { data: lead } = await supabase
-                                            .from('leads')
-                                            .select('id, status, reengaged_at')
-                                            .eq('id', conv.lead_id)
-                                            .maybeSingle();
+                                    if (matchedLead) {
+                                        const now = new Date().toISOString();
+                                        const originalStatus = matchedLead.status;
 
-                                        // Only re-engage if: background status AND not already re-engaged
-                                        if (lead && BACKGROUND_STATUSES.includes(lead.status) && !lead.reengaged_at) {
-                                            const now = new Date().toISOString();
-                                            const originalStatus = lead.status;
+                                        // 1. Mover al pipeline activo + registrar atribución
+                                        await supabase.from('leads').update({
+                                            status:         'En seguimiento',
+                                            reengaged_from:  originalStatus,
+                                            reengaged_via:   'whatsapp',
+                                            reengaged_at:    now,
+                                        }).eq('id', matchedLead.id);
 
-                                            // 1. Move lead to active pipeline + stamp attribution
-                                            await supabase.from('leads').update({
-                                                status:          'En seguimiento',
-                                                reengaged_from:  originalStatus,
-                                                reengaged_via:   'whatsapp',
-                                                reengaged_at:    now,
-                                            }).eq('id', lead.id);
+                                        // 2. Log en historial de actividades
+                                        await supabase.from('call_activities').insert({
+                                            lead_id:     matchedLead.id,
+                                            company_id:  companyId,
+                                            action_type: 'whatsapp',
+                                            notes:       `♻️ Lead re-enganchado automáticamente desde pool de campañas (${originalStatus}) — respondió por WhatsApp`,
+                                            created_at:  now,
+                                        });
 
-                                            // 2. Log activity for traceability (appears in lead history)
-                                            await supabase.from('call_activities').insert({
-                                                lead_id:     lead.id,
-                                                company_id:  companyId,
-                                                action_type: 'whatsapp',
-                                                notes:       `♻️ Lead re-enganchado automáticamente desde pool de campañas (${originalStatus}) — respondió por WhatsApp`,
-                                                created_at:  now,
-                                            });
-
-                                            console.log(`✅ Recovery Intelligence: Lead ${lead.id} re-engaged from "${originalStatus}" via WhatsApp`);
-                                        }
+                                        console.log(`✅ Recovery Intelligence: Lead ${matchedLead.id} (${chatId}) re-engaged from "${originalStatus}"`);
                                     }
                                 } catch (reengageErr) {
-                                    // Non-blocking — never fail the webhook because of this
                                     console.error('Recovery Intelligence error (non-fatal):', reengageErr);
                                 }
                                 // ─────────────────────────────────────────────────────
 
-                                const aiPromise = supabase.functions.invoke('ai-chat-processor', { body: { conversationId: convId } });
-                                if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) EdgeRuntime.waitUntil(aiPromise);
+                                if (convId) {
+                                    const aiPromise = supabase.functions.invoke('ai-chat-processor', { body: { conversationId: convId } });
+                                    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) EdgeRuntime.waitUntil(aiPromise);
+                                }
                             }
                         }
                     }
