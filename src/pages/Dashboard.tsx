@@ -214,6 +214,14 @@ export default function Dashboard() {
     const [showEscalationConfig, setShowEscalationConfig] = useState(false);
     const [escalationThresholdInput, setEscalationThresholdInput] = useState<number>(6);
     const [isSavingThreshold, setIsSavingThreshold] = useState(false);
+    // ── Recovery Intelligence — campaign pool re-engagement stats ──────────────
+    const [recoveryStats, setRecoveryStats] = useState<{
+        thisMonth: number;
+        byChannel: { whatsapp: number; email: number; sms: number };
+        pipelineValue: number;
+        poolTotal: number;
+        recentLeads: { id: string; name: string; reengaged_from: string; reengaged_via: string; reengaged_at: string; value: number }[];
+    } | null>(null);
     const [financeResumen, setFinanceResumen] = useState<{
         ventaTotal: number;
         totalCobrado: number;
@@ -637,6 +645,47 @@ export default function Dashboard() {
                 });
         }
     }, [dashboardData, dashboardAssignedTo]);
+
+    // ── Recovery Intelligence — fetch re-engaged leads stats ─────────────────
+    useEffect(() => {
+        if (!profile?.company_id) return;
+        const monthStart = startOfMonth(new Date()).toISOString();
+        let q = supabase
+            .from('leads')
+            .select('id, name, reengaged_from, reengaged_via, reengaged_at, value')
+            .eq('company_id', profile.company_id)
+            .not('reengaged_at', 'is', null)
+            .gte('reengaged_at', monthStart)
+            .order('reengaged_at', { ascending: false });
+        if (dashboardAssignedTo) q = q.eq('assigned_to', dashboardAssignedTo);
+
+        q.then(({ data: reengaged }) => {
+            if (!reengaged) return;
+            const byChannel = { whatsapp: 0, email: 0, sms: 0 };
+            let pipelineValue = 0;
+            for (const l of reengaged) {
+                const ch = (l.reengaged_via || 'whatsapp') as keyof typeof byChannel;
+                if (ch in byChannel) byChannel[ch]++;
+                pipelineValue += Number(l.value || 0);
+            }
+            // Pool total (Llamada fría + En Nutrición)
+            let poolQ = supabase
+                .from('leads')
+                .select('id', { count: 'exact', head: true })
+                .eq('company_id', profile.company_id)
+                .in('status', ['Llamada fría', 'En Nutrición']);
+            if (dashboardAssignedTo) poolQ = poolQ.eq('assigned_to', dashboardAssignedTo);
+            poolQ.then(({ count: poolCount }) => {
+                setRecoveryStats({
+                    thisMonth: reengaged.length,
+                    byChannel,
+                    pipelineValue,
+                    poolTotal: poolCount || 0,
+                    recentLeads: reengaged.slice(0, 5) as any,
+                });
+            });
+        });
+    }, [profile?.company_id, dashboardAssignedTo, refreshKey]);
 
     useEffect(() => {
         if (profile?.role === 'super_admin') {
@@ -1165,6 +1214,99 @@ export default function Dashboard() {
                                             <ArrowRight className="w-3 h-3" />
                                         </button>
                                     </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ── Recovery Intelligence Widget ──────────────────────────────────── */}
+                    {isAdmin && recoveryStats !== null && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                            {/* Header */}
+                            <div
+                                className="flex items-center justify-between px-4 py-3 cursor-pointer select-none bg-gradient-to-r from-emerald-600 to-teal-500"
+                                onClick={() => navigate('/leads', { state: { pipelineView: 'all', statusFilter: 'all' } })}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <span className="text-lg">♻️</span>
+                                    <div>
+                                        <p className="text-white font-black text-sm leading-tight">Leads Recuperados</p>
+                                        <p className="text-emerald-100 text-[9px] font-bold uppercase tracking-widest">Pool de Campañas → Pipeline Activo</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="text-right">
+                                        <p className="text-white font-black text-xl leading-none">{recoveryStats.thisMonth}</p>
+                                        <p className="text-emerald-100 text-[9px] font-bold">este mes</p>
+                                    </div>
+                                    <ArrowRight className="w-4 h-4 text-white/70" />
+                                </div>
+                            </div>
+
+                            {/* Stats row */}
+                            <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
+                                <div className="px-3 py-2.5 text-center">
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">WhatsApp</p>
+                                    <p className="text-sm font-black text-emerald-600">{recoveryStats.byChannel.whatsapp}</p>
+                                </div>
+                                <div className="px-3 py-2.5 text-center">
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Pipeline</p>
+                                    <p className="text-sm font-black text-indigo-600">${recoveryStats.pipelineValue.toLocaleString()}</p>
+                                </div>
+                                <div className="px-3 py-2.5 text-center">
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Tasa</p>
+                                    <p className="text-sm font-black text-amber-600">
+                                        {recoveryStats.poolTotal > 0
+                                            ? `${((recoveryStats.thisMonth / recoveryStats.poolTotal) * 100).toFixed(1)}%`
+                                            : '0%'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Recent recovered leads */}
+                            {recoveryStats.recentLeads.length > 0 ? (
+                                <div className="divide-y divide-gray-50">
+                                    {recoveryStats.recentLeads.map((lead) => (
+                                        <div
+                                            key={lead.id}
+                                            className="px-4 py-2.5 flex items-center justify-between hover:bg-emerald-50/40 transition-colors cursor-pointer group/row"
+                                            onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
+                                        >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="text-xs">♻️</span>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-bold text-gray-800 truncate">{lead.name}</p>
+                                                    <p className="text-[9px] text-gray-400 font-semibold">
+                                                        desde {lead.reengaged_from} · {lead.reengaged_via?.toUpperCase()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <span className="text-[9px] font-black text-gray-400">
+                                                    {lead.reengaged_at ? formatDistanceToNow(new Date(lead.reengaged_at), { addSuffix: true, locale: es }) : ''}
+                                                </span>
+                                                <ArrowRight className="w-3 h-3 text-gray-300 group-hover/row:text-emerald-500 transition-colors" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="px-4 py-5 text-center">
+                                    <p className="text-[11px] text-gray-400 font-semibold">Sin recuperaciones este mes</p>
+                                    <p className="text-[9px] text-gray-300 mt-1">Cuando un lead del pool responda WhatsApp, aparecerá aquí</p>
+                                </div>
+                            )}
+
+                            {/* Footer CTA */}
+                            {recoveryStats.recentLeads.length > 0 && (
+                                <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50">
+                                    <button
+                                        onClick={() => navigate('/leads', { state: { reengaged: true } })}
+                                        className="w-full flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all"
+                                    >
+                                        Ver todos los recuperados
+                                        <ArrowRight className="w-3 h-3" />
+                                    </button>
                                 </div>
                             )}
                         </div>
