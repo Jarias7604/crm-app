@@ -4,7 +4,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Line, LabelList
 } from 'recharts';
-import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout, CreditCard, Brain, Sparkles, MessageSquare, Crosshair, Flame, Zap, HelpCircle, UserMinus } from 'lucide-react';
+import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout, CreditCard, Brain, Sparkles, MessageSquare, Crosshair, Flame, Zap, HelpCircle, UserMinus, RefreshCw } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { supabase } from '../services/supabase';
 import { useEffect, useState, useRef, useMemo } from 'react';
@@ -1219,98 +1219,7 @@ export default function Dashboard() {
                         </div>
                     )}
 
-                    {/* ── Recovery Intelligence Widget ──────────────────────────────────── */}
-                    {isAdmin && recoveryStats !== null && (
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                            {/* Header */}
-                            <div
-                                className="flex items-center justify-between px-4 py-3 cursor-pointer select-none bg-gradient-to-r from-emerald-600 to-teal-500"
-                                onClick={() => navigate('/leads', { state: { pipelineView: 'all', statusFilter: 'all' } })}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <span className="text-lg">♻️</span>
-                                    <div>
-                                        <p className="text-white font-black text-sm leading-tight">Leads Recuperados</p>
-                                        <p className="text-emerald-100 text-[9px] font-bold uppercase tracking-widest">Pool de Campañas → Pipeline Activo</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="text-right">
-                                        <p className="text-white font-black text-xl leading-none">{recoveryStats.thisMonth}</p>
-                                        <p className="text-emerald-100 text-[9px] font-bold">este mes</p>
-                                    </div>
-                                    <ArrowRight className="w-4 h-4 text-white/70" />
-                                </div>
-                            </div>
 
-                            {/* Stats row */}
-                            <div className="grid grid-cols-3 divide-x divide-gray-100 border-b border-gray-100">
-                                <div className="px-3 py-2.5 text-center">
-                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">WhatsApp</p>
-                                    <p className="text-sm font-black text-emerald-600">{recoveryStats.byChannel.whatsapp}</p>
-                                </div>
-                                <div className="px-3 py-2.5 text-center">
-                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Pipeline</p>
-                                    <p className="text-sm font-black text-indigo-600">${recoveryStats.pipelineValue.toLocaleString()}</p>
-                                </div>
-                                <div className="px-3 py-2.5 text-center">
-                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Tasa</p>
-                                    <p className="text-sm font-black text-amber-600">
-                                        {recoveryStats.poolTotal > 0
-                                            ? `${((recoveryStats.thisMonth / recoveryStats.poolTotal) * 100).toFixed(1)}%`
-                                            : '0%'}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Recent recovered leads */}
-                            {recoveryStats.recentLeads.length > 0 ? (
-                                <div className="divide-y divide-gray-50">
-                                    {recoveryStats.recentLeads.map((lead) => (
-                                        <div
-                                            key={lead.id}
-                                            className="px-4 py-2.5 flex items-center justify-between hover:bg-emerald-50/40 transition-colors cursor-pointer group/row"
-                                            onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
-                                        >
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <span className="text-xs">♻️</span>
-                                                <div className="min-w-0">
-                                                    <p className="text-xs font-bold text-gray-800 truncate">{lead.name}</p>
-                                                    <p className="text-[9px] text-gray-400 font-semibold">
-                                                        desde {lead.reengaged_from} · {lead.reengaged_via?.toUpperCase()}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                                <span className="text-[9px] font-black text-gray-400">
-                                                    {lead.reengaged_at ? formatDistanceToNow(new Date(lead.reengaged_at), { addSuffix: true, locale: es }) : ''}
-                                                </span>
-                                                <ArrowRight className="w-3 h-3 text-gray-300 group-hover/row:text-emerald-500 transition-colors" />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="px-4 py-5 text-center">
-                                    <p className="text-[11px] text-gray-400 font-semibold">Sin recuperaciones este mes</p>
-                                    <p className="text-[9px] text-gray-300 mt-1">Cuando un lead del pool responda WhatsApp, aparecerá aquí</p>
-                                </div>
-                            )}
-
-                            {/* Footer CTA */}
-                            {recoveryStats.recentLeads.length > 0 && (
-                                <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50">
-                                    <button
-                                        onClick={() => navigate('/leads', { state: { reengaged: true } })}
-                                        className="w-full flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all"
-                                    >
-                                        Ver todos los recuperados
-                                        <ArrowRight className="w-3 h-3" />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
 
                     {/* Responsable Filter — multi-select, solo admins */}
                     {isAdmin && (
@@ -2208,100 +2117,119 @@ export default function Dashboard() {
                     );
                 })()}
 
-                {/* ── Lead Health Pulse: 3 KPIs en una sola fila compacta ── */}
+                {/* ── Recovery Intelligence (Reemplaza Lead Health Pulse) ── */}
                 <div className="lg:col-span-4 flex flex-col h-full">
                     <div className="bg-white rounded-[24px] border border-slate-200/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] transition-all duration-500 overflow-hidden flex flex-col h-full">
                         {/* Header */}
-                        <div className="px-4 pt-3 pb-2 border-b border-slate-100/80 flex items-center gap-2">
-                            <Zap className="w-3 h-3 text-indigo-500" />
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Lead Health Pulse</span>
-                            <InfoTip text="Panel de salud de tu pipeline en tiempo real. De un vistazo sabes cuántos seguimientos se vencieron, cuántos leads están activos y cuántos aún no tienen un agente asignado." position="bottom" />
-                        </div>
-
-                        {/* 3 métricas en horizontal */}
-                        <div className="grid grid-cols-3 divide-x divide-slate-100">
-
-                            {/* KPI 1 — Seguimientos vencidos */}
-                            {(() => {
-                                const overdueLeads = upcomingFollowUps.filter((f: any) => {
-                                    try { return new Date(f.next_followup_date) < new Date(); } catch { return false; }
-                                });
-                                const urgentCount = overdueLeads.length;
-                                const color = urgentCount > 5 ? 'text-red-600' : urgentCount > 0 ? 'text-amber-500' : 'text-emerald-500';
-                                const bg = urgentCount > 5 ? 'bg-red-50' : urgentCount > 0 ? 'bg-amber-50' : 'bg-emerald-50';
-                                const badge = urgentCount > 5 ? '🔴 Urgente' : urgentCount > 0 ? '⚠️ Revisar' : '✅ Al día';
-                                return (
-                                    <button
-                                        onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  startDate: dateRange.startDate, endDate: dateRange.endDate } })}
-                                        className="flex flex-col items-center gap-1 py-4 px-2 hover:bg-slate-50/70 transition-colors group/kpi"
-                                    >
-                                        <Clock className={`w-4 h-4 ${color} mb-0.5`} />
-                                        <span className={`text-3xl font-black tracking-tighter ${color}`}>{urgentCount}</span>
-                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider text-center leading-tight">Seguimientos<br/>vencidos</span>
-                                        <InfoTip text="Seguimientos cuya fecha límite ya pasó y nadie los atendió. Cada día que pasan sin contacto, el lead se enfría. ¡Estos son los más urgentes!" position="top" />
-                                        <span className={`mt-1 text-[8px] font-black px-2 py-0.5 rounded-full ${bg} ${color}`}>{badge}</span>
-                                    </button>
-                                );
-                            })()}
-
-                            {/* KPI 2 — Pipeline activo */}
-                            {(() => {
-                                const staleCount = funnelData
-                                    .filter((s: any) => !['Cerrado', 'Cliente', 'Perdido', 'Erróneo'].includes(s.key))
-                                    .reduce((sum: number, s: any) => sum + (s.value || 0), 0);
-                                const noFollowup = escalationLeads.length;
-                                return (
-                                    <button
-                                        onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all' } })}
-                                        className="flex flex-col items-center gap-1 py-4 px-2 hover:bg-slate-50/70 transition-colors group/kpi"
-                                    >
-                                        <Target className="w-4 h-4 text-indigo-500 mb-0.5" />
-                                        <span className="text-3xl font-black tracking-tighter text-indigo-600">{staleCount}</span>
-                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider text-center leading-tight">Pipeline<br/>activo</span>
-                                        <InfoTip text="Cuántos prospectos están en etapas abiertas (aún no cerrados ni perdidos). Este es tu inventario de oportunidades vivas. Si este número baja, hay que generar más leads." position="top" />
-                                        <span className={`mt-1 text-[8px] font-black px-2 py-0.5 rounded-full ${noFollowup > 0 ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-500'}`}>
-                                            {noFollowup > 0 ? `⚠️ ${noFollowup} escal.` : `${stats.conversionRate}% conv.`}
-                                        </span>
-                                    </button>
-                                );
-                            })()}
-
-                            {/* KPI 3 — Sin asignar */}
-                            {(() => {
-                                const count = unassignedLeads.length;
-                                let oldestDateLabel = '';
-                                if (count > 0) {
-                                    const oldest = unassignedLeads.reduce((o, l) =>
-                                        new Date(l.created_at) < new Date(o.created_at) ? l : o
-                                    );
-                                    try { oldestDateLabel = formatDistanceToNow(new Date(oldest.created_at), { addSuffix: false, locale: es }); } catch { oldestDateLabel = '—'; }
-                                }
-                                const color = count > 0 ? 'text-amber-600' : 'text-emerald-500';
-                                const bg = count > 0 ? 'bg-amber-50' : 'bg-emerald-50';
-                                return (
-                                    <button
-                                        onClick={() => setIsUnassignedModalOpen(true)}
-                                        className="flex flex-col items-center gap-1 py-4 px-2 hover:bg-slate-50/70 transition-colors group/kpi"
-                                    >
-                                        <UserMinus className={`w-4 h-4 ${color} mb-0.5 ${count > 0 ? 'animate-pulse' : ''}`} />
-                                        <span className={`text-3xl font-black tracking-tighter ${color}`}>{count}</span>
-                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider text-center leading-tight">Sin<br/>asignar</span>
-                                        <InfoTip text="Leads que llegaron pero ningún agente los tiene asignados. Un lead sin dueño es un lead perdido — mientras más tiempo sin asignar, menor la probabilidad de cerrar." position="top" />
-                                        <span className={`mt-1 text-[8px] font-black px-2 py-0.5 rounded-full ${bg} ${color}`}>
-                                            {count > 0 ? `Más viejo: ${oldestDateLabel}` : '✅ Todo asignado'}
-                                        </span>
-                                    </button>
-                                );
-                            })()}
-
-                        </div>
-
-                        {/* Filler — ocupa el espacio restante con un gradiente sutil */}
-                        <div className="flex-grow border-t border-slate-50 bg-gradient-to-b from-slate-50/30 to-transparent flex items-center justify-center">
-                            <div className="flex items-center gap-1.5 opacity-30">
-                                <Zap className="w-3 h-3 text-indigo-400" />
-                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Live · actualización en tiempo real</span>
+                        <div 
+                            onClick={() => navigate('/leads', { state: { pipelineView: 'all', statusFilter: 'all' } })}
+                            className="px-4 py-3 border-b border-slate-100/80 flex items-center justify-between bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 cursor-pointer group select-none"
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-sm">
+                                    <RefreshCw className="w-4 h-4 text-white" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[9px] font-black text-emerald-100 uppercase tracking-[0.2em]">Recovery Intelligence</span>
+                                        <span className="bg-emerald-500/40 text-white text-[8px] font-extrabold px-1.5 py-0.2 rounded-full border border-white/20">Auto-Reactivación</span>
+                                    </div>
+                                    <p className="text-white font-black text-xs leading-tight">Leads Recuperados del Pool de Campañas</p>
+                                </div>
                             </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-2xl font-black text-white">{recoveryStats?.thisMonth || 0}</span>
+                                <ArrowRight className="w-4 h-4 text-white/80 group-hover:translate-x-1 transition-transform" />
+                            </div>
+                        </div>
+
+                        {/* 3 KPIs principales en grid */}
+                        <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100 bg-white">
+                            {/* KPI 1: WhatsApp */}
+                            <div className="py-3 px-2 flex flex-col items-center text-center">
+                                <div className="flex items-center gap-1 mb-1">
+                                    <span className="text-xs">💬</span>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">WhatsApp</span>
+                                </div>
+                                <span className="text-2xl font-black text-emerald-600">{recoveryStats?.byChannel.whatsapp || 0}</span>
+                                <span className="text-[9px] font-bold text-slate-400 mt-0.5">respuestas automáticas</span>
+                            </div>
+
+                            {/* KPI 2: Valor Pipeline */}
+                            <div className="py-3 px-2 flex flex-col items-center text-center">
+                                <div className="flex items-center gap-1 mb-1">
+                                    <span className="text-xs">💰</span>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Pipeline</span>
+                                </div>
+                                <span className="text-2xl font-black text-indigo-600">${(recoveryStats?.pipelineValue || 0).toLocaleString()}</span>
+                                <span className="text-[9px] font-bold text-slate-400 mt-0.5">valor desbloqueado</span>
+                            </div>
+
+                            {/* KPI 3: Tasa de Recuperación con Explicación Transparente */}
+                            <div className="py-3 px-2 flex flex-col items-center text-center relative group/tasa">
+                                <div className="flex items-center gap-1 mb-1">
+                                    <span className="text-xs">📈</span>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Tasa Recuperación</span>
+                                    <InfoTip 
+                                        text={`La Tasa de Recuperación mide cuántos leads del Pool Frío han re-enganchado. Se calcula: (Leads Recuperados: ${recoveryStats?.thisMonth || 0} ÷ Total Pool de Campañas: ${recoveryStats?.poolTotal || 0}) × 100 = ${recoveryStats && recoveryStats.poolTotal > 0 ? ((recoveryStats.thisMonth / recoveryStats.poolTotal) * 100).toFixed(1) : 0}%`} 
+                                        position="top" 
+                                    />
+                                </div>
+                                <span className="text-2xl font-black text-amber-600">
+                                    {recoveryStats && recoveryStats.poolTotal > 0
+                                        ? `${((recoveryStats.thisMonth / recoveryStats.poolTotal) * 100).toFixed(1)}%`
+                                        : '0.0%'}
+                                </span>
+                                <span className="text-[8px] font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/60 mt-0.5">
+                                    {recoveryStats?.thisMonth || 0} de {recoveryStats?.poolTotal || 0} en Pool
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Lista de Leads Recientes Recuperados */}
+                        <div className="flex-1 p-3 flex flex-col justify-between bg-slate-50/50">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Últimos Leads Reactivados</span>
+                                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/50">En tiempo real</span>
+                            </div>
+
+                            {recoveryStats?.recentLeads && recoveryStats.recentLeads.length > 0 ? (
+                                <div className="space-y-1.5">
+                                    {recoveryStats.recentLeads.slice(0, 3).map((lead: any) => (
+                                        <div 
+                                            key={lead.id} 
+                                            onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
+                                            className="bg-white p-2.5 rounded-xl border border-slate-200/70 flex items-center justify-between shadow-2xs hover:border-emerald-400 transition-colors cursor-pointer group/item"
+                                        >
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-1.5">
+                                                    <p className="text-xs font-bold text-slate-900 truncate group-hover/item:text-emerald-600 transition-colors">{lead.name}</p>
+                                                    <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.2 rounded-md shrink-0">♻️ Recuperado</span>
+                                                </div>
+                                                <p className="text-[9px] text-slate-400 font-medium truncate mt-0.5">
+                                                    Desde <span className="font-bold text-slate-600">{lead.reengaged_from || 'Llamada fría'}</span> · vía {lead.reengaged_via?.toUpperCase() || 'WHATSAPP'}
+                                                </p>
+                                            </div>
+                                            <span className="text-[9px] font-bold text-slate-400 shrink-0 ml-2">
+                                                {lead.reengaged_at ? formatDistanceToNow(new Date(lead.reengaged_at), { addSuffix: true, locale: es }) : 'reciente'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="py-4 text-center">
+                                    <p className="text-xs font-bold text-slate-400">Sin reactivaciones recientes en el pool</p>
+                                    <p className="text-[9px] text-slate-300 font-medium mt-0.5">Cuando un prospecto en Llamada Fría responda por WhatsApp, aparecerá aquí inmediatamente</p>
+                                </div>
+                            )}
+
+                            <button
+                                onClick={() => navigate('/leads', { state: { pipelineView: 'all', statusFilter: 'all' } })}
+                                className="mt-3 w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 uppercase tracking-wider"
+                            >
+                                Ver todos los recuperados en Leads
+                                <ArrowRight className="w-3 h-3" />
+                            </button>
                         </div>
                     </div>
                 </div>
