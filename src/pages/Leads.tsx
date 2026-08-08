@@ -1403,6 +1403,11 @@ export default function Leads() {
                         }`}
                     >
                         🎯 <span>Pipeline Activo</span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${
+                            pipelineView === 'active' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-600'
+                        }`}>
+                            {leads.filter(l => !(BACKGROUND_STATUSES as readonly string[]).includes(l.status) && l.status !== 'Erróneo' && l.status !== 'Perdido').length}
+                        </span>
                     </button>
                     <button
                         onClick={() => { setPipelineView('pool'); }}
