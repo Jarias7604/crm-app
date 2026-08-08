@@ -210,6 +210,7 @@ export default function Dashboard() {
     const [hotLeads, setHotLeads] = useState<any[]>([]);
     // ── Escalation threshold — configurable per company (default: 6) ──────────
     const [escalationThreshold, setEscalationThreshold] = useState<number>(6);
+    const [escalationTotal, setEscalationTotal] = useState<number>(0); // real count for badge
     const [showEscalationConfig, setShowEscalationConfig] = useState(false);
     const [escalationThresholdInput, setEscalationThresholdInput] = useState<number>(6);
     const [isSavingThreshold, setIsSavingThreshold] = useState(false);
@@ -582,25 +583,35 @@ export default function Dashboard() {
                 .select('features')
                 .eq('id', profile.company_id)
                 .single()
-                .then(({ data: companyData }) => {
+                .then(async ({ data: companyData }) => {
                     const threshold = (companyData?.features as any)?.escalation_threshold;
                     const parsed = typeof threshold === 'number' ? threshold : 6;
                     setEscalationThreshold(parsed);
                     setEscalationThresholdInput(parsed);
 
-                    // Load escalation leads using the dynamic threshold
+                    // Fetch real total count for badge
+                    let countQuery = supabase
+                        .from('leads')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('company_id', profile.company_id)
+                        .eq('status', 'Llamada fría')
+                        .gte('contact_count', parsed);
+                    if (dashboardAssignedTo) countQuery = countQuery.eq('assigned_to', dashboardAssignedTo);
+                    const { count: totalCount } = await countQuery;
+                    setEscalationTotal(totalCount || 0);
+
+                    // Fetch top 10 leads for display list
                     let escalationQuery = supabase
                         .from('leads')
                         .select('id, name, company_name, phone, email, contact_count, created_at, assigned_to')
+                        .eq('company_id', profile.company_id)
                         .eq('status', 'Llamada fría')
                         .gte('contact_count', parsed)
                         .order('contact_count', { ascending: false })
                         .limit(10);
-                    if (profile?.company_id) escalationQuery = escalationQuery.eq('company_id', profile.company_id);
                     if (dashboardAssignedTo) escalationQuery = escalationQuery.eq('assigned_to', dashboardAssignedTo);
-                    escalationQuery.then(({ data }) => {
-                        setEscalationLeads(data || []);
-                    });
+                    const { data } = await escalationQuery;
+                    setEscalationLeads(data || []);
                 });
         }
 
@@ -1021,7 +1032,7 @@ export default function Dashboard() {
                                 <PhoneOff className="w-3.5 h-3.5" />
                                 <span className="hidden sm:inline">Escalación</span>
                                 <span className="bg-white/20 backdrop-blur-sm text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-                                    {escalationLeads.length}
+                                    {escalationTotal}
                                 </span>
                             </button>
 
@@ -1074,7 +1085,16 @@ export default function Dashboard() {
                                                                 setEscalationThreshold(escalationThresholdInput);
                                                                 setShowEscalationConfig(false);
                                                                 toast.success(`Umbral actualizado a ${escalationThresholdInput} intentos`);
-                                                                // Re-fetch escalation leads with the new threshold immediately
+                                                                // Re-fetch real count (badge) and top 10 list with new threshold
+                                                                let countQ = supabase
+                                                                    .from('leads')
+                                                                    .select('id', { count: 'exact', head: true })
+                                                                    .eq('company_id', profile.company_id)
+                                                                    .eq('status', 'Llamada fría')
+                                                                    .gte('contact_count', escalationThresholdInput);
+                                                                if (dashboardAssignedTo) countQ = countQ.eq('assigned_to', dashboardAssignedTo);
+                                                                const { count: newTotal } = await countQ;
+                                                                setEscalationTotal(newTotal || 0);
                                                                 let refetchQuery = supabase
                                                                     .from('leads')
                                                                     .select('id, name, company_name, phone, email, contact_count, created_at, assigned_to')
