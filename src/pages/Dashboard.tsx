@@ -208,6 +208,11 @@ export default function Dashboard() {
     const [escalationLeads, setEscalationLeads] = useState<any[]>([]);
     const [showEscalation, setShowEscalation] = useState<boolean | 'expanded'>(true);
     const [hotLeads, setHotLeads] = useState<any[]>([]);
+    // ── Escalation threshold — configurable per company (default: 6) ──────────
+    const [escalationThreshold, setEscalationThreshold] = useState<number>(6);
+    const [showEscalationConfig, setShowEscalationConfig] = useState(false);
+    const [escalationThresholdInput, setEscalationThresholdInput] = useState<number>(6);
+    const [isSavingThreshold, setIsSavingThreshold] = useState(false);
     const [financeResumen, setFinanceResumen] = useState<{
         ventaTotal: number;
         totalCobrado: number;
@@ -570,19 +575,34 @@ export default function Dashboard() {
 
         }
 
-        // Load escalation leads (Llamada fría with 6+ contact attempts)
-        let escalationQuery = supabase
-            .from('leads')
-            .select('id, name, company_name, phone, email, contact_count, created_at, assigned_to')
-            .eq('status', 'Llamada fría')
-            .gte('contact_count', 6)
-            .order('contact_count', { ascending: false })
-            .limit(10);
-        if (profile?.company_id) escalationQuery = escalationQuery.eq('company_id', profile.company_id);
-        if (dashboardAssignedTo) escalationQuery = escalationQuery.eq('assigned_to', dashboardAssignedTo);
-        escalationQuery.then(({ data }) => {
-                setEscalationLeads(data || []);
-            });
+        // Load escalation threshold from company features (dynamic, default 6)
+        if (profile?.company_id) {
+            supabase
+                .from('companies')
+                .select('features')
+                .eq('id', profile.company_id)
+                .single()
+                .then(({ data: companyData }) => {
+                    const threshold = (companyData?.features as any)?.escalation_threshold;
+                    const parsed = typeof threshold === 'number' ? threshold : 6;
+                    setEscalationThreshold(parsed);
+                    setEscalationThresholdInput(parsed);
+
+                    // Load escalation leads using the dynamic threshold
+                    let escalationQuery = supabase
+                        .from('leads')
+                        .select('id, name, company_name, phone, email, contact_count, created_at, assigned_to')
+                        .eq('status', 'Llamada fría')
+                        .gte('contact_count', parsed)
+                        .order('contact_count', { ascending: false })
+                        .limit(10);
+                    if (profile?.company_id) escalationQuery = escalationQuery.eq('company_id', profile.company_id);
+                    if (dashboardAssignedTo) escalationQuery = escalationQuery.eq('assigned_to', dashboardAssignedTo);
+                    escalationQuery.then(({ data }) => {
+                        setEscalationLeads(data || []);
+                    });
+                });
+        }
 
         // 🔥 Load hot leads (cierre_inminente) for dashboard card
         if (profile?.company_id) {
@@ -1009,8 +1029,64 @@ export default function Dashboard() {
                             {showEscalation === 'expanded' && (
                                 <div className="absolute right-0 top-full mt-2 w-[380px] bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                                     <div className="bg-gradient-to-r from-red-500 to-orange-500 px-4 py-3">
-                                        <p className="text-white font-black text-xs">⚠️ Leads que requieren escalación</p>
-                                        <p className="text-white/60 text-[9px] font-bold">6+ intentos de contacto sin respuesta</p>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-white font-black text-xs">⚠️ Leads que requieren escalación</p>
+                                                <p className="text-white/60 text-[9px] font-bold">{escalationThreshold}+ intentos de contacto sin respuesta</p>
+                                            </div>
+                                            {isAdmin && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setShowEscalationConfig(v => !v); }}
+                                                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/25 transition-colors"
+                                                    title="Configurar umbral"
+                                                >
+                                                    <Settings className="w-3.5 h-3.5 text-white" />
+                                                </button>
+                                            )}
+                                        </div>
+                                        {/* Inline threshold config panel */}
+                                        {showEscalationConfig && isAdmin && (
+                                            <div className="mt-3 bg-white/10 backdrop-blur-sm rounded-xl p-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                                                <p className="text-white/80 text-[9px] font-black uppercase tracking-widest mb-2">Umbral de escalación</p>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        max={50}
+                                                        value={escalationThresholdInput}
+                                                        onChange={(e) => setEscalationThresholdInput(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="w-16 text-center bg-white/20 text-white font-black text-sm rounded-lg px-2 py-1.5 outline-none border border-white/30 focus:border-white/60"
+                                                    />
+                                                    <span className="text-white/70 text-[10px] font-bold flex-1">intentos antes de escalar</span>
+                                                    <button
+                                                        disabled={isSavingThreshold}
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            if (!profile?.company_id) return;
+                                                            setIsSavingThreshold(true);
+                                                            try {
+                                                                const { data: comp } = await supabase.from('companies').select('features').eq('id', profile.company_id).single();
+                                                                const currentFeatures = (comp?.features as Record<string, unknown>) ?? {};
+                                                                await supabase.from('companies').update({
+                                                                    features: { ...currentFeatures, escalation_threshold: escalationThresholdInput }
+                                                                }).eq('id', profile.company_id);
+                                                                setEscalationThreshold(escalationThresholdInput);
+                                                                setShowEscalationConfig(false);
+                                                                toast.success(`Umbral actualizado a ${escalationThresholdInput} intentos`);
+                                                            } catch (err) {
+                                                                toast.error('No se pudo guardar');
+                                                            } finally {
+                                                                setIsSavingThreshold(false);
+                                                            }
+                                                        }}
+                                                        className="bg-white text-red-600 font-black text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-lg hover:bg-red-50 transition-all disabled:opacity-50"
+                                                    >
+                                                        {isSavingThreshold ? '...' : 'Guardar'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="max-h-[280px] overflow-y-auto divide-y divide-gray-50">
                                         {escalationLeads.slice(0, 8).map((lead) => {
@@ -1050,7 +1126,7 @@ export default function Dashboard() {
                                     </div>
                                     <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50">
                                         <button
-                                            onClick={() => { setShowEscalation(true); navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: 'Llamada fría', minContactCount: 6 } }); }}
+                                            onClick={() => { setShowEscalation(true); navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: 'Llamada fría', minContactCount: escalationThreshold } }); }}
                                             className="w-full flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all"
                                         >
                                             Ver todos en Leads
