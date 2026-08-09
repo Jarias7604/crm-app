@@ -25,6 +25,8 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
   const [pendingToken, setPendingToken] = useState('');
   const [connectedPhone, setConnectedPhone] = useState('');
   const [sdkReady, setSdkReady] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('Conectando con Meta...');
+  const loadingTimerRef = { current: null as ReturnType<typeof setTimeout> | null };
 
   // Load Facebook JS SDK
   useEffect(() => {
@@ -51,12 +53,27 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
       return;
     }
     setStep('loading');
+    setLoadingMsg('Conectando con Meta...');
+
+    // Auto-reset after 45 seconds if callback never fires (popup blocked)
+    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+    loadingTimerRef.current = setTimeout(() => {
+      setStep('landing');
+      toast.error('Tiempo de espera agotado. ¿Popups bloqueados? Permite popups de este sitio e intenta de nuevo.', { duration: 8000 });
+    }, 45000);
+
     window.FB.login(
       async (response: any) => {
+        if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
         if (response?.authResponse?.code) {
+          setLoadingMsg('Procesando tu cuenta...');
           await handleCodeExchange(response.authResponse.code);
+        } else if (response?.status === 'connected' && response?.authResponse?.accessToken) {
+          // FB returned an access token instead of a code (config mismatch)
+          toast.error('Configuración de Meta incompleta. Usa el Modo Avanzado.', { duration: 8000 });
+          setStep('landing');
         } else {
-          toast.error('Conexión cancelada por el usuario.');
+          toast.error('Conexión cancelada o popup bloqueado. Intenta de nuevo.');
           setStep('landing');
         }
       },
@@ -114,12 +131,24 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
 
   // ── LOADING ────────────────────────────────────────────────────────────────
   if (step === 'loading') return (
-    <div className="flex flex-col items-center justify-center py-12 gap-4">
+    <div className="flex flex-col items-center justify-center py-10 gap-4">
       <div className="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center animate-pulse">
         <span className="text-3xl">📱</span>
       </div>
       <Loader2 className="w-6 h-6 text-green-500 animate-spin" />
-      <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Conectando con Meta...</p>
+      <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{loadingMsg}</p>
+      <p className="text-[10px] text-gray-400 font-medium text-center max-w-xs">
+        Se abrió una ventana de Facebook. Complétala y regresa aquí.
+      </p>
+      <button
+        onClick={() => {
+          if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+          setStep('landing');
+        }}
+        className="text-[10px] text-gray-400 underline hover:text-gray-600 transition-colors mt-2"
+      >
+        Cancelar y volver
+      </button>
     </div>
   );
 
