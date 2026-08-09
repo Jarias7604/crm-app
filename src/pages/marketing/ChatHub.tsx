@@ -42,13 +42,29 @@ export default function ChatHub() {
     const [agentStatus, setAgentStatus] = useState<boolean>(false);
     const [pendingFile, setPendingFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [barsHidden, setBarsHidden] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const lastScrollTopRef = useRef(0);
     const location = useLocation();
     const navigate = useNavigate();
     const hasAutoSelected = useRef<string | null>(null);
     const { profile } = useAuth();
     const { isAdmin } = usePermissions();
+
+    // Native-like hide-on-scroll: hide header+footer when scrolling down, show on scroll up
+    const handleChatScroll = () => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const currentTop = el.scrollTop;
+        const delta = currentTop - lastScrollTopRef.current;
+        if (delta > 8 && currentTop > 60) {
+            setBarsHidden(true);
+        } else if (delta < -8) {
+            setBarsHidden(false);
+        }
+        lastScrollTopRef.current = currentTop;
+    };
 
     // 1. Initial Load + realtime new message notifications
     useEffect(() => {
@@ -740,9 +756,9 @@ export default function ChatHub() {
             <div className={`flex-1 ${selectedConv ? 'flex' : 'hidden md:flex'} flex-col bg-[#f8fafc] rounded-none md:rounded-[32px] overflow-hidden relative isolate min-h-0`}>
 
                 {selectedConv ? (
-                    <>
-                        {/* HEADER — Ultra Clean Mobile & Executive Desktop CRM Branding */}
-                        <header className="px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 flex items-center justify-between bg-white sticky top-0 z-30 shrink-0 border-b border-slate-200/80 shadow-xs">
+                    <div className="flex flex-col h-full relative">
+                        {/* HEADER — slides up on scroll-down, back on scroll-up */}
+                        <header className={`px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 flex items-center justify-between bg-white shrink-0 border-b border-slate-200/80 shadow-xs z-30 transition-transform duration-300 ease-in-out md:!translate-y-0 ${barsHidden ? '-translate-y-full' : 'translate-y-0'}`}>
                             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                                 <button
                                     onClick={() => setSelectedConv(null)}
@@ -840,9 +856,11 @@ export default function ChatHub() {
                             </div>
                         </header>
 
+                        {/* Messages — fills all remaining height between header and footer */}
                         <div
                             ref={scrollRef}
-                            className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-6 py-4 space-y-3 custom-scrollbar scroll-smooth relative bg-[#f8fafc]"
+                            onScroll={handleChatScroll}
+                            className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-4 md:px-6 py-4 space-y-3 custom-scrollbar relative bg-[#f8fafc]"
                         >
                             {messages.map((msg, idx) => (
                                 <div key={msg.id || idx} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'} group w-full animate-in fade-in slide-in-from-bottom-2 duration-300 relative z-10`}>
@@ -999,8 +1017,8 @@ export default function ChatHub() {
                             </div>
                         )}
 
-                        {/* INPUT BAR — Minimalist Executive style */}
-                        <div className="px-4 pb-4 pt-3 bg-white border-t border-slate-200/70">
+                        {/* FOOTER INPUT BAR — slides down on scroll-down, back on scroll-up */}
+                        <div className={`px-4 pb-4 pt-3 bg-white border-t border-slate-200/70 shrink-0 z-30 transition-transform duration-300 ease-in-out md:!translate-y-0 ${barsHidden ? 'translate-y-full' : 'translate-y-0'}`}>
                             {/* QUICK SUGGESTIONS */}
                             <div className="flex gap-2 overflow-x-auto pb-2.5 custom-scrollbar">
                                 {QUICK_RESPONSES.map((resp, i) => (
@@ -1089,7 +1107,7 @@ export default function ChatHub() {
                                 </button>
                             </form>
                         </div>
-                    </>
+                    </div>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center p-20 text-center bg-slate-50/10">
                         <div className="w-32 h-32 bg-slate-50 rounded-[40px] flex items-center justify-center mb-10 border border-slate-100">
