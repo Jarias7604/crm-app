@@ -161,7 +161,91 @@ Planifica y ejecuta campañas masivas de marketing por múltiples canales con an
 
 ---
 
-## 7. Sistema de Roles y Permisos — Arquitectura Enterprise
+## 6. Conectar WhatsApp Business al CRM
+
+### ¿Para qué sirve?
+Conectar tu número de WhatsApp Business al CRM permite que los mensajes de tus clientes lleguen directamente al sistema, se conviertan en leads automáticamente y los agentes puedan responder sin salir del CRM.
+
+> **Requisito previo:** Tu número de WhatsApp debe estar registrado en una cuenta de **WhatsApp Business API** (Meta Business Suite). Si ya usas ese número desde el teléfono, no es el mismo — necesitas el número registrado en la API.
+
+---
+
+### Paso 1 — Ir a Workspaces
+
+1. En el menú lateral, haz clic en **Company → Workspaces**
+2. Verás la lista de workspaces de tu empresa (ejemplo: Principal, Agente Karla, Agente Josseline)
+3. Localiza el workspace al que quieres asignar el número de WhatsApp
+
+---
+
+### Paso 2 — Abrir la configuración
+
+1. Haz clic en el botón **⚙️ Configurar** del workspace deseado
+2. Se abrirá el panel de configuración del workspace
+3. Verás la pantalla **"Conecta WhatsApp Business"**
+
+---
+
+### Paso 3 — Conectar con Meta (1 clic)
+
+1. Haz clic en el botón verde **"Conectar con Meta — 1 Click"**
+2. Se abrirá una ventana emergente (popup) de **Facebook Login**
+3. Ingresa con la cuenta de Facebook que tiene acceso a tu WhatsApp Business Account
+4. En el popup, selecciona tu **cuenta de WhatsApp Business** de la lista
+5. Haz clic en **Continuar**
+
+> **Nota:** Si tu empresa tiene varios números bajo la misma cuenta, el CRM te mostrará una lista para elegir. Si solo tienes uno, se conectará automáticamente.
+
+---
+
+### Paso 4 — Confirmación
+
+Una vez completado el proceso, verás la pantalla de confirmación:
+
+```
+✅ ¡WhatsApp Conectado!
++503 7XXX-XXXX ya recibe leads en este workspace.
+● Activo y Recibiendo Mensajes
+```
+
+El workspace mostrará el badge **"WhatsApp Activo"** en la lista de workspaces.
+
+---
+
+### ¿Qué pasa después de conectar?
+
+| Acción | Resultado automático |
+|--------|---------------------|
+| Un cliente escribe al número | El mensaje llega al CRM como lead nuevo |
+| El agente responde desde el CRM | El cliente recibe el mensaje en WhatsApp |
+| Un anuncio de Meta captura un contacto | El lead entra directamente al pipeline |
+
+---
+
+### Modo de Conexión Avanzada (Manual)
+
+Si prefieres conectar con un token de Sistema (para entornos técnicos), usa la opción **"Configuración Manual Avanzada"** en el mismo panel. Este modo requiere un Access Token generado desde **Meta Business Suite → Usuarios del Sistema**.
+
+> **Recomendado para:** Empresas con múltiples WABAs, integraciones especializadas, o entornos de desarrollo.
+
+---
+
+### Preguntas Frecuentes — WhatsApp
+
+**¿Puedo conectar el mismo número a varios workspaces?**
+No. Cada número de WhatsApp solo puede estar activo en un workspace a la vez. Esto garantiza que los leads lleguen al agente correcto.
+
+**¿Se pierden los mensajes anteriores?**
+No. Los mensajes históricos permanecen en Meta. El CRM solo captura los nuevos mensajes a partir del momento de la conexión.
+
+**¿Qué pasa si desconecto el número?**
+El número deja de recibir mensajes en el CRM. Puedes reconectarlo en cualquier momento desde Workspaces → ⚙️ Configurar.
+
+**¿El webhook necesita configurarse cada vez?**
+No. El webhook se configura una sola vez a nivel de plataforma. Todos los números que conectes usan el mismo webhook automáticamente.
+
+---
+
 
 ### El Principio de Fuente Única de Verdad
 El sistema de permisos de Arias CRM sigue el mismo estándar que HubSpot y Salesforce: **el Rol es la fuente única de verdad**. Los permisos del perfil individual nunca pueden contradecir o bloquear lo que el Rol otorga.
