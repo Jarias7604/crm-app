@@ -4,7 +4,7 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, CustomRole, Role, Company } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send, BarChart3 } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send, BarChart3, Check } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
@@ -453,22 +453,64 @@ export default function Team() {
                                 </div>
                             </div>
 
-                            {/* WORKSPACE / DEPARTAMENTO */}
+                            {/* WORKSPACE / DEPARTAMENTO — Premium Card Selector */}
                             {workspaces.length > 0 && (
-                                <div className="space-y-1.5">
+                                <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.15em] ml-1">Workspace / Departamento</label>
-                                    <div className="relative">
-                                        <select
-                                            className="w-full h-11 rounded-xl border border-gray-100 bg-gray-50/50 px-4 font-black text-[11px] uppercase text-gray-600 outline-none focus:bg-white focus:border-indigo-100 transition-all appearance-none cursor-pointer shadow-inner"
-                                            value={selectedWorkspaceId}
-                                            onChange={e => setSelectedWorkspaceId(e.target.value)}
+                                    <div className="space-y-1.5">
+                                        {/* Principal */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedWorkspaceId('')}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
+                                                selectedWorkspaceId === ''
+                                                    ? 'border-[#4449AA] bg-indigo-50/40 shadow-sm ring-1 ring-[#4449AA]/15'
+                                                    : 'border-gray-100 bg-gray-50/50 hover:border-gray-200 hover:bg-white'
+                                            }`}
                                         >
-                                            <option value="">🏢 Principal (Empresa Raíz)</option>
-                                            {workspaces.map(w => (
-                                                <option key={w.id} value={w.id}>📦 {w.name.trim()}</option>
-                                            ))}
-                                        </select>
-                                        <Building className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 pointer-events-none" />
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0 ${
+                                                selectedWorkspaceId === '' ? 'bg-amber-100' : 'bg-gray-100'
+                                            }`}>👑</div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`text-[10px] font-black uppercase tracking-wider truncate ${
+                                                    selectedWorkspaceId === '' ? 'text-[#4449AA]' : 'text-gray-600'
+                                                }`}>Principal</p>
+                                                <p className="text-[9px] text-gray-400 font-medium">Empresa Raíz</p>
+                                            </div>
+                                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                                                selectedWorkspaceId === '' ? 'bg-[#4449AA] border-[#4449AA]' : 'border-gray-200'
+                                            }`}>
+                                                {selectedWorkspaceId === '' && <Check className="w-2.5 h-2.5 text-white stroke-[3]" />}
+                                            </div>
+                                        </button>
+                                        {/* Child workspaces */}
+                                        {workspaces.map(w => (
+                                            <button
+                                                type="button"
+                                                key={w.id}
+                                                onClick={() => setSelectedWorkspaceId(w.id)}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-all text-left ${
+                                                    selectedWorkspaceId === w.id
+                                                        ? 'border-[#4449AA] bg-indigo-50/40 shadow-sm ring-1 ring-[#4449AA]/15'
+                                                        : 'border-gray-100 bg-gray-50/50 hover:border-gray-200 hover:bg-white'
+                                                }`}
+                                            >
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0 ${
+                                                    selectedWorkspaceId === w.id ? 'bg-indigo-100' : 'bg-gray-100'
+                                                }`}>🏢</div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className={`text-[10px] font-black uppercase tracking-wider truncate ${
+                                                        selectedWorkspaceId === w.id ? 'text-[#4449AA]' : 'text-gray-600'
+                                                    }`}>{w.name.trim()}</p>
+                                                    <p className="text-[9px] text-gray-400 font-medium">Departamento</p>
+                                                </div>
+                                                <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                                                    selectedWorkspaceId === w.id ? 'bg-[#4449AA] border-[#4449AA]' : 'border-gray-200'
+                                                }`}>
+                                                    {selectedWorkspaceId === w.id && <Check className="w-2.5 h-2.5 text-white stroke-[3]" />}
+                                                </div>
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             )}
