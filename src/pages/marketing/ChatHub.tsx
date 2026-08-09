@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
     MoreVertical, Send, FileText, Smartphone, Layers,
-    Paperclip, TrendingUp, Eye, Zap, Smile, Mail, Phone as PhoneIcon,
+    Paperclip, TrendingUp, Eye, Zap, Smile, Mail, Phone as PhoneIcon, Video as VideoIcon,
     Send as TelegramIcon, MessageSquare, Trash2, UserPlus, Search, X as CloseIcon, ChevronRight, ChevronLeft, Loader2, Mic
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -776,6 +776,13 @@ export default function ChatHub() {
                                         >
                                             <PhoneIcon className="w-4 h-4" />
                                         </a>
+                                        <button
+                                            onClick={() => navigate('/google-meet', { state: { lead: selectedConv.lead } })}
+                                            className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                                            title="Videollamada Google Meet"
+                                        >
+                                            <VideoIcon className="w-4 h-4" />
+                                        </button>
                                         <a
                                             href={`https://wa.me/${selectedConv.lead.phone.replace(/\D/g, '')}`}
                                             target="_blank"
