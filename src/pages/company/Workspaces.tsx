@@ -121,7 +121,7 @@ export default function Workspaces() {
 
     const openCreateModal = () => {
         setEditingWorkspace(null);
-        setShowWizard(true);
+        setShowWizard('embedded');
         setFormData({
             name: '',
             waba_id: '',
@@ -533,7 +533,7 @@ export default function Workspaces() {
                                     </div>
                                     <button
                                         type="button"
-                                        onClick={() => setShowWizard(!showWizard)}
+                                        onClick={() => setShowWizard(prev => prev === 'embedded' ? 'manual' : 'embedded')}
                                         className="text-[9px] font-black text-indigo-500 hover:text-indigo-700 uppercase tracking-widest transition-colors"
                                     >
                                         {showWizard ? 'Modo avanzado' : 'Modo simple'}
