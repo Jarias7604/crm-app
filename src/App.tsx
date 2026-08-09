@@ -78,6 +78,7 @@ const Integrations      = lazy(() => import('./pages/company/Integrations'));
 const Billing           = lazy(() => import('./pages/company/Billing'));
 const GoogleCallback    = lazy(() => import('./pages/company/GoogleCallback'));
 const OutlookCallback   = lazy(() => import('./pages/company/OutlookCallback'));
+const WAOAuthCallback   = lazy(() => import('./pages/company/WAOAuthCallback'));
 const Reports           = lazy(() => import('./pages/Reports'));
 const PlanManager       = lazy(() => import('./pages/admin/PlanManager'));
 const BillingManager    = lazy(() => import('./pages/admin/BillingManager'));
@@ -258,6 +259,7 @@ function App() {
                     <Route path="/company/integrations" element={<Integrations />} />
                     <Route path="/integrations/google/callback" element={<GoogleCallback />} />
                     <Route path="/integrations/outlook/callback" element={<OutlookCallback />} />
+                    <Route path="/integrations/wa/callback" element={<WAOAuthCallback />} />
                   </Route>
 
                   {/* Reports (all authenticated) */}

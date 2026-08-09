@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CheckCircle2, Phone, Loader2, ChevronRight, RefreshCw, ArrowLeft, Zap, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
@@ -7,8 +7,6 @@ const META_APP_ID = import.meta.env.VITE_META_APP_ID || '1187621119804509';
 const META_WA_CONFIG_ID = import.meta.env.VITE_META_WA_CONFIG_ID || '';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-declare global { interface Window { FB: any; fbAsyncInit: any; } }
 
 interface PhoneOption { id: string; display_phone_number: string; verified_name: string; status: string; waba_id: string; }
 interface Props {
@@ -24,66 +22,110 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
   const [numbers, setNumbers] = useState<PhoneOption[]>([]);
   const [pendingToken, setPendingToken] = useState('');
   const [connectedPhone, setConnectedPhone] = useState('');
-  const [sdkReady, setSdkReady] = useState(false);
-  const [loadingMsg, setLoadingMsg] = useState('Conectando con Meta...');
-  const loadingTimerRef = { current: null as ReturnType<typeof setTimeout> | null };
+  const [loadingMsg, setLoadingMsg] = useState('Esperando autorización de Meta...');
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messageListenerRef = useRef<((e: MessageEvent) => void) | null>(null);
 
-  // Load Facebook JS SDK
+  // Check for sessionStorage fallback (when popup opener wasn't available)
   useEffect(() => {
-    if (window.FB) { setSdkReady(true); return; }
-    window.fbAsyncInit = () => {
-      window.FB.init({ appId: META_APP_ID, autoLogAppEvents: true, xfbml: false, version: 'v21.0' });
-      setSdkReady(true);
+    const code = sessionStorage.getItem('wa_oauth_code');
+    const state = sessionStorage.getItem('wa_oauth_state');
+    if (code && state === companyId) {
+      sessionStorage.removeItem('wa_oauth_code');
+      sessionStorage.removeItem('wa_oauth_state');
+      setStep('loading');
+      setLoadingMsg('Procesando tu cuenta...');
+      handleCodeExchange(code);
+    }
+  }, [companyId]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (messageListenerRef.current) {
+        window.removeEventListener('message', messageListenerRef.current);
+      }
     };
-    const script = document.createElement('script');
-    script.src = 'https://connect.facebook.net/en_US/sdk.js';
-    script.async = true;
-    script.defer = true;
-    document.body.appendChild(script);
-    return () => { /* SDK stays loaded */ };
   }, []);
 
   const handleEmbeddedSignup = () => {
-    if (!sdkReady || !window.FB) {
-      toast.error('SDK de Facebook no cargó. Recarga la página.');
-      return;
-    }
     if (!META_WA_CONFIG_ID) {
-      toast.error('Falta VITE_META_WA_CONFIG_ID en las variables de entorno.');
+      toast.error('Falta configuración de Meta. Contacta al administrador.', { duration: 6000 });
       return;
     }
-    setStep('loading');
-    setLoadingMsg('Conectando con Meta...');
 
-    // Auto-reset after 45 seconds if callback never fires (popup blocked)
-    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-    loadingTimerRef.current = setTimeout(() => {
-      setStep('landing');
-      toast.error('Tiempo de espera agotado. ¿Popups bloqueados? Permite popups de este sitio e intenta de nuevo.', { duration: 8000 });
-    }, 45000);
+    // Build the Facebook OAuth URL directly — no FB SDK needed
+    const callbackUrl = `${window.location.origin}/integrations/wa/callback`;
+    const params = new URLSearchParams({
+      client_id: META_APP_ID,
+      config_id: META_WA_CONFIG_ID,
+      redirect_uri: callbackUrl,
+      response_type: 'code',
+      override_default_response_type: 'true',
+      state: companyId,
+    });
+    const oauthUrl = `https://www.facebook.com/dialog/oauth?${params.toString()}`;
 
-    window.FB.login(
-      async (response: any) => {
-        if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
-        if (response?.authResponse?.code) {
-          setLoadingMsg('Procesando tu cuenta...');
-          await handleCodeExchange(response.authResponse.code);
-        } else if (response?.status === 'connected' && response?.authResponse?.accessToken) {
-          // FB returned an access token instead of a code (config mismatch)
-          toast.error('Configuración de Meta incompleta. Usa el Modo Avanzado.', { duration: 8000 });
-          setStep('landing');
-        } else {
-          toast.error('Conexión cancelada o popup bloqueado. Intenta de nuevo.');
-          setStep('landing');
-        }
-      },
-      {
-        config_id: META_WA_CONFIG_ID,
-        response_type: 'code',
-        override_default_response_type: true,
-        extras: { setup: {}, featureType: '', sessionInfoVersion: '3' },
-      }
+    // Open as a real popup window (bypasses SDK popup blocker issues)
+    const popup = window.open(
+      oauthUrl,
+      'wa-meta-oauth',
+      'width=640,height=720,scrollbars=yes,resizable=yes,left=200,top=50'
     );
+
+    if (!popup || popup.closed) {
+      toast.error('El navegador bloqueó la ventana. Permite ventanas emergentes de este sitio e intenta de nuevo.', { duration: 8000 });
+      return;
+    }
+
+    setStep('loading');
+    setLoadingMsg('Esperando que completes el proceso en la ventana de Facebook...');
+
+    // Listen for postMessage from WAOAuthCallback
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== 'WA_OAUTH_CALLBACK') return;
+
+      // Cleanup
+      window.removeEventListener('message', handleMessage);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+      if (event.data.code) {
+        setLoadingMsg('Procesando tu cuenta de WhatsApp...');
+        handleCodeExchange(event.data.code);
+      } else {
+        toast.error(event.data.error || 'Conexión cancelada o denegada.');
+        setStep('landing');
+      }
+    };
+
+    messageListenerRef.current = handleMessage;
+    window.addEventListener('message', handleMessage);
+
+    // Auto-reset if popup is closed without completing
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        // Give postMessage a moment to arrive
+        setTimeout(() => {
+          if (step === 'loading') {
+            window.removeEventListener('message', handleMessage);
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            setStep('landing');
+            toast('Ventana cerrada. Intenta de nuevo.', { icon: 'ℹ️' });
+          }
+        }, 1000);
+      }
+    }, 800);
+
+    // Hard timeout: 3 minutes
+    timeoutRef.current = setTimeout(() => {
+      clearInterval(checkClosed);
+      window.removeEventListener('message', handleMessage);
+      setStep('landing');
+      toast.error('Tiempo agotado. Intenta de nuevo.', { duration: 5000 });
+    }, 180_000);
   };
 
   const handleCodeExchange = async (code: string) => {
@@ -118,8 +160,8 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
 
   const handlePickNumber = async (num: PhoneOption) => {
     setStep('loading');
+    setLoadingMsg('Guardando número...');
     try {
-      // Save the selected number via onSuccess callback
       setConnectedPhone(num.display_phone_number);
       setStep('success');
       onSuccess({ phone: num.display_phone_number, phoneNumberId: num.id, wabaId: num.waba_id, token: pendingToken });
@@ -136,13 +178,11 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
         <span className="text-3xl">📱</span>
       </div>
       <Loader2 className="w-6 h-6 text-green-500 animate-spin" />
-      <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{loadingMsg}</p>
-      <p className="text-[10px] text-gray-400 font-medium text-center max-w-xs">
-        Se abrió una ventana de Facebook. Complétala y regresa aquí.
-      </p>
+      <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">{loadingMsg}</p>
       <button
         onClick={() => {
-          if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          if (messageListenerRef.current) window.removeEventListener('message', messageListenerRef.current);
           setStep('landing');
         }}
         className="text-[10px] text-gray-400 underline hover:text-gray-600 transition-colors mt-2"
@@ -230,31 +270,20 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
           </p>
         </div>
 
-        {/* Embedded Signup Button */}
+        {/* Connect Button */}
         {META_WA_CONFIG_ID ? (
           <button
             onClick={handleEmbeddedSignup}
-            disabled={!sdkReady}
-            className="w-full h-12 rounded-2xl bg-[#25D366] hover:bg-[#20C05A] text-white font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2.5 shadow-lg shadow-green-200/60 transition-all hover:translate-y-[-1px] active:scale-95 disabled:opacity-50"
+            className="w-full h-12 rounded-2xl bg-[#25D366] hover:bg-[#20C05A] text-white font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2.5 shadow-lg shadow-green-200/60 transition-all hover:translate-y-[-1px] active:scale-95"
           >
-            {sdkReady ? (
-              <>
-                <Zap className="w-4 h-4" />
-                Conectar con Meta — 1 Click
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                Cargando...
-              </>
-            )}
+            <Zap className="w-4 h-4" />
+            Conectar con Meta — 1 Click
           </button>
         ) : (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-left space-y-2">
             <p className="text-[10px] font-black text-amber-800 uppercase tracking-wider">⚙️ Configuración Requerida</p>
             <p className="text-[10px] text-amber-700 font-medium">
-              Para usar Embedded Signup, agrega <code className="bg-amber-100 px-1 rounded font-mono">VITE_META_WA_CONFIG_ID</code> en tu <code className="bg-amber-100 px-1 rounded font-mono">.env</code>.<br />
-              Obtenlo en: <span className="font-black">Meta App → WhatsApp → Embedded Signup → Configuration Profile</span>
+              Falta <code className="bg-amber-100 px-1 rounded font-mono">VITE_META_WA_CONFIG_ID</code> en las variables de entorno.
             </p>
           </div>
         )}
@@ -263,7 +292,7 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
       {/* Steps */}
       <div className="space-y-2">
         {[
-          { icon: '🔐', text: 'Login con tu cuenta de Facebook' },
+          { icon: '🔐', text: 'Se abre una ventana de Facebook — inicia sesión' },
           { icon: '📋', text: 'Selecciona tu cuenta de WhatsApp Business' },
           { icon: '✅', text: 'Tu número queda activo en este workspace' },
         ].map((s, i) => (
