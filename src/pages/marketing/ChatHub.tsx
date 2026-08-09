@@ -42,50 +42,13 @@ export default function ChatHub() {
     const [agentStatus, setAgentStatus] = useState<boolean>(false);
     const [pendingFile, setPendingFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [barsHidden, setBarsHidden] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const lastScrollTopRef = useRef(0);
     const location = useLocation();
     const navigate = useNavigate();
     const hasAutoSelected = useRef<string | null>(null);
     const { profile } = useAuth();
     const { isAdmin } = usePermissions();
-
-    // Native-like hide-on-scroll: hide header+footer when scrolling down, show on scroll up
-    // cooldown prevents the layout-resize feedback loop (container grows/shrinks → spurious scroll events)
-    const scrollCooldownRef = useRef(false);
-    const rafRef = useRef<number | null>(null);
-
-    const handleChatScroll = () => {
-        if (rafRef.current !== null) return; // throttle: one update per animation frame
-        rafRef.current = requestAnimationFrame(() => {
-            rafRef.current = null;
-            if (scrollCooldownRef.current) return; // ignore events during transition cooldown
-            const el = scrollRef.current;
-            if (!el) return;
-            const currentTop = el.scrollTop;
-            const delta = currentTop - lastScrollTopRef.current;
-            lastScrollTopRef.current = currentTop;
-            if (delta > 12 && currentTop > 80) {
-                // scrolling DOWN — collapse bars
-                setBarsHidden(prev => {
-                    if (prev) return prev; // already hidden, no state change
-                    scrollCooldownRef.current = true;
-                    setTimeout(() => { scrollCooldownRef.current = false; }, 400);
-                    return true;
-                });
-            } else if (delta < -12) {
-                // scrolling UP — restore bars
-                setBarsHidden(prev => {
-                    if (!prev) return prev; // already shown, no state change
-                    scrollCooldownRef.current = true;
-                    setTimeout(() => { scrollCooldownRef.current = false; }, 400);
-                    return false;
-                });
-            }
-        });
-    };
 
     // 1. Initial Load + realtime new message notifications
     useEffect(() => {
@@ -778,12 +741,8 @@ export default function ChatHub() {
 
                 {selectedConv ? (
                     <>
-                        {/* HEADER collapse wrapper — shrinks to 0 on scroll-down, expands on scroll-up */}
-                        <div
-                            className="shrink-0 overflow-hidden transition-all duration-300 ease-in-out"
-                            style={{ maxHeight: barsHidden ? 0 : '80px' }}
-                        >
-                        <header className="px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 flex items-center justify-between bg-white border-b border-slate-200/80 shadow-xs z-30">
+                        {/* HEADER — sticky top, same pattern as Leads/Calendar */}
+                        <header className="px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 flex items-center justify-between bg-white shrink-0 border-b border-slate-200/80 shadow-xs z-30">
                             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                                 <button
                                     onClick={() => setSelectedConv(null)}
@@ -880,12 +839,10 @@ export default function ChatHub() {
                                 </div>
                             </div>
                         </header>
-                        </div>{/* end header collapse wrapper */}
 
-                        {/* Messages — fills all remaining height automatically as header/footer collapse */}
+                        {/* Messages — flex-1 fills the space between header and footer */}
                         <div
                             ref={scrollRef}
-                            onScroll={handleChatScroll}
                             className="flex-1 overflow-y-auto min-h-0 px-3 sm:px-4 md:px-6 py-4 space-y-3 custom-scrollbar relative bg-[#f8fafc]"
                         >
                             {messages.map((msg, idx) => (
@@ -1043,12 +1000,8 @@ export default function ChatHub() {
                             </div>
                         )}
 
-                        {/* FOOTER collapse wrapper — shrinks to 0 on scroll-down, expands on scroll-up */}
-                        <div
-                            className="shrink-0 overflow-hidden transition-all duration-300 ease-in-out"
-                            style={{ maxHeight: barsHidden ? 0 : '200px' }}
-                        >
-                        <div className="px-4 pb-4 pt-3 bg-white border-t border-slate-200/70">
+                        {/* FOOTER INPUT BAR — always visible, same pattern as Leads/Calendar */}
+                        <div className="px-4 pb-4 pt-3 bg-white border-t border-slate-200/70 shrink-0">
                             {/* QUICK SUGGESTIONS */}
                             <div className="flex gap-2 overflow-x-auto pb-2.5 custom-scrollbar">
                                 {QUICK_RESPONSES.map((resp, i) => (
@@ -1137,7 +1090,6 @@ export default function ChatHub() {
                                 </button>
                             </form>
                         </div>
-                        </div>{/* end footer collapse wrapper */}
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center p-20 text-center bg-slate-50/10">
