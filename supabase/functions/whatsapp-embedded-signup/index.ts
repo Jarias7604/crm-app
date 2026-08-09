@@ -14,7 +14,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const META_API_VERSION = "v21.0";
-const SYSTEM_TOKEN = Deno.env.get('WHATSAPP_TOKEN') || "EAAQ4Ipb5RF0BSH5EZC9zcUO9mBUPyTrPt8o7pAbWYbAFZCUkaL0vzlJbBXf4FFapS81RL6wTnH1DxYgTqrp3T7vkjlvMsBo1ZAZBsdGT8wtz9DsznBdyL7QyqjKBGFXlYfEgoEwCjQ4O9iBoaeMhvgEcEVoOvB2hB2aDn0td9Gs1ByFXv83OeWuhwD8wWGOfnQZDZD";
+const SYSTEM_TOKEN = Deno.env.get('WHATSAPP_TOKEN') || "EAAQ4Ipb5RF0BSAWu2biyhZCBK3U1o0Eg7YbtrmAhggHpHgrdpOFsw7HjaZBDTsKpMzkQw2nrkam3xL4mhZC6fnxgS0U8GOc5x2eRk8HSBVZCBdE9qTzWZAvIU9MCPkZCezEyQ5JRi5YNkDkGMOQCuSmlnH5keZCftHgXzUktAKOrblxdojReuUXTtzqH6uy4gTYQwZDZD";
+
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
