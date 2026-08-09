@@ -4,6 +4,7 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, CustomRole, Role, Company } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { CustomSelect } from '../../components/ui/CustomSelect';
 import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send, BarChart3, Check } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
@@ -819,16 +820,14 @@ export default function Team() {
                                             {workspaces.length > 0 && (
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">🏢 Workspace / Departamento</label>
-                                                    <select
+                                                    <CustomSelect
                                                         value={editingMember.company_id || myProfile?.company_id || ''}
-                                                        onChange={e => setEditingMember({ ...editingMember, company_id: e.target.value })}
-                                                        className="w-full h-14 rounded-xl border border-gray-100 bg-gray-50/50 px-5 font-bold text-sm text-gray-900 shadow-inner outline-none cursor-pointer"
-                                                    >
-                                                        <option value={myProfile?.company_id}>🏠 Principal (Sin departamento específico)</option>
-                                                        {workspaces.map(w => (
-                                                            <option key={w.id} value={w.id}>📁 {w.name}</option>
-                                                        ))}
-                                                    </select>
+                                                        onChange={val => setEditingMember({ ...editingMember, company_id: val })}
+                                                        options={[
+                                                            { value: myProfile?.company_id || '', label: 'Principal (Sin departamento específico)', icon: '🏠' },
+                                                            ...workspaces.map(w => ({ value: w.id, label: w.name, icon: '📁' }))
+                                                        ]}
+                                                    />
                                                     <p className="text-[9px] text-gray-400 pl-1 font-medium">Asigna al agente a un departamento específico.</p>
                                                 </div>
                                             )}

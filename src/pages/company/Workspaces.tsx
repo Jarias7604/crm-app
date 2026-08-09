@@ -10,6 +10,7 @@ import { supabase } from '../../services/supabase';
 import type { Company, Profile } from '../../types';
 import WhatsAppConnectWizard from '../../components/marketing/WhatsAppConnectWizard';
 import WhatsAppEmbeddedConnect from '../../components/marketing/WhatsAppEmbeddedConnect';
+import { CustomSelect } from '../../components/ui/CustomSelect';
 
 export default function Workspaces() {
     const { profile, setSimulatedCompanyId } = useAuth();
@@ -552,18 +553,15 @@ export default function Workspaces() {
                                 {agents.length > 0 && (
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">👤 Agente Responsable</label>
-                                        <select
+                                        <CustomSelect
                                             value={formData.agentId}
-                                            onChange={e => setFormData({ ...formData, agentId: e.target.value })}
-                                            className="w-full h-12 px-4 rounded-xl bg-gray-50/50 border border-gray-200 focus:bg-white focus:border-[#4449AA]/30 outline-none font-bold text-sm transition-all cursor-pointer"
-                                        >
-                                            <option value="">— Sin asignar —</option>
-                                            {agents.map(a => (
-                                                <option key={a.id} value={a.id}>
-                                                    {a.full_name || a.email}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            onChange={val => setFormData({ ...formData, agentId: val })}
+                                            placeholder="— Sin asignar —"
+                                            options={[
+                                                { value: '', label: '— Sin asignar —' },
+                                                ...agents.map(a => ({ value: a.id, label: a.full_name || a.email || '', icon: '👤' }))
+                                            ]}
+                                        />
                                         <p className="text-[9px] text-gray-400 font-medium pl-1">El agente seleccionado será movido a este workspace automáticamente.</p>
                                     </div>
                                 )}
