@@ -756,9 +756,13 @@ export default function ChatHub() {
             <div className={`flex-1 ${selectedConv ? 'flex' : 'hidden md:flex'} flex-col bg-[#f8fafc] rounded-none md:rounded-[32px] overflow-hidden relative isolate min-h-0`}>
 
                 {selectedConv ? (
-                    <div className="flex flex-col h-full relative">
-                        {/* HEADER — slides up on scroll-down, back on scroll-up */}
-                        <header className={`px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 flex items-center justify-between bg-white shrink-0 border-b border-slate-200/80 shadow-xs z-30 transition-transform duration-300 ease-in-out md:!translate-y-0 ${barsHidden ? '-translate-y-full' : 'translate-y-0'}`}>
+                    <>
+                        {/* HEADER collapse wrapper — shrinks to 0 on scroll-down, expands on scroll-up */}
+                        <div
+                            className="shrink-0 overflow-hidden transition-all duration-300 ease-in-out"
+                            style={{ maxHeight: barsHidden ? 0 : '80px' }}
+                        >
+                        <header className="px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 flex items-center justify-between bg-white border-b border-slate-200/80 shadow-xs z-30">
                             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                                 <button
                                     onClick={() => setSelectedConv(null)}
@@ -855,8 +859,9 @@ export default function ChatHub() {
                                 </div>
                             </div>
                         </header>
+                        </div>{/* end header collapse wrapper */}
 
-                        {/* Messages — fills all remaining height between header and footer */}
+                        {/* Messages — fills all remaining height automatically as header/footer collapse */}
                         <div
                             ref={scrollRef}
                             onScroll={handleChatScroll}
@@ -1017,8 +1022,12 @@ export default function ChatHub() {
                             </div>
                         )}
 
-                        {/* FOOTER INPUT BAR — slides down on scroll-down, back on scroll-up */}
-                        <div className={`px-4 pb-4 pt-3 bg-white border-t border-slate-200/70 shrink-0 z-30 transition-transform duration-300 ease-in-out md:!translate-y-0 ${barsHidden ? 'translate-y-full' : 'translate-y-0'}`}>
+                        {/* FOOTER collapse wrapper — shrinks to 0 on scroll-down, expands on scroll-up */}
+                        <div
+                            className="shrink-0 overflow-hidden transition-all duration-300 ease-in-out"
+                            style={{ maxHeight: barsHidden ? 0 : '200px' }}
+                        >
+                        <div className="px-4 pb-4 pt-3 bg-white border-t border-slate-200/70">
                             {/* QUICK SUGGESTIONS */}
                             <div className="flex gap-2 overflow-x-auto pb-2.5 custom-scrollbar">
                                 {QUICK_RESPONSES.map((resp, i) => (
@@ -1107,7 +1116,8 @@ export default function ChatHub() {
                                 </button>
                             </form>
                         </div>
-                    </div>
+                        </div>{/* end footer collapse wrapper */}
+                    </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center p-20 text-center bg-slate-50/10">
                         <div className="w-32 h-32 bg-slate-50 rounded-[40px] flex items-center justify-center mb-10 border border-slate-100">
