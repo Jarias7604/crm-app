@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { teamService, type Invitation } from '../../services/team';
-import type { Profile, CustomRole, Role } from '../../types';
+import type { Profile, CustomRole, Role, Company } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send, BarChart3 } from 'lucide-react';
@@ -29,6 +29,8 @@ export default function Team() {
     const [searchTerm, setSearchTerm] = useState('');
     const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
     const [allowedPermissions, setAllowedPermissions] = useState<string[]>([]);
+    const [workspaces, setWorkspaces] = useState<Company[]>([]);
+    const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('');
 
     // Modal States
     const [editingMember, setEditingMember] = useState<Profile | null>(null);
@@ -74,15 +76,33 @@ export default function Team() {
     const loadData = async () => {
         if (!myProfile?.company_id) return;
         try {
-            const [membersData, invitationsData, limit, roles, allowed, rPerms] = await Promise.all([
-                teamService.getTeamMembers(myProfile.company_id),
+            // Load child workspaces (departments)
+            const { data: childWs } = await supabase
+                .from('companies')
+                .select('id, name, parent_company_id, license_status, allowed_permissions, max_users, is_active, created_at')
+                .eq('parent_company_id', myProfile.company_id)
+                .order('name');
+            const wsArr = (childWs || []) as Company[];
+            setWorkspaces(wsArr);
+
+            // All company IDs: parent + children
+            const allCompanyIds = [myProfile.company_id, ...wsArr.map(w => w.id)];
+
+            // Load members from ALL workspaces
+            const { data: membersData } = await supabase
+                .from('profiles')
+                .select('id, email, role, created_at, company_id, full_name, phone, is_active, avatar_url, website, permissions, custom_role_id, birth_date, address, telegram_chat_id, status')
+                .in('company_id', allCompanyIds)
+                .order('created_at', { ascending: false });
+
+            const [invitationsData, limit, roles, allowed, rPerms] = await Promise.all([
                 teamService.getInvitations(myProfile.company_id),
                 teamService.getCompanyLimit(myProfile.company_id),
                 teamService.getRoles(myProfile.company_id),
                 teamService.getCompanyPermissions(myProfile.company_id),
                 permissionsService.getRolePermissions()
             ]);
-            setMembers(membersData || []);
+            setMembers((membersData || []) as Profile[]);
             setInvitations(invitationsData || []);
             setMaxUsers(limit);
             setCustomRoles(roles);
@@ -133,7 +153,7 @@ export default function Team() {
                 fullName: formData.fullName,
                 phone: formData.phone,
                 role: baseRole as Role,
-                companyId: myProfile.company_id,
+                companyId: selectedWorkspaceId || myProfile.company_id,
                 customRoleId: customRoleId || undefined,
                 birthDate: formData.birthDate,
                 address: formData.address
@@ -144,6 +164,7 @@ export default function Team() {
                 email: '', password: '', fullName: '', phone: '',
                 birthDate: '', address: ''
             }));
+            setSelectedWorkspaceId('');
             toast.success('Miembro creado correctamente');
             loadData();
         } catch (error: any) {
@@ -432,6 +453,26 @@ export default function Team() {
                                 </div>
                             </div>
 
+                            {/* WORKSPACE / DEPARTAMENTO */}
+                            {workspaces.length > 0 && (
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.15em] ml-1">Workspace / Departamento</label>
+                                    <div className="relative">
+                                        <select
+                                            className="w-full h-11 rounded-xl border border-gray-100 bg-gray-50/50 px-4 font-black text-[11px] uppercase text-gray-600 outline-none focus:bg-white focus:border-indigo-100 transition-all appearance-none cursor-pointer shadow-inner"
+                                            value={selectedWorkspaceId}
+                                            onChange={e => setSelectedWorkspaceId(e.target.value)}
+                                        >
+                                            <option value="">🏢 Principal (Empresa Raíz)</option>
+                                            {workspaces.map(w => (
+                                                <option key={w.id} value={w.id}>📦 {w.name.trim()}</option>
+                                            ))}
+                                        </select>
+                                        <Building className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 pointer-events-none" />
+                                    </div>
+                                </div>
+                            )}
+
                             {/* CONTRASEÑA PREMIUM — Auto-generar o Email Link */}
                             <div className="space-y-2">
                                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.15em] ml-1">Contraseña de Acceso</label>
@@ -460,7 +501,7 @@ export default function Team() {
                                                             fullName: formData.fullName,
                                                             phone: formData.phone,
                                                             role: (selectedRole?.base_role as Role) || 'collaborator',
-                                                            companyId: myProfile!.company_id!,
+                                                            companyId: selectedWorkspaceId || myProfile!.company_id!,
                                                             customRoleId: selectedRole?.id || formData.customRoleId || undefined,
                                                             birthDate: formData.birthDate,
                                                             address: formData.address
@@ -475,6 +516,7 @@ export default function Team() {
                                                             });
                                                         }
                                                         setFormData(prev => ({ ...prev, email: '', password: '', fullName: '', phone: '', birthDate: '', address: '' }));
+                                                        setSelectedWorkspaceId('');
                                                         toast.success(`📧 Colaborador creado. Link de acceso enviado a ${formData.email}`, { duration: 8000 });
                                                         loadData();
                                                     } catch (err: any) {
@@ -607,6 +649,12 @@ export default function Team() {
                                                     )}
                                                 </div>
                                                 <p className="text-[11px] text-gray-400 font-bold tracking-tight lowercase truncate opacity-70 leading-normal">{member.email}</p>
+                                                {workspaces.find(w => w.id === member.company_id) && (
+                                                    <span className="text-[9px] text-indigo-400 font-black uppercase tracking-wider flex items-center gap-1 mt-0.5">
+                                                        <Building className="w-2.5 h-2.5 shrink-0" />
+                                                        {workspaces.find(w => w.id === member.company_id)?.name?.trim()}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
 
