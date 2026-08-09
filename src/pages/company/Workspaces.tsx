@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
-    Building2, Plus, Key, Loader2, X, Check,
+    Building2, Plus, Key, Loader2, X, Check, ChevronDown,
     Settings, ShieldAlert, ArrowLeftRight, Wifi, WifiOff, CheckCircle2, XCircle, RefreshCw, Zap
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
-import type { Company } from '../../types';
+import type { Company, Profile } from '../../types';
 import WhatsAppConnectWizard from '../../components/marketing/WhatsAppConnectWizard';
 import WhatsAppEmbeddedConnect from '../../components/marketing/WhatsAppEmbeddedConnect';
 
@@ -26,12 +26,16 @@ export default function Workspaces() {
         phone_number_id: '',
         sender_phone_number: '',
         whatsapp_token: '',
-        allowed_permissions: [] as string[]
+        allowed_permissions: [] as string[],
+        agentId: ''
     });
     const [isSaving, setIsSaving] = useState(false);
     const [verifyStatus, setVerifyStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
     const [verifyDetails, setVerifyDetails] = useState<string>('');
     const [showWizard, setShowWizard] = useState<'embedded' | 'manual' | false>(false);
+    const [agents, setAgents] = useState<Profile[]>([]);
+    const [agentsByWorkspace, setAgentsByWorkspace] = useState<Record<string, Profile[]>>({});
+    const [showAdvanced, setShowAdvanced] = useState(false);
 
     // WhatsApp status per workspace: { [companyId]: 'active' | 'inactive' | 'loading' }
     const [waStatus, setWaStatus] = useState<Record<string, 'active' | 'inactive' | 'loading'>>({});
@@ -97,6 +101,19 @@ export default function Workspaces() {
                 });
                 setWaStatus(statusMap);
             }
+
+            // Load agents across all workspaces
+            const allCompanyIds2 = [parentId, ...ws.map((w: Company) => w.id)];
+            const { data: agentsData } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, avatar_url, company_id, role')
+                .in('company_id', allCompanyIds2)
+                .order('full_name');
+            const aMap: Record<string, Profile[]> = {};
+            allCompanyIds2.forEach(id => { aMap[id] = []; });
+            (agentsData || []).forEach((a: any) => { if (aMap[a.company_id]) aMap[a.company_id].push(a as Profile); });
+            setAgents((agentsData || []) as Profile[]);
+            setAgentsByWorkspace(aMap);
         } catch (err) {
             console.error('Error loading workspaces:', err);
             toast.error('Error al cargar workspaces');
@@ -128,8 +145,10 @@ export default function Workspaces() {
             phone_number_id: '',
             sender_phone_number: '',
             whatsapp_token: '',
-            allowed_permissions: [...parentPermissions]
+            allowed_permissions: [...parentPermissions],
+            agentId: ''
         });
+        setShowAdvanced(false);
         setShowModal(true);
     };
 
@@ -208,13 +227,15 @@ export default function Workspaces() {
                 .maybeSingle();
 
             const settings = mktData?.settings || {};
+            const currentAgent = agentsByWorkspace[workspace.id]?.find(a => (a as any).role !== 'company_admin' && (a as any).role !== 'super_admin');
             setFormData({
                 name: workspace.name,
                 waba_id: settings.wabaId || '',
                 phone_number_id: settings.phoneNumberId || '',
                 sender_phone_number: settings.phone || '',
                 whatsapp_token: settings.token || '',
-                allowed_permissions: workspace.allowed_permissions || []
+                allowed_permissions: workspace.allowed_permissions || [],
+                agentId: currentAgent?.id || ''
             });
         } catch (err) {
             console.error('Error fetching workspace integration details:', err);
@@ -224,7 +245,8 @@ export default function Workspaces() {
                 phone_number_id: '',
                 sender_phone_number: '',
                 whatsapp_token: '',
-                allowed_permissions: workspace.allowed_permissions || []
+                allowed_permissions: workspace.allowed_permissions || [],
+                agentId: ''
             });
         }
     };
@@ -251,6 +273,10 @@ export default function Workspaces() {
                     .eq('id', editingWorkspace.id);
 
                 if (updateError) throw updateError;
+                // Assign agent to this workspace
+                if (formData.agentId) {
+                    await supabase.from('profiles').update({ company_id: editingWorkspace.id }).eq('id', formData.agentId);
+                }
                 toast.success('Workspace actualizado');
             } else {
                 // Create child company inheriting billing and active status from parent
@@ -271,6 +297,10 @@ export default function Workspaces() {
 
                 if (insertError) throw insertError;
                 targetCompanyId = newComp.id;
+                // Assign agent to this new workspace
+                if (formData.agentId) {
+                    await supabase.from('profiles').update({ company_id: targetCompanyId }).eq('id', formData.agentId);
+                }
                 toast.success('Workspace creado exitosamente');
             }
 
@@ -517,6 +547,26 @@ export default function Workspaces() {
                                         className="w-full h-12 px-4 rounded-xl bg-gray-50/50 border border-gray-200 focus:bg-white focus:border-[#4449AA]/30 outline-none font-bold text-sm transition-all"
                                     />
                                 </div>
+
+                                {/* Agent Picker */}
+                                {agents.length > 0 && (
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">👤 Agente Responsable</label>
+                                        <select
+                                            value={formData.agentId}
+                                            onChange={e => setFormData({ ...formData, agentId: e.target.value })}
+                                            className="w-full h-12 px-4 rounded-xl bg-gray-50/50 border border-gray-200 focus:bg-white focus:border-[#4449AA]/30 outline-none font-bold text-sm transition-all cursor-pointer"
+                                        >
+                                            <option value="">— Sin asignar —</option>
+                                            {agents.map(a => (
+                                                <option key={a.id} value={a.id}>
+                                                    {a.full_name || a.email}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="text-[9px] text-gray-400 font-medium pl-1">El agente seleccionado será movido a este workspace automáticamente.</p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* WhatsApp API Configuration */}
@@ -569,40 +619,50 @@ export default function Workspaces() {
                                     </>
                                 ) : null}
                             </div>
-
-
-                            {/* Features Permissions */}
-                            <div className="space-y-4">
-                                <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 pb-2">
-                                    Módulos Habilitados
-                                </h3>
-                                <p className="text-[10px] text-gray-400 font-medium">
-                                    Elige los módulos de tu plan principal que deseas activar para este workspace.
-                                </p>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {parentPermissions.map(perm => (
-                                        <button
-                                            key={perm}
-                                            onClick={() => handleTogglePermission(perm)}
-                                            className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
-                                                formData.allowed_permissions.includes(perm)
-                                                    ? 'border-[#4449AA] bg-indigo-50/20 text-indigo-950 font-black shadow-sm'
-                                                    : 'border-gray-100 hover:border-gray-200 text-gray-400 font-medium'
-                                            }`}
-                                        >
-                                            <span className="text-xs uppercase tracking-wider">{perm}</span>
-                                            <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
-                                                formData.allowed_permissions.includes(perm)
-                                                    ? 'border-[#4449AA] bg-[#4449AA] text-white'
-                                                    : 'border-gray-200 bg-white'
-                                            }`}>
-                                                {formData.allowed_permissions.includes(perm) && <Check className="w-3 h-3 stroke-[3]" />}
+                            {/* Configuración Avanzada: Módulos */}
+                            {parentPermissions.length > 0 && (
+                                <div className="space-y-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAdvanced(!showAdvanced)}
+                                        className="flex items-center gap-2 w-full text-left py-2 border-t border-gray-50"
+                                    >
+                                        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${showAdvanced ? 'rotate-180' : ''}`} />
+                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">
+                                            Configuración Avanzada — Módulos habilitados
+                                        </span>
+                                    </button>
+                                    {showAdvanced && (
+                                        <div className="space-y-3 animate-in fade-in duration-200">
+                                            <p className="text-[10px] text-gray-400 font-medium">
+                                                Elige los módulos de tu plan principal que deseas activar para este workspace.
+                                            </p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {parentPermissions.map(perm => (
+                                                    <button
+                                                        key={perm}
+                                                        onClick={() => handleTogglePermission(perm)}
+                                                        className={`flex items-center justify-between p-3.5 rounded-xl border text-left transition-all ${
+                                                            formData.allowed_permissions.includes(perm)
+                                                                ? 'border-[#4449AA] bg-indigo-50/20 text-indigo-950 font-black shadow-sm'
+                                                                : 'border-gray-100 hover:border-gray-200 text-gray-400 font-medium'
+                                                        }`}
+                                                    >
+                                                        <span className="text-xs uppercase tracking-wider">{perm}</span>
+                                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
+                                                            formData.allowed_permissions.includes(perm)
+                                                                ? 'border-[#4449AA] bg-[#4449AA] text-white'
+                                                                : 'border-gray-200 bg-white'
+                                                        }`}>
+                                                            {formData.allowed_permissions.includes(perm) && <Check className="w-3 h-3 stroke-[3]" />}
+                                                        </div>
+                                                    </button>
+                                                ))}
                                             </div>
-                                        </button>
-                                    ))}
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
+                            )}
                         </div>
 
                         {/* Actions */}

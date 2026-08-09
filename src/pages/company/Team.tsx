@@ -222,6 +222,10 @@ export default function Team() {
                 address: editingMember.address,
                 avatar_url: editingMember.avatar_url
             });
+            // Update workspace assignment if changed
+            if (editingMember.company_id) {
+                await supabase.from('profiles').update({ company_id: editingMember.company_id }).eq('id', editingMember.id);
+            }
 
             toast.success('Cambios guardados');
             setEditingMember(null);
@@ -812,6 +816,22 @@ export default function Team() {
                                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Número de Contacto</label>
                                                 <Input value={editingMember.phone || ''} onChange={e => setEditingMember({ ...editingMember, phone: e.target.value })} className="h-14 rounded-xl shadow-inner bg-gray-50/50 font-bold" />
                                             </div>
+                                            {workspaces.length > 0 && (
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">🏢 Workspace / Departamento</label>
+                                                    <select
+                                                        value={editingMember.company_id || myProfile?.company_id || ''}
+                                                        onChange={e => setEditingMember({ ...editingMember, company_id: e.target.value })}
+                                                        className="w-full h-14 rounded-xl border border-gray-100 bg-gray-50/50 px-5 font-bold text-sm text-gray-900 shadow-inner outline-none cursor-pointer"
+                                                    >
+                                                        <option value={myProfile?.company_id}>🏠 Principal (Sin departamento específico)</option>
+                                                        {workspaces.map(w => (
+                                                            <option key={w.id} value={w.id}>📁 {w.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    <p className="text-[9px] text-gray-400 pl-1 font-medium">Asigna al agente a un departamento específico.</p>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="space-y-6">
                                             <div className="space-y-2">
