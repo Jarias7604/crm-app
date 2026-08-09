@@ -163,16 +163,17 @@ export default function LandingHero({ onLoginClick }: LandingHeroProps) {
         {/* Left */}
         <div>
           {/* Eyebrow badge */}
-          <div className="inline-flex items-center gap-2 bg-red-50 border border-red-100 text-red-600 text-xs font-bold px-4 py-1.5 rounded-full mb-6 tracking-wide">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+          <div className="inline-flex items-center gap-2 bg-cyan-50 border border-cyan-200 text-cyan-700 text-xs font-bold px-4 py-1.5 rounded-full mb-6 tracking-wide">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
             {t('El CRM de ventas #1 para Latinoamérica', 'The #1 Sales CRM for Latin America')}
           </div>
 
-          {/* Headline */}
           <h1 className="text-5xl lg:text-6xl font-black text-gray-900 leading-[1.05] tracking-tight mb-6">
             {t('Convierte leads', 'Turn leads into')}<br />
             {t('en clientes.', 'customers.')}<br />
-            <span className="text-red-600">{t('Automáticamente.', 'Automatically.')}</span>
+            <span style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              {t('Automáticamente.', 'Automatically.')}
+            </span>
           </h1>
 
           <p className="text-lg text-gray-500 max-w-lg mb-10 leading-relaxed">
@@ -187,7 +188,8 @@ export default function LandingHero({ onLoginClick }: LandingHeroProps) {
             {user ? (
               <button
                 onClick={() => navigate('/dashboard')}
-                className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-4 rounded-xl transition-all text-base shadow-lg shadow-red-600/25"
+                style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)' }}
+                className="inline-flex items-center gap-2 text-white font-bold px-8 py-4 rounded-xl transition-all text-base shadow-lg"
               >
                 {t('Ir al Dashboard', 'Go to Dashboard')} <ArrowRight className="w-4 h-4" />
               </button>
@@ -195,7 +197,8 @@ export default function LandingHero({ onLoginClick }: LandingHeroProps) {
               <>
                 <button
                   onClick={() => navigate('/register')}
-                  className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-8 py-4 rounded-xl transition-all text-base shadow-lg shadow-red-600/25"
+                  style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)' }}
+                  className="inline-flex items-center gap-2.5 text-white font-bold px-8 py-4 rounded-xl transition-all text-base shadow-lg hover:opacity-90"
                 >
                   {t('Prueba gratuita — 14 días', 'Free Trial — 14 days')} <ArrowRight className="w-4 h-4" />
                 </button>
@@ -203,7 +206,7 @@ export default function LandingHero({ onLoginClick }: LandingHeroProps) {
                   onClick={onLoginClick}
                   className="inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-semibold px-7 py-4 rounded-xl border border-gray-200 transition-all text-base"
                 >
-                  <Play className="w-4 h-4 text-red-500" fill="currentColor" />
+                  <Play className="w-4 h-4 text-cyan-500" fill="currentColor" />
                   {t('Ver demo', 'Watch Demo')}
                 </button>
               </>

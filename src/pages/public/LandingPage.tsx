@@ -9,6 +9,12 @@ import LandingFaqCta from '../../components/landing/LandingFaqCta';
 import AriasAgent from '../../components/landing/AriasAgent';
 import Login from '../Login';
 
+// Load Inter font
+const interFont = document.createElement('link');
+interFont.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap';
+interFont.rel = 'stylesheet';
+if (!document.head.querySelector('[href*="Inter"]')) document.head.appendChild(interFont);
+
 export default function LandingPage() {
   const [showLogin, setShowLogin] = useState(false);
   const { i18n } = useTranslation();
@@ -19,12 +25,6 @@ export default function LandingPage() {
       className="min-h-screen bg-white text-gray-900 antialiased overflow-x-hidden"
       style={{ fontFamily: "'Inter', 'system-ui', sans-serif" }}
     >
-      {/* Google Fonts */}
-      <link rel="preconnect" href="https://fonts.googleapis.com" />
-      <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
-        rel="stylesheet"
-      />
 
       {/* Navbar */}
       <LandingNavbar
@@ -74,17 +74,26 @@ export default function LandingPage() {
       {/* AI Chatbot */}
       <AriasAgent />
 
-      {/* Login modal */}
+      {/* Login modal — dark theme matching Login.tsx */}
       {showLogin && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(2,6,23,0.85)', backdropFilter: 'blur(12px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowLogin(false); }}
+        >
+          <div className="relative w-full max-w-md rounded-3xl border border-white/10 shadow-2xl overflow-hidden" style={{ background: '#0b1120' }}>
+            {/* Close button */}
             <button
               onClick={() => setShowLogin(false)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition-colors"
+              className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all"
             >
               ✕
             </button>
-            <Login />
+            {/* Gradient top accent */}
+            <div className="h-1 w-full" style={{ background: 'linear-gradient(90deg, #06b6d4, #8b5cf6)' }} />
+            <div className="p-8">
+              <Login />
+            </div>
           </div>
         </div>
       )}

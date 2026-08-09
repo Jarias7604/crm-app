@@ -109,7 +109,7 @@ export default function LandingPricing() {
               className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${annual ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
             >
               {t('Anual', 'Annual')}
-              <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">-25%</span>
+              <span className="bg-cyan-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">-25%</span>
             </button>
           </div>
         </div>
@@ -122,7 +122,7 @@ export default function LandingPricing() {
               className={`relative rounded-3xl border-2 ${plan.color} p-8 ${plan.popular ? 'shadow-2xl shadow-red-100 bg-white ring-2 ring-red-500' : 'bg-white shadow-sm'} transition-transform hover:-translate-y-1`}
             >
               {plan.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white text-xs font-black px-6 py-1.5 rounded-full shadow">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-white text-xs font-black px-6 py-1.5 rounded-full shadow" style={{ background: 'linear-gradient(135deg,#06b6d4,#8b5cf6)' }}>
                   {t('MÁS POPULAR', 'MOST POPULAR')}
                 </div>
               )}
@@ -165,9 +165,10 @@ export default function LandingPricing() {
                 onClick={() => navigate('/register')}
                 className={`w-full py-3.5 rounded-xl text-sm font-bold transition-all ${
                   plan.popular
-                    ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/25'
+                    ? 'text-white shadow-lg hover:opacity-90'
                     : 'bg-gray-900 hover:bg-gray-800 text-white'
                 }`}
+                style={plan.popular ? { background: 'linear-gradient(135deg,#06b6d4,#8b5cf6)' } : {}}
               >
                 {t('Empezar gratis', 'Get started free')}
               </button>

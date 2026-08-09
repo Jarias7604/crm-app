@@ -58,7 +58,7 @@ export default function LandingFaqCta() {
       <section className="bg-gray-50 py-24 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
-            <span className="text-xs font-black text-red-600 uppercase tracking-[0.25em]">
+            <span className="text-xs font-black uppercase tracking-[0.25em]" style={{color:'#06b6d4'}}>
               {t('¿Por qué Arias CRM?', 'Why Arias CRM?')}
             </span>
             <h2 className="text-4xl lg:text-5xl font-black text-gray-900 mt-3">
@@ -81,7 +81,7 @@ export default function LandingFaqCta() {
       <section className="bg-white py-24 border-b border-gray-100">
         <div className="max-w-3xl mx-auto px-6">
           <div className="text-center mb-16">
-            <span className="text-xs font-black text-red-600 uppercase tracking-[0.25em]">
+            <span className="text-xs font-black uppercase tracking-[0.25em]" style={{color:'#06b6d4'}}>
               {t('Preguntas Frecuentes', 'Frequently Asked Questions')}
             </span>
             <h2 className="text-4xl font-black text-gray-900 mt-3">
@@ -111,19 +111,20 @@ export default function LandingFaqCta() {
         </div>
       </section>
 
-      {/* Final CTA */}
-      <section className="bg-gradient-to-br from-[#1a2b5e] via-[#1d3a8a] to-[#0f172a] py-24">
+      {/* Final CTA — Zoho-style blue-to-purple gradient */}
+      <section style={{background:'linear-gradient(135deg,#1e3a8a 0%,#4c1d95 60%,#1e1b4b 100%)'}} className="py-24">
         <div className="max-w-4xl mx-auto px-6 text-center">
           <h2 className="text-4xl lg:text-5xl font-black text-white mb-6 leading-tight">
             {t('Tu equipo de ventas merece mejores herramientas.', 'Your sales team deserves better tools.')}
           </h2>
           <p className="text-blue-200/70 text-lg mb-10 max-w-2xl mx-auto">
-            {t('Empieza gratis hoy. Sin tarjeta de crédito. Sin contratos. Sin límites de tiempo.', 'Start free today. No credit card. No contracts. No time limits.')}
+            {t('Empieza gratis hoy. Sin tarjeta de crédito. Sin contratos.', 'Start free today. No credit card. No contracts.')}
           </p>
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <button
               onClick={() => navigate('/register')}
-              className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black px-10 py-5 rounded-2xl transition-all text-base shadow-2xl shadow-red-600/30"
+              style={{background:'linear-gradient(135deg,#06b6d4,#8b5cf6)'}}
+              className="inline-flex items-center gap-2 text-white font-black px-10 py-5 rounded-2xl transition-all text-base shadow-2xl hover:opacity-90"
             >
               {t('Comenzar prueba gratis — 14 días', 'Start free trial — 14 days')}
               <ArrowRight className="w-5 h-5" />
