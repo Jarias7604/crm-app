@@ -777,9 +777,9 @@ export default function ChatHub() {
                                             <PhoneIcon className="w-4 h-4" />
                                         </a>
                                         <button
-                                            onClick={() => navigate('/google-meet', { state: { lead: selectedConv.lead } })}
+                                            onClick={() => window.open('https://meet.google.com/new', '_blank')}
                                             className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-                                            title="Videollamada Google Meet"
+                                            title="Iniciar Videollamada (Google Meet)"
                                         >
                                             <VideoIcon className="w-4 h-4" />
                                         </button>
