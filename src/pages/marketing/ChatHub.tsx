@@ -771,7 +771,7 @@ export default function ChatHub() {
                             </div>
                             <div className="flex gap-2 items-center shrink-0">
                                 {selectedConv.lead?.phone && (
-                                    <>
+                                    <div className="hidden sm:flex items-center gap-2">
                                         <a
                                             href={`tel:${selectedConv.lead.phone}`}
                                             className="h-9 w-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/60 transition-all shadow-xs"
@@ -797,20 +797,20 @@ export default function ChatHub() {
                                             <Smartphone className="w-4 h-4 text-emerald-600" />
                                             <span className="hidden xl:inline">WhatsApp</span>
                                         </a>
-                                    </>
+                                    </div>
                                 )}
                                 <button
                                     onClick={() => handleAiProcess()}
                                     disabled={isAiProcessing || !agentStatus}
                                     title="Activar Agente IA"
-                                    className={`h-9 px-3 flex items-center gap-1.5 rounded-xl border transition-all shadow-xs text-xs font-bold ${isAiProcessing ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-200/60 text-slate-700 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200'}`}
+                                    className={`hidden sm:flex h-9 px-3 items-center gap-1.5 rounded-xl border transition-all shadow-xs text-xs font-bold ${isAiProcessing ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-200/60 text-slate-700 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200'}`}
                                 >
                                     <Zap className={`w-4 h-4 ${isAiProcessing ? 'animate-pulse text-amber-500' : 'text-amber-500'}`} />
                                     <span className="hidden xl:inline">IA Auto</span>
                                 </button>
                                 <button
                                     onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedConv.lead, conversation_id: selectedConv.id, fromChat: true } })}
-                                    className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-100"
+                                    className="h-9 px-3.5 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-100 shrink-0"
                                 >
                                     <TrendingUp className="w-4 h-4" />
                                     <span>Cotizar</span>
