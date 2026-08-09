@@ -42,25 +42,12 @@ export default function ChatHub() {
     const [agentStatus, setAgentStatus] = useState<boolean>(false);
     const [pendingFile, setPendingFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [hideHeader, setHideHeader] = useState(false);
-    const lastScrollY = useRef(0);
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const location = useLocation();
     const navigate = useNavigate();
     const hasAutoSelected = useRef<string | null>(null);
     const { profile } = useAuth();
-
-    const handleScroll = () => {
-        if (!scrollRef.current) return;
-        const currentScrollY = scrollRef.current.scrollTop;
-        if (currentScrollY > lastScrollY.current && currentScrollY > 40) {
-            setHideHeader(true);
-        } else if (currentScrollY < lastScrollY.current || currentScrollY <= 20) {
-            setHideHeader(false);
-        }
-        lastScrollY.current = currentScrollY;
-    };
     const { isAdmin } = usePermissions();
 
     // 1. Initial Load + realtime new message notifications
@@ -755,7 +742,7 @@ export default function ChatHub() {
                 {selectedConv ? (
                     <>
                         {/* HEADER — Ultra Clean Mobile & Executive Desktop CRM Branding */}
-                        <header className={`px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 flex items-center justify-between bg-white sticky top-0 z-30 shrink-0 border-b border-slate-200/80 shadow-xs transition-all duration-300 ${hideHeader ? '-translate-y-full opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto' : 'translate-y-0 opacity-100'}`}>
+                        <header className="px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 flex items-center justify-between bg-white sticky top-0 z-30 shrink-0 border-b border-slate-200/80 shadow-xs">
                             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                                 <button
                                     onClick={() => setSelectedConv(null)}
@@ -855,7 +842,6 @@ export default function ChatHub() {
 
                         <div
                             ref={scrollRef}
-                            onScroll={handleScroll}
                             className="flex-1 overflow-y-auto px-3 sm:px-4 md:px-6 py-4 space-y-3 custom-scrollbar scroll-smooth relative bg-[#f8fafc]"
                         >
                             {messages.map((msg, idx) => (
