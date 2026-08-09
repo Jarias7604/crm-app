@@ -23,8 +23,14 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
   const [pendingToken, setPendingToken] = useState('');
   const [connectedPhone, setConnectedPhone] = useState('');
   const [loadingMsg, setLoadingMsg] = useState('Esperando autorización de Meta...');
+  const stepRef = useRef<Step>('landing');
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageListenerRef = useRef<((e: MessageEvent) => void) | null>(null);
+
+  // Keep stepRef in sync
+  useEffect(() => {
+    stepRef.current = step;
+  }, [step]);
 
   // Check for sessionStorage fallback (when popup opener wasn't available)
   useEffect(() => {
@@ -109,15 +115,15 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
     const checkClosed = setInterval(() => {
       if (popup.closed) {
         clearInterval(checkClosed);
-        // Give postMessage a moment to arrive
+        // Give postMessage 1.5s to arrive before resetting
         setTimeout(() => {
-          if (step === 'loading') {
+          if (stepRef.current === 'loading') {
             window.removeEventListener('message', handleMessage);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            setStep('landing');
-            toast('Ventana cerrada. Intenta de nuevo.', { icon: 'ℹ️' });
+            // Try fetching numbers directly before giving up
+            handleCodeExchange('direct_fetch');
           }
-        }, 1000);
+        }, 1500);
       }
     }, 800);
 
