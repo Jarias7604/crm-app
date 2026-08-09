@@ -4,48 +4,22 @@ import { Play } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
 
-// Real CRM Dashboard screenshot from production
+// Real CRM Dashboard screenshot provided by user
 const DashboardMockup = () => (
-  <div style={{ position: 'relative', width: '100%' }}>
-    {/* Real screenshot */}
+  <div style={{ width: '100%', maxWidth: '1150px', margin: '0 auto' }}>
     <div style={{
       borderRadius: '16px',
       overflow: 'hidden',
-      boxShadow: '0 32px 80px rgba(0,0,0,0.18)',
+      boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
       border: '1px solid #e8edf5',
+      background: '#ffffff',
     }}>
       <img
         src="/crm-dashboard.png"
-        alt="Arias CRM Dashboard — Pipeline, Leads, WhatsApp Inbox"
-        style={{ width: '100%', display: 'block' }}
+        alt="Arias CRM Dashboard"
+        style={{ width: '100%', height: 'auto', display: 'block' }}
         loading="eager"
       />
-    </div>
-    {/* Floating badge: New lead */}
-    <div style={{
-      position: 'absolute', top: '-14px', right: '-12px',
-      background: 'white', borderRadius: '14px', padding: '10px 14px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.14)', border: '1px solid #e8edf5',
-      display: 'flex', gap: '8px', alignItems: 'center', zIndex: 10,
-    }}>
-      <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-          <path d="M5 13l4 4L19 7"/>
-        </svg>
-      </div>
-      <div>
-        <p style={{ fontSize: '10px', fontWeight: 700, color: '#111827', margin: 0 }}>Nuevo lead capturado</p>
-        <p style={{ fontSize: '9px', color: '#6b7280', margin: 0 }}>TikTok Ads · hace 2 seg</p>
-      </div>
-    </div>
-    {/* Floating badge: AI response time */}
-    <div style={{
-      position: 'absolute', bottom: '-14px', left: '24px',
-      background: 'white', borderRadius: '14px', padding: '10px 16px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.14)', border: '1px solid #e8edf5',
-    }}>
-      <p style={{ fontSize: '9px', color: '#6b7280', margin: '0 0 2px' }}>IA respondió en</p>
-      <p style={{ fontSize: '20px', fontWeight: 900, color: '#e13b24', margin: 0 }}>2.4 seg</p>
     </div>
   </div>
 );
