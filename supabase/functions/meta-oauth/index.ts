@@ -25,6 +25,8 @@ Deno.serve(async (req) => {
 
   try {
     const { code, redirect_uri, company_id } = await req.json();
+    if (!company_id) throw new Error('Missing company_id');
+    if (!code) throw new Error('Missing OAuth authorization code');
 
     const APP_ID = Deno.env.get('META_APP_ID') || '1187621119804509';
     const APP_SECRET = Deno.env.get('META_APP_SECRET');
@@ -34,19 +36,30 @@ Deno.serve(async (req) => {
     const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // Canonicalize redirect_uri — strip www. if present so it matches the dialog request 100%
+    const cleanRedirectUri = redirect_uri
+      ? redirect_uri.replace('://www.', '://')
+      : 'https://ariascrm.com/integrations/meta/callback';
+
     // STEP 1: Exchange code → short-lived user token
+    const tokenParams = new URLSearchParams({
+      client_id: APP_ID,
+      client_secret: APP_SECRET,
+      redirect_uri: cleanRedirectUri,
+      code: code,
+    });
+
     const tokenRes = await fetch(`https://graph.facebook.com/${META_API_VERSION}/oauth/access_token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: APP_ID,
-        client_secret: APP_SECRET,
-        redirect_uri,
-        code,
-      }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: tokenParams.toString(),
     });
+
     const tokenData = await tokenRes.json();
-    if (tokenData.error) throw new Error(`Token exchange failed: ${tokenData.error.message}`);
+    if (tokenData.error) {
+      console.error('[meta-oauth] Token exchange error:', tokenData.error);
+      throw new Error(`Token exchange failed: ${tokenData.error.message}`);
+    }
     const shortToken = tokenData.access_token;
 
     // STEP 2: Exchange short-lived → long-lived user token (60 days)
@@ -55,8 +68,6 @@ Deno.serve(async (req) => {
     );
     const llData = await llRes.json();
     const longToken = llData.access_token || shortToken;
-    const expiresIn = llData.expires_in || 5183944; // ~60 days default
-    const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
     // STEP 3: Get ALL pages with their long-lived page tokens
     const pagesRes = await fetch(

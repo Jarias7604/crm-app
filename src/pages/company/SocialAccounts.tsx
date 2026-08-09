@@ -17,7 +17,9 @@ const SCOPES = [
   'business_management',
 ].join(',');
 
-function initiateMetaOAuth(redirectUri: string, companyId: string) {
+function initiateMetaOAuth(_unused: string, companyId: string) {
+  const cleanOrigin = window.location.origin.replace('://www.', '://');
+  const redirectUri = `${cleanOrigin}/integrations/meta/callback`;
   const state = encodeURIComponent(companyId);
   const url = [
     `https://www.facebook.com/v22.0/dialog/oauth`,
@@ -86,7 +88,8 @@ export default function SocialAccounts() {
   }
 
   const grouped = groupByPlatform(accounts);
-  const redirectUri = `${window.location.origin}/integrations/meta/callback`;
+  const cleanOrigin = window.location.origin.replace('://www.', '://');
+  const redirectUri = `${cleanOrigin}/integrations/meta/callback`;
   const metaConnected = (grouped.facebook?.length || 0) + (grouped.instagram?.length || 0) > 0;
 
   return (

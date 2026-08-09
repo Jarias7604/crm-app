@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
@@ -16,6 +16,7 @@ export default function MetaCallback() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Conectando con Meta...');
   const [accountsFound, setAccountsFound] = useState(0);
+  const exchangedRef = useRef(false);
 
   useEffect(() => {
     const code = searchParams.get('code');
@@ -37,13 +38,17 @@ export default function MetaCallback() {
 
     if (!profile?.company_id) return; // Wait for profile
 
+    if (exchangedRef.current) return;
+    exchangedRef.current = true;
+
     exchangeCode(code);
   }, [searchParams, profile?.company_id]);
 
   async function exchangeCode(code: string) {
     try {
       setMessage('Intercambiando código por tokens seguros...');
-      const redirectUri = `${window.location.origin}/integrations/meta/callback`;
+      const cleanOrigin = window.location.origin.replace('://www.', '://');
+      const redirectUri = `${cleanOrigin}/integrations/meta/callback`;
 
       const { data, error } = await supabase.functions.invoke('meta-oauth', {
         body: {

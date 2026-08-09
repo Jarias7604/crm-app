@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { CheckCircle2, Phone, Loader2, ChevronRight, RefreshCw, ArrowLeft, Zap, Settings } from 'lucide-react';
+import { CheckCircle2, Phone, Loader2, ChevronRight, ArrowLeft, Zap, Settings } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
 
 const META_APP_ID = import.meta.env.VITE_META_APP_ID || '1187621119804509';
-const META_WA_CONFIG_ID = import.meta.env.VITE_META_WA_CONFIG_ID || '';
+const META_WA_CONFIG_ID = import.meta.env.VITE_META_WA_CONFIG_ID || '1055343583553557';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -26,6 +26,8 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
   const stepRef = useRef<Step>('landing');
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageListenerRef = useRef<((e: MessageEvent) => void) | null>(null);
+  const currentRedirectUriRef = useRef<string>('');
+  const exchangingRef = useRef<boolean>(false);
 
   // Keep stepRef in sync
   useEffect(() => {
@@ -36,11 +38,11 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
   useEffect(() => {
     const code = sessionStorage.getItem('wa_oauth_code');
     const state = sessionStorage.getItem('wa_oauth_state');
-    if (code && state === companyId) {
+    if (code && state === companyId && !exchangingRef.current) {
       sessionStorage.removeItem('wa_oauth_code');
       sessionStorage.removeItem('wa_oauth_state');
       setStep('loading');
-      setLoadingMsg('Procesando tu cuenta...');
+      setLoadingMsg('Procesando tu cuenta de WhatsApp...');
       handleCodeExchange(code);
     }
   }, [companyId]);
@@ -61,9 +63,12 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
       return;
     }
 
-    // Build the Facebook OAuth URL directly — normalize origin to remove www. if present
+    exchangingRef.current = false;
+    // Canonicalize callback URL to remove www. if present so redirect_uri is 100% deterministic
     const cleanOrigin = window.location.origin.replace('://www.', '://');
     const callbackUrl = `${cleanOrigin}/integrations/wa/callback`;
+    currentRedirectUriRef.current = callbackUrl;
+
     const params = new URLSearchParams({
       client_id: META_APP_ID,
       config_id: META_WA_CONFIG_ID,
@@ -74,7 +79,7 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
     });
     const oauthUrl = `https://www.facebook.com/dialog/oauth?${params.toString()}`;
 
-    // Open as a real popup window (bypasses SDK popup blocker issues)
+    // Open as popup window
     const popup = window.open(
       oauthUrl,
       'wa-meta-oauth',
@@ -82,7 +87,7 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
     );
 
     if (!popup || popup.closed) {
-      toast.error('El navegador bloqueó la ventana. Permite ventanas emergentes de este sitio e intenta de nuevo.', { duration: 8000 });
+      toast.error('El navegador bloqueó la ventana emergente. Permite popups en este sitio e intenta nuevamente.', { duration: 8000 });
       return;
     }
 
@@ -91,19 +96,17 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
 
     // Listen for postMessage from WAOAuthCallback
     const handleMessage = (event: MessageEvent) => {
-      // Allow messages from ariascrm.com or www.ariascrm.com or current origin
       if (!event.origin.includes('ariascrm.com') && event.origin !== window.location.origin) return;
       if (event.data?.type !== 'WA_OAUTH_CALLBACK') return;
 
-      // Cleanup
       window.removeEventListener('message', handleMessage);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
       if (event.data.code) {
-        setLoadingMsg('Procesando tu cuenta de WhatsApp...');
+        setLoadingMsg('Verificando tu cuenta de WhatsApp con Meta...');
         handleCodeExchange(event.data.code);
       } else {
-        toast.error(event.data.error || 'Conexión cancelada o denegada.');
+        toast.error(event.data.error || 'Conexión cancelada o denegada por Facebook.');
         setStep('landing');
       }
     };
@@ -115,13 +118,12 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
     const checkClosed = setInterval(() => {
       if (popup.closed) {
         clearInterval(checkClosed);
-        // Give postMessage 1.5s to arrive before resetting
         setTimeout(() => {
-          if (stepRef.current === 'loading') {
+          if (stepRef.current === 'loading' && !exchangingRef.current) {
             window.removeEventListener('message', handleMessage);
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            // Try fetching numbers directly before giving up
-            handleCodeExchange('direct_fetch');
+            setStep('landing');
+            toast.error('La ventana de Facebook fue cerrada sin completar el proceso.');
           }
         }, 1500);
       }
@@ -132,13 +134,18 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
       clearInterval(checkClosed);
       window.removeEventListener('message', handleMessage);
       setStep('landing');
-      toast.error('Tiempo agotado. Intenta de nuevo.', { duration: 5000 });
+      toast.error('Tiempo agotado. Intenta nuevamente.', { duration: 5000 });
     }, 180_000);
   };
 
   const handleCodeExchange = async (code: string) => {
+    if (exchangingRef.current && code !== 'direct_fetch') return;
+    exchangingRef.current = true;
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      const redirectUriToUse = currentRedirectUriRef.current || `${window.location.origin.replace('://www.', '://')}/integrations/wa/callback`;
+
       const res = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-embedded-signup`, {
         method: 'POST',
         headers: {
@@ -149,34 +156,54 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
         body: JSON.stringify({
           code,
           company_id: companyId,
-          redirect_uri: `${window.location.origin.replace('://www.', '://')}/integrations/wa/callback`
+          redirect_uri: redirectUriToUse
         }),
       });
-      const result = await res.json();
-      if (!res.ok || result.error) throw new Error(result.error || 'Error del servidor');
 
-      if (result.auto_saved) {
-        setConnectedPhone(result.phone_number);
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || 'Error de conexión con Meta');
+
+      setPendingToken(result.token || '');
+      const fetchedNumbers: PhoneOption[] = result.numbers || [];
+      setNumbers(fetchedNumbers);
+
+      if (fetchedNumbers.length === 1) {
+        // Auto-select single number
+        const singleNum = fetchedNumbers[0];
+        setConnectedPhone(singleNum.display_phone_number);
         setStep('success');
-        onSuccess({ phone: result.phone_number, phoneNumberId: result.phone_number_id, wabaId: result.waba_id, token: '' });
-      } else {
-        setPendingToken(result.token);
-        setNumbers(result.numbers || []);
+        onSuccess({
+          phone: singleNum.display_phone_number,
+          phoneNumberId: singleNum.id,
+          wabaId: singleNum.waba_id,
+          token: result.token || '',
+        });
+      } else if (fetchedNumbers.length > 1) {
+        // Show pick step
         setStep('pick');
+      } else {
+        throw new Error('No se encontraron números de WhatsApp Business en tu cuenta de Meta.');
       }
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || 'Error al validar cuenta de WhatsApp');
       setStep('landing');
+    } finally {
+      exchangingRef.current = false;
     }
   };
 
   const handlePickNumber = async (num: PhoneOption) => {
     setStep('loading');
-    setLoadingMsg('Guardando número...');
+    setLoadingMsg('Guardando número de WhatsApp...');
     try {
       setConnectedPhone(num.display_phone_number);
       setStep('success');
-      onSuccess({ phone: num.display_phone_number, phoneNumberId: num.id, wabaId: num.waba_id, token: pendingToken });
+      onSuccess({
+        phone: num.display_phone_number,
+        phoneNumberId: num.id,
+        wabaId: num.waba_id,
+        token: pendingToken,
+      });
     } catch (err: any) {
       toast.error(err.message);
       setStep('pick');
@@ -190,11 +217,12 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
         <span className="text-3xl">📱</span>
       </div>
       <Loader2 className="w-6 h-6 text-green-500 animate-spin" />
-      <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-center">{loadingMsg}</p>
+      <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest text-center px-4">{loadingMsg}</p>
       <button
         onClick={() => {
           if (timeoutRef.current) clearTimeout(timeoutRef.current);
           if (messageListenerRef.current) window.removeEventListener('message', messageListenerRef.current);
+          exchangingRef.current = false;
           setStep('landing');
         }}
         className="text-[10px] text-gray-400 underline hover:text-gray-600 transition-colors mt-2"
@@ -215,8 +243,8 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
           <Phone className="w-4 h-4 text-white" />
         </div>
         <div>
-          <p className="text-sm font-black text-gray-900">Selecciona el número</p>
-          <p className="text-[10px] text-gray-400 font-medium">{numbers.length} número(s) encontrado(s)</p>
+          <p className="text-sm font-black text-gray-900">Selecciona tu número de WhatsApp</p>
+          <p className="text-[10px] text-gray-400 font-medium">Se encontraron {numbers.length} número(s) en tu cuenta Meta</p>
         </div>
       </div>
       <div className="space-y-2 max-h-64 overflow-y-auto">
@@ -224,15 +252,15 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
           <button
             key={num.id}
             onClick={() => handlePickNumber(num)}
-            className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-gray-100 hover:border-green-400 hover:bg-green-50/30 transition-all text-left group"
+            className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-gray-100 hover:border-green-500 hover:bg-green-50/40 transition-all text-left group"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
-                <Phone className="w-4 h-4 text-green-500" />
+              <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                <Phone className="w-5 h-5 text-green-600" />
               </div>
               <div>
                 <p className="text-sm font-black text-gray-900">{num.display_phone_number}</p>
-                <p className="text-[10px] text-gray-400 font-medium">{num.verified_name}</p>
+                <p className="text-[10px] text-gray-500 font-bold">{num.verified_name}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -278,30 +306,19 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
         <div>
           <h3 className="text-base font-black text-gray-900">Conecta WhatsApp Business</h3>
           <p className="text-[11px] text-gray-500 font-medium mt-1 max-w-xs mx-auto">
-            Recibe y responde leads directamente desde el CRM. Sin salir a Meta.
+            Vincular tu número oficial de Facebook / Meta para enviar y recibir mensajes directamente desde el CRM.
           </p>
         </div>
 
         {/* Connect Button */}
         {META_WA_CONFIG_ID ? (
-          <div className="space-y-2">
+          <div className="space-y-2 pt-2">
             <button
               onClick={handleEmbeddedSignup}
               className="w-full h-12 rounded-2xl bg-[#25D366] hover:bg-[#20C05A] text-white font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2.5 shadow-lg shadow-green-200/60 transition-all hover:translate-y-[-1px] active:scale-95"
             >
               <Zap className="w-4 h-4" />
               Conectar con Meta — 1 Click
-            </button>
-            <button
-              onClick={() => {
-                setStep('loading');
-                setLoadingMsg('Cargando números de WhatsApp desde Meta...');
-                handleCodeExchange('direct_fetch');
-              }}
-              className="w-full h-10 rounded-xl bg-green-50 hover:bg-green-100/70 text-green-700 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 border border-green-200 transition-all"
-            >
-              <Phone className="w-3.5 h-3.5 text-green-600" />
-              Ver números disponibles en mi cuenta (+503 7971 8911)
             </button>
           </div>
         ) : (
@@ -317,9 +334,9 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
       {/* Steps */}
       <div className="space-y-2">
         {[
-          { icon: '🔐', text: 'Se abre una ventana de Facebook — inicia sesión' },
+          { icon: '🔐', text: 'Se abre la ventana oficial de Facebook Meta' },
           { icon: '📋', text: 'Selecciona tu cuenta de WhatsApp Business' },
-          { icon: '✅', text: 'Tu número queda activo en este workspace' },
+          { icon: '✅', text: 'Tu número se registra automáticamente en este workspace' },
         ].map((s, i) => (
           <div key={i} className="flex items-center gap-3 px-1">
             <div className="w-7 h-7 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-sm shrink-0">{s.icon}</div>
@@ -341,7 +358,7 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
         className="w-full h-10 rounded-xl border border-gray-100 text-gray-400 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 hover:border-gray-200 hover:text-gray-600 transition-all"
       >
         <Settings className="w-3.5 h-3.5" />
-        Configuración Manual Avanzada
+        Configuración Manual Avanzada (Ingresar Token)
       </button>
     </div>
   );
