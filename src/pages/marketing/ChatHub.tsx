@@ -737,13 +737,13 @@ export default function ChatHub() {
                 </div>
             </div>
 
-            <div className={`flex-1 ${selectedConv ? 'flex' : 'hidden md:flex'} flex-col bg-[#e5ddd5] rounded-none md:rounded-[32px] overflow-hidden relative isolate min-h-0`}>
+            <div className={`flex-1 ${selectedConv ? 'flex' : 'hidden md:flex'} flex-col bg-[#f8fafc] rounded-none md:rounded-[32px] overflow-hidden relative isolate min-h-0`}>
 
                 {selectedConv ? (
                     <>
-                        {/* HEADER — Telegram/WhatsApp native style */}
-                        <header className="px-3 md:px-5 py-3 flex items-center justify-between bg-[#1f2937] sticky top-0 z-30 shrink-0">
-                            <div className="flex items-center gap-2 md:gap-4 min-w-0">
+                        {/* HEADER — Executive Minimalist style */}
+                        <header className="px-4 md:px-6 py-3.5 flex items-center justify-between bg-[#111827] sticky top-0 z-30 shrink-0 border-b border-slate-800/80 shadow-sm">
+                            <div className="flex items-center gap-3 md:gap-4 min-w-0">
                                 <button
                                     onClick={() => setSelectedConv(null)}
                                     className="md:hidden p-1.5 rounded-full text-white/70 hover:text-white transition-colors shrink-0"
@@ -751,27 +751,27 @@ export default function ChatHub() {
                                     <ChevronLeft className="w-5 h-5" />
                                 </button>
                                 <div className="relative shrink-0">
-                                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-lg font-black shadow-lg overflow-hidden">
+                                    <div className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-base font-bold shadow-sm overflow-hidden">
                                         {selectedConv.lead?.name?.[0]}
                                     </div>
-                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 border-2 border-[#1f2937] rounded-full" />
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 border-2 border-[#111827] rounded-full" />
                                 </div>
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <h2 className="text-[15px] md:text-[17px] font-bold text-white tracking-tight truncate max-w-[140px] sm:max-w-[240px]">{selectedConv.lead?.name}</h2>
-                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${selectedConv.channel === 'whatsapp' ? 'bg-emerald-500/20 text-emerald-400' : selectedConv.channel === 'telegram' ? 'bg-sky-500/20 text-sky-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{selectedConv.channel}</span>
+                                        <h2 className="text-[15px] md:text-[16px] font-bold text-white tracking-tight truncate max-w-[140px] sm:max-w-[240px]">{selectedConv.lead?.name}</h2>
+                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${selectedConv.channel === 'whatsapp' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : selectedConv.channel === 'telegram' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'}`}>{selectedConv.channel}</span>
                                     </div>
-                                    <p className="text-[11px] text-white/50 font-medium mt-0.5 flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block" /> en línea
+                                    <p className="text-[11px] text-slate-400 font-medium mt-0.5 flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block animate-pulse" /> en línea
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex gap-1.5 items-center shrink-0">
+                            <div className="flex gap-2 items-center shrink-0">
                                 {selectedConv.lead?.phone && (
                                     <>
                                         <a
                                             href={`tel:${selectedConv.lead.phone}`}
-                                            className="h-9 w-9 flex items-center justify-center rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-all"
+                                            className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-all"
                                             title="Llamar"
                                         >
                                             <PhoneIcon className="w-4 h-4" />
@@ -790,14 +790,14 @@ export default function ChatHub() {
                                 <button
                                     onClick={() => handleAiProcess()}
                                     disabled={isAiProcessing || !agentStatus}
-                                    title="IA"
-                                    className={`h-9 w-9 flex items-center justify-center rounded-full transition-all ${isAiProcessing ? 'text-white/20' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
+                                    title="IA Agent"
+                                    className={`h-9 w-9 flex items-center justify-center rounded-full transition-all ${isAiProcessing ? 'text-white/20' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
                                 >
-                                    <Zap className={`w-4 h-4 ${isAiProcessing ? 'animate-pulse' : ''}`} />
+                                    <Zap className={`w-4 h-4 ${isAiProcessing ? 'animate-pulse text-amber-400' : ''}`} />
                                 </button>
                                 <button
                                     onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedConv.lead, conversation_id: selectedConv.id, fromChat: true } })}
-                                    className="h-9 px-3 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 transition-all flex items-center gap-1.5"
+                                    className="h-9 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full text-[11px] font-bold tracking-wide transition-all flex items-center gap-1.5 shadow-sm"
                                 >
                                     <TrendingUp className="w-3.5 h-3.5" />
                                     <span className="hidden sm:inline">Cotizar</span>
@@ -805,7 +805,7 @@ export default function ChatHub() {
                                 <div className="relative group">
                                     <button
                                         onClick={() => setShowDetails(!showDetails)}
-                                        className="w-9 h-9 rounded-full flex items-center justify-center transition-all text-white/60 hover:text-white hover:bg-white/10"
+                                        className="w-9 h-9 rounded-full flex items-center justify-center transition-all text-slate-400 hover:text-white hover:bg-white/10"
                                     >
                                         <MoreVertical className="w-4 h-4" />
                                     </button>
@@ -826,33 +826,15 @@ export default function ChatHub() {
 
                         <div
                             ref={scrollRef}
-                            className="flex-1 overflow-y-auto px-3 md:px-5 py-5 space-y-2 custom-scrollbar scroll-smooth relative"
-                            style={{
-                                backgroundColor: selectedConv.channel === 'whatsapp' ? '#e5ddd5' : selectedConv.channel === 'telegram' ? '#e6ebee' : '#eef2ff',
-                                backgroundImage: selectedConv.channel === 'whatsapp'
-                                    ? `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Cg opacity='0.06' fill='%23000'%3E%3Ccircle cx='50' cy='50' r='4'/%3E%3Ccircle cx='150' cy='80' r='3'/%3E%3Ccircle cx='280' cy='40' r='5'/%3E%3Ccircle cx='350' cy='120' r='3'/%3E%3Ccircle cx='80' cy='180' r='4'/%3E%3Ccircle cx='220' cy='160' r='3'/%3E%3Ccircle cx='320' cy='200' r='4'/%3E%3Ccircle cx='40' cy='270' r='3'/%3E%3Ccircle cx='180' cy='300' r='5'/%3E%3Ccircle cx='310' cy='280' r='3'/%3E%3Ccircle cx='100' cy='350' r='4'/%3E%3Ccircle cx='250' cy='370' r='3'/%3E%3C/g%3E%3C/svg%3E")`
-                                    : 'none'
-                            }}
+                            className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-3 custom-scrollbar scroll-smooth relative bg-[#f8fafc]"
                         >
-                            {/* SVG wallpaper overlay for WhatsApp / Telegram native feeling */}
-                            {selectedConv.channel === 'whatsapp' && (
-                                <div className="absolute inset-0 opacity-[0.08] pointer-events-none" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath fill-rule='evenodd' d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zM11 61c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm7-43c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm0 43c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm-7-25c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm35-25c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm0 57c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm18-18c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm-36-7c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm18 18c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zm18-18c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z'/%3E%3C/g%3E%3C/svg%3E\")" }} />
-                            )}
-                            {selectedConv.channel === 'telegram' && (
-                                <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M30 30c2-5 5-8 10-10-5-2-8-5-10-10-2 5-5 8-10 10 5 2 8 5 10 10zm0 0c2 5 5 8 10 10-5 2-8 5-10 10-2-5-5-8-10-10 5-2 8-5 10-10z'/%3E%3C/g%3E%3C/svg%3E\")" }} />
-                            )}
-
                             {messages.map((msg, idx) => (
                                 <div key={msg.id || idx} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'} group w-full animate-in fade-in slide-in-from-bottom-2 duration-300 relative z-10`}>
                                     <div className={`flex flex-col gap-1 ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} max-w-[85%] md:max-w-[75%]`}>
-                                        <div className={`px-4 py-2.5 rounded-2xl shadow-sm relative ${
+                                        <div className={`px-4 py-3 rounded-2xl shadow-sm relative border ${
                                             msg.direction === 'outbound'
-                                                ? (selectedConv.channel === 'whatsapp'
-                                                    ? 'bg-[#d9fdd3] text-slate-800 rounded-tr-sm'
-                                                    : selectedConv.channel === 'telegram'
-                                                        ? 'bg-[#effdde] text-slate-800 rounded-tr-sm'
-                                                        : 'bg-indigo-100 text-slate-800 rounded-tr-sm')
-                                                : 'bg-white text-slate-800 rounded-tl-sm shadow-sm'
+                                                ? 'bg-[#dcfce7] text-emerald-950 border-emerald-200/70 rounded-tr-none'
+                                                : 'bg-white text-slate-800 border-slate-200/70 rounded-tl-none'
                                         }`}>
                                             <div className="text-[15px] font-normal leading-[1.5] pr-14 pb-1 relative">
                                                 {msg.content.startsWith('__QUOTE__') ? (
@@ -1001,16 +983,16 @@ export default function ChatHub() {
                             </div>
                         )}
 
-                        {/* INPUT BAR — Telegram native style */}
-                        <div className="px-3 pb-3 pt-2 bg-[#f2f2f7] border-t border-black/5">
+                        {/* INPUT BAR — Minimalist Executive style */}
+                        <div className="px-4 pb-4 pt-3 bg-white border-t border-slate-200/70">
                             {/* QUICK SUGGESTIONS */}
-                            <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                            <div className="flex gap-2 overflow-x-auto pb-2.5 custom-scrollbar">
                                 {QUICK_RESPONSES.map((resp, i) => (
                                     <button
                                         key={i}
                                         type="button"
                                         onClick={() => setNewMessage(resp.text)}
-                                        className="shrink-0 px-3 py-1 bg-white border border-black/8 text-slate-600 rounded-full text-[12px] font-medium transition-all active:scale-95 shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200"
+                                        className="shrink-0 px-3.5 py-1.5 bg-slate-50 hover:bg-indigo-50 text-slate-600 hover:text-indigo-600 border border-slate-200/80 hover:border-indigo-200 rounded-full text-[12px] font-medium transition-all active:scale-95 shadow-xs"
                                     >
                                         {resp.label}
                                     </button>
@@ -1021,7 +1003,7 @@ export default function ChatHub() {
                             {pendingFile && (
                                 <div className="mb-2 animate-in slide-in-from-bottom-2 duration-300">
                                     <div className="relative inline-block">
-                                        <div className="bg-white rounded-2xl border border-black/8 p-2 shadow-sm overflow-hidden">
+                                        <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-sm overflow-hidden">
                                             {previewUrl ? (
                                                 <img src={previewUrl} className="h-28 w-auto rounded-xl object-contain" alt="Preview" />
                                             ) : (
@@ -1048,24 +1030,24 @@ export default function ChatHub() {
                             )}
 
                             {/* MESSAGE INPUT ROW */}
-                            <form onSubmit={handleSendMessage} className="flex items-end gap-2">
+                            <form onSubmit={handleSendMessage} className="flex items-end gap-2.5">
                                 {/* Attachment */}
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full bg-white border border-black/8 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm mb-0.5"
+                                    className="w-10 h-10 shrink-0 flex items-center justify-center rounded-full bg-slate-100 border border-slate-200/60 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 hover:border-indigo-200 transition-all mb-0.5"
                                 >
                                     <Paperclip className="w-4 h-4" />
                                 </button>
 
                                 {/* Pill Input */}
-                                <div className="flex-1 bg-white rounded-[22px] border border-black/8 shadow-sm flex items-end px-4 py-2 gap-2 min-h-[44px]">
+                                <div className="flex-1 bg-slate-50 rounded-[22px] border border-slate-200/80 focus-within:border-indigo-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-indigo-100 transition-all flex items-end px-4 py-2 gap-2 min-h-[44px]">
                                     <textarea
                                         value={newMessage}
                                         onChange={e => setNewMessage(e.target.value)}
                                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); } }}
-                                        placeholder="Mensaje"
-                                        className="flex-1 bg-transparent text-[16px] text-slate-800 outline-none resize-none max-h-32 custom-scrollbar placeholder:text-slate-400 leading-snug self-center"
+                                        placeholder="Escribe un mensaje..."
+                                        className="flex-1 bg-transparent text-[15px] text-slate-800 outline-none resize-none max-h-32 custom-scrollbar placeholder:text-slate-400 leading-snug self-center"
                                         rows={1}
                                     />
                                     <button type="button" className="text-slate-400 hover:text-amber-500 transition-colors shrink-0 mb-0.5">
@@ -1080,7 +1062,7 @@ export default function ChatHub() {
                                     className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-full transition-all shadow-sm mb-0.5 ${
                                         newMessage.trim() || pendingFile
                                             ? 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 shadow-indigo-200'
-                                            : 'bg-white border border-black/8 text-slate-400 hover:text-indigo-600'
+                                            : 'bg-slate-100 border border-slate-200/60 text-slate-400 hover:text-indigo-600'
                                     }`}
                                 >
                                     {isSending
