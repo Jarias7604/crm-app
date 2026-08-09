@@ -9,6 +9,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import type { Company } from '../../types';
 import WhatsAppConnectWizard from '../../components/marketing/WhatsAppConnectWizard';
+import WhatsAppEmbeddedConnect from '../../components/marketing/WhatsAppEmbeddedConnect';
 
 export default function Workspaces() {
     const { profile, setSimulatedCompanyId } = useAuth();
@@ -30,7 +31,7 @@ export default function Workspaces() {
     const [isSaving, setIsSaving] = useState(false);
     const [verifyStatus, setVerifyStatus] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
     const [verifyDetails, setVerifyDetails] = useState<string>('');
-    const [showWizard, setShowWizard] = useState(true); // default: show simple wizard
+    const [showWizard, setShowWizard] = useState<'embedded' | 'manual' | false>(false);
 
     // WhatsApp status per workspace: { [companyId]: 'active' | 'inactive' | 'loading' }
     const [waStatus, setWaStatus] = useState<Record<string, 'active' | 'inactive' | 'loading'>>({});
@@ -136,7 +137,7 @@ export default function Workspaces() {
         setEditingWorkspace(workspace);
         setVerifyStatus('idle');
         setVerifyDetails('');
-        setShowWizard(true);
+        setShowWizard('embedded'); // default: premium Embedded Signup
         setShowModal(true);
         fetchIntegrationDetails(workspace);
     };
@@ -539,59 +540,34 @@ export default function Workspaces() {
                                     </button>
                                 </div>
 
-                                {showWizard ? (
-                                    <WhatsAppConnectWizard
-                                        onSave={handleWizardSave}
-                                        onCancel={() => { setShowWizard(false); }}
-                                        initialToken={formData.whatsapp_token}
+                                {showWizard === 'embedded' ? (
+                                    // PREMIUM: Embedded Signup (one-click Meta popup)
+                                    <WhatsAppEmbeddedConnect
+                                        companyId={editingWorkspace?.id || ''}
+                                        onSuccess={async (data) => {
+                                            if (editingWorkspace?.id) {
+                                                await handleWizardSave({ token: data.token, phoneNumberId: data.phoneNumberId, wabaId: data.wabaId, phone: data.phone });
+                                            }
+                                        }}
+                                        onSwitchManual={() => setShowWizard('manual')}
                                     />
-                                ) : (
-                                    <div className="space-y-4">
-                                        {/* Verify button + result */}
-                                        <div className="flex items-center gap-3">
-                                            <button
-                                                type="button"
-                                                onClick={handleVerifyConnection}
-                                                disabled={verifyStatus === 'loading' || !formData.whatsapp_token || !formData.phone_number_id}
-                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all disabled:opacity-40 disabled:cursor-not-allowed border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100"
-                                            >
-                                                {verifyStatus === 'loading' ? <RefreshCw className="w-3 h-3 animate-spin" /> : verifyStatus === 'ok' ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : verifyStatus === 'error' ? <XCircle className="w-3 h-3 text-red-500" /> : <Wifi className="w-3 h-3" />}
-                                                {verifyStatus === 'loading' ? 'Verificando...' : 'Verificar'}
-                                            </button>
-                                        </div>
-
-                                        {verifyStatus !== 'idle' && verifyStatus !== 'loading' && verifyDetails && (
-                                            <div className={`text-[10px] font-bold px-3 py-2 rounded-lg ${verifyStatus === 'ok' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                                                {verifyDetails}
-                                            </div>
-                                        )}
-
-                                        {/* Webhook reminder */}
-                                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[10px] text-amber-800 font-medium">
-                                            <span className="font-black">⚠️ Webhook:</span> URL: <code className="bg-amber-100 px-1 rounded font-mono">https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/meta-webhook</code> | Token: <code className="bg-amber-100 px-1 rounded font-mono">crm_secure_verify</code>
-                                        </div>
-
-                                        {/* Manual fields */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-1.5">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">WABA ID</label>
-                                                <input value={formData.waba_id} onChange={e => setFormData({ ...formData, waba_id: e.target.value })} placeholder="Ej: 2216370055815946" className="w-full h-11 px-3 rounded-lg bg-white border border-gray-200 focus:border-green-500/30 outline-none font-medium text-xs transition-all" />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Phone Number ID</label>
-                                                <input value={formData.phone_number_id} onChange={e => setFormData({ ...formData, phone_number_id: e.target.value })} placeholder="Ej: 1128590870346279" className="w-full h-11 px-3 rounded-lg bg-white border border-gray-200 focus:border-green-500/30 outline-none font-medium text-xs transition-all" />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Número Visible</label>
-                                                <input value={formData.sender_phone_number} onChange={e => setFormData({ ...formData, sender_phone_number: e.target.value })} placeholder="Ej: +50372690007" className="w-full h-11 px-3 rounded-lg bg-white border border-gray-200 focus:border-green-500/30 outline-none font-medium text-xs transition-all" />
-                                            </div>
-                                            <div className="space-y-1.5 md:col-span-2">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Access Token</label>
-                                                <input value={formData.whatsapp_token} onChange={e => { setFormData({ ...formData, whatsapp_token: e.target.value }); setVerifyStatus('idle'); }} placeholder="EAAQ4Ipb5..." className="w-full h-11 px-3 rounded-lg bg-white border border-gray-200 focus:border-green-500/30 outline-none font-mono text-[10px] transition-all" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                                ) : showWizard === 'manual' ? (
+                                    // FALLBACK: Manual Token Wizard
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowWizard('embedded')}
+                                            className="flex items-center gap-1.5 text-[9px] font-black text-indigo-500 hover:text-indigo-700 uppercase tracking-widest transition-colors mb-3"
+                                        >
+                                            ← Volver a Conexión Rápida
+                                        </button>
+                                        <WhatsAppConnectWizard
+                                            onSave={handleWizardSave}
+                                            onCancel={() => { setShowWizard('embedded'); }}
+                                            initialToken={formData.whatsapp_token}
+                                        />
+                                    </>
+                                ) : null}
                             </div>
 
 
