@@ -40,8 +40,10 @@ export default function DashboardLayout() {
             {/* Main Content Area */}
             {/* Dynamic padding based on sidebar state */}
             <div className={cn(
-                "transition-all duration-300 ease-in-out flex flex-col min-h-screen",
-                isImmersiveView ? "pb-0 md:pb-0" : "pb-20 md:pb-0",
+                "transition-all duration-300 ease-in-out flex flex-col",
+                isImmersiveView
+                    ? "h-screen overflow-hidden pb-16 md:pb-0"
+                    : "min-h-screen pb-20 md:pb-0",
                 sidebarCollapsed ? "md:pl-20" : "md:pl-64"
             )}>
                 {/* Optimized Global Header - Hidden on Quote Detail & Chat for immersion */}
@@ -89,8 +91,10 @@ export default function DashboardLayout() {
 
                 {/* Main Content Area - Clean separation */}
                 <main className={cn(
-                    "flex-1 w-full pb-8 transition-all",
-                    !isImmersiveView ? "max-w-[1580px] mx-auto px-4 md:px-8" : "pt-0 px-0 pb-0"
+                    "w-full transition-all",
+                    isImmersiveView
+                        ? "flex-1 overflow-hidden flex flex-col pt-0 px-0 pb-0"
+                        : "flex-1 pb-8 max-w-[1580px] mx-auto px-4 md:px-8"
                 )}>
                     <Outlet />
                 </main>
