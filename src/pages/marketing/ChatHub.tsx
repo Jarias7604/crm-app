@@ -741,28 +741,31 @@ export default function ChatHub() {
 
                 {selectedConv ? (
                     <>
-                        {/* HEADER — Executive Minimalist style */}
-                        <header className="px-4 md:px-6 py-3.5 flex items-center justify-between bg-[#111827] sticky top-0 z-30 shrink-0 border-b border-slate-800/80 shadow-sm">
+                        {/* HEADER — Clean Executive CRM Branding */}
+                        <header className="px-4 md:px-6 py-3 flex items-center justify-between bg-white sticky top-0 z-30 shrink-0 border-b border-slate-200/80 shadow-xs">
                             <div className="flex items-center gap-3 md:gap-4 min-w-0">
                                 <button
                                     onClick={() => setSelectedConv(null)}
-                                    className="md:hidden p-1.5 rounded-full text-white/70 hover:text-white transition-colors shrink-0"
+                                    className="md:hidden p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
                                 >
                                     <ChevronLeft className="w-5 h-5" />
                                 </button>
                                 <div className="relative shrink-0">
-                                    <div className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-base font-bold shadow-sm overflow-hidden">
+                                    <div className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white text-base font-bold shadow-sm ring-2 ring-indigo-50 overflow-hidden">
                                         {selectedConv.lead?.name?.[0]}
                                     </div>
-                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 border-2 border-[#111827] rounded-full" />
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
                                 </div>
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <h2 className="text-[15px] md:text-[16px] font-bold text-white tracking-tight truncate max-w-[140px] sm:max-w-[240px]">{selectedConv.lead?.name}</h2>
-                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${selectedConv.channel === 'whatsapp' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : selectedConv.channel === 'telegram' ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'}`}>{selectedConv.channel}</span>
+                                        <h2 className="text-[15px] md:text-[16px] font-bold text-slate-900 tracking-tight truncate max-w-[140px] sm:max-w-[240px]">{selectedConv.lead?.name}</h2>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${selectedConv.channel === 'whatsapp' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80' : selectedConv.channel === 'telegram' ? 'bg-sky-50 text-sky-700 border border-sky-200/80' : 'bg-indigo-50 text-indigo-700 border border-indigo-200/80'}`}>
+                                            <span className={`w-1.5 h-1.5 rounded-full ${selectedConv.channel === 'whatsapp' ? 'bg-emerald-500' : 'bg-sky-500'}`} />
+                                            {selectedConv.channel}
+                                        </span>
                                     </div>
-                                    <p className="text-[11px] text-slate-400 font-medium mt-0.5 flex items-center gap-1.5">
-                                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block animate-pulse" /> en línea
+                                    <p className="text-[11px] text-slate-500 font-medium mt-0.5 flex items-center gap-1.5">
+                                        <span className="w-2 h-2 bg-emerald-500 rounded-full inline-block animate-pulse" /> en línea
                                     </p>
                                 </div>
                             </div>
@@ -771,59 +774,62 @@ export default function ChatHub() {
                                     <>
                                         <a
                                             href={`tel:${selectedConv.lead.phone}`}
-                                            className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-all"
-                                            title="Llamar"
+                                            className="h-9 w-9 flex items-center justify-center rounded-xl bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-slate-200/60 transition-all shadow-xs"
+                                            title="Llamada Telefónica"
                                         >
                                             <PhoneIcon className="w-4 h-4" />
                                         </a>
                                         <button
                                             onClick={() => window.open('https://meet.google.com/new', '_blank')}
-                                            className="h-9 w-9 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                                            className="h-9 px-3 flex items-center gap-1.5 rounded-xl bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200/60 transition-all shadow-xs text-xs font-bold"
                                             title="Iniciar Videollamada (Google Meet)"
                                         >
-                                            <VideoIcon className="w-4 h-4" />
+                                            <VideoIcon className="w-4 h-4 text-sky-600" />
+                                            <span className="hidden xl:inline">Video</span>
                                         </button>
                                         <a
                                             href={`https://wa.me/${selectedConv.lead.phone.replace(/\D/g, '')}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="h-9 w-9 flex items-center justify-center rounded-full text-emerald-400 hover:text-white hover:bg-emerald-500/20 transition-all"
-                                            title="WhatsApp"
+                                            className="h-9 px-3 flex items-center gap-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60 transition-all shadow-xs text-xs font-bold"
+                                            title="Abrir en WhatsApp"
                                         >
-                                            <Smartphone className="w-4 h-4" />
+                                            <Smartphone className="w-4 h-4 text-emerald-600" />
+                                            <span className="hidden xl:inline">WhatsApp</span>
                                         </a>
                                     </>
                                 )}
                                 <button
                                     onClick={() => handleAiProcess()}
                                     disabled={isAiProcessing || !agentStatus}
-                                    title="IA Agent"
-                                    className={`h-9 w-9 flex items-center justify-center rounded-full transition-all ${isAiProcessing ? 'text-white/20' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+                                    title="Activar Agente IA"
+                                    className={`h-9 px-3 flex items-center gap-1.5 rounded-xl border transition-all shadow-xs text-xs font-bold ${isAiProcessing ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-200/60 text-slate-700 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200'}`}
                                 >
-                                    <Zap className={`w-4 h-4 ${isAiProcessing ? 'animate-pulse text-amber-400' : ''}`} />
+                                    <Zap className={`w-4 h-4 ${isAiProcessing ? 'animate-pulse text-amber-500' : 'text-amber-500'}`} />
+                                    <span className="hidden xl:inline">IA Auto</span>
                                 </button>
                                 <button
                                     onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedConv.lead, conversation_id: selectedConv.id, fromChat: true } })}
-                                    className="h-9 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full text-[11px] font-bold tracking-wide transition-all flex items-center gap-1.5 shadow-sm"
+                                    className="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-100"
                                 >
-                                    <TrendingUp className="w-3.5 h-3.5" />
-                                    <span className="hidden sm:inline">Cotizar</span>
+                                    <TrendingUp className="w-4 h-4" />
+                                    <span>Cotizar</span>
                                 </button>
                                 <div className="relative group">
                                     <button
                                         onClick={() => setShowDetails(!showDetails)}
-                                        className="w-9 h-9 rounded-full flex items-center justify-center transition-all text-slate-400 hover:text-white hover:bg-white/10"
+                                        className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center transition-all text-slate-500 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/60"
                                     >
                                         <MoreVertical className="w-4 h-4" />
                                     </button>
-                                    <div className="absolute top-12 right-0 w-48 bg-[#1f2937] rounded-xl shadow-2xl border border-white/10 p-1 hidden group-hover:block z-50">
+                                    <div className="absolute top-12 right-0 w-48 bg-white rounded-xl shadow-xl border border-slate-200 p-1 hidden group-hover:block z-50">
                                         {isAdmin() && (
                                             <button
                                                 onClick={(e) => handleDeleteConversation(e, selectedConv.id)}
-                                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-[11px] font-bold text-red-400 hover:bg-red-500/10 transition-colors"
+                                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 transition-colors"
                                             >
                                                 <Trash2 className="w-4 h-4" />
-                                                ELIMINAR CHAT
+                                                Eliminar Chat
                                             </button>
                                         )}
                                     </div>
