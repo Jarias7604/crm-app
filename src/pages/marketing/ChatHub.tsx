@@ -754,9 +754,9 @@ export default function ChatHub() {
 
                 {selectedConv ? (
                     <>
-                        {/* HEADER — Clean Executive CRM Branding with Smart Mobile Auto-Hide */}
+                        {/* HEADER — Ultra Clean Mobile & Executive Desktop CRM Branding */}
                         <header className={`px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 flex items-center justify-between bg-white sticky top-0 z-30 shrink-0 border-b border-slate-200/80 shadow-xs transition-all duration-300 ${hideHeader ? '-translate-y-full opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto' : 'translate-y-0 opacity-100'}`}>
-                            <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                                 <button
                                     onClick={() => setSelectedConv(null)}
                                     className="md:hidden p-1.5 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0"
@@ -764,20 +764,22 @@ export default function ChatHub() {
                                     <ChevronLeft className="w-5 h-5" />
                                 </button>
                                 <div className="relative shrink-0">
-                                    <div className="w-10 h-10 md:w-11 md:h-11 rounded-full bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white text-base font-bold shadow-sm ring-2 ring-indigo-50 overflow-hidden">
+                                    <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-full bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm sm:text-base font-bold shadow-sm ring-2 ring-indigo-50 overflow-hidden">
                                         {selectedConv.lead?.name?.[0]}
                                     </div>
-                                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 sm:w-3.5 sm:h-3.5 bg-emerald-500 border-2 border-white rounded-full" />
                                 </div>
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <h2 className="text-[15px] md:text-[16px] font-bold text-slate-900 tracking-tight truncate max-w-[140px] sm:max-w-[240px]">{selectedConv.lead?.name}</h2>
-                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${selectedConv.channel === 'whatsapp' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80' : selectedConv.channel === 'telegram' ? 'bg-sky-50 text-sky-700 border border-sky-200/80' : 'bg-indigo-50 text-indigo-700 border border-indigo-200/80'}`}>
+                                        <h2 className="text-[14px] sm:text-[15px] md:text-[16px] font-bold text-slate-900 tracking-tight truncate max-w-[130px] sm:max-w-[240px]">
+                                            {selectedConv.lead?.name ? selectedConv.lead.name.split(' ').slice(0, 2).join(' ') : 'Cliente'}
+                                        </h2>
+                                        <span className={`hidden sm:inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider items-center gap-1 ${selectedConv.channel === 'whatsapp' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80' : selectedConv.channel === 'telegram' ? 'bg-sky-50 text-sky-700 border border-sky-200/80' : 'bg-indigo-50 text-indigo-700 border border-indigo-200/80'}`}>
                                             <span className={`w-1.5 h-1.5 rounded-full ${selectedConv.channel === 'whatsapp' ? 'bg-emerald-500' : 'bg-sky-500'}`} />
                                             {selectedConv.channel}
                                         </span>
                                     </div>
-                                    <p className="text-[11px] text-slate-500 font-medium mt-0.5 flex items-center gap-1.5">
+                                    <p className="hidden sm:flex text-[11px] text-slate-500 font-medium mt-0.5 items-center gap-1.5">
                                         <span className="w-2 h-2 bg-emerald-500 rounded-full inline-block animate-pulse" /> en línea
                                     </p>
                                 </div>
@@ -823,12 +825,13 @@ export default function ChatHub() {
                                 </button>
                                 <button
                                     onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedConv.lead, conversation_id: selectedConv.id, fromChat: true } })}
-                                    className="h-9 px-3.5 sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-100 shrink-0"
+                                    className="h-9 w-9 sm:w-auto sm:px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold tracking-wide transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-100 shrink-0"
+                                    title="Cotizar"
                                 >
-                                    <TrendingUp className="w-4 h-4" />
-                                    <span>Cotizar</span>
+                                    <Send className="w-4 h-4 -rotate-45 translate-x-0.5" />
+                                    <span className="hidden sm:inline">Cotizar</span>
                                 </button>
-                                <div className="relative group">
+                                <div className="relative group hidden sm:block">
                                     <button
                                         onClick={() => setShowDetails(!showDetails)}
                                         className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center transition-all text-slate-500 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/60"
