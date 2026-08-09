@@ -25,36 +25,105 @@ const PET_QUOTES_EN = [
   "Quote Generator Pro ready to generate flawless proposals in 1 minute. 📄"
 ];
 
-const RESPONSES_EN = {
-  'default': "Great question! I'm Ari, your digital pet and AI agent. I can help you set up webhooks, extract B2B leads from Google Maps, or activate our 24/7 qualifying chat bot. Want to see a custom demo?",
-  'price': "Our unified Arias CRM package is just $65/mo. No hidden platform costs, no paying $150 extra for WhatsApp Inbox. Let's register to start your 14-day free trial!",
-  'trial': "Absolutely! You can start a free 14-day trial right now. Just click 'Comenzar gratis' to launch your own CRM environment instantly.",
-  'demo': "I'd love to help you schedule a demo! Our specialists can show you the Lead Hunter, TikTok API captures, and direct payment portals. Let's connect!",
-  'feature': "We integrate official Meta webhook, direct TikTok leads API, dynamic PDF quoting engine, and automated AI chat qualify flows. Which feature should we launch first?",
-  'help': "I can help with pricing details, starting your trial, maps prospecting, or configuring custom TikTok APIs. Ask away!",
-  'hi': "Bip Bop! 👋 Hello, I'm Ari! Your smart B2B Sales Sentinel. Let's make your business grow with our top-tier Salvadoran tech power!",
+// Multiple response variants per category — Ari never says the same thing twice
+const RESPONSES_EN: Record<string, string[]> = {
+  'hi': [
+    "Bip Bop! 👋 Hi, I'm Ari — your AI Sales Sentinel. Ready to help you close more deals today?",
+    "Hey there! 🤖 Ari here. I can show you how to automate your entire sales pipeline. What's your biggest challenge right now?",
+    "Hello! ⚡ I'm Ari, built by the Arias CRM team. Want to see how we turn leads into clients on autopilot?",
+  ],
+  'price': [
+    "Our full suite starts at just $49/mo (annual). No per-agent fees, no WhatsApp add-ons. Everything included. Want to start your 14-day free trial?",
+    "Compare us to HubSpot at $890/mo — we offer the same power for $65/mo monthly, no contracts. That's $9,900/year back in your pocket. 💸",
+    "Arias CRM is all-inclusive: AI agents, WhatsApp API, Lead Hunter, PDF quotes — one flat price. Start free for 14 days, no credit card needed.",
+  ],
+  'trial': [
+    "Yes! Click 'Start Free Trial' above — your CRM environment is live in under 60 seconds. No credit card required.",
+    "Absolutely! 14 days free, full access to every feature. Hit the button at the top and you're in. 🚀",
+    "Of course! Just click 'Start Free Trial' — we'll have your workspace up and running immediately. No commitment needed.",
+  ],
+  'demo': [
+    "I'd love to schedule a 15-min demo! Our team will walk you through Lead Hunter, AI agents, and our PDF quote builder live. Want to book now?",
+    "Great idea! Let's do a personalized demo where I show you how we capture TikTok & Meta leads in real-time. When works for you?",
+    "Demo time! 🎯 We can show you our WhatsApp automation, Kanban pipeline, and the ROI calculator. Just click 'Book demo' below.",
+  ],
+  'feature': [
+    "Key features: 📥 Real-time TikTok & Meta lead capture, 🤖 24/7 WhatsApp AI Agent, 📄 PDF Quote Generator, 🗺️ Google Maps Lead Hunter, 📊 Kanban Pipeline. Which would you like to explore?",
+    "We have 9 integrated modules: Lead management, AI chatbot, Marketing automation, PDF quotes, Lead Hunter, Flyer Studio, Omnichannel inbox, Analytics, and Payment portal. All in one platform.",
+    "Our top differentiators vs. HubSpot: ✅ Built-in WhatsApp API, ✅ Google Maps prospector, ✅ PDF quote generator with payments, ✅ No per-agent pricing. Which matters most to you?",
+  ],
+  'help': [
+    "I'm here to help! Ask me about pricing, features, integrations, or how to get started. What do you need?",
+    "Sure! I can assist with: setting up your first workspace, connecting WhatsApp, importing leads from TikTok, or generating your first quote. What's the priority?",
+    "Happy to help! Whether it's a technical question or you just want to see a feature in action — I've got you covered. Fire away! 🎯",
+  ],
+  'default': [
+    "Great question! I can help with lead capture, WhatsApp automation, PDF quotes, or B2B prospecting on Google Maps. Which area interests you most?",
+    "Interesting! Arias CRM handles the full sales cycle: capture → qualify → quote → close. Want me to walk you through a specific step?",
+    "Good one! Our platform connects TikTok Ads, Meta Leads, WhatsApp Business API, and Google Maps — all feeding into one smart pipeline. Want a demo?",
+  ],
 };
 
-const RESPONSES_ES = {
-  'default': "¡Excelente pregunta! Soy Ari, tu Sales Sentinel e inteligencia artificial. Te puedo ayudar a conectar TikTok APIs, prospectar en Google Maps, o redactar ofertas comerciales en PDF. ¿Te gustaría agendar una demo?",
-  'price': "Toda nuestra suite integrada de Arias CRM cuesta solo $65/mes. Sin cobros ocultos ni sorpresas de facturación. ¿Quieres iniciar tu prueba de 14 días?",
-  'trial': "¡Por supuesto! Inicia tu prueba gratis de 14 días sin tarjetas de crédito haciendo clic en 'Comenzar gratis' en el menú superior.",
-  'demo': "¡Con gusto! Agendemos una sesión personalizada de 15 minutos para mostrarte cómo capturar leads en 120ms sin Zapier. ¿Qué horario te queda mejor?",
-  'feature': "Ofrecemos capturas instantáneas de TikTok y Meta, extracción masiva de Google Maps, cotizador con firma digital y bandeja omnicanal compartida. ¿Cuál te interesa probar?",
-  'help': "Puedo asesorarte en planes de precios, sincronización de formularios de Instagram, extracción de prospectos B2B o automatización de cobros.",
-  'hi': "¡Bip Bop! 👋 ¡Hola, soy Ari! Tu Sales Sentinel y mascota virtual. ¡Hagamos que tu negocio venda 2.5 veces más rápido con tecnología de última generación!",
+const RESPONSES_ES: Record<string, string[]> = {
+  'hi': [
+    "¡Bip Bop! 👋 Soy Ari, tu Sales Sentinel con IA. ¿Listo para automatizar tus ventas hoy?",
+    "¡Hola! 🤖 Ari aquí. Puedo mostrarte cómo convertir leads en clientes en piloto automático. ¿Cuál es tu mayor reto ahora mismo?",
+    "¡Qué tal! ⚡ Soy Ari, creado por el equipo de Arias CRM. ¿Quieres ver cómo duplicamos las tasas de cierre con IA?",
+  ],
+  'price': [
+    "Nuestra suite completa comienza en $49/mes (anual). Sin cobros por agente, sin sorpresas. Todo incluido. ¿Quieres iniciar tu prueba gratuita?",
+    "Compáranos con HubSpot a $890/mes — nosotros ofrecemos lo mismo por $65/mes sin contratos. Eso es $9,900/año que te quedas en el bolsillo. 💸",
+    "Arias CRM es todo en uno: AI agents, WhatsApp API, Lead Hunter, cotizaciones PDF — un precio plano. 14 días gratis, sin tarjeta.",
+  ],
+  'trial': [
+    "¡Claro! Haz clic en 'Empezar gratis' arriba — tu entorno CRM estará listo en menos de 60 segundos. Sin tarjeta de crédito.",
+    "¡Por supuesto! 14 días gratis, acceso completo a todas las funciones. Solo presiona el botón arriba. 🚀",
+    "¡Cómo no! Solo haz clic en 'Empezar gratis' — activamos tu workspace de inmediato. Sin compromiso.",
+  ],
+  'demo': [
+    "¡Con mucho gusto! Agendemos 15 minutos donde te mostramos Lead Hunter, AI agents y el cotizador PDF en vivo. ¿Cuándo te queda bien?",
+    "¡Excelente idea! Te hacemos una demo personalizada donde ves la captura en tiempo real de TikTok y Meta. ¿Qué horario prefieres?",
+    "¡Vamos! 🎯 Podemos mostrarte la automatización de WhatsApp, el pipeline Kanban y el calculador de ROI. Solo haz clic en 'Agendar demo'.",
+  ],
+  'feature': [
+    "Funciones clave: 📥 Captura en tiempo real de TikTok & Meta, 🤖 AI Agent 24/7 en WhatsApp, 📄 Cotizador con PDF, 🗺️ Lead Hunter en Google Maps, 📊 Pipeline Kanban. ¿Cuál quieres explorar?",
+    "Tenemos 9 módulos integrados: Gestión de leads, Chatbot IA, Automatización de marketing, Cotizaciones PDF, Lead Hunter, Flyer Studio, Inbox omnicanal, Analítica y Portal de cobros.",
+    "Diferencias vs. HubSpot: ✅ WhatsApp API incluido, ✅ Prospector de Google Maps, ✅ Cotizador PDF con cobros, ✅ Sin cobro por agente. ¿Qué te importa más?",
+  ],
+  'help': [
+    "¡Aquí estoy! Pregúntame sobre precios, funciones, integraciones o cómo empezar. ¿Qué necesitas?",
+    "¡Claro! Puedo ayudarte con: configurar tu primer workspace, conectar WhatsApp, importar leads de TikTok o generar tu primera cotización.",
+    "¡Con gusto! Tanto preguntas técnicas como ver una función en acción — te tengo cubierto. ¡Dispara! 🎯",
+  ],
+  'default': [
+    "¡Buena pregunta! Puedo ayudarte con captura de leads, automatización de WhatsApp, cotizaciones PDF o prospección B2B en Google Maps. ¿Qué área te interesa?",
+    "¡Interesante! Arias CRM maneja todo el ciclo de ventas: capturar → calificar → cotizar → cerrar. ¿Quieres que te explique un paso en específico?",
+    "¡Buen punto! Nuestra plataforma conecta TikTok Ads, Meta Leads, WhatsApp Business API y Google Maps — todo en un pipeline inteligente. ¿Te muestro una demo?",
+  ],
 };
+
+// Track last index per key to avoid consecutive repeats
+const lastIndexMap: Record<string, number> = {};
 
 function getResponse(input: string, lang: string): string {
   const responses = lang?.startsWith('es') ? RESPONSES_ES : RESPONSES_EN;
   const lower = input.toLowerCase();
-  if (/hola|hey|hi|hello|buenas|ari/i.test(lower)) return responses.hi;
-  if (/preci|price|cost|plan|paquete|cuanto/i.test(lower)) return responses.price;
-  if (/trial|prueba|gratis|free/i.test(lower)) return responses.trial;
-  if (/demo|mostrar|show/i.test(lower)) return responses.demo;
-  if (/feature|funcion|caracterist|incluye|ofrec/i.test(lower)) return responses.feature;
-  if (/ayud|help|support|soporte/i.test(lower)) return responses.help;
-  return responses.default;
+
+  let key = 'default';
+  if (/hola|hey|hi|hello|buenas|ari/i.test(lower)) key = 'hi';
+  else if (/preci|price|cost|plan|paquete|cuanto/i.test(lower)) key = 'price';
+  else if (/trial|prueba|gratis|free/i.test(lower)) key = 'trial';
+  else if (/demo|mostrar|show/i.test(lower)) key = 'demo';
+  else if (/feature|funcion|caracterist|incluye|ofrec/i.test(lower)) key = 'feature';
+  else if (/ayud|help|support|soporte/i.test(lower)) key = 'help';
+
+  const variants = responses[key];
+  const last = lastIndexMap[key] ?? -1;
+  // Pick a different index than last time
+  let idx = Math.floor(Math.random() * variants.length);
+  if (variants.length > 1 && idx === last) idx = (idx + 1) % variants.length;
+  lastIndexMap[key] = idx;
+  return variants[idx];
 }
 
 export default function AriasAgent() {

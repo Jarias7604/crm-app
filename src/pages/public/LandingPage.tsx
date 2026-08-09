@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import LandingNavbar from '../../components/landing/LandingNavbar';
 import LandingFooter from '../../components/landing/LandingFooter';
 import AriasAgent from '../../components/landing/AriasAgent';
+import HeroIllustration from '../../components/landing/HeroIllustration';
 import Login from '../Login';
 import { supabase } from '../../services/supabase';
 
@@ -653,68 +654,78 @@ export default function LandingPage() {
   if (toggleInbox) hsEquivalent += 150;
 
   return (
-    <div className="min-h-screen bg-[#07070d] text-white font-sans antialiased overflow-x-hidden" style={{fontFamily:"'Inter','system-ui',sans-serif"}}>
+    <div className="min-h-screen bg-[#080d1a] text-white font-sans antialiased overflow-x-hidden" style={{fontFamily:"'Inter','system-ui',sans-serif"}}>
       <LandingNavbar onLoginClick={() => setShowLogin(true)} onProductClick={setActiveProductDetail} />
 
-      {/* ─── HERO WITH LIVE SIMULATOR ────────────────────────────────────────── */}
-      <section className="relative min-h-screen flex flex-col justify-center pt-32 pb-24 border-b border-white/[0.05]">
-        {/* Futuristic glowing circles */}
-        <div className="absolute top-[10%] left-[5%] w-[350px] h-[350px] rounded-full bg-indigo-500/10 blur-[100px] pointer-events-none" />
-        <div className="absolute top-[40%] right-[5%] w-[450px] h-[450px] rounded-full bg-emerald-500/10 blur-[130px] pointer-events-none" />
-        <div className="absolute bottom-[5%] left-[20%] w-[250px] h-[250px] rounded-full bg-purple-500/10 blur-[90px] pointer-events-none" />
+      {/* ─── HERO — ENTERPRISE REDESIGN ──────────────────────────────────────── */}
+      <section className="relative min-h-screen flex flex-col justify-center pt-32 pb-24 border-b border-white/[0.04]">
+        {/* Premium glow orbs — blue/teal palette */}
+        <div className="absolute top-[8%] left-[3%] w-[420px] h-[420px] rounded-full bg-blue-600/8 blur-[120px] pointer-events-none" />
+        <div className="absolute top-[35%] right-[3%] w-[380px] h-[380px] rounded-full bg-teal-500/8 blur-[100px] pointer-events-none" />
+        <div className="absolute bottom-[10%] left-[25%] w-[300px] h-[300px] rounded-full bg-blue-400/5 blur-[80px] pointer-events-none" />
 
-        {/* Dynamic Matrix Grid Overlay */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
+        {/* Subtle enterprise grid */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e40af08_1px,transparent_1px),linear-gradient(to_bottom,#1e40af08_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,#000_60%,transparent_100%)] pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-12 items-center relative z-10 w-full">
-          {/* Left: Persuasive Core copy */}
-          <div className="lg:col-span-7 flex flex-col justify-center">
-            <div className="inline-flex items-center gap-2 border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1.5 rounded-full mb-8 self-start">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="text-[10px] font-bold text-indigo-300 tracking-[0.25em] uppercase">{txt('Módulo Social Captura V2.0', 'Social Capture Module V2.0')}</span>
+        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-8 items-center relative z-10 w-full">
+          {/* Left: Enterprise copy */}
+          <div className="lg:col-span-6 flex flex-col justify-center">
+
+            {/* Badge — clean enterprise style */}
+            <div className="inline-flex items-center gap-2.5 border border-blue-500/25 bg-blue-500/8 px-4 py-2 rounded-full mb-8 self-start backdrop-blur-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+              <span className="text-[10px] font-bold text-blue-300 tracking-[0.22em] uppercase">{txt('Plataforma CRM con IA — v2.0', 'AI-Powered CRM Platform — v2.0')}</span>
             </div>
 
-            <h1 className="text-5xl lg:text-7xl font-black leading-[0.95] tracking-tight mb-8">
-              {txt('La landing page', 'The landing page')}<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-indigo-300 to-emerald-400">
-                {txt('que devora leads', 'that devours leads')}<br />{txt('e inyecta ventas.', 'and injects sales.')}
+            {/* Headline — short, powerful, Salesforce-grade */}
+            <h1 className="text-5xl lg:text-[64px] font-black leading-[1.0] tracking-[-0.02em] mb-6">
+              {txt('Cierra más tratos.', 'Close More Deals.')}<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-sky-300 to-teal-400">
+                {txt('Automáticamente.', 'Automatically.')}
               </span>
             </h1>
 
-            <p className="text-base lg:text-lg text-slate-400 max-w-xl mb-10 leading-relaxed">
+            <p className="text-base lg:text-lg text-slate-400 max-w-lg mb-10 leading-relaxed">
               {txt(
-                'Integra tus campañas de TikTok, Instagram y Facebook. AI Agents cualifican y nuestro cotizador profesional cierra el trato. Todo en piloto automático.',
-                'Integrate your TikTok, Instagram and Facebook campaigns. AI Agents qualify and our professional quote generator closes the deal. All on autopilot.'
+                'El único CRM con AI Agents integrados, automatización de WhatsApp y cotizaciones instantáneas. Diseñado para equipos de ventas modernos.',
+                'The only CRM with built-in AI Agents, WhatsApp automation, and instant quote generation. Built for modern sales teams.'
               )}
             </p>
 
-            <div className="flex items-center gap-4 flex-wrap">
+            {/* CTAs — enterprise style */}
+            <div className="flex items-center gap-3 flex-wrap">
               {user ? (
-                <button onClick={() => navigate('/dashboard')} className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-8 py-4 rounded-xl transition-all text-sm shadow-xl shadow-indigo-600/30">
-                  {txt('Entrar al Centro de Control', 'Enter Control Center')} <ArrowRight className="w-4 h-4" />
+                <button onClick={() => navigate('/dashboard')} className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-3.5 rounded-xl transition-all text-sm shadow-xl shadow-blue-600/25 border border-blue-500/30">
+                  {txt('Entrar al Dashboard', 'Go to Dashboard')} <ArrowRight className="w-4 h-4" />
                 </button>
               ) : (
                 <>
-                  <button onClick={() => navigate('/register')} className="inline-flex items-center gap-2 bg-white text-slate-950 hover:bg-slate-100 font-bold px-8 py-4 rounded-xl transition-all text-sm shadow-lg">
-                    {txt('Empezar gratis 14 días', 'Start free for 14 days')} <ArrowRight className="w-4 h-4" />
+                  <button onClick={() => navigate('/register')} className="inline-flex items-center gap-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-3.5 rounded-xl transition-all text-sm shadow-xl shadow-blue-600/25 border border-blue-500/30">
+                    {txt('Empezar gratis — 14 días', 'Start Free Trial — 14 days')} <ArrowRight className="w-4 h-4" />
                   </button>
-                  <button onClick={() => setShowLogin(true)} className="inline-flex items-center gap-2 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white font-semibold px-8 py-4 rounded-xl transition-all text-sm">
-                    {txt('Ver demo guiada', 'Watch guided demo')}
+                  <button onClick={() => setShowLogin(true)} className="inline-flex items-center gap-2 border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white font-semibold px-7 py-3.5 rounded-xl transition-all text-sm bg-white/[0.02] hover:bg-white/[0.05]">
+                    {txt('Ver demo', 'Watch Demo')}
                   </button>
                 </>
               )}
             </div>
 
-            {/* Micro proof bar */}
-            <div className="mt-14 pt-8 border-t border-white/[0.05] flex flex-wrap gap-8 text-slate-500 text-xs">
-              <div>{txt('🛡️ Encriptación Enterprise', '🛡️ Enterprise Encryption')}</div>
-              <div>{txt('⚡ Latencia de Ingestión <200ms', '⚡ Ingestion Latency <200ms')}</div>
-              <div>💬 Meta & TikTok API Verified Partner</div>
+            {/* Trust bar — logos */}
+            <div className="mt-12 pt-8 border-t border-white/[0.06]">
+              <p className="text-[11px] text-slate-600 uppercase tracking-widest font-semibold mb-4">{txt('Integrado con', 'Integrated with')}</p>
+              <div className="flex flex-wrap items-center gap-5">
+                {CHANNELS.map(ch => (
+                  <div key={ch.name} className="flex items-center gap-1.5 opacity-50 hover:opacity-80 transition-opacity">
+                    <BrandIcon name={ch.name} />
+                    <span className="text-xs text-slate-400 font-medium">{ch.name}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Right: Live Interactive Webhook Simulator Mockup (Extremely high-tech landing page tech!) */}
-          <div className="lg:col-span-5 bg-white/[0.02] backdrop-blur border border-white/10 rounded-3xl p-6 relative">
+          {/* Right: 3D Isometric CRM Dashboard Illustration */}
+          <div className="lg:col-span-6 relative flex items-center justify-center">
             <div className="absolute -top-3 -right-3 bg-emerald-500 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shadow">
               Live Demo
             </div>
@@ -784,40 +795,25 @@ export default function LandingPage() {
                   </div>
                   <div className="flex items-center justify-between text-xs border-b border-white/5 pb-2">
                     <span className="text-slate-400">{txt('Módulo Asignado:', 'Assigned Module:')}</span>
-                    <span className="font-bold text-indigo-400">AI Follow-Up Active</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">{txt('Acción Bot:', 'Bot Action:')}</span>
-                    <span className="font-bold text-emerald-400">{txt('WhatsApp Enviado ✅', 'WhatsApp Sent ✅')}</span>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => { setSimStatus('idle'); setSimName(''); setSimPhone(''); }}
-                  className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold py-2 rounded-xl text-xs transition-colors"
-                >
-                  {txt('Probar otra vez', 'Try again')}
-                </button>
-              </div>
-            )}
+            <HeroIllustration />
           </div>
         </div>
       </section>
 
       {/* ─── DYNAMIC INTEGRATIONS SHOWCASE ────────────────────────────────────── */}
-      <section className="py-16 bg-[#040408] border-b border-white/[0.05]">
+      <section className="py-14 bg-[#060b17] border-b border-white/[0.04]">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-slate-500 text-xs font-semibold tracking-[0.2em] uppercase mb-8">{txt('Captura omnicanal directa en 1 clic', 'Direct omnichannel capture in 1 click')}</p>
-          <div className="flex flex-wrap justify-center items-center gap-6">
+          <p className="text-slate-600 text-[10px] font-bold tracking-[0.25em] uppercase mb-8">{txt('Conectado con las plataformas que ya usas', 'Connected with the platforms you already use')}</p>
+          <div className="flex flex-wrap justify-center items-center gap-5">
             {CHANNELS.map(ch => (
-              <div 
-                key={ch.name} 
-                className="flex items-center gap-3 border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/10 px-5 py-3 rounded-2xl transition-all cursor-default"
+              <div
+                key={ch.name}
+                className="flex items-center gap-2.5 border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10 px-5 py-2.5 rounded-2xl transition-all cursor-default"
               >
                 <BrandIcon name={ch.name} />
-                <span className="text-sm font-semibold text-slate-300">{ch.name}</span>
+                <span className="text-sm font-medium text-slate-400">{ch.name}</span>
                 {ch.active && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/50" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-md shadow-blue-400/50" />
                 )}
               </div>
             ))}
