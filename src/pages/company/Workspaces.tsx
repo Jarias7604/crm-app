@@ -174,6 +174,7 @@ export default function Workspaces() {
             phone: data.phone,
         };
 
+        // Save WhatsApp integration
         const { data: existing } = await supabase
             .from('marketing_integrations')
             .select('id')
@@ -187,10 +188,21 @@ export default function Workspaces() {
             await supabase.from('marketing_integrations').insert({ company_id: targetCompanyId, provider: 'whatsapp', settings: settingsPayload, is_active: true });
         }
 
-        // Update badge
+        // Also save workspace name if changed
+        if (formData.name.trim() && formData.name !== editingWorkspace?.name) {
+            await supabase.from('companies').update({ name: formData.name }).eq('id', targetCompanyId);
+        }
+
+        // Also save agent assignment if selected — this must persist even after WhatsApp connects
+        if (formData.agentId) {
+            await supabase.from('profiles').update({ company_id: targetCompanyId }).eq('id', formData.agentId);
+        }
+
+        // Update badge and reload
         setWaStatus(prev => ({ ...prev, [targetCompanyId]: 'active' }));
         toast.success(`✅ WhatsApp ${data.phone} conectado al workspace`);
         window.dispatchEvent(new CustomEvent('refresh-workspaces'));
+        loadData();
     };
 
     const handleVerifyConnection = async () => {
