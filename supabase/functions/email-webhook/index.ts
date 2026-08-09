@@ -80,14 +80,13 @@ serve(async (req) => {
         })
         .eq('id', lead.id);
 
-      // 2. Log activity
-      await supabase.from('call_activities').insert({
+      // 2. Log nota en lead_notes (no requiere user_id)
+      await supabase.from('lead_notes').insert({
         lead_id: lead.id,
         company_id: companyId,
-        action_type: 'email',
-        notes: `♻️ Lead re-enganchado automáticamente desde pool de campañas (${originalStatus}) — respondió por Email`,
+        content: `♻️ Lead re-enganchado automáticamente desde pool de campañas (${originalStatus}) — respondió por Email`,
         created_at: now,
-      });
+      }).maybeSingle(); // ignore error if table doesn't exist
     }
 
     // 3. Store conversation and inbound message via RPC
@@ -104,7 +103,8 @@ serve(async (req) => {
       console.error('[email-webhook] RPC error saving message:', rpcErr);
     }
 
-    return new Response(JSON.stringify({ success: true, lead_id: lead.id, reengaged: BACKGROUND_STATUSES.includes(originalStatus) }), {
+    const wasReengaged = BACKGROUND_STATUSES.includes(originalStatus) && !lead.reengaged_at;
+    return new Response(JSON.stringify({ success: true, lead_id: lead.id, reengaged: wasReengaged }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
