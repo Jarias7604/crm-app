@@ -158,6 +158,9 @@ export default function Workspaces() {
         setVerifyStatus('idle');
         setVerifyDetails('');
         setShowWizard('embedded'); // default: premium Embedded Signup
+        // Pre-populate the agent from existing profiles for this workspace
+        const existingAgent = agentsByWorkspace[workspace.id]?.[0];
+        setFormData(prev => ({ ...prev, agentId: existingAgent?.id || '' }));
         setShowModal(true);
         fetchIntegrationDetails(workspace);
     };
