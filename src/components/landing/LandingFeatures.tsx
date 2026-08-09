@@ -98,87 +98,13 @@ const OmnichannelMockup = () => (
 );
 
 const LeadHunterMockup = () => (
-  <div style={{background:'#fff',borderRadius:'16px',boxShadow:'0 24px 64px rgba(0,0,0,0.12)',overflow:'hidden',border:'1px solid #e8edf5',maxWidth:'800px',margin:'0 auto'}}>
-    <div style={{background:'#134e38',padding:'10px 20px',display:'flex',alignItems:'center',gap:'12px'}}>
-      <span style={{color:'white',fontSize:'13px',fontWeight:700}}>🎯 Lead Hunter Pro</span>
-      <div style={{background:'rgba(255,255,255,0.15)',borderRadius:'6px',padding:'5px 12px',display:'flex',alignItems:'center',gap:'8px',flex:1,maxWidth:'300px'}}>
-        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.7)'}}>Industria:</span>
-        <span style={{fontSize:'11px',color:'white',fontWeight:600}}>Gimnasios y Fitness</span>
-      </div>
-      <div style={{background:'rgba(255,255,255,0.15)',borderRadius:'6px',padding:'5px 12px',display:'flex',alignItems:'center',gap:'8px'}}>
-        <span style={{fontSize:'11px',color:'rgba(255,255,255,0.7)'}}>Ciudad:</span>
-        <span style={{fontSize:'11px',color:'white',fontWeight:600}}>Miami, FL</span>
-      </div>
-      <button style={{background:'#e13b24',color:'white',border:'none',borderRadius:'6px',padding:'6px 16px',fontSize:'11px',fontWeight:700,cursor:'pointer'}}>🔍 Buscar</button>
-    </div>
-    <div style={{display:'flex',height:'300px'}}>
-      {/* Map area */}
-      <div style={{width:'320px',background:'#e8f4e8',flexShrink:0,position:'relative',overflow:'hidden'}}>
-        <svg viewBox="0 0 320 300" style={{width:'100%',height:'100%'}}>
-          <rect width="320" height="300" fill="#e8f4e8"/>
-          <path d="M30 150 Q80 100 130 130 Q180 90 240 120 Q280 100 310 110" stroke="#c8e0c8" strokeWidth="20" fill="none"/>
-          <path d="M20 200 Q90 180 150 200 Q200 180 260 190 Q300 185 315 175" stroke="#c8e0c8" strokeWidth="15" fill="none"/>
-          <rect x="60" y="120" width="40" height="30" rx="4" fill="#d4e8d4" stroke="#b8d4b8" strokeWidth="1"/>
-          <rect x="140" y="90" width="50" height="35" rx="4" fill="#d4e8d4" stroke="#b8d4b8" strokeWidth="1"/>
-          <rect x="220" y="110" width="45" height="28" rx="4" fill="#d4e8d4" stroke="#b8d4b8" strokeWidth="1"/>
-          {[[80,118],[165,88],[243,108],[110,200],[200,195],[270,180],[145,155]].map(([x,y],i)=>(
-            <g key={i}>
-              <circle cx={x} cy={y} r="12" fill="#16a34a" opacity="0.9"/>
-              <circle cx={x} cy={y} r="5" fill="white"/>
-              <circle cx={x} cy={y+16} r="8" fill="#16a34a" opacity="0.2"/>
-            </g>
-          ))}
-          <text x="160" y="280" textAnchor="middle" fill="#166534" fontSize="11" fontWeight="700">47 negocios encontrados</text>
-        </svg>
-      </div>
-      {/* Results table */}
-      <div style={{flex:1,overflow:'auto'}}>
-        <div style={{padding:'10px 16px',borderBottom:'1px solid #f3f4f6',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <span style={{fontSize:'12px',fontWeight:700,color:'#111827'}}>47 leads encontrados · Miami, FL</span>
-          <div style={{display:'flex',gap:'6px'}}>
-            <button style={{background:'#f3f4f6',border:'none',borderRadius:'6px',padding:'5px 10px',fontSize:'10px',fontWeight:600,cursor:'pointer',color:'#374151'}}>Exportar CSV</button>
-            <button style={{background:'#e13b24',border:'none',borderRadius:'6px',padding:'5px 10px',fontSize:'10px',fontWeight:700,cursor:'pointer',color:'white'}}>Agregar todos al CRM</button>
-          </div>
-        </div>
-        <table style={{width:'100%',borderCollapse:'collapse'}}>
-          <thead>
-            <tr style={{background:'#f9fafb'}}>
-              {['','Negocio','Teléfono','Email','Rating','Acción'].map(h=>(
-                <th key={h} style={{padding:'8px 10px',fontSize:'9px',fontWeight:700,color:'#6b7280',textAlign:'left',textTransform:'uppercase',letterSpacing:'0.05em'}}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              {name:'FitLife Gym',phone:'+1 305 442 1234',email:'info@fitlife.com',rating:'4.8 ⭐',added:false},
-              {name:'PowerZone Miami',phone:'+1 786 555 9876',email:'contact@pzone.com',rating:'4.6 ⭐',added:true},
-              {name:'Iron Temple',phone:'+1 305 333 4567',email:'gym@irontemple.com',rating:'4.7 ⭐',added:false},
-              {name:'South Beach Fit',phone:'+1 786 123 4567',email:'hello@sbfit.com',rating:'4.5 ⭐',added:false},
-              {name:'Muscle Factory',phone:'+1 305 789 0123',email:'info@musclefact.com',rating:'4.9 ⭐',added:false},
-            ].map((row,i)=>(
-              <tr key={row.name} style={{borderBottom:'1px solid #f9fafb',background:i%2===0?'white':'#fafbff'}}>
-                <td style={{padding:'8px 10px'}}><input type="checkbox" style={{cursor:'pointer'}}/></td>
-                <td style={{padding:'8px 10px'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-                    <div style={{width:'28px',height:'28px',borderRadius:'6px',background:'#dcfce7',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'12px'}}>🏋️</div>
-                    <span style={{fontSize:'11px',fontWeight:600,color:'#111827'}}>{row.name}</span>
-                  </div>
-                </td>
-                <td style={{padding:'8px 10px',fontSize:'10px',color:'#374151'}}>{row.phone}</td>
-                <td style={{padding:'8px 10px',fontSize:'10px',color:'#1f73b7'}}>{row.email}</td>
-                <td style={{padding:'8px 10px',fontSize:'10px',color:'#374151'}}>{row.rating}</td>
-                <td style={{padding:'8px 10px'}}>
-                  {row.added
-                    ? <span style={{background:'#dcfce7',color:'#16a34a',fontSize:'9px',fontWeight:700,padding:'3px 8px',borderRadius:'4px'}}>✓ En CRM</span>
-                    : <button style={{background:'#e13b24',color:'white',border:'none',borderRadius:'4px',padding:'3px 8px',fontSize:'9px',fontWeight:700,cursor:'pointer'}}>+ Agregar</button>
-                  }
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+  <div style={{ background: '#fff', borderRadius: '16px', boxShadow: '0 24px 64px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e8edf5', maxWidth: '1150px', margin: '0 auto' }}>
+    <img
+      src="/crm-lead-hunter.png"
+      alt="Lead Hunter AI PRO — Arias CRM"
+      style={{ width: '100%', height: 'auto', display: 'block' }}
+      loading="lazy"
+    />
   </div>
 );
 
