@@ -284,13 +284,26 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
 
         {/* Connect Button */}
         {META_WA_CONFIG_ID ? (
-          <button
-            onClick={handleEmbeddedSignup}
-            className="w-full h-12 rounded-2xl bg-[#25D366] hover:bg-[#20C05A] text-white font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2.5 shadow-lg shadow-green-200/60 transition-all hover:translate-y-[-1px] active:scale-95"
-          >
-            <Zap className="w-4 h-4" />
-            Conectar con Meta — 1 Click
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={handleEmbeddedSignup}
+              className="w-full h-12 rounded-2xl bg-[#25D366] hover:bg-[#20C05A] text-white font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2.5 shadow-lg shadow-green-200/60 transition-all hover:translate-y-[-1px] active:scale-95"
+            >
+              <Zap className="w-4 h-4" />
+              Conectar con Meta — 1 Click
+            </button>
+            <button
+              onClick={() => {
+                setStep('loading');
+                setLoadingMsg('Cargando números de WhatsApp desde Meta...');
+                handleCodeExchange('direct_fetch');
+              }}
+              className="w-full h-10 rounded-xl bg-green-50 hover:bg-green-100/70 text-green-700 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 border border-green-200 transition-all"
+            >
+              <Phone className="w-3.5 h-3.5 text-green-600" />
+              Ver números disponibles en mi cuenta (+503 7971 8911)
+            </button>
+          </div>
         ) : (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-left space-y-2">
             <p className="text-[10px] font-black text-amber-800 uppercase tracking-wider">⚙️ Configuración Requerida</p>
