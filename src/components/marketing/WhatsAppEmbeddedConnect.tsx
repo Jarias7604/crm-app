@@ -146,7 +146,11 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
           'Authorization': `Bearer ${session?.access_token}`,
           'apikey': SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ code, company_id: companyId }),
+        body: JSON.stringify({
+          code,
+          company_id: companyId,
+          redirect_uri: `${window.location.origin.replace('://www.', '://')}/integrations/wa/callback`
+        }),
       });
       const result = await res.json();
       if (!res.ok || result.error) throw new Error(result.error || 'Error del servidor');

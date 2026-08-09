@@ -2,7 +2,7 @@
 /**
  * WHATSAPP EMBEDDED SIGNUP — Edge Function
  * Exchanges the code from Meta's Embedded Signup popup for an access token,
- * or falls back to system token, then returns all WABA phone numbers to pick/confirm.
+ * or returns all WABA phone numbers to pick/confirm.
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -18,28 +18,39 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    const { code, company_id } = await req.json();
+    const body = await req.json();
+    const { code, company_id, redirect_uri } = body;
     if (!company_id) throw new Error('Missing company_id');
 
     const APP_ID = Deno.env.get('META_APP_ID') || '1187621119804509';
     const APP_SECRET = Deno.env.get('META_APP_SECRET');
+    const cleanRedirectUri = redirect_uri || 'https://ariascrm.com/integrations/wa/callback';
 
     let userToken = SYSTEM_TOKEN;
 
     // STEP 1: If code + secret available, exchange code for user access token
-    if (code && APP_SECRET) {
+    if (code && code !== 'direct_fetch' && APP_SECRET) {
       try {
+        const params = new URLSearchParams({
+          client_id: APP_ID,
+          client_secret: APP_SECRET,
+          redirect_uri: cleanRedirectUri,
+          code: code,
+        });
+
         const tokenRes = await fetch(`https://graph.facebook.com/${META_API_VERSION}/oauth/access_token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ client_id: APP_ID, client_secret: APP_SECRET, code }).toString(),
+          body: params.toString(),
         });
         const tokenData = await tokenRes.json();
         if (tokenData.access_token) {
           userToken = tokenData.access_token;
+        } else if (tokenData.error) {
+          console.warn('OAuth code exchange warning:', tokenData.error.message);
         }
       } catch (e) {
-        console.warn('OAuth code exchange failed, falling back to system token:', e.message);
+        console.warn('OAuth code exchange failed, using system token:', e.message);
       }
     }
 
@@ -62,56 +73,55 @@ Deno.serve(async (req) => {
       console.warn('Business fetch failed:', e.message);
     }
 
-    // Query 2: me/whatsapp_business_accounts (or explicit WABA lookup if empty)
-    if (results.length === 0) {
+    // Query 2: me/whatsapp_business_accounts
+    try {
+      const r2 = await fetch(
+        `https://graph.facebook.com/${META_API_VERSION}/me?fields=whatsapp_business_accounts{id,phone_numbers{id,display_phone_number,verified_name,status}}&access_token=${userToken}`
+      );
+      const d2 = await r2.json();
+      for (const waba of d2.whatsapp_business_accounts?.data || []) {
+        const nums = waba.phone_numbers?.data || [];
+        if (nums.length > 0) results.push({ waba_id: waba.id, numbers: nums });
+      }
+    } catch (e) {
+      console.warn('WABA fetch failed:', e.message);
+    }
+
+    // Query 3: Known WABAs fallback
+    const knownWabaIds = ['2058962911293336', '2216370055815946', '493677260500824', '2076489033220259'];
+    for (const wabaId of knownWabaIds) {
       try {
-        const r2 = await fetch(
-          `https://graph.facebook.com/${META_API_VERSION}/me?fields=whatsapp_business_accounts{id,phone_numbers{id,display_phone_number,verified_name,status}}&access_token=${userToken}`
+        const r3 = await fetch(
+          `https://graph.facebook.com/${META_API_VERSION}/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,status&access_token=${SYSTEM_TOKEN}`
         );
-        const d2 = await r2.json();
-        for (const waba of d2.whatsapp_business_accounts?.data || []) {
-          const nums = waba.phone_numbers?.data || [];
-          if (nums.length > 0) results.push({ waba_id: waba.id, numbers: nums });
+        const d3 = await r3.json();
+        if (d3.data && d3.data.length > 0) {
+          results.push({ waba_id: wabaId, numbers: d3.data });
         }
-      } catch (e) {
-        console.warn('WABA fetch failed:', e.message);
-      }
+      } catch (_) {}
     }
 
-    // Query 3: Known WABAs fallback (for system token)
-    if (results.length === 0) {
-      const knownWabaIds = ['2216370055815946', '493677260500824', '2058962911293336', '2076489033220259'];
-      for (const wabaId of knownWabaIds) {
-        try {
-          const r3 = await fetch(
-            `https://graph.facebook.com/${META_API_VERSION}/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,status&access_token=${userToken}`
-          );
-          const d3 = await r3.json();
-          if (d3.data && d3.data.length > 0) {
-            results.push({ waba_id: wabaId, numbers: d3.data });
-          }
-        } catch (_) {}
-      }
-    }
-
-    const allNumbers = results.flatMap(r =>
+    let allNumbers = results.flatMap(r =>
       r.numbers.map(n => ({ ...n, waba_id: r.waba_id }))
     );
 
-    if (allNumbers.length === 0) {
-      throw new Error('No se encontraron números de WhatsApp en tu cuenta de Meta.');
-    }
+    // Deduplicate numbers by id
+    const seen = new Set();
+    allNumbers = allNumbers.filter(n => {
+      if (seen.has(n.id)) return false;
+      seen.add(n.id);
+      return true;
+    });
 
-    // If exactly 1 number found, auto-save
-    if (allNumbers.length === 1) {
-      const num = allNumbers[0];
-      await upsertIntegration(company_id, userToken, num.id, num.waba_id, num.display_phone_number);
-      return new Response(JSON.stringify({
-        success: true, auto_saved: true,
-        phone_number: num.display_phone_number,
-        phone_number_id: num.id,
-        waba_id: num.waba_id,
-      }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    // Always include Patty's number (+503 7971 8911) as available option if not present
+    if (!seen.has('516453938224335')) {
+      allNumbers.push({
+        id: '516453938224335',
+        display_phone_number: '+503 7971 8911',
+        verified_name: 'Arias Defense Components (Ventas Patty)',
+        status: 'CONNECTED',
+        waba_id: '493677260500824'
+      });
     }
 
     // Multiple numbers — return list for user to pick
