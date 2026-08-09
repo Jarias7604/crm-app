@@ -4,127 +4,48 @@ import { Play } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
 
-// Realistic CRM dashboard mockup SVG
+// Real CRM Dashboard screenshot from production
 const DashboardMockup = () => (
-  <div className="relative w-full">
-    {/* Main dashboard card */}
-    <div className="rounded-2xl overflow-hidden shadow-2xl border border-gray-200" style={{background:'#fff'}}>
-      {/* Top bar */}
-      <div style={{background:'#1e2d5a'}} className="px-4 py-2 flex items-center gap-3">
-        <div style={{background:'#2d4080'}} className="rounded-lg px-3 py-1 text-white text-xs font-bold">Arias CRM</div>
-        {['Pipeline','Leads','WhatsApp','Reportes','Campañas'].map(tab=>(
-          <span key={tab} className="text-xs text-white/50 hover:text-white cursor-pointer px-2">{tab}</span>
-        ))}
-        <div className="ml-auto flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white text-xs">A</div>
-        </div>
-      </div>
-      {/* Content area */}
-      <div className="flex" style={{minHeight:'320px'}}>
-        {/* Sidebar */}
-        <div style={{background:'#f8faff',width:'52px',borderRight:'1px solid #e8edf5'}} className="flex flex-col items-center py-3 gap-3 flex-shrink-0">
-          {[['▦','#3b82f6'],['◉','#8b5cf6'],['◈','#06b6d4'],['▲','#10b981'],['⋮','#94a3b8']].map(([ic,cl],i)=>(
-            <div key={i} style={{background:i===0?cl+'20':'transparent',color:i===0?cl:'#94a3b8'}} className="w-9 h-9 rounded-lg flex items-center justify-center text-sm cursor-pointer hover:bg-blue-50 transition-colors">{ic}</div>
-          ))}
-        </div>
-        {/* Main content */}
-        <div style={{background:'#f5f7fc'}} className="flex-1 p-4">
-          {/* Stats row */}
-          <div className="grid grid-cols-4 gap-3 mb-4">
-            {[
-              {label:'Leads Totales',val:'1,247',change:'+18%',color:'#3b82f6'},
-              {label:'Cerrados Hoy',val:'38',change:'+34%',color:'#10b981'},
-              {label:'Revenue Mes',val:'$94K',change:'+22%',color:'#8b5cf6'},
-              {label:'Tasa Cierre',val:'38%',change:'+12%',color:'#f97316'},
-            ].map((s,i)=>(
-              <div key={i} style={{background:'#fff',border:'1px solid #e8edf5'}} className="rounded-xl p-3 shadow-sm">
-                <p style={{color:'#94a3b8',fontSize:'10px'}} className="font-medium mb-1">{s.label}</p>
-                <p style={{color:'#111827',fontSize:'20px',fontWeight:900}} className="leading-none">{s.val}</p>
-                <p style={{color:'#10b981',fontSize:'10px'}} className="font-bold mt-1">{s.change} vs mes anterior</p>
-              </div>
-            ))}
-          </div>
-          {/* Pipeline + Chat split */}
-          <div className="grid grid-cols-3 gap-3">
-            {/* Kanban */}
-            <div className="col-span-2" style={{background:'#fff',border:'1px solid #e8edf5',borderRadius:'12px',padding:'12px'}}>
-              <div className="flex items-center justify-between mb-3">
-                <p style={{fontSize:'11px',fontWeight:700,color:'#111827'}}>Pipeline de Ventas</p>
-                <div style={{background:'#e13b24',color:'white',fontSize:'9px',fontWeight:700}} className="px-2 py-1 rounded-full">+ Nuevo Lead</div>
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  {stage:'Nuevos',color:'#3b82f6',leads:['Carlos M.','Ana L.','Pedro R.']},
-                  {stage:'Contactados',color:'#8b5cf6',leads:['María G.','Luis V.']},
-                  {stage:'Propuesta',color:'#f97316',leads:['Julia H.','Miguel A.']},
-                  {stage:'Ganados',color:'#10b981',leads:['Sofía C.']},
-                ].map(col=>(
-                  <div key={col.stage}>
-                    <div style={{background:col.color+'15',borderRadius:'6px',padding:'4px 6px',marginBottom:'6px'}}>
-                      <span style={{color:col.color,fontSize:'9px',fontWeight:700}}>{col.stage} ({col.leads.length})</span>
-                    </div>
-                    {col.leads.map(n=>(
-                      <div key={n} style={{background:'#f8faff',border:'1px solid #e8edf5',borderRadius:'8px',padding:'6px',marginBottom:'4px'}}>
-                        <div style={{fontSize:'9px',fontWeight:600,color:'#374151'}}>{n}</div>
-                        <div style={{height:'2px',background:col.color+'30',borderRadius:'2px',marginTop:'3px'}}>
-                          <div style={{height:'2px',background:col.color,borderRadius:'2px',width:'60%'}}/>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* WhatsApp chat */}
-            <div style={{background:'#fff',border:'1px solid #e8edf5',borderRadius:'12px',overflow:'hidden'}}>
-              <div style={{background:'#25d366',padding:'8px 10px'}}>
-                <p style={{color:'white',fontSize:'10px',fontWeight:700}}>WhatsApp Inbox</p>
-                <p style={{color:'rgba(255,255,255,0.7)',fontSize:'8px'}}>3 conversaciones activas</p>
-              </div>
-              <div style={{padding:'8px'}}>
-                {[
-                  {name:'Carlos M.',msg:'Me interesa el plan...',time:'10:32',unread:2},
-                  {name:'Ana López',msg:'¿Tienen demo disponible?',time:'10:18',unread:1},
-                  {name:'Pedro R.',msg:'Perfecto, lo revisaré',time:'09:45',unread:0},
-                ].map(c=>(
-                  <div key={c.name} style={{borderBottom:'1px solid #f3f4f6',padding:'6px 0',display:'flex',gap:'6px',alignItems:'center'}}>
-                    <div style={{width:'28px',height:'28px',borderRadius:'50%',background:'#e8edf5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'10px',fontWeight:700,color:'#374151',flexShrink:0}}>{c.name[0]}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                        <span style={{fontSize:'10px',fontWeight:700,color:'#111827'}}>{c.name}</span>
-                        <span style={{fontSize:'8px',color:'#94a3b8'}}>{c.time}</span>
-                      </div>
-                      <p style={{fontSize:'9px',color:'#6b7280',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{c.msg}</p>
-                    </div>
-                    {c.unread>0&&<div style={{background:'#25d366',color:'white',borderRadius:'50%',width:'16px',height:'16px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'8px',fontWeight:700,flexShrink:0}}>{c.unread}</div>}
-                  </div>
-                ))}
-                {/* AI response suggestion */}
-                <div style={{background:'#f0f9ff',border:'1px solid #bae6fd',borderRadius:'8px',padding:'6px',marginTop:'6px'}}>
-                  <p style={{fontSize:'8px',color:'#0369a1',fontWeight:700,marginBottom:'2px'}}>💡 Respuesta sugerida IA:</p>
-                  <p style={{fontSize:'8px',color:'#374151'}}>"Hola Carlos, claro que sí..."</p>
-                  <button style={{background:'#e13b24',color:'white',fontSize:'8px',fontWeight:700,padding:'2px 8px',borderRadius:'4px',marginTop:'4px',border:'none',cursor:'pointer'}}>Enviar</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+  <div style={{ position: 'relative', width: '100%' }}>
+    {/* Real screenshot */}
+    <div style={{
+      borderRadius: '16px',
+      overflow: 'hidden',
+      boxShadow: '0 32px 80px rgba(0,0,0,0.18)',
+      border: '1px solid #e8edf5',
+    }}>
+      <img
+        src="/crm-dashboard.png"
+        alt="Arias CRM Dashboard — Pipeline, Leads, WhatsApp Inbox"
+        style={{ width: '100%', display: 'block' }}
+        loading="eager"
+      />
     </div>
-    {/* Floating notification */}
-    <div style={{position:'absolute',top:'-12px',right:'-16px',background:'white',borderRadius:'16px',padding:'10px 14px',boxShadow:'0 8px 32px rgba(0,0,0,0.15)',border:'1px solid #e8edf5',display:'flex',gap:'8px',alignItems:'center',zIndex:10}}>
-      <div style={{width:'32px',height:'32px',borderRadius:'50%',background:'#10b981',display:'flex',alignItems:'center',justifyContent:'center'}}>
-        <svg viewBox="0 0 24 24" fill="white" width="16" height="16"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/></svg>
+    {/* Floating badge: New lead */}
+    <div style={{
+      position: 'absolute', top: '-14px', right: '-12px',
+      background: 'white', borderRadius: '14px', padding: '10px 14px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.14)', border: '1px solid #e8edf5',
+      display: 'flex', gap: '8px', alignItems: 'center', zIndex: 10,
+    }}>
+      <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+          <path d="M5 13l4 4L19 7"/>
+        </svg>
       </div>
       <div>
-        <p style={{fontSize:'10px',fontWeight:700,color:'#111827'}}>Nuevo lead capturado</p>
-        <p style={{fontSize:'9px',color:'#6b7280'}}>TikTok Ads · hace 2 seg</p>
+        <p style={{ fontSize: '10px', fontWeight: 700, color: '#111827', margin: 0 }}>Nuevo lead capturado</p>
+        <p style={{ fontSize: '9px', color: '#6b7280', margin: 0 }}>TikTok Ads · hace 2 seg</p>
       </div>
     </div>
-    {/* Bottom metric */}
-    <div style={{position:'absolute',bottom:'-14px',left:'24px',background:'white',borderRadius:'16px',padding:'10px 16px',boxShadow:'0 8px 32px rgba(0,0,0,0.15)',border:'1px solid #e8edf5'}}>
-      <p style={{fontSize:'9px',color:'#6b7280',marginBottom:'2px'}}>IA respondió en</p>
-      <p style={{fontSize:'18px',fontWeight:900,color:'#e13b24'}}>2.4 seg</p>
+    {/* Floating badge: AI response time */}
+    <div style={{
+      position: 'absolute', bottom: '-14px', left: '24px',
+      background: 'white', borderRadius: '14px', padding: '10px 16px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.14)', border: '1px solid #e8edf5',
+    }}>
+      <p style={{ fontSize: '9px', color: '#6b7280', margin: '0 0 2px' }}>IA respondió en</p>
+      <p style={{ fontSize: '20px', fontWeight: 900, color: '#e13b24', margin: 0 }}>2.4 seg</p>
     </div>
   </div>
 );
@@ -232,8 +153,8 @@ export default function LandingHero({ onLoginClick }: LandingHeroProps) {
           </div>
         </div>
 
-        {/* Full-width dashboard mockup below */}
-        <div style={{marginTop:'64px',paddingBottom:'32px'}}>
+        {/* Full-width real dashboard screenshot below */}
+        <div style={{marginTop:'72px',paddingBottom:'40px'}}>
           <DashboardMockup />
         </div>
       </div>
