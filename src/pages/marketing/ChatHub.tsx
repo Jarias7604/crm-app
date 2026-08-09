@@ -53,17 +53,38 @@ export default function ChatHub() {
     const { isAdmin } = usePermissions();
 
     // Native-like hide-on-scroll: hide header+footer when scrolling down, show on scroll up
+    // cooldown prevents the layout-resize feedback loop (container grows/shrinks → spurious scroll events)
+    const scrollCooldownRef = useRef(false);
+    const rafRef = useRef<number | null>(null);
+
     const handleChatScroll = () => {
-        const el = scrollRef.current;
-        if (!el) return;
-        const currentTop = el.scrollTop;
-        const delta = currentTop - lastScrollTopRef.current;
-        if (delta > 8 && currentTop > 60) {
-            setBarsHidden(true);
-        } else if (delta < -8) {
-            setBarsHidden(false);
-        }
-        lastScrollTopRef.current = currentTop;
+        if (rafRef.current !== null) return; // throttle: one update per animation frame
+        rafRef.current = requestAnimationFrame(() => {
+            rafRef.current = null;
+            if (scrollCooldownRef.current) return; // ignore events during transition cooldown
+            const el = scrollRef.current;
+            if (!el) return;
+            const currentTop = el.scrollTop;
+            const delta = currentTop - lastScrollTopRef.current;
+            lastScrollTopRef.current = currentTop;
+            if (delta > 12 && currentTop > 80) {
+                // scrolling DOWN — collapse bars
+                setBarsHidden(prev => {
+                    if (prev) return prev; // already hidden, no state change
+                    scrollCooldownRef.current = true;
+                    setTimeout(() => { scrollCooldownRef.current = false; }, 400);
+                    return true;
+                });
+            } else if (delta < -12) {
+                // scrolling UP — restore bars
+                setBarsHidden(prev => {
+                    if (!prev) return prev; // already shown, no state change
+                    scrollCooldownRef.current = true;
+                    setTimeout(() => { scrollCooldownRef.current = false; }, 400);
+                    return false;
+                });
+            }
+        });
     };
 
     // 1. Initial Load + realtime new message notifications
