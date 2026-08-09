@@ -17,7 +17,7 @@ export default function WAOAuthCallback() {
         if (window.opener && !window.opener.closed) {
             window.opener.postMessage(
                 { type: 'WA_OAUTH_CALLBACK', code, error, state },
-                window.location.origin
+                '*'
             );
             setTimeout(() => window.close(), 500);
         } else {

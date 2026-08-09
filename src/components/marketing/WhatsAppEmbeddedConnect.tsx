@@ -55,8 +55,9 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
       return;
     }
 
-    // Build the Facebook OAuth URL directly — no FB SDK needed
-    const callbackUrl = `${window.location.origin}/integrations/wa/callback`;
+    // Build the Facebook OAuth URL directly — normalize origin to remove www. if present
+    const cleanOrigin = window.location.origin.replace('://www.', '://');
+    const callbackUrl = `${cleanOrigin}/integrations/wa/callback`;
     const params = new URLSearchParams({
       client_id: META_APP_ID,
       config_id: META_WA_CONFIG_ID,
@@ -84,7 +85,8 @@ export default function WhatsAppEmbeddedConnect({ companyId, onSuccess, onSwitch
 
     // Listen for postMessage from WAOAuthCallback
     const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
+      // Allow messages from ariascrm.com or www.ariascrm.com or current origin
+      if (!event.origin.includes('ariascrm.com') && event.origin !== window.location.origin) return;
       if (event.data?.type !== 'WA_OAUTH_CALLBACK') return;
 
       // Cleanup
