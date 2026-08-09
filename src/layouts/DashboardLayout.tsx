@@ -40,7 +40,8 @@ export default function DashboardLayout() {
             {/* Main Content Area */}
             {/* Dynamic padding based on sidebar state */}
             <div className={cn(
-                "transition-all duration-300 ease-in-out flex flex-col min-h-screen pb-20 md:pb-0",
+                "transition-all duration-300 ease-in-out flex flex-col min-h-screen",
+                isImmersiveView ? "pb-0 md:pb-0" : "pb-20 md:pb-0",
                 sidebarCollapsed ? "md:pl-20" : "md:pl-64"
             )}>
                 {/* Optimized Global Header - Hidden on Quote Detail & Chat for immersion */}
