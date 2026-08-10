@@ -18,11 +18,9 @@ export default function DashboardLayout() {
     const location = useLocation();
 
     // Check if we are in an immersive page (no global header or container padding/max-width)
-    const isImmersiveView = (location.pathname.startsWith('/cotizaciones/') &&
-        !location.pathname.endsWith('/editar') &&
-        location.pathname !== '/cotizaciones/nueva' &&
-        location.pathname !== '/cotizaciones/nueva-pro') ||
-        location.pathname === '/marketing/chat';
+    // NOTE: Only ChatHub needs the locked h-screen/overflow-hidden layout.
+    // CotizacionDetalle has its own sticky header and needs free scroll — do NOT include it here.
+    const isImmersiveView = location.pathname === '/marketing/chat';
 
     // Initialize session timeout
     useSessionTimeout();
