@@ -235,17 +235,44 @@ export default function CotizadorPro() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [paqData, itemsData, plansData, settingsData] = await Promise.all([
+            const [paqData, itemsData, plansData, settingsData, pricingItemsData] = await Promise.all([
                 cotizadorService.getAllPaquetes(),
                 cotizadorService.getAllItems(),
                 pricingService.getFinancingPlans(profile?.company_id),
-                pricingService.getPaymentSettings(profile?.company_id)
+                pricingService.getPaymentSettings(profile?.company_id),
+                pricingService.getAllPricingItems()
             ]);
 
             setPaquetes(paqData);
-            setModulos(itemsData.filter(i => i.tipo === 'modulo'));
+
+            // Merge pricing_items for types not already covered in cotizador_items
+            // (e.g. 'equipo', 'implementacion', custom types created via the Catálogo UI)
+            const existingTypes = new Set(itemsData.map((i: CotizadorItem) => i.tipo));
+            const extraItems: CotizadorItem[] = pricingItemsData
+                .filter((p: any) => p.activo && !existingTypes.has(p.tipo) && p.tipo !== 'plan')
+                .map((p: any): CotizadorItem => ({
+                    id: p.id,
+                    company_id: p.company_id ?? null,
+                    tipo: p.tipo,
+                    nombre: p.nombre,
+                    codigo: p.codigo,
+                    pago_unico: p.costo_unico ?? 0,       // pricing_items uses costo_unico
+                    precio_anual: p.precio_anual ?? 0,
+                    precio_mensual: p.precio_mensual ?? 0,
+                    precio_por_dte: p.precio_por_dte ?? 0,
+                    incluye_en_paquete: false,
+                    activo: p.activo,
+                    orden: p.orden ?? 0,
+                    descripcion: p.descripcion,
+                    metadata: p.metadata,
+                    created_at: p.created_at,
+                    updated_at: p.updated_at ?? p.created_at,
+                }));
+
+            const allItems: CotizadorItem[] = [...itemsData, ...extraItems];
+            setModulos(allItems.filter(i => i.tipo === 'modulo'));
             // Capturar TODOS los ítems no-modulo (servicio, equipo, implementacion, etc.)
-            setServicios(itemsData.filter(i => i.tipo !== 'modulo'));
+            setServicios(allItems.filter(i => i.tipo !== 'modulo'));
             setFinancingPlans(plansData);
             setPaymentSettings(settingsData);
 
@@ -279,7 +306,7 @@ export default function CotizadorPro() {
                     }));
                 }
             }
-            return { paqData, modulosData: itemsData.filter((i: CotizadorItem) => i.tipo === 'modulo'), serviciosData: itemsData.filter((i: CotizadorItem) => i.tipo !== 'modulo'), plansData };
+            return { paqData, modulosData: allItems.filter((i: CotizadorItem) => i.tipo === 'modulo'), serviciosData: allItems.filter((i: CotizadorItem) => i.tipo !== 'modulo'), plansData };
         } catch (error) {
             logger.error('Error loading data', error, { action: 'loadData' });
             toast.error('Error al cargar datos dinámicos');
