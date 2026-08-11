@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, ArrowUpDown, GripVertical, Search, BadgeDollarSign, TrendingUp } from 'lucide-react';
+import { Plus, FileText, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, ArrowUpDown, GripVertical, Search, BadgeDollarSign, TrendingUp, Calendar, ChevronDown, X } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useAuth } from '../auth/AuthProvider';
 import { cotizacionesService } from '../services/cotizaciones';
 import { CotizacionesMobileView } from './CotizacionesMobileView';
 import { Button } from '../components/ui/Button';
+import { CustomDatePicker } from '../components/ui/CustomDatePicker';
 import toast from 'react-hot-toast';
 import { useAriasTables } from '../hooks/useAriasTables';
 
@@ -21,6 +24,10 @@ export default function Cotizaciones() {
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
+    const [startDateFilter, setStartDateFilter] = useState<string | null>(null);
+    const [endDateFilter, setEndDateFilter] = useState<string | null>(null);
+    const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
+    const dateRangeRef = useRef<HTMLDivElement>(null);
     const { tableRef: quotesTableRef, wrapperRef: quotesWrapperRef } = useAriasTables();
 
     // Column order persistence
@@ -88,6 +95,17 @@ export default function Cotizaciones() {
         valor_total: 0,
         valor_aceptadas: 0
     });
+
+    // Close date range picker when clicking outside
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            if (dateRangeRef.current && !dateRangeRef.current.contains(e.target as Node)) {
+                setIsDateRangeOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, []);
 
     useEffect(() => {
         if (profile?.company_id) {
@@ -209,7 +227,20 @@ export default function Cotizaciones() {
 
         const matchesStatus = !statusFilter ? true : cot.estado === statusFilter;
 
-        return matchesSearch && matchesStatus;
+        let matchesDate = true;
+        if (startDateFilter || endDateFilter) {
+            const cotDate = cot.created_at ? new Date(cot.created_at) : null;
+            if (cotDate) {
+                const startBound = startDateFilter ? new Date(startDateFilter + 'T00:00:00') : null;
+                const endBound = endDateFilter ? new Date(endDateFilter + 'T23:59:59') : null;
+                if (startBound && cotDate < startBound) matchesDate = false;
+                if (endBound && cotDate > endBound) matchesDate = false;
+            } else {
+                matchesDate = false;
+            }
+        }
+
+        return matchesSearch && matchesStatus && matchesDate;
     });
 
     const sortedCotizaciones = [...filteredCotizaciones].sort((a, b) => {
@@ -285,11 +316,11 @@ export default function Cotizaciones() {
                             <p className="text-[13px] text-gray-400 font-medium">Gestión de cotizaciones de facturación electrónica</p>
                         </div>
 
-                        <div className="flex items-center gap-3 w-full sm:w-auto">
-                            {/* Minimalist Professional Search Bar */}
-                            <div className="relative flex-1 sm:w-64">
+                        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                            {/* Search Bar */}
+                            <div className="relative flex-1 min-w-[180px] sm:w-56">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Search className="h-4 h-4 text-gray-400" />
+                                    <Search className="h-4 w-4 text-gray-400" />
                                 </div>
                                 <input
                                     type="text"
@@ -300,9 +331,121 @@ export default function Cotizaciones() {
                                 />
                             </div>
 
+                            {/* Date Range Picker — Período */}
+                            <div className="relative" ref={dateRangeRef}>
+                                <button
+                                    onClick={() => setIsDateRangeOpen(!isDateRangeOpen)}
+                                    className={`flex items-center gap-2 border px-3 py-2 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all shadow-sm h-9 ${
+                                        (startDateFilter || endDateFilter)
+                                            ? 'border-teal-300 text-teal-700 bg-teal-50/40'
+                                            : 'border-gray-100 text-gray-600 bg-white'
+                                    }`}
+                                >
+                                    <Calendar className="h-3.5 w-3.5 opacity-60 flex-shrink-0" />
+                                    <span>
+                                        {startDateFilter || endDateFilter
+                                            ? `${startDateFilter ? format(new Date(startDateFilter + 'T12:00:00'), 'dd MMM', { locale: es }) : '…'} – ${endDateFilter ? format(new Date(endDateFilter + 'T12:00:00'), 'dd MMM', { locale: es }) : '…'}`
+                                            : 'Período'}
+                                    </span>
+                                    {(startDateFilter || endDateFilter) ? (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setStartDateFilter(null); setEndDateFilter(null); }}
+                                            className="ml-0.5 text-teal-400 hover:text-teal-700 transition-colors"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    ) : (
+                                        <ChevronDown className={`h-3.5 w-3.5 opacity-40 transition-transform duration-300 ${isDateRangeOpen ? 'rotate-180' : ''}`} />
+                                    )}
+                                </button>
+
+                                {isDateRangeOpen && (
+                                    <div className="absolute right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-4 animate-in fade-in slide-in-from-top-2 duration-200" style={{ minWidth: '320px' }}>
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.15em]">Rango de fechas</span>
+                                            <button onClick={() => setIsDateRangeOpen(false)} className="text-gray-300 hover:text-gray-500 transition-colors p-1 rounded-lg hover:bg-gray-50">
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+
+                                        {/* Presets */}
+                                        <div className="flex flex-wrap gap-1.5 mb-3">
+                                            {[
+                                                { label: 'Hoy', days: 0 },
+                                                { label: 'Últ. 7 días', days: 7 },
+                                                { label: 'Últ. 30 días', days: 30 },
+                                                { label: 'Este mes', days: -1 },
+                                            ].map(({ label, days }) => (
+                                                <button
+                                                    key={label}
+                                                    onClick={() => {
+                                                        const today = new Date();
+                                                        const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
+                                                        if (days === 0) {
+                                                            setStartDateFilter(fmt(today));
+                                                            setEndDateFilter(fmt(today));
+                                                        } else if (days === -1) {
+                                                            setStartDateFilter(fmt(new Date(today.getFullYear(), today.getMonth(), 1)));
+                                                            setEndDateFilter(fmt(today));
+                                                        } else {
+                                                            const start = new Date(today);
+                                                            start.setDate(today.getDate() - days);
+                                                            setStartDateFilter(fmt(start));
+                                                            setEndDateFilter(fmt(today));
+                                                        }
+                                                        setIsDateRangeOpen(false);
+                                                    }}
+                                                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-gray-500 bg-gray-50 border border-gray-100 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-200 transition-all"
+                                                >
+                                                    {label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="border-t border-gray-50 my-3" />
+
+                                        {/* Date inputs */}
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] mb-1.5 block">Desde</label>
+                                                <CustomDatePicker
+                                                    value={startDateFilter || ''}
+                                                    onChange={(d) => setStartDateFilter(d || null)}
+                                                    placeholder="Inicio"
+                                                    variant="light"
+                                                    forceOpenDown
+                                                    alignRight
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] mb-1.5 block">Hasta</label>
+                                                <CustomDatePicker
+                                                    value={endDateFilter || ''}
+                                                    onChange={(d) => setEndDateFilter(d || null)}
+                                                    placeholder="Fin"
+                                                    variant="light"
+                                                    minDate={startDateFilter || undefined}
+                                                    forceOpenDown
+                                                    alignRight
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Apply */}
+                                        <button
+                                            onClick={() => setIsDateRangeOpen(false)}
+                                            className="mt-3 w-full py-2 rounded-xl text-xs font-bold bg-teal-600 text-white hover:bg-teal-700 transition-colors shadow-sm shadow-teal-100"
+                                        >
+                                            Aplicar
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
                             <Button
                                 onClick={() => navigate('/cotizaciones/nueva-pro')}
-                                className="h-10 px-6 bg-[#4449AA] hover:bg-[#383d8f] text-white text-[10px] font-black uppercase tracking-widest border-0 shadow-lg"
+                                className="h-9 px-5 bg-[#4449AA] hover:bg-[#383d8f] text-white text-[10px] font-black uppercase tracking-widest border-0 shadow-lg"
                             >
                                 <Plus className="w-4 h-4 mr-2" />
                                 Nueva Cotización
