@@ -410,7 +410,8 @@ export default function CotizadorPro() {
     // Si el tenant no tiene paquetes configurados, se salta automáticamente 1 → 3 → 4.
     // Si el tenant tiene paquetes, el flujo es normal: 1 → 2 → 3 → 4.
     // —————————————————————————————————————————————————————
-    const tienePaquetes = paquetes.length > 0;
+    // Plan/Paquete ahora se selecciona desde el chip "Plan" en Paso 3 — Paso 2 eliminado del flujo
+    const tienePaquetes = false;
 
     const handleSiguiente = () => {
         if (pasoActual === 1 && !formData.cliente_nombre) {
