@@ -602,11 +602,16 @@ export const pdfService = {
                 }
             };
 
+            // ── Flag: hay costos recurrentes (licencia/módulos)?
+            const hasRecurringItems = subtotalRecurrenteBase > 0 || financials.totalAnual > 0;
+
             // ── COMPARATIVA DE PLANES DE PAGO ────────────────────────────────────
-            doc.setTextColor(99, 102, 241);
-            doc.setFontSize(6.5);
-            doc.setFont('helvetica', 'bold');
-            doc.text('PLANES DE PAGO', margin, by - 2);
+            if (hasRecurringItems || allPlans.length >= 2) {
+                doc.setTextColor(99, 102, 241);
+                doc.setFontSize(6.5);
+                doc.setFont('helvetica', 'bold');
+                doc.text('PLANES DE PAGO', margin, by - 2);
+            }
 
             if (allPlans.length >= 2) {
                 // ── MODO COMPARATIVO: 2 columnas, tarjetas completas ─────────────
@@ -895,32 +900,122 @@ export const pdfService = {
                 }
 
             } else {
-                // ── MODO CLÁSICO: 2 boxes (cuando hay 1 plan o ninguno) ───────────
-                const badgeH = 12;
-                doc.setFillColor(241, 245, 249);
-                doc.roundedRect(margin, by + 1, pageWidth - (margin * 2), badgeH, 2, 2, 'F');
-                doc.setDrawColor(226, 232, 240);
-                doc.roundedRect(margin, by + 1, pageWidth - (margin * 2), badgeH, 2, 2, 'D');
+                // ── MODO CLÁSICO (1 plan o ninguno) ─────────────────────────
+                if (hasRecurringItems) {
+                    // ── Badge con nombre del plan ──
+                    const badgeH = 12;
+                    doc.setFillColor(241, 245, 249);
+                    doc.roundedRect(margin, by + 1, pageWidth - (margin * 2), badgeH, 2, 2, 'F');
+                    doc.setDrawColor(226, 232, 240);
+                    doc.roundedRect(margin, by + 1, pageWidth - (margin * 2), badgeH, 2, 2, 'D');
 
-                doc.setTextColor(15, 23, 42);
-                doc.setFontSize(11);
-                doc.setFont('helvetica', 'bold');
-                const tituloText = planTitulo.toUpperCase();
-                doc.text(tituloText, margin + 5, by + 8);
+                    doc.setTextColor(15, 23, 42);
+                    doc.setFontSize(11);
+                    doc.setFont('helvetica', 'bold');
+                    const tituloText = planTitulo.toUpperCase();
+                    doc.text(tituloText, margin + 5, by + 8);
 
-                const tituloWidth = doc.getTextWidth(tituloText);
-                doc.setTextColor(100, 116, 139);
-                doc.setFontSize(8.5);
-                doc.setFont('helvetica', 'normal');
-                doc.text('— ' + planDescripcion, margin + 5 + tituloWidth + 2, by + 8);
+                    const tituloWidth = doc.getTextWidth(tituloText);
+                    doc.setTextColor(100, 116, 139);
+                    doc.setFontSize(8.5);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text('— ' + planDescripcion, margin + 5 + tituloWidth + 2, by + 8);
 
-                by += badgeH + 10;
+                    by += badgeH + 10;
 
-                drawBox(bx, by, 'PAGO INICIAL', 'Requerido para activar', pagoInicial, pagoInicial, COLORS.ORANGE);
-                const cColor = financials.isMonthly ? COLORS.BLUE : COLORS.GREEN;
-                const cTitle = financials.isMonthly ? 'PAGO RECURRENTE' : 'RECURRENTE ANUAL';
-                const cSubtitle = divisor > 1 ? `Pago en ${divisor} cuotas` : 'Pago único acumulado';
-                drawBox(bx + boxW + gap, by, cTitle, cSubtitle, financials.isMonthly ? cuotaMensual : financials.totalAnual, financials.isMonthly ? financials.montoPeriodo : financials.totalAnual, cColor, true);
+                    // Dos cajas: PAGO INICIAL + RECURRENTE
+                    drawBox(bx, by, 'PAGO INICIAL', 'Requerido para activar', pagoInicial, pagoInicial, COLORS.ORANGE);
+                    const cColor = financials.isMonthly ? COLORS.BLUE : COLORS.GREEN;
+                    const cTitle = financials.isMonthly ? 'PAGO RECURRENTE' : 'RECURRENTE ANUAL';
+                    const cSubtitle = divisor > 1 ? `Pago en ${divisor} cuotas` : 'Pago único acumulado';
+                    drawBox(bx + boxW + gap, by, cTitle, cSubtitle, financials.isMonthly ? cuotaMensual : financials.totalAnual, financials.isMonthly ? financials.montoPeriodo : financials.totalAnual, cColor, true);
+                } else {
+                    // ── SOLO PAGO ÚNICO: bloque full-width PAGO INICIAL ──
+                    const modulosArr2 = parseModules(cotizacion.modulos_adicionales);
+                    const serviciosUnicos2 = modulosArr2.filter((m: any) => (Number(m.pago_unico) || 0) > 0);
+                    const implementacionBase2 = Number(cotizacion.costo_implementacion) || 0;
+                    const initRowCount2 = (implementacionBase2 > 0 ? 1 : 0) + serviciosUnicos2.length + (descuentoImplementacionMonto > 0 ? 1 : 0) + 1;
+                    const initH2 = 14 + (initRowCount2 * 5) + 12;
+                    const totalW2b = pageWidth - (margin * 2);
+
+                    if (by + initH2 > pageHeight - 40) { drawFooter(1); doc.addPage(); by = 20; }
+
+                    doc.setFillColor(255, 247, 237);
+                    doc.setDrawColor(253, 186, 116);
+                    doc.setLineWidth(0.4);
+                    doc.roundedRect(margin, by, totalW2b, initH2, 3, 3, 'FD');
+                    doc.setFillColor(249, 115, 22);
+                    doc.roundedRect(margin, by, 2, initH2, 1, 1, 'F');
+
+                    doc.setTextColor(249, 115, 22);
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('PAGO INICIAL', margin + 6, by + 8);
+                    doc.setTextColor(148, 163, 184);
+                    doc.setFontSize(5.5);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text('Requerido antes de activar', margin + 6, by + 13);
+
+                    let iy2 = by + 19;
+                    const iFontSize2 = 6.5;
+
+                    if (implementacionBase2 > 0) {
+                        doc.setTextColor(71, 85, 105);
+                        doc.setFontSize(iFontSize2);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text('Implementación', margin + 6, iy2);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`$${implementacionBase2.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2b - 6, iy2, { align: 'right' });
+                        iy2 += 5;
+                    }
+
+                    serviciosUnicos2.forEach((serv: any) => {
+                        doc.setTextColor(71, 85, 105);
+                        doc.setFontSize(iFontSize2);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text((serv.nombre || '').substring(0, 30), margin + 6, iy2);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`$${(Number(serv.pago_unico) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2b - 6, iy2, { align: 'right' });
+                        iy2 += 5;
+                    });
+
+                    if (descuentoImplementacionMonto > 0) {
+                        doc.setTextColor(22, 163, 74);
+                        doc.setFontSize(iFontSize2);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(ajusteLabel || 'Descuento aplicado', margin + 6, iy2);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`-$${descuentoImplementacionMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2b - 6, iy2, { align: 'right' });
+                        iy2 += 5;
+                    }
+
+                    const subtotalInit2 = implementacionBase2 + serviciosUnicos2.reduce((s: number, m: any) => s + (Number(m.pago_unico) || 0), 0) - descuentoImplementacionMonto;
+                    const ivaInit2 = subtotalInit2 * financials.ivaPct;
+
+                    doc.setTextColor(100, 116, 139);
+                    doc.setFontSize(iFontSize2);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(`IVA (${Math.round(financials.ivaPct * 100)}%)`, margin + 6, iy2);
+                    doc.setTextColor(249, 115, 22);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`+$ ${ivaInit2.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2b - 6, iy2, { align: 'right' });
+                    iy2 += 2;
+
+                    doc.setDrawColor(253, 186, 116);
+                    doc.setLineWidth(0.1);
+                    doc.line(margin + 6, iy2 + 1, margin + totalW2b - 6, iy2 + 1);
+                    iy2 += 5;
+
+                    doc.setTextColor(71, 85, 105);
+                    doc.setFontSize(7);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('TOTAL A PAGAR HOY', margin + 6, iy2);
+                    doc.setTextColor(249, 115, 22);
+                    doc.setFontSize(14);
+                    doc.text(`$${pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2b - 6, iy2 + 1, { align: 'right' });
+
+                    by += initH2 + 4;
+                }
             }
 
             drawFooter(1);
