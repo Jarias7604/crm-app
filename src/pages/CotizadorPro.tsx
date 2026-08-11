@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Receipt, Search, X, Package, Globe, Link2, ChevronRight, Check, Edit2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Receipt, Search, X, Package, Globe, Link2, ChevronRight, Check, Edit2, LayoutGrid, List, ChevronDown } from 'lucide-react';
 import { cotizadorService, type CotizadorPaquete, type CotizadorItem, type CotizacionCalculada } from '../services/cotizador';
 import { pricingService } from '../services/pricing';
 import type { FinancingPlan, PaymentSettings } from '../types/pricing';
@@ -30,6 +30,8 @@ export default function CotizadorPro() {
     const [filtroStep3, setFiltroStep3] = useState<string>('todos');
     const [chipOrder, setChipOrder] = useState<string[]>([]);
     const [dragChip, setDragChip] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<'list' | 'card'>('list');
+    const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
     const [searchLead, setSearchLead] = useState('');
     const [showLeadSelector, setShowLeadSelector] = useState(false);
 
@@ -902,6 +904,64 @@ export default function CotizadorPro() {
                             por_volumen:         { label: 'Volumen',   color: '#14b8a6', icon: '📊' },
                         };
 
+                        const toggleExpand = (id: string, e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            setExpandedItems(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+                        };
+
+                        // ── CARD renderer (items) ──
+                        const renderItemCard = (item: typeof todosLosItems[0], isModulo: boolean) => {
+                            const isSelected = isModulo ? formData.modulos_ids.includes(item.id) : formData.servicios_ids.includes(item.id);
+                            const toggle = isModulo ? () => toggleModulo(item.id) : () => toggleServicio(item.id);
+                            const modelo = (item as any).modelo_precio || (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual');
+                            const meta = MODELO_LABELS[modelo] || MODELO_LABELS.precio_fijo;
+                            const defaultPrice = item.precio_por_dte > 0 ? (formData.volumen_dtes * item.precio_por_dte) : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual);
+                            const currentPrice = overrides[item.id] ?? defaultPrice;
+                            return (
+                                <div key={item.id} onClick={toggle}
+                                    className={`relative flex flex-col p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 min-h-[180px] ${
+                                        isSelected ? 'border-[#4449AA] bg-[#4449AA]/5 shadow-md' : 'border-gray-100 hover:border-[#4449AA]/40 bg-white hover:shadow-md'
+                                    }`}>
+                                    <div className="flex items-start justify-between mb-3">
+                                        <span className="text-[10px] font-black px-2 py-1 rounded-full" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>{meta.icon} {meta.label}</span>
+                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-[#4449AA] border-[#4449AA]' : 'border-gray-300'}`}>
+                                            {isSelected && <Check className="w-3 h-3 text-white" />}
+                                        </div>
+                                    </div>
+                                    <p className={`text-sm font-bold leading-snug ${isSelected ? 'text-[#4449AA]' : 'text-gray-800'}`}>{item.nombre}</p>
+                                    {item.descripcion && <p className="text-[11px] text-gray-400 mt-2 line-clamp-3 flex-1 leading-relaxed">{item.descripcion}</p>}
+                                    <div className="mt-auto pt-3 border-t border-gray-100">
+                                        <p className={`text-base font-black ${isSelected ? 'text-[#4449AA]' : 'text-gray-700'}`}>${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+                                        <p className="text-[10px] text-gray-400">{item.pago_unico > 0 ? 'Pago único' : item.precio_por_dte > 0 ? 'Por volumen' : '/año'}</p>
+                                    </div>
+                                </div>
+                            );
+                        };
+
+                        // ── CARD renderer (paquetes/plan) ──
+                        const renderPaqueteCard = (paq: CotizadorPaquete) => {
+                            const isSel = formData.paquete_id === paq.id;
+                            return (
+                                <div key={paq.id} onClick={() => setFormData(prev => ({ ...prev, paquete_id: isSel ? '' : paq.id }))}
+                                    className={`relative flex flex-col p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 min-h-[180px] ${
+                                        isSel ? 'border-[#4449AA] bg-[#4449AA]/5 shadow-md' : 'border-gray-100 hover:border-[#4449AA]/40 bg-white hover:shadow-md'
+                                    }`}>
+                                    <div className="flex items-start justify-between mb-3">
+                                        <span className="text-[10px] font-black px-2 py-1 rounded-full bg-violet-50 text-violet-700">📦 Plan</span>
+                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${isSel ? 'bg-[#4449AA] border-[#4449AA]' : 'border-gray-300'}`}>
+                                            {isSel && <Check className="w-3 h-3 text-white" />}
+                                        </div>
+                                    </div>
+                                    <p className={`text-sm font-bold ${isSel ? 'text-[#4449AA]' : 'text-gray-800'}`}>{paq.paquete}</p>
+                                    {paq.descripcion && <p className="text-[11px] text-gray-400 mt-2 line-clamp-3 flex-1 leading-relaxed">{paq.descripcion}</p>}
+                                    <div className="mt-auto pt-3 border-t border-gray-100">
+                                        <p className={`text-base font-black ${isSel ? 'text-[#4449AA]' : 'text-gray-700'}`}>${paq.costo_paquete_anual.toLocaleString()}</p>
+                                        <p className="text-[10px] text-gray-400">/año{paq.costo_implementacion > 0 ? ` + $${paq.costo_implementacion.toLocaleString()} setup` : ''}</p>
+                                    </div>
+                                </div>
+                            );
+                        };
+
                         const renderItemRow = (item: typeof todosLosItems[0], isModulo: boolean) => {
                             const isSelected = isModulo
                                 ? formData.modulos_ids.includes(item.id)
@@ -923,90 +983,69 @@ export default function CotizadorPro() {
                             const currentPrice = overrides[item.id] ?? defaultPrice;
                             const unitLabel = modelo === 'por_hora' ? 'hr' : modelo === 'por_unidad' ? 'und' : '';
 
+                            const isExpanded = expandedItems.has(item.id);
                             return (
-                                <div
-                                    key={item.id}
-                                    onClick={toggle}
-                                    className={`relative flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all duration-150 group ${
-                                        isSelected
-                                            ? 'border-[#4449AA] bg-[#4449AA]/5 shadow-sm'
-                                            : 'border-gray-100 hover:border-gray-200 bg-white hover:bg-gray-50/50'
-                                    }`}
-                                >
-                                    {/* Checkbox + Info */}
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                            isSelected ? 'bg-[#4449AA] border-[#4449AA]' : 'border-gray-300'
-                                        }`}>
-                                            {isSelected && <Check className="w-3 h-3 text-white" />}
+                                <div key={item.id} className={`rounded-2xl border-2 overflow-hidden transition-all duration-200 ${isSelected ? 'border-[#4449AA] shadow-sm' : 'border-gray-100 hover:border-gray-200'}`}>
+                                    <div onClick={toggle} className={`flex items-center justify-between p-4 cursor-pointer transition-all duration-150 ${isSelected ? 'bg-[#4449AA]/5' : 'bg-white hover:bg-gray-50/50'}`}>
+                                        {/* Checkbox + Info */}
+                                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${isSelected ? 'bg-[#4449AA] border-[#4449AA]' : 'border-gray-300'}`}>
+                                                {isSelected && <Check className="w-3 h-3 text-white" />}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <p className={`text-sm font-bold truncate ${isSelected ? 'text-[#4449AA]' : 'text-gray-800'}`}>{item.nombre}</p>
+                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>{meta.icon} {meta.label}</span>
+                                                </div>
+                                                {item.descripcion && <p className="text-[11px] text-gray-400 mt-0.5 line-clamp-1">{item.descripcion}</p>}
+                                            </div>
                                         </div>
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <p className={`text-sm font-bold truncate ${isSelected ? 'text-[#4449AA]' : 'text-gray-800'}`}>
-                                                    {item.nombre}
-                                                </p>
-                                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>
-                                                    {meta.icon} {meta.label}
-                                                </span>
+                                        {/* Precio + expand */}
+                                        <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                                            <div onClick={e => e.stopPropagation()}>
+                                                {isSelected && needsQty ? (
+                                                    <div className="flex flex-col items-end gap-1">
+                                                        <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+                                                            <input type="number" min={1} className="w-12 text-center font-black text-amber-700 bg-transparent outline-none text-sm" value={qty}
+                                                                onChange={e => { const q = Math.max(1, Number(e.target.value)); setItemQtys(prev => ({ ...prev, [item.id]: q })); setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q })); }} />
+                                                            <span className="text-[10px] text-amber-500 font-bold">{unitLabel}</span>
+                                                        </div>
+                                                        <p className="text-sm font-black text-[#4449AA]">${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+                                                        <p className="text-[10px] text-gray-400">${baseUnitPrice}/{unitLabel}</p>
+                                                    </div>
+                                                ) : isSelected && canEditPrices ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-xs text-gray-400 font-bold">$</span>
+                                                        <input type="number" className="w-24 text-right font-bold text-[#4449AA] border border-[#4449AA]/30 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-[#4449AA]/30 outline-none text-sm"
+                                                            value={overrides[item.id] ?? defaultPrice} onChange={e => setOverrides({ ...overrides, [item.id]: Number(e.target.value) })} />
+                                                        <span className="text-[10px] text-gray-400 font-bold">{item.pago_unico > 0 ? 'único' : item.precio_por_dte > 0 ? '/vol' : '/año'}</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-right">
+                                                        <p className={`text-sm font-black ${isSelected ? 'text-[#4449AA]' : 'text-gray-700'}`}>${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+                                                        {item.precio_por_dte > 0 && !overrides[item.id] && <p className="text-[10px] text-gray-400">{formData.volumen_dtes} × ${item.precio_por_dte}</p>}
+                                                        <p className="text-[10px] text-gray-400">{needsQty ? `por ${unitLabel}` : item.pago_unico > 0 ? 'Pago único' : item.precio_por_dte > 0 ? 'Por volumen' : '/año'}</p>
+                                                    </div>
+                                                )}
                                             </div>
                                             {item.descripcion && (
-                                                <p className="text-[11px] text-gray-400 mt-0.5 line-clamp-1">{item.descripcion}</p>
+                                                <button onClick={e => toggleExpand(item.id, e)} className={`p-1.5 rounded-lg transition-all hover:bg-gray-100 ${isExpanded ? 'bg-gray-100' : ''}`}>
+                                                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                                                </button>
                                             )}
                                         </div>
                                     </div>
-
-                                    {/* Precio + Cantidad (para por_hora / por_unidad) */}
-                                    <div className="flex items-center gap-2 flex-shrink-0 ml-4" onClick={e => e.stopPropagation()}>
-                                        {isSelected && needsQty ? (
-                                            /* Modo cantidad: qty × base_price */
-                                            <div className="flex flex-col items-end gap-1">
-                                                <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
-                                                    <input
-                                                        type="number"
-                                                        min={1}
-                                                        className="w-12 text-center font-black text-amber-700 bg-transparent outline-none text-sm"
-                                                        value={qty}
-                                                        onChange={e => {
-                                                            const newQty = Math.max(1, Number(e.target.value));
-                                                            setItemQtys(prev => ({ ...prev, [item.id]: newQty }));
-                                                            // Actualizar override con precio × nueva cantidad
-                                                            setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * newQty }));
-                                                        }}
-                                                    />
-                                                    <span className="text-[10px] text-amber-500 font-bold">{unitLabel}</span>
-                                                </div>
-                                                <p className="text-sm font-black text-[#4449AA]">
-                                                    ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                                </p>
-                                                <p className="text-[10px] text-gray-400">${baseUnitPrice}/{unitLabel}</p>
+                                    {/* Expanded detail */}
+                                    {isExpanded && item.descripcion && (
+                                        <div className={`px-5 py-4 border-t ${isSelected ? 'bg-[#4449AA]/5 border-[#4449AA]/20' : 'bg-gray-50 border-gray-100'}`}>
+                                            <p className="text-sm text-gray-600 leading-relaxed">{item.descripcion}</p>
+                                            <div className="flex gap-2 mt-3 flex-wrap">
+                                                {item.pago_unico > 0 && <span className="text-xs bg-purple-50 text-purple-700 font-bold px-2 py-1 rounded-lg">💳 Pago único: ${item.pago_unico.toLocaleString()}</span>}
+                                                {item.precio_mensual > 0 && <span className="text-xs bg-blue-50 text-blue-700 font-bold px-2 py-1 rounded-lg">🔁 Mensual: ${item.precio_mensual.toLocaleString()}</span>}
+                                                {item.precio_anual > 0 && item.pago_unico === 0 && <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded-lg">📅 Anual: ${item.precio_anual.toLocaleString()}</span>}
                                             </div>
-                                        ) : isSelected && canEditPrices ? (
-                                            <div className="flex items-center gap-1">
-                                                <span className="text-xs text-gray-400 font-bold">$</span>
-                                                <input
-                                                    type="number"
-                                                    className="w-24 text-right font-bold text-[#4449AA] border border-[#4449AA]/30 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-[#4449AA]/30 outline-none text-sm"
-                                                    value={overrides[item.id] ?? defaultPrice}
-                                                    onChange={e => setOverrides({ ...overrides, [item.id]: Number(e.target.value) })}
-                                                />
-                                                <span className="text-[10px] text-gray-400 font-bold">
-                                                    {item.pago_unico > 0 ? 'único' : item.precio_por_dte > 0 ? '/vol' : '/año'}
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <div className="text-right">
-                                                <p className={`text-sm font-black ${isSelected ? 'text-[#4449AA]' : 'text-gray-700'}`}>
-                                                    ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                                                </p>
-                                                {item.precio_por_dte > 0 && !overrides[item.id] && (
-                                                    <p className="text-[10px] text-gray-400">{formData.volumen_dtes} × ${item.precio_por_dte}</p>
-                                                )}
-                                                <p className="text-[10px] text-gray-400">
-                                                    {needsQty ? `por ${unitLabel}` : item.pago_unico > 0 ? 'Pago único' : item.precio_por_dte > 0 ? 'Por volumen' : '/año'}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         };
@@ -1093,9 +1132,10 @@ export default function CotizadorPro() {
                                     )}
                                 </div>
 
-                                {/* Chips drag-to-reorder con contador */}
+                                {/* Chips + View toggle */}
                                 {categoriasOrdenadas.length >= 1 && (
-                                    <div className="flex gap-2 flex-wrap">
+                                    <div className="flex items-start gap-3">
+                                    <div className="flex gap-2 flex-wrap flex-1">
                                         <button onClick={() => setFiltroStep3('todos')}
                                             className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
                                                 filtroStep3 === 'todos' ? 'bg-[#4449AA] text-white border-[#4449AA]' : 'bg-white text-gray-500 border-gray-200 hover:border-[#4449AA]/50'
@@ -1114,6 +1154,18 @@ export default function CotizadorPro() {
                                             </button>
                                         ))}
                                     </div>
+                                    {/* View toggle: Lista / Cards */}
+                                    <div className="flex gap-1 flex-shrink-0">
+                                        <button onClick={() => setViewMode('list')} title="Vista lista"
+                                            className={`p-2 rounded-lg border transition-all ${viewMode === 'list' ? 'bg-[#4449AA] text-white border-[#4449AA]' : 'bg-white text-gray-400 border-gray-200 hover:border-[#4449AA]/50'}`}>
+                                            <List className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={() => setViewMode('card')} title="Vista cards"
+                                            className={`p-2 rounded-lg border transition-all ${viewMode === 'card' ? 'bg-[#4449AA] text-white border-[#4449AA]' : 'bg-white text-gray-400 border-gray-200 hover:border-[#4449AA]/50'}`}>
+                                            <LayoutGrid className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    </div>
                                 )}
 
                                 {paquetes.length === 0 && todosLosItems.length === 0 ? (
@@ -1125,26 +1177,32 @@ export default function CotizadorPro() {
                                     <>
                                         {/* Plan (paquetes) */}
                                         {paquetes.length > 0 && (filtroStep3 === 'todos' || filtroStep3 === 'plan') && (
-                                            <div className="space-y-2">
-                                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1">Plan</h3>
-                                                {paquetes.map(p => renderPaqueteRow(p))}
+                                            <div>
+                                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1 mb-2">Plan</h3>
+                                                {viewMode === 'card'
+                                                    ? <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{paquetes.map(p => renderPaqueteCard(p))}</div>
+                                                    : <div className="space-y-2">{paquetes.map(p => renderPaqueteRow(p))}</div>}
                                             </div>
                                         )}
                                         {/* Módulos */}
                                         {modulos.length > 0 && (filtroStep3 === 'todos' || filtroStep3 === 'modulo') && (
-                                            <div className="space-y-2">
-                                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1">Módulos</h3>
-                                                {modulos.map(m => renderItemRow(m, true))}
+                                            <div>
+                                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1 mb-2">Módulos</h3>
+                                                {viewMode === 'card'
+                                                    ? <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{modulos.map(m => renderItemCard(m, true))}</div>
+                                                    : <div className="space-y-2">{modulos.map(m => renderItemRow(m, true))}</div>}
                                             </div>
                                         )}
                                         {/* Grupos dinámicos */}
                                         {Object.entries(gruposServicios).map(([tipo, items]) =>
                                             (filtroStep3 === 'todos' || filtroStep3 === tipo) && (
-                                                <div key={tipo} className="space-y-2">
-                                                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1">
+                                                <div key={tipo}>
+                                                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1 mb-2">
                                                         {TIPO_LABELS[tipo] || tipo.charAt(0).toUpperCase() + tipo.slice(1)}
                                                     </h3>
-                                                    {items.map(s => renderItemRow(s, false))}
+                                                    {viewMode === 'card'
+                                                        ? <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{items.map(s => renderItemCard(s, false))}</div>
+                                                        : <div className="space-y-2">{items.map(s => renderItemRow(s, false))}</div>}
                                                 </div>
                                             )
                                         )}
