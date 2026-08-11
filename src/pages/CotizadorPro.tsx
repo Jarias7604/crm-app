@@ -27,6 +27,7 @@ export default function CotizadorPro() {
     const [paquetes, setPaquetes] = useState<CotizadorPaquete[]>([]);
     const [modulos, setModulos] = useState<CotizadorItem[]>([]);
     const [servicios, setServicios] = useState<CotizadorItem[]>([]);
+    const [filtroStep3, setFiltroStep3] = useState<string>('todos');
     const [searchLead, setSearchLead] = useState('');
     const [showLeadSelector, setShowLeadSelector] = useState(false);
 
@@ -239,7 +240,8 @@ export default function CotizadorPro() {
 
             setPaquetes(paqData);
             setModulos(itemsData.filter(i => i.tipo === 'modulo'));
-            setServicios(itemsData.filter(i => i.tipo === 'servicio'));
+            // Capturar TODOS los ítems no-modulo (servicio, equipo, implementacion, etc.)
+            setServicios(itemsData.filter(i => i.tipo !== 'modulo'));
             setFinancingPlans(plansData);
             setPaymentSettings(settingsData);
 
@@ -273,7 +275,7 @@ export default function CotizadorPro() {
                     }));
                 }
             }
-            return { paqData, modulosData: itemsData.filter((i: CotizadorItem) => i.tipo === 'modulo'), serviciosData: itemsData.filter((i: CotizadorItem) => i.tipo === 'servicio'), plansData };
+            return { paqData, modulosData: itemsData.filter((i: CotizadorItem) => i.tipo === 'modulo'), serviciosData: itemsData.filter((i: CotizadorItem) => i.tipo !== 'modulo'), plansData };
         } catch (error) {
             logger.error('Error loading data', error, { action: 'loadData' });
             toast.error('Error al cargar datos dinámicos');
@@ -1006,6 +1008,24 @@ export default function CotizadorPro() {
                             );
                         };
 
+                        // Agrupar servicios por tipo (servicio, equipo, implementacion, etc.)
+                        const gruposServicios = servicios.reduce((acc: Record<string, typeof servicios>, item) => {
+                            const key = item.tipo || 'otros';
+                            acc[key] = [...(acc[key] || []), item];
+                            return acc;
+                        }, {});
+                        const TIPO_LABELS: Record<string, string> = {
+                            servicio: 'Servicios',
+                            implementacion: 'Implementación',
+                            equipo: 'Equipo',
+                            otros: 'Otros',
+                        };
+                        // Categorías disponibles para los chips
+                        const categorias = [
+                            ...(modulos.length > 0 ? ['modulo'] : []),
+                            ...Object.keys(gruposServicios)
+                        ];
+
                         return (
                             <div className="space-y-5">
                                 <div className="flex items-start justify-between">
@@ -1020,6 +1040,41 @@ export default function CotizadorPro() {
                                     )}
                                 </div>
 
+                                {/* ── Chips de categoría ── */}
+                                {categorias.length > 1 && (
+                                    <div className="flex gap-2 flex-wrap">
+                                        <button
+                                            onClick={() => setFiltroStep3('todos')}
+                                            className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                                                filtroStep3 === 'todos'
+                                                    ? 'bg-[#4449AA] text-white border-[#4449AA]'
+                                                    : 'bg-white text-gray-500 border-gray-200 hover:border-[#4449AA]/50'
+                                            }`}
+                                        >Todos</button>
+                                        {modulos.length > 0 && (
+                                            <button
+                                                onClick={() => setFiltroStep3('modulo')}
+                                                className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                                                    filtroStep3 === 'modulo'
+                                                        ? 'bg-[#4449AA] text-white border-[#4449AA]'
+                                                        : 'bg-white text-gray-500 border-gray-200 hover:border-[#4449AA]/50'
+                                                }`}
+                                            >Módulos</button>
+                                        )}
+                                        {Object.keys(gruposServicios).map(tipo => (
+                                            <button
+                                                key={tipo}
+                                                onClick={() => setFiltroStep3(tipo)}
+                                                className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                                                    filtroStep3 === tipo
+                                                        ? 'bg-[#4449AA] text-white border-[#4449AA]'
+                                                        : 'bg-white text-gray-500 border-gray-200 hover:border-[#4449AA]/50'
+                                                }`}
+                                            >{TIPO_LABELS[tipo] || tipo.charAt(0).toUpperCase() + tipo.slice(1)}</button>
+                                        ))}
+                                    </div>
+                                )}
+
                                 {todosLosItems.length === 0 ? (
                                     <div className="py-12 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
                                         <p className="text-gray-500 font-bold mb-1">Sin ítems en el catálogo aún</p>
@@ -1028,18 +1083,22 @@ export default function CotizadorPro() {
                                 ) : (
                                     <>
                                         {/* Módulos */}
-                                        {modulos.length > 0 && (
+                                        {modulos.length > 0 && (filtroStep3 === 'todos' || filtroStep3 === 'modulo') && (
                                             <div className="space-y-2">
                                                 <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1">Módulos</h3>
                                                 {modulos.map(m => renderItemRow(m, true))}
                                             </div>
                                         )}
-                                        {/* Servicios */}
-                                        {servicios.length > 0 && (
-                                            <div className="space-y-2">
-                                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1">Servicios</h3>
-                                                {servicios.map(s => renderItemRow(s, false))}
-                                            </div>
+                                        {/* Grupos dinámicos: Servicios, Equipo, Implementación, etc. */}
+                                        {Object.entries(gruposServicios).map(([tipo, items]) =>
+                                            (filtroStep3 === 'todos' || filtroStep3 === tipo) && (
+                                                <div key={tipo} className="space-y-2">
+                                                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1">
+                                                        {TIPO_LABELS[tipo] || tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+                                                    </h3>
+                                                    {items.map(s => renderItemRow(s, false))}
+                                                </div>
+                                            )
                                         )}
                                     </>
                                 )}
