@@ -1685,156 +1685,65 @@ export default function CotizadorPro() {
                                             </div>
                                         )}
 
-                                        {/* 2. PAGO RECURRENTE (BLUE/GREEN) — solo visible si hay ítems recurrentes con precio > 0 */}
-                                        {totales.subtotal_recurrente_base > 0 && (
-                                        <div className={`${formData.forma_pago === 'mensual' ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'} border rounded-2xl p-5 shadow-sm`}>
-                                            <div className="flex justify-between items-center mb-3">
+                                        {/* 2. OPCIONES DE PAGO — una card por plan seleccionado (igual que CotizacionDetalle) */}
+                                        {totales.subtotal_recurrente_base > 0 && selectedPlanIds.length > 0 && (() => {
+                                            const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id);
+                                            const paqueteBase: CotizadorPaquete = paqueteSeleccionado ?? { id: '__items_only__', company_id: profile?.company_id ?? null, paquete: 'Propuesta Personalizada', cantidad_dtes: 0, costo_paquete_anual: 0, costo_paquete_mensual: 0, costo_implementacion: 0, orden: 0, activo: true, metadata: null, created_at: '', updated_at: '' };
+                                            const pkgFinal = { ...paqueteBase, ...(paqueteOverride !== null ? { costo_paquete_anual: paqueteOverride } : {}), ...(implementationOverride !== null ? { costo_implementacion: implementationOverride } : {}) };
+                                            const itemsSel = [...modulos.filter(m => formData.modulos_ids.includes(m.id)), ...servicios.filter(s => formData.servicios_ids.includes(s.id))].map(item => {
+                                                if (overrides[item.id] !== undefined) { const esPU = (item.pago_unico || 0) > 0; const ov = overrides[item.id]; return { ...item, pago_unico: esPU ? ov : 0, precio_anual: esPU ? 0 : ov, precio_mensual: esPU ? item.precio_mensual : ov / 12, precio_por_dte: 0 }; }
+                                                return item;
+                                            });
+                                            return (
                                                 <div>
-                                                    <h4 className={`text-[10px] font-black ${formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'} uppercase tracking-widest leading-none`}>
-                                                        {financingPlans.find(p => p.id === selectedPlanId)?.titulo?.toUpperCase() || 'FORMA DE PAGO'}
-                                                    </h4>
-                                                </div>
-                                                <div className={`w-8 h-8 ${formData.forma_pago === 'mensual' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'} rounded-lg flex items-center justify-center`}>
-                                                    <Globe className="w-4 h-4" />
-                                                </div>
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                {/* Módulos recurrentes — desglose individual o agrupado según show_breakdown */}
-                                                {(() => {
-                                                    const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
-                                                    const showBreakdown = selectedPlan?.show_breakdown ?? true;
-                                                    const recurrentes = totales.desglose.filter((d: any) => !d.es_pago_unico && d.precio_anual > 0);
-                                                    if (!showBreakdown) {
-                                                        return (
-                                                            <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
-                                                                <span>Pago recurrente</span>
-                                                                <span>${(totales.subtotal_recurrente_base + (totales.recargo_mensual_monto || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                            </div>
-                                                        );
-                                                    }
-                                                    return (
-                                                        <>
-                                                            {recurrentes.map((d: any, i: number) => (
-                                                                <div key={i} className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
-                                                                    <span className="truncate">{d.nombre}</span>
-                                                                    <span>${d.precio_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Opciones de Pago</p>
+                                                    <div className={`grid gap-4 ${selectedPlanIds.length === 1 ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+                                                        {selectedPlanIds.map((planId, idx) => {
+                                                            const plan = financingPlans.find(p => p.id === planId);
+                                                            if (!plan) return null;
+                                                            const isMain = planId === selectedPlanId;
+                                                            const cfg = { forma_pago: (plan.tipo_ajuste === 'discount' ? 'anual' : 'mensual') as 'anual' | 'mensual', meses: plan.meses || 1, cuotas: plan.cuotas, tipo_ajuste: plan.tipo_ajuste || 'none', tasa_ajuste: plan.interes_porcentaje || 0, descuento_manual: formData.descuento_porcentaje || 0, iva_porcentaje: formData.iva_porcentaje, incluir_implementacion: formData.incluir_implementacion, metadata: { porcentaje_anticipo: formData.porcentaje_anticipo } };
+                                                            const pt = cotizadorService.calcularCotizacion(pkgFinal, itemsSel, formData.volumen_dtes, cfg);
+                                                            const numCuotas = plan.cuotas || plan.meses || 1;
+                                                            const isPU = numCuotas <= 1;
+                                                            const displayAmt = isPU ? pt.total_recurrente : pt.cuota_mensual;
+                                                            return (
+                                                                <div key={planId} className={`rounded-2xl p-5 border-2 relative ${isMain ? 'border-[#4449AA] bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg shadow-[#4449AA]/10' : 'border-gray-200 bg-white shadow-sm'}`}>
+                                                                    <div className="flex gap-1.5 mb-3 flex-wrap min-h-[22px]">
+                                                                        {idx === 0 && selectedPlanIds.length >= 2 && <span className="text-[8px] font-black bg-orange-400 text-white px-2.5 py-1 rounded-full uppercase tracking-widest">Lo que pidió</span>}
+                                                                        {idx === 1 && <span className="text-[8px] font-black bg-indigo-500 text-white px-2.5 py-1 rounded-full uppercase tracking-widest">★ Recomendado</span>}
+                                                                        {plan.tipo_ajuste === 'discount' && <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full uppercase">Mejor Precio</span>}
+                                                                    </div>
+                                                                    <h3 className={`text-base font-black uppercase tracking-tight leading-none mb-1 ${isMain ? 'text-[#4449AA]' : 'text-gray-900'}`}>{plan.titulo}</h3>
+                                                                    {plan.descripcion && <p className="text-[10px] text-gray-400 mb-4 leading-relaxed">{plan.descripcion}</p>}
+                                                                    <div className={`text-3xl font-black tracking-tighter leading-none mb-1 ${isMain ? 'text-[#4449AA]' : 'text-gray-900'}`}>
+                                                                        ${displayAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                        {!isPU && <span className="text-[11px] font-bold text-gray-400 ml-1">/cuota</span>}
+                                                                    </div>
+                                                                    <p className={`text-[10px] font-bold mb-4 ${isPU ? 'text-emerald-500' : 'text-blue-500'}`}>{isPU ? 'Pago único adelantado' : `${numCuotas} pagos consecutivos`}</p>
+                                                                    <div className="space-y-1.5 mb-4 border-t border-gray-100 pt-3">
+                                                                        {totales.desglose.filter((d: any) => !d.es_pago_unico && d.precio_anual > 0).map((d: any, i: number) => (
+                                                                            <div key={i} className="flex justify-between text-[10px] text-gray-500 font-medium">
+                                                                                <span className="truncate">{d.nombre}</span>
+                                                                                <span className="font-bold text-gray-700 ml-2 flex-shrink-0">${d.precio_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                        {!isPU && pt.recargo_mensual_monto > 0 && <div className="flex justify-between text-[10px] text-blue-500 font-medium"><span>+ {plan.etiqueta_ajuste?.trim() || 'Financiamiento'} ({plan.interes_porcentaje}%)</span><span>+${pt.recargo_mensual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
+                                                                        {plan.tipo_ajuste === 'discount' && pt.ahorro_pago_anual > 0 && <div className="flex justify-between text-[10px] text-emerald-600 font-medium"><span>- Descuento anticipado ({plan.interes_porcentaje}%)</span><span>-${pt.ahorro_pago_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
+                                                                        <div className="flex justify-between text-[10px] text-gray-400 font-medium"><span>IVA ({formData.iva_porcentaje}%)</span><span className={isPU ? 'text-emerald-500' : 'text-blue-500'}>+${pt.iva_monto_recurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                                                                        <div className="pt-2 border-t border-gray-100 flex justify-between text-[11px] font-bold text-gray-700"><span>Total {isPU ? 'a pagar' : `(${numCuotas} cuotas)`}</span><span>${pt.total_recurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                                                                    </div>
+                                                                    <div className={`w-full h-9 rounded-xl flex items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-widest ${isMain ? 'bg-[#4449AA] text-white shadow-md shadow-[#4449AA]/25' : 'bg-gray-100 text-gray-600'}`}>
+                                                                        {isMain ? <><Check className="w-3.5 h-3.5" />Plan Activo</> : 'Alternativa'}
+                                                                    </div>
                                                                 </div>
-                                                            ))}
-                                                            {recurrentes.length > 1 && (
-                                                                <div className="flex justify-between text-[11px] text-gray-400 font-medium leading-none pt-1 border-t border-dashed border-gray-200">
-                                                                    <span>Subtotal recurrente</span>
-                                                                    <span>${totales.subtotal_recurrente_base.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                                </div>
-                                                            )}
-                                                        </>
-                                                    );
-                                                })()}
-
-                                                {(() => {
-                                                    const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
-                                                    const showBreakdown = selectedPlan?.show_breakdown ?? true;
-                                                    const etiquetaLabel = selectedPlan?.etiqueta_ajuste?.trim()
-                                                        || (selectedPlan?.tipo_ajuste === 'discount' ? '- Descuento anticipado' : '+ Financiamiento');
-                                                    return totales.recargo_mensual_monto > 0 && showBreakdown && (
-                                                        <div className="flex justify-between text-[11px] text-blue-600 font-medium leading-none group items-center">
-                                                            {editingLabelId === selectedPlan?.id ? (
-                                                                <div className="flex items-center gap-1 bg-blue-50/50 rounded pr-1 -ml-1">
-                                                                    <input
-                                                                        type="text"
-                                                                        autoFocus
-                                                                        className="w-36 h-5 text-[10px] bg-white border border-blue-200 rounded px-1.5 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-blue-700"
-                                                                        value={tempLabelValue}
-                                                                        onChange={(e) => setTempLabelValue(e.target.value)}
-                                                                        onKeyDown={(e) => {
-                                                                            if (e.key === 'Enter' && selectedPlan?.id) {
-                                                                                const newLabel = tempLabelValue.trim();
-                                                                                pricingService.updateFinancingPlan(selectedPlan.id, { etiqueta_ajuste: newLabel || null } as any)
-                                                                                    .then(() => {
-                                                                                        setFinancingPlans(prev => prev.map(p => p.id === selectedPlan.id ? { ...p, etiqueta_ajuste: newLabel || undefined } : p));
-                                                                                        setEditingLabelId(null);
-                                                                                    });
-                                                                            } else if (e.key === 'Escape') {
-                                                                                setEditingLabelId(null);
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    <button
-                                                                        className="text-green-600 hover:bg-green-100 p-0.5 rounded transition-colors"
-                                                                        onClick={() => {
-                                                                            if (selectedPlan?.id) {
-                                                                                const newLabel = tempLabelValue.trim();
-                                                                                pricingService.updateFinancingPlan(selectedPlan.id, { etiqueta_ajuste: newLabel || null } as any)
-                                                                                    .then(() => {
-                                                                                        setFinancingPlans(prev => prev.map(p => p.id === selectedPlan.id ? { ...p, etiqueta_ajuste: newLabel || undefined } : p));
-                                                                                        setEditingLabelId(null);
-                                                                                    });
-                                                                            }
-                                                                        }}
-                                                                    >
-                                                                        <Check className="w-3 h-3" />
-                                                                    </button>
-                                                                    <button
-                                                                        className="text-gray-400 hover:bg-gray-200 p-0.5 rounded transition-colors"
-                                                                        onClick={() => setEditingLabelId(null)}
-                                                                    >
-                                                                        <X className="w-3 h-3" />
-                                                                    </button>
-                                                                </div>
-                                                            ) : (
-                                                                <span
-                                                                    title="Editar etiqueta en cotización"
-                                                                    className="cursor-pointer hover:underline hover:text-blue-800 transition-colors flex items-center gap-1"
-                                                                    onClick={() => {
-                                                                        setEditingLabelId(selectedPlan?.id || null);
-                                                                        setTempLabelValue(selectedPlan?.etiqueta_ajuste || '');
-                                                                    }}
-                                                                >
-                                                                    {etiquetaLabel} ({totales.recargo_aplicado_porcentaje}%)
-                                                                    <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                                </span>
-                                                            )}
-                                                            <span className="font-bold">+${totales.recargo_mensual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                        </div>
-                                                    );
-                                                })()}
-
-                                                {/* Mostrar descuento del plan si existe */}
-                                                {financingPlans.find(p => p.id === selectedPlanId)?.tipo_ajuste === 'discount' && totales.ahorro_pago_anual > 0 && (
-                                                    <div className="flex justify-between text-[11px] text-green-600 font-medium leading-none">
-                                                        <span>- Descuento Pago Anticipado</span>
-                                                        <span className="font-bold">-${totales.ahorro_pago_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            );
+                                                        })}
                                                     </div>
-                                                )}
-
-                                                {/* Descuento manual del agente */}
-                                                {totales.descuento_manual_monto > 0 && (
-                                                    <div className="flex justify-between text-[11px] text-emerald-600 font-medium leading-none">
-                                                        <span>- Descuento ({formData.descuento_porcentaje}%)</span>
-                                                        <span className="font-bold">-${totales.descuento_manual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                    </div>
-                                                )}
-
-                                                <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
-                                                    <span>IVA ({formData.iva_porcentaje}%)</span>
-                                                    <span className={formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'}>
-                                                        +${totales.iva_monto_recurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                    </span>
                                                 </div>
+                                            );
+                                        })()}
 
-                                                <div className={`pt-2 border-t ${formData.forma_pago === 'mensual' ? 'border-blue-200' : 'border-green-200'} mt-2 space-y-2`}>
-                                                    <div className="flex justify-between items-end">
-                                                        <span className="text-[10px] font-black text-gray-900 uppercase">
-                                                            {financingPlans.find(p => p.id === selectedPlanId)?.titulo || 'Total'}
-                                                        </span>
-                                                        <span className={`text-xl font-black ${formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'} tracking-tighter leading-none`}>
-                                                            ${(totales.cuota_mensual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                        </span>
-                                                    </div>
-
-                                                </div>
-                                            </div>
-                                        </div>
-                                        )}
 
                                         {/* 3. INVERSIÓN TOTAL (PURPLE) */}
                                         <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden group">
