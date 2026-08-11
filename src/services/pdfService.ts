@@ -45,28 +45,31 @@ export const pdfService = {
                 WHITE: [255, 255, 255]
             };
 
-            // ── Cargar activos e configuración en paralelo ──
-            const companyIdForSettings = (cotizacion as any).company_id || (cotizacion.company as any)?.id || null;
-            const [logoData, avatarData, qrData, settingsRes] = await Promise.all([
-                imageCache.loadImagesParallel([
-                    cotizacion.company?.logo_url || '',
-                    cotizacion.creator?.avatar_url || '',
-                    `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.href)}`
-                ]),
-                companyIdForSettings
-                    ? supabase.from('payment_settings').select('etiqueta_pago_unico, etiqueta_pago_inicial')
-                        .or(`company_id.eq.${companyIdForSettings},company_id.is.null`)
-                        .order('company_id', { ascending: false, nullsFirst: false })
-                        .limit(1).maybeSingle()
-                    : Promise.resolve({ data: null, error: null })
-            ]).then(([imgs, sr]) => [...imgs, sr]);
+            // Load assets in parallel (original)
+            const [logoData, avatarData, qrData] = await imageCache.loadImagesParallel([
+                cotizacion.company?.logo_url || '',
+                cotizacion.creator?.avatar_url || '',
+                `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.href)}`
+            ]);
 
-            // Etiquetas dinámicas por empresa (HubSpot/Salesforce pattern)
-            const pdfSettings = (settingsRes as any)?.data;
-            // Cuando son SOLO ítems de pago único (equipo, hardware)
-            const LABEL_PAGO_UNICO = pdfSettings?.etiqueta_pago_unico?.trim() || 'PAGO ÚNICO';
-            // Cuando hay mezcla de pago único + recurrente
-            const LABEL_PAGO_INICIAL = pdfSettings?.etiqueta_pago_inicial?.trim() || 'PAGO INICIAL';
+            // ── Etiquetas dinámicas por empresa ───────────────────────────────────
+            // Auto: "PAGO Único" si solo pago único, "PAGO INICIAL" si hay recurrentes
+            let LABEL_PAGO_UNICO = 'PAGO ÚNICO';
+            let LABEL_PAGO_INICIAL = 'PAGO INICIAL';
+            try {
+                const companyId = (cotizacion as any).company_id || (cotizacion.company as any)?.id || null;
+                if (companyId) {
+                    const { data: pdfCfg } = await supabase
+                        .from('payment_settings')
+                        .select('etiqueta_pago_unico, etiqueta_pago_inicial')
+                        .or(`company_id.eq.${companyId},company_id.is.null`)
+                        .order('company_id', { ascending: false, nullsFirst: false })
+                        .limit(1)
+                        .maybeSingle();
+                    if (pdfCfg?.etiqueta_pago_unico?.trim()) LABEL_PAGO_UNICO = pdfCfg.etiqueta_pago_unico.trim();
+                    if (pdfCfg?.etiqueta_pago_inicial?.trim()) LABEL_PAGO_INICIAL = pdfCfg.etiqueta_pago_inicial.trim();
+                }
+            } catch { /* usa defaults si falla */ }
 
 
             const drawHeader = () => {
@@ -851,7 +854,7 @@ export const pdfService = {
                     doc.setTextColor(249, 115, 22);
                     doc.setFontSize(9);
                     doc.setFont('helvetica', 'bold');
-                    doc.text(LABEL_PAGO_INICIAL, margin + 6, by + 8);
+                    doc.text(hasRecurringItems ? LABEL_PAGO_INICIAL : LABEL_PAGO_UNICO, margin + 6, by + 8);
                     doc.setTextColor(148, 163, 184);
                     doc.setFontSize(5.5);
                     doc.setFont('helvetica', 'normal');
