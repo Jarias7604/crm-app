@@ -45,12 +45,29 @@ export const pdfService = {
                 WHITE: [255, 255, 255]
             };
 
-            // Load assets in parallel
-            const [logoData, avatarData, qrData] = await imageCache.loadImagesParallel([
-                cotizacion.company?.logo_url || '',
-                cotizacion.creator?.avatar_url || '',
-                `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.href)}`
-            ]);
+            // ── Cargar activos e configuración en paralelo ──
+            const companyIdForSettings = (cotizacion as any).company_id || (cotizacion.company as any)?.id || null;
+            const [logoData, avatarData, qrData, settingsRes] = await Promise.all([
+                imageCache.loadImagesParallel([
+                    cotizacion.company?.logo_url || '',
+                    cotizacion.creator?.avatar_url || '',
+                    `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.href)}`
+                ]),
+                companyIdForSettings
+                    ? supabase.from('payment_settings').select('etiqueta_pago_unico, etiqueta_pago_inicial')
+                        .or(`company_id.eq.${companyIdForSettings},company_id.is.null`)
+                        .order('company_id', { ascending: false, nullsFirst: false })
+                        .limit(1).maybeSingle()
+                    : Promise.resolve({ data: null, error: null })
+            ]).then(([imgs, sr]) => [...imgs, sr]);
+
+            // Etiquetas dinámicas por empresa (HubSpot/Salesforce pattern)
+            const pdfSettings = (settingsRes as any)?.data;
+            // Cuando son SOLO ítems de pago único (equipo, hardware)
+            const LABEL_PAGO_UNICO = pdfSettings?.etiqueta_pago_unico?.trim() || 'PAGO ÚNICO';
+            // Cuando hay mezcla de pago único + recurrente
+            const LABEL_PAGO_INICIAL = pdfSettings?.etiqueta_pago_inicial?.trim() || 'PAGO INICIAL';
+
 
             const drawHeader = () => {
                 const headerH = 60;
@@ -834,7 +851,7 @@ export const pdfService = {
                     doc.setTextColor(249, 115, 22);
                     doc.setFontSize(9);
                     doc.setFont('helvetica', 'bold');
-                    doc.text('PAGO INICIAL', margin + 6, by + 8);
+                    doc.text(LABEL_PAGO_INICIAL, margin + 6, by + 8);
                     doc.setTextColor(148, 163, 184);
                     doc.setFontSize(5.5);
                     doc.setFont('helvetica', 'normal');
@@ -924,7 +941,7 @@ export const pdfService = {
                     by += badgeH + 10;
 
                     // Dos cajas: PAGO INICIAL + RECURRENTE
-                    drawBox(bx, by, 'PAGO INICIAL', 'Requerido para activar', pagoInicial, pagoInicial, COLORS.ORANGE);
+                    drawBox(bx, by, LABEL_PAGO_INICIAL, 'Requerido para activar', pagoInicial, pagoInicial, COLORS.ORANGE);
                     const cColor = financials.isMonthly ? COLORS.BLUE : COLORS.GREEN;
                     const cTitle = financials.isMonthly ? 'PAGO RECURRENTE' : 'RECURRENTE ANUAL';
                     const cSubtitle = divisor > 1 ? `Pago en ${divisor} cuotas` : 'Pago único acumulado';
@@ -950,7 +967,7 @@ export const pdfService = {
                     doc.setTextColor(249, 115, 22);
                     doc.setFontSize(9);
                     doc.setFont('helvetica', 'bold');
-                    doc.text('PAGO INICIAL', margin + 6, by + 8);
+                    doc.text(LABEL_PAGO_UNICO, margin + 6, by + 8);
                     doc.setTextColor(148, 163, 184);
                     doc.setFontSize(5.5);
                     doc.setFont('helvetica', 'normal');

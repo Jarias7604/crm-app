@@ -565,6 +565,52 @@ export default function FinancialRules() {
                                     <p className="text-[10px] text-gray-400 pl-1">Texto que aparece en el badge verde del plan anual.</p>
                                 </div>
 
+                                {/* ── PDF LABEL CUSTOMIZATION (HubSpot/Salesforce pattern) ── */}
+                                <div className="pt-2 border-t border-gray-50 space-y-6">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Etiquetas del PDF</span>
+                                        <span className="text-[9px] bg-indigo-50 text-indigo-500 font-bold px-2 py-0.5 rounded-full uppercase">Por empresa</span>
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 pl-1 -mt-1">
+                                        Personaliza los títulos de las secciones en el PDF de cotización.
+                                        Cada empresa puede tener sus propios textos.
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1 flex items-center gap-1.5">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block"></span>
+                                                Cotización solo Pago Único
+                                            </label>
+                                            <Input
+                                                disabled={!isEditingSettings}
+                                                value={settings.etiqueta_pago_unico || ''}
+                                                onChange={e => setSettings({ ...settings, etiqueta_pago_unico: e.target.value })}
+                                                className="h-11 font-medium bg-gray-50/50"
+                                                placeholder="PAGO ÚNICO (default: PAGO INICIAL)"
+                                            />
+                                            <p className="text-[9px] text-gray-400 pl-1">
+                                                Se usa cuando todos los ítems son pago único (ej: Equipo, Hardware).
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1 flex items-center gap-1.5">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-orange-600 inline-block"></span>
+                                                Cotización Mixta (pago único + recurrente)
+                                            </label>
+                                            <Input
+                                                disabled={!isEditingSettings}
+                                                value={settings.etiqueta_pago_inicial || ''}
+                                                onChange={e => setSettings({ ...settings, etiqueta_pago_inicial: e.target.value })}
+                                                className="h-11 font-medium bg-gray-50/50"
+                                                placeholder="PAGO INICIAL (default)"
+                                            />
+                                            <p className="text-[9px] text-gray-400 pl-1">
+                                                Se usa cuando hay ítems recurrentes + costos iniciales (ej: Impl. + Licencia).
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="space-y-3">
                                     <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest pl-1">Desglose de Financiamiento</label>
                                     <div className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${isEditingSettings ? 'bg-white border-gray-200' : 'bg-gray-50/50 border-gray-100'}`}>

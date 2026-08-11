@@ -57,6 +57,11 @@ export interface PaymentSettings {
     recargo_financiamiento_base: number;
     nota_mejor_precio: string;
     show_financing_breakdown: boolean;
+    // ── Etiquetas del PDF (editables por empresa) ──────────────────────
+    // HubSpot/Salesforce pattern: cada org define sus propios labels
+    etiqueta_pago_unico?: string;    // Ej: "INVERSIÓN TOTAL", "PAGO ÚNICO"  — para quotes solo pago único
+    etiqueta_pago_inicial?: string;  // Ej: "PAGO INICIAL", "ANTICIPO"       — para quotes mixtos
+    // ──────────────────────────────────────────────────────────────────
     created_at: string;
     updated_at: string;
 }
