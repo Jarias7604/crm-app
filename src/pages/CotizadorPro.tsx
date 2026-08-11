@@ -28,6 +28,8 @@ export default function CotizadorPro() {
     const [modulos, setModulos] = useState<CotizadorItem[]>([]);
     const [servicios, setServicios] = useState<CotizadorItem[]>([]);
     const [filtroStep3, setFiltroStep3] = useState<string>('todos');
+    const [chipOrder, setChipOrder] = useState<string[]>([]);
+    const [dragChip, setDragChip] = useState<string | null>(null);
     const [searchLead, setSearchLead] = useState('');
     const [showLeadSelector, setShowLeadSelector] = useState(false);
 
@@ -1008,23 +1010,73 @@ export default function CotizadorPro() {
                             );
                         };
 
-                        // Agrupar servicios por tipo (servicio, equipo, implementacion, etc.)
+                        // Agrupar no-modulos por tipo
                         const gruposServicios = servicios.reduce((acc: Record<string, typeof servicios>, item) => {
                             const key = item.tipo || 'otros';
                             acc[key] = [...(acc[key] || []), item];
                             return acc;
                         }, {});
                         const TIPO_LABELS: Record<string, string> = {
-                            servicio: 'Servicios',
-                            implementacion: 'Implementación',
-                            equipo: 'Equipo',
-                            otros: 'Otros',
+                            plan: 'Plan', modulo: 'Módulos', servicio: 'Servicios',
+                            implementacion: 'Implementación', equipo: 'Equipo', otros: 'Otros',
                         };
-                        // Categorías disponibles para los chips
-                        const categorias = [
+                        const categoriasBase = [
+                            ...(paquetes.length > 0 ? ['plan'] : []),
                             ...(modulos.length > 0 ? ['modulo'] : []),
                             ...Object.keys(gruposServicios)
                         ];
+                        const categoriasOrdenadas = chipOrder.length > 0
+                            ? chipOrder.filter(c => categoriasBase.includes(c)).concat(categoriasBase.filter(c => !chipOrder.includes(c)))
+                            : categoriasBase;
+                        const conteo: Record<string, number> = {
+                            plan: paquetes.length, modulo: modulos.length,
+                            ...Object.fromEntries(Object.entries(gruposServicios).map(([t, it]) => [t, it.length]))
+                        };
+                        const totalItems = paquetes.length + modulos.length + servicios.length;
+
+                        // Render fila de plan/paquete
+                        const renderPaqueteRow = (paq: CotizadorPaquete) => {
+                            const isSel = formData.paquete_id === paq.id;
+                            return (
+                                <div key={paq.id} onClick={() => setFormData(prev => ({ ...prev, paquete_id: isSel ? '' : paq.id }))}
+                                    className={`flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all duration-150 ${
+                                        isSel ? 'border-[#4449AA] bg-[#4449AA]/5 shadow-sm' : 'border-gray-100 hover:border-gray-200 bg-white hover:bg-gray-50/50'
+                                    }`}>
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                            isSel ? 'bg-[#4449AA] border-[#4449AA]' : 'border-gray-300'
+                                        }`}>{isSel && <Check className="w-3 h-3 text-white" />}</div>
+                                        <div className="min-w-0">
+                                            <p className={`text-sm font-bold truncate ${isSel ? 'text-[#4449AA]' : 'text-gray-800'}`}>{paq.paquete}</p>
+                                            {paq.descripcion && <p className="text-[11px] text-gray-400 line-clamp-1">{paq.descripcion}</p>}
+                                        </div>
+                                    </div>
+                                    <div className="text-right flex-shrink-0 ml-4">
+                                        <p className={`text-sm font-black ${isSel ? 'text-[#4449AA]' : 'text-gray-700'}`}>${paq.costo_paquete_anual.toLocaleString()}</p>
+                                        <p className="text-[10px] text-gray-400">/año</p>
+                                    </div>
+                                </div>
+                            );
+                        };
+
+                        // Drag handlers (solo reordena chips, cero impacto en lógica)
+                        const onChipDragStart = (e: React.DragEvent, tipo: string) => { e.dataTransfer.effectAllowed = 'move'; setDragChip(tipo); };
+                        const onChipDragOver = (e: React.DragEvent, tipo: string) => {
+                            e.preventDefault();
+                            if (dragChip && dragChip !== tipo) {
+                                const base = chipOrder.length > 0 ? chipOrder : categoriasBase;
+                                const fi = base.indexOf(dragChip), ti = base.indexOf(tipo);
+                                if (fi !== -1 && ti !== -1) { const n = [...base]; n.splice(fi, 1); n.splice(ti, 0, dragChip); setChipOrder(n); }
+                            }
+                        };
+                        const onChipDragEnd = () => setDragChip(null);
+
+                        const chipClass = (tipo: string) => `relative flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border transition-all select-none cursor-grab active:cursor-grabbing ${
+                            dragChip === tipo ? 'opacity-50 scale-95' : ''
+                        } ${ filtroStep3 === tipo ? 'bg-[#4449AA] text-white border-[#4449AA]' : 'bg-white text-gray-500 border-gray-200 hover:border-[#4449AA]/50' }`;
+                        const badgeClass = (tipo: string) => `text-[10px] font-black px-1 rounded-full ${
+                            filtroStep3 === tipo ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-500'
+                        }`;
 
                         return (
                             <div className="space-y-5">
@@ -1033,55 +1085,50 @@ export default function CotizadorPro() {
                                         <h2 className="text-lg font-bold text-[#4449AA]">Servicios e Ítems Adicionales</h2>
                                         <p className="text-xs text-gray-400 mt-0.5">Selecciona los ítems que forman esta propuesta</p>
                                     </div>
-                                    {(formData.modulos_ids.length + formData.servicios_ids.length) > 0 && (
+                                    {(formData.modulos_ids.length + formData.servicios_ids.length + (formData.paquete_id ? 1 : 0)) > 0 && (
                                         <span className="text-xs font-black text-[#4449AA] bg-[#4449AA]/10 px-3 py-1 rounded-full">
-                                            {formData.modulos_ids.length + formData.servicios_ids.length} seleccionados
+                                            {formData.modulos_ids.length + formData.servicios_ids.length + (formData.paquete_id ? 1 : 0)} seleccionados
                                         </span>
                                     )}
                                 </div>
 
-                                {/* ── Chips de categoría ── */}
-                                {categorias.length > 1 && (
+                                {/* Chips drag-to-reorder con contador */}
+                                {categoriasOrdenadas.length >= 1 && (
                                     <div className="flex gap-2 flex-wrap">
-                                        <button
-                                            onClick={() => setFiltroStep3('todos')}
-                                            className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
-                                                filtroStep3 === 'todos'
-                                                    ? 'bg-[#4449AA] text-white border-[#4449AA]'
-                                                    : 'bg-white text-gray-500 border-gray-200 hover:border-[#4449AA]/50'
-                                            }`}
-                                        >Todos</button>
-                                        {modulos.length > 0 && (
-                                            <button
-                                                onClick={() => setFiltroStep3('modulo')}
-                                                className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
-                                                    filtroStep3 === 'modulo'
-                                                        ? 'bg-[#4449AA] text-white border-[#4449AA]'
-                                                        : 'bg-white text-gray-500 border-gray-200 hover:border-[#4449AA]/50'
-                                                }`}
-                                            >Módulos</button>
-                                        )}
-                                        {Object.keys(gruposServicios).map(tipo => (
-                                            <button
-                                                key={tipo}
+                                        <button onClick={() => setFiltroStep3('todos')}
+                                            className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                                                filtroStep3 === 'todos' ? 'bg-[#4449AA] text-white border-[#4449AA]' : 'bg-white text-gray-500 border-gray-200 hover:border-[#4449AA]/50'
+                                            }`}>
+                                            Todos <span className={badgeClass('todos')}>{totalItems}</span>
+                                        </button>
+                                        {categoriasOrdenadas.map(tipo => (
+                                            <button key={tipo} draggable
+                                                onDragStart={e => onChipDragStart(e, tipo)}
+                                                onDragOver={e => onChipDragOver(e, tipo)}
+                                                onDragEnd={onChipDragEnd}
                                                 onClick={() => setFiltroStep3(tipo)}
-                                                className={`px-3 py-1 rounded-full text-xs font-bold border transition-all ${
-                                                    filtroStep3 === tipo
-                                                        ? 'bg-[#4449AA] text-white border-[#4449AA]'
-                                                        : 'bg-white text-gray-500 border-gray-200 hover:border-[#4449AA]/50'
-                                                }`}
-                                            >{TIPO_LABELS[tipo] || tipo.charAt(0).toUpperCase() + tipo.slice(1)}</button>
+                                                className={chipClass(tipo)}>
+                                                {TIPO_LABELS[tipo] || tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+                                                <span className={badgeClass(tipo)}>{conteo[tipo] ?? 0}</span>
+                                            </button>
                                         ))}
                                     </div>
                                 )}
 
-                                {todosLosItems.length === 0 ? (
+                                {paquetes.length === 0 && todosLosItems.length === 0 ? (
                                     <div className="py-12 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
                                         <p className="text-gray-500 font-bold mb-1">Sin ítems en el catálogo aún</p>
-                                        <p className="text-sm text-gray-400">Ve a <strong>Configuración → Catálogo</strong> para agregar tus servicios y productos.</p>
+                                        <p className="text-sm text-gray-400">Ve a <strong>Configuración → Catálogo</strong> para agregar.</p>
                                     </div>
                                 ) : (
                                     <>
+                                        {/* Plan (paquetes) */}
+                                        {paquetes.length > 0 && (filtroStep3 === 'todos' || filtroStep3 === 'plan') && (
+                                            <div className="space-y-2">
+                                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1">Plan</h3>
+                                                {paquetes.map(p => renderPaqueteRow(p))}
+                                            </div>
+                                        )}
                                         {/* Módulos */}
                                         {modulos.length > 0 && (filtroStep3 === 'todos' || filtroStep3 === 'modulo') && (
                                             <div className="space-y-2">
@@ -1089,7 +1136,7 @@ export default function CotizadorPro() {
                                                 {modulos.map(m => renderItemRow(m, true))}
                                             </div>
                                         )}
-                                        {/* Grupos dinámicos: Servicios, Equipo, Implementación, etc. */}
+                                        {/* Grupos dinámicos */}
                                         {Object.entries(gruposServicios).map(([tipo, items]) =>
                                             (filtroStep3 === 'todos' || filtroStep3 === tipo) && (
                                                 <div key={tipo} className="space-y-2">
