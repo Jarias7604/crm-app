@@ -245,11 +245,12 @@ export default function CotizadorPro() {
 
             setPaquetes(paqData);
 
-            // Merge pricing_items for types not already covered in cotizador_items
-            // (e.g. 'equipo', 'implementacion', custom types created via the Catálogo UI)
-            const existingTypes = new Set(itemsData.map((i: CotizadorItem) => i.tipo));
+            // Merge pricing_items: deduplicar por ID (no por tipo)
+            // Así, items de 'implementacion', 'equipo' o cualquier tipo del Catálogo
+            // aparecen en el wizard aunque cotizador_items tenga items del mismo tipo.
+            const existingIds = new Set(itemsData.map((i: CotizadorItem) => i.id));
             const extraItems: CotizadorItem[] = pricingItemsData
-                .filter((p: any) => p.activo && !existingTypes.has(p.tipo) && p.tipo !== 'plan')
+                .filter((p: any) => p.activo && !existingIds.has(p.id) && p.tipo !== 'plan')
                 .map((p: any): CotizadorItem => ({
                     id: p.id,
                     company_id: p.company_id ?? null,
