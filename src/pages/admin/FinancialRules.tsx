@@ -565,48 +565,68 @@ export default function FinancialRules() {
                                     <p className="text-[10px] text-gray-400 pl-1">Texto que aparece en el badge verde del plan anual.</p>
                                 </div>
 
-                                {/* ── PDF LABEL CUSTOMIZATION (HubSpot/Salesforce pattern) ── */}
-                                <div className="pt-2 border-t border-gray-50 space-y-6">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Etiquetas del PDF</span>
-                                        <span className="text-[9px] bg-indigo-50 text-indigo-500 font-bold px-2 py-0.5 rounded-full uppercase">Por empresa</span>
+                                {/* ── ETIQUETAS DEL PDF — compact + live preview ── */}
+                                <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                                    <div className="px-5 py-3 bg-gray-50/60 border-b border-gray-100 flex items-center justify-between">
+                                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Etiquetas del PDF</span>
+                                        <span className="text-[9px] bg-indigo-50 text-indigo-500 font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Por empresa</span>
                                     </div>
-                                    <p className="text-[10px] text-gray-400 pl-1 -mt-1">
-                                        Personaliza los títulos de las secciones en el PDF de cotización.
-                                        Cada empresa puede tener sus propios textos.
-                                    </p>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                                        {/* Label 1: Solo pago único */}
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1 flex items-center gap-1.5">
-                                                <span className="w-2.5 h-2.5 rounded-full bg-orange-400 inline-block"></span>
-                                                Cotización solo Pago Único
+                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block"></span>
+                                                Solo Pago Único
                                             </label>
                                             <Input
                                                 disabled={!isEditingSettings}
                                                 value={settings.etiqueta_pago_unico || ''}
                                                 onChange={e => setSettings({ ...settings, etiqueta_pago_unico: e.target.value })}
-                                                className="h-11 font-medium bg-gray-50/50"
-                                                placeholder="PAGO ÚNICO (default: PAGO INICIAL)"
+                                                className="h-9 text-sm font-semibold bg-gray-50/50"
+                                                placeholder="PAGO ÚNICO"
                                             />
-                                            <p className="text-[9px] text-gray-400 pl-1">
-                                                Se usa cuando todos los ítems son pago único (ej: Equipo, Hardware).
-                                            </p>
+                                            <div className="rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50/60 to-amber-50/30 p-3 flex gap-2.5 items-start">
+                                                <div className="w-0.5 self-stretch bg-orange-400 rounded-full shrink-0"></div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[10px] font-black text-orange-500 uppercase tracking-wide truncate">
+                                                        {settings.etiqueta_pago_unico?.trim() || 'PAGO ÚNICO'}
+                                                    </p>
+                                                    <p className="text-[8px] text-gray-400 mt-0.5">Requerido antes de activar</p>
+                                                    <div className="flex justify-between mt-1.5 pt-1.5 border-t border-orange-100/80">
+                                                        <span className="text-[7px] font-bold text-gray-400 uppercase tracking-wide">Total a pagar hoy</span>
+                                                        <span className="text-[10px] font-black text-orange-500">$836.20</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p className="text-[8px] text-gray-400">Equipos, hardware o servicios de pago único.</p>
                                         </div>
+                                        {/* Label 2: Cotización mixta */}
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1 flex items-center gap-1.5">
-                                                <span className="w-2.5 h-2.5 rounded-full bg-orange-600 inline-block"></span>
-                                                Cotización Mixta (pago único + recurrente)
+                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-orange-600 inline-block"></span>
+                                                Cotización Mixta
                                             </label>
                                             <Input
                                                 disabled={!isEditingSettings}
                                                 value={settings.etiqueta_pago_inicial || ''}
                                                 onChange={e => setSettings({ ...settings, etiqueta_pago_inicial: e.target.value })}
-                                                className="h-11 font-medium bg-gray-50/50"
-                                                placeholder="PAGO INICIAL (default)"
+                                                className="h-9 text-sm font-semibold bg-gray-50/50"
+                                                placeholder="PAGO INICIAL"
                                             />
-                                            <p className="text-[9px] text-gray-400 pl-1">
-                                                Se usa cuando hay ítems recurrentes + costos iniciales (ej: Impl. + Licencia).
-                                            </p>
+                                            <div className="rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50/60 to-amber-50/30 p-3 flex gap-2.5 items-start">
+                                                <div className="w-0.5 self-stretch bg-orange-600 rounded-full shrink-0"></div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[10px] font-black text-orange-600 uppercase tracking-wide truncate">
+                                                        {settings.etiqueta_pago_inicial?.trim() || 'PAGO INICIAL'}
+                                                    </p>
+                                                    <p className="text-[8px] text-gray-400 mt-0.5">Requerido para activar</p>
+                                                    <div className="flex justify-between mt-1.5 pt-1.5 border-t border-orange-100/80">
+                                                        <span className="text-[7px] font-bold text-gray-400 uppercase tracking-wide">Total a pagar hoy</span>
+                                                        <span className="text-[10px] font-black text-orange-600">$1,200.00</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <p className="text-[8px] text-gray-400">Implementación + Licencia (mixto).</p>
                                         </div>
                                     </div>
                                 </div>
