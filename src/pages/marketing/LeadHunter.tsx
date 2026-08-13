@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap, Users } from 'lucide-react';
-import { leadDiscoveryService, type DiscoveredLead } from '../../services/marketing/leadDiscovery';
+import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap, Users, X, ArrowRight, Layers } from 'lucide-react';
+import { leadDiscoveryService, type DiscoveredLead, type RegionalDensity } from '../../services/marketing/leadDiscovery';
 import { leadsService } from '../../services/leads';
 import { useAuth } from '../../auth/AuthProvider';
 import { BulkAssignModal } from '../../components/leads/BulkAssignModal';
 import toast from 'react-hot-toast';
 
+// Lead Hunter AI Component - Multi-City Density Scanner Integrated
 export default function LeadHunter() {
     const navigate = useNavigate();
     const { profile, simulatedCompanyId } = useAuth();
@@ -20,6 +21,12 @@ export default function LeadHunter() {
     const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [results, setResults] = useState<DiscoveredLead[]>([]);
+
+    // Density Scanner State
+    const [isDensityScanning, setIsDensityScanning] = useState(false);
+    const [isDensityModalOpen, setIsDensityModalOpen] = useState(false);
+    const [densityResults, setDensityResults] = useState<RegionalDensity[]>([]);
+    const [selectedDensityCityIds, setSelectedDensityCityIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         leadsService.getTeamMembers().then(data => setTeamMembers(data || [])).catch(() => {});
@@ -60,7 +67,96 @@ export default function LeadHunter() {
         }
     };
 
+    // Handle Density Scan across multiple cities
+    const handleScanDensity = async () => {
+        if (!query || !location) {
+            toast.error('Por favor ingresa qué buscas y un país o región (ej. Estados Unidos).');
+            return;
+        }
 
+        setIsDensityScanning(true);
+        try {
+            toast.loading('Escaneando densidad de prospectos en múltiples ciudades...', { id: 'densityScan' });
+            const density = await leadDiscoveryService.scanDensityByRegion(query, location);
+            setDensityResults(density);
+
+            // Pre-select non-empty cities
+            const validIds = new Set(density.filter(d => d.count > 0).map(d => d.id));
+            setSelectedDensityCityIds(validIds);
+
+            const totalFound = density.reduce((sum, item) => sum + item.count, 0);
+            if (totalFound > 0) {
+                toast.success(`🎉 ¡Escaneo completado! ${totalFound} prospectos detectados por zonas.`, { id: 'densityScan' });
+                setIsDensityModalOpen(true);
+            } else {
+                toast('No se detectaron prospectos en las ciudades de la región.', { id: 'densityScan' });
+            }
+        } catch (error) {
+            console.error('Density scan error:', error);
+            toast.error('Error al escanear la densidad de prospectos.', { id: 'densityScan' });
+        } finally {
+            setIsDensityScanning(false);
+        }
+    };
+
+    const toggleDensityCity = (id: string) => {
+        const newSet = new Set(selectedDensityCityIds);
+        if (newSet.has(id)) newSet.delete(id);
+        else newSet.add(id);
+        setSelectedDensityCityIds(newSet);
+    };
+
+    const toggleAllDensityCities = () => {
+        if (selectedDensityCityIds.size === densityResults.length) {
+            setSelectedDensityCityIds(new Set());
+        } else {
+            setSelectedDensityCityIds(new Set(densityResults.map(d => d.id)));
+        }
+    };
+
+    const handleImportFromDensityModal = async () => {
+        if (!activeCompanyId) {
+            toast.error('No se identificó tu empresa.');
+            return;
+        }
+
+        const selectedCities = densityResults.filter(d => selectedDensityCityIds.has(d.id));
+        const aggregatedLeads: DiscoveredLead[] = [];
+        selectedCities.forEach(c => aggregatedLeads.push(...c.leads));
+
+        if (aggregatedLeads.length === 0) {
+            toast.error('Selecciona al menos una ciudad con prospectos.');
+            return;
+        }
+
+        setIsDensityModalOpen(false);
+        setResults(aggregatedLeads);
+        
+        // Select all aggregated leads that are not imported yet
+        const toImportIds = new Set(aggregatedLeads.filter(l => !l.is_imported).map(l => l.id));
+        setSelectedIds(toImportIds);
+
+        // Perform bulk import
+        setIsImporting(true);
+        try {
+            toast.loading(`Importando ${toImportIds.size} prospectos de las ciudades seleccionadas...`, { id: 'densityImport' });
+            const toImportLeads = aggregatedLeads.filter(l => toImportIds.has(l.id));
+            const stats = await leadDiscoveryService.importLeadsBulk(toImportLeads, activeCompanyId);
+
+            setResults(prev => prev.map(r => ({
+                ...r,
+                is_imported: true
+            })));
+
+            toast.success(`✅ ${stats.success} prospectos agregados exitosamente a tu CRM (${stats.failed} duplicados ignorados).`, { id: 'densityImport' });
+            setSelectedIds(new Set());
+        } catch (error) {
+            console.error(error);
+            toast.error('Error durante la importación masiva.', { id: 'densityImport' });
+        } finally {
+            setIsImporting(false);
+        }
+    };
 
     // Apply client-side filtering
     const filteredResults = useMemo(() => {
@@ -224,7 +320,7 @@ export default function LeadHunter() {
 
             {/* Filters Sub-Panel */}
             {showFilters && (
-                <div className="bg-white p-6 rounded-[2rem] border border- amber-100 shadow-sm animate-in slide-in-from-top-4 duration-300 flex flex-wrap gap-8 items-center">
+                <div className="bg-white p-6 rounded-[2rem] border border-amber-100 shadow-sm animate-in slide-in-from-top-4 duration-300 flex flex-wrap gap-8 items-center">
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Calificación Mínima</label>
                         <div className="flex items-center gap-2">
@@ -282,50 +378,67 @@ export default function LeadHunter() {
                 </div>
             )}
 
-            {/* Search Bar - Premium UI */}
-            <div className="bg-[#0f172a] p-8 rounded-[2rem] shadow-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl -mr-32 -mt-32 transition-transform group-hover:scale-110" />
-                <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl -ml-24 -mb-24" />
+            {/* Search Bar - Delicate & Clean (Mockup Approved Style) */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm">
+                <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                    <div className="md:col-span-5 bg-slate-50/80 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center gap-3">
+                        <Building2 className="w-5 h-5 text-slate-400 shrink-0" />
+                        <div className="w-full">
+                            <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Término de Búsqueda</label>
+                            <input
+                                type="text"
+                                placeholder="ej. Iglesias cristianas, Dentistas, Cafés"
+                                className="w-full bg-transparent text-slate-800 font-bold text-sm focus:outline-none placeholder-slate-400"
+                                value={query}
+                                onChange={(e) => setQuery(e.target.value)}
+                            />
+                        </div>
+                    </div>
 
-                <form onSubmit={handleSearch} className="flex flex-col lg:flex-row gap-4 relative z-10">
-                    <div className="flex-1 relative">
-                        <div className="absolute left-4 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center">
-                            <Building2 className="w-4 h-4 text-amber-400" />
+                    <div className="md:col-span-4 bg-slate-50/80 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center gap-3">
+                        <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
+                        <div className="w-full">
+                            <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider">País o Región</label>
+                            <input
+                                type="text"
+                                placeholder="ej. Estados Unidos, México, Colombia"
+                                className="w-full bg-transparent text-slate-800 font-bold text-sm focus:outline-none placeholder-slate-400"
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
+                            />
                         </div>
-                        <input
-                            type="text"
-                            placeholder="¿Qué categoría buscas? (ej. Dentistas, Agencias, Cafés)"
-                            className="w-full pl-16 pr-4 py-5 rounded-2xl bg-white/10 text-white placeholder-gray-400 border border-white/10 focus:bg-white/15 focus:ring-4 focus:ring-amber-500/20 focus:outline-none transition-all font-bold"
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                        />
                     </div>
-                    <div className="flex-1 relative">
-                        <div className="absolute left-4 top-1/2 transform -translate-y-1/2 w-8 h-8 bg-white/5 rounded-lg flex items-center justify-center">
-                            <MapPin className="w-4 h-4 text-blue-400" />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="¿En qué ciudad o zona?"
-                            className="w-full pl-16 pr-4 py-5 rounded-2xl bg-white/10 text-white placeholder-gray-400 border border-white/10 focus:bg-white/15 focus:ring-4 focus:ring-blue-500/20 focus:outline-none transition-all font-bold"
-                            value={location}
-                            onChange={(e) => setLocation(e.target.value)}
-                        />
+
+                    <div className="md:col-span-3 flex gap-2">
+                        <button
+                            type="button"
+                            onClick={handleScanDensity}
+                            disabled={isDensityScanning || isLoading}
+                            className="flex-1 py-3 px-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            {isDensityScanning ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    <Layers className="w-4 h-4" />
+                                    <span>Escanear Ciudades</span>
+                                </>
+                            )}
+                        </button>
+
+                        <button
+                            type="submit"
+                            disabled={isLoading || isDensityScanning}
+                            className="py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
+                            title="Búsqueda directa en ciudad especificada"
+                        >
+                            {isLoading ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <Search className="w-4 h-4" />
+                            )}
+                        </button>
                     </div>
-                    <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black px-12 py-5 rounded-2xl shadow-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:hover:scale-100 flex items-center justify-center gap-3 overflow-hidden"
-                    >
-                        {isLoading ? (
-                            <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                            <>
-                                <Search className="w-6 h-6" />
-                                <span className="tracking-tight uppercase">Cazar Prospectos</span>
-                            </>
-                        )}
-                    </button>
                 </form>
             </div>
 
@@ -463,6 +576,101 @@ export default function LeadHunter() {
                         toast.success('Leads asignados — ve a /leads para verlos.');
                     }}
                 />
+            )}
+
+            {/* ── DENSITY SCANNER MODAL (Human-Designed & Clean) ──────────────────────── */}
+            {isDensityModalOpen && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        
+                        {/* Header Panel */}
+                        <div className="p-6 border-b border-slate-100 flex items-start justify-between">
+                            <div>
+                                <h2 className="text-lg font-bold text-slate-900">Ciudades con más prospectos encontrados</h2>
+                                <p className="text-xs text-slate-500 mt-0.5">Selecciona las ciudades que deseas importar a tu lista de leads.</p>
+                            </div>
+                            <button
+                                onClick={() => setIsDensityModalOpen(false)}
+                                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div className="px-6 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+                            <span className="text-xs font-medium text-slate-600">
+                                {densityResults.filter(d => d.count > 0).length} zonas encontradas en {location}
+                            </span>
+                            <button
+                                onClick={toggleAllDensityCities}
+                                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                            >
+                                {selectedDensityCityIds.size === densityResults.length ? 'Deseleccionar todas' : `Seleccionar todas (${densityResults.length})`}
+                            </button>
+                        </div>
+
+                        {/* Friendly City List */}
+                        <div className="p-6 space-y-3 max-h-[380px] overflow-y-auto bg-slate-50/40">
+                            {densityResults.map((item) => {
+                                const isChecked = selectedDensityCityIds.has(item.id);
+                                return (
+                                    <label
+                                        key={item.id}
+                                        onClick={() => toggleDensityCity(item.id)}
+                                        className={`p-4 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
+                                            isChecked
+                                                ? 'bg-slate-50 border-2 border-indigo-500 shadow-sm'
+                                                : 'bg-white border border-slate-200 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => {}}
+                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                                            />
+                                            <span className="text-sm font-bold text-slate-800">{item.cityName}</span>
+                                            <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-200/60 text-slate-600">
+                                                {item.stateName}
+                                            </span>
+                                        </div>
+                                        <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${
+                                            item.count > 0
+                                                ? 'text-amber-700 bg-amber-50 border-amber-200/60'
+                                                : 'text-slate-400 bg-slate-100 border-slate-200'
+                                        }`}>
+                                            {item.count} prospectos
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+
+                        {/* Footer with friendly CTA */}
+                        <div className="p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div>
+                                <span className="text-sm font-bold text-slate-900 block">
+                                    Total: {densityResults
+                                        .filter(d => selectedDensityCityIds.has(d.id))
+                                        .reduce((sum, item) => sum + item.count, 0)} prospectos seleccionados
+                                </span>
+                                <span className="text-xs text-slate-400 font-medium">Se ignorarán duplicados automáticamente</span>
+                            </div>
+
+                            <button
+                                onClick={handleImportFromDensityModal}
+                                disabled={isImporting}
+                                className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                <span>Importar Leads a mi CRM</span>
+                                <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                    </div>
+                </div>
             )}
         </div>
     );
