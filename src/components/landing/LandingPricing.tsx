@@ -1,53 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { supabase } from '../../services/supabase';
 
-const PLANS = [
+interface PlanDisplay {
+  name: string;
+  slug: string;
+  monthly: number;
+  annual: number;
+  usersES: string;
+  usersEN: string;
+  descES: string;
+  descEN: string;
+  popular?: boolean;
+  color: string;
+  features: string[];
+}
+
+const DEFAULT_PLANS: PlanDisplay[] = [
   {
     name: 'Starter',
     slug: 'starter',
-    monthly: 65,
+    monthly: 59,
     annual: 49,
     usersES: 'Hasta 3 usuarios',
     usersEN: 'Up to 3 users',
     descES: 'Esencial para equipos pequeños que inician.',
     descEN: 'Essential for small teams getting started.',
     color: 'border-gray-200',
-    features: {
-      es: ['Pipeline Kanban visual', 'Cotizador + PDF profesional', '1 AI Bot (WhatsApp/Telegram)', 'Campañas de email', 'Reportes básicos de ventas'],
-      en: ['Visual Kanban pipeline', 'Quote generator + PDF', '1 AI Bot (WhatsApp/Telegram)', 'Email campaigns', 'Basic sales reports'],
-    }
-  },
-  {
-    name: 'Growth',
-    slug: 'growth',
-    monthly: 129,
-    annual: 99,
-    usersES: 'Hasta 8 usuarios',
-    usersEN: 'Up to 8 users',
-    descES: 'La suite completa para escalar sin límites.',
-    descEN: 'The complete suite to scale without limits.',
-    popular: true,
-    color: 'border-red-500',
-    features: {
-      es: ['Todo en Starter', 'Flyer Studio con IA', 'Lead Hunter (Google Maps)', 'Captura TikTok + Meta Leads', 'Workspaces multi-agente', 'Reportes analíticos avanzados'],
-      en: ['Everything in Starter', 'Flyer Studio with AI', 'Lead Hunter (Google Maps)', 'TikTok + Meta Leads capture', 'Multi-agent workspaces', 'Advanced analytics'],
-    }
+    features: ['Pipeline Kanban visual', 'Cotizador + PDF profesional', '1 AI Bot (WhatsApp/Telegram)', 'Campañas de email', 'Reportes básicos de ventas'],
   },
   {
     name: 'Pro',
     slug: 'pro',
-    monthly: 199,
-    annual: 159,
-    usersES: 'Hasta 15 usuarios',
-    usersEN: 'Up to 15 users',
-    descES: 'Arquitectura empresarial para grandes operaciones.',
-    descEN: 'Enterprise architecture for large operations.',
+    monthly: 89,
+    annual: 69,
+    usersES: 'Hasta 10 usuarios',
+    usersEN: 'Up to 10 users',
+    descES: 'Para empresas en crecimiento que necesitan más poder.',
+    descEN: 'For growing businesses that need more power.',
+    popular: true,
+    color: 'border-red-500',
+    features: ['Todo en Starter', 'Marketing Hub', 'AI Consultant', 'Bandeja Omnicanal', 'Webhooks & API', 'Google Calendar Sync'],
+  },
+  {
+    name: 'Enterprise',
+    slug: 'enterprise',
+    monthly: 299,
+    annual: 239,
+    usersES: 'Usuarios ilimitados',
+    usersEN: 'Unlimited users',
+    descES: 'Solución completa para organizaciones que escalan.',
+    descEN: 'Complete solution for scaling organizations.',
     color: 'border-gray-200',
-    features: {
-      es: ['Todo en Growth', 'API REST & Webhooks avanzados', 'Inbox omnicanal unificado', 'Multi-workspace corporativo', 'Workflows visuales automatizados', 'SLA garantizado 99.9%'],
-      en: ['Everything in Growth', 'Advanced REST API & Webhooks', 'Unified omnichannel inbox', 'Corporate multi-workspace', 'Automated visual workflows', 'Guaranteed SLA 99.9%'],
-    }
+    features: ['Todo en Pro', 'Digital Sales Room', 'AI Autonomous Agent', 'Revenue Intelligence', 'SSO & 2FA', 'Audit Log'],
   },
 ];
 
@@ -59,10 +65,10 @@ const COMPARE_ROWS = [
   { featureES: 'Flyer Studio con IA', featureEN: 'Flyer Studio with AI', us: true, hub: false, sf: false },
   { featureES: 'Pipeline Kanban visual', featureEN: 'Visual Kanban pipeline', us: true, hub: true, sf: true },
   { featureES: 'Bandeja omnicanal colaborativa', featureEN: 'Collaborative omnichannel inbox', us: true, hub: true, sf: true },
-  { featureES: 'Precio mensual base', featureEN: 'Base monthly price', us: '$65', hub: '$890', sf: '$150+' },
+  { featureES: 'Precio mensual base', featureEN: 'Base monthly price', us: '$59', hub: '$890', sf: '$150+' },
 ];
 
-const Check = ({ ok, label }: { ok: boolean | string; label?: string }) => {
+const Check = ({ ok }: { ok: boolean | string; label?: string }) => {
   if (typeof ok === 'string') return <span className="text-sm font-black text-gray-800">{ok}</span>;
   return ok
     ? <span className="inline-flex w-6 h-6 rounded-full bg-emerald-100 items-center justify-center">
@@ -74,11 +80,60 @@ const Check = ({ ok, label }: { ok: boolean | string; label?: string }) => {
 };
 
 export default function LandingPricing() {
+  const [plans, setPlans] = useState<PlanDisplay[]>(DEFAULT_PLANS);
   const [annual, setAnnual] = useState(true);
   const navigate = useNavigate();
   const { i18n } = useTranslation();
   const isES = i18n.language?.startsWith('es');
   const t = (es: string, en: string) => isES ? es : en;
+
+  useEffect(() => {
+    async function loadPlans() {
+      try {
+        const { data, error } = await supabase
+          .from('saas_plans')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true });
+
+        if (error || !data || data.length === 0) return;
+
+        const mapped: PlanDisplay[] = data.map((plan, idx) => {
+          const isPopular = plan.slug?.toLowerCase().includes('pro') || plan.slug?.toLowerCase().includes('growth') || idx === 1;
+          
+          let annualMonthly = plan.price_annual;
+          if (plan.price_annual && plan.price_annual > plan.price_monthly) {
+            annualMonthly = Math.round(plan.price_annual / 12);
+          }
+
+          const maxUsersText = plan.max_users >= 100 
+            ? t('Usuarios ilimitados', 'Unlimited users')
+            : t(`Hasta ${plan.max_users} usuarios`, `Up to ${plan.max_users} users`);
+
+          const featureList: string[] = Array.isArray(plan.features) ? plan.features : [];
+
+          return {
+            name: plan.name,
+            slug: plan.slug || `plan-${idx}`,
+            monthly: plan.price_monthly || 0,
+            annual: annualMonthly || 0,
+            usersES: maxUsersText,
+            usersEN: maxUsersText,
+            descES: plan.description || '',
+            descEN: plan.description || '',
+            popular: isPopular,
+            color: isPopular ? 'border-red-500' : 'border-gray-200',
+            features: featureList,
+          };
+        });
+
+        setPlans(mapped);
+      } catch (err) {
+        console.error('Error loading dynamic saas_plans:', err);
+      }
+    }
+    loadPlans();
+  }, [isES]);
 
   return (
     <section className="bg-white py-24 border-b border-gray-100" id="pricing">
@@ -116,7 +171,7 @@ export default function LandingPricing() {
 
         {/* Plans grid */}
         <div className="grid md:grid-cols-3 gap-8 mb-20">
-          {PLANS.map((plan) => (
+          {plans.map((plan) => (
             <div
               key={plan.slug}
               className={`relative rounded-3xl border-2 ${plan.color} p-8 ${plan.popular ? 'shadow-2xl shadow-red-100 bg-white ring-2 ring-red-500' : 'bg-white shadow-sm'} transition-transform hover:-translate-y-1`}
@@ -151,7 +206,7 @@ export default function LandingPricing() {
               </p>
 
               <ul className="space-y-3 mb-8">
-                {plan.features[isES ? 'es' : 'en'].map((f, i) => (
+                {plan.features.map((f, i) => (
                   <li key={i} className="flex items-start gap-3 text-sm text-gray-600">
                     <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth={3} className="w-4 h-4 flex-shrink-0 mt-0.5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
@@ -221,3 +276,4 @@ export default function LandingPricing() {
     </section>
   );
 }
+
