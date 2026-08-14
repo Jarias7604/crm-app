@@ -43,10 +43,9 @@ Deno.serve(async (req) => {
             return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
         }
 
-        const supabase = createClient(
-            Deno.env.get("SUPABASE_URL") ?? "",
-            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-        );
+        const supabaseUrl = Deno.env.get("CRM_SUPABASE_URL") || Deno.env.get("SUPABASE_URL") || "";
+        const supabaseKey = Deno.env.get("CRM_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+        const supabase = createClient(supabaseUrl, supabaseKey);
 
         const { data: campaign, error: campError } = await supabase
             .from("marketing_campaigns").select("*").eq("id", campaignId).single();
@@ -63,7 +62,28 @@ Deno.serve(async (req) => {
         if (filters.specificIds && filters.specificIds.length > 0) {
             query = query.in(filters.idType || 'id', filters.specificIds);
         } else {
-            if (filters.status?.length > 0) query = query.in("status", filters.status.map((s: string) => s.toLowerCase()));
+            if (filters.status?.length > 0) {
+                const statusMap: Record<string, string> = {
+                    'prospecto': 'Prospecto',
+                    'llamada fría': 'Llamada fría',
+                    'en nutrición': 'En Nutrición',
+                    'lead calificado': 'Lead calificado',
+                    'en seguimiento': 'En seguimiento',
+                    'negociación': 'Negociación',
+                    'cerrado': 'Cerrado',
+                    'cliente': 'Cliente',
+                    'perdido': 'Perdido',
+                    'erróneo': 'Erróneo'
+                };
+                const expandedStatuses = Array.from(new Set(
+                    filters.status.flatMap((s: string) => {
+                        const lower = s.toLowerCase();
+                        const title = statusMap[lower] || (s.charAt(0).toUpperCase() + s.slice(1));
+                        return [s, lower, title];
+                    })
+                ));
+                query = query.in("status", expandedStatuses);
+            }
             if (filters.priority && filters.priority !== 'all') query = query.eq("priority", filters.priority);
             if (filters.dateRange === "new") {
                 const d = new Date(); d.setDate(d.getDate() - 30);
