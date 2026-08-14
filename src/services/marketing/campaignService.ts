@@ -187,10 +187,26 @@ export const campaignService = {
                 query = query.gte('created_at', thirtyDaysAgo.toISOString());
             }
             if (filters.status && filters.status.length > 0) {
-                // Normalize to lowercase — DB stores statuses in lowercase (prospecto, cliente, etc.)
-                // This fixes the mismatch when campaigns stored statuses capitalized (Prospecto)
-                const normalizedStatuses = filters.status.map(s => s.toLowerCase());
-                query = query.in('status', normalizedStatuses);
+                const statusMap: Record<string, string> = {
+                    'prospecto': 'Prospecto',
+                    'llamada fría': 'Llamada fría',
+                    'en nutrición': 'En Nutrición',
+                    'lead calificado': 'Lead calificado',
+                    'en seguimiento': 'En seguimiento',
+                    'negociación': 'Negociación',
+                    'cerrado': 'Cerrado',
+                    'cliente': 'Cliente',
+                    'perdido': 'Perdido',
+                    'erróneo': 'Erróneo'
+                };
+                const expandedStatuses = Array.from(new Set(
+                    filters.status.flatMap(s => {
+                        const lower = s.toLowerCase();
+                        const title = statusMap[lower] || (s.charAt(0).toUpperCase() + s.slice(1));
+                        return [s, lower, title];
+                    })
+                ));
+                query = query.in('status', expandedStatuses);
             }
             if (filters.priority && filters.priority !== 'all') {
                 query = query.eq('priority', filters.priority);

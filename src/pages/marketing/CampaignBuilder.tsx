@@ -111,18 +111,17 @@ export default function CampaignBuilder() {
         } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    // NOTE: These values must match the actual DB status values (case-insensitive normalized to lowercase)
-    const possibleStatuses = ["prospecto", "llamada fría", "en nutrición", "lead calificado", "en seguimiento", "negociación", "cerrado", "cliente", "perdido"];
+    const possibleStatuses = ["Prospecto", "Llamada fría", "En Nutrición", "Lead calificado", "En seguimiento", "Negociación", "Cerrado", "Cliente", "Perdido"];
     const statusLabels: Record<string, string> = {
-        "prospecto": "Prospecto",
-        "llamada fría": "Llamada Fría",
-        "en nutrición": "En Nutrición",
-        "lead calificado": "Lead Calificado",
-        "en seguimiento": "En Seguimiento",
-        "negociación": "Negociación",
-        "cerrado": "Cerrado",
-        "cliente": "Cliente",
-        "perdido": "Perdido",
+        "Prospecto": "Prospecto",
+        "Llamada fría": "Llamada Fría",
+        "En Nutrición": "En Nutrición",
+        "Lead calificado": "Lead Calificado",
+        "En seguimiento": "En Seguimiento",
+        "Negociación": "Negociación",
+        "Cerrado": "Cerrado",
+        "Cliente": "Cliente",
+        "Perdido": "Perdido",
     };
     const [availableIndustries, setAvailableIndustries] = useState<string[]>([]);
     const [showIndustryModal, setShowIndustryModal] = useState(false);
