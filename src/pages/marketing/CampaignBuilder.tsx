@@ -56,6 +56,8 @@ export default function CampaignBuilder() {
         if (campaignId) {
             campaignService.getCampaignById(campaignId).then(campaign => {
                 setSelectedChannel(campaign.type as any);
+                const specIds = campaign.audience_filters?.specificIds || [];
+                if (specIds.length > 0) setIsDirectConnect(true);
                 setFormData({
                     name: campaign.name || '',
                     subject: campaign.subject || '',
@@ -66,7 +68,7 @@ export default function CampaignBuilder() {
                         industry: campaign.audience_filters?.industry || [],
                         dateRange: campaign.audience_filters?.dateRange || 'all',
                         priority: campaign.audience_filters?.priority || 'all',
-                        specificIds: campaign.audience_filters?.specificIds || [],
+                        specificIds: specIds,
                         idType: campaign.audience_filters?.idType || 'id'
                     }
                 });
@@ -615,12 +617,20 @@ export default function CampaignBuilder() {
                                             <button
                                                 key={status}
                                                 onClick={() => {
+                                                    setIsDirectConnect(false);
                                                     const current = formData.audience_filter?.status || [];
                                                     // Always store lowercase to match DB
                                                     const newStatus = isSelected
                                                         ? current.filter(s => s.toLowerCase() !== status.toLowerCase())
                                                         : [...current.filter(s => s.toLowerCase() !== status.toLowerCase()), status];
-                                                    setFormData({ ...formData, audience_filter: { ...formData.audience_filter, status: newStatus } });
+                                                    setFormData({
+                                                        ...formData,
+                                                        audience_filter: {
+                                                            ...formData.audience_filter,
+                                                            status: newStatus,
+                                                            specificIds: []
+                                                        }
+                                                    });
                                                 }}
                                                 className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all border ${isSelected ? 'bg-indigo-600 text-white border-transparent shadow-md' : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50'
                                                     }`}
