@@ -22,40 +22,40 @@ Deno.serve(async (req) => {
         )
 
         if (msgId) {
-            // 1. Mark message as opened/clicked
-            const updateData: any = {}
-            if (type === 'open') updateData.status = 'opened'
-            if (type === 'click') updateData.status = 'clicked'
+            const userAgent = (req.headers.get('user-agent') || '').toLowerCase();
+            const isKnownBot = /bot|spider|crawler|googleimageproxy|yahoo|microsoft|outlook|proxy|security|scanner|headless|python|curl|fetch|ping/i.test(userAgent);
 
-            const { data: msg } = await supabase
+            // Fetch current message to check creation time and status
+            const { data: fullMsg } = await supabase
                 .from('marketing_messages')
-                .update({
-                    status: type === 'open' ? 'opened' : 'clicked',
-                    updated_at: new Date().toISOString()
-                })
+                .select('created_at, status, metadata')
                 .eq('id', msgId)
-                .select('conversation_id')
-                .single()
+                .single();
 
-            // 2. Increment campaign stats
-            if (msg) {
-                // Find the campaign id from conversation -> metadata or similar
-                // Since we don't have a direct link in marketing_messages to campaign (it's via conversation or metadata)
-                // We'll use the metadata in marketing_messages where we'll store campaign_id
-                const { data: fullMsg } = await supabase
-                    .from('marketing_messages')
-                    .select('metadata')
-                    .eq('id', msgId)
-                    .single()
+            const isInstantScan = fullMsg?.created_at && (Date.now() - new Date(fullMsg.created_at).getTime()) < 3000;
 
-                const campaignId = fullMsg?.metadata?.campaign_id
-                if (campaignId) {
-                    const statsKey = type === 'open' ? 'opened' : 'clicked'
-                    // Dynamic update of jsonb stats
-                    await supabase.rpc('increment_campaign_stats', {
-                        campaign_id: campaignId,
-                        stat_key: statsKey
-                    })
+            if (type === 'open' && (isKnownBot || isInstantScan)) {
+                console.log(`[Tracking] Suppressed bot/pre-fetch open for ${msgId} (UA: ${userAgent})`);
+            } else {
+                const targetStatus = type === 'click' ? 'clicked' : 'opened';
+                // Don't overwrite 'clicked' with 'opened'
+                if (fullMsg && fullMsg.status !== 'clicked') {
+                    await supabase
+                        .from('marketing_messages')
+                        .update({
+                            status: targetStatus,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', msgId);
+
+                    const campaignId = fullMsg?.metadata?.campaign_id;
+                    if (campaignId && fullMsg.status !== targetStatus) {
+                        const statsKey = type === 'open' ? 'opened' : 'clicked';
+                        await supabase.rpc('increment_campaign_stats', {
+                            campaign_id: campaignId,
+                            stat_key: statsKey
+                        });
+                    }
                 }
             }
         }
