@@ -16,49 +16,59 @@ Deno.serve(async (req) => {
         const msgId = url.searchParams.get('mid')
         const redirectUrl = url.searchParams.get('url')
 
-        const supabase = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
+        const supabaseUrl = Deno.env.get('CRM_SUPABASE_URL') || Deno.env.get('SUPABASE_URL') || '';
+        const supabaseKey = Deno.env.get('CRM_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        const isDebug = url.searchParams.get('debug') === 'true';
+        let debugInfo: any = {};
 
         if (msgId) {
             const userAgent = (req.headers.get('user-agent') || '').toLowerCase();
-            // Only block explicit bots/crawlers, NOT legitimate email clients like Outlook, Apple Mail or Gmail
-            const isKnownBot = /bot|spider|crawler|bytespider|headless|phantomjs|puppeteer|python-requests|curl|wget/i.test(userAgent);
+            // Only block explicit automated bots/crawlers
+            const isKnownBot = /bot|spider|crawler|bytespider|headless|phantomjs|puppeteer|python-requests|wget/i.test(userAgent);
 
             // Fetch current message to check creation time and status
-            const { data: fullMsg } = await supabase
+            const { data: fullMsg, error: fetchErr } = await supabase
                 .from('marketing_messages')
                 .select('created_at, status, metadata')
                 .eq('id', msgId)
                 .single();
 
-            const isInstantScan = fullMsg?.created_at && (Date.now() - new Date(fullMsg.created_at).getTime()) < 3000;
+            debugInfo = { userAgent, isKnownBot, fetchErr, fullMsg };
 
-            if (type === 'open' && (isKnownBot || isInstantScan)) {
-                console.log(`[Tracking] Suppressed bot/pre-fetch open for ${msgId} (UA: ${userAgent})`);
+            if (type === 'open' && isKnownBot) {
+                console.log(`[Tracking] Suppressed bot open for ${msgId} (UA: ${userAgent})`);
+                debugInfo.action = 'suppressed_bot';
             } else {
                 const targetStatus = type === 'click' ? 'clicked' : 'opened';
+                debugInfo.targetStatus = targetStatus;
                 // Don't overwrite 'clicked' with 'opened'
                 if (fullMsg && fullMsg.status !== 'clicked') {
-                    await supabase
+                    const { error: updErr } = await supabase
                         .from('marketing_messages')
-                        .update({
-                            status: targetStatus,
-                            updated_at: new Date().toISOString()
-                        })
+                        .update({ status: targetStatus })
                         .eq('id', msgId);
+
+                    debugInfo.updErr = updErr;
 
                     const campaignId = fullMsg?.metadata?.campaign_id;
                     if (campaignId && fullMsg.status !== targetStatus) {
                         const statsKey = type === 'open' ? 'opened' : 'clicked';
-                        await supabase.rpc('increment_campaign_stats', {
+                        const { error: rpcErr } = await supabase.rpc('increment_campaign_stats', {
                             campaign_id: campaignId,
                             stat_key: statsKey
                         });
+                        debugInfo.rpcErr = rpcErr;
                     }
                 }
             }
+        }
+
+        if (isDebug) {
+            return new Response(JSON.stringify(debugInfo, null, 2), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
         }
 
         // Response
