@@ -23,7 +23,8 @@ Deno.serve(async (req) => {
 
         if (msgId) {
             const userAgent = (req.headers.get('user-agent') || '').toLowerCase();
-            const isKnownBot = /bot|spider|crawler|googleimageproxy|yahoo|microsoft|outlook|proxy|security|scanner|headless|python|curl|fetch|ping/i.test(userAgent);
+            // Only block explicit bots/crawlers, NOT legitimate email clients like Outlook, Apple Mail or Gmail
+            const isKnownBot = /bot|spider|crawler|bytespider|headless|phantomjs|puppeteer|python-requests|curl|wget/i.test(userAgent);
 
             // Fetch current message to check creation time and status
             const { data: fullMsg } = await supabase
