@@ -27,6 +27,7 @@ export default function LeadHunter() {
     const [isDensityModalOpen, setIsDensityModalOpen] = useState(false);
     const [densityResults, setDensityResults] = useState<RegionalDensity[]>([]);
     const [selectedDensityCityIds, setSelectedDensityCityIds] = useState<Set<string>>(new Set());
+    const [densitySearchFilter, setDensitySearchFilter] = useState('');
 
     useEffect(() => {
         leadsService.getTeamMembers().then(data => setTeamMembers(data || [])).catch(() => {});
@@ -586,8 +587,8 @@ export default function LeadHunter() {
                         {/* Header Panel */}
                         <div className="p-6 border-b border-slate-100 flex items-start justify-between">
                             <div>
-                                <h2 className="text-lg font-bold text-slate-900">Ciudades con más prospectos encontrados</h2>
-                                <p className="text-xs text-slate-500 mt-0.5">Selecciona las ciudades que deseas importar a tu lista de leads.</p>
+                                <h2 className="text-lg font-bold text-slate-900">Ciudades y Regiones con más prospectos encontrados</h2>
+                                <p className="text-xs text-slate-500 mt-0.5">Selecciona las zonas que deseas importar a tu lista de leads.</p>
                             </div>
                             <button
                                 onClick={() => setIsDensityModalOpen(false)}
@@ -597,55 +598,75 @@ export default function LeadHunter() {
                             </button>
                         </div>
 
-                        {/* Quick Actions */}
-                        <div className="px-6 py-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
-                            <span className="text-xs font-medium text-slate-600">
-                                {densityResults.filter(d => d.count > 0).length} zonas encontradas en {location}
-                            </span>
-                            <button
-                                onClick={toggleAllDensityCities}
-                                className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
-                            >
-                                {selectedDensityCityIds.size === densityResults.length ? 'Deseleccionar todas' : `Seleccionar todas (${densityResults.length})`}
-                            </button>
+                        {/* Search & Quick Actions Bar */}
+                        <div className="px-6 py-3 bg-slate-50/80 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div className="relative w-full sm:w-64">
+                                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                <input
+                                    type="text"
+                                    placeholder="Filtrar ciudad o estado..."
+                                    value={densitySearchFilter}
+                                    onChange={(e) => setDensitySearchFilter(e.target.value)}
+                                    className="w-full pl-9 pr-3 py-1.5 bg-white rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+                                <span className="text-xs font-medium text-slate-600">
+                                    {densityResults.filter(d => d.count > 0).length} zonas en {location}
+                                </span>
+                                <button
+                                    onClick={toggleAllDensityCities}
+                                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 shrink-0"
+                                >
+                                    {selectedDensityCityIds.size === densityResults.length ? 'Deseleccionar todas' : `Seleccionar todas (${densityResults.length})`}
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Friendly City List */}
-                        <div className="p-6 space-y-3 max-h-[380px] overflow-y-auto bg-slate-50/40">
-                            {densityResults.map((item) => {
-                                const isChecked = selectedDensityCityIds.has(item.id);
-                                return (
-                                    <label
-                                        key={item.id}
-                                        onClick={() => toggleDensityCity(item.id)}
-                                        className={`p-4 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
-                                            isChecked
-                                                ? 'bg-slate-50 border-2 border-indigo-500 shadow-sm'
-                                                : 'bg-white border border-slate-200 hover:bg-slate-50'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={isChecked}
-                                                onChange={() => {}}
-                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
-                                            />
-                                            <span className="text-sm font-bold text-slate-800">{item.cityName}</span>
-                                            <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-200/60 text-slate-600">
-                                                {item.stateName}
+                        {/* Friendly City List with Filter & Descending Sort */}
+                        <div className="p-6 space-y-3 max-h-[400px] overflow-y-auto bg-slate-50/40">
+                            {[...densityResults]
+                                .filter(item => {
+                                    if (!densitySearchFilter) return true;
+                                    const term = densitySearchFilter.toLowerCase();
+                                    return item.cityName.toLowerCase().includes(term) || item.stateName.toLowerCase().includes(term);
+                                })
+                                .sort((a, b) => b.count - a.count)
+                                .map((item) => {
+                                    const isChecked = selectedDensityCityIds.has(item.id);
+                                    return (
+                                        <label
+                                            key={item.id}
+                                            onClick={() => toggleDensityCity(item.id)}
+                                            className={`p-3.5 rounded-xl flex items-center justify-between cursor-pointer transition-all ${
+                                                isChecked
+                                                    ? 'bg-slate-50 border-2 border-indigo-500 shadow-sm'
+                                                    : 'bg-white border border-slate-200 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {}}
+                                                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                                                />
+                                                <span className="text-sm font-bold text-slate-800">{item.cityName}</span>
+                                                <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-200/60 text-slate-600">
+                                                    {item.stateName}
+                                                </span>
+                                            </div>
+                                            <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${
+                                                item.count > 0
+                                                    ? 'text-amber-700 bg-amber-50 border-amber-200/60'
+                                                    : 'text-slate-400 bg-slate-100 border-slate-200'
+                                            }`}>
+                                                {item.count.toLocaleString()} prospectos
                                             </span>
-                                        </div>
-                                        <span className={`text-xs font-semibold px-3 py-1 rounded-full border ${
-                                            item.count > 0
-                                                ? 'text-amber-700 bg-amber-50 border-amber-200/60'
-                                                : 'text-slate-400 bg-slate-100 border-slate-200'
-                                        }`}>
-                                            {item.count} prospectos
-                                        </span>
-                                    </label>
-                                );
-                            })}
+                                        </label>
+                                    );
+                                })}
                         </div>
 
                         {/* Footer with friendly CTA */}
@@ -654,7 +675,7 @@ export default function LeadHunter() {
                                 <span className="text-sm font-bold text-slate-900 block">
                                     Total: {densityResults
                                         .filter(d => selectedDensityCityIds.has(d.id))
-                                        .reduce((sum, item) => sum + item.count, 0)} prospectos seleccionados
+                                        .reduce((sum, item) => sum + item.count, 0).toLocaleString()} prospectos seleccionados
                                 </span>
                                 <span className="text-xs text-slate-400 font-medium">Se ignorarán duplicados automáticamente</span>
                             </div>
@@ -664,7 +685,9 @@ export default function LeadHunter() {
                                 disabled={isImporting}
                                 className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                             >
-                                <span>Importar Leads a mi CRM</span>
+                                <span>Importar {densityResults
+                                    .filter(d => selectedDensityCityIds.has(d.id))
+                                    .reduce((sum, item) => sum + item.count, 0).toLocaleString()} Leads a mi CRM</span>
                                 <ArrowRight className="w-4 h-4" />
                             </button>
                         </div>
