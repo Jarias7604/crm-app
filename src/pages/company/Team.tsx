@@ -214,6 +214,7 @@ export default function Team() {
         setIsSaving(true);
         try {
             await teamService.updateMember(editingMember.id, {
+                email: editingMember.email,
                 full_name: editingMember.full_name,
                 phone: editingMember.phone,
                 role: selectedRole?.base_role || editingMember.role,
@@ -811,7 +812,11 @@ export default function Team() {
                                         <div className="space-y-6">
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Nombre Completo</label>
-                                                <Input value={editingMember.full_name || ''} onChange={e => setEditingMember({ ...editingMember, full_name: e.target.value })} className="h-14 rounded-xl shadow-inner bg-gray-50/50 font-bold" />
+                                                <Input value={editingMember.full_name || ''} onChange={e => setEditingMember({ ...editingMember, full_name: e.target.value })} className="h-14 rounded-xl shadow-inner bg-gray-50/50 font-bold" placeholder="Nombre completo..." />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Correo Electrónico</label>
+                                                <Input type="email" value={editingMember.email || ''} onChange={e => setEditingMember({ ...editingMember, email: e.target.value })} className="h-14 rounded-xl shadow-inner bg-gray-50/50 font-bold" placeholder="correo@empresa.com" />
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Número de Contacto</label>

@@ -89,6 +89,7 @@ export const teamService = {
 
     // Update member details
     async updateMember(userId: string, updates: {
+        email?: string | null;
         full_name?: string | null;
         phone?: string | null;
         role?: Role;
