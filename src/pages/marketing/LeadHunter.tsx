@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap, Users, X, ArrowRight, Layers, Sparkles, ChevronDown } from 'lucide-react';
+import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap, Users, X, ArrowRight, Layers, Sparkles, ChevronDown, ShieldCheck } from 'lucide-react';
 import { leadDiscoveryService, OFFICIAL_CATEGORIES, type DiscoveredLead, type RegionalDensity } from '../../services/marketing/leadDiscovery';
 import { leadsService } from '../../services/leads';
 import { useAuth } from '../../auth/AuthProvider';
@@ -285,13 +285,13 @@ export default function LeadHunter() {
             {/* Sleek Minimalist Enterprise Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-1 pb-1">
                 <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                        <Link to="/marketing" className="text-slate-400 hover:text-indigo-600 font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1">
+                    <div className="flex items-center gap-2.5 mb-1">
+                        <Link to="/marketing" className="text-slate-400 hover:text-indigo-600 font-extrabold text-sm uppercase tracking-wider transition-colors flex items-center gap-1">
                             Marketing
                         </Link>
-                        <span className="text-slate-300 font-bold text-xs">/</span>
-                        <span className="text-slate-700 font-black text-sm tracking-tight">Lead Hunter</span>
-                        <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">PRO</span>
+                        <span className="text-slate-300 font-bold text-sm">/</span>
+                        <span className="text-slate-900 font-black text-xl tracking-tight">Lead Hunter</span>
+                        <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-xs">PRO</span>
                     </div>
                     <p className="text-slate-500 text-xs font-medium">Búsqueda masiva y escaneo regional de prospectos en tiempo real con Inteligencia Artificial.</p>
                 </div>
@@ -550,25 +550,46 @@ export default function LeadHunter() {
                 </form>
 
                 {/* Sub-bar for Deep Scan Mode Control */}
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-500">
+                <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-500">
                     <div className="flex items-center gap-3">
-                        <span className="text-slate-400 uppercase text-[10px] tracking-wider font-bold">Modo de Captura:</span>
+                        <span className="text-slate-400 uppercase text-[10px] tracking-wider font-extrabold">Modo de Captura:</span>
                         <button
                             type="button"
                             onClick={() => setIsDeepScan(!isDeepScan)}
-                            className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 border ${
+                            className={`px-3 py-1 rounded-lg transition-all flex items-center gap-2 border text-xs font-bold ${
                                 isDeepScan
-                                    ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-xs'
-                                    : 'bg-slate-50 border-slate-200 text-slate-600'
+                                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 shadow-2xs'
+                                    : 'bg-slate-50 border-slate-200/80 text-slate-600 hover:bg-slate-100/60'
                             }`}
                         >
-                            <Zap className={`w-3.5 h-3.5 ${isDeepScan ? 'text-amber-600 fill-current' : 'text-slate-400'}`} />
-                            <span>{isDeepScan ? '🔍 Escaneo Profundo 100% (Multi-Sinónimos + Sub-Zonas)' : '⚡ Escaneo Estándar'}</span>
+                            {isDeepScan ? (
+                                <>
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                    <span>Escaneo Profundo 100% (Multi-Sinónimos + Sub-Zonas)</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Zap className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <span>Escaneo Estándar</span>
+                                </>
+                            )}
                         </button>
                     </div>
-                    <span className="text-[11px] text-slate-400 hidden sm:block">
-                        {isDeepScan ? '✅ Captura exhaustiva en todos los municipios y sinónimos sin perder nada' : '⚡ Búsqueda rápida por nombre directo'}
-                    </span>
+
+                    {/* Senior Glassmorphic Badge replacing plain green checkmark */}
+                    <div className="hidden sm:flex items-center">
+                        {isDeepScan ? (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-[11px] font-extrabold backdrop-blur-md animate-in fade-in duration-200">
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span>Cobertura 100% Nacional • Todos los Municipios + Sinónimos</span>
+                            </div>
+                        ) : (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[11px] font-bold">
+                                <Zap className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span>Búsqueda directa por ciudad específica</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
