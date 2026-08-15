@@ -564,6 +564,7 @@ class LeadDiscoveryService {
             email: string | null;
             phone: string | null;
             source: string;
+            industry: string | null;
             status: LeadStatus;          // TypeScript enforces valid TitleCase status
             company_id: string;
             google_place_id: string;
@@ -574,6 +575,7 @@ class LeadDiscoveryService {
             email: lead.email || null,
             phone: lead.phone || null,
             source: 'Lead Hunter AI',
+            industry: lead.category || 'Iglesias y Congregaciones',
             status: 'Prospecto',         // LeadStatus — TitleCase enforced by type
             company_id: companyId,
             google_place_id: lead.id,
@@ -604,6 +606,7 @@ class LeadDiscoveryService {
                     email: string | null;
                     phone: string | null;
                     source: string;
+                    industry: string | null;
                     status: LeadStatus;  // TypeScript enforces valid TitleCase status
                     company_id: string;
                     google_place_id: string;
@@ -614,6 +617,7 @@ class LeadDiscoveryService {
                     email: lead.email || null,
                     phone: lead.phone || null,
                     source: 'Lead Hunter AI',
+                    industry: lead.category || 'Iglesias y Congregaciones',
                     status: 'Prospecto',     // LeadStatus — TitleCase enforced by type
                     company_id: companyId,
                     google_place_id: lead.id,
