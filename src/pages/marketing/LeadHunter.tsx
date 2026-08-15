@@ -281,62 +281,50 @@ export default function LeadHunter() {
     };
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex justify-between items-center bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm transition-all hover:shadow-md">
-                <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center">
-                        <Search className="w-8 h-8 text-amber-500" />
+        <div className="space-y-4">
+            {/* Sleek Minimalist Enterprise Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-1 pb-1">
+                <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                        <Link to="/marketing" className="text-slate-400 hover:text-indigo-600 font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1">
+                            Marketing
+                        </Link>
+                        <span className="text-slate-300 font-bold text-xs">/</span>
+                        <span className="text-slate-700 font-black text-sm tracking-tight">Lead Hunter</span>
+                        <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">PRO</span>
                     </div>
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <Link to="/marketing" className="text-gray-400 hover:text-blue-600 font-bold text-xs uppercase tracking-widest transition-colors flex items-center gap-1">
-                                ↞ Dashboard de Marketing
-                            </Link>
-                        </div>
-                        <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Lead Hunter AI <span className="text-amber-500">PRO</span></h1>
-                        <p className="text-gray-500 font-medium text-sm">Escaneo masivo de prospectos mediante Inteligencia Artificial.</p>
-                    </div>
+                    <p className="text-slate-500 text-xs font-medium">Búsqueda masiva y escaneo regional de prospectos en tiempo real con Inteligencia Artificial.</p>
                 </div>
 
+                {/* Bulk selection & action group */}
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setShowFilters(!showFilters)}
-                        className={`p-4 rounded-2xl border transition-all flex items-center gap-2 font-bold text-sm ${showFilters ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50'
-                            }`}
-                    >
-                        <Filter className="w-5 h-5" />
-                        Filtros Avanzados
-                    </button>
-
-                    {/* Asignar por % — appears when results are loaded */}
                     {filteredResults.length > 0 && !isLoading && (
                         <button
                             onClick={() => setIsBulkAssignOpen(true)}
-                            className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all flex items-center gap-2 font-bold text-sm"
+                            className="px-3.5 py-2 rounded-xl border border-indigo-200 bg-indigo-50/80 text-indigo-700 hover:bg-indigo-100 transition-all flex items-center gap-2 font-bold text-xs shadow-xs"
                         >
-                            <Users className="w-5 h-5" />
-                            Asignar Leads
+                            <Users className="w-4 h-4" />
+                            <span>Asignar Leads</span>
                         </button>
                     )}
 
                     {selectedIds.size > 0 && (
-                        <div className="flex items-center gap-4 bg-[#0f172a] p-1.5 pl-6 rounded-2xl animate-in fade-in slide-in-from-right-4 duration-300">
-                            <span className="text-white font-bold text-sm">{selectedIds.size} seleccionados</span>
+                        <div className="flex items-center gap-3 bg-[#0f172a] p-1.5 pl-4 rounded-xl animate-in fade-in slide-in-from-right-4 duration-300">
+                            <span className="text-white font-bold text-xs">{selectedIds.size} sel.</span>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => handleImportBulk(false)}
                                     disabled={isImporting || isStartingCampaign}
-                                    className="bg-white/10 hover:bg-white/20 text-white font-bold px-4 py-3 rounded-xl transition-all flex items-center gap-2 disabled:opacity-50 border border-white/10"
+                                    className="bg-white/10 hover:bg-white/20 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1.5 disabled:opacity-50 border border-white/10"
                                 >
-                                    <Download className="w-5 h-5 text-amber-500" /> Importar
+                                    <Download className="w-3.5 h-3.5 text-amber-500" /> Importar
                                 </button>
                                 <button
                                     onClick={() => handleImportBulk(true)}
                                     disabled={isImporting || isStartingCampaign}
-                                    className="bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white font-black px-6 py-3 rounded-xl shadow-lg shadow-orange-500/30 transition-all flex items-center gap-2 disabled:opacity-50"
+                                    className="bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white font-black px-4 py-1.5 rounded-lg text-xs shadow-md shadow-orange-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50"
                                 >
-                                    <Zap className="w-5 h-5" /> Iniciar Campaña
+                                    <Zap className="w-3.5 h-3.5" /> Campaña
                                 </button>
                             </div>
                         </div>
@@ -346,23 +334,23 @@ export default function LeadHunter() {
 
             {/* Filters Sub-Panel */}
             {showFilters && (
-                <div className="bg-white p-6 rounded-[2rem] border border-amber-100 shadow-sm animate-in slide-in-from-top-4 duration-300 flex flex-wrap gap-8 items-center">
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Calificación Mínima</label>
-                        <div className="flex items-center gap-2">
+                <div className="bg-white p-4 rounded-2xl border border-amber-100 shadow-sm animate-in slide-in-from-top-4 duration-300 flex flex-wrap gap-6 items-center">
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Calificación Mínima</label>
+                        <div className="flex items-center gap-1.5">
                             {[1, 2, 3, 4, 5].map(star => (
                                 <button
                                     key={star}
                                     onClick={() => setFilters({ ...filters, minRating: star })}
-                                    className={`p-2 rounded-lg transition-colors ${filters.minRating >= star ? 'text-amber-500' : 'text-gray-200'}`}
+                                    className={`p-1.5 rounded-lg transition-colors ${filters.minRating >= star ? 'text-amber-500' : 'text-slate-200'}`}
                                 >
-                                    <Star className={`w-6 h-6 ${filters.minRating >= star ? 'fill-current' : ''}`} />
+                                    <Star className={`w-5 h-5 ${filters.minRating >= star ? 'fill-current' : ''}`} />
                                 </button>
                             ))}
                             {filters.minRating > 0 && (
                                 <button
                                     onClick={() => setFilters({ ...filters, minRating: 0 })}
-                                    className="text-xs font-bold text-gray-400 hover:text-red-500 ml-2"
+                                    className="text-xs font-bold text-slate-400 hover:text-red-500 ml-2"
                                 >
                                     Limpiar
                                 </button>
@@ -370,34 +358,34 @@ export default function LeadHunter() {
                         </div>
                     </div>
 
-                    <div className="h-12 w-px bg-gray-100 hidden md:block" />
+                    <div className="h-10 w-px bg-slate-100 hidden md:block" />
 
-                    <div className="flex gap-4">
+                    <div className="flex gap-2">
                         <button
                             onClick={() => setFilters({ ...filters, hasPhone: !filters.hasPhone })}
-                            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all border ${filters.hasPhone ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'
+                            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all border ${filters.hasPhone ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100'
                                 }`}
                         >
-                            <Phone className="w-4 h-4 inline mr-2" /> Solo con Teléfono
+                            <Phone className="w-3.5 h-3.5 inline mr-1.5" /> Solo con Teléfono
                         </button>
                         <button
                             onClick={() => setFilters({ ...filters, hasWebsite: !filters.hasWebsite })}
-                            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all border ${filters.hasWebsite ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'
+                            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all border ${filters.hasWebsite ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100'
                                 }`}
                         >
-                            <Globe className="w-4 h-4 inline mr-2" /> Solo con Web
+                            <Globe className="w-3.5 h-3.5 inline mr-1.5" /> Solo con Web
                         </button>
                         <button
                             onClick={() => setFilters({ ...filters, hasEmail: !filters.hasEmail })}
-                            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all border ${filters.hasEmail ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'
+                            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all border ${filters.hasEmail ? 'bg-green-50 border-green-200 text-green-700' : 'bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100'
                                 }`}
                         >
-                            <Mail className="w-4 h-4 inline mr-2" /> Solo con Email
+                            <Mail className="w-3.5 h-3.5 inline mr-1.5" /> Solo con Email
                         </button>
                     </div>
 
                     <div className="flex-1 text-right">
-                        <span className="text-sm font-bold text-gray-400 italic">
+                        <span className="text-xs font-bold text-slate-400 italic">
                             Filtrando {filteredResults.length} de {results.length} resultados
                         </span>
                     </div>
@@ -405,7 +393,7 @@ export default function LeadHunter() {
             )}
 
             {/* Search Bar - Symmetrical Unified Inputs with Floating Micro-Labels */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm space-y-3">
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 shadow-xs space-y-3">
                 <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
                     
                     {/* 1. Rubro / Categoría Selector (Unified Floating Card) */}
@@ -536,7 +524,7 @@ export default function LeadHunter() {
                         <button
                             type="submit"
                             disabled={isLoading || isDensityScanning}
-                            className="w-[54px] h-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center disabled:opacity-50 shrink-0"
+                            className="w-[48px] h-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center disabled:opacity-50 shrink-0"
                             title="Búsqueda directa en ciudad especificada"
                         >
                             {isLoading ? (
@@ -544,6 +532,19 @@ export default function LeadHunter() {
                             ) : (
                                 <Search className="w-4 h-4" />
                             )}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`w-[48px] h-full rounded-xl border font-bold text-xs transition-all flex items-center justify-center shrink-0 ${
+                                showFilters 
+                                    ? 'bg-amber-500 text-white border-amber-500 shadow-sm' 
+                                    : 'bg-slate-50/80 hover:bg-slate-100/80 border-slate-200/80 text-slate-500 hover:text-slate-800'
+                            }`}
+                            title="Filtros Avanzados (Teléfono, Email, Rating)"
+                        >
+                            <Filter className="w-4 h-4" />
                         </button>
                     </div>
                 </form>
