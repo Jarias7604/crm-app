@@ -67,6 +67,11 @@ export default function LeadHunter() {
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isDeepScan) {
+            handleScanDensity();
+            return;
+        }
+
         if (!query || !location) {
             toast.error('Por favor ingresa qué buscas y dónde.');
             return;
@@ -503,34 +508,20 @@ export default function LeadHunter() {
                         </div>
                     </div>
 
-                    {/* 4. Botones de Acción (Matching Symmetrical Height) */}
+                    {/* 4. Botón Único de Acción Principal + Filtros */}
                     <div className="md:col-span-3 h-[54px] flex gap-2">
                         <button
-                            type="button"
-                            onClick={handleScanDensity}
+                            type="submit"
                             disabled={isDensityScanning || isLoading}
-                            className="flex-1 h-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                            className="flex-1 h-full bg-gradient-to-r from-indigo-600 via-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                         >
-                            {isDensityScanning ? (
+                            {isDensityScanning || isLoading ? (
                                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             ) : (
                                 <>
-                                    <Layers className="w-4 h-4" />
-                                    <span>Escanear Zonas</span>
+                                    <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                                    <span>{isDeepScan ? 'Escanear Zonas' : 'Cazar Leads'}</span>
                                 </>
-                            )}
-                        </button>
-
-                        <button
-                            type="submit"
-                            disabled={isLoading || isDensityScanning}
-                            className="w-[48px] h-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center disabled:opacity-50 shrink-0"
-                            title="Búsqueda directa en ciudad especificada"
-                        >
-                            {isLoading ? (
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                                <Search className="w-4 h-4" />
                             )}
                         </button>
 
