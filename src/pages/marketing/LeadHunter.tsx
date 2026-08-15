@@ -404,21 +404,26 @@ export default function LeadHunter() {
                 </div>
             )}
 
-            {/* Search Bar - Enhanced with Category Selector & Deep Crawl Mode */}
+            {/* Search Bar - Symmetrical Unified Inputs with Floating Micro-Labels */}
             <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm space-y-3">
                 <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                    {/* Rubro / Categoría Selector (Modern Custom Popover) */}
+                    
+                    {/* 1. Rubro / Categoría Selector (Unified Floating Card) */}
                     <div ref={categoryDropdownRef} className="md:col-span-3 relative">
                         <button
                             type="button"
                             onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
-                            className="w-full bg-slate-50/80 hover:bg-slate-100/80 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center justify-between gap-2 text-left transition-all group"
+                            className={`w-full h-[54px] bg-slate-50/80 hover:bg-slate-100/80 rounded-xl px-3.5 py-2 border transition-all flex items-center justify-between gap-2.5 text-left group ${
+                                isCategoryDropdownOpen ? 'bg-white border-indigo-500 ring-4 ring-indigo-500/10 shadow-xs' : 'border-slate-200/80'
+                            }`}
                         >
-                            <div className="flex items-center gap-2.5 overflow-hidden">
-                                <Sparkles className="w-4 h-4 text-amber-500 shrink-0 group-hover:scale-110 transition-transform" />
-                                <div className="truncate">
-                                    <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider leading-none mb-0.5">Rubro u Oficio</label>
-                                    <span className="text-slate-800 font-bold text-xs truncate block flex items-center gap-1.5">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                <Sparkles className={`w-4 h-4 shrink-0 transition-all ${isCategoryDropdownOpen ? 'text-indigo-600 scale-110' : 'text-amber-500 group-hover:scale-110'}`} />
+                                <div className="min-w-0 flex-1">
+                                    <label className="block text-[10px] text-slate-400 font-extrabold uppercase tracking-wider leading-none mb-1 cursor-pointer">
+                                        Rubro u Oficio
+                                    </label>
+                                    <span className="text-slate-900 font-bold text-xs sm:text-sm truncate block leading-none">
                                         {(() => {
                                             const activeCat = OFFICIAL_CATEGORIES.find(c => c.key === selectedCategory);
                                             if (!activeCat) return 'Seleccionar Rubro...';
@@ -473,15 +478,17 @@ export default function LeadHunter() {
                         )}
                     </div>
 
-                    {/* Término Específico */}
-                    <div className="md:col-span-3 bg-slate-50/80 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center gap-3">
-                        <Building2 className="w-5 h-5 text-slate-400 shrink-0" />
-                        <div className="w-full">
-                            <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Término de Búsqueda</label>
+                    {/* 2. Término Específico (Unified Floating Card) */}
+                    <div className="md:col-span-3 h-[54px] bg-slate-50/80 hover:bg-slate-100/60 focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center gap-2.5 transition-all group">
+                        <Building2 className="w-4 h-4 text-slate-400 shrink-0 group-focus-within:text-indigo-600 transition-colors" />
+                        <div className="min-w-0 flex-1 flex flex-col justify-center">
+                            <label className="block text-[10px] text-slate-400 font-extrabold uppercase tracking-wider leading-none mb-1">
+                                Término de Búsqueda
+                            </label>
                             <input
                                 type="text"
                                 placeholder="ej. Iglesias cristianas, Dentistas, Cafés"
-                                className="w-full bg-transparent text-slate-800 font-bold text-sm focus:outline-none placeholder-slate-400"
+                                className="w-full bg-transparent text-slate-900 font-bold text-xs sm:text-sm focus:outline-none placeholder-slate-400 leading-none truncate"
                                 value={query}
                                 onChange={(e) => {
                                     setQuery(e.target.value);
@@ -491,28 +498,30 @@ export default function LeadHunter() {
                         </div>
                     </div>
 
-                    {/* País / Región */}
-                    <div className="md:col-span-3 bg-slate-50/80 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center gap-3">
-                        <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
-                        <div className="w-full">
-                            <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider">País o Región</label>
+                    {/* 3. País / Región (Unified Floating Card) */}
+                    <div className="md:col-span-3 h-[54px] bg-slate-50/80 hover:bg-slate-100/60 focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center gap-2.5 transition-all group">
+                        <MapPin className="w-4 h-4 text-slate-400 shrink-0 group-focus-within:text-indigo-600 transition-colors" />
+                        <div className="min-w-0 flex-1 flex flex-col justify-center">
+                            <label className="block text-[10px] text-slate-400 font-extrabold uppercase tracking-wider leading-none mb-1">
+                                País o Región
+                            </label>
                             <input
                                 type="text"
                                 placeholder="ej. El Salvador, Estados Unidos, México"
-                                className="w-full bg-transparent text-slate-800 font-bold text-sm focus:outline-none placeholder-slate-400"
+                                className="w-full bg-transparent text-slate-900 font-bold text-xs sm:text-sm focus:outline-none placeholder-slate-400 leading-none truncate"
                                 value={location}
                                 onChange={(e) => setLocation(e.target.value)}
                             />
                         </div>
                     </div>
 
-                    {/* Botones de Acción */}
-                    <div className="md:col-span-3 flex gap-2">
+                    {/* 4. Botones de Acción (Matching Symmetrical Height) */}
+                    <div className="md:col-span-3 h-[54px] flex gap-2">
                         <button
                             type="button"
                             onClick={handleScanDensity}
                             disabled={isDensityScanning || isLoading}
-                            className="flex-1 py-3 px-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                            className="flex-1 h-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                         >
                             {isDensityScanning ? (
                                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -527,7 +536,7 @@ export default function LeadHunter() {
                         <button
                             type="submit"
                             disabled={isLoading || isDensityScanning}
-                            className="py-3 px-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
+                            className="w-[54px] h-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center disabled:opacity-50 shrink-0"
                             title="Búsqueda directa en ciudad especificada"
                         >
                             {isLoading ? (
