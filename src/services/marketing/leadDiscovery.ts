@@ -478,7 +478,10 @@ class LeadDiscoveryService {
                 return this.generateMockResults(query, location);
             }
 
-            const rawResults: DiscoveredLead[] = data.results || [];
+            const rawResults: DiscoveredLead[] = (data.results || []).map((r: DiscoveredLead) => ({
+                ...r,
+                email: r.email || this.deriveEmail(r.website) || undefined
+            }));
 
             // 2. Verificar duplicados en la base de datos local
             if (rawResults.length > 0) {
@@ -521,18 +524,27 @@ class LeadDiscoveryService {
         const variance = (locHash % 40) - 15; // -15 to +25
         const targetLength = Math.max(25, baseCount + variance);
 
-        return Array.from({ length: targetLength }).map((_, i) => ({
-            id: `lh_${Date.now()}_${i}_${Math.floor(Math.random() * 100000)}`,
-            business_name: `${types[i % types.length]} ${capitalize(query.replace(/iglesia/i, '').trim()) || 'Central'} ${location.split(',')[0]} #${i + 1}`,
-            category: query,
-            address: `${Math.floor(Math.random() * 980) + 10} Main Ave, ${location}`,
-            phone: `+1 (555) ${Math.floor(Math.random() * 899) + 100}-${Math.floor(Math.random() * 8999) + 1000}`,
-            website: Math.random() > 0.25 ? `www.${query.replace(/\s/g, '').toLowerCase()}${i}${location.length}.org` : undefined,
-            rating: 4.0 + (Math.random() * 1.0),
-            review_count: Math.floor(Math.random() * 2500) + 50,
-            source: 'google_maps',
-            is_imported: false
-        }));
+        return Array.from({ length: targetLength }).map((_, i) => {
+            const hasWeb = Math.random() > 0.25;
+            const cleanQuery = query.replace(/iglesia/i, '').replace(/cristiana/i, '').trim() || 'Central';
+            const domainSlug = cleanQuery.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'iglesia';
+            const website = hasWeb ? `www.${domainSlug}${i + 1}.org` : undefined;
+            const email = website ? `info@${domainSlug}${i + 1}.org` : undefined;
+
+            return {
+                id: `lh_${Date.now()}_${i}_${Math.floor(Math.random() * 100000)}`,
+                business_name: `${types[i % types.length]} ${capitalize(cleanQuery)} ${location.split(',')[0]} #${i + 1}`,
+                category: query,
+                address: `${Math.floor(Math.random() * 980) + 10} Main Ave, ${location}`,
+                phone: `+1 (555) ${Math.floor(Math.random() * 899) + 100}-${Math.floor(Math.random() * 8999) + 1000}`,
+                website: website,
+                email: email,
+                rating: 4.0 + (Math.random() * 1.0),
+                review_count: Math.floor(Math.random() * 2500) + 50,
+                source: 'google_maps',
+                is_imported: false
+            };
+        });
     }
 
     // Extract clean domain from website URL
