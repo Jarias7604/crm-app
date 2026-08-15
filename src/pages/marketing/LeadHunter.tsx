@@ -32,6 +32,7 @@ export default function LeadHunter() {
     const [densityResults, setDensityResults] = useState<RegionalDensity[]>([]);
     const [selectedDensityCityIds, setSelectedDensityCityIds] = useState<Set<string>>(new Set());
     const [densitySearchFilter, setDensitySearchFilter] = useState('');
+    const [audienceFilter, setAudienceFilter] = useState<'hispanic' | 'anglo' | 'all'>('hispanic');
 
     useEffect(() => {
         leadsService.getTeamMembers().then(data => setTeamMembers(data || [])).catch(() => {});
@@ -65,6 +66,30 @@ export default function LeadHunter() {
         }
     };
 
+    const getEffectiveQuery = (rawQuery: string) => {
+        if (!rawQuery) return rawQuery;
+        const lower = rawQuery.toLowerCase();
+        if (audienceFilter === 'hispanic') {
+            if (!lower.includes('hispana') && !lower.includes('español') && !lower.includes('latina') && !lower.includes('spanish')) {
+                return `${rawQuery} hispana`;
+            }
+        } else if (audienceFilter === 'anglo') {
+            let translated = rawQuery
+                .replace(/iglesia cristiana/i, 'Christian Church')
+                .replace(/iglesia/i, 'Church')
+                .replace(/abogado/i, 'Law Firm')
+                .replace(/contador/i, 'CPA Accounting')
+                .replace(/dentista/i, 'Dental Clinic')
+                .replace(/clínica/i, 'Medical Clinic')
+                .replace(/taller/i, 'Auto Repair');
+            if (!translated.toLowerCase().includes('english') && !translated.toLowerCase().includes('church') && !translated.toLowerCase().includes('firm') && !translated.toLowerCase().includes('clinic')) {
+                translated = `${translated} English`;
+            }
+            return translated;
+        }
+        return rawQuery;
+    };
+
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         if (isDeepScan) {
@@ -80,7 +105,8 @@ export default function LeadHunter() {
         setIsLoading(true);
         setSelectedIds(new Set());
         try {
-            const data = await leadDiscoveryService.searchBusiness(query, location);
+            const effectiveQuery = getEffectiveQuery(query);
+            const data = await leadDiscoveryService.searchBusiness(effectiveQuery, location);
             setResults(data);
             if (data.length > 0) {
                 toast.success(`🎉 ¡Encontramos ${data.length} prospectos potenciales!`);
@@ -104,8 +130,9 @@ export default function LeadHunter() {
 
         setIsDensityScanning(true);
         try {
-            toast.loading(isDeepScan ? '🔍 Ejecutando Escaneo Profundo 100% (Multi-Synonym & Sub-Zones)...' : 'Escaneando densidad por zonas...', { id: 'densityScan' });
-            const density = await leadDiscoveryService.scanDensityByRegion(query, location, {
+            const effectiveQuery = getEffectiveQuery(query);
+            toast.loading(isDeepScan ? `🔍 Escaneando Profundo: "${effectiveQuery}" en ${location}...` : 'Escaneando densidad por zonas...', { id: 'densityScan' });
+            const density = await leadDiscoveryService.scanDensityByRegion(effectiveQuery, location, {
                 deepScan: isDeepScan,
                 categoryKey: selectedCategory !== 'custom' ? selectedCategory : undefined
             });
@@ -567,8 +594,46 @@ export default function LeadHunter() {
                         </button>
                     </div>
 
+                    {/* Audience Demographic Filter Pills */}
+                    <div className="flex items-center gap-1.5 bg-slate-100/70 p-1 rounded-xl border border-slate-200/60">
+                        <span className="text-[10px] text-slate-400 font-extrabold uppercase px-1.5">Audiencia:</span>
+                        <button
+                            type="button"
+                            onClick={() => setAudienceFilter('hispanic')}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                audienceFilter === 'hispanic'
+                                    ? 'bg-white text-indigo-700 shadow-xs border border-indigo-200/80 font-black'
+                                    : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            <span>🇲🇽 🇪🇸 Hispana / Español</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setAudienceFilter('anglo')}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                audienceFilter === 'anglo'
+                                    ? 'bg-white text-blue-700 shadow-xs border border-blue-200/80 font-black'
+                                    : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            <span>🇺🇸 Anglo / English</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setAudienceFilter('all')}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                audienceFilter === 'all'
+                                    ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-black'
+                                    : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            <span>🌐 Todas</span>
+                        </button>
+                    </div>
+
                     {/* Senior Glassmorphic Badge replacing plain green checkmark */}
-                    <div className="hidden sm:flex items-center">
+                    <div className="hidden lg:flex items-center">
                         {isDeepScan ? (
                             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-[11px] font-extrabold backdrop-blur-md animate-in fade-in duration-200">
                                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
