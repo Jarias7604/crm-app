@@ -83,6 +83,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     const [isLossReasonFilterOpen, setIsLossReasonFilterOpen] = useState(false);
     const [isLostAtStageFilterOpen, setIsLostAtStageFilterOpen] = useState(false);
     const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
+    const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
     const [isProductFilterOpen, setIsProductFilterOpen] = useState(false);
 
     const statusFilterRef = useRef<HTMLDivElement>(null);
@@ -92,6 +93,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     const lostAtStageFilterRef = useRef<HTMLDivElement>(null);
     const dateRangeRef = useRef<HTMLDivElement>(null);
     const productFilterRef = useRef<HTMLDivElement>(null);
+    const exportMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -102,6 +104,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
             if (statusFilterRef.current && !statusFilterRef.current.contains(event.target as Node)) setIsStatusFilterOpen(false);
             if (dateRangeRef.current && !dateRangeRef.current.contains(event.target as Node)) setIsDateRangeOpen(false);
             if (productFilterRef.current && !productFilterRef.current.contains(event.target as Node)) setIsProductFilterOpen(false);
+            if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) setIsExportMenuOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -739,18 +742,85 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                                 <Layout className="w-5 h-5 md:w-4 md:h-4" /><span className="md:hidden text-xs font-semibold ml-1">Kanban</span>
                             </button>
                         </div>
-                        <div className="hidden sm:flex items-center gap-1.5">
-                            <Button variant="outline" className="flex items-center gap-1.5 h-9 px-3 text-xs font-semibold border-gray-200 text-gray-600" onClick={handleDownloadTemplate}>
-                                <Download className="w-3.5 h-3.5" /><span className="hidden lg:inline ml-1">Plantilla</span>
-                            </Button>
-                            <Button variant="outline" className="flex items-center gap-1.5 h-9 px-3 text-xs font-semibold border-gray-200 text-gray-600" onClick={() => { const l = filteredLeads.length > 0 ? filteredLeads : leads; csvHelper.exportLeads(l, teamMembers); toast.success('Exportación iniciada'); }}>
-                                <Download className="w-3.5 h-3.5 rotate-180" /><span className="hidden lg:inline ml-1">Exportar</span>
-                            </Button>
+                        <div className="flex items-center gap-1.5">
+                            <div className="relative" ref={exportMenuRef}>
+                                <Button
+                                    variant="outline"
+                                    className="flex items-center gap-1.5 h-9 px-3 text-xs font-semibold border-gray-200 text-gray-600 hover:bg-gray-50"
+                                    onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                                >
+                                    <Download className="w-3.5 h-3.5 text-indigo-600" />
+                                    <span className="hidden sm:inline ml-0.5">Exportar</span>
+                                    <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${isExportMenuOpen ? 'rotate-180' : ''}`} />
+                                </Button>
+
+                                {isExportMenuOpen && (
+                                    <div className="absolute right-0 mt-1.5 w-60 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 py-2 animate-in fade-in slide-in-from-top-2 duration-150">
+                                        <div className="px-3.5 py-2 border-b border-gray-50 mb-1 bg-gray-50/50 rounded-t-2xl">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Formatos de Exportación</p>
+                                            <p className="text-[11px] font-semibold text-indigo-600 mt-0.5">
+                                                {filteredLeads.length > 0 ? `${filteredLeads.length} prospectos filtrados` : `${leads.length} prospectos totales`}
+                                            </p>
+                                        </div>
+
+                                        <button
+                                            onClick={async () => {
+                                                setIsExportMenuOpen(false);
+                                                const l = filteredLeads.length > 0 ? filteredLeads : leads;
+                                                const toastId = toast.loading('Generando Excel...', { id: 'export-excel' });
+                                                try {
+                                                    await csvHelper.exportLeadsExcel(l, teamMembers, `prospectos_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+                                                    toast.success(`Exportación a Excel completada (${l.length} registros)`, { id: toastId });
+                                                } catch (err) {
+                                                    toast.error('Error al exportar a Excel', { id: toastId });
+                                                }
+                                            }}
+                                            className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50/60 hover:text-indigo-700 flex items-center gap-3 transition-colors"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-[10px] shrink-0">XLS</div>
+                                            <div>
+                                                <p className="font-bold">Excel (.xlsx)</p>
+                                                <p className="text-[10px] text-gray-400 font-normal">Recomendado para Microsoft Excel</p>
+                                            </div>
+                                        </button>
+
+                                        <button
+                                            onClick={() => {
+                                                setIsExportMenuOpen(false);
+                                                const l = filteredLeads.length > 0 ? filteredLeads : leads;
+                                                csvHelper.exportLeads(l, teamMembers, `prospectos_${format(new Date(), 'yyyy-MM-dd')}.csv`, products, lossReasons);
+                                                toast.success(`Exportación a CSV completada (${l.length} registros)`);
+                                            }}
+                                            className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-indigo-50/60 hover:text-indigo-700 flex items-center gap-3 transition-colors"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-black text-[10px] shrink-0">CSV</div>
+                                            <div>
+                                                <p className="font-bold">CSV (.csv)</p>
+                                                <p className="text-[10px] text-gray-400 font-normal">UTF-8 compatible con Google Sheets</p>
+                                            </div>
+                                        </button>
+
+                                        <div className="border-t border-gray-100 my-1" />
+
+                                        <button
+                                            onClick={() => {
+                                                setIsExportMenuOpen(false);
+                                                handleDownloadTemplate();
+                                            }}
+                                            className="w-full text-left px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 flex items-center gap-2.5 transition-colors"
+                                        >
+                                            <Download className="w-3.5 h-3.5 text-gray-400" />
+                                            <span>Descargar Plantilla (.xlsx)</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="relative">
                                 <input type="file" accept=".csv,.xlsx" onChange={handleImportCSV} className="absolute inset-0 opacity-0 cursor-pointer" disabled={isImporting} />
                                 <Button variant="outline" className="flex items-center gap-1.5 h-9 px-3 text-xs font-semibold border-gray-200 text-gray-600" disabled={isImporting}>
                                     {isImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                                    <span className="hidden lg:inline ml-1">Importar</span>
+                                    <span className="hidden sm:inline ml-0.5">Importar</span>
                                 </Button>
                             </div>
                         </div>

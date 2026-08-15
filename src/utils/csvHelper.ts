@@ -568,7 +568,7 @@ export const csvHelper = {
         });
     },
 
-    exportLeads(leads: any[], teamMembers: any[] = [], filename = 'leads_export.csv') {
+    exportLeads(leads: any[], teamMembers: any[] = [], filename = 'leads_export.csv', products: any[] = [], lossReasons: any[] = []) {
         const rows = leads.map(lead => {
             return CSV_COLUMNS.map(col => {
                 let value = lead[col.key];
@@ -576,7 +576,7 @@ export const csvHelper = {
                 // Resolve Assigner Name from ID
                 if ((col.key === 'assigned_to' || col.key === 'next_followup_assignee') && value) {
                     const member = teamMembers.find(m => m.id === value);
-                    value = member ? (member.full_name || member.email) : value; // Fallback to ID if not found
+                    value = member ? (member.full_name || member.email) : value;
                 }
 
                 // Map Priority Internal -> Label
@@ -595,10 +595,14 @@ export const csvHelper = {
                 if ((col.key === 'created_at' || col.key === 'next_followup_date') && value) {
                     try {
                         const date = new Date(value);
-                        const day = String(date.getDate()).padStart(2, '0');
-                        const month = String(date.getMonth() + 1).padStart(2, '0');
-                        const year = date.getFullYear();
-                        value = `${day}-${month}-${year}`;
+                        if (!isNaN(date.getTime())) {
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const year = date.getFullYear();
+                            value = `${day}-${month}-${year}`;
+                        } else {
+                            value = '';
+                        }
                     } catch (e) { value = ''; }
                 }
 
@@ -628,5 +632,94 @@ export const csvHelper = {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    },
+
+    async exportLeadsExcel(leads: any[], teamMembers: any[] = [], filename = 'leads_export.xlsx') {
+        try {
+            const XLSX = await import('xlsx');
+            const wb = XLSX.utils.book_new();
+
+            const headers = CSV_COLUMNS.map(col => col.label);
+
+            const rows = leads.map(lead => {
+                return CSV_COLUMNS.map(col => {
+                    let value = lead[col.key];
+
+                    // Resolve Assigner Name from ID
+                    if ((col.key === 'assigned_to' || col.key === 'next_followup_assignee') && value) {
+                        const member = teamMembers.find(m => m.id === value);
+                        value = member ? (member.full_name || member.email) : value;
+                    }
+
+                    // Map Priority Internal -> Label
+                    if (col.key === 'priority' && value) {
+                        const config = PRIORITY_CONFIG[value as keyof typeof PRIORITY_CONFIG];
+                        if (config) value = config.label;
+                    }
+
+                    // Map Source Internal -> Label
+                    if (col.key === 'source' && value) {
+                        const config = SOURCE_CONFIG[value];
+                        if (config) value = config.label;
+                    }
+
+                    // Format Dates
+                    if ((col.key === 'created_at' || col.key === 'next_followup_date') && value) {
+                        try {
+                            const date = new Date(value);
+                            if (!isNaN(date.getTime())) {
+                                const day = String(date.getDate()).padStart(2, '0');
+                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                const year = date.getFullYear();
+                                return `${day}-${month}-${year}`;
+                            }
+                        } catch (e) {}
+                        return '';
+                    }
+
+                    // Format numeric values as numbers for Excel formulas
+                    if (col.key === 'value' || col.key === 'closing_amount') {
+                        if (value === null || value === undefined || value === '') return 0;
+                        const num = Number(value);
+                        return isNaN(num) ? 0 : num;
+                    }
+
+                    return value === null || value === undefined ? '' : String(value);
+                });
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+            // Set column widths dynamically based on max content length
+            const colWidths = CSV_COLUMNS.map(col => {
+                let maxLen = col.label.length;
+                rows.forEach(r => {
+                    const idx = CSV_COLUMNS.findIndex(c => c.key === col.key);
+                    const valStr = String(r[idx] ?? '');
+                    if (valStr.length > maxLen) maxLen = valStr.length;
+                });
+                return { wch: Math.min(Math.max(maxLen + 4, 12), 40) };
+            });
+            ws['!cols'] = colWidths;
+
+            // Apply header style
+            const headerStyle = {
+                fill: { fgColor: { rgb: "4449AA" } },
+                font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
+                alignment: { horizontal: "center", vertical: "center" }
+            };
+
+            headers.forEach((_, idx) => {
+                const cellRef = XLSX.utils.encode_cell({ r: 0, c: idx });
+                if (ws[cellRef]) ws[cellRef].s = headerStyle;
+            });
+
+            XLSX.utils.book_append_sheet(wb, ws, 'Prospectos');
+            XLSX.writeFile(wb, filename);
+        } catch (error) {
+            console.error('Error exporting leads to Excel:', error);
+            // Fallback to CSV if Excel export encounters an error
+            this.exportLeads(leads, teamMembers, filename.replace('.xlsx', '.csv'));
+        }
     }
 };
