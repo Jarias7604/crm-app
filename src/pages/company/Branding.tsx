@@ -60,7 +60,8 @@ export default function Branding() {
                 terminos_condiciones: data.terminos_condiciones || '',
                 date_format: data.date_format || 'DD/MM/YYYY',
                 time_format: data.time_format || '24h',
-                timezone: data.timezone || 'America/El_Salvador'
+                timezone: data.timezone || 'America/El_Salvador',
+                language: (data as any)?.language || (i18n.language?.startsWith('es') ? 'es' : 'en')
             });
         } catch (error) {
             console.error('Error loading branding:', error);
