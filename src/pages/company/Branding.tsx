@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { brandingService } from '../../services/branding';
 import { storageService } from '../../services/storage';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Building2, Save, Upload, Globe, Image as ImageIcon, CheckCircle2, X, Maximize2, Square, FileText, ChevronDown } from 'lucide-react';
+import { Building2, Save, Upload, Globe, Image as ImageIcon, CheckCircle2, X, Maximize2, Square, FileText, ChevronDown, Languages } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Company } from '../../types';
 import Cropper from 'react-easy-crop';
@@ -11,6 +12,7 @@ import { getCroppedImg } from '../../utils/cropImage';
 import { createPortal } from 'react-dom';
 
 export default function Branding() {
+    const { i18n } = useTranslation();
     const [company, setCompany] = useState<Company | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -28,7 +30,8 @@ export default function Branding() {
         terminos_condiciones: '',
         date_format: 'DD/MM/YYYY',
         time_format: '24h',
-        timezone: 'America/El_Salvador'
+        timezone: 'America/El_Salvador',
+        language: i18n.language?.startsWith('es') ? 'es' : 'en'
     });
 
     // Cropping state
@@ -291,8 +294,32 @@ export default function Branding() {
 
                             {/* Localization Section */}
                             <div className="space-y-2">
-                                <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Configuración de Localización (Fechas y Horas)</label>
+                                <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1 flex items-center gap-1.5">
+                                    <Languages className="w-3.5 h-3.5" />
+                                    <span>Configuración de Localización e Idioma</span>
+                                </label>
                                 <div className="p-5 border border-slate-100 rounded-xl bg-indigo-50/30 space-y-4">
+                                    <div className="space-y-1.5">
+                                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider ml-1">
+                                            Idioma Predeterminado del Sistema
+                                        </label>
+                                        <select 
+                                            value={formData.language} 
+                                            onChange={e => {
+                                                const newLang = e.target.value;
+                                                setFormData({ ...formData, language: newLang });
+                                                i18n.changeLanguage(newLang);
+                                                localStorage.setItem('i18nextLng', newLang);
+                                                toast.success(newLang === 'es' ? 'Idioma cambiado a Español' : 'Language changed to English');
+                                            }} 
+                                            className="w-full h-11 rounded-xl border-gray-200 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-sm text-slate-700 bg-white shadow-sm transition-all outline-none px-3"
+                                        >
+                                            <option value="es">🇪🇸 Español (América Latina / España)</option>
+                                            <option value="en">🇺🇸 English (United States)</option>
+                                        </select>
+                                        <p className="text-[9px] text-slate-400 font-medium ml-1 mt-0.5">* Define el idioma global predeterminado de la plataforma y menús para tu cuenta.</p>
+                                    </div>
+
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
                                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Fecha</label>
