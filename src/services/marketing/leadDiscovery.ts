@@ -54,16 +54,86 @@ export const OFFICIAL_CATEGORIES: IndustryCategory[] = [
 ];
 
 class LeadDiscoveryService {
-    // City presets with sub-municipalities for deep comprehensive scanning
+    // City presets with sub-municipalities for deep comprehensive scanning across full countries
     private CITY_PRESETS: Record<string, CityPresetItem[]> = {
         'estados unidos': [
-            { id: 'us_ca_south', cityName: 'Los Ángeles, San Diego, Long Beach', stateName: 'California (Sur)', locationQuery: 'Los Angeles, CA, USA', subQueries: ['Los Angeles, CA, USA', 'San Diego, CA, USA', 'Long Beach, CA, USA', 'Irvine, CA, USA', 'Pasadena, CA, USA'] },
-            { id: 'us_ca_north', cityName: 'San Francisco, San José, Sacramento', stateName: 'California (Norte)', locationQuery: 'San Francisco, CA, USA', subQueries: ['San Francisco, CA, USA', 'San Jose, CA, USA', 'Sacramento, CA, USA', 'Oakland, CA, USA', 'Palo Alto, CA, USA'] },
-            { id: 'us_fl_south', cityName: 'Miami, Fort Lauderdale, West Palm', stateName: 'Florida (Sur)', locationQuery: 'Miami, FL, USA', subQueries: ['Miami, FL, USA', 'Fort Lauderdale, FL, USA', 'Boca Raton, FL, USA', 'Coral Gables, FL, USA', 'Hialeah, FL, USA'] },
-            { id: 'us_fl_central', cityName: 'Orlando, Tampa, Jacksonville', stateName: 'Florida (Centro/Norte)', locationQuery: 'Orlando, FL, USA', subQueries: ['Orlando, FL, USA', 'Tampa, FL, USA', 'Jacksonville, FL, USA', 'St Petersburg, FL, USA'] },
+            { id: 'us_al', cityName: 'Birmingham, Montgomery, Mobile, Huntsville', stateName: 'Alabama', locationQuery: 'Birmingham, AL, USA', subQueries: ['Birmingham, AL, USA', 'Montgomery, AL, USA', 'Mobile, AL, USA', 'Huntsville, AL, USA'] },
+            { id: 'us_ak', cityName: 'Anchorage, Fairbanks, Juneau', stateName: 'Alaska', locationQuery: 'Anchorage, AK, USA', subQueries: ['Anchorage, AK, USA', 'Fairbanks, AK, USA', 'Juneau, AK, USA'] },
+            { id: 'us_az', cityName: 'Phoenix, Tucson, Mesa, Chandler', stateName: 'Arizona', locationQuery: 'Phoenix, AZ, USA', subQueries: ['Phoenix, AZ, USA', 'Tucson, AZ, USA', 'Mesa, AZ, USA', 'Chandler, AZ, USA'] },
+            { id: 'us_ar', cityName: 'Little Rock, Fort Smith, Fayetteville', stateName: 'Arkansas', locationQuery: 'Little Rock, AR, USA', subQueries: ['Little Rock, AR, USA', 'Fort Smith, AR, USA', 'Fayetteville, AR, USA'] },
+            { id: 'us_ca_south', cityName: 'Los Ángeles, San Diego, Long Beach, Irvine', stateName: 'California (Sur)', locationQuery: 'Los Angeles, CA, USA', subQueries: ['Los Angeles, CA, USA', 'San Diego, CA, USA', 'Long Beach, CA, USA', 'Irvine, CA, USA', 'Pasadena, CA, USA'] },
+            { id: 'us_ca_north', cityName: 'San Francisco, San José, Sacramento, Oakland', stateName: 'California (Norte)', locationQuery: 'San Francisco, CA, USA', subQueries: ['San Francisco, CA, USA', 'San Jose, CA, USA', 'Sacramento, CA, USA', 'Oakland, CA, USA', 'Fresno, CA, USA'] },
+            { id: 'us_co', cityName: 'Denver, Colorado Springs, Aurora', stateName: 'Colorado', locationQuery: 'Denver, CO, USA', subQueries: ['Denver, CO, USA', 'Colorado Springs, CO, USA', 'Aurora, CO, USA', 'Fort Collins, CO, USA'] },
+            { id: 'us_ct', cityName: 'Bridgeport, New Haven, Stamford, Hartford', stateName: 'Connecticut', locationQuery: 'Bridgeport, CT, USA', subQueries: ['Bridgeport, CT, USA', 'New Haven, CT, USA', 'Stamford, CT, USA', 'Hartford, CT, USA'] },
+            { id: 'us_de', cityName: 'Wilmington, Dover, Newark', stateName: 'Delaware', locationQuery: 'Wilmington, DE, USA', subQueries: ['Wilmington, DE, USA', 'Dover, DE, USA', 'Newark, DE, USA'] },
+            { id: 'us_fl_south', cityName: 'Miami, Fort Lauderdale, West Palm Beach, Hialeah', stateName: 'Florida (Sur)', locationQuery: 'Miami, FL, USA', subQueries: ['Miami, FL, USA', 'Fort Lauderdale, FL, USA', 'Boca Raton, FL, USA', 'Coral Gables, FL, USA', 'Hialeah, FL, USA'] },
+            { id: 'us_fl_central', cityName: 'Orlando, Tampa, Jacksonville, St Petersburg', stateName: 'Florida (Centro/Norte)', locationQuery: 'Orlando, FL, USA', subQueries: ['Orlando, FL, USA', 'Tampa, FL, USA', 'Jacksonville, FL, USA', 'St Petersburg, FL, USA', 'Tallahassee, FL, USA'] },
+            { id: 'us_ga', cityName: 'Atlanta, Augusta, Columbus, Savannah', stateName: 'Georgia', locationQuery: 'Atlanta, GA, USA', subQueries: ['Atlanta, GA, USA', 'Augusta, GA, USA', 'Columbus, GA, USA', 'Savannah, GA, USA'] },
+            { id: 'us_hi', cityName: 'Honolulu, Hilo, Kailua', stateName: 'Hawaii', locationQuery: 'Honolulu, HI, USA', subQueries: ['Honolulu, HI, USA', 'Hilo, HI, USA', 'Kailua, HI, USA'] },
+            { id: 'us_id', cityName: 'Boise, Meridian, Nampa', stateName: 'Idaho', locationQuery: 'Boise, ID, USA', subQueries: ['Boise, ID, USA', 'Meridian, ID, USA', 'Nampa, ID, USA'] },
+            { id: 'us_il', cityName: 'Chicago, Aurora, Naperville, Rockford', stateName: 'Illinois', locationQuery: 'Chicago, IL, USA', subQueries: ['Chicago, IL, USA', 'Aurora, IL, USA', 'Naperville, IL, USA', 'Rockford, IL, USA'] },
+            { id: 'us_in', cityName: 'Indianapolis, Fort Wayne, Evansville', stateName: 'Indiana', locationQuery: 'Indianapolis, IN, USA', subQueries: ['Indianapolis, IN, USA', 'Fort Wayne, IN, USA', 'Evansville, IN, USA', 'South Bend, IN, USA'] },
+            { id: 'us_ia', cityName: 'Des Moines, Cedar Rapids, Davenport', stateName: 'Iowa', locationQuery: 'Des Moines, IA, USA', subQueries: ['Des Moines, IA, USA', 'Cedar Rapids, IA, USA', 'Davenport, IA, USA'] },
+            { id: 'us_ks', cityName: 'Wichita, Overland Park, Kansas City, Topeka', stateName: 'Kansas', locationQuery: 'Wichita, KS, USA', subQueries: ['Wichita, KS, USA', 'Overland Park, KS, USA', 'Kansas City, KS, USA', 'Topeka, KS, USA'] },
+            { id: 'us_ky', cityName: 'Louisville, Lexington, Bowling Green', stateName: 'Kentucky', locationQuery: 'Louisville, KY, USA', subQueries: ['Louisville, KY, USA', 'Lexington, KY, USA', 'Bowling Green, KY, USA'] },
+            { id: 'us_la', cityName: 'New Orleans, Baton Rouge, Shreveport', stateName: 'Louisiana', locationQuery: 'New Orleans, LA, USA', subQueries: ['New Orleans, LA, USA', 'Baton Rouge, LA, USA', 'Shreveport, LA, USA'] },
+            { id: 'us_me', cityName: 'Portland, Lewiston, Bangor', stateName: 'Maine', locationQuery: 'Portland, ME, USA', subQueries: ['Portland, ME, USA', 'Lewiston, ME, USA', 'Bangor, ME, USA'] },
+            { id: 'us_md', cityName: 'Baltimore, Frederick, Rockville', stateName: 'Maryland', locationQuery: 'Baltimore, MD, USA', subQueries: ['Baltimore, MD, USA', 'Frederick, MD, USA', 'Rockville, MD, USA'] },
+            { id: 'us_ma', cityName: 'Boston, Worcester, Springfield, Cambridge', stateName: 'Massachusetts', locationQuery: 'Boston, MA, USA', subQueries: ['Boston, MA, USA', 'Worcester, MA, USA', 'Springfield, MA, USA', 'Cambridge, MA, USA'] },
+            { id: 'us_mi', cityName: 'Detroit, Grand Rapids, Warren', stateName: 'Michigan', locationQuery: 'Detroit, MI, USA', subQueries: ['Detroit, MI, USA', 'Grand Rapids, MI, USA', 'Warren, MI, USA', 'Sterling Heights, MI, USA'] },
+            { id: 'us_mn', cityName: 'Minneapolis, St Paul, Rochester', stateName: 'Minnesota', locationQuery: 'Minneapolis, MN, USA', subQueries: ['Minneapolis, MN, USA', 'St Paul, MN, USA', 'Rochester, MN, USA'] },
+            { id: 'us_ms', cityName: 'Jackson, Gulfport, Southaven', stateName: 'Mississippi', locationQuery: 'Jackson, MS, USA', subQueries: ['Jackson, MS, USA', 'Gulfport, MS, USA', 'Southaven, MS, USA'] },
+            { id: 'us_mo', cityName: 'Kansas City, St Louis, Springfield', stateName: 'Missouri', locationQuery: 'Kansas City, MO, USA', subQueries: ['Kansas City, MO, USA', 'St Louis, MO, USA', 'Springfield, MO, USA'] },
+            { id: 'us_mt', cityName: 'Billings, Missoula, Great Falls', stateName: 'Montana', locationQuery: 'Billings, MT, USA', subQueries: ['Billings, MT, USA', 'Missoula, MT, USA', 'Great Falls, MT, USA'] },
+            { id: 'us_ne', cityName: 'Omaha, Lincoln, Bellevue', stateName: 'Nebraska', locationQuery: 'Omaha, NE, USA', subQueries: ['Omaha, NE, USA', 'Lincoln, NE, USA', 'Bellevue, NE, USA'] },
+            { id: 'us_nv', cityName: 'Las Vegas, Henderson, Reno', stateName: 'Nevada', locationQuery: 'Las Vegas, NV, USA', subQueries: ['Las Vegas, NV, USA', 'Henderson, NV, USA', 'Reno, NV, USA'] },
+            { id: 'us_nh', cityName: 'Manchester, Nashua, Concord', stateName: 'New Hampshire', locationQuery: 'Manchester, NH, USA', subQueries: ['Manchester, NH, USA', 'Nashua, NH, USA', 'Concord, NH, USA'] },
+            { id: 'us_nj', cityName: 'Newark, Jersey City, Paterson, Elizabeth', stateName: 'New Jersey', locationQuery: 'Newark, NJ, USA', subQueries: ['Newark, NJ, USA', 'Jersey City, NJ, USA', 'Paterson, NJ, USA', 'Elizabeth, NJ, USA'] },
+            { id: 'us_nm', cityName: 'Albuquerque, Las Cruces, Rio Rancho, Santa Fe', stateName: 'New Mexico', locationQuery: 'Albuquerque, NM, USA', subQueries: ['Albuquerque, NM, USA', 'Las Cruces, NM, USA', 'Rio Rancho, NM, USA', 'Santa Fe, NM, USA'] },
             { id: 'us_ny_metro', cityName: 'New York City Metro', stateName: 'New York (Metro)', locationQuery: 'New York, NY, USA', subQueries: ['Manhattan, NY, USA', 'Brooklyn, NY, USA', 'Queens, NY, USA', 'Bronx, NY, USA', 'Staten Island, NY, USA', 'Yonkers, NY, USA'] },
-            { id: 'us_tx_metro', cityName: 'Houston, Dallas, Fort Worth', stateName: 'Texas (Metro Este)', locationQuery: 'Houston, TX, USA', subQueries: ['Houston, TX, USA', 'Dallas, TX, USA', 'Fort Worth, TX, USA', 'Arlington, TX, USA', 'Sugar Land, TX, USA'] },
-            { id: 'us_tx_south', cityName: 'Austin, San Antonio, El Paso', stateName: 'Texas (Sur/Oeste)', locationQuery: 'Austin, TX, USA', subQueries: ['Austin, TX, USA', 'San Antonio, TX, USA', 'El Paso, TX, USA', 'McAllen, TX, USA'] }
+            { id: 'us_ny_upstate', cityName: 'Buffalo, Rochester, Syracuse, Albany', stateName: 'New York (Upstate)', locationQuery: 'Buffalo, NY, USA', subQueries: ['Buffalo, NY, USA', 'Rochester, NY, USA', 'Syracuse, NY, USA', 'Albany, NY, USA'] },
+            { id: 'us_nc', cityName: 'Charlotte, Raleigh, Greensboro, Durham', stateName: 'North Carolina', locationQuery: 'Charlotte, NC, USA', subQueries: ['Charlotte, NC, USA', 'Raleigh, NC, USA', 'Greensboro, NC, USA', 'Durham, NC, USA'] },
+            { id: 'us_nd', cityName: 'Fargo, Bismarck, Grand Forks', stateName: 'North Dakota', locationQuery: 'Fargo, ND, USA', subQueries: ['Fargo, ND, USA', 'Bismarck, ND, USA', 'Grand Forks, ND, USA'] },
+            { id: 'us_oh', cityName: 'Columbus, Cleveland, Cincinnati, Toledo', stateName: 'Ohio', locationQuery: 'Columbus, OH, USA', subQueries: ['Columbus, OH, USA', 'Cleveland, OH, USA', 'Cincinnati, OH, USA', 'Toledo, OH, USA'] },
+            { id: 'us_ok', cityName: 'Oklahoma City, Tulsa, Norman', stateName: 'Oklahoma', locationQuery: 'Oklahoma City, OK, USA', subQueries: ['Oklahoma City, OK, USA', 'Tulsa, OK, USA', 'Norman, OK, USA'] },
+            { id: 'us_or', cityName: 'Portland, Salem, Eugene, Gresham', stateName: 'Oregon', locationQuery: 'Portland, OR, USA', subQueries: ['Portland, OR, USA', 'Salem, OR, USA', 'Eugene, OR, USA', 'Gresham, OR, USA'] },
+            { id: 'us_pa', cityName: 'Philadelphia, Pittsburgh, Allentown, Erie', stateName: 'Pennsylvania', locationQuery: 'Philadelphia, PA, USA', subQueries: ['Philadelphia, PA, USA', 'Pittsburgh, PA, USA', 'Allentown, PA, USA', 'Erie, PA, USA'] },
+            { id: 'us_ri', cityName: 'Providence, Warwick, Cranston', stateName: 'Rhode Island', locationQuery: 'Providence, RI, USA', subQueries: ['Providence, RI, USA', 'Warwick, RI, USA', 'Cranston, RI, USA'] },
+            { id: 'us_sc', cityName: 'Charleston, Columbia, North Charleston', stateName: 'South Carolina', locationQuery: 'Charleston, SC, USA', subQueries: ['Charleston, SC, USA', 'Columbia, SC, USA', 'North Charleston, SC, USA'] },
+            { id: 'us_sd', cityName: 'Sioux Falls, Rapid City, Aberdeen', stateName: 'South Dakota', locationQuery: 'Sioux Falls, SD, USA', subQueries: ['Sioux Falls, SD, USA', 'Rapid City, SD, USA', 'Aberdeen, SD, USA'] },
+            { id: 'us_tn', cityName: 'Nashville, Memphis, Knoxville, Chattanooga', stateName: 'Tennessee', locationQuery: 'Nashville, TN, USA', subQueries: ['Nashville, TN, USA', 'Memphis, TN, USA', 'Knoxville, TN, USA', 'Chattanooga, TN, USA'] },
+            { id: 'us_tx_metro', cityName: 'Houston, Dallas, Fort Worth, Arlington', stateName: 'Texas (Metro Este)', locationQuery: 'Houston, TX, USA', subQueries: ['Houston, TX, USA', 'Dallas, TX, USA', 'Fort Worth, TX, USA', 'Arlington, TX, USA', 'Sugar Land, TX, USA'] },
+            { id: 'us_tx_south', cityName: 'Austin, San Antonio, El Paso, McAllen', stateName: 'Texas (Sur/Oeste)', locationQuery: 'Austin, TX, USA', subQueries: ['Austin, TX, USA', 'San Antonio, TX, USA', 'El Paso, TX, USA', 'McAllen, TX, USA'] },
+            { id: 'us_ut', cityName: 'Salt Lake City, West Valley City, Provo', stateName: 'Utah', locationQuery: 'Salt Lake City, UT, USA', subQueries: ['Salt Lake City, UT, USA', 'West Valley City, UT, USA', 'Provo, UT, USA'] },
+            { id: 'us_vt', cityName: 'Burlington, South Burlington, Rutland', stateName: 'Vermont', locationQuery: 'Burlington, VT, USA', subQueries: ['Burlington, VT, USA', 'South Burlington, VT, USA', 'Rutland, VT, USA'] },
+            { id: 'us_va', cityName: 'Virginia Beach, Norfolk, Chesapeake, Richmond', stateName: 'Virginia', locationQuery: 'Virginia Beach, VA, USA', subQueries: ['Virginia Beach, VA, USA', 'Norfolk, VA, USA', 'Chesapeake, VA, USA', 'Richmond, VA, USA'] },
+            { id: 'us_wa', cityName: 'Seattle, Spokane, Tacoma, Vancouver', stateName: 'Washington', locationQuery: 'Seattle, WA, USA', subQueries: ['Seattle, WA, USA', 'Spokane, WA, USA', 'Tacoma, WA, USA', 'Vancouver, WA, USA'] },
+            { id: 'us_wv', cityName: 'Charleston, Huntington, Morgantown', stateName: 'West Virginia', locationQuery: 'Charleston, WV, USA', subQueries: ['Charleston, WV, USA', 'Huntington, WV, USA', 'Morgantown, WV, USA'] },
+            { id: 'us_wi', cityName: 'Milwaukee, Madison, Green Bay', stateName: 'Wisconsin', locationQuery: 'Milwaukee, WI, USA', subQueries: ['Milwaukee, WI, USA', 'Madison, WI, USA', 'Green Bay, WI, USA'] },
+            { id: 'us_wy', cityName: 'Cheyenne, Casper, Laramie', stateName: 'Wyoming', locationQuery: 'Cheyenne, WY, USA', subQueries: ['Cheyenne, WY, USA', 'Casper, WY, USA', 'Laramie, WY, USA'] },
+            { id: 'us_pr', cityName: 'San Juan, Bayamón, Ponce, Carolina', stateName: 'Puerto Rico', locationQuery: 'San Juan, Puerto Rico', subQueries: ['San Juan, Puerto Rico', 'Bayamón, Puerto Rico', 'Ponce, Puerto Rico', 'Carolina, Puerto Rico'] }
+        ],
+        'guatemala': [
+            { id: 'gt_guatemala', cityName: 'Ciudad de Guatemala y Área Metro', stateName: 'Guatemala', locationQuery: 'Ciudad de Guatemala, Guatemala', subQueries: ['Ciudad de Guatemala, Guatemala', 'Mixco, Guatemala', 'Villa Nueva, Guatemala', 'Santa Catarina Pinula, Guatemala'] },
+            { id: 'gt_sacatepequez', cityName: 'Antigua Guatemala y Alrededores', stateName: 'Sacatepéquez', locationQuery: 'Antigua Guatemala, Guatemala', subQueries: ['Antigua Guatemala, Guatemala', 'Ciudad Vieja, Guatemala', 'Jocotenango, Guatemala'] },
+            { id: 'gt_quetzaltenango', cityName: 'Quetzaltenango (Xela) y Municipios', stateName: 'Quetzaltenango', locationQuery: 'Quetzaltenango, Guatemala', subQueries: ['Quetzaltenango, Guatemala', 'Salcajá, Guatemala', 'Coatepeque, Guatemala'] },
+            { id: 'gt_escuintla', cityName: 'Escuintla, Puerto San José y Palín', stateName: 'Escuintla', locationQuery: 'Escuintla, Guatemala', subQueries: ['Escuintla, Guatemala', 'Puerto San José, Guatemala', 'Palín, Guatemala', 'Santa Lucía Cotzumalguapa, Guatemala'] },
+            { id: 'gt_alta_verapaz', cityName: 'Cobán y San Pedro Carchá', stateName: 'Alta Verapaz', locationQuery: 'Cobán, Guatemala', subQueries: ['Cobán, Guatemala', 'San Pedro Carchá, Guatemala', 'Chamelco, Guatemala'] },
+            { id: 'gt_izabal', cityName: 'Puerto Barrios, Morales y Livingston', stateName: 'Izabal', locationQuery: 'Puerto Barrios, Guatemala', subQueries: ['Puerto Barrios, Guatemala', 'Morales, Guatemala', 'Livingston, Guatemala'] },
+            { id: 'gt_retalhuleu', cityName: 'Retalhuleu y Champerico', stateName: 'Retalhuleu', locationQuery: 'Retalhuleu, Guatemala', subQueries: ['Retalhuleu, Guatemala', 'Champerico, Guatemala', 'San Sebastián, Guatemala'] },
+            { id: 'gt_huehuetenango', cityName: 'Huehuetenango y Chiantla', stateName: 'Huehuetenango', locationQuery: 'Huehuetenango, Guatemala', subQueries: ['Huehuetenango, Guatemala', 'Chiantla, Guatemala'] },
+            { id: 'gt_peten', cityName: 'Flores, Santa Elena y San Benito', stateName: 'Petén', locationQuery: 'Flores, Petén, Guatemala', subQueries: ['Flores, Guatemala', 'San Benito, Petén, Guatemala', 'Poptún, Guatemala'] },
+            { id: 'gt_suchitepequez', cityName: 'Mazatenango y Cuyotenango', stateName: 'Suchitepéquez', locationQuery: 'Mazatenango, Guatemala', subQueries: ['Mazatenango, Guatemala', 'Cuyotenango, Guatemala'] },
+            { id: 'gt_san_marcos', cityName: 'San Marcos y San Pedro Sacatepéquez', stateName: 'San Marcos', locationQuery: 'San Marcos, Guatemala', subQueries: ['San Marcos, Guatemala', 'San Pedro Sacatepéquez, Guatemala', 'Malacatán, Guatemala'] }
+        ],
+        'costa rica': [
+            { id: 'cr_san_jose', cityName: 'San José Gran Área Metropolitana', stateName: 'San José', locationQuery: 'San José, Costa Rica', subQueries: ['San José, Costa Rica', 'Escazú, Costa Rica', 'Santa Ana, Costa Rica', 'Desamparados, Costa Rica', 'Curridabat, Costa Rica'] },
+            { id: 'cr_alajuela', cityName: 'Alajuela, San Ramón y Grecia', stateName: 'Alajuela', locationQuery: 'Alajuela, Costa Rica', subQueries: ['Alajuela, Costa Rica', 'San Ramón, Costa Rica', 'Grecia, Costa Rica', 'Ciudad Quesada, Costa Rica'] },
+            { id: 'cr_cartago', cityName: 'Cartago, Paraíso y La Unión', stateName: 'Cartago', locationQuery: 'Cartago, Costa Rica', subQueries: ['Cartago, Costa Rica', 'Paraíso, Costa Rica', 'Tres Ríos, Costa Rica'] },
+            { id: 'cr_heredia', cityName: 'Heredia, Belén y Barva', stateName: 'Heredia', locationQuery: 'Heredia, Costa Rica', subQueries: ['Heredia, Costa Rica', 'San Antonio de Belén, Costa Rica', 'Barva, Costa Rica'] },
+            { id: 'cr_guanacaste', cityName: 'Liberia, Tamarindo y Nicoya', stateName: 'Guanacaste', locationQuery: 'Liberia, Costa Rica', subQueries: ['Liberia, Costa Rica', 'Tamarindo, Costa Rica', 'Nicoya, Costa Rica', 'Santa Cruz, Costa Rica'] },
+            { id: 'cr_puntarenas', cityName: 'Puntarenas, Jacó y Quepos', stateName: 'Puntarenas', locationQuery: 'Puntarenas, Costa Rica', subQueries: ['Puntarenas, Costa Rica', 'Jacó, Costa Rica', 'Quepos, Costa Rica'] },
+            { id: 'cr_limon', cityName: 'Limón, Puerto Viejo y Guápiles', stateName: 'Limón', locationQuery: 'Limón, Costa Rica', subQueries: ['Limón, Costa Rica', 'Puerto Viejo, Costa Rica', 'Guápiles, Costa Rica'] }
         ],
         'mexico': [
             { id: 'mx_cdmx', cityName: 'Ciudad de México y Área Metro', stateName: 'CDMX', locationQuery: 'CDMX, México', subQueries: ['CDMX, México', 'Polanco CDMX, México', 'Condesa CDMX, México', 'Coyoacán CDMX, México', 'Santa Fe CDMX, México', 'Naucalpan, México', 'Tlalpan CDMX, México'] },
@@ -271,14 +341,30 @@ class LeadDiscoveryService {
         ]
     };
 
-    getCityPresets(location: string) {
+    getCityPresets(location: string): CityPresetItem[] {
         const normalized = location.toLowerCase().trim();
+
+        // US variations matching
+        if (['usa', 'us', 'estados unidos', 'united states', 'eeuu', 'ee.uu'].some(k => normalized.includes(k) || k === normalized)) {
+            return this.CITY_PRESETS['estados unidos'];
+        }
+
         for (const [countryKey, cities] of Object.entries(this.CITY_PRESETS)) {
             if (normalized.includes(countryKey) || countryKey.includes(normalized)) {
                 return cities;
             }
         }
-        return this.CITY_PRESETS['el salvador'];
+
+        // Dynamic Whole Country Fallback Generator
+        const cleanLoc = capitalize(location);
+        return [
+            { id: `dyn_capital`, cityName: `${cleanLoc} Capital y Área Metro`, stateName: 'Zona Metropolitana', locationQuery: `${cleanLoc}`, subQueries: [`${cleanLoc}`, `Centro ${cleanLoc}`, `Capital ${cleanLoc}`] },
+            { id: `dyn_norte`, cityName: `${cleanLoc} Zona Norte`, stateName: 'Región Norte', locationQuery: `Norte ${cleanLoc}`, subQueries: [`Norte ${cleanLoc}`] },
+            { id: `dyn_sur`, cityName: `${cleanLoc} Zona Sur`, stateName: 'Región Sur', locationQuery: `Sur ${cleanLoc}`, subQueries: [`Sur ${cleanLoc}`] },
+            { id: `dyn_este`, cityName: `${cleanLoc} Zona Este`, stateName: 'Región Este', locationQuery: `Este ${cleanLoc}`, subQueries: [`Este ${cleanLoc}`] },
+            { id: `dyn_oeste`, cityName: `${cleanLoc} Zona Oeste`, stateName: 'Región Oeste', locationQuery: `Oeste ${cleanLoc}`, subQueries: [`Oeste ${cleanLoc}`] },
+            { id: `dyn_central`, cityName: `${cleanLoc} Región Central`, stateName: 'Región Central', locationQuery: `Central ${cleanLoc}`, subQueries: [`Central ${cleanLoc}`] }
+        ];
     }
 
     scanDensityByRegion = async (query: string, location: string, options?: { deepScan?: boolean; categoryKey?: string }): Promise<RegionalDensity[]> => {
