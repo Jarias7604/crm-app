@@ -53,7 +53,7 @@ serve(async (req) => {
         let allPlaces: any[] = [];
         let nextPageToken: string | null = null;
         let pageCount = 0;
-        const maxPages = 3; // Approx 60 results (20 per page)
+        const maxPages = 5; // Approx 100 results per sub-query (20 per page)
 
         do {
             const response = await fetch(textSearchUrl, {

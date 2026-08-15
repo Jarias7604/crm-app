@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap, Users, X, ArrowRight, Layers } from 'lucide-react';
-import { leadDiscoveryService, type DiscoveredLead, type RegionalDensity } from '../../services/marketing/leadDiscovery';
+import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap, Users, X, ArrowRight, Layers, Sparkles, ChevronDown } from 'lucide-react';
+import { leadDiscoveryService, OFFICIAL_CATEGORIES, type DiscoveredLead, type RegionalDensity } from '../../services/marketing/leadDiscovery';
 import { leadsService } from '../../services/leads';
 import { useAuth } from '../../auth/AuthProvider';
 import { BulkAssignModal } from '../../components/leads/BulkAssignModal';
@@ -14,7 +14,11 @@ export default function LeadHunter() {
     // SIMULATION GUARD: always use the active company, not the JWT tenant
     const activeCompanyId = simulatedCompanyId || profile?.company_id;
     const [query, setQuery] = useState('');
-    const [location, setLocation] = useState('');
+    const [location, setLocation] = useState('El Salvador');
+    const [selectedCategory, setSelectedCategory] = useState('custom');
+    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+    const categoryDropdownRef = useRef<HTMLDivElement>(null);
+    const [isDeepScan, setIsDeepScan] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [isStartingCampaign, setIsStartingCampaign] = useState(false);
@@ -31,6 +35,14 @@ export default function LeadHunter() {
 
     useEffect(() => {
         leadsService.getTeamMembers().then(data => setTeamMembers(data || [])).catch(() => {});
+
+        const handleClickOutside = (e: MouseEvent) => {
+            if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
+                setIsCategoryDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -42,6 +54,16 @@ export default function LeadHunter() {
         hasWebsite: false,
         hasEmail: false
     });
+
+    // Handle category change
+    const handleCategorySelect = (catKey: string) => {
+        setSelectedCategory(catKey);
+        setIsCategoryDropdownOpen(false);
+        const cat = OFFICIAL_CATEGORIES.find(c => c.key === catKey);
+        if (cat && cat.key !== 'custom') {
+            setQuery(cat.synonyms[0] || cat.label);
+        }
+    };
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -77,8 +99,11 @@ export default function LeadHunter() {
 
         setIsDensityScanning(true);
         try {
-            toast.loading('Escaneando densidad de prospectos en múltiples ciudades...', { id: 'densityScan' });
-            const density = await leadDiscoveryService.scanDensityByRegion(query, location);
+            toast.loading(isDeepScan ? '🔍 Ejecutando Escaneo Profundo 100% (Multi-Synonym & Sub-Zones)...' : 'Escaneando densidad por zonas...', { id: 'densityScan' });
+            const density = await leadDiscoveryService.scanDensityByRegion(query, location, {
+                deepScan: isDeepScan,
+                categoryKey: selectedCategory !== 'custom' ? selectedCategory : undefined
+            });
             setDensityResults(density);
 
             // Pre-select non-empty cities
@@ -379,10 +404,77 @@ export default function LeadHunter() {
                 </div>
             )}
 
-            {/* Search Bar - Delicate & Clean (Mockup Approved Style) */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm">
+            {/* Search Bar - Enhanced with Category Selector & Deep Crawl Mode */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm space-y-3">
                 <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                    <div className="md:col-span-5 bg-slate-50/80 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center gap-3">
+                    {/* Rubro / Categoría Selector (Modern Custom Popover) */}
+                    <div ref={categoryDropdownRef} className="md:col-span-3 relative">
+                        <button
+                            type="button"
+                            onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                            className="w-full bg-slate-50/80 hover:bg-slate-100/80 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center justify-between gap-2 text-left transition-all group"
+                        >
+                            <div className="flex items-center gap-2.5 overflow-hidden">
+                                <Sparkles className="w-4 h-4 text-amber-500 shrink-0 group-hover:scale-110 transition-transform" />
+                                <div className="truncate">
+                                    <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider leading-none mb-0.5">Rubro u Oficio</label>
+                                    <span className="text-slate-800 font-bold text-xs truncate block flex items-center gap-1.5">
+                                        {(() => {
+                                            const activeCat = OFFICIAL_CATEGORIES.find(c => c.key === selectedCategory);
+                                            if (!activeCat) return 'Seleccionar Rubro...';
+                                            return `${activeCat.icon} ${activeCat.label}`;
+                                        })()}
+                                    </span>
+                                </div>
+                            </div>
+                            <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${isCategoryDropdownOpen ? 'rotate-180 text-indigo-600' : ''}`} />
+                        </button>
+
+                        {/* Modern Floating Menu (Wider & Cleaner) */}
+                        {isCategoryDropdownOpen && (
+                            <div className="absolute left-0 top-full mt-2 w-[340px] sm:w-[380px] md:w-[400px] bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 shadow-2xl z-50 p-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-150 max-h-84 overflow-y-auto">
+                                <div className="px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
+                                    <span>Rubros Oficiales (Google)</span>
+                                    <span className="text-indigo-600 font-semibold">{OFFICIAL_CATEGORIES.length} rubros disponibles</span>
+                                </div>
+                                {OFFICIAL_CATEGORIES.map((cat) => {
+                                    const isSelected = cat.key === selectedCategory;
+                                    return (
+                                        <button
+                                            key={cat.key}
+                                            type="button"
+                                            onClick={() => handleCategorySelect(cat.key)}
+                                            className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-all ${
+                                                isSelected
+                                                    ? 'bg-amber-500/10 border border-amber-500/30 text-slate-900 font-bold shadow-xs'
+                                                    : 'hover:bg-slate-100/70 text-slate-700 font-semibold border border-transparent'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                <span className="text-lg shrink-0">{cat.icon}</span>
+                                                <div className="truncate">
+                                                    <span className="block text-xs font-bold truncate leading-tight text-slate-900">{cat.label}</span>
+                                                    {cat.synonyms.length > 0 && (
+                                                        <span className="block text-[10px] text-slate-400 font-normal truncate mt-0.5">
+                                                            Incluye: {cat.synonyms.slice(0, 3).join(', ')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {isSelected && (
+                                                <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 ml-2">
+                                                    <Check className="w-3 h-3 stroke-[3]" />
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Término Específico */}
+                    <div className="md:col-span-3 bg-slate-50/80 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center gap-3">
                         <Building2 className="w-5 h-5 text-slate-400 shrink-0" />
                         <div className="w-full">
                             <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Término de Búsqueda</label>
@@ -391,18 +483,22 @@ export default function LeadHunter() {
                                 placeholder="ej. Iglesias cristianas, Dentistas, Cafés"
                                 className="w-full bg-transparent text-slate-800 font-bold text-sm focus:outline-none placeholder-slate-400"
                                 value={query}
-                                onChange={(e) => setQuery(e.target.value)}
+                                onChange={(e) => {
+                                    setQuery(e.target.value);
+                                    if (selectedCategory !== 'custom') setSelectedCategory('custom');
+                                }}
                             />
                         </div>
                     </div>
 
-                    <div className="md:col-span-4 bg-slate-50/80 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center gap-3">
+                    {/* País / Región */}
+                    <div className="md:col-span-3 bg-slate-50/80 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center gap-3">
                         <MapPin className="w-5 h-5 text-slate-400 shrink-0" />
                         <div className="w-full">
                             <label className="block text-[10px] text-slate-400 font-semibold uppercase tracking-wider">País o Región</label>
                             <input
                                 type="text"
-                                placeholder="ej. Estados Unidos, México, Colombia"
+                                placeholder="ej. El Salvador, Estados Unidos, México"
                                 className="w-full bg-transparent text-slate-800 font-bold text-sm focus:outline-none placeholder-slate-400"
                                 value={location}
                                 onChange={(e) => setLocation(e.target.value)}
@@ -410,19 +506,20 @@ export default function LeadHunter() {
                         </div>
                     </div>
 
+                    {/* Botones de Acción */}
                     <div className="md:col-span-3 flex gap-2">
                         <button
                             type="button"
                             onClick={handleScanDensity}
                             disabled={isDensityScanning || isLoading}
-                            className="flex-1 py-3 px-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                            className="flex-1 py-3 px-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
                         >
                             {isDensityScanning ? (
                                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                             ) : (
                                 <>
                                     <Layers className="w-4 h-4" />
-                                    <span>Escanear Ciudades</span>
+                                    <span>Escanear Zonas</span>
                                 </>
                             )}
                         </button>
@@ -430,7 +527,7 @@ export default function LeadHunter() {
                         <button
                             type="submit"
                             disabled={isLoading || isDensityScanning}
-                            className="py-3 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
+                            className="py-3 px-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
                             title="Búsqueda directa en ciudad especificada"
                         >
                             {isLoading ? (
@@ -441,6 +538,28 @@ export default function LeadHunter() {
                         </button>
                     </div>
                 </form>
+
+                {/* Sub-bar for Deep Scan Mode Control */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-500">
+                    <div className="flex items-center gap-3">
+                        <span className="text-slate-400 uppercase text-[10px] tracking-wider font-bold">Modo de Captura:</span>
+                        <button
+                            type="button"
+                            onClick={() => setIsDeepScan(!isDeepScan)}
+                            className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 border ${
+                                isDeepScan
+                                    ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-xs'
+                                    : 'bg-slate-50 border-slate-200 text-slate-600'
+                            }`}
+                        >
+                            <Zap className={`w-3.5 h-3.5 ${isDeepScan ? 'text-amber-600 fill-current' : 'text-slate-400'}`} />
+                            <span>{isDeepScan ? '🔍 Escaneo Profundo 100% (Multi-Sinónimos + Sub-Zonas)' : '⚡ Escaneo Estándar'}</span>
+                        </button>
+                    </div>
+                    <span className="text-[11px] text-slate-400 hidden sm:block">
+                        {isDeepScan ? '✅ Captura exhaustiva en todos los municipios y sinónimos sin perder nada' : '⚡ Búsqueda rápida por nombre directo'}
+                    </span>
+                </div>
             </div>
 
             {/* Selection Toolbar */}
