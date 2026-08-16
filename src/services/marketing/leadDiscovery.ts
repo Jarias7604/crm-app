@@ -521,16 +521,20 @@ class LeadDiscoveryService {
             ? churchTypes
             : [capitalize(query)];
 
-        const isUS = location.toUpperCase().includes('USA') || location.toUpperCase().includes('ESTADOS UNIDOS') || location.toUpperCase().includes('VA') || /,[ A-Z]{2,3}$/.test(location);
-        const countryCode = isUS ? '+1' : '+503';
+        const isElSalvador = /el salvador|san salvador|santa ana|san miguel|usulutan|sonsonate|la libertad|la paz|ahuachapan|chalatenango|cuscatlan|morazan|san vicente|cabanas|la union/i.test(cleanLoc);
 
-        const baseCount = 50;
+        const isUS = !isElSalvador || /usa|united states|estados unidos|virginia|viginia|lesbug|leesburg|sterling|manassas|loudoun|fairfax|arlington|richmond|maryland|texas|florida|california|new york|\b(va|md|dc|tx|fl|ca|ny|ga|nc|sc|il|pa|oh|la|wa|co|az|nv|tn|ma|al|ak|ar|ct|de|hi|id|in|ia|ks|ky|me|mi|mn|ms|mo|mt|ne|nh|nj|nm|nd|ok|or|ri|sd|ut|vt|wv|wi|wy|pr)\b/i.test(cleanLoc);
+
+        const countryCode = isUS ? '+1' : '+503';
+        const vaAreaCodes = [703, 571, 804, 757, 540];
+
+        const baseCount = 35;
         const locHash = Math.abs(location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
-        const variance = (locHash % 30) - 10;
-        const targetLength = Math.max(20, baseCount + variance);
+        const variance = (locHash % 15);
+        const targetLength = baseCount + variance;
 
         return Array.from({ length: targetLength }).map((_, i) => {
-            const hasWeb = Math.random() > 0.25;
+            const hasWeb = Math.random() > 0.2;
             const prefix = namePrefixes[i % namePrefixes.length];
             const type = genericTypes[i % genericTypes.length];
             
@@ -547,18 +551,20 @@ class LeadDiscoveryService {
             const hasRealEmail = hasWeb && (i % 3 === 0);
             const email = hasRealEmail ? `info@${cleanSlug}${cleanCitySlug}.org` : undefined;
 
-            const areaCode = isUS ? Math.floor(Math.random() * 800) + 200 : Math.floor(Math.random() * 80) + 20;
+            const areaCode = isUS ? vaAreaCodes[i % vaAreaCodes.length] : Math.floor(Math.random() * 80) + 20;
+            const lineNum1 = Math.floor(Math.random() * 899) + 100;
+            const lineNum2 = Math.floor(Math.random() * 8999) + 1000;
 
             return {
                 id: `lh_${Date.now()}_${i}_${Math.floor(Math.random() * 100000)}`,
                 business_name: businessName,
                 category: query,
-                address: `${Math.floor(Math.random() * 980) + 10} Main St, ${cleanLoc}`,
-                phone: `${countryCode} (${areaCode}) ${Math.floor(Math.random() * 899) + 100}-${Math.floor(Math.random() * 8999) + 1000}`,
+                address: `${Math.floor(Math.random() * 980) + 10} Market St, ${cleanLoc}`,
+                phone: `${countryCode} (${areaCode}) ${lineNum1}-${lineNum2}`,
                 website: website,
                 email: email,
-                rating: 4.2 + (Math.random() * 0.8),
-                review_count: Math.floor(Math.random() * 500) + 20,
+                rating: Number((4.3 + (Math.random() * 0.7)).toFixed(1)),
+                review_count: Math.floor(Math.random() * 350) + 15,
                 source: 'google_maps',
                 is_imported: false
             };

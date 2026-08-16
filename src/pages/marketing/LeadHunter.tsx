@@ -158,10 +158,6 @@ export default function LeadHunter() {
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isDeepScan) {
-            handleScanDensity();
-            return;
-        }
 
         if (!query || !location) {
             toast.error('Por favor ingresa qué buscas y dónde.');

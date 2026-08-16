@@ -149,24 +149,29 @@ function generateMockResults(query: string, location: string) {
     const types = ['Iglesia Evangélica', 'Centro Cristiano', 'Comunidad de Fe', 'Ministerio Internacional', 'Iglesia Bautista', 'Templo Betel', 'Iglesia Pentecostal', 'Asambleas de Dios', 'Centro de Alabanza', 'Ministerio Mahanaim', 'Iglesia Cristiana'];
     const namePrefixes = ['Gran Comisión', 'Luz y Vida', 'Nueva Vida', 'Camino de Santidad', 'Monte de los Olivos', 'Manantial de Vida', 'Puerta del Cielo', 'Ríos de Agua Viva'];
 
-    const isUS = location.toUpperCase().includes('USA') || location.toUpperCase().includes('ESTADOS UNIDOS') || /,[ A-Z]{2,3}$/.test(location);
-    const countryCode = isUS ? '+1' : '+503';
-    const city = location.split(',')[0].trim();
+    const cleanLoc = location.trim();
+    const isElSalvador = /el salvador|san salvador|santa ana|san miguel|usulutan|sonsonate|la libertad|la paz|ahuachapan|chalatenango|cuscatlan|morazan|san vicente|cabanas|la union/i.test(cleanLoc);
+    const isUS = !isElSalvador || /usa|united states|estados unidos|virginia|viginia|lesbug|leesburg|sterling|manassas|loudoun|fairfax|arlington|richmond|maryland|texas|florida|california|new york|\b(va|md|dc|tx|fl|ca|ny|ga|nc|sc|il|pa|oh|la|wa|co|az|nv|tn|ma|al|ak|ar|ct|de|hi|id|in|ia|ks|ky|me|mi|mn|ms|mo|mt|ne|nh|nj|nm|nd|ok|or|ri|sd|ut|vt|wv|wi|wy|pr)\b/i.test(cleanLoc);
 
-    return Array.from({ length: 20 }).map((_, i) => {
+    const countryCode = isUS ? '+1' : '+503';
+    const vaAreaCodes = [703, 571, 804, 757, 540];
+    const city = cleanLoc.split(',')[0].trim();
+
+    return Array.from({ length: 25 }).map((_, i) => {
         const prefix = namePrefixes[i % namePrefixes.length];
         const type = types[i % types.length];
-        const businessName = `${type} ${prefix} ${city}`;
+        const businessName = `${type} ${prefix} de ${city}`;
+        const areaCode = isUS ? vaAreaCodes[i % vaAreaCodes.length] : Math.floor(Math.random() * 80) + 20;
 
         return {
             id: `mock_${Date.now()}_${i}`,
             business_name: businessName,
             category: query,
-            address: `${Math.floor(Math.random() * 900) + 10} Main St, ${location}`,
-            phone: `${countryCode} (${isUS ? Math.floor(Math.random() * 800) + 200 : Math.floor(Math.random() * 80) + 20}) ${Math.floor(Math.random() * 899) + 100}-${Math.floor(Math.random() * 8999) + 1000}`,
+            address: `${Math.floor(Math.random() * 900) + 10} Market St, ${cleanLoc}`,
+            phone: `${countryCode} (${areaCode}) ${Math.floor(Math.random() * 899) + 100}-${Math.floor(Math.random() * 8999) + 1000}`,
             website: Math.random() > 0.3 ? `www.${prefix.replace(/[^a-zA-Z]/g, '').toLowerCase()}${city.replace(/[^a-zA-Z]/g, '').toLowerCase()}.org` : undefined,
-            rating: 3.5 + (Math.random() * 1.5),
-            review_count: Math.floor(Math.random() * 1200),
+            rating: 4.2 + (Math.random() * 0.8),
+            review_count: Math.floor(Math.random() * 400) + 10,
             source: 'google_maps',
             is_imported: false
         };
