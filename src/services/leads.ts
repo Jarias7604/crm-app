@@ -614,14 +614,39 @@ export const leadsService = {
         return data as Lead;
     },
 
-    // Delete a lead
+    // Delete a lead (cleans up child records first to avoid FK constraint errors)
     async deleteLead(id: string) {
+        await supabase.from('follow_ups').delete().eq('lead_id', id);
+        await supabase.from('call_activities').delete().eq('lead_id', id);
+        await supabase.from('lead_ai_memory').delete().eq('lead_id', id);
+
         const { error } = await supabase
             .from('leads')
             .delete()
             .eq('id', id);
 
-        if (error) throw error;
+        if (error) {
+            console.error(`[leadsService] Error deleting lead ${id}:`, error);
+            throw error;
+        }
+    },
+
+    // Delete multiple leads in bulk (single query with child cleanup)
+    async deleteLeadsBulk(ids: string[]) {
+        if (!ids.length) return;
+        await supabase.from('follow_ups').delete().in('lead_id', ids);
+        await supabase.from('call_activities').delete().in('lead_id', ids);
+        await supabase.from('lead_ai_memory').delete().in('lead_id', ids);
+
+        const { error } = await supabase
+            .from('leads')
+            .delete()
+            .in('id', ids);
+
+        if (error) {
+            console.error(`[leadsService] Error bulk deleting leads:`, error);
+            throw error;
+        }
     },
 
     // Bulk assign leads to an agent — single SQL UPDATE (not N individual calls)

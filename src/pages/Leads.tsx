@@ -480,12 +480,13 @@ export default function Leads() {
         if (!window.confirm(`¿Estás seguro de que deseas eliminar ${selectedLeadIds.length} prospectos?`)) return;
 
         try {
-            await Promise.all(selectedLeadIds.map(id => leadsService.deleteLead(id)));
+            await leadsService.deleteLeadsBulk(selectedLeadIds);
             toast.success(`${selectedLeadIds.length} prospectos eliminados correctamente`);
             setSelectedLeadIds([]);
             loadLeads();
-        } catch (error) {
-            toast.error("Error al eliminar algunos prospectos");
+        } catch (error: any) {
+            console.error('[Leads] handleBulkDelete error:', error);
+            toast.error("Error al eliminar los prospectos: " + (error?.message || "Error desconocido"));
         }
     };
 
