@@ -69,11 +69,13 @@ export default function LeadHunter() {
     const getEffectiveQuery = (rawQuery: string) => {
         if (!rawQuery) return rawQuery;
         const lower = rawQuery.toLowerCase();
-        if (audienceFilter === 'hispanic') {
+        const isUS = location.toUpperCase().includes('USA') || location.toUpperCase().includes('ESTADOS UNIDOS');
+
+        if (audienceFilter === 'hispanic' && isUS) {
             if (!lower.includes('hispana') && !lower.includes('español') && !lower.includes('latina') && !lower.includes('spanish')) {
                 return `${rawQuery} hispana`;
             }
-        } else if (audienceFilter === 'anglo') {
+        } else if (audienceFilter === 'anglo' && isUS) {
             let translated = rawQuery
                 .replace(/iglesia cristiana/i, 'Christian Church')
                 .replace(/iglesia/i, 'Church')
