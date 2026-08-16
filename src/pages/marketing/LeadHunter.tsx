@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap, Users, X, ArrowRight, Layers, Sparkles, ChevronDown, ShieldCheck } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { leadDiscoveryService, OFFICIAL_CATEGORIES, type DiscoveredLead, type RegionalDensity } from '../../services/marketing/leadDiscovery';
 import { leadsService } from '../../services/leads';
 import { useAuth } from '../../auth/AuthProvider';
@@ -10,6 +11,7 @@ import toast from 'react-hot-toast';
 // Lead Hunter AI Component - Multi-City Density Scanner Integrated
 export default function LeadHunter() {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const { profile, simulatedCompanyId } = useAuth();
     // SIMULATION GUARD: always use the active company, not the JWT tenant
     const activeCompanyId = simulatedCompanyId || profile?.company_id;
@@ -236,7 +238,8 @@ export default function LeadHunter() {
         try {
             if (toImport.length > 0) {
                 toast.loading(`Importando ${toImport.length} leads...`, { id: 'bulkImport' });
-                const stats = await leadDiscoveryService.importLeadsBulk(toImport, activeCompanyId);
+                const stats = await leadDiscoveryService.importLeadsBulk(toImport, activeCompanyId, profile?.id);
+                queryClient.invalidateQueries({ queryKey: ['leads'] });
 
                 setResults(prev => prev.map(r =>
                     selectedIds.has(r.id) ? { ...r, is_imported: true } : r
@@ -275,7 +278,8 @@ export default function LeadHunter() {
         }
 
         try {
-            const res = await leadDiscoveryService.importLead(lead, activeCompanyId);
+            const res = await leadDiscoveryService.importLead(lead, activeCompanyId, profile?.id);
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
             setResults(prev => prev.map(r =>
                 r.id === lead.id ? { ...r, is_imported: true } : r
             ));

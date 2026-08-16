@@ -580,15 +580,15 @@ class LeadDiscoveryService {
         return `info@${domain}`;
     }
 
-    async importLead(lead: DiscoveredLead, companyId: string): Promise<{ success: boolean; isDuplicate: boolean }> {
-        const res = await this.importLeadsBulk([lead], companyId);
+    async importLead(lead: DiscoveredLead, companyId: string, assignedToId?: string): Promise<{ success: boolean; isDuplicate: boolean }> {
+        const res = await this.importLeadsBulk([lead], companyId, assignedToId);
         return {
             success: res.success > 0 || res.failed > 0, // Considered handled if saved or already existed
             isDuplicate: res.failed > 0 && res.success === 0
         };
     }
 
-    async importLeadsBulk(leads: DiscoveredLead[], companyId: string): Promise<{ success: number; failed: number }> {
+    async importLeadsBulk(leads: DiscoveredLead[], companyId: string, assignedToId?: string): Promise<{ success: number; failed: number }> {
         if (!leads.length) return { success: 0, failed: 0 };
 
         let success = 0;
@@ -605,6 +605,7 @@ class LeadDiscoveryService {
                     industry: string | null;
                     status: LeadStatus;
                     company_id: string;
+                    assigned_to: string | null;
                     google_place_id: string;
                     next_action_notes: string;
                 } = {
@@ -616,6 +617,7 @@ class LeadDiscoveryService {
                     industry: lead.category || 'Iglesias y Congregaciones',
                     status: 'Prospecto',
                     company_id: companyId,
+                    assigned_to: assignedToId || null,
                     google_place_id: lead.id,
                     next_action_notes: `Prospecto de Lead Hunter. Dirección: ${lead.address}. Rating: ${lead.rating?.toFixed(1)}${lead.website ? `. Web: ${this.cleanDomain(lead.website)}` : ''}`
                 };
