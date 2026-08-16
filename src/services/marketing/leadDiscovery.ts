@@ -480,7 +480,7 @@ class LeadDiscoveryService {
 
             const rawResults: DiscoveredLead[] = (data.results || []).map((r: DiscoveredLead) => ({
                 ...r,
-                email: r.email || this.deriveEmail(r.website) || undefined
+                email: (r.email && r.email.includes('@') && !r.email.includes('example.com')) ? r.email.trim() : undefined
             }));
 
             // 2. Verificar duplicados en la base de datos local
@@ -529,7 +529,9 @@ class LeadDiscoveryService {
             const cleanQuery = query.replace(/iglesia/i, '').replace(/cristiana/i, '').trim() || 'Central';
             const domainSlug = cleanQuery.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'iglesia';
             const website = hasWeb ? `www.${domainSlug}${i + 1}.org` : undefined;
-            const email = website ? `info@${domainSlug}${i + 1}.org` : undefined;
+            // Only ~25% of mock businesses have a verified published email to strictly reflect real-world ratio
+            const hasRealEmail = hasWeb && (i % 4 === 0);
+            const email = hasRealEmail ? `contacto@${domainSlug}${i + 1}.org` : undefined;
 
             return {
                 id: `lh_${Date.now()}_${i}_${Math.floor(Math.random() * 100000)}`,
