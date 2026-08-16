@@ -174,12 +174,7 @@ export default function LeadHunter() {
         }
     };
 
-    const handleImportFromDensityModal = async () => {
-        if (!activeCompanyId) {
-            toast.error('No se identificó tu empresa.');
-            return;
-        }
-
+    const handleLoadLeadsFromDensity = () => {
         const selectedCities = densityResults.filter(d => selectedDensityCityIds.has(d.id));
         const aggregatedLeads: DiscoveredLead[] = [];
         selectedCities.forEach(c => aggregatedLeads.push(...c.leads));
@@ -191,31 +186,8 @@ export default function LeadHunter() {
 
         setIsDensityModalOpen(false);
         setResults(aggregatedLeads);
-        
-        // Select all aggregated leads that are not imported yet
-        const toImportIds = new Set(aggregatedLeads.filter(l => !l.is_imported).map(l => l.id));
-        setSelectedIds(toImportIds);
-
-        // Perform bulk import
-        setIsImporting(true);
-        try {
-            toast.loading(`Importando ${toImportIds.size} prospectos de las ciudades seleccionadas...`, { id: 'densityImport' });
-            const toImportLeads = aggregatedLeads.filter(l => toImportIds.has(l.id));
-            const stats = await leadDiscoveryService.importLeadsBulk(toImportLeads, activeCompanyId);
-
-            setResults(prev => prev.map(r => ({
-                ...r,
-                is_imported: true
-            })));
-
-            toast.success(`✅ ${stats.success} prospectos agregados exitosamente a tu CRM (${stats.failed} duplicados ignorados).`, { id: 'densityImport' });
-            setSelectedIds(new Set());
-        } catch (error) {
-            console.error(error);
-            toast.error('Error durante la importación masiva.', { id: 'densityImport' });
-        } finally {
-            setIsImporting(false);
-        }
+        setSelectedIds(new Set());
+        toast.success(`📋 ${aggregatedLeads.length} prospectos cargados. Selecciona los que deseas importar a tu CRM.`);
     };
 
     // Apply client-side filtering
@@ -889,13 +861,12 @@ export default function LeadHunter() {
                             </div>
 
                             <button
-                                onClick={handleImportFromDensityModal}
-                                disabled={isImporting}
-                                className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                onClick={handleLoadLeadsFromDensity}
+                                className="w-full sm:w-auto py-3 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
                             >
-                                <span>Importar {densityResults
+                                <span>Cargar {densityResults
                                     .filter(d => selectedDensityCityIds.has(d.id))
-                                    .reduce((sum, item) => sum + item.count, 0).toLocaleString()} Leads a mi CRM</span>
+                                    .reduce((sum, item) => sum + item.count, 0).toLocaleString()} Prospectos</span>
                                 <ArrowRight className="w-4 h-4" />
                             </button>
                         </div>
