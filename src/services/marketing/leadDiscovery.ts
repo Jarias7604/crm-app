@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { scrapeWebsiteEmail } from './webEmailScraper';
 import type { LeadStatus } from '../../types';
 
 export interface DiscoveredLead {
@@ -596,6 +597,16 @@ class LeadDiscoveryService {
 
         for (const lead of leads) {
             try {
+                // Auto-scrape website email on import if missing
+                let emailToSave = lead.email || null;
+                if (!emailToSave && lead.website) {
+                    try {
+                        emailToSave = await scrapeWebsiteEmail(lead.website);
+                    } catch {
+                        // ignore scrape errors on import
+                    }
+                }
+
                 const newLead: {
                     name: string;
                     company_name: string;
@@ -611,7 +622,7 @@ class LeadDiscoveryService {
                 } = {
                     name: lead.business_name,
                     company_name: lead.business_name,
-                    email: lead.email || null,
+                    email: emailToSave,
                     phone: lead.phone || null,
                     source: 'Lead Hunter AI',
                     industry: lead.category || 'Iglesias y Congregaciones',
@@ -636,8 +647,12 @@ class LeadDiscoveryService {
                 }
 
                 if (error) {
-                    // Duplicate by google_place_id, phone or email = expected, skip silently
+                    // Duplicate by google_place_id, phone or email = expected
                     if (error.code === '23505') {
+                        // If we now have an email for an existing lead, update it
+                        if (emailToSave) {
+                            await supabase.from('leads').update({ email: emailToSave }).eq('google_place_id', lead.id);
+                        }
                         failed++;
                     } else {
                         console.error(`[LeadHunter] import error for "${lead.business_name}":`, error.code, error.message, error.details);

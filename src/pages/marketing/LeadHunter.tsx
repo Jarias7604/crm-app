@@ -3,8 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap, Users, X, ArrowRight, Layers, Sparkles, ChevronDown, ShieldCheck } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { leadDiscoveryService, OFFICIAL_CATEGORIES, type DiscoveredLead, type RegionalDensity } from '../../services/marketing/leadDiscovery';
-import { batchScrapeLeadEmails } from '../../services/marketing/webEmailScraper';
+import { batchScrapeLeadEmails, scrapeWebsiteEmail } from '../../services/marketing/webEmailScraper';
 import { leadsService } from '../../services/leads';
+import { supabase } from '../../services/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { BulkAssignModal } from '../../components/leads/BulkAssignModal';
 import toast from 'react-hot-toast';
@@ -25,6 +26,7 @@ export default function LeadHunter() {
     const [isLoading, setIsLoading] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [isScrapingEmails, setIsScrapingEmails] = useState(false);
+    const [scanningSingleId, setScanningSingleId] = useState<string | null>(null);
     const [isStartingCampaign, setIsStartingCampaign] = useState(false);
     const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -61,6 +63,30 @@ export default function LeadHunter() {
         noWebsiteOnly: false
     });
 
+    const handleScrapeSingleLeadEmail = async (lead: DiscoveredLead) => {
+        if (!lead.website) return;
+        setScanningSingleId(lead.id);
+        toast.loading(`🔍 Escaneando página web de ${lead.business_name}...`, { id: `scrape-${lead.id}` });
+        try {
+            const foundEmail = await scrapeWebsiteEmail(lead.website);
+            if (foundEmail) {
+                setResults(prev => prev.map(r => r.id === lead.id ? { ...r, email: foundEmail } : r));
+                toast.success(`✅ Correo real encontrado: ${foundEmail}`, { id: `scrape-${lead.id}` });
+                if (lead.is_imported) {
+                    await supabase.from('leads').update({ email: foundEmail }).eq('google_place_id', lead.id);
+                    queryClient.invalidateQueries({ queryKey: ['leads'] });
+                }
+            } else {
+                toast(`ℹ️ No se encontró un correo público en el sitio web de ${lead.business_name}.`, { icon: 'ℹ️', id: `scrape-${lead.id}` });
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error('Error al escanear sitio web.', { id: `scrape-${lead.id}` });
+        } finally {
+            setScanningSingleId(null);
+        }
+    };
+
     const handleScrapeEmails = async () => {
         const leadsToScrape = results.filter(r => r.website && !r.email);
         if (leadsToScrape.length === 0) {
@@ -72,8 +98,13 @@ export default function LeadHunter() {
         toast.loading(`🔍 Bot escaneando los sitios web de ${leadsToScrape.length} prospectos...`, { id: 'webScrape' });
 
         try {
-            const stats = await batchScrapeLeadEmails(results, (leadId, foundEmail) => {
+            const stats = await batchScrapeLeadEmails(results, async (leadId, foundEmail) => {
                 setResults(prev => prev.map(r => r.id === leadId ? { ...r, email: foundEmail } : r));
+                const target = results.find(r => r.id === leadId);
+                if (target?.is_imported) {
+                    await supabase.from('leads').update({ email: foundEmail }).eq('google_place_id', leadId);
+                    queryClient.invalidateQueries({ queryKey: ['leads'] });
+                }
             });
 
             if (stats.foundCount > 0) {
@@ -777,10 +808,23 @@ export default function LeadHunter() {
                                             Email Real — Venta CRM / IA
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-extrabold">
-                                            <Globe className="w-3 h-3 text-blue-600" />
-                                            Tiene Web (Listo p/ Escanear)
-                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleScrapeSingleLeadEmail(lead);
+                                            }}
+                                            disabled={scanningSingleId === lead.id}
+                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 text-[11px] font-extrabold transition-all cursor-pointer shadow-2xs"
+                                            title="Escanear la página web de esta empresa para buscar su correo real"
+                                        >
+                                            {scanningSingleId === lead.id ? (
+                                                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                            ) : (
+                                                <Search className="w-3 h-3 text-blue-600" />
+                                            )}
+                                            <span>🔍 Escanear Email Web</span>
+                                        </button>
                                     )}
                                 </div>
 
