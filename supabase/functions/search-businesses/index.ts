@@ -146,20 +146,31 @@ serve(async (req) => {
 
 // Fallback mock data generator
 function generateMockResults(query: string, location: string) {
-    const types = ['Elite', 'Premium', 'Solutions', 'Group', 'Services', 'Associates', 'Center', 'Global'];
+    const types = ['Iglesia Evangélica', 'Centro Cristiano', 'Comunidad de Fe', 'Ministerio Internacional', 'Iglesia Bautista', 'Templo Betel', 'Iglesia Pentecostal', 'Asambleas de Dios', 'Centro de Alabanza', 'Ministerio Mahanaim', 'Iglesia Cristiana'];
+    const namePrefixes = ['Gran Comisión', 'Luz y Vida', 'Nueva Vida', 'Camino de Santidad', 'Monte de los Olivos', 'Manantial de Vida', 'Puerta del Cielo', 'Ríos de Agua Viva'];
 
-    return Array.from({ length: 20 }).map((_, i) => ({
-        id: `mock_${Date.now()}_${i}`,
-        business_name: `${capitalize(query)} ${types[i % types.length]} ${i + 1}`,
-        category: query,
-        address: `${Math.floor(Math.random() * 900) + 10} Main St, ${location}`,
-        phone: `+503 ${Math.floor(Math.random() * 8999) + 1000}-${Math.floor(Math.random() * 8999) + 1000}`,
-        website: Math.random() > 0.3 ? `www.${query.replace(/\s/g, '').toLowerCase()}${i}.com` : undefined,
-        rating: 3.5 + (Math.random() * 1.5),
-        review_count: Math.floor(Math.random() * 1200),
-        source: 'google_maps',
-        is_imported: false
-    }));
+    const isUS = location.toUpperCase().includes('USA') || location.toUpperCase().includes('ESTADOS UNIDOS') || /,[ A-Z]{2,3}$/.test(location);
+    const countryCode = isUS ? '+1' : '+503';
+    const city = location.split(',')[0].trim();
+
+    return Array.from({ length: 20 }).map((_, i) => {
+        const prefix = namePrefixes[i % namePrefixes.length];
+        const type = types[i % types.length];
+        const businessName = `${type} ${prefix} ${city}`;
+
+        return {
+            id: `mock_${Date.now()}_${i}`,
+            business_name: businessName,
+            category: query,
+            address: `${Math.floor(Math.random() * 900) + 10} Main St, ${location}`,
+            phone: `${countryCode} (${isUS ? Math.floor(Math.random() * 800) + 200 : Math.floor(Math.random() * 80) + 20}) ${Math.floor(Math.random() * 899) + 100}-${Math.floor(Math.random() * 8999) + 1000}`,
+            website: Math.random() > 0.3 ? `www.${prefix.replace(/[^a-zA-Z]/g, '').toLowerCase()}${city.replace(/[^a-zA-Z]/g, '').toLowerCase()}.org` : undefined,
+            rating: 3.5 + (Math.random() * 1.5),
+            review_count: Math.floor(Math.random() * 1200),
+            source: 'google_maps',
+            is_imported: false
+        };
+    });
 }
 
 function capitalize(str: string) {

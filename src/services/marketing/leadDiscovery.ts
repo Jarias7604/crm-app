@@ -509,7 +509,8 @@ class LeadDiscoveryService {
 
     // Fallback mock generator (used when Edge Function is unavailable or in local dev)
     private generateMockResults(query: string, location: string): DiscoveredLead[] {
-        const types = ['Iglesia Evangelica', 'Centro Cristiano', 'Comunidad de Fe', 'Ministerio Internacional', 'Iglesia Bautista', 'Templo Betel', 'Iglesia Pentecostal', 'Asamblea de Dios', 'Centro de Alabanza', 'Ministerio Mahanaim', 'Iglesia Cristiana', 'Ministerio Hosanna', 'Comunidad Cristiana', 'Templo Elim', 'Iglesia Filadelfia'];
+        const types = ['Iglesia Evangélica', 'Centro Cristiano', 'Comunidad de Fe', 'Ministerio Internacional', 'Iglesia Bautista', 'Templo Betel', 'Iglesia Pentecostal', 'Asambleas de Dios', 'Centro de Alabanza', 'Ministerio Mahanaim', 'Iglesia Cristiana', 'Ministerio Hosanna', 'Comunidad Cristiana', 'Templo Elim', 'Iglesia Filadelfia'];
+        const namePrefixes = ['Gran Comisión', 'Luz y Vida', 'Nueva Vida', 'Camino de Santidad', 'Monte de los Olivos', 'Manantial de Vida', 'Puerta del Cielo', 'Ríos de Agua Viva', 'Príncipe de Paz', 'Fe y Esperanza', 'Redención', 'Buenas Nuevas', 'Gracia Divina', 'Jesucristo es el Señor', 'Refugio de Esperanza'];
         
         const lowerQ = query.toLowerCase();
         let baseCount = 65;
@@ -524,21 +525,29 @@ class LeadDiscoveryService {
         const variance = (locHash % 40) - 15; // -15 to +25
         const targetLength = Math.max(25, baseCount + variance);
 
+        const isUS = location.toUpperCase().includes('USA') || location.toUpperCase().includes('ESTADOS UNIDOS') || /,[ A-Z]{2,3}$/.test(location);
+        const countryCode = isUS ? '+1' : '+503';
+
         return Array.from({ length: targetLength }).map((_, i) => {
             const hasWeb = Math.random() > 0.25;
-            const cleanQuery = query.replace(/iglesia/i, '').replace(/cristiana/i, '').trim() || 'Central';
-            const domainSlug = cleanQuery.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'iglesia';
-            const website = hasWeb ? `www.${domainSlug}${i + 1}.org` : undefined;
-            // Only ~25% of mock businesses have a verified published email to strictly reflect real-world ratio
+            const prefix = namePrefixes[i % namePrefixes.length];
+            const type = types[i % types.length];
+            const city = location.split(',')[0].trim();
+            const businessName = `${type} ${prefix} ${city}`;
+
+            const cleanSlug = prefix.replace(/[^a-zA-Z]/g, '').toLowerCase();
+            const website = hasWeb ? `www.${cleanSlug}${city.replace(/[^a-zA-Z]/g, '').toLowerCase()}.org` : undefined;
             const hasRealEmail = hasWeb && (i % 4 === 0);
-            const email = hasRealEmail ? `contacto@${domainSlug}${i + 1}.org` : undefined;
+            const email = hasRealEmail ? `contacto@${cleanSlug}${city.replace(/[^a-zA-Z]/g, '').toLowerCase()}.org` : undefined;
+
+            const areaCode = isUS ? Math.floor(Math.random() * 800) + 200 : Math.floor(Math.random() * 80) + 20;
 
             return {
                 id: `lh_${Date.now()}_${i}_${Math.floor(Math.random() * 100000)}`,
-                business_name: `${types[i % types.length]} ${capitalize(cleanQuery)} ${location.split(',')[0]} #${i + 1}`,
+                business_name: businessName,
                 category: query,
-                address: `${Math.floor(Math.random() * 980) + 10} Main Ave, ${location}`,
-                phone: `+1 (555) ${Math.floor(Math.random() * 899) + 100}-${Math.floor(Math.random() * 8999) + 1000}`,
+                address: `${Math.floor(Math.random() * 980) + 10} Main St, ${location}`,
+                phone: `${countryCode} (${areaCode}) ${Math.floor(Math.random() * 899) + 100}-${Math.floor(Math.random() * 8999) + 1000}`,
                 website: website,
                 email: email,
                 rating: 4.0 + (Math.random() * 1.0),
