@@ -580,39 +580,12 @@ class LeadDiscoveryService {
         return `info@${domain}`;
     }
 
-    async importLead(lead: DiscoveredLead, companyId: string): Promise<void> {
-        const newLead: {
-            name: string;
-            company_name: string;
-            email: string | null;
-            phone: string | null;
-            source: string;
-            industry: string | null;
-            status: LeadStatus;          // TypeScript enforces valid TitleCase status
-            company_id: string;
-            google_place_id: string;
-            next_action_notes: string;
-        } = {
-            name: lead.business_name,
-            company_name: lead.business_name,
-            email: lead.email || null,
-            phone: lead.phone || null,
-            source: 'Lead Hunter AI',
-            industry: lead.category || 'Iglesias y Congregaciones',
-            status: 'Prospecto',         // LeadStatus — TitleCase enforced by type
-            company_id: companyId,
-            google_place_id: lead.id,
-            next_action_notes: `Prospecto de Lead Hunter. Dirección: ${lead.address}. Rating: ${lead.rating?.toFixed(1)}${lead.website ? `. Web: ${this.cleanDomain(lead.website)}` : ''}`
+    async importLead(lead: DiscoveredLead, companyId: string): Promise<{ success: boolean; isDuplicate: boolean }> {
+        const res = await this.importLeadsBulk([lead], companyId);
+        return {
+            success: res.success > 0 || res.failed > 0, // Considered handled if saved or already existed
+            isDuplicate: res.failed > 0 && res.success === 0
         };
-
-        const { error } = await supabase
-            .from('leads')
-            .upsert(newLead, { onConflict: 'google_place_id' });
-
-        if (error) {
-            console.error('[LeadHunter] importLead error:', error.code, error.message, error.details);
-            throw error;
-        }
     }
 
     async importLeadsBulk(leads: DiscoveredLead[], companyId: string): Promise<{ success: number; failed: number }> {
@@ -630,7 +603,7 @@ class LeadDiscoveryService {
                     phone: string | null;
                     source: string;
                     industry: string | null;
-                    status: LeadStatus;  // TypeScript enforces valid TitleCase status
+                    status: LeadStatus;
                     company_id: string;
                     google_place_id: string;
                     next_action_notes: string;
@@ -641,22 +614,31 @@ class LeadDiscoveryService {
                     phone: lead.phone || null,
                     source: 'Lead Hunter AI',
                     industry: lead.category || 'Iglesias y Congregaciones',
-                    status: 'Prospecto',     // LeadStatus — TitleCase enforced by type
+                    status: 'Prospecto',
                     company_id: companyId,
                     google_place_id: lead.id,
-                    next_action_notes: `Importación masiva. Dirección: ${lead.address}. Rating: ${lead.rating?.toFixed(1)}${lead.website ? `. Web: ${this.cleanDomain(lead.website)}` : ''}`
+                    next_action_notes: `Prospecto de Lead Hunter. Dirección: ${lead.address}. Rating: ${lead.rating?.toFixed(1)}${lead.website ? `. Web: ${this.cleanDomain(lead.website)}` : ''}`
                 };
 
-                const { error } = await supabase
+                // Try upsert first
+                let { error } = await supabase
                     .from('leads')
                     .upsert(newLead, { onConflict: 'google_place_id' });
 
+                // If upsert fails (e.g. onConflict index mismatch or missing constraint), fallback to insert
+                if (error && error.code !== '23505') {
+                    const insertRes = await supabase
+                        .from('leads')
+                        .insert(newLead);
+                    error = insertRes.error;
+                }
+
                 if (error) {
-                    // Duplicate by google_place_id = expected, skip silently
+                    // Duplicate by google_place_id, phone or email = expected, skip silently
                     if (error.code === '23505') {
                         failed++;
                     } else {
-                        console.error(`[LeadHunter] bulk import error for "${lead.business_name}":`, error.code, error.message, error.details);
+                        console.error(`[LeadHunter] import error for "${lead.business_name}":`, error.code, error.message, error.details);
                         failed++;
                     }
                 } else {

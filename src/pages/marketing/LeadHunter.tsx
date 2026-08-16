@@ -275,14 +275,18 @@ export default function LeadHunter() {
         }
 
         try {
-            await leadDiscoveryService.importLead(lead, activeCompanyId);
+            const res = await leadDiscoveryService.importLead(lead, activeCompanyId);
             setResults(prev => prev.map(r =>
                 r.id === lead.id ? { ...r, is_imported: true } : r
             ));
-            toast.success(`✅ ${lead.business_name} agregado.`);
+            if (res.isDuplicate) {
+                toast.success(`ℹ️ ${lead.business_name} ya existe en tu CRM.`, { id: `singleImport-${lead.id}` });
+            } else {
+                toast.success(`✅ ${lead.business_name} agregado al CRM.`, { id: `singleImport-${lead.id}` });
+            }
         } catch (error) {
             console.error(error);
-            toast.error('Error al importar.');
+            toast.error('Error al importar.', { id: `singleImport-${lead.id}` });
         }
     };
 
