@@ -38,7 +38,7 @@ export default function LeadHunter() {
     const [densityResults, setDensityResults] = useState<RegionalDensity[]>([]);
     const [selectedDensityCityIds, setSelectedDensityCityIds] = useState<Set<string>>(new Set());
     const [densitySearchFilter, setDensitySearchFilter] = useState('');
-    const [audienceFilter, setAudienceFilter] = useState<'hispanic' | 'anglo' | 'all'>('hispanic');
+    const [audienceFilter, setAudienceFilter] = useState<'hispanic' | 'anglo' | 'all'>('all');
 
     useEffect(() => {
         leadsService.getTeamMembers().then(data => setTeamMembers(data || [])).catch(() => {});

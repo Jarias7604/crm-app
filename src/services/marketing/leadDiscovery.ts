@@ -510,36 +510,42 @@ class LeadDiscoveryService {
 
     // Fallback mock generator (used when Edge Function is unavailable or in local dev)
     private generateMockResults(query: string, location: string): DiscoveredLead[] {
-        const types = ['Iglesia Evangélica', 'Centro Cristiano', 'Comunidad de Fe', 'Ministerio Internacional', 'Iglesia Bautista', 'Templo Betel', 'Iglesia Pentecostal', 'Asambleas de Dios', 'Centro de Alabanza', 'Ministerio Mahanaim', 'Iglesia Cristiana', 'Ministerio Hosanna', 'Comunidad Cristiana', 'Templo Elim', 'Iglesia Filadelfia'];
-        const namePrefixes = ['Gran Comisión', 'Luz y Vida', 'Nueva Vida', 'Camino de Santidad', 'Monte de los Olivos', 'Manantial de Vida', 'Puerta del Cielo', 'Ríos de Agua Viva', 'Príncipe de Paz', 'Fe y Esperanza', 'Redención', 'Buenas Nuevas', 'Gracia Divina', 'Jesucristo es el Señor', 'Refugio de Esperanza'];
-        
         const lowerQ = query.toLowerCase();
-        let baseCount = 65;
-        if (lowerQ.includes('lotificadora') || lowerQ.includes('desarrolladora')) baseCount = 15;
-        else if (lowerQ.includes('clínica') || lowerQ.includes('dentista') || lowerQ.includes('médic')) baseCount = 85;
-        else if (lowerQ.includes('contador') || lowerQ.includes('auditor')) baseCount = 45;
-        else if (lowerQ.includes('restaurante') || lowerQ.includes('café')) baseCount = 95;
-        else if (lowerQ.includes('iglesia') || lowerQ.includes('cristian')) baseCount = 80;
+        const cleanLoc = location.trim();
+        const city = cleanLoc.split(',')[0].trim();
 
-        // Scale by location complexity to give true regional density distribution
-        const locHash = Math.abs(location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
-        const variance = (locHash % 40) - 15; // -15 to +25
-        const targetLength = Math.max(25, baseCount + variance);
+        const churchTypes = ['Iglesia Evangélica', 'Iglesia Bautista', 'Centro Cristiano', 'Comunidad de Fe', 'Ministerio Internacional', 'Templo Betel', 'Iglesia Pentecostal', 'Asambleas de Dios', 'Centro de Alabanza', 'Ministerio Mahanaim', 'Iglesia Cristiana', 'Ministerio Hosanna', 'Comunidad Cristiana', 'Templo Elim', 'Iglesia Filadelfia'];
+        const namePrefixes = ['Gran Comisión', 'Luz y Vida', 'Nueva Vida', 'Camino de Santidad', 'Monte de los Olivos', 'Manantial de Vida', 'Puerta del Cielo', 'Ríos de Agua Viva', 'Príncipe de Paz', 'Fe y Esperanza', 'Redención', 'Buenas Nuevas', 'Gracia Divina', 'Jesucristo es el Señor', 'Refugio de Esperanza'];
 
-        const isUS = location.toUpperCase().includes('USA') || location.toUpperCase().includes('ESTADOS UNIDOS') || /,[ A-Z]{2,3}$/.test(location);
+        const genericTypes = (lowerQ.includes('iglesia') || lowerQ.includes('cristian') || lowerQ.includes('bautista'))
+            ? churchTypes
+            : [capitalize(query)];
+
+        const isUS = location.toUpperCase().includes('USA') || location.toUpperCase().includes('ESTADOS UNIDOS') || location.toUpperCase().includes('VA') || /,[ A-Z]{2,3}$/.test(location);
         const countryCode = isUS ? '+1' : '+503';
+
+        const baseCount = 50;
+        const locHash = Math.abs(location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
+        const variance = (locHash % 30) - 10;
+        const targetLength = Math.max(20, baseCount + variance);
 
         return Array.from({ length: targetLength }).map((_, i) => {
             const hasWeb = Math.random() > 0.25;
             const prefix = namePrefixes[i % namePrefixes.length];
-            const type = types[i % types.length];
-            const city = location.split(',')[0].trim();
-            const businessName = `${type} ${prefix} ${city}`;
+            const type = genericTypes[i % genericTypes.length];
+            
+            let businessName = '';
+            if (lowerQ.includes('iglesia') || lowerQ.includes('cristian') || lowerQ.includes('bautista')) {
+                businessName = `${type} ${prefix} de ${city}`;
+            } else {
+                businessName = `${type} ${prefix} ${city}`;
+            }
 
             const cleanSlug = prefix.replace(/[^a-zA-Z]/g, '').toLowerCase();
-            const website = hasWeb ? `www.${cleanSlug}${city.replace(/[^a-zA-Z]/g, '').toLowerCase()}.org` : undefined;
-            const hasRealEmail = hasWeb && (i % 4 === 0);
-            const email = hasRealEmail ? `contacto@${cleanSlug}${city.replace(/[^a-zA-Z]/g, '').toLowerCase()}.org` : undefined;
+            const cleanCitySlug = city.replace(/[^a-zA-Z]/g, '').toLowerCase();
+            const website = hasWeb ? `www.${cleanSlug}${cleanCitySlug}.org` : undefined;
+            const hasRealEmail = hasWeb && (i % 3 === 0);
+            const email = hasRealEmail ? `info@${cleanSlug}${cleanCitySlug}.org` : undefined;
 
             const areaCode = isUS ? Math.floor(Math.random() * 800) + 200 : Math.floor(Math.random() * 80) + 20;
 
@@ -547,12 +553,12 @@ class LeadDiscoveryService {
                 id: `lh_${Date.now()}_${i}_${Math.floor(Math.random() * 100000)}`,
                 business_name: businessName,
                 category: query,
-                address: `${Math.floor(Math.random() * 980) + 10} Main St, ${location}`,
+                address: `${Math.floor(Math.random() * 980) + 10} Main St, ${cleanLoc}`,
                 phone: `${countryCode} (${areaCode}) ${Math.floor(Math.random() * 899) + 100}-${Math.floor(Math.random() * 8999) + 1000}`,
                 website: website,
                 email: email,
-                rating: 4.0 + (Math.random() * 1.0),
-                review_count: Math.floor(Math.random() * 2500) + 50,
+                rating: 4.2 + (Math.random() * 0.8),
+                review_count: Math.floor(Math.random() * 500) + 20,
                 source: 'google_maps',
                 is_imported: false
             };
