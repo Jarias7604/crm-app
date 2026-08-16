@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap, Users, X, ArrowRight, Layers, Sparkles, ChevronDown, ShieldCheck } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { leadDiscoveryService, OFFICIAL_CATEGORIES, type DiscoveredLead, type RegionalDensity } from '../../services/marketing/leadDiscovery';
+import { batchScrapeLeadEmails } from '../../services/marketing/webEmailScraper';
 import { leadsService } from '../../services/leads';
 import { useAuth } from '../../auth/AuthProvider';
 import { BulkAssignModal } from '../../components/leads/BulkAssignModal';
@@ -23,6 +24,7 @@ export default function LeadHunter() {
     const [isDeepScan, setIsDeepScan] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
+    const [isScrapingEmails, setIsScrapingEmails] = useState(false);
     const [isStartingCampaign, setIsStartingCampaign] = useState(false);
     const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -55,8 +57,37 @@ export default function LeadHunter() {
         minRating: 0,
         hasPhone: false,
         hasWebsite: false,
-        hasEmail: false
+        hasEmail: false,
+        noWebsiteOnly: false
     });
+
+    const handleScrapeEmails = async () => {
+        const leadsToScrape = results.filter(r => r.website && !r.email);
+        if (leadsToScrape.length === 0) {
+            toast('No hay prospectos con sitio web pendientes de escanear email.', { icon: 'ℹ️' });
+            return;
+        }
+
+        setIsScrapingEmails(true);
+        toast.loading(`🔍 Bot escaneando los sitios web de ${leadsToScrape.length} prospectos...`, { id: 'webScrape' });
+
+        try {
+            const stats = await batchScrapeLeadEmails(results, (leadId, foundEmail) => {
+                setResults(prev => prev.map(r => r.id === leadId ? { ...r, email: foundEmail } : r));
+            });
+
+            if (stats.foundCount > 0) {
+                toast.success(`✅ Bot encontró ${stats.foundCount} correos reales en los sitios web.`, { id: 'webScrape' });
+            } else {
+                toast(`ℹ️ Se escanearon ${stats.scannedCount} sitios web, pero no tenían correos visibles en su portada.`, { id: 'webScrape' });
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error('Error durante el escaneo web.', { id: 'webScrape' });
+        } finally {
+            setIsScrapingEmails(false);
+        }
+    };
 
     // Handle category change
     const handleCategorySelect = (catKey: string) => {
@@ -199,6 +230,7 @@ export default function LeadHunter() {
             if (filters.hasPhone && !lead.phone) return false;
             if (filters.hasWebsite && !lead.website) return false;
             if (filters.hasEmail && !lead.email) return false;
+            if (filters.noWebsiteOnly && lead.website) return false;
             return true;
         });
     }, [results, filters]);
@@ -374,27 +406,49 @@ export default function LeadHunter() {
 
                     <div className="h-10 w-px bg-slate-100 hidden md:block" />
 
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2 items-center">
                         <button
                             onClick={() => setFilters({ ...filters, hasPhone: !filters.hasPhone })}
-                            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all border ${filters.hasPhone ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100'
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all border ${filters.hasPhone ? 'bg-blue-50 border-blue-200 text-blue-700' : 'bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100'
                                 }`}
                         >
-                            <Phone className="w-3.5 h-3.5 inline mr-1.5" /> Solo con Teléfono
+                            <Phone className="w-3.5 h-3.5 inline mr-1.5" /> Con Teléfono
                         </button>
                         <button
-                            onClick={() => setFilters({ ...filters, hasWebsite: !filters.hasWebsite })}
-                            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all border ${filters.hasWebsite ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100'
+                            onClick={() => setFilters({ ...filters, hasWebsite: !filters.hasWebsite, noWebsiteOnly: false })}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all border ${filters.hasWebsite ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100'
                                 }`}
                         >
-                            <Globe className="w-3.5 h-3.5 inline mr-1.5" /> Solo con Web
+                            <Globe className="w-3.5 h-3.5 inline mr-1.5" /> Con Web
+                        </button>
+                        <button
+                            onClick={() => setFilters({ ...filters, noWebsiteOnly: !filters.noWebsiteOnly, hasWebsite: false })}
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all border ${filters.noWebsiteOnly ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100'
+                                }`}
+                        >
+                            <Globe className="w-3.5 h-3.5 inline mr-1.5 text-purple-600" /> Sin Web (Venta Web)
                         </button>
                         <button
                             onClick={() => setFilters({ ...filters, hasEmail: !filters.hasEmail })}
-                            className={`px-4 py-2 rounded-xl font-bold text-xs transition-all border ${filters.hasEmail ? 'bg-green-50 border-green-200 text-green-700' : 'bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100'
+                            className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all border ${filters.hasEmail ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-transparent text-slate-500 hover:bg-slate-100'
                                 }`}
                         >
-                            <Mail className="w-3.5 h-3.5 inline mr-1.5" /> Solo con Email
+                            <Mail className="w-3.5 h-3.5 inline mr-1.5" /> Con Email Real
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={handleScrapeEmails}
+                            disabled={isScrapingEmails || results.filter(r => r.website && !r.email).length === 0}
+                            className="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-extrabold text-xs shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-40 cursor-pointer ml-auto"
+                            title="Escanea los sitios web de los prospectos para extraer el correo publicado"
+                        >
+                            {isScrapingEmails ? (
+                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                                <Search className="w-3.5 h-3.5" />
+                            )}
+                            <span>Escanear Emails Web ({results.filter(r => r.website && !r.email).length})</span>
                         </button>
                     </div>
 
@@ -707,6 +761,26 @@ export default function LeadHunter() {
                                             <Globe className="w-4 h-4 text-gray-400" />
                                             <span className="text-gray-500 truncate text-xs">{lead.website}</span>
                                         </div>
+                                    )}
+                                </div>
+
+                                {/* Commercial Strategy Targeting Badge */}
+                                <div className="mb-4">
+                                    {!lead.website ? (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-[11px] font-extrabold">
+                                            <Globe className="w-3 h-3 text-purple-600" />
+                                            Sin Web (Venta Página Web)
+                                        </span>
+                                    ) : lead.email ? (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-extrabold">
+                                            <Mail className="w-3 h-3 text-emerald-600" />
+                                            Email Real — Venta CRM / IA
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-extrabold">
+                                            <Globe className="w-3 h-3 text-blue-600" />
+                                            Tiene Web (Listo p/ Escanear)
+                                        </span>
                                     )}
                                 </div>
 
