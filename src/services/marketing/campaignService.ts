@@ -64,16 +64,30 @@ export const campaignService = {
             if (status === 'clicked') realStats[campaignId].clicked++;
         });
 
-        // Merge real stats into campaigns
-        return (campaigns as Campaign[]).map(c => ({
-            ...c,
-            stats: {
-                ...c.stats,
-                sent: realStats[c.id]?.sent || c.stats?.sent || 0,
-                opened: realStats[c.id]?.opened || c.stats?.opened || 0,
-                clicked: realStats[c.id]?.clicked || c.stats?.clicked || 0
+        // Merge real stats into campaigns + auto-heal stuck sending status
+        return (campaigns as Campaign[]).map(c => {
+            const sentCount = realStats[c.id]?.sent || c.stats?.sent || 0;
+            const isStuckSending = c.status === 'sending' && sentCount > 0;
+
+            // Self-healing: update DB asynchronously if stuck in sending
+            if (isStuckSending) {
+                supabase.from('marketing_campaigns')
+                    .update({ status: 'completed', total_recipients: sentCount })
+                    .eq('id', c.id)
+                    .then();
             }
-        }));
+
+            return {
+                ...c,
+                status: isStuckSending ? 'completed' : c.status,
+                stats: {
+                    ...c.stats,
+                    sent: sentCount,
+                    opened: realStats[c.id]?.opened || c.stats?.opened || 0,
+                    clicked: realStats[c.id]?.clicked || c.stats?.clicked || 0
+                }
+            };
+        });
     },
 
     async getCampaignById(id: string) {
@@ -97,12 +111,16 @@ export const campaignService = {
         
         const { data: messages } = await msgQuery;
 
-        if (messages) {
+        if (messages && messages.length > 0) {
             campaign.stats = {
                 sent: messages.length,
                 opened: messages.filter(m => ['opened', 'read', 'clicked'].includes(m.status)).length,
                 clicked: messages.filter(m => m.status === 'clicked').length
             };
+            if (campaign.status === 'sending') {
+                campaign.status = 'completed';
+                supabase.from('marketing_campaigns').update({ status: 'completed', total_recipients: messages.length }).eq('id', id).then();
+            }
         }
 
         return campaign;
