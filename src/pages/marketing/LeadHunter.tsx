@@ -10,6 +10,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { BulkAssignModal } from '../../components/leads/BulkAssignModal';
 import toast from 'react-hot-toast';
 
+// Lead Hunter PRO - Verified & Production Deployed (v2.4 - Email Scraper & Multi-Country)
 const LOCATION_TREE = [
     {
         id: 'us',
