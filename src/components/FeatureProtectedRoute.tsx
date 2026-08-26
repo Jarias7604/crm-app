@@ -2,7 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 
 interface FeatureProtectedRouteProps {
-    feature: 'leads' | 'quotes' | 'calendar' | 'marketing' | 'chat' | 'invoices' | 'facturas';
+    feature: 'leads' | 'quotes' | 'calendar' | 'marketing' | 'chat' | 'invoices' | 'facturas' | 'clientes' | 'proyectos' | 'finanzas' | 'tickets';
     allowedRoles?: string[];
 }
 
@@ -32,8 +32,15 @@ export default function FeatureProtectedRoute({ feature, allowedRoles }: Feature
     // Permission Check Logic (Synced with Sidebar via AuthProvider RPC)
     const canAccess = () => {
         if (!profile) return false;
-        // La lógica de SaaS ya viene procesada
-        return profile.permissions?.[feature] === true;
+        if (profile.permissions?.[feature] === true) return true;
+        
+        // Granular check: e.g. for 'clientes', allow if 'clientes.view' or 'clientes.manage' or 'clientes' is true
+        const hasGranular = Object.keys(profile.permissions || {}).some(
+            k => (k === feature || k.startsWith(`${feature}.`)) && profile.permissions?.[k] === true
+        );
+        if (hasGranular) return true;
+        
+        return false;
     };
 
     if (!canAccess()) {

@@ -293,7 +293,9 @@ function App() {
                   </Route>
 
                   {/* Clientes Module */}
-                  <Route path="/clientes" element={<Clientes />} />
+                  <Route element={<FeatureProtectedRoute feature="clientes" />}>
+                    <Route path="/clientes" element={<Clientes />} />
+                  </Route>
 
                   {/* Facturación Module */}
                   <Route element={<FeatureProtectedRoute feature="invoices" />}>
@@ -302,14 +304,20 @@ function App() {
                   </Route>
 
                   {/* Proyectos Module */}
-                  <Route path="/proyectos" element={<ProjectManagement />} />
+                  <Route element={<FeatureProtectedRoute feature="proyectos" />}>
+                    <Route path="/proyectos" element={<ProjectManagement />} />
+                  </Route>
 
                   {/* Finanzas Module */}
-                  <Route path="/finanzas" element={<Finanzas />} />
+                  <Route element={<FeatureProtectedRoute feature="finanzas" />}>
+                    <Route path="/finanzas" element={<Finanzas />} />
+                  </Route>
 
                   {/* Support Routes */}
-                  <Route path="/support/tickets" element={<Tickets />} />
-                  <Route path="/support/atrasados" element={<OverdueTickets />} />
+                  <Route element={<FeatureProtectedRoute feature="tickets" />}>
+                    <Route path="/support/tickets" element={<Tickets />} />
+                    <Route path="/support/atrasados" element={<OverdueTickets />} />
+                  </Route>
                   <Route path="/onboarding" element={<OnboardingWizard />} />
                 </Route>
               </Route>

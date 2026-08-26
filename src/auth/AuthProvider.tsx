@@ -303,15 +303,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // RPC devolvió permisos consolidados — usar directamente
                 activePerms = mergedPerms;
             } else if (data?.custom_role_id) {
-                // 2. Si tiene custom_role asignado → el rol es la fuente de verdad TOTAL
-                // profiles.permissions es ignorado completamente (evita el bug crónico de Patricia)
-                const { data: roleData } = await supabase
-                    .from('custom_roles')
-                    .select('permissions')
-                    .eq('id', data.custom_role_id)
-                    .single();
-                activePerms = (roleData?.permissions as Record<string, boolean>) || {};
-                console.info('✅ Permisos cargados desde custom_role (fuente única de verdad)');
+                // 2. Si tiene custom_role asignado → consultar la tabla role_permissions
+                const { data: rolePerms } = await supabase
+                    .from('role_permissions')
+                    .select('permission_key, is_enabled')
+                    .eq('role_id', data.custom_role_id)
+                    .eq('is_enabled', true);
+
+                if (rolePerms && rolePerms.length > 0) {
+                    activePerms = {};
+                    rolePerms.forEach(rp => {
+                        activePerms[rp.permission_key] = true;
+                    });
+                } else {
+                    const { data: roleData } = await supabase
+                        .from('custom_roles')
+                        .select('permissions')
+                        .eq('id', data.custom_role_id)
+                        .single();
+                    activePerms = (roleData?.permissions as Record<string, boolean>) || {};
+                }
+                console.info('✅ Permisos cargados desde role_permissions/custom_role (fuente única de verdad)');
             }
 
             // ─────────────────────────────────────────────────────────────────

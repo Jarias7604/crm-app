@@ -128,6 +128,29 @@ export const permissionsService = {
         return data as RolePermission[];
     },
 
+    async syncRolePermissionsToCustomRole(roleId: string) {
+        try {
+            const { data: rolePerms } = await supabase
+                .from('role_permissions')
+                .select('permission_key, is_enabled')
+                .eq('role_id', roleId);
+
+            const permMap: Record<string, boolean> = {};
+            (rolePerms || []).forEach(rp => {
+                if (rp.is_enabled) {
+                    permMap[rp.permission_key] = true;
+                }
+            });
+
+            await supabase
+                .from('custom_roles')
+                .update({ permissions: permMap })
+                .eq('id', roleId);
+        } catch (e) {
+            console.error('Error syncing custom_roles.permissions:', e);
+        }
+    },
+
     async updatePermission(roleId: string, key: string, isEnabled: boolean) {
         const { data, error } = await supabase
             .from('role_permissions')
@@ -143,6 +166,7 @@ export const permissionsService = {
             .single();
 
         if (error) throw error;
+        await this.syncRolePermissionsToCustomRole(roleId);
         return data as RolePermission;
     },
 
@@ -162,6 +186,13 @@ export const permissionsService = {
             .select();
 
         if (error) throw error;
+
+        // Sync affected roles
+        const affectedRoleIds = Array.from(new Set(updates.map(u => u.role_id)));
+        for (const roleId of affectedRoleIds) {
+            await this.syncRolePermissionsToCustomRole(roleId);
+        }
+
         return data as RolePermission[];
     }
 };
