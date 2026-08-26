@@ -72,6 +72,8 @@ export function rateLimitResponse(resetAt: number): Response {
     {
       status: 429,
       headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
         'Content-Type': 'application/json',
         'Retry-After': String(Math.ceil((resetAt - Date.now()) / 1000)),
         'X-RateLimit-Limit': String(Object.values(LIMITS)[0].max),

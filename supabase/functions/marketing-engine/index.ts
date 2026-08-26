@@ -102,8 +102,8 @@ Deno.serve(async (req) => {
         const excludedIds = new Set(filters.excludedIds || []);
         const afterExclusion = excludedIds.size > 0 ? leads.filter(l => !excludedIds.has(l.id)) : leads;
 
-        const { data: sentMessages } = await supabase.from('marketing_messages').select('metadata->lead_id').eq('metadata->>campaign_id', campaignId);
-        const sentLeadIds = new Set(sentMessages?.map(m => m.lead_id) || []);
+        const { data: sentMessages } = await supabase.from('marketing_messages').select('metadata').eq('metadata->>campaign_id', campaignId);
+        const sentLeadIds = new Set(sentMessages?.map((m: any) => m.metadata?.lead_id).filter(Boolean) || []);
         const filteredLeads = afterExclusion.filter(l => !sentLeadIds.has(l.id));
 
         if (filteredLeads.length === 0) {
@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
 
         for (let i = 0; i < filteredLeads.length; i++) {
             const lead = filteredLeads[i];
-            if (i > 0) await new Promise(r => setTimeout(r, 600));
+            if (i > 0) await new Promise(r => setTimeout(r, 150));
             const phone = normalizePhone(lead.phone);
 
             try {

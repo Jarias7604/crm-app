@@ -314,10 +314,21 @@ export default function CampaignBuilder() {
 
             if (!isDraft) {
                 toast.loading('Ejecutando campaña...', { id: 'sending' });
-                const result = await campaignService.sendCampaign(savedId);
-                const sent = result?.results?.success || 0;
-                const failed = result?.results?.failed || 0;
-                toast.success(`¡Procesado! ${sent} enviados, ${failed} fallidos`, { id: 'sending' });
+                try {
+                    const result = await campaignService.sendCampaign(savedId);
+                    const sent = result?.results?.success || 0;
+                    const failed = result?.results?.failed || 0;
+                    if (sent === 0 && failed > 0) {
+                        toast.error(`⚠️ 0 enviados, ${failed} fallidos. Revisa la configuración de Resend/Email.`, { id: 'sending', duration: 6000 });
+                    } else {
+                        toast.success(`¡Procesado! ${sent} enviados, ${failed} fallidos`, { id: 'sending', duration: 5000 });
+                    }
+                } catch (sendError: any) {
+                    console.error('Campaign send error:', sendError);
+                    const sendMsg = sendError?.message || sendError?.error_description || 'Error al ejecutar envío de campaña';
+                    toast.error(`Error en envío: ${sendMsg}`, { id: 'sending', duration: 6000 });
+                    return;
+                }
             } else {
                 toast.success(isEditMode ? 'Campaña actualizada' : 'Borrador guardado');
             }
@@ -328,7 +339,7 @@ export default function CampaignBuilder() {
         } catch (error: any) {
             console.error('Campaign save error:', error);
             const msg = error?.message || error?.error_description || 'Error al procesar campaña';
-            toast.error(msg);
+            toast.error(msg, { id: 'sending' });
         }
     };
 
