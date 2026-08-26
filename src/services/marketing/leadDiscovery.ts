@@ -525,8 +525,48 @@ class LeadDiscoveryService {
             return this.checkExistingDuplicates(combinedLeads);
         }
 
-        const singleResult = await this.fetchSingleBusinessQuery(query, location);
-        return this.checkExistingDuplicates(singleResult);
+        // Infer query synonyms to maximize results for specific cities/zones
+        const lowerQ = query.toLowerCase();
+        const matchedCat = OFFICIAL_CATEGORIES.find(c => 
+            c.synonyms.some(s => lowerQ.includes(s.toLowerCase())) || lowerQ.includes(c.key)
+        );
+
+        const queryVariants = matchedCat && matchedCat.synonyms.length > 0
+            ? Array.from(new Set([query, ...matchedCat.synonyms.slice(0, 3)]))
+            : [query];
+
+        if (queryVariants.length === 1) {
+            const singleResult = await this.fetchSingleBusinessQuery(query, location);
+            return this.checkExistingDuplicates(singleResult);
+        }
+
+        // Run query variants in parallel for maximum coverage
+        const variantTasks = queryVariants.map(v => this.fetchSingleBusinessQuery(v, location));
+        const settledVariants = await Promise.allSettled(variantTasks);
+
+        const fulfilledVariants = settledVariants.filter(
+            (s): s is PromiseFulfilledResult<DiscoveredLead[]> => s.status === 'fulfilled'
+        );
+
+        if (fulfilledVariants.length === 0) {
+            const singleResult = await this.fetchSingleBusinessQuery(query, location);
+            return this.checkExistingDuplicates(singleResult);
+        }
+
+        const seenIds = new Set<string>();
+        const seenNames = new Set<string>();
+        const combinedLeads: DiscoveredLead[] = [];
+
+        fulfilledVariants.flatMap(s => s.value).forEach(lead => {
+            const normName = lead.business_name.toLowerCase().trim();
+            if (!seenIds.has(lead.id) && !seenNames.has(normName)) {
+                seenIds.add(lead.id);
+                seenNames.add(normName);
+                combinedLeads.push(lead);
+            }
+        });
+
+        return this.checkExistingDuplicates(combinedLeads);
     }
 
     private async fetchSingleBusinessQuery(query: string, location: string): Promise<DiscoveredLead[]> {

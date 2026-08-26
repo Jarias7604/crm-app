@@ -1,7 +1,4 @@
-/**
- * Web Email Scraper Service
- * Scrapes public business websites for authentic published email addresses.
- */
+import { supabase } from '../supabase';
 
 const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
@@ -18,6 +15,19 @@ const IGNORED_PATTERNS = [
  */
 export async function scrapeWebsiteEmail(websiteUrl: string): Promise<string | null> {
     if (!websiteUrl) return null;
+
+    // Primary: Call server-side Edge Function (bypasses CORS, crawls subpages /contact, /contacto, /about)
+    try {
+        const { data, error } = await supabase.functions.invoke('scrape-website-email', {
+            body: { websiteUrl }
+        });
+
+        if (!error && data && data.email) {
+            return data.email;
+        }
+    } catch {
+        // Fallback to client proxy if edge function invocation fails
+    }
 
     try {
         let cleanUrl = websiteUrl.trim();
