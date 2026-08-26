@@ -74,6 +74,182 @@ const LOCATION_TREE = [
                 cities: ['San Miguel', 'Ciudad Barrios']
             }
         ]
+    },
+    {
+        id: 'gt',
+        countryName: 'Guatemala',
+        flag: '🇬🇹',
+        states: [
+            {
+                stateName: 'Guatemala',
+                stateCode: 'GT',
+                cities: ['Ciudad de Guatemala', 'Mixco', 'Villa Nueva', 'Santa Catarina Pinula']
+            },
+            {
+                stateName: 'Sacatepéquez',
+                stateCode: 'SAC',
+                cities: ['Antigua Guatemala', 'Ciudad Vieja', 'Jocotenango']
+            },
+            {
+                stateName: 'Quetzaltenango',
+                stateCode: 'XELA',
+                cities: ['Quetzaltenango', 'Salcajá', 'Coatepeque']
+            },
+            {
+                stateName: 'Escuintla',
+                stateCode: 'ESC',
+                cities: ['Escuintla', 'Puerto San José', 'Palín']
+            }
+        ]
+    },
+    {
+        id: 'co',
+        countryName: 'Colombia',
+        flag: '🇨🇴',
+        states: [
+            {
+                stateName: 'Cundinamarca',
+                stateCode: 'BOG',
+                cities: ['Bogotá', 'Chía', 'Soacha', 'Zipaquirá']
+            },
+            {
+                stateName: 'Antioquia',
+                stateCode: 'ANT',
+                cities: ['Medellín', 'Envigado', 'Bello', 'Itagüí']
+            },
+            {
+                stateName: 'Valle del Cauca',
+                stateCode: 'VAC',
+                cities: ['Cali', 'Palmira', 'Yumbo', 'Jamundí']
+            },
+            {
+                stateName: 'Atlántico',
+                stateCode: 'ATL',
+                cities: ['Barranquilla', 'Soledad', 'Puerto Colombia']
+            }
+        ]
+    },
+    {
+        id: 'mx',
+        countryName: 'México',
+        flag: '🇲🇽',
+        states: [
+            {
+                stateName: 'CDMX',
+                stateCode: 'MEX',
+                cities: ['Ciudad de México', 'Polanco', 'Condesa', 'Coyoacán', 'Santa Fe']
+            },
+            {
+                stateName: 'Jalisco',
+                stateCode: 'JAL',
+                cities: ['Guadalajara', 'Zapopan', 'Tlaquepaque']
+            },
+            {
+                stateName: 'Nuevo León',
+                stateCode: 'NL',
+                cities: ['Monterrey', 'San Pedro Garza García', 'San Nicolás']
+            },
+            {
+                stateName: 'Puebla',
+                stateCode: 'PUE',
+                cities: ['Puebla', 'San Andrés Cholula']
+            }
+        ]
+    },
+    {
+        id: 'cr',
+        countryName: 'Costa Rica',
+        flag: '🇨🇷',
+        states: [
+            {
+                stateName: 'San José',
+                stateCode: 'SJ',
+                cities: ['San José', 'Escazú', 'Santa Ana', 'Curridabat']
+            },
+            {
+                stateName: 'Alajuela',
+                stateCode: 'ALA',
+                cities: ['Alajuela', 'San Ramón', 'Grecia']
+            },
+            {
+                stateName: 'Guanacaste',
+                stateCode: 'GUA',
+                cities: ['Liberia', 'Tamarindo', 'Nicoya']
+            }
+        ]
+    },
+    {
+        id: 'es',
+        countryName: 'España',
+        flag: '🇪🇸',
+        states: [
+            {
+                stateName: 'Madrid',
+                stateCode: 'MAD',
+                cities: ['Madrid', 'Getafe', 'Alcalá de Henares', 'Alcobendas']
+            },
+            {
+                stateName: 'Barcelona',
+                stateCode: 'BCN',
+                cities: ['Barcelona', 'Hospitalet de Llobregat', 'Badalona']
+            },
+            {
+                stateName: 'Valencia',
+                stateCode: 'VAL',
+                cities: ['Valencia', 'Torrent', 'Paterna']
+            }
+        ]
+    },
+    {
+        id: 'hn',
+        countryName: 'Honduras',
+        flag: '🇭🇳',
+        states: [
+            {
+                stateName: 'Francisco Morazán',
+                stateCode: 'FM',
+                cities: ['Tegucigalpa', 'Valle de Ángeles']
+            },
+            {
+                stateName: 'Cortés',
+                stateCode: 'COR',
+                cities: ['San Pedro Sula', 'Puerto Cortés', 'Choloma']
+            }
+        ]
+    },
+    {
+        id: 'pa',
+        countryName: 'Panamá',
+        flag: '🇵🇦',
+        states: [
+            {
+                stateName: 'Panamá',
+                stateCode: 'PAN',
+                cities: ['Ciudad de Panamá', 'San Miguelito', 'Tocumen']
+            },
+            {
+                stateName: 'Chiriquí',
+                stateCode: 'CHI',
+                cities: ['David', 'Boquete']
+            }
+        ]
+    },
+    {
+        id: 'do',
+        countryName: 'República Dominicana',
+        flag: '🇩🇴',
+        states: [
+            {
+                stateName: 'Distrito Nacional',
+                stateCode: 'SD',
+                cities: ['Santo Domingo', 'Santo Domingo Este']
+            },
+            {
+                stateName: 'Santiago',
+                stateCode: 'STI',
+                cities: ['Santiago de los Caballeros']
+            }
+        ]
     }
 ];
 

@@ -57,13 +57,13 @@ serve(async (req) => {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Goog-Api-Key': GOOGLE_API_KEY,
-                    'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'
+                    'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.internationalPhoneNumber,places.websiteUri,places.rating,places.userRatingCount,nextPageToken'
                 },
                 body: JSON.stringify({
                     textQuery: `${query} in ${location}`,
                     languageCode: 'es',
                     pageToken: nextPageToken || undefined,
-                    maxResultCount: 20 // Default/Max for searchText is usually 20 per request
+                    maxResultCount: 20 // Max per request for Google Places API (New)
                 })
             });
 
@@ -74,7 +74,7 @@ serve(async (req) => {
                 if (allPlaces.length === 0) {
                     return new Response(
                         JSON.stringify({
-                            error: data.error?.message || 'Error al conectar con Google Places API',
+                            error: data.error?.message || 'Error al conectar con Google Places API. Verifica que Places API (New) esté habilitada en Google Cloud Console.',
                             code: data.error?.status
                         }),
                         { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -90,8 +90,6 @@ serve(async (req) => {
             nextPageToken = data.nextPageToken;
             pageCount++;
 
-            // Small delay between page requests if needed (Google recommendation for legacy API, 
-            // usually less critical for New API but good for stability)
             if (nextPageToken && pageCount < maxPages) {
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
@@ -105,15 +103,15 @@ serve(async (req) => {
             );
         }
 
-        // Map New API results to our format
+        // Map New API results to our format using internationalPhoneNumber as primary
         const validResults = allPlaces.map((place: any) => ({
             id: place.id,
             business_name: place.displayName?.text || 'Sin Nombre',
             category: query,
-            address: place.formattedAddress,
-            phone: place.nationalPhoneNumber,
-            website: place.websiteUri?.replace(/^https?:\/\//, ''),
-            rating: place.rating,
+            address: place.formattedAddress || 'Dirección no disponible',
+            phone: place.internationalPhoneNumber || place.nationalPhoneNumber || null,
+            website: place.websiteUri || null,
+            rating: place.rating || null,
             review_count: place.userRatingCount || 0,
             source: 'google_maps',
             is_imported: false
