@@ -10,6 +10,73 @@ import { useAuth } from '../../auth/AuthProvider';
 import { BulkAssignModal } from '../../components/leads/BulkAssignModal';
 import toast from 'react-hot-toast';
 
+const LOCATION_TREE = [
+    {
+        id: 'us',
+        countryName: 'Estados Unidos',
+        flag: '🇺🇸',
+        states: [
+            {
+                stateName: 'Virginia',
+                stateCode: 'VA',
+                cities: ['Sterling', 'Herndon', 'Manassas', 'Leesburg', 'Ashburn', 'Reston', 'Woodbridge', 'Fairfax', 'Alexandria', 'Richmond', 'Winchester', 'Fredericksburg']
+            },
+            {
+                stateName: 'Maryland',
+                stateCode: 'MD',
+                cities: ['Silver Spring', 'Gaithersburg', 'Rockville', 'Wheaton', 'Hyattsville', 'Frederick', 'Baltimore', 'Bethesda']
+            },
+            {
+                stateName: 'Florida',
+                stateCode: 'FL',
+                cities: ['Miami', 'Hialeah', 'Orlando', 'Tampa', 'Fort Lauderdale', 'West Palm Beach', 'Kissimmee']
+            },
+            {
+                stateName: 'Texas',
+                stateCode: 'TX',
+                cities: ['Houston', 'Dallas', 'San Antonio', 'Austin', 'Fort Worth', 'El Paso', 'Arlington']
+            },
+            {
+                stateName: 'New York',
+                stateCode: 'NY',
+                cities: ['New York City', 'Queens', 'Brooklyn', 'Bronx', 'Brentwood', 'White Plains']
+            },
+            {
+                stateName: 'California',
+                stateCode: 'CA',
+                cities: ['Los Angeles', 'San Francisco', 'San Jose', 'San Diego', 'Anaheim', 'Fresno']
+            }
+        ]
+    },
+    {
+        id: 'sv',
+        countryName: 'El Salvador',
+        flag: '🇸🇻',
+        states: [
+            {
+                stateName: 'San Salvador',
+                stateCode: 'SS',
+                cities: ['San Salvador', 'Soyapango', 'Ilopango', 'Mejicanos', 'Apopa', 'San Marcos']
+            },
+            {
+                stateName: 'La Libertad',
+                stateCode: 'LL',
+                cities: ['Santa Tecla', 'Antiguo Cuscatlán', 'Lourdes Colón', 'Ciudad Arce', 'Puerto de La Libertad']
+            },
+            {
+                stateName: 'Santa Ana',
+                stateCode: 'SA',
+                cities: ['Santa Ana', 'Chalchuapa', 'Metapán']
+            },
+            {
+                stateName: 'San Miguel',
+                stateCode: 'SM',
+                cities: ['San Miguel', 'Ciudad Barrios']
+            }
+        ]
+    }
+];
+
 // Lead Hunter AI Component - Multi-City Density Scanner Integrated
 export default function LeadHunter() {
     const navigate = useNavigate();
@@ -18,10 +85,16 @@ export default function LeadHunter() {
     // SIMULATION GUARD: always use the active company, not the JWT tenant
     const activeCompanyId = simulatedCompanyId || profile?.company_id;
     const [query, setQuery] = useState('');
-    const [location, setLocation] = useState('El Salvador');
+    const [location, setLocation] = useState('Leesburg, VA');
     const [selectedCategory, setSelectedCategory] = useState('custom');
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
     const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
+    // Location Accordion State
+    const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
+    const locationDropdownRef = useRef<HTMLDivElement>(null);
+    const [openCountry, setOpenCountry] = useState<string | null>('us');
+    const [openState, setOpenState] = useState<string | null>('Virginia');
     const [isDeepScan, setIsDeepScan] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
@@ -46,6 +119,9 @@ export default function LeadHunter() {
         const handleClickOutside = (e: MouseEvent) => {
             if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
                 setIsCategoryDropdownOpen(false);
+            }
+            if (locationDropdownRef.current && !locationDropdownRef.current.contains(e.target as Node)) {
+                setIsLocationDropdownOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -177,7 +253,7 @@ export default function LeadHunter() {
             }
         } catch (error) {
             console.error(error);
-            toast.error('Error al realizar la búsqueda.');
+            toast.error(error instanceof Error ? error.message : 'Error al realizar la búsqueda.');
         } finally {
             setIsLoading(false);
         }
@@ -213,7 +289,7 @@ export default function LeadHunter() {
             }
         } catch (error) {
             console.error('Density scan error:', error);
-            toast.error('Error al escanear la densidad de prospectos.', { id: 'densityScan' });
+            toast.error(error instanceof Error ? error.message : 'Error al escanear la densidad de prospectos.', { id: 'densityScan' });
         } finally {
             setIsDensityScanning(false);
         }
@@ -581,21 +657,129 @@ export default function LeadHunter() {
                         </div>
                     </div>
 
-                    {/* 3. País / Región (Unified Floating Card) */}
-                    <div className="md:col-span-3 h-[54px] bg-slate-50/80 hover:bg-slate-100/60 focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 rounded-xl px-3.5 py-2 border border-slate-200/80 flex items-center gap-2.5 transition-all group">
-                        <MapPin className="w-4 h-4 text-slate-400 shrink-0 group-focus-within:text-indigo-600 transition-colors" />
-                        <div className="min-w-0 flex-1 flex flex-col justify-center">
-                            <label className="block text-[10px] text-slate-400 font-extrabold uppercase tracking-wider leading-none mb-1">
-                                País o Región
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="ej. El Salvador, Estados Unidos, México"
-                                className="w-full bg-transparent text-slate-900 font-bold text-xs sm:text-sm focus:outline-none placeholder-slate-400 leading-none truncate"
-                                value={location}
-                                onChange={(e) => setLocation(e.target.value)}
-                            />
+                    {/* 3. País / Región / Ciudad con Acordeón (Unified Floating Card) */}
+                    <div ref={locationDropdownRef} className="md:col-span-3 relative">
+                        <div className={`h-[54px] bg-slate-50/80 hover:bg-slate-100/60 focus-within:bg-white focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10 rounded-xl px-3.5 py-2 border transition-all flex items-center justify-between gap-2.5 group cursor-pointer ${
+                            isLocationDropdownOpen ? 'bg-white border-indigo-500 ring-4 ring-indigo-500/10 shadow-sm' : 'border-slate-200/80'
+                        }`}>
+                            <MapPin className="w-4 h-4 text-slate-400 shrink-0 group-focus-within:text-indigo-600 transition-colors" />
+                            <div className="min-w-0 flex-1 flex flex-col justify-center">
+                                <label className="block text-[10px] text-slate-400 font-extrabold uppercase tracking-wider leading-none mb-1">
+                                    País, Estado o Ciudad
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="ej. Leesburg, VA | Sterling, VA"
+                                    className="w-full bg-transparent text-slate-900 font-bold text-xs sm:text-sm focus:outline-none placeholder-slate-400 leading-none truncate"
+                                    value={location}
+                                    onFocus={() => setIsLocationDropdownOpen(true)}
+                                    onChange={(e) => setLocation(e.target.value)}
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsLocationDropdownOpen(!isLocationDropdownOpen)}
+                                className="p-1 text-slate-400 hover:text-indigo-600 transition-colors"
+                                title="Abrir Acordeón de Ciudades"
+                            >
+                                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isLocationDropdownOpen ? 'rotate-180 text-indigo-600' : ''}`} />
+                            </button>
                         </div>
+
+                        {/* Accordion Menu: Country -> State -> Cities */}
+                        {isLocationDropdownOpen && (
+                            <div className="absolute right-0 md:left-0 top-full mt-2 w-[340px] sm:w-[380px] md:w-[420px] bg-white/95 backdrop-blur-xl rounded-2xl border border-slate-200/80 shadow-2xl z-50 p-2.5 space-y-2 animate-in fade-in slide-in-from-top-2 duration-150 max-h-96 overflow-y-auto">
+                                <div className="px-2 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 flex items-center justify-between">
+                                    <span>📍 Acordeón: País → Estado → Ciudad</span>
+                                    <span className="text-indigo-600 font-semibold">Selecciona una ciudad</span>
+                                </div>
+
+                                {LOCATION_TREE.map((country) => {
+                                    const isCountryExpanded = openCountry === country.id;
+                                    return (
+                                        <div key={country.id} className="border border-slate-200/80 rounded-xl overflow-hidden bg-slate-50/50">
+                                            {/* Country Accordion Header */}
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setOpenCountry(isCountryExpanded ? null : country.id);
+                                                    setOpenState(null);
+                                                }}
+                                                className="w-full p-2.5 font-extrabold text-xs sm:text-sm text-slate-800 flex items-center justify-between hover:bg-slate-100/80 transition-colors text-left"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-base">{country.flag}</span>
+                                                    <span>{country.countryName}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] bg-slate-200/80 text-slate-600 px-2 py-0.5 rounded-full font-bold">
+                                                        {country.states.length} Estados/Depto
+                                                    </span>
+                                                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isCountryExpanded ? 'rotate-180 text-indigo-600' : ''}`} />
+                                                </div>
+                                            </button>
+
+                                            {/* Country Expanded -> States List */}
+                                            {isCountryExpanded && (
+                                                <div className="p-2 space-y-1.5 bg-white border-t border-slate-100">
+                                                    {country.states.map((st) => {
+                                                        const isStateExpanded = openState === st.stateName;
+                                                        return (
+                                                            <div key={st.stateName} className="border border-slate-100 rounded-lg overflow-hidden">
+                                                                {/* State Accordion Header */}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setOpenState(isStateExpanded ? null : st.stateName)}
+                                                                    className="w-full px-3 py-2 text-xs font-bold text-slate-700 flex items-center justify-between hover:bg-indigo-50/50 transition-colors text-left"
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" />
+                                                                        <span>{st.stateName} ({st.stateCode})</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-[10px] text-indigo-600 font-semibold">{st.cities.length} ciudades</span>
+                                                                        <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isStateExpanded ? 'rotate-180 text-indigo-600' : ''}`} />
+                                                                    </div>
+                                                                </button>
+
+                                                                {/* State Expanded -> Cities Grid */}
+                                                                {isStateExpanded && (
+                                                                    <div className="p-2 bg-slate-50/80 border-t border-slate-100 grid grid-cols-2 gap-1.5">
+                                                                        {st.cities.map((cityName) => {
+                                                                            const fullLocation = `${cityName}, ${st.stateCode}`;
+                                                                            const isSelected = location.toLowerCase().includes(cityName.toLowerCase());
+                                                                            return (
+                                                                                <button
+                                                                                    key={cityName}
+                                                                                    type="button"
+                                                                                    onClick={() => {
+                                                                                        setLocation(fullLocation);
+                                                                                        setIsLocationDropdownOpen(false);
+                                                                                        toast.success(`📍 Ciudad elegida: ${fullLocation}`);
+                                                                                    }}
+                                                                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold text-left transition-all flex items-center justify-between ${
+                                                                                        isSelected
+                                                                                            ? 'bg-indigo-600 text-white shadow-xs'
+                                                                                            : 'bg-white hover:bg-indigo-50 text-slate-700 border border-slate-200/60'
+                                                                                    }`}
+                                                                                >
+                                                                                    <span className="truncate">{cityName}</span>
+                                                                                    {isSelected && <Check className="w-3 h-3 stroke-[3] shrink-0 ml-1" />}
+                                                                                </button>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     {/* 4. Botón Único de Acción Principal + Filtros */}

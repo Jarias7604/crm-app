@@ -150,5 +150,111 @@ export const teamService = {
         });
 
         return uniqueRoles;
+    },
+
+    // Get active portfolio counts (leads, tickets, follow-ups) for a member
+    async getMemberPortfolioSummary(userId: string, companyId: string) {
+        const [leadsRes, ticketsRes, followUpsRes] = await Promise.all([
+            supabase
+                .from('leads')
+                .select('id', { count: 'exact', head: true })
+                .eq('assigned_to', userId)
+                .eq('company_id', companyId),
+            supabase
+                .from('tickets')
+                .select('id', { count: 'exact', head: true })
+                .eq('assigned_to', userId)
+                .eq('company_id', companyId)
+                .not('status', 'in', '("resolved","closed")'),
+            supabase
+                .from('follow_ups')
+                .select('id', { count: 'exact', head: true })
+                .eq('assigned_to', userId)
+                .eq('company_id', companyId)
+                .eq('completed', false)
+        ]);
+
+        return {
+            leadsCount: leadsRes.count || 0,
+            ticketsCount: ticketsRes.count || 0,
+            followUpsCount: followUpsRes.count || 0,
+            totalItems: (leadsRes.count || 0) + (ticketsRes.count || 0) + (followUpsRes.count || 0)
+        };
+    },
+
+    // Pause / Activate member status with optional portfolio transfer
+    async toggleMemberStatus(params: {
+        userId: string;
+        companyId: string;
+        isActive: boolean;
+        reassignToUserId?: string | null;
+    }) {
+        const { userId, companyId, isActive, reassignToUserId } = params;
+
+        // 1. Update user profile status
+        const { error: profileErr } = await supabase
+            .from('profiles')
+            .update({
+                is_active: isActive,
+                status: isActive ? 'active' : 'inactive'
+            })
+            .eq('id', userId);
+
+        if (profileErr) throw profileErr;
+
+        const transferred = { leads: 0, tickets: 0, followUps: 0 };
+
+        // 2. If deactivating and a new agent is selected, reassign active portfolio
+        if (!isActive && reassignToUserId) {
+            const nowIso = new Date().toISOString();
+
+            // Reassign Leads
+            const { data: updatedLeads, error: leadsErr } = await supabase
+                .from('leads')
+                .update({
+                    assigned_to: reassignToUserId,
+                    assigned_at: nowIso
+                })
+                .eq('assigned_to', userId)
+                .eq('company_id', companyId)
+                .select('id');
+
+            if (leadsErr) {
+                console.error('Error reassigning leads:', leadsErr);
+            } else {
+                transferred.leads = updatedLeads?.length || 0;
+            }
+
+            // Reassign active Tickets
+            const { data: updatedTickets, error: ticketsErr } = await supabase
+                .from('tickets')
+                .update({ assigned_to: reassignToUserId })
+                .eq('assigned_to', userId)
+                .eq('company_id', companyId)
+                .select('id');
+
+            if (ticketsErr) {
+                console.error('Error reassigning tickets:', ticketsErr);
+            } else {
+                transferred.tickets = updatedTickets?.length || 0;
+            }
+
+            // Reassign pending Follow-ups
+            const { data: updatedFollowUps, error: followUpsErr } = await supabase
+                .from('follow_ups')
+                .update({ assigned_to: reassignToUserId })
+                .eq('assigned_to', userId)
+                .eq('company_id', companyId)
+                .eq('completed', false)
+                .select('id');
+
+            if (followUpsErr) {
+                console.error('Error reassigning follow-ups:', followUpsErr);
+            } else {
+                transferred.followUps = updatedFollowUps?.length || 0;
+            }
+        }
+
+        return transferred;
     }
 };

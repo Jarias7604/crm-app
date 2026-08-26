@@ -38,13 +38,9 @@ serve(async (req) => {
 
         if (!GOOGLE_API_KEY) {
             console.error('GOOGLE_PLACES_API_KEY not found in env');
-            // Fallback to mock data if API key is not configured
             return new Response(
-                JSON.stringify({
-                    results: generateMockResults(query, location),
-                    source: 'mock'
-                }),
-                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                JSON.stringify({ error: 'GOOGLE_PLACES_API_KEY no está configurada en Supabase.' }),
+                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
         }
 
@@ -78,12 +74,10 @@ serve(async (req) => {
                 if (allPlaces.length === 0) {
                     return new Response(
                         JSON.stringify({
-                            error: 'Error searching businesses',
-                            details: data.error?.message || 'Unknown error',
-                            results: generateMockResults(query, location),
-                            source: 'mock_fallback'
+                            error: data.error?.message || 'Error al conectar con Google Places API',
+                            code: data.error?.status
                         }),
-                        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
                     );
                 }
                 break; // Return what we have so far
@@ -144,40 +138,3 @@ serve(async (req) => {
     }
 });
 
-// Fallback mock data generator
-function generateMockResults(query: string, location: string) {
-    const types = ['Iglesia Evangélica', 'Centro Cristiano', 'Comunidad de Fe', 'Ministerio Internacional', 'Iglesia Bautista', 'Templo Betel', 'Iglesia Pentecostal', 'Asambleas de Dios', 'Centro de Alabanza', 'Ministerio Mahanaim', 'Iglesia Cristiana'];
-    const namePrefixes = ['Gran Comisión', 'Luz y Vida', 'Nueva Vida', 'Camino de Santidad', 'Monte de los Olivos', 'Manantial de Vida', 'Puerta del Cielo', 'Ríos de Agua Viva'];
-
-    const cleanLoc = location.trim();
-    const isElSalvador = /el salvador|san salvador|santa ana|san miguel|usulutan|sonsonate|la libertad|la paz|ahuachapan|chalatenango|cuscatlan|morazan|san vicente|cabanas|la union/i.test(cleanLoc);
-    const isUS = !isElSalvador || /usa|united states|estados unidos|virginia|viginia|lesbug|leesburg|sterling|manassas|loudoun|fairfax|arlington|richmond|maryland|texas|florida|california|new york|\b(va|md|dc|tx|fl|ca|ny|ga|nc|sc|il|pa|oh|la|wa|co|az|nv|tn|ma|al|ak|ar|ct|de|hi|id|in|ia|ks|ky|me|mi|mn|ms|mo|mt|ne|nh|nj|nm|nd|ok|or|ri|sd|ut|vt|wv|wi|wy|pr)\b/i.test(cleanLoc);
-
-    const countryCode = isUS ? '+1' : '+503';
-    const vaAreaCodes = [703, 571, 804, 757, 540];
-    const city = cleanLoc.split(',')[0].trim();
-
-    return Array.from({ length: 25 }).map((_, i) => {
-        const prefix = namePrefixes[i % namePrefixes.length];
-        const type = types[i % types.length];
-        const businessName = `${type} ${prefix} de ${city}`;
-        const areaCode = isUS ? vaAreaCodes[i % vaAreaCodes.length] : Math.floor(Math.random() * 80) + 20;
-
-        return {
-            id: `mock_${Date.now()}_${i}`,
-            business_name: businessName,
-            category: query,
-            address: `${Math.floor(Math.random() * 900) + 10} Market St, ${cleanLoc}`,
-            phone: `${countryCode} (${areaCode}) ${Math.floor(Math.random() * 899) + 100}-${Math.floor(Math.random() * 8999) + 1000}`,
-            website: Math.random() > 0.3 ? `www.${prefix.replace(/[^a-zA-Z]/g, '').toLowerCase()}${city.replace(/[^a-zA-Z]/g, '').toLowerCase()}.org` : undefined,
-            rating: 4.2 + (Math.random() * 0.8),
-            review_count: Math.floor(Math.random() * 400) + 10,
-            source: 'google_maps',
-            is_imported: false
-        };
-    });
-}
-
-function capitalize(str: string) {
-    return str.charAt(0).toUpperCase() + str.slice(1);
-}

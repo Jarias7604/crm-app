@@ -412,6 +412,8 @@ class LeadDiscoveryService {
         // Limit synonyms for speed unless deepScan is explicitly true
         const activeVariants = options?.deepScan ? queryVariants : queryVariants.slice(0, 2);
 
+        const errors: string[] = [];
+
         const densityPromises = presets.map(async (preset) => {
             try {
                 const subLocs = (preset.subQueries && preset.subQueries.length > 0)
@@ -452,6 +454,7 @@ class LeadDiscoveryService {
                 };
             } catch (err) {
                 console.error(`Density scan error for ${preset.cityName}:`, err);
+                errors.push(err instanceof Error ? err.message : 'No se pudo conectar con Google Places API');
                 return {
                     id: preset.id,
                     cityName: preset.cityName,
@@ -464,111 +467,105 @@ class LeadDiscoveryService {
         });
 
         const results = await Promise.all(densityPromises);
+        const totalLeads = results.reduce((sum, r) => sum + r.count, 0);
+        if (totalLeads === 0 && presets.length > 0 && errors.length === presets.length) {
+            throw new Error(errors[0]);
+        }
         return results.sort((a, b) => b.count - a.count);
     };
 
     async searchBusiness(query: string, location: string): Promise<DiscoveredLead[]> {
-        try {
-            // 1. Llamar a la Edge Function
-            const { data, error } = await supabase.functions.invoke('search-businesses', {
-                body: { query, location }
+        const normLoc = location.toLowerCase().trim();
+        
+        let subLocations: string[] = [];
+        if (['usa', 'us', 'estados unidos', 'united states', 'eeuu', 'ee.uu'].some(k => normLoc === k || normLoc.includes(k))) {
+            subLocations = [
+                'Virginia, USA', 'Maryland, USA', 'Washington DC', 'Florida, USA', 
+                'Texas, USA', 'New York, USA', 'New Jersey, USA', 'California, USA', 
+                'Illinois, USA', 'Georgia, USA', 'North Carolina, USA', 'Pennsylvania, USA'
+            ];
+        } else if (['el salvador', 'sv', 'elsalvador'].some(k => normLoc === k || normLoc.includes(k))) {
+            subLocations = [
+                'San Salvador, El Salvador', 'Santa Ana, El Salvador', 'San Miguel, El Salvador',
+                'La Libertad, El Salvador', 'Sonsonate, El Salvador', 'Usulután, El Salvador'
+            ];
+        } else if (['mexico', 'méxico', 'mx'].some(k => normLoc === k || normLoc.includes(k))) {
+            subLocations = [
+                'Ciudad de México, México', 'Guadalajara, México', 'Monterrey, México',
+                'Puebla, México', 'Tijuana, México'
+            ];
+        }
+
+        if (subLocations.length > 0) {
+            const tasks = subLocations.map(subLoc => this.fetchSingleBusinessQuery(query, subLoc));
+            const settled = await Promise.allSettled(tasks);
+
+            const fulfilled = settled.filter(
+                (s): s is PromiseFulfilledResult<DiscoveredLead[]> => s.status === 'fulfilled'
+            );
+            if (fulfilled.length === 0) {
+                const firstRejected = settled.find((s): s is PromiseRejectedResult => s.status === 'rejected');
+                const reason = firstRejected?.reason;
+                throw new Error(reason instanceof Error ? reason.message : 'No se pudo conectar con Google Places API');
+            }
+
+            const seenIds = new Set<string>();
+            const seenNames = new Set<string>();
+            const combinedLeads: DiscoveredLead[] = [];
+
+            fulfilled.flatMap(s => s.value).forEach(lead => {
+                const normName = lead.business_name.toLowerCase().trim();
+                if (!seenIds.has(lead.id) && !seenNames.has(normName)) {
+                    seenIds.add(lead.id);
+                    seenNames.add(normName);
+                    combinedLeads.push(lead);
+                }
             });
 
-            if (error) {
-                console.error('Edge Function error:', error);
-                return this.generateMockResults(query, location);
-            }
-
-            const rawResults: DiscoveredLead[] = (data.results || []).map((r: DiscoveredLead) => ({
-                ...r,
-                email: (r.email && r.email.includes('@') && !r.email.includes('example.com')) ? r.email.trim() : undefined
-            }));
-
-            // 2. Verificar duplicados en la base de datos local
-            if (rawResults.length > 0) {
-                const placeIds = rawResults.map(r => r.id);
-                const { data: existingLeads } = await supabase
-                    .from('leads')
-                    .select('google_place_id')
-                    .in('google_place_id', placeIds);
-
-                if (existingLeads) {
-                    const existingSet = new Set(existingLeads.map(l => l.google_place_id));
-                    return rawResults.map(r => ({
-                        ...r,
-                        is_imported: existingSet.has(r.id)
-                    }));
-                }
-            }
-
-            return rawResults;
-        } catch (error) {
-            console.error('Search error:', error);
-            return this.generateMockResults(query, location);
+            return this.checkExistingDuplicates(combinedLeads);
         }
+
+        const singleResult = await this.fetchSingleBusinessQuery(query, location);
+        return this.checkExistingDuplicates(singleResult);
     }
 
-    // Fallback mock generator (used when Edge Function is unavailable or in local dev)
-    private generateMockResults(query: string, location: string): DiscoveredLead[] {
-        const lowerQ = query.toLowerCase();
-        const cleanLoc = location.trim();
-        const city = cleanLoc.split(',')[0].trim();
-
-        const churchTypes = ['Iglesia Evangélica', 'Iglesia Bautista', 'Centro Cristiano', 'Comunidad de Fe', 'Ministerio Internacional', 'Templo Betel', 'Iglesia Pentecostal', 'Asambleas de Dios', 'Centro de Alabanza', 'Ministerio Mahanaim', 'Iglesia Cristiana', 'Ministerio Hosanna', 'Comunidad Cristiana', 'Templo Elim', 'Iglesia Filadelfia'];
-        const namePrefixes = ['Gran Comisión', 'Luz y Vida', 'Nueva Vida', 'Camino de Santidad', 'Monte de los Olivos', 'Manantial de Vida', 'Puerta del Cielo', 'Ríos de Agua Viva', 'Príncipe de Paz', 'Fe y Esperanza', 'Redención', 'Buenas Nuevas', 'Gracia Divina', 'Jesucristo es el Señor', 'Refugio de Esperanza'];
-
-        const genericTypes = (lowerQ.includes('iglesia') || lowerQ.includes('cristian') || lowerQ.includes('bautista'))
-            ? churchTypes
-            : [capitalize(query)];
-
-        const isElSalvador = /el salvador|san salvador|santa ana|san miguel|usulutan|sonsonate|la libertad|la paz|ahuachapan|chalatenango|cuscatlan|morazan|san vicente|cabanas|la union/i.test(cleanLoc);
-
-        const isUS = !isElSalvador || /usa|united states|estados unidos|virginia|viginia|lesbug|leesburg|sterling|manassas|loudoun|fairfax|arlington|richmond|maryland|texas|florida|california|new york|\b(va|md|dc|tx|fl|ca|ny|ga|nc|sc|il|pa|oh|la|wa|co|az|nv|tn|ma|al|ak|ar|ct|de|hi|id|in|ia|ks|ky|me|mi|mn|ms|mo|mt|ne|nh|nj|nm|nd|ok|or|ri|sd|ut|vt|wv|wi|wy|pr)\b/i.test(cleanLoc);
-
-        const countryCode = isUS ? '+1' : '+503';
-        const vaAreaCodes = [703, 571, 804, 757, 540];
-
-        const baseCount = 35;
-        const locHash = Math.abs(location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0));
-        const variance = (locHash % 15);
-        const targetLength = baseCount + variance;
-
-        return Array.from({ length: targetLength }).map((_, i) => {
-            const hasWeb = Math.random() > 0.2;
-            const prefix = namePrefixes[i % namePrefixes.length];
-            const type = genericTypes[i % genericTypes.length];
-            
-            let businessName = '';
-            if (lowerQ.includes('iglesia') || lowerQ.includes('cristian') || lowerQ.includes('bautista')) {
-                businessName = `${type} ${prefix} de ${city}`;
-            } else {
-                businessName = `${type} ${prefix} ${city}`;
-            }
-
-            const cleanSlug = prefix.replace(/[^a-zA-Z]/g, '').toLowerCase();
-            const cleanCitySlug = city.replace(/[^a-zA-Z]/g, '').toLowerCase();
-            const website = hasWeb ? `www.${cleanSlug}${cleanCitySlug}.org` : undefined;
-            const hasRealEmail = hasWeb && (i % 3 === 0);
-            const email = hasRealEmail ? `info@${cleanSlug}${cleanCitySlug}.org` : undefined;
-
-            const areaCode = isUS ? vaAreaCodes[i % vaAreaCodes.length] : Math.floor(Math.random() * 80) + 20;
-            const lineNum1 = Math.floor(Math.random() * 899) + 100;
-            const lineNum2 = Math.floor(Math.random() * 8999) + 1000;
-
-            return {
-                id: `lh_${Date.now()}_${i}_${Math.floor(Math.random() * 100000)}`,
-                business_name: businessName,
-                category: query,
-                address: `${Math.floor(Math.random() * 980) + 10} Market St, ${cleanLoc}`,
-                phone: `${countryCode} (${areaCode}) ${lineNum1}-${lineNum2}`,
-                website: website,
-                email: email,
-                rating: Number((4.3 + (Math.random() * 0.7)).toFixed(1)),
-                review_count: Math.floor(Math.random() * 350) + 15,
-                source: 'google_maps',
-                is_imported: false
-            };
+    private async fetchSingleBusinessQuery(query: string, location: string): Promise<DiscoveredLead[]> {
+        const { data, error } = await supabase.functions.invoke('search-businesses', {
+            body: { query, location }
         });
+
+        if (error || data?.error) {
+            throw new Error(data?.error || error?.message || 'No se pudo conectar con Google Places API');
+        }
+
+        const rawResults: DiscoveredLead[] = (data?.results || []).map((r: DiscoveredLead) => ({
+            ...r,
+            email: (r.email && r.email.includes('@') && !r.email.includes('example.com')) ? r.email.trim() : undefined
+        }));
+
+        return rawResults;
+    }
+
+    private async checkExistingDuplicates(leads: DiscoveredLead[]): Promise<DiscoveredLead[]> {
+        if (leads.length === 0) return leads;
+        try {
+            const placeIds = leads.map(r => r.id);
+            const { data: existingLeads } = await supabase
+                .from('leads')
+                .select('google_place_id')
+                .in('google_place_id', placeIds);
+
+            if (existingLeads) {
+                const existingSet = new Set(existingLeads.map(l => l.google_place_id));
+                return leads.map(r => ({
+                    ...r,
+                    is_imported: existingSet.has(r.id)
+                }));
+            }
+        } catch (e) {
+            console.error('Check duplicates error:', e);
+        }
+        return leads;
     }
 
     // Extract clean domain from website URL

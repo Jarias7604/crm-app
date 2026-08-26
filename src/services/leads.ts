@@ -750,7 +750,7 @@ export const leadsService = {
         return data as FollowUp;
     },
 
-    // Get team members for assignee dropdown
+    // Get active team members for assignee dropdown
     async getTeamMembers() {
         const companyId = await this.getActiveCompanyId();
 
@@ -758,8 +758,9 @@ export const leadsService = {
 
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, email, role, full_name, avatar_url')
-            .eq('company_id', companyId);
+            .select('id, email, role, full_name, avatar_url, is_active')
+            .eq('company_id', companyId)
+            .neq('is_active', false);
 
         if (error) throw error;
         return data;

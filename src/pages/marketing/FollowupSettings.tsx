@@ -217,7 +217,7 @@ export default function FollowupSettingsPage() {
         try {
             const [data, { data: profilesData }] = await Promise.all([
                 followupSettingsService.get(profile.company_id),
-                supabase.from('profiles').select('id, full_name, email').eq('company_id', profile.company_id).order('full_name')
+                supabase.from('profiles').select('id, full_name, email').eq('company_id', profile.company_id).not('is_active', 'eq', false).order('full_name')
             ]);
             setSettings(data);
             setProfiles(profilesData || []);

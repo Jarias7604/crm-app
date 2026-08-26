@@ -98,7 +98,7 @@ export default function PipelineConfig() {
       setCompanyId(profile.company_id);
       const [compRes, teamRes] = await Promise.all([
         supabase.from('companies').select('portal_terms_text').eq('id', profile.company_id).single(),
-        supabase.from('profiles').select('id, full_name, email').eq('company_id', profile.company_id).order('full_name'),
+        supabase.from('profiles').select('id, full_name, email').eq('company_id', profile.company_id).not('is_active', 'eq', false).order('full_name'),
       ]);
       if (compRes.data?.portal_terms_text) setTermsText(compRes.data.portal_terms_text);
       if (teamRes.data) setTeamMembers(teamRes.data as TeamMember[]);

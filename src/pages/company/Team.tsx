@@ -5,7 +5,7 @@ import type { Profile, CustomRole, Role, Company } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { CustomSelect } from '../../components/ui/CustomSelect';
-import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send, BarChart3, Check } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send, BarChart3, Check, PauseCircle, PlayCircle, ArrowRight, UserCheck, AlertTriangle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
@@ -28,6 +28,7 @@ export default function Team() {
     const [maxUsers, setMaxUsers] = useState(5);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
     const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
     const [allowedPermissions, setAllowedPermissions] = useState<string[]>([]);
     const [workspaces, setWorkspaces] = useState<Company[]>([]);
@@ -38,6 +39,13 @@ export default function Team() {
     const [editingMember, setEditingMember] = useState<Profile | null>(null);
     const [baselinePermissions, setBaselinePermissions] = useState<Record<string, boolean>>({});
     const [activeTab, setActiveTab] = useState<TabType>('general');
+
+    // Pause & Reassign Portfolio Modal States
+    const [pausingMember, setPausingMember] = useState<Profile | null>(null);
+    const [portfolioSummary, setPortfolioSummary] = useState<{ leadsCount: number; ticketsCount: number; followUpsCount: number; totalItems: number } | null>(null);
+    const [targetReassignAgentId, setTargetReassignAgentId] = useState<string>('');
+    const [isPausing, setIsPausing] = useState(false);
+    const [isLoadingPortfolio, setIsLoadingPortfolio] = useState(false);
 
     // Status States
     const [isCreating, setIsCreating] = useState(false);
@@ -131,8 +139,75 @@ export default function Team() {
         const matchesSearch = m.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             m.email.toLowerCase().includes(searchTerm.toLowerCase());
 
-        return matchesSearch;
+        const matchesStatus = statusFilter === 'all'
+            ? true
+            : statusFilter === 'active'
+                ? m.is_active !== false
+                : m.is_active === false;
+
+        return matchesSearch && matchesStatus;
     });
+
+    const handleOpenPauseModal = async (member: Profile) => {
+        setPausingMember(member);
+        setIsLoadingPortfolio(true);
+        // Default target agent: first active agent other than member being paused
+        const otherActiveMembers = members.filter(m => m.id !== member.id && m.is_active !== false);
+        setTargetReassignAgentId(otherActiveMembers[0]?.id || '');
+
+        try {
+            const summary = await teamService.getMemberPortfolioSummary(member.id, member.company_id || myProfile?.company_id || '');
+            setPortfolioSummary(summary);
+        } catch (err) {
+            console.error('Failed to load portfolio summary:', err);
+            setPortfolioSummary({ leadsCount: 0, ticketsCount: 0, followUpsCount: 0, totalItems: 0 });
+        } finally {
+            setIsLoadingPortfolio(false);
+        }
+    };
+
+    const handleConfirmPause = async () => {
+        if (!pausingMember) return;
+        setIsPausing(true);
+        try {
+            const res = await teamService.toggleMemberStatus({
+                userId: pausingMember.id,
+                companyId: pausingMember.company_id || myProfile?.company_id || '',
+                isActive: false,
+                reassignToUserId: targetReassignAgentId || null
+            });
+
+            let msg = `⏸️ ${pausingMember.full_name || 'Colaborador'} pausado correctamente.`;
+            if (targetReassignAgentId && (res.leads > 0 || res.tickets > 0 || res.followUps > 0)) {
+                const targetObj = members.find(m => m.id === targetReassignAgentId);
+                const targetName = targetObj?.full_name?.split(' ')[0] || 'nuevo agente';
+                msg += ` Se reasignaron ${res.leads} leads, ${res.tickets} tickets y ${res.followUps} seguimientos a ${targetName}.`;
+            }
+
+            toast.success(msg, { duration: 7000 });
+            setPausingMember(null);
+            setPortfolioSummary(null);
+            loadData();
+        } catch (err: any) {
+            toast.error(`Error al pausar colaborador: ${err.message || err}`);
+        } finally {
+            setIsPausing(false);
+        }
+    };
+
+    const handleReactivateMember = async (member: Profile) => {
+        try {
+            await teamService.toggleMemberStatus({
+                userId: member.id,
+                companyId: member.company_id || myProfile?.company_id || '',
+                isActive: true
+            });
+            toast.success(`🟢 ${member.full_name || 'Colaborador'} reactivado correctamente.`);
+            loadData();
+        } catch (err: any) {
+            toast.error(`Error al reactivar colaborador: ${err.message || err}`);
+        }
+    };
 
     const handleCreateMember = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -655,16 +730,45 @@ export default function Team() {
                                 </div>
 
                                 {/* Bottom Level: Filter Bar */}
-                                <div className="px-10 pb-4">
-                                    <div className="relative group w-full">
+                                <div className="px-10 pb-4 flex flex-col sm:flex-row items-center gap-3">
+                                    <div className="relative group flex-1 w-full">
                                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 group-focus-within:text-indigo-500 transition-colors" />
                                         <input
                                             type="text"
-                                            placeholder="FILTRAR..."
+                                            placeholder="BUSCAR MIEMBRO..."
                                             value={searchTerm}
                                             onChange={(e) => setSearchTerm(e.target.value)}
                                             className="w-full h-11 pl-12 pr-4 rounded-2xl bg-gray-50/50 border border-transparent focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all font-black text-[11px] uppercase tracking-widest placeholder:text-gray-300"
                                         />
+                                    </div>
+                                    <div className="flex bg-gray-100/80 p-1 rounded-xl shrink-0 gap-1 self-stretch sm:self-auto justify-center">
+                                        <button
+                                            type="button"
+                                            onClick={() => setStatusFilter('all')}
+                                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                statusFilter === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                                            }`}
+                                        >
+                                            Todos ({members.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setStatusFilter('active')}
+                                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                statusFilter === 'active' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                                            }`}
+                                        >
+                                            Activos ({members.filter(m => m.is_active !== false).length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setStatusFilter('inactive')}
+                                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                statusFilter === 'inactive' ? 'bg-white text-slate-700 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                                            }`}
+                                        >
+                                            Pausados ({members.filter(m => m.is_active === false).length})
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -672,14 +776,16 @@ export default function Team() {
                             {/* Internal Scrollable List */}
                             <div className="overflow-y-auto overflow-x-hidden divide-y divide-gray-50/80 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent flex-1 pb-10">
                                 {filteredMembers.map(member => (
-                                    <div key={member.id} className="px-10 py-4 hover:bg-gray-50/60 transition-all group flex items-center justify-between border-l-4 border-l-transparent hover:border-l-indigo-500">
+                                    <div key={member.id} className={`px-10 py-4 hover:bg-gray-50/60 transition-all group flex items-center justify-between border-l-4 border-l-transparent hover:border-l-indigo-500 ${member.is_active === false ? 'bg-gray-50/40 opacity-75' : ''}`}>
                                         <div className="flex items-center gap-4 min-w-0">
                                             <div className="relative shrink-0">
                                                 <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-gray-400 overflow-hidden border border-gray-100 shadow-sm group-hover:scale-105 transition-transform duration-300">
                                                     {member.avatar_url ? <img src={member.avatar_url} className="w-full h-full object-cover" /> : <User className="w-5 h-5 opacity-10" />}
                                                 </div>
-                                                {member.is_active !== false && (
-                                                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full" />
+                                                {member.is_active !== false ? (
+                                                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" />
+                                                ) : (
+                                                    <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-slate-400 border-2 border-white rounded-full" />
                                                 )}
                                             </div>
                                             <div className="flex flex-col gap-0 min-w-0">
@@ -704,9 +810,38 @@ export default function Team() {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-6 shrink-0 ml-4">
-                                            <RoleBadge member={member} />
+                                        <div className="flex items-center gap-4 shrink-0 ml-4">
+                                            {member.is_active === false ? (
+                                                <span className="px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                                    Pausado
+                                                </span>
+                                            ) : (
+                                                <RoleBadge member={member} />
+                                            )}
                                             <div className="flex items-center gap-1.5">
+                                                {/* Pause / Play Quick Actions */}
+                                                {member.id !== myProfile?.id && (
+                                                    member.is_active !== false ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleOpenPauseModal(member)}
+                                                            className="p-1.5 rounded-xl text-slate-400 hover:text-[#4449AA] hover:bg-indigo-50 transition-all"
+                                                            title="Pausar colaborador y reasignar cartera"
+                                                        >
+                                                            <PauseCircle className="w-4 h-4" />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleReactivateMember(member)}
+                                                            className="p-1.5 rounded-xl text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 transition-all"
+                                                            title="Reactivar colaborador"
+                                                        >
+                                                            <PlayCircle className="w-4 h-4" />
+                                                        </button>
+                                                    )
+                                                )}
                                                 <button
                                                     onClick={async () => {
                                                         // Get merged permissions (role + user overrides) for display
@@ -730,13 +865,15 @@ export default function Team() {
                                                         loadPasswordResetLog(member.id);
                                                     }}
                                                     className="p-1.5 rounded-xl text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                                                    title="Editar colaborador"
                                                 >
                                                     <Edit2 className="w-3.5 h-3.5" />
                                                 </button>
                                                 {member.id !== myProfile?.id ? (
                                                     <button
-                                                        onClick={() => { if (confirm('¿Eliminar usuario?')) teamService.deleteMember(member.id).then(loadData) }}
+                                                        onClick={() => { if (confirm('¿Eliminar usuario definitivamente del sistema?')) teamService.deleteMember(member.id).then(loadData) }}
                                                         className="p-1.5 rounded-xl text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                                                        title="Eliminar usuario"
                                                     >
                                                         <Trash2 className="w-3.5 h-3.5" />
                                                     </button>
@@ -1133,6 +1270,146 @@ export default function Team() {
                             >
                                 {isSaving ? 'Actualizando...' : 'Guardar Cambios permanentemente'}
                             </Button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Modal de Pausa de Colaborador y Transferencia de Cartera */}
+            {pausingMember && createPortal(
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[9999] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-xl max-h-[85vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden border border-slate-200/80 animate-in zoom-in-95 duration-200">
+                        {/* Header - Arias Corporate Gradient */}
+                        <div className="bg-gradient-to-r from-[#4449AA] via-indigo-700 to-indigo-900 px-8 py-5 text-white flex items-center justify-between shrink-0 shadow-md">
+                            <div className="flex items-center gap-3.5">
+                                <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center shadow-inner border border-white/10">
+                                    <PauseCircle className="w-6 h-6 text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="font-extrabold text-base tracking-tight uppercase">Pausar Colaborador</h3>
+                                    <p className="text-indigo-200 text-xs font-medium">Desactivar acceso y gestionar cartera activa</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => { setPausingMember(null); setPortfolioSummary(null); }}
+                                className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                            >
+                                <X className="w-5 h-5 text-white" />
+                            </button>
+                        </div>
+
+                        {/* Content Body - Scrollable */}
+                        <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-5 scrollbar-thin scrollbar-thumb-indigo-100">
+                            {/* Member Details */}
+                            <div className="flex items-center gap-4 p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100/80">
+                                <div className="w-12 h-12 rounded-2xl bg-[#4449AA] text-white font-black text-lg flex items-center justify-center shrink-0 uppercase shadow-md overflow-hidden">
+                                    {pausingMember.avatar_url ? (
+                                        <img src={pausingMember.avatar_url} className="w-full h-full object-cover" />
+                                    ) : (
+                                        pausingMember.full_name?.charAt(0) || 'U'
+                                    )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="font-black text-gray-900 text-base uppercase tracking-tight truncate">
+                                        {pausingMember.full_name || 'Sin Nombre'}
+                                    </p>
+                                    <p className="text-xs text-gray-500 font-medium">{pausingMember.email}</p>
+                                </div>
+                                <span className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 font-black text-[10px] uppercase tracking-widest shrink-0">
+                                    Pausa & Reasignación
+                                </span>
+                            </div>
+
+                            {/* Active Portfolio Summary */}
+                            <div className="space-y-2.5">
+                                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                    <BarChart3 className="w-4 h-4 text-[#4449AA]" />
+                                    Cartera Activa Detectada
+                                </p>
+
+                                {isLoadingPortfolio ? (
+                                    <div className="p-6 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center gap-3 text-gray-400">
+                                        <Loader2 className="w-5 h-5 animate-spin text-[#4449AA]" />
+                                        <span className="text-xs font-bold uppercase tracking-wider">Analizando leads y tareas asignadas...</span>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 text-center">
+                                            <p className="text-2xl font-black text-[#4449AA]">{portfolioSummary?.leadsCount || 0}</p>
+                                            <p className="text-[10px] font-extrabold text-indigo-400 uppercase tracking-wider mt-0.5">Leads Activos</p>
+                                        </div>
+                                        <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100 text-center">
+                                            <p className="text-2xl font-black text-blue-600">{portfolioSummary?.ticketsCount || 0}</p>
+                                            <p className="text-[10px] font-extrabold text-blue-400 uppercase tracking-wider mt-0.5">Tickets Soporte</p>
+                                        </div>
+                                        <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 text-center">
+                                            <p className="text-2xl font-black text-emerald-600">{portfolioSummary?.followUpsCount || 0}</p>
+                                            <p className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider mt-0.5">Seguimientos</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Reassignment Target Selector */}
+                            <div className="space-y-2.5 pt-1">
+                                <label className="block text-[11px] font-black text-gray-700 uppercase tracking-widest flex items-center gap-2">
+                                    <UserCheck className="w-4 h-4 text-emerald-600" />
+                                    Reasignar Cartera Activa A:
+                                </label>
+
+                                {members.filter(m => m.id !== pausingMember.id && m.is_active !== false).length > 0 ? (
+                                    <select
+                                        value={targetReassignAgentId}
+                                        onChange={(e) => setTargetReassignAgentId(e.target.value)}
+                                        className="w-full h-12 px-4 rounded-2xl bg-gray-50 border border-gray-200 text-gray-900 font-bold text-sm outline-none focus:bg-white focus:border-[#4449AA] focus:ring-4 focus:ring-[#4449AA]/10 transition-all"
+                                    >
+                                        {members
+                                            .filter(m => m.id !== pausingMember.id && m.is_active !== false)
+                                            .map(agent => (
+                                                <option key={agent.id} value={agent.id}>
+                                                    {agent.full_name || agent.email} ({agent.role === 'company_admin' ? 'Admin' : 'Agente'})
+                                                </option>
+                                            ))
+                                        }
+                                    </select>
+                                ) : (
+                                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold flex items-center gap-2">
+                                        <AlertTriangle className="w-4 h-4 shrink-0 text-slate-500" />
+                                        <span>No hay otros miembros activos disponibles. La cartera quedará vinculada históricamente a su cuenta.</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Notice box */}
+                            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 leading-relaxed font-medium">
+                                💡 <strong>¿Qué sucede al pausar?</strong>
+                                <ul className="list-disc list-inside mt-1 space-y-0.5 text-[10px]">
+                                    <li>Su inicio de sesión quedará inhabilitado de inmediato.</li>
+                                    <li>Se <strong>liberará un cupo de usuario</strong> en la empresa.</li>
+                                    <li>Se transferirán sus prospectos y tareas activas al colaborador seleccionado en 1 clic.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        {/* Footer Actions - Shrink 0 */}
+                        <div className="px-8 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => { setPausingMember(null); setPortfolioSummary(null); }}
+                                className="h-11 px-6 rounded-2xl text-gray-500 hover:text-gray-900 font-black text-[11px] uppercase tracking-widest transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmPause}
+                                disabled={isPausing || isLoadingPortfolio}
+                                className="h-11 px-7 rounded-2xl bg-[#4449AA] hover:bg-indigo-700 text-white font-black text-[11px] uppercase tracking-widest shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isPausing ? <Loader2 className="w-4 h-4 animate-spin" /> : <PauseCircle className="w-4 h-4" />}
+                                {isPausing ? 'Pausando...' : 'Confirmar y Pausar Colaborador'}
+                            </button>
                         </div>
                     </div>
                 </div>,
