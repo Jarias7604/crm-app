@@ -272,12 +272,21 @@ export default function MarketingDashboard() {
                             </div>
                         </div>
                         <div className="space-y-2">
-                             {heatmapLeads.slice(0, 3).map((l, i) => (
-                                <div key={i} className="bg-slate-50/50 p-3 rounded-xl border border-transparent hover:border-indigo-100 hover:bg-white transition-all cursor-pointer group">
-                                    <p className="text-[11px] font-bold text-slate-800 leading-tight group-hover:text-indigo-900 transition-colors">{l.name} espera comunicación.</p>
-                                    <p className="text-[9px] text-slate-400 mt-1 font-medium italic">Alta tasa de apertura detectada.</p>
+                            {heatmapLeads.filter(l => l.opens > 0 || l.clicks > 0).slice(0, 3).length === 0 ? (
+                                <div className="p-4 bg-slate-50/50 rounded-xl text-center">
+                                    <p className="text-[10px] font-bold text-slate-500">Sin aperturas activas aún.</p>
+                                    <p className="text-[9px] text-slate-400 mt-0.5 font-medium">Maya monitorea aperturas y clics en tiempo real.</p>
                                 </div>
-                             ))}
+                            ) : (
+                                heatmapLeads.filter(l => l.opens > 0 || l.clicks > 0).slice(0, 3).map((l, i) => (
+                                    <div key={i} onClick={() => handleLeadRedirect(l.id)} className="bg-slate-50/50 p-3 rounded-xl border border-transparent hover:border-indigo-100 hover:bg-white transition-all cursor-pointer group">
+                                        <p className="text-[11px] font-bold text-slate-800 leading-tight group-hover:text-indigo-900 transition-colors">{l.name} espera comunicación.</p>
+                                        <p className="text-[9px] text-indigo-600 mt-1 font-bold flex items-center gap-1">
+                                            🔥 {l.clicks > 0 ? `${l.clicks} Clic(s) detectados — Contactar urgente` : `${l.opens} Apertura(s) detectadas — Enviar mensaje`}
+                                        </p>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>

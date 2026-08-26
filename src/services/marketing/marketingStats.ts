@@ -197,15 +197,21 @@ export const marketingStatsService = {
 
             if (leadsError) throw leadsError;
 
-            const realLeads = (leads || []).map(l => ({
-                id: l.id,
-                name: l.name || 'Cliente',
-                email: l.email || '-',
-                sent: statsMap[l.id]?.sent || 0,
-                opens: statsMap[l.id]?.opens || 0,
-                clicks: statsMap[l.id]?.clicks || 0,
-                engagementScore: (l as any).engagement_score || 0
-            }));
+            const realLeads = (leads || []).map(l => {
+                const opens = statsMap[l.id]?.opens || 0;
+                const clicks = statsMap[l.id]?.clicks || 0;
+                const baseScore = (l as any).engagement_score || 0;
+                const dynamicScore = baseScore + (opens * 3) + (clicks * 5);
+                return {
+                    id: l.id,
+                    name: l.name || 'Cliente',
+                    email: l.email || '-',
+                    sent: statsMap[l.id]?.sent || 0,
+                    opens,
+                    clicks,
+                    engagementScore: dynamicScore
+                };
+            });
 
             // Complete with recent leads up to 20 total
             if (!campaignId && realLeads.length < 20) {
@@ -224,10 +230,10 @@ export const marketingStatsService = {
                     sent: 0, opens: 0, clicks: 0, engagementScore: 0
                 }));
 
-                return [...realLeads, ...additionalLeads].sort((a, b) => (b.clicks + b.opens) - (a.clicks + a.opens));
+                return [...realLeads, ...additionalLeads].sort((a, b) => b.engagementScore - a.engagementScore);
             }
 
-            return realLeads.sort((a, b) => (b.clicks + b.opens) - (a.clicks + a.opens));
+            return realLeads.sort((a, b) => b.engagementScore - a.engagementScore);
         } catch (error) {
             console.error('Error fetching real heatmap data:', error);
             return [];
