@@ -243,14 +243,13 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     useEffect(() => {
         if (profile?.company_id && (profile?.role === 'company_admin' || profile?.role === 'super_admin')) {
-            // Check cache first for instant workspace switcher
+            // Serve from sessionStorage cache immediately for instant workspace switcher
             const cachedWs = sessionStorage.getItem(`crm_workspaces_${profile.company_id}`);
             if (cachedWs) {
                 try { setWorkspaces(JSON.parse(cachedWs)); } catch {}
             }
-            // Defer network fetch by 600ms to allow primary view to load first
-            const timer = setTimeout(() => loadWorkspaces(), 600);
-            return () => clearTimeout(timer);
+            // Load fresh data immediately (no defer)
+            loadWorkspaces();
         }
     }, [profile?.company_id, profile?.role]);
 
@@ -314,13 +313,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 setHotLeadCount(count || 0);
             } catch { /* silently ignore */ }
         };
-        // Initial delayed fetch (1.5s after mount)
-        const initialTimer = setTimeout(fetchHotLeads, 1500);
+        // Fetch immediately, then poll every 60s
+        fetchHotLeads();
         const interval = setInterval(fetchHotLeads, 60000);
-        return () => {
-            clearTimeout(initialTimer);
-            clearInterval(interval);
-        };
+        return () => clearInterval(interval);
     }, [profile?.company_id]);
 
     // Defer trial days fetch to run in background

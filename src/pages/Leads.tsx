@@ -72,7 +72,7 @@ export default function Leads() {
         },
         initialPageParam: undefined as string | undefined,
         getNextPageParam: (lastPage) => lastPage.nextCursor,
-        staleTime: 2 * 60 * 1000, // 2 minutes instant in-memory cache on tab navigation
+        staleTime: 5 * 1000, // 5 seconds — ensures newly imported leads appear immediately on navigation
         gcTime: 10 * 60 * 1000,
     });
     const leads = leadsData?.pages.flatMap(page => page.data) ?? [];

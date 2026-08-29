@@ -110,9 +110,9 @@ export default function Cotizaciones() {
     useEffect(() => {
         if (profile?.company_id) {
             loadCotizaciones();
-            if (isAdmin) loadStats();
+            if (canViewAllQuotes) loadStats();
         }
-    }, [profile?.company_id]); // Stable dep — fires exactly once per company/login
+    }, [profile?.company_id, profile?.role]); // role included to re-fire on simulation/workspace switches
 
     // Recompute stats from filtered cotizaciones for collaborators
     useEffect(() => {
