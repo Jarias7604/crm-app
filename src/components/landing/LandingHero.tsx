@@ -72,15 +72,23 @@ export default function LandingHero({ onLoginClick }: LandingHeroProps) {
             {/* CTAs */}
             <div style={{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'32px'}}>
               {user ? (
-                <button onClick={() => navigate('/dashboard')} style={{background:'#e13b24',color:'white',fontWeight:700,padding:'14px 32px',borderRadius:'8px',border:'none',cursor:'pointer',fontSize:'15px',boxShadow:'0 4px 24px rgba(225,59,36,0.35)'}}>
+                <button 
+                  onClick={() => navigate('/dashboard')} 
+                  style={{background:'linear-gradient(135deg, #06b6d4, #8b5cf6)', color:'white', fontWeight:800, padding:'14px 32px', borderRadius:'12px', border:'none', cursor:'pointer', fontSize:'15px', boxShadow:'0 8px 25px rgba(6,182,212,0.35)'}}
+                  className="hover:scale-105 active:scale-95 transition-all"
+                >
                   {t('Ir al Dashboard →','Go to Dashboard →')}
                 </button>
               ) : (
                 <>
-                  <button onClick={() => navigate('/register')} style={{background:'#e13b24',color:'white',fontWeight:700,padding:'14px 32px',borderRadius:'8px',border:'none',cursor:'pointer',fontSize:'15px',boxShadow:'0 4px 24px rgba(225,59,36,0.35)'}}>
+                  <button 
+                    onClick={() => navigate('/register')} 
+                    style={{background:'linear-gradient(135deg, #06b6d4, #8b5cf6)', color:'white', fontWeight:800, padding:'14px 32px', borderRadius:'12px', border:'none', cursor:'pointer', fontSize:'15px', boxShadow:'0 8px 25px rgba(6,182,212,0.35)'}}
+                    className="hover:scale-105 active:scale-95 transition-all"
+                  >
                     {t('Empieza gratis →','Start free →')}
                   </button>
-                  <button onClick={onLoginClick} style={{background:'white',color:'#374151',fontWeight:600,padding:'14px 28px',borderRadius:'8px',border:'1px solid #d1d5db',cursor:'pointer',fontSize:'15px',display:'flex',alignItems:'center',gap:'8px'}}>
+                  <button onClick={onLoginClick} style={{background:'white',color:'#374151',fontWeight:600,padding:'14px 28px',borderRadius:'12px',border:'1px solid #d1d5db',cursor:'pointer',fontSize:'15px',display:'flex',alignItems:'center',gap:'8px'}} className="hover:bg-slate-50 transition-all">
                     <Play size={14} style={{color:'#1f73b7'}} fill="#1f73b7"/>
                     {t('Ver demo','Watch demo')}
                   </button>
@@ -118,7 +126,11 @@ export default function LandingHero({ onLoginClick }: LandingHeroProps) {
                 <input key={i} type={f.type} placeholder={f.placeholder} style={{width:'100%',padding:'11px 14px',border:'1px solid #d1d5db',borderRadius:'8px',fontSize:'14px',color:'#374151',outline:'none',boxSizing:'border-box'}} onFocus={e=>{e.target.style.borderColor='#1f73b7'}} onBlur={e=>{e.target.style.borderColor='#d1d5db'}}/>
               ))}
             </div>
-            <button onClick={() => navigate('/register')} style={{width:'100%',background:'#e13b24',color:'white',fontWeight:800,padding:'14px',borderRadius:'8px',border:'none',cursor:'pointer',fontSize:'15px',letterSpacing:'0.03em',boxShadow:'0 4px 20px rgba(225,59,36,0.3)'}}>
+            <button 
+              onClick={() => navigate('/register')} 
+              style={{width:'100%',background:'linear-gradient(135deg, #06b6d4, #8b5cf6)',color:'white',fontWeight:800,padding:'14px',borderRadius:'12px',border:'none',cursor:'pointer',fontSize:'15px',letterSpacing:'0.03em',boxShadow:'0 8px 25px rgba(6,182,212,0.35)'}}
+              className="hover:scale-[1.02] active:scale-98 transition-all"
+            >
               {t('CREAR MI CUENTA GRATIS','CREATE MY FREE ACCOUNT')}
             </button>
             <p style={{fontSize:'11px',color:'#9ca3af',textAlign:'center',marginTop:'12px'}}>

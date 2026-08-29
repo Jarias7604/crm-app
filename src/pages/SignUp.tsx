@@ -8,9 +8,10 @@ import { Input } from '../components/ui/Input';
 export default function SignUp() {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const [fullName, setFullName] = useState('');
+    const [companyName, setCompanyName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [companyName, setCompanyName] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -26,8 +27,7 @@ export default function SignUp() {
                 password,
                 options: {
                     data: {
-                        // Store in user_metadata so it survives cross-browser/cross-tab
-                        // email confirmation (localStorage is unreliable in those cases)
+                        full_name: fullName.trim() || email.split('@')[0],
                         pending_company_name: companyName.trim()
                     }
                 }
@@ -79,7 +79,7 @@ export default function SignUp() {
                 <p className="mt-1.5 text-xs text-slate-400">{t('auth.signUpSubtitle')}</p>
             </div>
 
-            <form className="space-y-5" onSubmit={handleSignUp}>
+            <form className="space-y-4" onSubmit={handleSignUp}>
                 {error === '__EMAIL_SENT__' ? (
                     <div className="bg-emerald-500/10 border-l-4 border-emerald-500 p-4 rounded-r-xl">
                         <p className="text-xs text-emerald-400 font-semibold">
@@ -94,19 +94,33 @@ export default function SignUp() {
                 ) : null}
 
                 <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                        Tu Nombre Completo
+                    </label>
+                    <Input
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Ej. Juan Pérez"
+                        className="mt-1 block w-full h-11 rounded-xl border-white/10 bg-slate-900 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
                         {t('auth.companyNameLabel')}
                     </label>
                     <Input
                         required
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
-                        className="mt-1 block w-full h-12 rounded-xl border-white/10 bg-slate-900 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                        placeholder="Ej. Mi Empresa S.A."
+                        className="mt-1 block w-full h-11 rounded-xl border-white/10 bg-slate-900 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
                         {t('auth.emailLabel')}
                     </label>
                     <Input
@@ -114,7 +128,8 @@ export default function SignUp() {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="mt-1 block w-full h-12 rounded-xl border-white/10 bg-slate-900 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                        placeholder="admin@tuempresa.com"
+                        className="mt-1 block w-full h-11 rounded-xl border-white/10 bg-slate-900 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
                     />
                 </div>
 
@@ -131,9 +146,14 @@ export default function SignUp() {
                     />
                 </div>
 
-                <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black h-12 rounded-xl transition-all shadow-lg shadow-blue-600/25 border-0">
+                <button 
+                    type="submit" 
+                    disabled={loading} 
+                    style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)' }}
+                    className="w-full text-white font-black h-12 rounded-xl transition-all shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.01] active:scale-98 cursor-pointer disabled:opacity-50 text-sm tracking-wide"
+                >
                     {loading ? t('auth.creatingAccount') : t('auth.createAccountButton')}
-                </Button>
+                </button>
             </form>
 
             <div className="text-center pt-2">

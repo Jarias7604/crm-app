@@ -33,9 +33,9 @@ const RESPONSES_EN: Record<string, string[]> = {
     "Hello! ⚡ I'm Ari, built by the Arias CRM team. Want to see how we turn leads into clients on autopilot?",
   ],
   'price': [
-    "Our full suite starts at just $49/mo (annual). No per-agent fees, no WhatsApp add-ons. Everything included. Want to start your 14-day free trial?",
-    "Compare us to HubSpot at $890/mo — we offer the same power for $65/mo monthly, no contracts. That's $9,900/year back in your pocket. 💸",
-    "Arias CRM is all-inclusive: AI agents, WhatsApp API, Lead Hunter, PDF quotes — one flat price. Start free for 14 days, no credit card needed.",
+    "Our commercial suite starts at just $49/mo with everything included: WhatsApp AI, PDF quotes, Lead Hunter, and full pipeline. Want to start your 14-day free trial?",
+    "Unlike traditional enterprise CRMs that charge hundreds per extra seat, Arias CRM provides a complete sales suite at a fraction of the cost. 💸",
+    "Arias CRM is all-inclusive: AI agents, WhatsApp API, Lead Hunter, mobile quotes, and invoicing. 14 days free, no credit card required.",
   ],
   'trial': [
     "Yes! Click 'Start Free Trial' above — your CRM environment is live in under 60 seconds. No credit card required.",
@@ -50,7 +50,7 @@ const RESPONSES_EN: Record<string, string[]> = {
   'feature': [
     "Key features: 📥 Real-time TikTok & Meta lead capture, 🤖 24/7 WhatsApp AI Agent, 📄 PDF Quote Generator, 🗺️ Google Maps Lead Hunter, 📊 Kanban Pipeline. Which would you like to explore?",
     "We have 9 integrated modules: Lead management, AI chatbot, Marketing automation, PDF quotes, Lead Hunter, Flyer Studio, Omnichannel inbox, Analytics, and Payment portal. All in one platform.",
-    "Our top differentiators vs. HubSpot: ✅ Built-in WhatsApp API, ✅ Google Maps prospector, ✅ PDF quote generator with payments, ✅ No per-agent pricing. Which matters most to you?",
+    "Our top differentiators vs. traditional CRMs: ✅ Built-in WhatsApp API, ✅ Google Maps prospector, ✅ Mobile PDF quote generator, ✅ No per-agent pricing trap. Which matters most to you?",
   ],
   'help': [
     "I'm here to help! Ask me about pricing, features, integrations, or how to get started. What do you need?",
@@ -71,9 +71,9 @@ const RESPONSES_ES: Record<string, string[]> = {
     "¡Qué tal! ⚡ Soy Ari, creado por el equipo de Arias CRM. ¿Quieres ver cómo duplicamos las tasas de cierre con IA?",
   ],
   'price': [
-    "Nuestra suite completa comienza en $49/mes (anual). Sin cobros por agente, sin sorpresas. Todo incluido. ¿Quieres iniciar tu prueba gratuita?",
-    "Compáranos con HubSpot a $890/mes — nosotros ofrecemos lo mismo por $65/mes sin contratos. Eso es $9,900/año que te quedas en el bolsillo. 💸",
-    "Arias CRM es todo en uno: AI agents, WhatsApp API, Lead Hunter, cotizaciones PDF — un precio plano. 14 días gratis, sin tarjeta.",
+    "Nuestra suite comercial comienza desde $49/mes con todo incluido: WhatsApp IA, cotizaciones PDF, Lead Hunter y pipeline. ¿Quieres iniciar tus 14 días de prueba gratis?",
+    "A diferencia de los CRMs tradicionales que cobran cientos de dólares por usuario extra, Arias CRM te da una suite completa a una fracción del costo. 💸",
+    "Arias CRM es todo en uno: AI agents, WhatsApp API, Lead Hunter, cotizador móvil y add-on DTE. 14 días gratis sin tarjeta.",
   ],
   'trial': [
     "¡Claro! Haz clic en 'Empezar gratis' arriba — tu entorno CRM estará listo en menos de 60 segundos. Sin tarjeta de crédito.",
@@ -86,9 +86,9 @@ const RESPONSES_ES: Record<string, string[]> = {
     "¡Vamos! 🎯 Podemos mostrarte la automatización de WhatsApp, el pipeline Kanban y el calculador de ROI. Solo haz clic en 'Agendar demo'.",
   ],
   'feature': [
-    "Funciones clave: 📥 Captura en tiempo real de TikTok & Meta, 🤖 AI Agent 24/7 en WhatsApp, 📄 Cotizador con PDF, 🗺️ Lead Hunter en Google Maps, 📊 Pipeline Kanban. ¿Cuál quieres explorar?",
-    "Tenemos 9 módulos integrados: Gestión de leads, Chatbot IA, Automatización de marketing, Cotizaciones PDF, Lead Hunter, Flyer Studio, Inbox omnicanal, Analítica y Portal de cobros.",
-    "Diferencias vs. HubSpot: ✅ WhatsApp API incluido, ✅ Prospector de Google Maps, ✅ Cotizador PDF con cobros, ✅ Sin cobro por agente. ¿Qué te importa más?",
+    "Funciones clave: 📥 Captura en tiempo real de TikTok & Meta, 🤖 AI Agent 24/7 en WhatsApp, 📄 Cotizador con PDF, 🗺️ Lead Hunter con Extracción de Emails Web para Campañas, 📊 Pipeline Kanban. ¿Cuál quieres explorar?",
+    "Tenemos 9 módulos integrados: Gestión de leads, Chatbot IA, Automatización de marketing y correos, Cotizaciones PDF, Lead Hunter con buscador de emails, Flyer Studio, Inbox omnicanal, Analítica y Facturación.",
+    "Diferencias clave vs. otros CRMs: ✅ WhatsApp API incluido, ✅ Lead Hunter con escaneo automático de emails web para campañas masivas, ✅ Cotizador PDF móvil, ✅ Sin cobros por usuario extra. ¿Qué te importa más?",
   ],
   'help': [
     "¡Aquí estoy! Pregúntame sobre precios, funciones, integraciones o cómo empezar. ¿Qué necesitas?",

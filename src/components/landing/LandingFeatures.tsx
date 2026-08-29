@@ -5,95 +5,13 @@ import { useTranslation } from 'react-i18next';
 // Large centered product mockup SVGs
 
 const OmnichannelMockup = () => (
-  <div style={{background:'#fff',borderRadius:'16px',boxShadow:'0 24px 64px rgba(0,0,0,0.12)',overflow:'hidden',border:'1px solid #e8edf5',maxWidth:'800px',margin:'0 auto'}}>
-    <div style={{background:'#1e2d5a',padding:'10px 16px',display:'flex',alignItems:'center',gap:'8px'}}>
-      <div style={{display:'flex',gap:'4px'}}>
-        {['#ff5f57','#ffbd2e','#28ca41'].map(c=><div key={c} style={{width:'10px',height:'10px',borderRadius:'50%',background:c}}/>)}
-      </div>
-      <div style={{flex:1,background:'rgba(255,255,255,0.1)',borderRadius:'6px',padding:'3px 12px',fontSize:'10px',color:'rgba(255,255,255,0.6)'}}>ariascrm.com/inbox</div>
-    </div>
-    <div style={{display:'flex',height:'340px'}}>
-      {/* Sidebar */}
-      <div style={{width:'220px',borderRight:'1px solid #f3f4f6',background:'#fafbff',flexShrink:0}}>
-        <div style={{padding:'12px',borderBottom:'1px solid #f3f4f6'}}>
-          <div style={{background:'#e13b24',color:'white',fontSize:'10px',fontWeight:700,padding:'6px 10px',borderRadius:'6px',textAlign:'center'}}>+ Nueva Conversación</div>
-        </div>
-        {[
-          {name:'Carlos Mendoza',ch:'WhatsApp',msg:'Me interesa el plan Pro',time:'10:32',unread:2,color:'#25d366'},
-          {name:'Ana López',ch:'Instagram',msg:'¿Tienen demo disponible?',time:'10:18',unread:1,color:'#e1306c'},
-          {name:'Pedro Ramírez',ch:'Meta Ads',msg:'Vi su anuncio en FB',time:'09:45',unread:0,color:'#1877f2'},
-          {name:'María García',ch:'TikTok',msg:'¿Cuánto cuesta el plan?',time:'09:12',unread:0,color:'#000'},
-          {name:'Luis Vásquez',ch:'WhatsApp',msg:'Perfecto, lo reviso',time:'ayer',unread:0,color:'#25d366'},
-        ].map((c,i)=>(
-          <div key={c.name} style={{padding:'10px 12px',borderBottom:'1px solid #f9fafb',background:i===0?'#f0f4ff':'white',cursor:'pointer',display:'flex',gap:'8px',alignItems:'flex-start'}}>
-            <div style={{width:'34px',height:'34px',borderRadius:'50%',background:c.color,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontSize:'13px',fontWeight:700}}>{c.name[0]}</div>
-            <div style={{flex:1,minWidth:0}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <span style={{fontSize:'11px',fontWeight:700,color:'#111827'}}>{c.name}</span>
-                <span style={{fontSize:'9px',color:'#9ca3af'}}>{c.time}</span>
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:'4px',marginTop:'2px'}}>
-                <span style={{fontSize:'9px',background:c.color+'20',color:c.color,padding:'1px 5px',borderRadius:'4px',fontWeight:600}}>{c.ch}</span>
-                <span style={{fontSize:'9px',color:'#6b7280',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{c.msg}</span>
-              </div>
-            </div>
-            {c.unread>0&&<div style={{background:'#e13b24',color:'white',borderRadius:'50%',width:'18px',height:'18px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'9px',fontWeight:700,flexShrink:0}}>{c.unread}</div>}
-          </div>
-        ))}
-      </div>
-      {/* Chat area */}
-      <div style={{flex:1,display:'flex',flexDirection:'column'}}>
-        <div style={{padding:'12px 16px',borderBottom:'1px solid #f3f4f6',display:'flex',alignItems:'center',gap:'10px',background:'white'}}>
-          <div style={{width:'36px',height:'36px',borderRadius:'50%',background:'#25d366',display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontWeight:700}}>C</div>
-          <div>
-            <p style={{fontSize:'13px',fontWeight:700,color:'#111827'}}>Carlos Mendoza</p>
-            <p style={{fontSize:'10px',color:'#25d366',fontWeight:600}}>● WhatsApp · En línea</p>
-          </div>
-          <div style={{marginLeft:'auto',display:'flex',gap:'6px'}}>
-            <div style={{background:'#f0f4ff',borderRadius:'6px',padding:'5px 10px',fontSize:'10px',fontWeight:600,color:'#1f73b7',cursor:'pointer'}}>Asignar</div>
-            <div style={{background:'#f0f4ff',borderRadius:'6px',padding:'5px 10px',fontSize:'10px',fontWeight:600,color:'#1f73b7',cursor:'pointer'}}>Ver lead</div>
-          </div>
-        </div>
-        <div style={{flex:1,padding:'16px',background:'#f5f7fc',overflow:'hidden',display:'flex',flexDirection:'column',gap:'12px'}}>
-          <div style={{alignSelf:'flex-start',maxWidth:'70%'}}>
-            <div style={{background:'white',borderRadius:'12px 12px 12px 0',padding:'10px 14px',boxShadow:'0 1px 4px rgba(0,0,0,0.08)',fontSize:'12px',color:'#374151'}}>Hola, vi su anuncio en TikTok. Me interesa el plan para mi equipo de 10 personas. ¿Tienen precios?</div>
-            <p style={{fontSize:'9px',color:'#9ca3af',marginTop:'3px'}}>10:30</p>
-          </div>
-          <div style={{alignSelf:'flex-end',maxWidth:'75%'}}>
-            <div style={{background:'#1f73b7',borderRadius:'12px 12px 0 12px',padding:'10px 14px',fontSize:'12px',color:'white'}}>
-              ¡Hola Carlos! 👋 Claro que sí. Para equipos de 10 personas, el plan Growth a $99/mes es perfecto. ¿Quieres que te envíe una cotización personalizada?
-            </div>
-            <p style={{fontSize:'9px',color:'#9ca3af',marginTop:'3px',textAlign:'right'}}>10:32 · IA Agent ✓✓</p>
-          </div>
-          <div style={{alignSelf:'flex-start',maxWidth:'70%'}}>
-            <div style={{background:'white',borderRadius:'12px 12px 12px 0',padding:'10px 14px',boxShadow:'0 1px 4px rgba(0,0,0,0.08)',fontSize:'12px',color:'#374151'}}>Sí, por favor. También me interesa ver una demo del sistema.</div>
-            <p style={{fontSize:'9px',color:'#9ca3af',marginTop:'3px'}}>10:33</p>
-          </div>
-        </div>
-        <div style={{padding:'10px 16px',borderTop:'1px solid #f3f4f6',background:'white',display:'flex',gap:'8px',alignItems:'center'}}>
-          <input placeholder="Escribe un mensaje..." style={{flex:1,border:'1px solid #e5e7eb',borderRadius:'20px',padding:'8px 14px',fontSize:'12px',outline:'none'}}/>
-          <button style={{background:'#e13b24',color:'white',borderRadius:'50%',width:'34px',height:'34px',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'14px'}}>→</button>
-        </div>
-      </div>
-      {/* Right panel */}
-      <div style={{width:'200px',borderLeft:'1px solid #f3f4f6',padding:'12px',background:'white',flexShrink:0}}>
-        <p style={{fontSize:'10px',fontWeight:800,color:'#111827',marginBottom:'10px',textTransform:'uppercase',letterSpacing:'0.05em'}}>Lead Info</p>
-        {[
-          {label:'Nombre',val:'Carlos Mendoza'},
-          {label:'Canal',val:'TikTok Ads'},
-          {label:'Empresa',val:'Distribuidora CM'},
-          {label:'Teléfono',val:'+503 7890 1234'},
-          {label:'Etapa',val:'Contactado'},
-          {label:'Valor',val:'$3,200'},
-        ].map(f=>(
-          <div key={f.label} style={{marginBottom:'8px'}}>
-            <p style={{fontSize:'9px',color:'#9ca3af',fontWeight:600}}>{f.label}</p>
-            <p style={{fontSize:'11px',color:'#111827',fontWeight:600}}>{f.val}</p>
-          </div>
-        ))}
-        <div style={{background:'#e13b24',color:'white',borderRadius:'6px',padding:'7px',textAlign:'center',fontSize:'10px',fontWeight:700,cursor:'pointer',marginTop:'8px'}}>Crear Cotización</div>
-      </div>
-    </div>
+  <div style={{ background: '#fff', borderRadius: '16px', boxShadow: '0 24px 64px rgba(0,0,0,0.12)', overflow: 'hidden', border: '1px solid #e8edf5', maxWidth: '1150px', margin: '0 auto' }}>
+    <img
+      src="/crm-omnichannel-inbox.png"
+      alt="Bandeja Omnicanal WhatsApp & Telegram — Arias CRM"
+      style={{ width: '100%', height: 'auto', display: 'block' }}
+      loading="lazy"
+    />
   </div>
 );
 
@@ -181,7 +99,7 @@ const AIAgentMockup = () => (
 
 const SECTIONS = [
   {
-    bg:'#f7f7f3',
+    bg:'#fff',
     textColor:'#111827',
     labelColor:'#1f73b7',
     labelES:'OMNICANAL', labelEN:'OMNICHANNEL',
@@ -196,11 +114,11 @@ const SECTIONS = [
     bg:'#1a1d20',
     textColor:'#fff',
     labelColor:'#fbbf24',
-    labelES:'LEAD HUNTER PRO', labelEN:'LEAD HUNTER PRO',
-    titleES:'500 prospectos de Google Maps en 60 segundos',
-    titleEN:'500 prospects from Google Maps in 60 seconds',
-    descES:'Ingresa industria y ciudad. Nuestro extractor entrega nombres, teléfonos y emails de empresas locales listos para tu pipeline de ventas.',
-    descEN:'Enter industry and city. Our extractor delivers names, phones and emails of local businesses ready for your sales pipeline.',
+    labelES:'LEAD HUNTER PRO & EMAIL SCRAPER', labelEN:'LEAD HUNTER PRO & EMAIL SCRAPER',
+    titleES:'500 prospectos de Google Maps con extracción de Emails en 60 segundos',
+    titleEN:'500 Google Maps prospects with Email Extraction in 60 seconds',
+    descES:'Ingresa industria y ciudad. Nuestro motor de IA escanea sitios web en tiempo real para extraer correos corporativos, teléfonos y nombres de empresas locales listos para tus campañas masivas de email y pipeline de ventas.',
+    descEN:'Enter industry and city. Our AI engine scans websites in real-time to extract verified corporate emails, phone numbers and business details ready for your outbound email campaigns and sales pipeline.',
     linkES:'Explorar Lead Hunter →', linkEN:'Explore Lead Hunter →',
     Mockup: LeadHunterMockup,
   },
@@ -221,6 +139,7 @@ const SECTIONS = [
 export default function LandingFeatures() {
   const { i18n } = useTranslation();
   const isES = i18n.language?.startsWith('es');
+  const t = (es: string, en: string) => isES ? es : en;
 
   return (
     <>
@@ -235,6 +154,125 @@ export default function LandingFeatures() {
           </h2>
         </div>
       </div>
+
+      {/* ─── 2-ROW ZIGZAG SHOWCASE: MOBILE QUOTE & LEAD WORKFLOW ─── */}
+      <section className="bg-gradient-to-b from-white via-slate-50/60 to-white py-16 px-6 border-b border-slate-100">
+        <div className="max-w-7xl mx-auto space-y-20">
+          
+          {/* ROW 1: Text Left | Flyer 1 Right */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-6 space-y-5">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-blue-700 text-xs font-black uppercase tracking-wider">
+                📱 {t('Ventas Móviles en la Calle y Oficina', 'Mobile Sales in Field & Office')}
+              </div>
+              <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 leading-tight">
+                {t('Creación de Cotizaciones y Nuevos Leads al Instante', 'Instant Quote & New Lead Creation')}
+              </h3>
+              <p className="text-slate-600 text-base leading-relaxed">
+                {t(
+                  'Desde cualquier teléfono móvil, tus asesores pueden registrar prospectos y armar propuestas comerciales en segundos sin depender de una computadora de escritorio.',
+                  'From any smartphone, your agents can log prospects and build commercial proposals in seconds without needing a desktop computer.'
+                )}
+              </p>
+
+              <div className="space-y-3 pt-2">
+                <div className="flex items-start gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black text-sm flex-shrink-0">
+                    ⚡
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">{t('Botón + de Acción Rápida', 'Fast Action + Button')}</h4>
+                    <p className="text-xs text-slate-500 mt-0.5">{t('Ubicado en la barra inferior para crear cotizaciones o prospectos con 1 toque.', 'Located in the bottom navigation to create quotes or leads in 1 tap.')}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-black text-sm flex-shrink-0">
+                    📊
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">{t('Lead Discovery & Pipeline Visual', 'Lead Discovery & Visual Pipeline')}</h4>
+                    <p className="text-xs text-slate-500 mt-0.5">{t('Visualiza tarjetas, valores potenciales y estados de prospectos en tiempo real.', 'View cards, deal values, and prospect stages in real time.')}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-6 flex justify-center">
+              <div className="rounded-3xl shadow-2xl overflow-hidden border border-slate-200/90 bg-white p-2.5 max-w-lg w-full hover:shadow-cyan-500/10 transition-shadow">
+                <img
+                  src="/flyer-movil-parte1.jpg"
+                  alt="Arias CRM — Creación de Cotizaciones y Nuevos Leads"
+                  className="w-full h-auto rounded-2xl block"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ROW 2: Flyer 2 Left | Text Right */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-6 flex justify-center order-2 lg:order-1">
+              <div className="rounded-3xl shadow-2xl overflow-hidden border border-slate-200/90 bg-white p-2.5 max-w-lg w-full hover:shadow-indigo-500/10 transition-shadow">
+                <img
+                  src="/flyer-movil-parte2.jpg"
+                  alt="Arias CRM — 3 Pasos para comenzar y envío por WhatsApp"
+                  className="w-full h-auto rounded-2xl block"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
+            <div className="lg:col-span-6 space-y-5 order-1 lg:order-2">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-xs font-black uppercase tracking-wider">
+                🚀 {t('Flujo de Cierre en 3 Pasos', '3-Step Closing Workflow')}
+              </div>
+              <h3 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 leading-tight">
+                {t('Cotiza, Genera el PDF y Envía por WhatsApp en 30 Segundos', 'Quote, Generate PDF & Send via WhatsApp in 30 Seconds')}
+              </h3>
+              <p className="text-slate-600 text-base leading-relaxed">
+                {t(
+                  'El proceso de venta más rápido del mercado: selecciona el cliente, agrega los productos del catálogo y dispara la cotización con tu logo directo al WhatsApp del cliente.',
+                  'The fastest sales workflow: pick the client, add catalog items, and shoot the branded quote directly to your client’s WhatsApp chat.'
+                )}
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
+                  <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-black flex items-center justify-center mb-1.5">1</span>
+                  <p className="text-xs font-bold text-slate-900">{t('Ve a Leads', 'Go to Leads')}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{t('Toca el botón +', 'Tap + button')}</p>
+                </div>
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
+                  <span className="w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-black flex items-center justify-center mb-1.5">2</span>
+                  <p className="text-xs font-bold text-slate-900">{t('Elige Opción', 'Pick Option')}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{t('Nueva Cotización', 'New Quote')}</p>
+                </div>
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm">
+                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center mb-1.5">3</span>
+                  <p className="text-xs font-bold text-slate-900">{t('WhatsApp', 'WhatsApp')}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{t('Envío en PDF', 'PDF Send')}</p>
+                </div>
+              </div>
+
+              {/* DTE Badge */}
+              <div className="bg-gradient-to-r from-slate-900 to-indigo-950 p-4 rounded-2xl text-white flex items-center justify-between gap-3 shadow-md">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🇸🇻</span>
+                  <div>
+                    <p className="text-xs font-black text-indigo-300 uppercase tracking-wider">{t('Add-on Exclusivo para El Salvador', 'Exclusive Add-on for El Salvador')}</p>
+                    <p className="text-xs text-slate-300">{t('Facturación Electrónica DTE oficial conectada con Hacienda.', 'Official DTE Electronic Invoicing with Hacienda.')}</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-black uppercase bg-indigo-500/30 text-indigo-200 px-3 py-1 rounded-full border border-indigo-400/30 whitespace-nowrap">
+                  CRM + ERP DTE
+                </span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
 
       {SECTIONS.map((sec, i) => {
         const { Mockup } = sec;

@@ -168,45 +168,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetchProfile = async (userId: string, _userEmail?: string) => {
         try {
-            // FETCH PROFILE (LOGICA NORMAL)
-            const { data, error } = await supabase
+            // 1. FETCH PROFILE (using maybeSingle to gracefully handle brand new registrations without profile rows)
+            let { data, error } = await supabase
                 .from('profiles')
                 .select('id, email, role, company_id, full_name, phone, status, created_at, custom_role_id, permissions, is_platform_owner')
                 .eq('id', userId)
-                .single();
+                .maybeSingle();
 
             if (error) {
-                console.error('Error fetching profile:', error);
-                setLoading(false);
-                return;
+                console.error('[AuthProvider] Error fetching profile:', error);
             }
 
-            // ✨ AUTO-PROVISION TENANT
+            // ✨ AUTO-PROVISION TENANT (Self-service SaaS Signup)
             // Reads company name from BOTH localStorage (same-tab flow)
             // AND session.user_metadata (cross-browser/cross-tab confirmation flow)
-            if (!data?.company_id) {
+            if (!data || !data.company_id) {
+                const { data: currentSession } = await supabase.auth.getSession();
                 const pendingCompanyName =
                     localStorage.getItem('pending_company_name') ||
+                    currentSession?.session?.user?.user_metadata?.pending_company_name ||
                     session?.user?.user_metadata?.pending_company_name ||
-                    '';
+                    'Mi Empresa';
+
                 if (pendingCompanyName) {
-                    console.info('[AuthProvider] Provisioning new tenant:', pendingCompanyName);
-                    const { error: rpcError } = await supabase.rpc('register_new_tenant', {
+                    console.info('[AuthProvider] 🚀 Provisioning new tenant:', pendingCompanyName);
+                    const { data: tenantResult, error: rpcError } = await supabase.rpc('register_new_tenant', {
                         company_name: pendingCompanyName
                     });
+
                     if (rpcError) {
                         console.error('[AuthProvider] register_new_tenant failed:', rpcError);
                     } else {
+                        console.info('[AuthProvider] ✅ Tenant provisioned successfully:', tenantResult);
                         localStorage.removeItem('pending_company_name');
                         // Also clear from user_metadata
                         await supabase.auth.updateUser({ data: { pending_company_name: null } });
-                        // Re-fetch profile so company_id is now populated
+
+                        // Re-fetch profile so company_id and permissions are populated
                         const { data: updatedProfile } = await supabase
                             .from('profiles')
                             .select('id, email, role, company_id, full_name, phone, status, created_at, custom_role_id, permissions, is_platform_owner')
                             .eq('id', userId)
-                            .single();
+                            .maybeSingle();
+
                         if (updatedProfile) {
+                            data = updatedProfile;
+
                             // 🎉 Fire welcome email (non-blocking — never breaks signup flow)
                             if (updatedProfile.company_id && updatedProfile.email) {
                                 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
@@ -226,18 +233,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                         companyName: pendingCompanyName,
                                         trialDays: 14,
                                     }),
-                                }).then(r => {
-                                    if (r.ok) console.info('[AuthProvider] ✅ Welcome email sent to', updatedProfile.email);
-                                    else r.text().then(e => console.warn('[AuthProvider] Welcome email failed (non-critical):', e));
                                 }).catch(e => console.warn('[AuthProvider] Welcome email error (non-critical):', e));
                             }
-                            // Use the freshly provisioned profile, skip the rest of this run
-                            setProfile({ ...updatedProfile, permissions: (updatedProfile.permissions as Record<string, boolean>) || {} } as Profile);
-                            setLoading(false);
-                            return;
                         }
                     }
                 }
+            }
+
+            if (!data) {
+                console.warn('[AuthProvider] No profile could be loaded or created for user:', userId);
+                setLoading(false);
+                return;
             }
 
             // 🛑 PLATFORM OWNER BYPASS (Reemplaza el antiguo hardcodeo inseguro)
@@ -324,6 +330,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     activePerms = (roleData?.permissions as Record<string, boolean>) || {};
                 }
                 console.info('✅ Permisos cargados desde role_permissions/custom_role (fuente única de verdad)');
+            }
+
+            // 3. Fallback para administradores de empresa sin rol personalizado (o perfiles en prueba)
+            if (Object.keys(activePerms).length === 0) {
+                if (data?.permissions && typeof data.permissions === 'object' && Object.keys(data.permissions).length > 0) {
+                    activePerms = { ...(data.permissions as Record<string, boolean>) };
+                } else if (data?.role === 'company_admin') {
+                    // HubSpot / Salesforce pattern: El Admin de la empresa tiene acceso completo a los módulos de su SaaS
+                    const defaultAdminModules = [
+                        'leads', 'clients', 'clientes', 'pipeline', 'quotes', 'invoices', 'facturas', 
+                        'marketing', 'chat', 'branding', 'dashboard_full', 'pricing', 'paquetes', 
+                        'financial_rules', 'items', 'calendar', 'loss_reasons', 'proyectos', 'finanzas', 
+                        'tickets', 'team_manage', 'team_view_assigned', 'reports', 'view_financials'
+                    ];
+                    defaultAdminModules.forEach(m => { activePerms[m] = true; });
+                }
             }
 
             // ─────────────────────────────────────────────────────────────────

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Mockup — Wizard Cotización Unificado</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', system-ui, sans-serif; background: #f3f4f6; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .wizard { background: white; border-radius: 20px; box-shadow: 0 4px 32px rgba(0,0,0,0.10); max-width: 900px; width: 100%; overflow: hidden; }
+
+  /* Header stepper */
+  .stepper { background: white; border-bottom: 1px solid #e5e7eb; padding: 20px 32px; display: flex; align-items: center; gap: 0; }
+  .step { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
+  .step:not(:last-child)::after { content:''; position: absolute; top: 20px; left: 60%; width: 80%; height: 3px; background: #e5e7eb; z-index: 0; }
+  .step.done:not(:last-child)::after { background: #22c55e; }
+  .step-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; z-index: 1; }
+  .step.done .step-circle { background: #22c55e; color: white; }
+  .step.active .step-circle { background: #4449AA; color: white; box-shadow: 0 0 0 4px #c7d2fe; }
+  .step.pending .step-circle { background: #e5e7eb; color: #9ca3af; }
+  .step-label { font-size: 11px; font-weight: 600; margin-top: 6px; color: #6b7280; }
+  .step.active .step-label { color: #4449AA; }
+  .step.done .step-label { color: #22c55e; }
+
+  /* Body */
+  .body { display: grid; grid-template-columns: 1fr 260px; gap: 0; }
+  .main { padding: 28px 32px; }
+  .sidebar { background: #f8fafc; border-left: 1px solid #e5e7eb; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* Title */
+  .step-title { font-size: 20px; font-weight: 800; color: #4449AA; margin-bottom: 4px; }
+  .step-sub { font-size: 13px; color: #6b7280; margin-bottom: 20px; }
+
+  /* Category chips */
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .chip { padding: 7px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; border: 1.5px solid #d1d5db; color: #6b7280; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; background: white; }
+  .chip:hover { border-color: #4449AA; color: #4449AA; }
+  .chip.active { background: #4449AA; color: white; border-color: #4449AA; }
+  .chip .count { background: rgba(255,255,255,0.25); border-radius: 999px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
+  .chip:not(.active) .count { background: #e5e7eb; color: #374151; }
+
+  /* Items grid */
+  .items-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-height: 360px; overflow-y: auto; padding-right: 4px; }
+  .items-grid::-webkit-scrollbar { width: 5px; }
+  .items-grid::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 99px; }
+  .items-grid::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+  .item-card { border: 2px solid #e5e7eb; border-radius: 14px; padding: 16px; cursor: pointer; transition: all 0.15s; position: relative; background: white; }
+  .item-card:hover { border-color: #a5b4fc; box-shadow: 0 2px 8px rgba(68,73,170,0.08); }
+  .item-card.selected { border-color: #4449AA; background: #eef2ff; }
+  .item-card.selected-equipo { border-color: #f59e0b; background: #fffbeb; }
+
+  .item-check { position: absolute; top: 14px; right: 14px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #d1d5db; display: flex; align-items: center; justify-content: center; font-size: 12px; color: white; }
+  .item-card.selected .item-check, .item-card.selected-equipo .item-check { background: #4449AA; border-color: #4449AA; }
+  .item-card.selected-equipo .item-check { background: #f59e0b; border-color: #f59e0b; }
+
+  .item-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge-plan { background: #ede9fe; color: #7c3aed; }
+  .badge-modulo { background: #dbeafe; color: #1d4ed8; }
+  .badge-servicio { background: #dcfce7; color: #166534; }
+  .badge-equipo { background: #fef3c7; color: #92400e; }
+  .badge-paquete { background: #fce7f3; color: #9d174d; }
+
+  .item-name { font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+  .item-desc { font-size: 12px; color: #6b7280; margin-bottom: 10px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .item-price { font-size: 15px; font-weight: 800; color: #3DCC91; }
+  .item-period { font-size: 11px; color: #9ca3af; font-weight: 500; }
+
+  /* Sidebar */
+  .sidebar-title { font-size: 13px; font-weight: 700; color: #374151; display: flex; align-items: center; gap-6px; }
+  .sidebar-label { font-size: 11px; color: #9ca3af; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; margin-top: 4px; }
+  .selected-item-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+  .selected-item-name { font-size: 12px; color: #374151; font-weight: 600; }
+  .selected-item-price { font-size: 12px; color: #3DCC91; font-weight: 700; }
+  .total-box { background: linear-gradient(135deg, #eef2ff, #e0e7ff); border-radius: 12px; padding: 16px; margin-top: auto; }
+  .total-label { font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+  .total-amount { font-size: 26px; font-weight: 900; color: #4449AA; }
+  .total-period { font-size: 12px; color: #6b7280; }
+
+  /* Footer */
+  .footer { padding: 20px 32px; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: white; }
+  .btn-back { padding: 10px 22px; border-radius: 10px; border: 1.5px solid #d1d5db; background: white; color: #374151; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .btn-next { padding: 10px 28px; border-radius: 10px; background: #4449AA; color: white; font-weight: 700; font-size: 14px; cursor: pointer; border: none; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(68,73,170,0.25); }
+  .btn-next:hover { background: #3730a3; }
+
+  .scroll-hint { text-align: center; font-size: 11px; color: #cbd5e1; padding: 8px 0 0; }
+</style>
+</head>
+<body>
+<div class="wizard">
+
+  <!-- Stepper -->
+  <div class="stepper">
+    <div class="step done">
+      <div class="step-circle">✓</div>
+      <div class="step-label">Cliente</div>
+    </div>
+    <div class="step active">
+      <div class="step-circle">2</div>
+      <div class="step-label">Productos</div>
+    </div>
+    <div class="step pending">
+      <div class="step-circle">3</div>
+      <div class="step-label">Resumen</div>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="body">
+    <div class="main">
+      <div class="step-title">📦 Productos y Servicios</div>
+      <div class="step-sub">Selecciona uno o varios ítems de cualquier categoría</div>
+
+      <!-- Category Chips -->
+      <div class="chips">
+        <div class="chip active" onclick="filterChip(this,'todos')">Todos <span class="count">12</span></div>
+        <div class="chip" onclick="filterChip(this,'plan')">Plan <span class="count">2</span></div>
+        <div class="chip" onclick="filterChip(this,'paquete')">Paquete <span class="count">1</span></div>
+        <div class="chip" onclick="filterChip(this,'modulo')">Módulo <span class="count">5</span></div>
+        <div class="chip" onclick="filterChip(this,'servicio')">Servicio <span class="count">3</span></div>
+        <div class="chip" onclick="filterChip(this,'equipo')">Equipo <span class="count">1</span></div>
+      </div>
+
+      <!-- Items Grid -->
+      <div class="items-grid" id="grid">
+
+        <div class="item-card selected" data-cat="plan" onclick="toggleCard(this)">
+          <div class="item-check">✓</div>
+          <span class="item-badge badge-plan">Plan</span>
+          <div class="item-name">Plan Premium</div>
+          <div class="item-desc">Acceso completo al ERP con módulos base ilimitados y soporte prioritario.</div>
+          <div class="item-price">$1,200 <span class="item-period">/ año</span></div>
+        </div>
+
+        <div class="item-card" data-cat="plan" onclick="toggleCard(this)">
+          <div class="item-check"></div>
+          <span class="item-badge badge-plan">Plan</span>
+          <div class="item-name">Plan Básico</div>
+          <div class="item-desc">Ideal para pequeñas empresas. Hasta 3 usuarios y módulos esenciales.</div>
+          <div class="item-price">$600 <span class="item-period">/ año</span></div>
+        </div>
+
+        <div class="item-card selected" data-cat="modulo" onclick="toggleCard(this)">
+          <div class="item-check">✓</div>
+          <span class="item-badge badge-modulo">Módulo</span>
+          <div class="item-name">POS Personalizado</div>
+          <div class="item-desc">Punto de venta integrado con facturación electrónica y control de inventario.</div>
+          <div class="item-price">$80 <span class="item-period">/ año</span></div>
+        </div>
+
+        <div class="item-card" data-cat="modulo" onclick="toggleCard(this)">
+          <div class="item-check"></div>
+          <span class="item-badge badge-modulo">Módulo</span>
+          <div class="item-name">Producción</div>
+          <div class="item-desc">Planifica y controla el proceso de producción de bienes y servicios.</div>
+          <div class="item-price">$300 <span class="item-period">/ año</span></div>
+        </div>
+
+        <div class="item-card" data-cat="servicio" onclick="toggleCard(this)">
+          <div class="item-check"></div>
+          <span class="item-badge badge-servicio">Servicio</span>
+          <div class="item-name">Cambio de Aceite</div>
+          <div class="item-desc">Servicio de mantenimiento de aceite de motor. Incluye filtro y revisión.</div>
+          <div class="item-price">$300 <span class="item-period">único</span></div>
+        </div>
+
+        <div class="item-card" data-cat="servicio" onclick="toggleCard(this)">
+          <div class="item-check"></div>
+          <span class="item-badge badge-servicio">Servicio</span>
+          <div class="item-name">Implementación</div>
+          <div class="item-desc">Configuración inicial del sistema, migración de datos y capacitación.</div>
+          <div class="item-price">$500 <span class="item-period">único</span></div>
+        </div>
+
+        <div class="item-card selected-equipo" data-cat="equipo" onclick="toggleCard(this)">
+          <div class="item-check">✓</div>
+          <span class="item-badge badge-equipo">Equipo</span>
+          <div class="item-name">Laptop Dell</div>
+          <div class="item-desc">Laptop Dell Inspiron 15, procesador Intel i7, 16GB RAM, 512GB SSD.</div>
+          <div class="item-price">$850 <span class="item-period">único</span></div>
+        </div>
+
+        <div class="item-card" data-cat="paquete" onclick="toggleCard(this)">
+          <div class="item-check"></div>
+          <span class="item-badge badge-paquete">Paquete</span>
+          <div class="item-name">Pack Inicial</div>
+          <div class="item-desc">Plan Básico + Módulo POS + Implementación. Todo lo necesario para arrancar.</div>
+          <div class="item-price">$999 <span class="item-period">/ año</span></div>
+        </div>
+
+      </div>
+      <div class="scroll-hint">↓ Scroll para ver más</div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div>
+        <div class="sidebar-title">🔥 Seleccionados</div>
+        <div class="sidebar-label">Items activos</div>
+        <div id="selected-list">
+          <div class="selected-item-row">
+            <span class="selected-item-name">Plan Premium</span>
+            <span class="selected-item-price">$1,200</span>
+          </div>
+          <div class="selected-item-row">
+            <span class="selected-item-name">POS Personalizado</span>
+            <span class="selected-item-price">$80</span>
+          </div>
+          <div class="selected-item-row">
+            <span class="selected-item-name">Laptop Dell</span>
+            <span class="selected-item-price">$850</span>
+          </div>
+        </div>
+      </div>
+      <div class="total-box">
+        <div class="total-label">Total estimado</div>
+        <div class="total-amount" id="total">$2,130</div>
+        <div class="total-period">/ cotización</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <button class="btn-back">← Anterior</button>
+    <button class="btn-next">Ver Resumen →</button>
+  </div>
+</div>
+
+<script>
+function filterChip(el, cat) {
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  const cards = document.querySelectorAll('.item-card');
+  cards.forEach(card => {
+    if (cat === 'todos' || card.dataset.cat === cat) {
+      card.style.display = '';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+function toggleCard(card) {
+  if (card.classList.contains('selected') || card.classList.contains('selected-equipo')) {
+    card.classList.remove('selected','selected-equipo');
+    card.querySelector('.item-check').textContent = '';
+  } else {
+    const cls = card.dataset.cat === 'equipo' ? 'selected-equipo' : 'selected';
+    card.classList.add(cls);
+    card.querySelector('.item-check').textContent = '✓';
+  }
+}
+</script>
+</body>
+</html>

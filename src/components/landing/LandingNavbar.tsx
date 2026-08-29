@@ -215,9 +215,13 @@ export default function LandingNavbar({ onLoginClick, onProductClick }: { onLogi
               {en ? 'Log In' : 'Iniciar Sesión'}
             </button>
 
-            <Button onClick={() => navigate('/register')} className="bg-blue-600 hover:bg-blue-500 text-white font-black rounded-xl px-6 py-5 shadow-lg shadow-blue-600/25 transition-all text-xs">
+            <button 
+              onClick={() => navigate('/register')} 
+              style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)' }}
+              className="text-white font-black rounded-xl px-6 py-2.5 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:opacity-95 transition-all text-xs tracking-wide cursor-pointer hover:scale-105 active:scale-95"
+            >
               {en ? 'Start for free' : 'Comenzar gratis'}
-            </Button>
+            </button>
           </div>
 
           {/* Mobile menu button */}

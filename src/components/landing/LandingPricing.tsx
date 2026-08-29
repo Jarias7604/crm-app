@@ -57,15 +57,16 @@ const DEFAULT_PLANS: PlanDisplay[] = [
   },
 ];
 
-const COMPARE_ROWS = [
+const BASE_COMPARE_ROWS = [
   { featureES: 'Captura de leads TikTok / Meta', featureEN: 'TikTok / Meta lead capture', us: true, hub: false, sf: false },
   { featureES: 'Agente IA en WhatsApp 24/7', featureEN: '24/7 AI Agent on WhatsApp', us: true, hub: false, sf: false },
-  { featureES: 'Cotizador integrado + PDF', featureEN: 'Integrated quote generator + PDF', us: true, hub: false, sf: false },
-  { featureES: 'Lead Hunter (Google Maps)', featureEN: 'Lead Hunter (Google Maps)', us: true, hub: false, sf: false },
-  { featureES: 'Flyer Studio con IA', featureEN: 'Flyer Studio with AI', us: true, hub: false, sf: false },
-  { featureES: 'Pipeline Kanban visual', featureEN: 'Visual Kanban pipeline', us: true, hub: true, sf: true },
-  { featureES: 'Bandeja omnicanal colaborativa', featureEN: 'Collaborative omnichannel inbox', us: true, hub: true, sf: true },
-  { featureES: 'Precio mensual base', featureEN: 'Base monthly price', us: '$59', hub: '$890', sf: '$150+' },
+  { featureES: 'Cotizaciones PDF desde el Móvil', featureEN: 'Mobile PDF Quote Generator', us: true, hub: false, sf: false },
+  { featureES: 'Lead Hunter + Extractor de Emails Web', featureEN: 'Lead Hunter + Web Email Scraper', us: true, hub: false, sf: false },
+  { featureES: 'Flyer Studio con IA para Redes', featureEN: 'AI Flyer Studio for Socials', us: true, hub: false, sf: false },
+  { featureES: 'Pipeline Kanban & Asignación de Asesores', featureEN: 'Kanban Pipeline & Advisor Assign', us: true, hub: true, sf: true },
+  { featureES: 'Bandeja Omnicanal Centralizada', featureEN: 'Centralized Omnichannel Inbox', us: true, hub: true, sf: true },
+  { featureES: 'Add-on Facturación DTE Hacienda (SV)', featureEN: 'DTE Electronic Invoicing Add-on', us: true, hub: false, sf: false },
+  { featureES: 'Sin cobros ocultos por usuario extra', featureEN: 'No hidden fees per extra seat', us: true, hub: false, sf: false },
 ];
 
 const Check = ({ ok }: { ok: boolean | string; label?: string }) => {
@@ -86,6 +87,18 @@ export default function LandingPricing() {
   const { i18n } = useTranslation();
   const isES = i18n.language?.startsWith('es');
   const t = (es: string, en: string) => isES ? es : en;
+
+  const starterPrice = plans[0]?.monthly || 49;
+  const compareRows = [
+    ...BASE_COMPARE_ROWS,
+    { 
+      featureES: 'Precio mensual base (Suite completa)', 
+      featureEN: 'Base monthly price (Full suite)', 
+      us: `$${starterPrice}/mo`, 
+      hub: '$500+/mo', 
+      sf: '$150+/usr' 
+    }
+  ];
 
   useEffect(() => {
     async function loadPlans() {
@@ -218,12 +231,8 @@ export default function LandingPricing() {
 
               <button
                 onClick={() => navigate('/register')}
-                className={`w-full py-3.5 rounded-xl text-sm font-bold transition-all ${
-                  plan.popular
-                    ? 'text-white shadow-lg hover:opacity-90'
-                    : 'bg-gray-900 hover:bg-gray-800 text-white'
-                }`}
-                style={plan.popular ? { background: 'linear-gradient(135deg,#06b6d4,#8b5cf6)' } : {}}
+                className="w-full py-3.5 rounded-xl text-sm font-black transition-all cursor-pointer text-white shadow-lg hover:shadow-cyan-500/30 hover:opacity-95 hover:scale-[1.02] active:scale-98"
+                style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)' }}
               >
                 {t('Empezar gratis', 'Get started free')}
               </button>
@@ -255,7 +264,7 @@ export default function LandingPricing() {
                 </tr>
               </thead>
               <tbody>
-                {COMPARE_ROWS.map((row, i) => (
+                {compareRows.map((row, i) => (
                   <tr key={i} className={`border-b border-gray-50 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
                     <td className="px-6 py-4 text-sm text-gray-700 font-medium">
                       {isES ? row.featureES : row.featureEN}
@@ -268,8 +277,8 @@ export default function LandingPricing() {
               </tbody>
             </table>
           </div>
-          <p className="text-center text-xs text-gray-400 mt-4">
-            {t('* Precios de HubSpot y Salesforce basados en tarifas públicas para pymes con funcionalidades equivalentes.', '* HubSpot and Salesforce prices based on public rates for SMBs with equivalent features.')}
+          <p className="text-center text-xs text-gray-400 mt-4 max-w-3xl mx-auto">
+            {t('* Comparativas y tarifas referenciales basadas en planes públicos vigentes de suites comerciales para PYMES. Todas las marcas registradas pertenecen a sus respectivos dueños.', '* Reference comparisons and rates based on current public plans of commercial suites for SMBs. All registered trademarks belong to their respective owners.')}
           </p>
         </div>
       </div>
