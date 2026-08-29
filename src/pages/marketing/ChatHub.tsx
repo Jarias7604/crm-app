@@ -15,14 +15,11 @@ import { storageService } from '../../services/storage';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { toast } from 'react-hot-toast';
+import { convCache, CONV_CACHE_TTL_MS } from '../../services/marketing/chatCache';
 
 // ─── Module-level memory cache ────────────────────────────────────────────────
 // Persists across React unmount/remount so navigating back is INSTANT.
 // Data is served immediately from cache, then refreshed silently in background.
-const _convCache: { data: ChatConversation[]; companyId: string | null; ts: number } = {
-    data: [], companyId: null, ts: 0
-};
-const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes — matches React Query staleTime
 // ─────────────────────────────────────────────────────────────────────────────
 
 const QUICK_RESPONSES = [
@@ -35,14 +32,15 @@ const QUICK_RESPONSES = [
 export default function ChatHub() {
     const { profile } = useAuth();
 
-    // Serve from cache immediately — zero blank loading state on re-navigation
+    // Serve from shared cache immediately — zero blank loading state on re-navigation
+    // Also benefits from Sidebar hover prefetch (data may already be loaded before user clicks)
     const cachedForThisCompany =
-        _convCache.companyId === (profile?.company_id ?? null) &&
-        Date.now() - _convCache.ts < CACHE_TTL_MS &&
-        _convCache.data.length > 0;
+        convCache.companyId === (profile?.company_id ?? null) &&
+        Date.now() - convCache.ts < CONV_CACHE_TTL_MS &&
+        convCache.data.length > 0;
 
     const [conversations, setConversations] = useState<ChatConversation[]>(
-        cachedForThisCompany ? _convCache.data : []
+        cachedForThisCompany ? convCache.data : []
     );
     const [selectedConv, setSelectedConv] = useState<ChatConversation | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -74,28 +72,35 @@ export default function ChatHub() {
     const loadData = useCallback(async () => {
         // Guard: never fetch without company_id — prevents fallback cascade in chatService
         if (!profile?.company_id) return;
+        
+        // Start both queries in parallel immediately
+        const conversationsPromise = chatService.getConversations(profile.company_id);
+        const agentsPromise = aiAgentService.getAgents(profile.company_id).catch(() => []);
+
         try {
-            const [conversationsData, agentsData] = await Promise.all([
-                chatService.getConversations(profile.company_id),
-                aiAgentService.getAgents(profile.company_id).catch(() => [])
-            ]);
-
-            const mainAgent = agentsData?.find(a => a.is_active) || agentsData?.[0];
-            setAgentStatus(mainAgent?.is_active || false);
-
-            // Update state and populate module-level cache for next navigation
+            // Conversations are the critical path — release loading spinner as soon as they arrive
+            const conversationsData = await conversationsPromise;
             if (conversationsData && conversationsData.length > 0) {
                 setConversations(conversationsData);
-                _convCache.data = conversationsData;
-                _convCache.companyId = profile.company_id;
-                _convCache.ts = Date.now();
+                // Update shared cache so Sidebar prefetch benefits future navigations
+                convCache.data = conversationsData;
+                convCache.companyId = profile.company_id;
+                convCache.ts = Date.now();
             }
         } catch (error) {
-            console.error('Error loading hub data:', error);
+            console.error('Error loading conversations:', error);
         } finally {
-            setLoading(false);
+            setLoading(false); // Always release spinner when conversations resolve (or fail)
         }
+
+        // Agent status loads in background — does NOT block conversation display
+        agentsPromise.then(agentsData => {
+            const mainAgent = agentsData?.find((a: any) => a.is_active) || agentsData?.[0];
+            setAgentStatus(mainAgent?.is_active || false);
+        }).catch(() => {});
+
     }, [profile?.company_id]);
+
 
     // 1. Initial Load + realtime new message notifications
     useEffect(() => {

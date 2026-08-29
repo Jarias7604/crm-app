@@ -9,6 +9,8 @@ import { brandingService } from '../services/branding';
 import { supabase } from '../services/supabase';
 import type { Company } from '../types';
 import toast from 'react-hot-toast';
+import { prefetchConversations } from '../services/marketing/chatCache';
+
 
 interface SidebarTheme {
     bg: string;
@@ -355,6 +357,15 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         return () => window.removeEventListener('company-branding-updated', handleBrandingUpdate);
     }, [simulatedCompanyId, profile?.company_id]);
 
+    // ⚡ Background prefetch: start loading ChatHub conversations immediately after login.
+    // By the time the user navigates to /marketing/chat the data is already cached → instant load.
+    useEffect(() => {
+        if (profile?.company_id && canAccess('chat')) {
+            prefetchConversations(profile.company_id);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [profile?.company_id]);
+
     const loadCompany = async () => {
         try {
             // SECURITY: Only apply simulatedCompanyId when the user is super_admin.
@@ -527,8 +538,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             name: t('sidebar.messages'),
             href: '/marketing/chat',
             icon: MessageSquare,
-            current: location.pathname.startsWith('/marketing/chat')
-        });
+            current: location.pathname.startsWith('/marketing/chat'),
+            // Hover prefetch: starts data loading before user clicks
+            onHover: () => prefetchConversations(profile?.company_id)
+        } as any);
     }
 
     const configSubItemsRaw = [
@@ -866,6 +879,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             ) : (
                                 <Link
                                     to={item.href}
+                                    onMouseEnter={(item as any).onHover}
                                     className={cn(
                                         item.current
                                             ? cn(theme.activeBg, theme.activeText, theme.activeShadow)
