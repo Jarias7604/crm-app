@@ -387,15 +387,21 @@ ${leadMemory.followup_count > 0 ? `• Seguimientos enviados: ${leadMemory.follo
 USA esta memoria para personalizar tu respuesta. NO preguntes lo que ya sabes.` : '';
 
         // ===========================================
-        // 3. LOAD PRICING CATALOG (company-specific)
+        // 3. LOAD PRICING CATALOG (company & hierarchy-specific)
         // ===========================================
+        let companyFilter = `company_id.eq.${companyId},company_id.is.null`;
+        const { data: compInfo } = await supabase.from('companies').select('parent_company_id').eq('id', companyId).maybeSingle();
+        if (compInfo?.parent_company_id) {
+            companyFilter = `company_id.eq.${companyId},company_id.eq.${compInfo.parent_company_id},company_id.is.null`;
+        }
+
         const { data: pricingItems } = await supabase.from('pricing_items')
             .select('*')
-            .or(`company_id.eq.${companyId},company_id.is.null`)
+            .or(companyFilter)
             .eq('activo', true)
             .order('orden', { ascending: true });
 
-        log(`Loaded ${pricingItems?.length || 0} pricing items`);
+        log(`Loaded ${pricingItems?.length || 0} pricing items for catalog context`);
         const catalogContext = buildCatalogContext(pricingItems || []);
 
         // ===========================================
