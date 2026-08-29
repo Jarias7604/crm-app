@@ -56,14 +56,45 @@ Deno.serve(async (req) => {
         const toPhone = conversation.external_id;
         const companyId = conversation.company_id;
 
-        // 2. Fetch Meta Credentials (Multi-tenant)
-        const { data: integration } = await supabase
+        // 2. Fetch Meta Credentials (Multi-tenant with parent workspace fallback)
+        let integration: any = null;
+        const { data: directInt } = await supabase
             .from('marketing_integrations')
             .select('settings')
             .eq('company_id', companyId)
             .eq('provider', 'whatsapp')
             .eq('is_active', true)
             .maybeSingle();
+
+        integration = directInt;
+
+        // Fallback A: Check parent company workspace
+        if (!integration?.settings?.token) {
+            const { data: comp } = await supabase.from('companies').select('parent_company_id').eq('id', companyId).maybeSingle();
+            if (comp?.parent_company_id) {
+                const { data: parentInt } = await supabase
+                    .from('marketing_integrations')
+                    .select('settings')
+                    .eq('company_id', comp.parent_company_id)
+                    .eq('provider', 'whatsapp')
+                    .eq('is_active', true)
+                    .maybeSingle();
+                if (parentInt?.settings?.token) integration = parentInt;
+            }
+        }
+
+        // Fallback B: Global active WhatsApp integration fallback
+        if (!integration?.settings?.token) {
+            const { data: fallbackInt } = await supabase
+                .from('marketing_integrations')
+                .select('settings')
+                .eq('provider', 'whatsapp')
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            if (fallbackInt?.settings?.token) integration = fallbackInt;
+        }
 
         if (!integration?.settings?.token || !integration?.settings?.phoneNumberId) {
             console.error(`[send-whatsapp] ❌ Missing credentials for company ${companyId}`);

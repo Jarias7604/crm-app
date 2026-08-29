@@ -373,8 +373,9 @@ ${demoSection}
 ${technicalRules}`;
 
         // ===========================================
-        // 5. GET OPENAI API KEY
+        // 5. GET OPENAI API KEY (Hierarchical lookup)
         // ===========================================
+        let apiKey: string | null = null;
         const { data: iconf } = await supabase.from('marketing_integrations')
             .select('settings')
             .eq('company_id', companyId)
@@ -382,7 +383,25 @@ ${technicalRules}`;
             .eq('is_active', true)
             .maybeSingle();
 
-        const apiKey = iconf?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY');
+        apiKey = iconf?.settings?.apiKey || null;
+
+        if (!apiKey) {
+            // Fallback: Check parent company
+            const { data: comp } = await supabase.from('companies').select('parent_company_id').eq('id', companyId).maybeSingle();
+            if (comp?.parent_company_id) {
+                const { data: parentOpenAi } = await supabase.from('marketing_integrations')
+                    .select('settings').eq('company_id', comp.parent_company_id).eq('provider', 'openai').eq('is_active', true).maybeSingle();
+                apiKey = parentOpenAi?.settings?.apiKey || null;
+            }
+        }
+
+        if (!apiKey) {
+            // Fallback: Global active integration or env var
+            const { data: fallbackOpenAi } = await supabase.from('marketing_integrations')
+                .select('settings').eq('provider', 'openai').eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
+            apiKey = fallbackOpenAi?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY') || null;
+        }
+
         if (!apiKey) throw new Error("OpenAI API Key not found");
         log(`OpenAI Key found: ...${apiKey.slice(-5)}`);
 
@@ -450,10 +469,29 @@ ${technicalRules}`;
                             }
                         }
                     } else if (conv.channel === 'whatsapp') {
-                        // ── WHATSAPP: Download audio via Meta Graph API ──
+                        // ── WHATSAPP: Download audio via Meta Graph API (Multi-tenant hierarchy) ──
+                        let metaToken: string | null = null;
                         const { data: waInt } = await supabase.from('marketing_integrations')
                             .select('settings').eq('company_id', companyId).eq('provider', 'whatsapp').eq('is_active', true).maybeSingle();
-                        const metaToken = waInt?.settings?.token || Deno.env.get('WHATSAPP_ACCESS_TOKEN');
+                        metaToken = waInt?.settings?.token || null;
+
+                        if (!metaToken) {
+                            // Fallback: parent workspace
+                            const { data: comp } = await supabase.from('companies').select('parent_company_id').eq('id', companyId).maybeSingle();
+                            if (comp?.parent_company_id) {
+                                const { data: parentWa } = await supabase.from('marketing_integrations')
+                                    .select('settings').eq('company_id', comp.parent_company_id).eq('provider', 'whatsapp').eq('is_active', true).maybeSingle();
+                                metaToken = parentWa?.settings?.token || null;
+                            }
+                        }
+
+                        if (!metaToken) {
+                            // Fallback: global active whatsapp integration
+                            const { data: fallbackWa } = await supabase.from('marketing_integrations')
+                                .select('settings').eq('provider', 'whatsapp').eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
+                            metaToken = fallbackWa?.settings?.token || Deno.env.get('WHATSAPP_ACCESS_TOKEN') || null;
+                        }
+
                         if (metaToken) {
                             log(`Fetching Meta media URL for fileId: ${fileId}`);
                             const metaMediaResp = await fetch(`https://graph.facebook.com/v22.0/${fileId}`, {
