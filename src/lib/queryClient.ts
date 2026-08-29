@@ -19,10 +19,12 @@ export const queryClient = new QueryClient({
             // Disable re-fetch when switching browser tabs (saves bandwidth on mobile)
             refetchOnWindowFocus: false,
 
-            // IMPORTANT: 'always' = always fetch on first mount, but if already cached within
-            // staleTime (3 min) React Query serves cached data instantly without a network call.
-            // 'false' was causing pages to show empty/stale data on first navigation.
-            refetchOnMount: 'always',
+            // true (default React Query) = respects staleTime on mount:
+            // - First visit or data older than 3min → fetch from Supabase
+            // - Return to page within 3min → serve from memory INSTANTLY, no network call
+            // NOTE: 'always' was set here before but it IGNORES staleTime, causing a Supabase
+            // round-trip on EVERY page navigation even with fresh cache — that was the slowness.
+            refetchOnMount: true,
 
             // Refetch on reconnect — catches updates after offline periods
             refetchOnReconnect: true,
