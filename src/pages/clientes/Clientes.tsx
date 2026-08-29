@@ -29,26 +29,21 @@ export default function Clientes() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [clientResult, stageResult] = await Promise.allSettled([
+      // All 3 queries in parallel
+      const [clientResult, stageResult, cuentasResult] = await Promise.allSettled([
         clientsService.getAll(),
         pipelineStagesService.getAll(),
+        profile?.company_id ? pagosService.getClientesCuentas(profile.company_id) : Promise.resolve([])
       ]);
       setClients(clientResult.status === 'fulfilled' ? clientResult.value : []);
       setStages(stageResult.status === 'fulfilled' ? stageResult.value : []);
 
-      if (profile?.company_id) {
-        try {
-          const cuentas = await pagosService.getClientesCuentas(profile.company_id);
-          const cuentasMap: Record<string, any> = {};
-          cuentas.forEach(c => {
-            if (c.nombre_cliente) {
-              cuentasMap[c.nombre_cliente.trim().toLowerCase()] = c;
-            }
-          });
-          setClientesCuentas(cuentasMap);
-        } catch (err) {
-          console.error('[Clientes] Error loading accounts:', err);
-        }
+      if (cuentasResult.status === 'fulfilled') {
+        const cuentasMap: Record<string, any> = {};
+        (cuentasResult.value as any[]).forEach(c => {
+          if (c.nombre_cliente) cuentasMap[c.nombre_cliente.trim().toLowerCase()] = c;
+        });
+        setClientesCuentas(cuentasMap);
       }
     } catch {
       setClients([]);
@@ -57,6 +52,7 @@ export default function Clientes() {
       setLoading(false);
     }
   }, [profile?.company_id]);
+
 
   useEffect(() => { load(); }, [load]);
 

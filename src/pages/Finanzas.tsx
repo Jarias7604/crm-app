@@ -60,40 +60,37 @@ export default function Finanzas() {
     if (!profile?.company_id) return;
     setLoading(true);
     try {
-      // Actualizar cuotas vencidas en tiempo real (RPC → función Postgres)
-      pagosService.refreshOverdueCuotas().catch(() => {});
+      // Fire all queries in parallel — not sequentially
+      pagosService.refreshOverdueCuotas().catch(() => {}); // fire-and-forget
 
-      let gasData: Gasto[] = [];
-      let clientesData: ClienteCuenta[] = [];
-
-      try { gasData = await gastosService.getGastos(profile.company_id); } catch (e) { console.error('Error gastos:', e); }
-      try {
-        clientesData = await pagosService.getClientesCuentas(profile.company_id);
-      } catch (e) {
-        console.error('[Finanzas] Error cuentas por cobrar:', e);
-        toast.error('Error cargando cuentas por cobrar');
-      }
-
-      setGastos(gasData);
-      setClientes(clientesData);
-
-      // Payments history
-      const { data: allPagos } = await supabase
-        .from('pagos')
-        .select('*, cotizaciones(nombre_cliente)')
-        .eq('company_id', profile.company_id)
-        .order('fecha_pago', { ascending: false });
-      if (allPagos) setPagosRecibidos(allPagos as any);
-
-      // Monthly contracts (last 6 months) for chart
       const sixAgo = new Date(); sixAgo.setMonth(sixAgo.getMonth() - 5); sixAgo.setDate(1);
-      const { data: cotsMes } = await supabase
-        .from('cotizaciones')
-        .select('created_at, total_anual')
-        .eq('company_id', profile.company_id)
-        .in('estado', ['aceptada', 'ganado', 'aprobada', 'pagado', 'activo'])
-        .gte('created_at', sixAgo.toISOString());
-      if (cotsMes) setCotizacionesMes(cotsMes.map(c => ({ mes: c.created_at.slice(0,7), total: Number(c.total_anual) })));
+
+      const [gasData, clientesData, pagosResult, cotsMesResult] = await Promise.allSettled([
+        gastosService.getGastos(profile.company_id),
+        pagosService.getClientesCuentas(profile.company_id),
+        supabase
+          .from('pagos')
+          .select('*, cotizaciones(nombre_cliente)')
+          .eq('company_id', profile.company_id)
+          .order('fecha_pago', { ascending: false }),
+        supabase
+          .from('cotizaciones')
+          .select('created_at, total_anual')
+          .eq('company_id', profile.company_id)
+          .in('estado', ['aceptada', 'ganado', 'aprobada', 'pagado', 'activo'])
+          .gte('created_at', sixAgo.toISOString())
+      ]);
+
+      if (gasData.status === 'fulfilled') setGastos(gasData.value as Gasto[]);
+      else console.error('Error gastos:', gasData.reason);
+
+      if (clientesData.status === 'fulfilled') setClientes(clientesData.value as ClienteCuenta[]);
+      else { console.error('[Finanzas] Error cuentas por cobrar:', clientesData.reason); toast.error('Error cargando cuentas por cobrar'); }
+
+      if (pagosResult.status === 'fulfilled' && pagosResult.value.data) setPagosRecibidos(pagosResult.value.data as any);
+
+      if (cotsMesResult.status === 'fulfilled' && cotsMesResult.value.data)
+        setCotizacionesMes(cotsMesResult.value.data.map((c: any) => ({ mes: c.created_at.slice(0,7), total: Number(c.total_anual) })));
 
     } catch (error) {
       console.error('[Finanzas] loadData error:', error);
@@ -102,6 +99,7 @@ export default function Finanzas() {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     loadData();

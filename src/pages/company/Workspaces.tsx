@@ -48,73 +48,56 @@ export default function Workspaces() {
         if (!profile?.company_id) return;
         setLoading(true);
         try {
-            // Find parent company first to get its full hierarchy
-            let parentId = profile.company_id;
+            // Step 1: get current company to find parentId (required first)
             const { data: currentComp } = await supabase
                 .from('companies')
                 .select('id, parent_company_id, allowed_permissions')
-                .eq('id', parentId)
+                .eq('id', profile.company_id)
                 .single();
 
-            if (currentComp?.parent_company_id) {
-                parentId = currentComp.parent_company_id;
+            const parentId = currentComp?.parent_company_id || profile.company_id;
+
+            // Step 2: fire all remaining queries in parallel (they all depend on parentId)
+            const [parentResult, listResult] = await Promise.all([
+                supabase.from('companies').select('*').eq('id', parentId).single(),
+                supabase.from('companies').select('*').or(`id.eq.${parentId},parent_company_id.eq.${parentId}`).order('name')
+            ]);
+
+            if (listResult.error) throw listResult.error;
+
+            if (parentResult.data) {
+                setParentCompany(parentResult.data as Company);
+                setParentPermissions(parentResult.data.allowed_permissions || []);
             }
 
-            // Load parent company details
-            const { data: parentData } = await supabase
-                .from('companies')
-                .select('*')
-                .eq('id', parentId)
-                .single();
-
-            if (parentData) {
-                setParentCompany(parentData as Company);
-                setParentPermissions(parentData.allowed_permissions || []);
-            }
-
-            // Load all workspaces (parent and children)
-            const { data: listData, error } = await supabase
-                .from('companies')
-                .select('*')
-                .or(`id.eq.${parentId},parent_company_id.eq.${parentId}`)
-                .order('name');
-
-            if (error) throw error;
-            const ws = listData || [];
+            const ws = listResult.data || [];
             setWorkspaces(ws);
 
-            // Load WhatsApp integration status for each workspace
-            if (ws.length > 0) {
-                const ids = ws.map((w: Company) => w.id);
-                const { data: integrations } = await supabase
-                    .from('marketing_integrations')
-                    .select('company_id, is_active, settings')
-                    .in('company_id', ids)
-                    .eq('provider', 'whatsapp')
-                    .eq('is_active', true);
+            // Step 3: parallel — WhatsApp integrations + agents (both need ws IDs)
+            const allIds = [parentId, ...ws.map((w: Company) => w.id)];
+            const [integrationsResult, agentsResult] = await Promise.all([
+                ws.length > 0
+                    ? supabase.from('marketing_integrations').select('company_id, is_active, settings').in('company_id', allIds).eq('provider', 'whatsapp').eq('is_active', true)
+                    : Promise.resolve({ data: [] }),
+                supabase.from('profiles').select('id, full_name, email, avatar_url, company_id, role').in('company_id', allIds).order('full_name')
+            ]);
 
-                const statusMap: Record<string, 'active' | 'inactive'> = {};
-                ids.forEach((id: string) => { statusMap[id] = 'inactive'; });
-                (integrations || []).forEach((i: any) => {
-                    if (i.settings?.token && i.settings?.phoneNumberId) {
-                        statusMap[i.company_id] = 'active';
-                    }
-                });
-                setWaStatus(statusMap);
-            }
+            // WhatsApp status map
+            const statusMap: Record<string, 'active' | 'inactive'> = {};
+            allIds.forEach((id: string) => { statusMap[id] = 'inactive'; });
+            ((integrationsResult as any).data || []).forEach((i: any) => {
+                if (i.settings?.token && i.settings?.phoneNumberId) statusMap[i.company_id] = 'active';
+            });
+            setWaStatus(statusMap);
 
-            // Load agents across all workspaces
-            const allCompanyIds2 = [parentId, ...ws.map((w: Company) => w.id)];
-            const { data: agentsData } = await supabase
-                .from('profiles')
-                .select('id, full_name, email, avatar_url, company_id, role')
-                .in('company_id', allCompanyIds2)
-                .order('full_name');
+            // Agents map
+            const agentsData = agentsResult.data || [];
             const aMap: Record<string, Profile[]> = {};
-            allCompanyIds2.forEach(id => { aMap[id] = []; });
-            (agentsData || []).forEach((a: any) => { if (aMap[a.company_id]) aMap[a.company_id].push(a as Profile); });
-            setAgents((agentsData || []) as Profile[]);
+            allIds.forEach(id => { aMap[id] = []; });
+            agentsData.forEach((a: any) => { if (aMap[a.company_id]) aMap[a.company_id].push(a as Profile); });
+            setAgents(agentsData as Profile[]);
             setAgentsByWorkspace(aMap);
+
         } catch (err) {
             console.error('Error loading workspaces:', err);
             toast.error('Error al cargar workspaces');
@@ -122,6 +105,8 @@ export default function Workspaces() {
             setLoading(false);
         }
     }, [profile?.company_id]);
+
+
 
     useEffect(() => {
         loadData();
