@@ -205,10 +205,29 @@ serve(async (req) => {
                             let content  = '';
                             const metadata: any = { whatsapp_id: msg.id, phone_number_id: phoneNumberId, raw_data: msg };
 
-                            if (msg.type === 'text')         { content = msg.text.body; }
-                            else if (msg.type === 'image')   { content = '[Imagen recibida]'; metadata.file_id = msg.image.id; metadata.mime_type = msg.image.mime_type; }
-                            else if (msg.type === 'document'){ content = `[Documento: ${msg.document.filename}]`; metadata.file_id = msg.document.id; metadata.fileName = msg.document.filename; }
-                            else                             { content = `[Mensaje tipo ${msg.type}]`; }
+                            if (msg.type === 'text') {
+                                content = msg.text.body;
+                            } else if (msg.type === 'audio' || msg.type === 'voice') {
+                                content = '[Nota de voz recibida]';
+                                const audioObj = msg.audio || msg.voice || {};
+                                metadata.file_id = audioObj.id;
+                                metadata.mime_type = audioObj.mime_type || 'audio/ogg';
+                                metadata.type = 'audio';
+                                metadata.voice = audioObj.voice || msg.type === 'voice';
+                            } else if (msg.type === 'image') {
+                                content = '[Imagen recibida]';
+                                metadata.file_id = msg.image?.id;
+                                metadata.mime_type = msg.image?.mime_type;
+                                metadata.type = 'image';
+                            } else if (msg.type === 'document') {
+                                content = `[Documento: ${msg.document?.filename || 'Archivo'}]`;
+                                metadata.file_id = msg.document?.id;
+                                metadata.fileName = msg.document?.filename;
+                                metadata.mime_type = msg.document?.mime_type;
+                                metadata.type = 'document';
+                            } else {
+                                content = `[Mensaje tipo ${msg.type}]`;
+                            }
 
                             const { data: convId, error } = await supabase.rpc('process_incoming_marketing_message', {
                                 p_company_id:  companyId,

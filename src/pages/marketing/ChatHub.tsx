@@ -913,32 +913,32 @@ export default function ChatHub() {
                                                             <span className="text-[10px] opacity-70">Haz clic para descargar</span>
                                                         </div>
                                                     </a>
-                                                ) : (msg.type as string) === 'voice' || (msg.type as string) === 'audio' ? (
+                                                ) : ((msg.type as string) === 'voice' || (msg.type as string) === 'audio' || msg.metadata?.type === 'audio' || msg.content?.startsWith('🎤') || msg.content?.startsWith('[Nota de voz') || msg.content?.startsWith('[Audio') || msg.content?.startsWith('[Mensaje tipo audio]')) ? (
                                                     <div className="flex flex-col gap-2 min-w-[240px] mb-1">
                                                         <div className="flex items-center gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200/50 backdrop-blur-sm">
-                                                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 shadow-inner">
-                                                                <PhoneIcon className="w-5 h-5" />
+                                                            <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner">
+                                                                <Mic className="w-5 h-5" />
                                                             </div>
                                                             <div className="flex-1">
-                                                                <p className="text-[9px] font-black uppercase text-indigo-600/60 tracking-widest mb-0.5">
+                                                                <p className="text-[9px] font-black uppercase text-emerald-600/80 tracking-widest mb-0.5">
                                                                     {(msg.metadata?.is_voice || (msg.type as string) === 'voice') ? 'Nota de Voz' : 'Audio Recibido'}
                                                                 </p>
-                                                                <p className="text-xs font-bold text-slate-700">Telegram Channel</p>
+                                                                <p className="text-xs font-bold text-slate-700 capitalize">{selectedConv.channel || 'WhatsApp'}</p>
                                                             </div>
                                                             {msg.metadata?.duration && (
-                                                                <span className="text-[10px] font-mono bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100/50">
+                                                                <span className="text-[10px] font-mono bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-100/50">
                                                                     {msg.metadata.duration}s
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        {msg.metadata?.transcription ? (
-                                                            <div className="bg-white/60 p-3 rounded-xl border border-indigo-100/50 italic text-[13px] text-slate-600 leading-relaxed shadow-sm relative overflow-hidden group/transcription">
-                                                                <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/20" />
-                                                                "{msg.metadata.transcription}"
+                                                        {msg.metadata?.transcription || msg.content?.startsWith('🎤') ? (
+                                                            <div className="bg-white/80 p-3 rounded-xl border border-emerald-100 italic text-[13px] text-slate-700 leading-relaxed shadow-sm relative overflow-hidden group/transcription">
+                                                                <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/40" />
+                                                                "{msg.metadata?.transcription || msg.content.replace(/^🎤\s*\[Audio\]:\s*/, '')}"
                                                             </div>
                                                         ) : (
                                                             <div className="bg-slate-50/30 p-2 rounded-lg border border-dashed border-slate-200 text-center">
-                                                                <span className="text-[10px] text-slate-400 font-medium">Procesando transcripción...</span>
+                                                                <span className="text-[10px] text-slate-400 font-medium">Nota de voz recibida</span>
                                                             </div>
                                                         )}
                                                     </div>

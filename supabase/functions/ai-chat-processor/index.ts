@@ -354,6 +354,7 @@ USA esta memoria para personalizar tu respuesta. NO preguntes lo que ya sabes.` 
 3. Usa SIEMPRE los precios reales del catálogo inyectado arriba — nunca inventes precios.
 4. Mensajes máximo 5-6 líneas. Nunca hagas listas largas en un solo mensaje.
 5. Si el agente tiene enlace de demo configurado, úsalo cuando el cliente pida reunión o llamada.
+6. Si el usuario envió una nota de voz o audio, el sistema ya te la transcribió automáticamente como "[Nota de voz del cliente: ...]". NUNCA digas "no puedo escuchar audios", responde con total naturalidad al contenido de lo que dijo en el audio.
 
 === PROTOCOLO DE TRIGGERS — NUNCA VISIBLES PARA EL CLIENTE ===
 - Al cotizar formalmente, agrega AL FINAL del mensaje: QUOTE_TRIGGER: {"plan_name": "NOMBRE_PLAN", "dte_volume": NUMERO_ANUAL, "items": ["Módulo1"]}
@@ -404,8 +405,8 @@ ${technicalRules}`;
 
         const previousMessages = (history || []).reverse().map((msg: any) => ({
             role: msg.direction === 'inbound' ? 'user' : 'assistant',
-            content: (msg.type === 'audio' || msg.type === 'voice')
-                ? `[Nota de voz: ${msg.metadata?.transcription || 'sin transcribir'}]`
+            content: (msg.type === 'audio' || msg.type === 'voice' || msg.metadata?.type === 'audio' || msg.content?.includes('[Audio') || msg.content?.includes('[Nota de voz'))
+                ? `[Nota de voz del cliente: ${msg.metadata?.transcription || msg.content}]`
                 : msg.type === 'image' ? '[El usuario envió una imagen]'
                 : msg.content
         }));
@@ -414,41 +415,98 @@ ${technicalRules}`;
         // 7. TRANSCRIBE VOICE (Whisper)
         // ===========================================
         let userMessage = lastMsg?.content || "";
-        if (lastMsg?.direction === 'inbound' && (lastMsg?.type === 'voice' || lastMsg?.type === 'audio')) {
-            const fileId = lastMsg.metadata?.file_id;
+        const isAudioMsg = lastMsg?.direction === 'inbound' && (
+            lastMsg?.type === 'voice' || 
+            lastMsg?.type === 'audio' || 
+            lastMsg?.metadata?.type === 'audio' || 
+            lastMsg?.metadata?.type === 'voice' ||
+            lastMsg?.metadata?.raw_data?.type === 'audio' ||
+            lastMsg?.metadata?.raw_data?.type === 'voice' ||
+            lastMsg?.content?.includes('[Mensaje tipo audio]') ||
+            lastMsg?.content?.includes('[Nota de voz') ||
+            lastMsg?.content?.includes('[Audio')
+        );
+
+        if (isAudioMsg) {
+            const fileId = lastMsg.metadata?.file_id || 
+                           lastMsg.metadata?.raw_data?.audio?.id || 
+                           lastMsg.metadata?.raw_data?.voice?.id;
+
             if (fileId && !lastMsg.metadata?.transcription) {
-                log(`Transcribing audio: ${fileId}`);
+                log(`Transcribing audio: ${fileId} on channel: ${conv.channel}`);
                 try {
-                    const { data: tgInt } = await supabase.from('marketing_integrations')
-                        .select('settings').eq('company_id', companyId).eq('provider', 'telegram').eq('is_active', true).maybeSingle();
-                    const botToken = tgInt?.settings?.token;
-                    if (botToken) {
-                        const fileInfoResp = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
-                        const fileInfo = await fileInfoResp.json();
-                        if (fileInfo.ok && fileInfo.result.file_path) {
-                            const audioResp = await fetch(`https://api.telegram.org/file/bot${botToken}/${fileInfo.result.file_path}`);
-                            const audioBlob = await audioResp.blob();
-                            const formData = new FormData();
-                            formData.append('file', audioBlob, 'audio.ogg');
-                            formData.append('model', 'whisper-1');
-                            const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-                                method: 'POST',
-                                headers: { 'Authorization': `Bearer ${apiKey}` },
-                                body: formData
-                            });
-                            const whisperData = await whisperResp.json();
-                            if (whisperData.text) {
-                                userMessage = whisperData.text;
-                                log(`Transcription: ${userMessage}`);
-                                await supabase.from('marketing_messages').update({
-                                    content: `[Nota de voz]: ${whisperData.text}`,
-                                    metadata: { ...lastMsg.metadata, transcription: whisperData.text }
-                                }).eq('id', lastMsg.id);
-                                previousMessages[previousMessages.length - 1].content = `[Nota de voz]: ${whisperData.text}`;
+                    let audioBlob: Blob | null = null;
+
+                    if (conv.channel === 'telegram') {
+                        const { data: tgInt } = await supabase.from('marketing_integrations')
+                            .select('settings').eq('company_id', companyId).eq('provider', 'telegram').eq('is_active', true).maybeSingle();
+                        const botToken = tgInt?.settings?.token;
+                        if (botToken) {
+                            const fileInfoResp = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
+                            const fileInfo = await fileInfoResp.json();
+                            if (fileInfo.ok && fileInfo.result.file_path) {
+                                const audioResp = await fetch(`https://api.telegram.org/file/bot${botToken}/${fileInfo.result.file_path}`);
+                                audioBlob = await audioResp.blob();
                             }
                         }
+                    } else if (conv.channel === 'whatsapp') {
+                        // ── WHATSAPP: Download audio via Meta Graph API ──
+                        const { data: waInt } = await supabase.from('marketing_integrations')
+                            .select('settings').eq('company_id', companyId).eq('provider', 'whatsapp').eq('is_active', true).maybeSingle();
+                        const metaToken = waInt?.settings?.token || Deno.env.get('WHATSAPP_ACCESS_TOKEN');
+                        if (metaToken) {
+                            log(`Fetching Meta media URL for fileId: ${fileId}`);
+                            const metaMediaResp = await fetch(`https://graph.facebook.com/v22.0/${fileId}`, {
+                                headers: { 'Authorization': `Bearer ${metaToken}` }
+                            });
+                            const metaMediaData = await metaMediaResp.json();
+                            if (metaMediaData.url) {
+                                log(`Downloading WhatsApp audio binary from: ${metaMediaData.url}`);
+                                const audioResp = await fetch(metaMediaData.url, {
+                                    headers: { 'Authorization': `Bearer ${metaToken}` }
+                                });
+                                audioBlob = await audioResp.blob();
+                            } else {
+                                log(`Meta media URL error: ${JSON.stringify(metaMediaData)}`);
+                            }
+                        } else {
+                            log('No WhatsApp token available for audio download');
+                        }
                     }
-                } catch (e) { log(`Transcription error: ${e.message}`); }
+
+                    if (audioBlob) {
+                        const formData = new FormData();
+                        formData.append('file', audioBlob, 'audio.ogg');
+                        formData.append('model', 'whisper-1');
+                        formData.append('language', 'es');
+                        const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                            method: 'POST',
+                            headers: { 'Authorization': `Bearer ${apiKey}` },
+                            body: formData
+                        });
+                        const whisperData = await whisperResp.json();
+                        if (whisperData.text) {
+                            userMessage = whisperData.text;
+                            log(`Whisper transcription success: "${userMessage}"`);
+                            await supabase.from('marketing_messages').update({
+                                content: `🎤 [Audio]: ${whisperData.text}`,
+                                metadata: { ...lastMsg.metadata, transcription: whisperData.text, type: 'audio' }
+                            }).eq('id', lastMsg.id);
+
+                            await supabase.from('marketing_conversations').update({
+                                last_message: `🎤 ${whisperData.text}`
+                            }).eq('id', conversationId);
+
+                            if (previousMessages.length > 0) {
+                                previousMessages[previousMessages.length - 1].content = `[Nota de voz transcrita del cliente]: ${whisperData.text}`;
+                            }
+                        } else {
+                            log(`Whisper error response: ${JSON.stringify(whisperData)}`);
+                        }
+                    }
+                } catch (e: any) {
+                    log(`Transcription error: ${e.message}`);
+                }
             } else if (lastMsg.metadata?.transcription) {
                 userMessage = lastMsg.metadata.transcription;
             }
