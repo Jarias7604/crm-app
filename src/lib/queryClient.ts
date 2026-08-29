@@ -16,11 +16,13 @@ export const queryClient = new QueryClient({
             // Retry failed requests once
             retry: 1,
 
-            // Disable aggressive refetches on tab switch / window focus to save CPU and bandwidth
+            // Disable re-fetch when switching browser tabs (saves bandwidth on mobile)
             refetchOnWindowFocus: false,
 
-            // Use cached data on mount if within staleTime (eliminates blank loading states on page change)
-            refetchOnMount: false,
+            // IMPORTANT: 'always' = always fetch on first mount, but if already cached within
+            // staleTime (3 min) React Query serves cached data instantly without a network call.
+            // 'false' was causing pages to show empty/stale data on first navigation.
+            refetchOnMount: 'always',
 
             // Refetch on reconnect — catches updates after offline periods
             refetchOnReconnect: true,
