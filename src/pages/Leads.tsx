@@ -46,6 +46,8 @@ import { localToUtcISO, DEFAULT_TIMEZONE } from '../utils/timezone';
 import { PipelineIntelligenceBar, applyPipelineFilter } from '../components/leads/PipelineIntelligenceBar';
 import type { PipelineFilter } from '../components/leads/PipelineIntelligenceBar';
 
+import { useWorkspaceHierarchy } from '../hooks/useWorkspaceHierarchy';
+
 export default function Leads() {
     const { profile, simulatedCompanyId } = useAuth();
     const activeCompanyId = simulatedCompanyId || profile?.company_id || '';
@@ -58,6 +60,17 @@ export default function Leads() {
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
 
+    // 🏢 Hierarchical Data Roll-up (HubSpot / Salesforce style)
+    const { 
+        workspaces, 
+        canRollup, 
+        selectedWorkspace, 
+        setSelectedWorkspace, 
+        targetCompanyIds 
+    } = useWorkspaceHierarchy();
+
+    const queryCompanyIds = targetCompanyIds.length > 0 ? targetCompanyIds : activeCompanyId;
+
     const { 
         data: leadsData, 
         isLoading: loading,
@@ -65,9 +78,9 @@ export default function Leads() {
         hasNextPage,
         isFetchingNextPage
     } = useInfiniteQuery({
-        queryKey: ['leads', activeCompanyId],
+        queryKey: ['leads', activeCompanyId, queryCompanyIds, selectedWorkspace],
         queryFn: async ({ pageParam }) => {
-            const result = await leadsService.getLeadsCursor(1000, pageParam as string | undefined, activeCompanyId);
+            const result = await leadsService.getLeadsCursor(1000, pageParam as string | undefined, queryCompanyIds);
             return result;
         },
         initialPageParam: undefined as string | undefined,
@@ -1390,6 +1403,7 @@ export default function Leads() {
                 productFilter={productFilter}
                 setProductFilter={setProductFilter}
                 products={products}
+                workspaceProps={{ workspaces, canRollup, selectedWorkspace, setSelectedWorkspace }}
             />
             {/* ── Pipeline Segment Toggle Banner ─────────────────────────────────── */}
             {statusFilter === 'all' && !filteredLeadId && !filteredLeadIds && (

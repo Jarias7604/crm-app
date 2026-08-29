@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Users, TrendingUp, Clock, CheckCircle2, Search, CalendarCheck } from 'lucide-react';
+import { Users, TrendingUp, Clock, CheckCircle2, Search, CalendarCheck, Building2 } from 'lucide-react';
 import { clientsService, pipelineStagesService } from '../../services/clients';
 import type { Client, ClientPipelineStage } from '../../types/clients';
 import OnboardingPipeline from '../../components/clientes/OnboardingPipeline';
@@ -9,6 +9,7 @@ import ClienteDetail from '../../components/clientes/ClienteDetail';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAuth } from '../../auth/AuthProvider';
 import { pagosService } from '../../services/pagos';
+import { useWorkspaceHierarchy } from '../../hooks/useWorkspaceHierarchy';
 
 type Tab = 'pipeline' | 'activos';
 
@@ -16,6 +17,15 @@ export default function Clientes() {
   const { hasPermission, isAdmin } = usePermissions();
   const canView = hasPermission('clientes.view') || isAdmin();
   const { profile } = useAuth();
+
+  // 🏢 Hierarchical Data Roll-up (HubSpot / Salesforce style)
+  const { 
+    workspaces, 
+    canRollup, 
+    selectedWorkspace, 
+    setSelectedWorkspace, 
+    targetCompanyIds 
+  } = useWorkspaceHierarchy();
 
   const [tab, setTab] = useState<Tab>('pipeline');
   const [clients, setClients] = useState<Client[]>([]);
@@ -29,9 +39,10 @@ export default function Clientes() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      const queryCompanyIds = targetCompanyIds.length > 0 ? targetCompanyIds : profile?.company_id;
       // All 3 queries in parallel
       const [clientResult, stageResult, cuentasResult] = await Promise.allSettled([
-        clientsService.getAll(),
+        clientsService.getAll({ companyId: queryCompanyIds }),
         pipelineStagesService.getAll(),
         profile?.company_id ? pagosService.getClientesCuentas(profile.company_id) : Promise.resolve([])
       ]);
@@ -51,7 +62,7 @@ export default function Clientes() {
     } finally {
       setLoading(false);
     }
-  }, [profile?.company_id]);
+  }, [profile?.company_id, JSON.stringify(targetCompanyIds)]);
 
 
   useEffect(() => { load(); }, [load]);
@@ -155,8 +166,8 @@ export default function Clientes() {
         ))}
       </div>
 
-      {/* Tabs + Search */}
-      <div className="flex items-center gap-3">
+      {/* Tabs + Search + Workspace Rollup */}
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
           {(['pipeline', 'activos'] as Tab[]).map(t => (
             <button
@@ -170,6 +181,28 @@ export default function Clientes() {
             </button>
           ))}
         </div>
+
+        {/* 🏢 Workstation / Workspace Filter (HubSpot style) */}
+        {canRollup && (
+          <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 shadow-sm h-9">
+            <Building2 className="w-3.5 h-3.5 text-[#4449AA] shrink-0" />
+            <select
+              value={selectedWorkspace}
+              onChange={(e) => setSelectedWorkspace(e.target.value)}
+              className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
+            >
+              <option value="all">
+                🌐 Todas las Estaciones ({workspaces.length})
+              </option>
+              {workspaces.map(w => (
+                <option key={w.id} value={w.id}>
+                  {w.isParent ? `👑 ${w.name} (Matriz)` : `🏢 ${w.name}`}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input

@@ -39,17 +39,27 @@ class CotizacionesService {
         return data;
     }
 
-    // Obtener todas las cotizaciones de la compañía
-    async getCotizaciones(companyId: string) {
-        const { data, error } = await supabase
+    // Obtener todas las cotizaciones de la compañía (soporta 1 compañía o array de jerarquía)
+    async getCotizaciones(companyId: string | string[]) {
+        let query = supabase
             .from('cotizaciones')
             .select(`
                 *,
                 lead:leads(id, name, email),
                 creator:profiles!created_by(full_name, email, avatar_url)
-            `)
-            .eq('company_id', companyId)
-            .order('created_at', { ascending: false });
+            `);
+
+        if (Array.isArray(companyId)) {
+            if (companyId.length === 1) {
+                query = query.eq('company_id', companyId[0]);
+            } else if (companyId.length > 1) {
+                query = query.in('company_id', companyId);
+            }
+        } else if (companyId) {
+            query = query.eq('company_id', companyId);
+        }
+
+        const { data, error } = await query.order('created_at', { ascending: false });
 
         if (error) throw error;
 
@@ -158,11 +168,22 @@ class CotizacionesService {
     }
 
     // Obtener estadísticas de cotizaciones
-    async getStats(companyId: string) {
-        const { data, error } = await supabase
+    async getStats(companyId: string | string[]) {
+        let query = supabase
             .from('cotizaciones')
-            .select('estado, total_anual')
-            .eq('company_id', companyId);
+            .select('estado, total_anual');
+
+        if (Array.isArray(companyId)) {
+            if (companyId.length === 1) {
+                query = query.eq('company_id', companyId[0]);
+            } else if (companyId.length > 1) {
+                query = query.in('company_id', companyId);
+            }
+        } else if (companyId) {
+            query = query.eq('company_id', companyId);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
 

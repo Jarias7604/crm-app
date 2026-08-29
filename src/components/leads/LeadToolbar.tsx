@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, SlidersHorizontal, ChevronDown, CheckCircle, Filter, Calendar, X, User, ArrowLeft } from 'lucide-react';
+import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, SlidersHorizontal, ChevronDown, CheckCircle, Filter, Calendar, X, User, ArrowLeft, Building2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { CustomDatePicker } from '../ui/CustomDatePicker';
 import { PRIORITY_CONFIG, STATUS_CONFIG, SOURCE_CONFIG } from '../../types';
@@ -51,6 +51,14 @@ interface LeadToolbarProps {
     setProductFilter: (v: string | 'all') => void;
     products: LeadProduct[];
     
+    // 🏢 Hierarchical Workspaces (HubSpot / Salesforce style)
+    workspaceProps?: {
+        workspaces: Array<{ id: string; name: string; isParent: boolean }>;
+        canRollup: boolean;
+        selectedWorkspace: string;
+        setSelectedWorkspace: (id: string) => void;
+    };
+    
     // Actions
     handleDownloadTemplate: () => void;
     handleImportCSV: (e: any) => void;
@@ -73,7 +81,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     completedLeadIds, setCompletedLeadIds, calendarDateLabel, setCalendarDateLabel,
     productFilter, setProductFilter, products,
     handleDownloadTemplate, handleImportCSV, isImporting, setIsModalOpen,
-    navigate, cameFromRef, setMinContactCountFilter, csvHelper
+    navigate, cameFromRef, setMinContactCountFilter, csvHelper, workspaceProps
 }) => {
     // Local UI states
     const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
@@ -714,6 +722,27 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
 
                     {/* Right: Search + View toggles + Actions */}
                     <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
+                        {/* 🏢 Workstation / Workspace Filter (HubSpot style) */}
+                        {workspaceProps?.canRollup && (
+                            <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 shadow-sm h-10">
+                                <Building2 className="w-4 h-4 text-[#4449AA] shrink-0" />
+                                <select
+                                    value={workspaceProps.selectedWorkspace}
+                                    onChange={(e) => workspaceProps.setSelectedWorkspace(e.target.value)}
+                                    className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1 max-w-[200px] truncate"
+                                >
+                                    <option value="all">
+                                        🌐 Todas las Estaciones ({workspaceProps.workspaces.length})
+                                    </option>
+                                    {workspaceProps.workspaces.map(w => (
+                                        <option key={w.id} value={w.id}>
+                                            {w.isParent ? `👑 ${w.name} (Matriz)` : `🏢 ${w.name}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
                         <div className="flex-1 min-w-[220px] max-w-sm">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />

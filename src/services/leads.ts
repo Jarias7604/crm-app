@@ -25,16 +25,26 @@ export const leadsService = {
 
     // Get leads with lightweight payload (optimized for List/Kanban views)
     // PROTECTED by safeSelect — if ANY column is missing, auto-fallback to SELECT *
-    async getLeads(page = 1, pageSize = 1000, companyId?: string) {
+    // Get leads with lightweight payload (optimized for List/Kanban views)
+    // PROTECTED by safeSelect — if ANY column is missing, auto-fallback to SELECT *
+    async getLeads(page = 1, pageSize = 1000, companyId?: string | string[]) {
         const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, assigned_at, interested_product_id';
 
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
 
         const resolvedCompanyId = companyId || (await this.getActiveCompanyId());
-        const filters = resolvedCompanyId
-            ? [{ column: 'company_id', op: 'eq' as const, value: resolvedCompanyId }]
-            : [];
+        const filters: any[] = [];
+
+        if (Array.isArray(resolvedCompanyId)) {
+            if (resolvedCompanyId.length === 1) {
+                filters.push({ column: 'company_id', op: 'eq' as const, value: resolvedCompanyId[0] });
+            } else if (resolvedCompanyId.length > 1) {
+                filters.push({ column: 'company_id', op: 'in' as const, value: resolvedCompanyId });
+            }
+        } else if (resolvedCompanyId) {
+            filters.push({ column: 'company_id', op: 'eq' as const, value: resolvedCompanyId });
+        }
 
         const result = await safeSelect<Lead>({
             table: 'leads',
@@ -52,15 +62,22 @@ export const leadsService = {
 
     // Cursor-based Pagination for ultra-fast performance on millions of rows
     // PROTECTED by safeSelect
-    async getLeadsCursor(limit = 50, cursor?: string, companyId?: string) {
+    async getLeadsCursor(limit = 50, cursor?: string, companyId?: string | string[]) {
         const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, last_follow_up_at, first_follow_up_at, assigned_at, interested_product_id';
 
         const resolvedCompanyId = companyId || (await this.getActiveCompanyId());
         const filters: any[] = [];
 
-        if (resolvedCompanyId) {
+        if (Array.isArray(resolvedCompanyId)) {
+            if (resolvedCompanyId.length === 1) {
+                filters.push({ column: 'company_id', op: 'eq' as const, value: resolvedCompanyId[0] });
+            } else if (resolvedCompanyId.length > 1) {
+                filters.push({ column: 'company_id', op: 'in' as const, value: resolvedCompanyId });
+            }
+        } else if (resolvedCompanyId) {
             filters.push({ column: 'company_id', op: 'eq' as const, value: resolvedCompanyId });
         }
+
         if (cursor) {
             filters.push({ column: 'created_at', op: 'lt' as const, value: cursor });
         }

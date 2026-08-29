@@ -113,7 +113,7 @@ export const stageDocTypesService = {
 // CLIENTS CRUD
 // ─────────────────────────────────────
 export const clientsService = {
-  async getAll(filters?: { esActivo?: boolean }): Promise<Client[]> {
+  async getAll(filters?: { esActivo?: boolean; companyId?: string | string[] }): Promise<Client[]> {
     let q = simGuard(
       supabase
         .from('clients')
@@ -129,6 +129,18 @@ export const clientsService = {
 
     if (filters?.esActivo !== undefined) {
       q = q.eq('es_activo', filters.esActivo);
+    }
+
+    if (filters?.companyId) {
+      if (Array.isArray(filters.companyId)) {
+        if (filters.companyId.length === 1) {
+          q = q.eq('company_id', filters.companyId[0]);
+        } else if (filters.companyId.length > 1) {
+          q = q.in('company_id', filters.companyId);
+        }
+      } else {
+        q = q.eq('company_id', filters.companyId);
+      }
     }
 
     const { data, error } = await q;

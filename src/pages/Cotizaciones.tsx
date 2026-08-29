@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, ArrowUpDown, GripVertical, Search, BadgeDollarSign, TrendingUp, Calendar, ChevronDown, X } from 'lucide-react';
+import { Plus, FileText, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, ArrowUpDown, GripVertical, Search, BadgeDollarSign, TrendingUp, Calendar, ChevronDown, X, Building2 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -11,12 +11,22 @@ import { Button } from '../components/ui/Button';
 import { CustomDatePicker } from '../components/ui/CustomDatePicker';
 import toast from 'react-hot-toast';
 import { useAriasTables } from '../hooks/useAriasTables';
+import { useWorkspaceHierarchy } from '../hooks/useWorkspaceHierarchy';
 
 export default function Cotizaciones() {
     const { profile } = useAuth();
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
     const canViewAllQuotes = isAdmin || (profile?.permissions?.['quotes_view_all'] === true);
     const navigate = useNavigate();
+
+    // 🏢 Hierarchical Data Roll-up (HubSpot / Salesforce style)
+    const { 
+        workspaces, 
+        canRollup, 
+        selectedWorkspace, 
+        setSelectedWorkspace, 
+        targetCompanyIds 
+    } = useWorkspaceHierarchy();
 
     const [cotizaciones, setCotizaciones] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -112,7 +122,7 @@ export default function Cotizaciones() {
             loadCotizaciones();
             if (canViewAllQuotes) loadStats();
         }
-    }, [profile?.company_id, profile?.role]); // role included to re-fire on simulation/workspace switches
+    }, [profile?.company_id, profile?.role, JSON.stringify(targetCompanyIds)]); // Re-fire on simulation or workspace filter switches
 
     // Recompute stats from filtered cotizaciones for collaborators
     useEffect(() => {
@@ -132,7 +142,8 @@ export default function Cotizaciones() {
     const loadCotizaciones = async () => {
         try {
             setLoading(true);
-            let data = await cotizacionesService.getCotizaciones(profile!.company_id);
+            const queryCompanyIds = targetCompanyIds.length > 0 ? targetCompanyIds : profile!.company_id;
+            let data = await cotizacionesService.getCotizaciones(queryCompanyIds);
             // 🔒 Role-based visibility: collaborators only see their own quotes
             if (!canViewAllQuotes && profile?.id) {
                 data = data.filter((cot: any) => cot.created_by === profile.id);
@@ -149,7 +160,8 @@ export default function Cotizaciones() {
     const loadStats = async () => {
         try {
             // Stats are computed from filtered cotizaciones for role-based consistency
-            const data = await cotizacionesService.getStats(profile!.company_id);
+            const queryCompanyIds = targetCompanyIds.length > 0 ? targetCompanyIds : profile!.company_id;
+            const data = await cotizacionesService.getStats(queryCompanyIds);
             if (!canViewAllQuotes && profile?.id) {
                 // Recompute stats from already-loaded (filtered) cotizaciones
                 const filtered = cotizaciones.length > 0 ? cotizaciones : [];
@@ -317,6 +329,27 @@ export default function Cotizaciones() {
                         </div>
 
                         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                            {/* 🏢 Workstation / Workspace Filter (HubSpot style) */}
+                            {canRollup && (
+                                <div className="flex items-center gap-1.5 bg-white border border-gray-100 rounded-xl px-2.5 py-1.5 shadow-sm h-9">
+                                    <Building2 className="w-3.5 h-3.5 text-[#4449AA] shrink-0" />
+                                    <select
+                                        value={selectedWorkspace}
+                                        onChange={(e) => setSelectedWorkspace(e.target.value)}
+                                        className="bg-transparent text-xs font-bold text-gray-700 outline-none cursor-pointer pr-1"
+                                    >
+                                        <option value="all">
+                                            🌐 Todas las Estaciones ({workspaces.length})
+                                        </option>
+                                        {workspaces.map(w => (
+                                            <option key={w.id} value={w.id}>
+                                                {w.isParent ? `👑 ${w.name} (Matriz)` : `🏢 ${w.name}`}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
                             {/* Search Bar */}
                             <div className="relative flex-1 min-w-[180px] sm:w-56">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
