@@ -156,8 +156,9 @@ serve(async (req) => {
                     for (const change of (entry.changes || [])) {
                         if (!change.value?.messages) continue;
 
-                        const messages      = change.value.messages;
-                        const phoneNumberId = change.value.metadata.phone_number_id;
+                        const metadataObj   = change.value?.metadata || {};
+                        const phoneNumberId = metadataObj.phone_number_id;
+                        const displayPhone  = metadataObj.display_phone_number ? metadataObj.display_phone_number.replace(/\D/g, '') : null;
 
                         // Resolve company
                         let companyId: string | null = url.searchParams.get('company_id');
@@ -184,6 +185,17 @@ serve(async (req) => {
                             if (byPhone) companyId = byPhone.company_id;
                         }
 
+                        if (!companyId && displayPhone) {
+                            const { data: byDisplayPhone } = await supabase
+                                .from('marketing_integrations')
+                                .select('company_id')
+                                .eq('provider', 'whatsapp')
+                                .eq('is_active', true)
+                                .or(`settings->>phone.ilike.%${displayPhone}%,settings->>phoneNumber.ilike.%${displayPhone}%`)
+                                .maybeSingle();
+                            if (byDisplayPhone) companyId = byDisplayPhone.company_id;
+                        }
+
                         if (!companyId) {
                             const { data: first } = await supabase
                                 .from('marketing_integrations')
@@ -195,7 +207,7 @@ serve(async (req) => {
                             if (first) companyId = first.company_id;
                         }
 
-                        if (!companyId) { console.error(`No company for WhatsApp PhoneID: ${phoneNumberId}`); continue; }
+                        if (!companyId) { console.error(`No company for WhatsApp PhoneID: ${phoneNumberId} / Phone: ${displayPhone}`); continue; }
 
                         for (const msg of messages) {
                             const contact    = change.value.contacts?.find((c: any) => c.wa_id === msg.from);

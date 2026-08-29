@@ -424,7 +424,7 @@ USA esta memoria para personalizar tu respuesta. NO preguntes lo que ya sabes.` 
 3. Usa SIEMPRE los precios reales del catálogo inyectado arriba — nunca inventes precios.
 4. Mensajes máximo 5-6 líneas. Nunca hagas listas largas en un solo mensaje.
 5. Si el agente tiene enlace de demo configurado, úsalo cuando el cliente pida reunión o llamada.
-6. Si el usuario envió una nota de voz o audio, el sistema ya te la transcribió automáticamente como "[Nota de voz del cliente: ...]". NUNCA digas "no puedo escuchar audios", responde con total naturalidad al contenido de lo que dijo en el audio.
+6. Si el usuario envió una nota de voz, el sistema la transcribió como "[Nota de voz transcrita del cliente: ...]". Responde con total naturalidad, calidez y precisión al contenido exacto de lo que dijo, como si lo hubieras escuchado. NUNCA digas "no puedo escuchar audios" ni "hubo un error en la transcripción". Si el audio no fue audible, responde cordialmente saludando y pidiéndole de forma natural que te comente por texto qué necesita para apoyarle de inmediato.
 
 === PROTOCOLO DE TRIGGERS — NUNCA VISIBLES PARA EL CLIENTE ===
 - Al cotizar formalmente, agrega AL FINAL del mensaje: QUOTE_TRIGGER: {"plan_name": "NOMBRE_PLAN", "dte_volume": NUMERO_ANUAL, "items": ["Módulo1"]}
@@ -479,7 +479,7 @@ ${technicalRules}`;
         // 6. GET CONVERSATION HISTORY (last 20 messages)
         // ===========================================
         const { data: history } = await supabase.from('marketing_messages')
-            .select('content, direction, type, created_at, metadata')
+            .select('id, content, direction, type, created_at, metadata')
             .eq('conversation_id', conversationId)
             .order('created_at', { ascending: false })
             .limit(20);
@@ -491,14 +491,6 @@ ${technicalRules}`;
             log('Skipping — last message was outbound+delivered');
             return new Response(JSON.stringify({ skipped: true }), { headers: corsHeaders });
         }
-
-        const previousMessages = (history || []).reverse().map((msg: any) => ({
-            role: msg.direction === 'inbound' ? 'user' : 'assistant',
-            content: (msg.type === 'audio' || msg.type === 'voice' || msg.metadata?.type === 'audio' || msg.content?.includes('[Audio') || msg.content?.includes('[Nota de voz'))
-                ? `[Nota de voz del cliente: ${msg.metadata?.transcription || msg.content}]`
-                : msg.type === 'image' ? '[El usuario envió una imagen]'
-                : msg.content
-        }));
 
         // ===========================================
         // 7. TRANSCRIBE VOICE (Whisper)
@@ -529,7 +521,7 @@ ${technicalRules}`;
                     if (conv.channel === 'telegram') {
                         const { data: tgInt } = await supabase.from('marketing_integrations')
                             .select('settings').eq('company_id', companyId).eq('provider', 'telegram').eq('is_active', true).maybeSingle();
-                        const botToken = tgInt?.settings?.token;
+                        const botToken = tgInt?.settings?.token || tgInt?.settings?.botToken;
                         if (botToken) {
                             const fileInfoResp = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
                             const fileInfo = await fileInfoResp.json();
@@ -543,37 +535,62 @@ ${technicalRules}`;
                         let metaToken: string | null = null;
                         const { data: waInt } = await supabase.from('marketing_integrations')
                             .select('settings').eq('company_id', companyId).eq('provider', 'whatsapp').eq('is_active', true).maybeSingle();
-                        metaToken = waInt?.settings?.token || null;
+                        metaToken = waInt?.settings?.token || waInt?.settings?.accessToken || waInt?.settings?.access_token || null;
 
+                        // Fallback A: lookup by phoneNumberId in metadata
                         if (!metaToken) {
-                            // Fallback: parent workspace
+                            const pId = lastMsg.metadata?.phone_number_id || lastMsg.metadata?.raw_data?.metadata?.phone_number_id;
+                            if (pId) {
+                                const { data: byPhone } = await supabase.from('marketing_integrations')
+                                    .select('settings').eq('provider', 'whatsapp').eq('is_active', true).filter('settings->>phoneNumberId', 'eq', pId).maybeSingle();
+                                metaToken = byPhone?.settings?.token || byPhone?.settings?.accessToken || byPhone?.settings?.access_token || null;
+                            }
+                        }
+
+                        // Fallback B: parent workspace
+                        if (!metaToken) {
                             const { data: comp } = await supabase.from('companies').select('parent_company_id').eq('id', companyId).maybeSingle();
                             if (comp?.parent_company_id) {
                                 const { data: parentWa } = await supabase.from('marketing_integrations')
                                     .select('settings').eq('company_id', comp.parent_company_id).eq('provider', 'whatsapp').eq('is_active', true).maybeSingle();
-                                metaToken = parentWa?.settings?.token || null;
+                                metaToken = parentWa?.settings?.token || parentWa?.settings?.accessToken || parentWa?.settings?.access_token || null;
                             }
                         }
 
+                        // Fallback C: global active whatsapp integration
                         if (!metaToken) {
-                            // Fallback: global active whatsapp integration
                             const { data: fallbackWa } = await supabase.from('marketing_integrations')
                                 .select('settings').eq('provider', 'whatsapp').eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
-                            metaToken = fallbackWa?.settings?.token || Deno.env.get('WHATSAPP_ACCESS_TOKEN') || null;
+                            metaToken = fallbackWa?.settings?.token || fallbackWa?.settings?.accessToken || fallbackWa?.settings?.access_token || null;
+                        }
+
+                        // Fallback D: environment variables
+                        if (!metaToken) {
+                            metaToken = Deno.env.get('WHATSAPP_TOKEN') || Deno.env.get('WHATSAPP_ACCESS_TOKEN') || Deno.env.get('META_ACCESS_TOKEN') || null;
                         }
 
                         if (metaToken) {
                             log(`Fetching Meta media URL for fileId: ${fileId}`);
                             const metaMediaResp = await fetch(`https://graph.facebook.com/v22.0/${fileId}`, {
-                                headers: { 'Authorization': `Bearer ${metaToken}` }
+                                headers: { 
+                                    'Authorization': `Bearer ${metaToken}`,
+                                    'User-Agent': 'curl/7.88.1'
+                                }
                             });
                             const metaMediaData = await metaMediaResp.json();
                             if (metaMediaData.url) {
                                 log(`Downloading WhatsApp audio binary from: ${metaMediaData.url}`);
                                 const audioResp = await fetch(metaMediaData.url, {
-                                    headers: { 'Authorization': `Bearer ${metaToken}` }
+                                    headers: { 
+                                        'Authorization': `Bearer ${metaToken}`,
+                                        'User-Agent': 'curl/7.88.1'
+                                    }
                                 });
-                                audioBlob = await audioResp.blob();
+                                if (audioResp.ok) {
+                                    audioBlob = await audioResp.blob();
+                                } else {
+                                    log(`Meta audio download failed with status: ${audioResp.status}`);
+                                }
                             } else {
                                 log(`Meta media URL error: ${JSON.stringify(metaMediaData)}`);
                             }
@@ -582,9 +599,11 @@ ${technicalRules}`;
                         }
                     }
 
-                    if (audioBlob) {
+                    if (audioBlob && audioBlob.size > 0) {
                         const formData = new FormData();
-                        formData.append('file', audioBlob, 'audio.ogg');
+                        const mime = lastMsg.metadata?.mime_type || audioBlob.type || 'audio/ogg';
+                        const ext = mime.includes('mp4') || mime.includes('m4a') ? 'm4a' : mime.includes('mp3') ? 'mp3' : 'ogg';
+                        formData.append('file', audioBlob, `audio.${ext}`);
                         formData.append('model', 'whisper-1');
                         formData.append('language', 'es');
                         const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -593,21 +612,22 @@ ${technicalRules}`;
                             body: formData
                         });
                         const whisperData = await whisperResp.json();
-                        if (whisperData.text) {
-                            userMessage = whisperData.text;
+                        if (whisperData.text && whisperData.text.trim()) {
+                            userMessage = whisperData.text.trim();
                             log(`Whisper transcription success: "${userMessage}"`);
-                            await supabase.from('marketing_messages').update({
-                                content: `🎤 [Audio]: ${whisperData.text}`,
-                                metadata: { ...lastMsg.metadata, transcription: whisperData.text, type: 'audio' }
-                            }).eq('id', lastMsg.id);
+                            if (lastMsg.id) {
+                                await supabase.from('marketing_messages').update({
+                                    content: `🎤 [Audio]: ${whisperData.text.trim()}`,
+                                    metadata: { ...lastMsg.metadata, transcription: whisperData.text.trim(), type: 'audio' }
+                                }).eq('id', lastMsg.id);
+                            }
 
                             await supabase.from('marketing_conversations').update({
-                                last_message: `🎤 ${whisperData.text}`
+                                last_message: `🎤 ${whisperData.text.trim()}`
                             }).eq('id', conversationId);
 
-                            if (previousMessages.length > 0) {
-                                previousMessages[previousMessages.length - 1].content = `[Nota de voz transcrita del cliente]: ${whisperData.text}`;
-                            }
+                            if (!lastMsg.metadata) lastMsg.metadata = {};
+                            lastMsg.metadata.transcription = whisperData.text.trim();
                         } else {
                             log(`Whisper error response: ${JSON.stringify(whisperData)}`);
                         }
@@ -621,7 +641,36 @@ ${technicalRules}`;
         }
 
         // ===========================================
-        // 8. CALL OPENAI GPT-4o
+        // 8. BUILD MESSAGE HISTORY FOR GPT-4o
+        // ===========================================
+        const previousMessages = (history || []).reverse().map((msg: any) => {
+            let role = msg.direction === 'inbound' ? 'user' : 'assistant';
+            let content = msg.content || '';
+
+            const isAudio = msg.type === 'audio' || 
+                            msg.type === 'voice' || 
+                            msg.metadata?.type === 'audio' || 
+                            msg.metadata?.type === 'voice' ||
+                            msg.content?.includes('[Audio') || 
+                            msg.content?.includes('[Nota de voz') ||
+                            msg.content?.includes('🎤 [Audio]');
+
+            if (isAudio) {
+                const transcription = msg.metadata?.transcription || (msg.content?.startsWith('🎤 [Audio]: ') ? msg.content.replace('🎤 [Audio]: ', '') : null);
+                if (transcription && transcription.trim()) {
+                    content = `[Nota de voz transcrita del cliente: "${transcription.trim()}"]`;
+                } else {
+                    content = `[El cliente envió una nota de voz pero no fue audible. Salúdalo con calidez y pídele cordialmente si te puede escribir o indicar qué necesita para asesorarle de inmediato]`;
+                }
+            } else if (msg.type === 'image' || msg.metadata?.type === 'image') {
+                content = '[El usuario envió una imagen]';
+            }
+
+            return { role, content };
+        });
+
+        // ===========================================
+        // 9. CALL OPENAI GPT-4o
         // ===========================================
         const openAiMessages = [
             { role: 'system', content: fullSystemPrompt },
