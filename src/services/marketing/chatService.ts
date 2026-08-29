@@ -102,6 +102,19 @@ export const chatService = {
     },
 
     async getConversations(companyId?: string) {
+        let finalCompanyId = companyId || localStorage.getItem('simulated_company_id');
+        if (!finalCompanyId) {
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (sessionData?.session?.user?.id) {
+                const { data: prof } = await supabase
+                    .from('profiles')
+                    .select('company_id')
+                    .eq('id', sessionData.session.user.id)
+                    .maybeSingle();
+                if (prof?.company_id) finalCompanyId = prof.company_id;
+            }
+        }
+
         let query = supabase
             .from('marketing_conversations')
             .select(`
@@ -109,8 +122,8 @@ export const chatService = {
                 lead:leads(id, name, email, company_name, phone, company_id)
             `);
 
-        if (companyId) {
-            query = query.eq('company_id', companyId);
+        if (finalCompanyId) {
+            query = query.eq('company_id', finalCompanyId);
         }
 
         const { data, error } = await simGuard(query)

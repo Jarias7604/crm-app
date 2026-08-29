@@ -28,7 +28,7 @@ export default function ChatHub() {
     const [selectedConv, setSelectedConv] = useState<ChatConversation | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
-    const [filter, setFilter] = useState<'all' | 'whatsapp' | 'telegram'>('all');
+    const [filter, setFilter] = useState<'all' | 'whatsapp' | 'telegram' | 'email'>('all');
     const [showDetails, setShowDetails] = useState(true);
     const [loading, setLoading] = useState(true);
     const [pendingQuote, setPendingQuote] = useState<any>(null);
@@ -631,14 +631,17 @@ export default function ChatHub() {
                     </div>
 
                     {/* CHANNEL FILTER PILLS */}
-                    <div className="flex gap-2 mt-3 pb-1">
-                        <button onClick={() => setFilter('all')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all ${ filter === 'all' ? 'bg-indigo-500 text-white shadow-sm' : 'bg-white text-slate-500 border border-black/5'}`}>
+                    <div className="flex gap-1.5 mt-3 pb-1 overflow-x-auto no-scrollbar">
+                        <button onClick={() => setFilter('all')} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all ${ filter === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-black/5 hover:bg-slate-50'}`}>
                             <Layers className="w-3 h-3" /> Todos
                         </button>
-                        <button onClick={() => setFilter('whatsapp')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all ${ filter === 'whatsapp' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white text-slate-500 border border-black/5'}`}>
+                        <button onClick={() => setFilter('whatsapp')} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all ${ filter === 'whatsapp' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-black/5 hover:bg-slate-50'}`}>
                             <Smartphone className="w-3 h-3" /> WhatsApp
                         </button>
-                        <button onClick={() => setFilter('telegram')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all ${ filter === 'telegram' ? 'bg-sky-500 text-white shadow-sm' : 'bg-white text-slate-500 border border-black/5'}`}>
+                        <button onClick={() => setFilter('email')} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all ${ filter === 'email' ? 'bg-purple-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-black/5 hover:bg-slate-50'}`}>
+                            <Mail className="w-3 h-3" /> Email
+                        </button>
+                        <button onClick={() => setFilter('telegram')} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all ${ filter === 'telegram' ? 'bg-sky-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-black/5 hover:bg-slate-50'}`}>
                             <TelegramIcon className="w-3 h-3" /> Telegram
                         </button>
                     </div>
@@ -673,9 +676,11 @@ export default function ChatHub() {
                                             {conv.lead?.name?.[0]?.toUpperCase() || '?'}
                                         </div>
                                         {/* Channel badge */}
-                                        <div className={`absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center ring-2 ring-white ${ conv.channel === 'telegram' ? 'bg-sky-500' : 'bg-emerald-500' }`}>
+                                        <div className={`absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center ring-2 ring-white ${ conv.channel === 'telegram' ? 'bg-sky-500' : conv.channel === 'email' ? 'bg-purple-500' : 'bg-emerald-500' }`}>
                                             {conv.channel === 'telegram'
                                                 ? <TelegramIcon className="w-2.5 h-2.5 text-white" />
+                                                : conv.channel === 'email'
+                                                ? <Mail className="w-2.5 h-2.5 text-white" />
                                                 : <Smartphone className="w-2 h-2 text-white" />}
                                         </div>
                                     </div>

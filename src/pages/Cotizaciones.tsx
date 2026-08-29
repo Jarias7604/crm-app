@@ -112,7 +112,7 @@ export default function Cotizaciones() {
             loadCotizaciones();
             if (canViewAllQuotes) loadStats();
         }
-    }, [profile]);
+    }, [profile?.company_id, profile?.id, canViewAllQuotes]);
 
     // Recompute stats from filtered cotizaciones for collaborators
     useEffect(() => {
