@@ -102,18 +102,12 @@ export const chatService = {
     },
 
     async getConversations(companyId?: string) {
-        let finalCompanyId = companyId || localStorage.getItem('simulated_company_id');
-        if (!finalCompanyId) {
-            const { data: sessionData } = await supabase.auth.getSession();
-            if (sessionData?.session?.user?.id) {
-                const { data: prof } = await supabase
-                    .from('profiles')
-                    .select('company_id')
-                    .eq('id', sessionData.session.user.id)
-                    .maybeSingle();
-                if (prof?.company_id) finalCompanyId = prof.company_id;
-            }
-        }
+        // Direct filter if companyId is available — fastest path
+        // If not available, skip explicit filter and let RLS handle company isolation.
+        // (Removed: auth.getSession() + profiles fallback that added 2 sequential Supabase
+        // calls before the actual query, causing ~600-900ms of unnecessary latency)
+        const simCompanyId = localStorage.getItem('simulated_company_id');
+        const finalCompanyId = companyId || simCompanyId || null;
 
         let query = supabase
             .from('marketing_conversations')

@@ -315,11 +315,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // ENTERPRISE PERMISSION RESOLUTION (Single Source of Truth)
             // Igual que HubSpot/Salesforce: el ROL es la fuente de verdad.
             // profiles.permissions NUNCA sobrescribe al custom_role.
+            // ⚡ PARALLELIZED: permissions RPC + company license query run simultaneously
             // ─────────────────────────────────────────────────────────────────
             let activePerms: Record<string, boolean> = {};
 
-            // 1. Intentar RPC centralizada primero
-            const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: userId });
+            // Run permissions RPC and company license fetch IN PARALLEL (they are independent)
+            const [permsResult, companyLicenseResult] = await Promise.all([
+                supabase.rpc('get_user_permissions', { user_id: userId }),
+                // Only fetch company license for non-super_admin users
+                (data.role !== 'super_admin' && data.company_id)
+                    ? supabase.from('companies').select('allowed_permissions').eq('id', data.company_id).single()
+                    : Promise.resolve({ data: null, error: null })
+            ]);
+
+            const mergedPerms = permsResult.data;
 
             if (mergedPerms && Object.keys(mergedPerms).length > 0) {
                 // RPC devolvió permisos consolidados — usar directamente
@@ -368,14 +377,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // 4. INTERSECT WITH COMPANY LICENSE (allowed_permissions)
             // Para usuarios no-superadmin, limitar los permisos cargados
             // a los que la empresa tiene permitidos en su columna 'allowed_permissions'.
+            // Uses pre-fetched companyLicenseResult (no extra DB call needed)
             // ─────────────────────────────────────────────────────────────────
-            if (data && data.role !== 'super_admin' && data.company_id) {
+            if (data && data.role !== 'super_admin' && data.company_id && companyLicenseResult.data) {
                 try {
-                    const { data: companyData } = await supabase
-                        .from('companies')
-                        .select('allowed_permissions')
-                        .eq('id', data.company_id)
-                        .single();
+                    const companyData = companyLicenseResult.data;
 
                     if (companyData) {
                         const rawLicense = companyData.allowed_permissions;

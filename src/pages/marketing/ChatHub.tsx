@@ -72,10 +72,12 @@ export default function ChatHub() {
     const { isAdmin } = usePermissions();
 
     const loadData = useCallback(async () => {
+        // Guard: never fetch without company_id — prevents fallback cascade in chatService
+        if (!profile?.company_id) return;
         try {
             const [conversationsData, agentsData] = await Promise.all([
-                chatService.getConversations(profile?.company_id),
-                profile?.company_id ? aiAgentService.getAgents(profile.company_id).catch(() => []) : Promise.resolve([])
+                chatService.getConversations(profile.company_id),
+                aiAgentService.getAgents(profile.company_id).catch(() => [])
             ]);
 
             const mainAgent = agentsData?.find(a => a.is_active) || agentsData?.[0];
@@ -85,7 +87,7 @@ export default function ChatHub() {
             if (conversationsData && conversationsData.length > 0) {
                 setConversations(conversationsData);
                 _convCache.data = conversationsData;
-                _convCache.companyId = profile?.company_id ?? null;
+                _convCache.companyId = profile.company_id;
                 _convCache.ts = Date.now();
             }
         } catch (error) {
