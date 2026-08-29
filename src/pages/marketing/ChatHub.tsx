@@ -50,9 +50,30 @@ export default function ChatHub() {
     const { profile } = useAuth();
     const { isAdmin } = usePermissions();
 
+    const loadData = useCallback(async () => {
+        try {
+            const [conversationsData, agentsData] = await Promise.all([
+                chatService.getConversations(profile?.company_id),
+                profile?.company_id ? aiAgentService.getAgents(profile.company_id).catch(() => []) : Promise.resolve([])
+            ]);
+
+            const mainAgent = agentsData?.find(a => a.is_active) || agentsData?.[0];
+            setAgentStatus(mainAgent?.is_active || false);
+            setConversations(conversationsData || []);
+        } catch (error) {
+            console.error('Error loading hub data:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [profile?.company_id]);
+
     // 1. Initial Load + realtime new message notifications
     useEffect(() => {
         loadData();
+
+        // Safety fallback: Never leave user stuck on loading spinner for > 3s
+        const timer = setTimeout(() => setLoading(false), 3000);
+
         // Realtime: refresh conversation list when any new inbound message arrives
         const sub = chatService.subscribeToConversations(() => loadData());
 
@@ -86,37 +107,11 @@ export default function ChatHub() {
             .subscribe();
 
         return () => {
+            clearTimeout(timer);
             sub.unsubscribe();
             newMsgSub.unsubscribe();
         };
-    }, [selectedConv?.id]);
-
-    // 2. Handle incoming quote for review from location state
-    useEffect(() => {
-        if (location.state?.newQuote) {
-            setPendingQuote(location.state.newQuote);
-        }
-    }, [location.state]);
-
-    const loadData = async () => {
-        try {
-            const [conversationsData] = await Promise.all([
-                chatService.getConversations()
-            ]);
-
-            if (profile?.company_id) {
-                const agents = await aiAgentService.getAgents(profile.company_id);
-                const mainAgent = agents.find(a => a.is_active) || agents[0];
-                setAgentStatus(mainAgent?.is_active || false);
-            }
-
-            setConversations(conversationsData);
-            setLoading(false);
-        } catch (error) {
-            console.error('Error loading hub data:', error);
-            setLoading(false);
-        }
-    };
+    }, [loadData, selectedConv?.id]);
 
     // 2. Auto-select logic when state or conversations change
     useEffect(() => {

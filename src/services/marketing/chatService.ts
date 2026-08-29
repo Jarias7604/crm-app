@@ -101,7 +101,7 @@ export const chatService = {
         return data as ChatConversation;
     },
 
-    async getConversations() {
+    async getConversations(companyId?: string) {
         let query = supabase
             .from('marketing_conversations')
             .select(`
@@ -109,8 +109,13 @@ export const chatService = {
                 lead:leads(id, name, email, company_name, phone, company_id)
             `);
 
+        if (companyId) {
+            query = query.eq('company_id', companyId);
+        }
+
         const { data, error } = await simGuard(query)
-            .order('last_message_at', { ascending: false });
+            .order('last_message_at', { ascending: false })
+            .limit(100);
 
         if (error) throw error;
         return data as ChatConversation[];
