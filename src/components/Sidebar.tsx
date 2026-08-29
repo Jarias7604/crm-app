@@ -243,7 +243,14 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     useEffect(() => {
         if (profile?.company_id && (profile?.role === 'company_admin' || profile?.role === 'super_admin')) {
-            loadWorkspaces();
+            // Check cache first for instant workspace switcher
+            const cachedWs = sessionStorage.getItem(`crm_workspaces_${profile.company_id}`);
+            if (cachedWs) {
+                try { setWorkspaces(JSON.parse(cachedWs)); } catch {}
+            }
+            // Defer network fetch by 600ms to allow primary view to load first
+            const timer = setTimeout(() => loadWorkspaces(), 600);
+            return () => clearTimeout(timer);
         }
     }, [profile?.company_id, profile?.role]);
 
@@ -276,7 +283,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 .order('name');
 
             if (error) throw error;
-            if (data) setWorkspaces(data as unknown as Company[]);
+            if (data) {
+                setWorkspaces(data as unknown as Company[]);
+                sessionStorage.setItem(`crm_workspaces_${profile?.company_id}`, JSON.stringify(data));
+            }
         } catch (err) {
             console.error('Error loading workspaces:', err);
         }
@@ -291,7 +301,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         }
     }, [profile?.company_id, profile?.role, simulatedCompanyId]);
 
-    // ≡ƒöÑ Poll hot leads (cierre_inminente) every 60s for sidebar badge
+    // Defer hot leads polling to run in background after main page is visible
     useEffect(() => {
         if (!profile?.company_id) return;
         const fetchHotLeads = async () => {
@@ -304,15 +314,19 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 setHotLeadCount(count || 0);
             } catch { /* silently ignore */ }
         };
-        fetchHotLeads();
+        // Initial delayed fetch (1.5s after mount)
+        const initialTimer = setTimeout(fetchHotLeads, 1500);
         const interval = setInterval(fetchHotLeads, 60000);
-        return () => clearInterval(interval);
+        return () => {
+            clearTimeout(initialTimer);
+            clearInterval(interval);
+        };
     }, [profile?.company_id]);
 
-    // ≡ƒôà Fetch trial days remaining (only for company_admin on trial companies)
+    // Defer trial days fetch to run in background
     useEffect(() => {
         if (!profile?.company_id) return;
-        // Super admins and platform owners always have full access ΓÇö skip trial logic
+        // Super admins and platform owners always have full access — skip trial logic
         if (profile?.role === 'super_admin' || (profile as any)?.is_platform_owner) {
             setTrialDaysLeft(null);
             return;
@@ -334,7 +348,8 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 }
             } catch { /* silent */ }
         };
-        fetchTrial();
+        const timer = setTimeout(fetchTrial, 2000);
+        return () => clearTimeout(timer);
     }, [profile?.company_id]);
 
     // Reload branding when wizard or branding page saves changes
