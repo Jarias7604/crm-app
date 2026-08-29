@@ -16,6 +16,15 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { toast } from 'react-hot-toast';
 
+// ─── Module-level memory cache ────────────────────────────────────────────────
+// Persists across React unmount/remount so navigating back is INSTANT.
+// Data is served immediately from cache, then refreshed silently in background.
+const _convCache: { data: ChatConversation[]; companyId: string | null; ts: number } = {
+    data: [], companyId: null, ts: 0
+};
+const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes — matches React Query staleTime
+// ─────────────────────────────────────────────────────────────────────────────
+
 const QUICK_RESPONSES = [
     { label: "👋 Saludo", text: "Hola, ¿cómo estás? Te saluda el equipo de Arias Defense. ¿En qué podemos ayudarte hoy?" },
     { label: "💰 Cotización", text: "Hola, para poder generarte una cotización formal y personalizada, ¿podrías indicarnos tu correo electrónico y qué productos te interesan?" },
@@ -24,13 +33,25 @@ const QUICK_RESPONSES = [
 ];
 
 export default function ChatHub() {
-    const [conversations, setConversations] = useState<ChatConversation[]>([]);
+    const { profile } = useAuth();
+
+    // Serve from cache immediately — zero blank loading state on re-navigation
+    const cachedForThisCompany =
+        _convCache.companyId === (profile?.company_id ?? null) &&
+        Date.now() - _convCache.ts < CACHE_TTL_MS &&
+        _convCache.data.length > 0;
+
+    const [conversations, setConversations] = useState<ChatConversation[]>(
+        cachedForThisCompany ? _convCache.data : []
+    );
     const [selectedConv, setSelectedConv] = useState<ChatConversation | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
+
     const [filter, setFilter] = useState<'all' | 'whatsapp' | 'telegram' | 'email'>('all');
     const [showDetails, setShowDetails] = useState(true);
-    const [loading, setLoading] = useState(true);
+    // If we served from cache, start with loading=false (instant UI)
+    const [loading, setLoading] = useState(!cachedForThisCompany);
     const [pendingQuote, setPendingQuote] = useState<any>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [showNewChatModal, setShowNewChatModal] = useState(false);
@@ -47,7 +68,7 @@ export default function ChatHub() {
     const location = useLocation();
     const navigate = useNavigate();
     const hasAutoSelected = useRef<string | null>(null);
-    const { profile } = useAuth();
+    // profile is declared above (at top of component, before useState)
     const { isAdmin } = usePermissions();
 
     const loadData = useCallback(async () => {
@@ -59,7 +80,14 @@ export default function ChatHub() {
 
             const mainAgent = agentsData?.find(a => a.is_active) || agentsData?.[0];
             setAgentStatus(mainAgent?.is_active || false);
-            setConversations(conversationsData || []);
+
+            // Update state and populate module-level cache for next navigation
+            if (conversationsData && conversationsData.length > 0) {
+                setConversations(conversationsData);
+                _convCache.data = conversationsData;
+                _convCache.companyId = profile?.company_id ?? null;
+                _convCache.ts = Date.now();
+            }
         } catch (error) {
             console.error('Error loading hub data:', error);
         } finally {

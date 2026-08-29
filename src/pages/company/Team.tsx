@@ -86,32 +86,38 @@ export default function Team() {
     const loadData = async () => {
         if (!myProfile?.company_id) return;
         try {
-            // Load child workspaces (departments)
-            const { data: childWs } = await supabase
-                .from('companies')
-                .select('id, name, parent_company_id, license_status, allowed_permissions, max_users, is_active, created_at')
-                .eq('parent_company_id', myProfile.company_id)
-                .order('name');
-            const wsArr = (childWs || []) as Company[];
-            setWorkspaces(wsArr);
-
-            // All company IDs: parent + children
-            const allCompanyIds = [myProfile.company_id, ...wsArr.map(w => w.id)];
-
-            // Load members from ALL workspaces
-            const { data: membersData } = await supabase
-                .from('profiles')
-                .select('id, email, role, created_at, company_id, full_name, phone, is_active, avatar_url, website, permissions, custom_role_id, birth_date, address, telegram_chat_id, status')
-                .in('company_id', allCompanyIds)
-                .order('created_at', { ascending: false });
-
-            const [invitationsData, limit, roles, allowed, rPerms] = await Promise.all([
+            // Fire ALL independent queries simultaneously — not one-by-one
+            const [
+                childWsResult,
+                invitationsData,
+                limit,
+                roles,
+                allowed,
+                rPerms
+            ] = await Promise.all([
+                supabase
+                    .from('companies')
+                    .select('id, name, parent_company_id, license_status, allowed_permissions, max_users, is_active, created_at')
+                    .eq('parent_company_id', myProfile.company_id)
+                    .order('name'),
                 teamService.getInvitations(myProfile.company_id),
                 teamService.getCompanyLimit(myProfile.company_id),
                 teamService.getRoles(myProfile.company_id),
                 teamService.getCompanyPermissions(myProfile.company_id),
                 permissionsService.getRolePermissions()
             ]);
+
+            const wsArr = (childWsResult.data || []) as Company[];
+            setWorkspaces(wsArr);
+
+            // Now fetch members using the workspace IDs we just got
+            const allCompanyIds = [myProfile.company_id, ...wsArr.map(w => w.id)];
+            const { data: membersData } = await supabase
+                .from('profiles')
+                .select('id, email, role, created_at, company_id, full_name, phone, is_active, avatar_url, website, permissions, custom_role_id, birth_date, address, telegram_chat_id, status')
+                .in('company_id', allCompanyIds)
+                .order('created_at', { ascending: false });
+
             setMembers((membersData || []) as Profile[]);
             setInvitations(invitationsData || []);
             setMaxUsers(limit);
@@ -129,6 +135,7 @@ export default function Team() {
             setLoading(false);
         }
     };
+
 
     const isLimitReached = (members.length + invitations.length) >= maxUsers;
 
