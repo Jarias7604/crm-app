@@ -88,7 +88,19 @@ Deno.serve(async (req) => {
             text: { preview_url: false, body: record.content }
         };
 
-        if (record.type === 'image' && record.metadata?.url) {
+        if (record.type === 'template' || record.metadata?.template_name) {
+            body = {
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: toPhone,
+                type: "template",
+                template: {
+                    name: record.metadata?.template_name || 'envio_cotizacion_crm',
+                    language: { code: record.metadata?.template_language || 'es' },
+                    components: record.metadata?.template_components || []
+                }
+            };
+        } else if (record.type === 'image' && record.metadata?.url) {
             body = {
                 messaging_product: "whatsapp",
                 recipient_type: "individual",
@@ -121,10 +133,13 @@ Deno.serve(async (req) => {
         // 5. Handle Result — with actionable error messages
         if (!res.ok) {
             const errorCode = result?.error?.code;
+            const errorSubcode = result?.error?.error_subcode;
             const errorMsg = result?.error?.message || 'Unknown Meta API error';
 
             let actionableError = errorMsg;
-            if (errorCode === 3 && errorMsg.includes('granular permission')) {
+            if (errorCode === 131047 || errorSubcode === 131047 || errorMsg.includes('24 hours')) {
+                actionableError = 'VENTANA 24H EXPIRADA: Han pasado más de 24 horas desde el último mensaje del cliente. Usa una plantilla aprobada de Meta o abre el enlace wa.me directo.';
+            } else if (errorCode === 3 && errorMsg.includes('granular permission')) {
                 actionableError = `ACCION REQUERIDA: Meta API ${META_API_VERSION} deprecada o token sin permisos WABA. Ir a developers.facebook.com/docs/graph-api/changelog`;
             } else if (errorCode === 190) {
                 actionableError = 'ACCION REQUERIDA: Token de WhatsApp expiró. Generar token permanente en Meta Business Manager.';
@@ -135,9 +150,15 @@ Deno.serve(async (req) => {
             console.error(`[send-whatsapp] ❌ Meta Error ${errorCode}: ${actionableError}`);
             await supabase.from('marketing_messages').update({
                 status: 'failed',
-                metadata: { ...record.metadata, meta_error: result, actionable_error: actionableError, api_version_used: META_API_VERSION }
+                metadata: { 
+                    ...record.metadata, 
+                    meta_error: result, 
+                    actionable_error: actionableError, 
+                    api_version_used: META_API_VERSION,
+                    is_24h_expired: errorCode === 131047 || errorSubcode === 131047 || errorMsg.includes('24 hours')
+                }
             }).eq('id', record.id);
-            return new Response('Meta API Error', { status: 400, headers: corsHeaders });
+            return new Response(JSON.stringify({ error: actionableError, meta_error: result }), { status: 400, headers: corsHeaders });
         }
 
         // Success
