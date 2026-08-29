@@ -7,29 +7,21 @@ import './index.css'
 import App from './App.tsx'
 import './i18n'
 
-// ── Sentry Error Monitoring ─────────────────────────────────────────────────
+// ── Sentry Error Monitoring (Lightweight / Low-Overhead) ─────────────────────
 // DSN is set in Vercel environment variables: VITE_SENTRY_DSN
-// Without DSN, Sentry is a no-op (safe to deploy without configuring it first)
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
   environment: import.meta.env.MODE,           // 'production' | 'development'
   release: import.meta.env.VITE_APP_VERSION,  // optional: tag deploys
   enabled: import.meta.env.PROD,              // only active in production builds
-  tracesSampleRate: 0.2,                      // capture 20% of transactions for performance
-  replaysOnErrorSampleRate: 1.0,              // full replay on every error
+  tracesSampleRate: 0.05,                     // lightweight 5% sampling to minimize JS execution overhead
+  replaysOnErrorSampleRate: 0.1,              // reduced DOM replay overhead
   integrations: [
     Sentry.browserTracingIntegration(),
   ],
 });
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-})
+import { queryClient } from './lib/queryClient';
 
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {

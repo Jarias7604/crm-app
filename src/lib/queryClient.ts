@@ -7,20 +7,20 @@ import { QueryClient } from '@tanstack/react-query';
 export const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            // Cache data for 3 minutes (balance: freshness vs performance)
+            // Cache data for 3 minutes for instant navigation
             staleTime: 3 * 60 * 1000,
 
-            // Keep unused data in cache for 5 minutes
-            gcTime: 5 * 60 * 1000,
+            // Keep unused data in cache for 10 minutes
+            gcTime: 10 * 60 * 1000,
 
             // Retry failed requests once
             retry: 1,
 
-            // Refetch on window focus — catches updates from other tabs
-            refetchOnWindowFocus: true,
+            // Disable aggressive refetches on tab switch / window focus to save CPU and bandwidth
+            refetchOnWindowFocus: false,
 
-            // Always refetch on mount — ensures fresh data after navigation
-            refetchOnMount: true,
+            // Use cached data on mount if within staleTime (eliminates blank loading states on page change)
+            refetchOnMount: false,
 
             // Refetch on reconnect — catches updates after offline periods
             refetchOnReconnect: true,

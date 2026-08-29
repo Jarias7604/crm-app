@@ -80,7 +80,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
-        // Get initial session
+        // ⚡ OPTIMISTIC FAST-PATH: Hydrate from sessionStorage immediately (<10ms)
+        const cachedRaw = sessionStorage.getItem('crm_cached_profile_v1');
+        if (cachedRaw) {
+            try {
+                const cachedProfile = JSON.parse(cachedRaw);
+                if (cachedProfile?.id) {
+                    setProfile(cachedProfile);
+                    setLoading(false); // Instant mount without spinner
+                }
+            } catch {
+                sessionStorage.removeItem('crm_cached_profile_v1');
+            }
+        }
+
+        // Get initial session & revalidate in background
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
@@ -88,6 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // Pasamos el email directamente para evitar carrera con el estado 'session'
                 fetchProfile(session.user.id, session.user.email);
             } else {
+                sessionStorage.removeItem('crm_cached_profile_v1');
+                setProfile(null);
                 setLoading(false);
             }
         });
@@ -557,6 +573,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             }
             setProfile(finalProfile);
+            // ⚡ Cache active profile for instant optimistic hydration on reload
+            if (finalProfile && !finalProfile.full_name?.startsWith('Simulación:')) {
+                sessionStorage.setItem('crm_cached_profile_v1', JSON.stringify(finalProfile));
+            }
         } catch (err) {
             console.error('Unexpected error fetching profile:', err);
         } finally {
@@ -565,9 +585,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signOut = async () => {
-        // Clear all cached queries and simulation state before signing out
+        // Clear all cached queries, storage, and simulation state before signing out
         // This ensures the next user who logs in starts with a clean slate
         queryClient.clear();
+        sessionStorage.removeItem('crm_cached_profile_v1');
         prevUserIdRef.current = null;
         localStorage.removeItem('simulated_role');
         localStorage.removeItem('simulated_company_id');

@@ -17,8 +17,12 @@ export default defineConfig({
           'vendor-query': ['@tanstack/react-query', '@tanstack/react-virtual'],
           // Charts (grande, cárguelo separado)
           'vendor-charts': ['recharts'],
+          // PDF & Images (solo al exportar cotizaciones o facturas)
+          'vendor-pdf': ['jspdf', 'jspdf-autotable', 'html2canvas', 'html-to-image'],
+          // Excel (solo al exportar reportes/leads)
+          'vendor-excel': ['xlsx'],
           // UI utilities
-          'vendor-ui': ['lucide-react', 'date-fns', 'react-hot-toast'],
+          'vendor-ui': ['lucide-react', 'date-fns', 'react-hot-toast', 'clsx', 'tailwind-merge'],
           // Supabase client (estable)
           'vendor-supabase': ['@supabase/supabase-js'],
           // i18n (solo carga cuando el usuario cambia idioma)
