@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
     MoreVertical, Send, FileText, Smartphone, Layers, Megaphone,
     Paperclip, TrendingUp, Eye, Zap, Smile, Mail, Phone as PhoneIcon, Video as VideoIcon,
-    Send as TelegramIcon, MessageSquare, Trash2, UserPlus, Search, X as CloseIcon, ChevronRight, ChevronLeft, Loader2, Mic
+    Send as TelegramIcon, MessageSquare, Trash2, UserPlus, Search, X as CloseIcon, ChevronRight, ChevronLeft, Loader2, Mic, Building2
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { chatService, type ChatConversation, type ChatMessage } from '../../services/marketing/chatService';
@@ -16,6 +16,7 @@ import { supabase } from '../../services/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { toast } from 'react-hot-toast';
 import { convCache, CONV_CACHE_TTL_MS } from '../../services/marketing/chatCache';
+import { useWorkspaceHierarchy } from '../../hooks/useWorkspaceHierarchy';
 
 // ─── Module-level memory cache ────────────────────────────────────────────────
 // Persists across React unmount/remount so navigating back is INSTANT.
@@ -31,11 +32,18 @@ const QUICK_RESPONSES = [
 
 export default function ChatHub() {
     const { profile } = useAuth();
+    const { 
+        workspaces, 
+        canRollup, 
+        selectedWorkspace, 
+        setSelectedWorkspace, 
+        targetCompanyIds 
+    } = useWorkspaceHierarchy();
 
     // Serve from shared cache immediately — zero blank loading state on re-navigation
-    // Also benefits from Sidebar hover prefetch (data may already be loaded before user clicks)
+    const cacheKey = targetCompanyIds.length > 0 ? targetCompanyIds.slice().sort().join(',') : (profile?.company_id ?? null);
     const cachedForThisCompany =
-        convCache.companyId === (profile?.company_id ?? null) &&
+        convCache.companyId === cacheKey &&
         Date.now() - convCache.ts < CONV_CACHE_TTL_MS &&
         convCache.data.length > 0;
 
@@ -66,27 +74,28 @@ export default function ChatHub() {
     const location = useLocation();
     const navigate = useNavigate();
     const hasAutoSelected = useRef<string | null>(null);
-    // profile is declared above (at top of component, before useState)
     const { isAdmin } = usePermissions();
 
     const loadData = useCallback(async () => {
-        // Guard: never fetch without company_id — prevents fallback cascade in chatService
-        if (!profile?.company_id) return;
+        const queryCompanyIds = targetCompanyIds.length > 0 ? targetCompanyIds : (profile?.company_id ? [profile.company_id] : []);
+        if (queryCompanyIds.length === 0) return;
+        
+        const effectiveCacheKey = queryCompanyIds.slice().sort().join(',');
         
         // Start both queries in parallel immediately
-        const conversationsPromise = chatService.getConversations(profile.company_id);
-        const agentsPromise = aiAgentService.getAgents(profile.company_id).catch(() => []);
+        const conversationsPromise = chatService.getConversations(queryCompanyIds);
+        const agentsPromise = profile?.company_id ? aiAgentService.getAgents(profile.company_id).catch(() => []) : Promise.resolve([]);
 
         try {
             // Conversations are the critical path — release loading spinner as soon as they arrive
             const conversationsData = await conversationsPromise;
-            if (conversationsData && conversationsData.length > 0) {
-                setConversations(conversationsData);
-                // Update shared cache so Sidebar prefetch benefits future navigations
-                convCache.data = conversationsData;
-                convCache.companyId = profile.company_id;
-                convCache.ts = Date.now();
-            }
+            const convList = conversationsData || [];
+            setConversations(convList);
+            
+            // Update shared cache so Sidebar prefetch benefits future navigations
+            convCache.data = convList;
+            convCache.companyId = effectiveCacheKey;
+            convCache.ts = Date.now();
         } catch (error) {
             console.error('Error loading conversations:', error);
         } finally {
@@ -99,7 +108,7 @@ export default function ChatHub() {
             setAgentStatus(mainAgent?.is_active || false);
         }).catch(() => {});
 
-    }, [profile?.company_id]);
+    }, [JSON.stringify(targetCompanyIds), profile?.company_id]);
 
 
     // 1. Initial Load + realtime new message notifications
@@ -664,6 +673,27 @@ export default function ChatHub() {
                             className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl text-[15px] text-slate-700 placeholder:text-slate-400 outline-none border border-black/5 shadow-sm focus:border-indigo-300 transition-all"
                         />
                     </div>
+
+                    {/* WORKSPACE ROLL-UP SELECTOR (For Super Admins / Matriz) */}
+                    {canRollup && workspaces.length > 1 && (
+                        <div className="mt-2.5">
+                            <div className="flex items-center gap-1.5 bg-white border border-indigo-100 rounded-xl px-2.5 py-1.5 shadow-sm">
+                                <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                <select
+                                    value={selectedWorkspace}
+                                    onChange={(e) => setSelectedWorkspace(e.target.value)}
+                                    className="bg-transparent text-[11px] font-bold text-slate-700 outline-none w-full cursor-pointer"
+                                >
+                                    <option value="all">🏢 Todas las Estaciones ({workspaces.length})</option>
+                                    {workspaces.map(w => (
+                                        <option key={w.id} value={w.id}>
+                                            {w.isParent ? `🏢 ${w.name} (Matriz)` : `📍 ${w.name}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                    )}
 
                     {/* CHANNEL FILTER PILLS */}
                     <div className="flex gap-1.5 mt-3 pb-1 overflow-x-auto no-scrollbar">

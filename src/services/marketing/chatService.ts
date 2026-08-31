@@ -101,14 +101,7 @@ export const chatService = {
         return data as ChatConversation;
     },
 
-    async getConversations(companyId?: string) {
-        // Direct filter if companyId is available — fastest path
-        // If not available, skip explicit filter and let RLS handle company isolation.
-        // (Removed: auth.getSession() + profiles fallback that added 2 sequential Supabase
-        // calls before the actual query, causing ~600-900ms of unnecessary latency)
-        const simCompanyId = localStorage.getItem('simulated_company_id');
-        const finalCompanyId = companyId || simCompanyId || null;
-
+    async getConversations(companyId?: string | string[]) {
         let query = supabase
             .from('marketing_conversations')
             .select(`
@@ -116,11 +109,22 @@ export const chatService = {
                 lead:leads(id, name, email, company_name, phone, company_id)
             `);
 
-        if (finalCompanyId) {
-            query = query.eq('company_id', finalCompanyId);
+        if (Array.isArray(companyId)) {
+            if (companyId.length === 1) {
+                query = query.eq('company_id', companyId[0]);
+            } else if (companyId.length > 1) {
+                query = query.in('company_id', companyId);
+            }
+        } else if (companyId) {
+            query = query.eq('company_id', companyId);
+        } else {
+            const simCompanyId = localStorage.getItem('simulated_company_id');
+            if (simCompanyId) {
+                query = query.eq('company_id', simCompanyId);
+            }
         }
 
-        const { data, error } = await simGuard(query)
+        const { data, error } = await query
             .order('last_message_at', { ascending: false })
             .limit(100);
 
