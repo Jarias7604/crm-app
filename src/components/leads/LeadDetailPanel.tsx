@@ -9,7 +9,8 @@ import { supabase } from '../../services/supabase';
 import { leadsService } from '../../services/leads';
 import { callActivityService, ACTION_TYPE_CONFIG, CALL_OUTCOME_CONFIG } from '../../services/callActivity';
 import { logger } from '../../utils/logger';
-import { PRIORITY_CONFIG, STATUS_CONFIG, SOURCE_CONFIG, ACTION_TYPES, SOURCE_OPTIONS } from '../../types';
+import { PRIORITY_CONFIG, STATUS_CONFIG, SOURCE_CONFIG, ACTION_TYPES } from '../../types';
+import { useLeadSources } from '../../hooks/useLeadSources';
 import type { Lead, FollowUp, LeadStatus, LeadPriority } from '../../types';
 import { type CallActivity } from '../../services/callActivity';
 import { QuickActionLogger } from '../QuickCallLogger';
@@ -89,7 +90,10 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const [activeTab, setActiveTab] = useState<'activity' | 'info' | 'quotes'>('activity');
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
-    
+
+    // Dynamic lead sources from DB
+    const { options: sourceOptions } = useLeadSources();
+
     // Dialog states
     const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
     const [isWhatsAppDialogOpen, setIsWhatsAppDialogOpen] = useState(false);
@@ -393,7 +397,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 onChange={(val) => handleUpdateLead({ source: val || null })}
                                                 options={[
                                                     { value: '', label: 'Sin especificar' },
-                                                    ...SOURCE_OPTIONS.map(opt => ({ value: opt.value, label: opt.label, icon: opt.icon }))
+                                                    ...sourceOptions.map(opt => ({ value: opt.value, label: opt.label, icon: opt.icon }))
                                                 ]}
                                                 placeholder="Sin especificar"
                                             />

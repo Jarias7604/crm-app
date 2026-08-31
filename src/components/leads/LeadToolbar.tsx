@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, SlidersHorizontal, ChevronDown, CheckCircle, Filter, Calendar, X, User, ArrowLeft, Building2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { CustomDatePicker } from '../ui/CustomDatePicker';
-import { PRIORITY_CONFIG, STATUS_CONFIG, SOURCE_CONFIG } from '../../types';
+import { PRIORITY_CONFIG, STATUS_CONFIG } from '../../types';
+import { useLeadSources } from '../../hooks/useLeadSources';
 import type { Lead, LeadStatus, LeadPriority, LossReason, LeadProduct } from '../../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -93,6 +94,9 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
     const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
     const [isProductFilterOpen, setIsProductFilterOpen] = useState(false);
+
+    // Dynamic lead sources from DB
+    const { options: dynamicSources, getBySlug } = useLeadSources();
 
     const statusFilterRef = useRef<HTMLDivElement>(null);
     const priorityFilterRef = useRef<HTMLDivElement>(null);
@@ -447,25 +451,25 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                                 >
                                     Todas
                                 </button>
-                                {Object.entries(SOURCE_CONFIG).map(([key, config]) => {
-                                    const isActive = Array.isArray(sourceFilter) ? sourceFilter.includes(key) : sourceFilter === key;
+                                {dynamicSources.map((src) => {
+                                    const isActive = Array.isArray(sourceFilter) ? sourceFilter.includes(src.value) : sourceFilter === src.value;
                                     return (
                                         <button
-                                            key={key}
+                                            key={src.value}
                                             onClick={() => {
                                                 if (sourceFilter === 'all') {
-                                                    setSourceFilter([key]);
+                                                    setSourceFilter([src.value]);
                                                 } else if (Array.isArray(sourceFilter)) {
-                                                    const next = sourceFilter.includes(key) ? sourceFilter.filter(s => s !== key) : [...sourceFilter, key];
+                                                    const next = sourceFilter.includes(src.value) ? sourceFilter.filter(s => s !== src.value) : [...sourceFilter, src.value];
                                                     setSourceFilter(next.length === 0 ? 'all' : next);
                                                 } else {
-                                                    setSourceFilter(sourceFilter === key ? 'all' : [sourceFilter, key]);
+                                                    setSourceFilter(sourceFilter === src.value ? 'all' : [sourceFilter, src.value]);
                                                 }
                                             }}
-                                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? `${config.bgColor} ${config.color} shadow-md ring-2 ring-current ring-opacity-30` : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? `${src.bgColor} ${src.color} shadow-md ring-2 ring-current ring-opacity-30` : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
                                         >
-                                            {isActive && <span>?</span>}
-                                            {config.icon} {config.label}
+                                            {isActive && <span>✓</span>}
+                                            {src.icon} {src.label}
                                         </button>
                                     );
                                 })}
@@ -1047,7 +1051,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                         )}
                         {sourceFilter !== 'all' && (
                             <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
-                                Fuente: {Array.isArray(sourceFilter) ? `${sourceFilter.length} sel.` : SOURCE_CONFIG[sourceFilter]?.label || sourceFilter}
+                                Fuente: {Array.isArray(sourceFilter) ? `${sourceFilter.length} sel.` : getBySlug(sourceFilter as string)?.name || sourceFilter}
                                 <button onClick={() => setSourceFilter('all')} className="hover:text-emerald-900 ml-0.5"><X className="w-3 h-3" /></button>
                             </span>
                         )}
