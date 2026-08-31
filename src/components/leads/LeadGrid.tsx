@@ -55,11 +55,16 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
                                                     <FileText className="w-3 h-3" /> Cotizado
                                                 </span>
                                             )}
-                                            {lead.source && SOURCE_CONFIG[lead.source] && (
-                                                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${SOURCE_CONFIG[lead.source].bgColor} ${SOURCE_CONFIG[lead.source].color}`}>
-                                                    {SOURCE_CONFIG[lead.source].icon} {SOURCE_CONFIG[lead.source].label}
-                                                </span>
-                                            )}
+                                            {lead.source && (() => {
+                                                const raw = lead.source.toLowerCase().trim();
+                                                const srcKey = raw === 'facebook ads' ? 'facebook_ads' : raw;
+                                                const cfg = SOURCE_CONFIG[srcKey];
+                                                return cfg ? (
+                                                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${cfg.bgColor} ${cfg.color}`}>
+                                                        {cfg.icon} {cfg.label}
+                                                    </span>
+                                                ) : null;
+                                            })()}
                                         </div>
                                         <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-gray-500 transition-colors" />
                                     </div>

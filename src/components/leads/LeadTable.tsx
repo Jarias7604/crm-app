@@ -405,14 +405,20 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                     </div>
                                                                 )}
 
-                                                                {colId === 'source' && (
-                                                                    lead.source && SOURCE_CONFIG[lead.source] ? (
-                                                                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 w-fit">
-                                                                            <span>{SOURCE_CONFIG[lead.source].icon}</span>
-                                                                            <span className="uppercase tracking-tight">{SOURCE_CONFIG[lead.source].label}</span>
+                                                                {colId === 'source' && (() => {
+                                                                    const raw = lead.source?.toLowerCase().trim() || '';
+                                                                    const srcKey = raw === 'facebook ads' ? 'facebook_ads' : raw;
+                                                                    const cfg = SOURCE_CONFIG[srcKey];
+                                                                    if (!lead.source) {
+                                                                        return <span className="text-[10px] text-slate-300 font-bold tracking-wider uppercase">—</span>;
+                                                                    }
+                                                                    return (
+                                                                        <div className={`inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-lg border w-fit ${cfg ? `${cfg.bgColor} ${cfg.color} border-current/20` : 'bg-slate-50 text-slate-700 border-slate-200'}`}>
+                                                                            <span>{cfg?.icon || '📡'}</span>
+                                                                            <span className="uppercase tracking-wider">{cfg?.label || lead.source}</span>
                                                                         </div>
-                                                                    ) : null
-                                                                )}
+                                                                    );
+                                                                })()}
 
                                                                 {colId === 'value' && (
                                                                     <div>
