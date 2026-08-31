@@ -424,7 +424,8 @@ USA esta memoria para personalizar tu respuesta. NO preguntes lo que ya sabes.` 
 3. Usa SIEMPRE los precios reales del catálogo inyectado arriba — nunca inventes precios.
 4. Mensajes máximo 5-6 líneas. Nunca hagas listas largas en un solo mensaje.
 5. Si el agente tiene enlace de demo configurado, úsalo cuando el cliente pida reunión o llamada.
-6. Si el usuario envió una nota de voz, el sistema la transcribió como "[Nota de voz transcrita del cliente: ...]". Responde con total naturalidad, calidez y precisión al contenido exacto de lo que dijo, como si lo hubieras escuchado. NUNCA digas "no puedo escuchar audios" ni "hubo un error en la transcripción". Si el audio no fue audible, responde cordialmente saludando y pidiéndole de forma natural que te comente por texto qué necesita para apoyarle de inmediato.
+6. ⚠️ CRÍTICO — AUDIOS: Si el usuario envió una nota de voz, el sistema la transcribió como "[Nota de voz transcrita del cliente: ...]". Responde con total naturalidad al contenido. ABSOLUTAMENTE PROHIBIDO decir "no puedo escuchar audios", "no tengo capacidad de escuchar", ni ninguna variante. Si el audio no se transcribió, pide amablemente que escriba: "¡Hola! Me llegó tu mensaje de voz pero no pude escucharlo bien. ¿Puedes escribirme qué necesitas? Estoy aquí para ayudarte 😊"
+7. ⚠️ CRÍTICO — CIERRE: Cuando el cliente diga "gracias", "ok", "entendido" o variantes SIN haber agendado demo ni cerrado compra → SIEMPRE hacer una última oferta antes de despedirte: "Por cierto, ¿le gustaría ver el sistema en una demo rápida de 15 minutos esta semana? Es gratis y sin compromiso. Muchos clientes la piden antes de decidir."
 
 === PROTOCOLO DE TRIGGERS — NUNCA VISIBLES PARA EL CLIENTE ===
 - Al cotizar formalmente, agrega AL FINAL del mensaje: QUOTE_TRIGGER: {"plan_name": "NOMBRE_PLAN", "dte_volume": NUMERO_ANUAL, "items": ["Módulo1"]}
@@ -505,7 +506,8 @@ ${technicalRules}`;
             lastMsg?.metadata?.raw_data?.type === 'voice' ||
             lastMsg?.content?.includes('[Mensaje tipo audio]') ||
             lastMsg?.content?.includes('[Nota de voz') ||
-            lastMsg?.content?.includes('[Audio')
+            lastMsg?.content?.includes('[Audio') ||
+            lastMsg?.content === '[Nota de voz recibida]'  // ← fix: webhook text before Whisper
         );
 
         if (isAudioMsg) {
