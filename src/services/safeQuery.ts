@@ -60,8 +60,11 @@ export async function safeSelect<T = any>(opts: SafeQueryOptions): Promise<SafeQ
     // Supabase RLS reads from the JWT, NOT from localStorage. Without this guard, queries
     // leak real tenant data to the simulated company view.
     // SOLUTION: Inject an explicit company_id filter at the query layer.
+    // EXCEPTION: If the caller already provides a company_id filter (e.g., workspace station
+    // selector), skip the sim guard to avoid conflicting filters that return 0 results.
     const simCompanyId = localStorage.getItem('simulated_company_id');
-    const simFilters = simCompanyId
+    const callerHasCompanyFilter = (filters || []).some(f => f.column === 'company_id');
+    const simFilters = (simCompanyId && !callerHasCompanyFilter)
         ? [{ column: 'company_id', op: 'eq' as const, value: simCompanyId }]
         : [];
     const allFilters = [...simFilters, ...(filters || [])];
