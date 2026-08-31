@@ -209,7 +209,7 @@ serve(async (req) => {
 
                         if (!companyId) { console.error(`No company for WhatsApp PhoneID: ${phoneNumberId} / Phone: ${displayPhone}`); continue; }
 
-                        for (const msg of messages) {
+                        for (const msg of change.value.messages) {
                             const contact    = change.value.contacts?.find((c: any) => c.wa_id === msg.from);
                             const senderName = contact?.profile?.name || msg.from;
                             const chatId     = msg.from;
