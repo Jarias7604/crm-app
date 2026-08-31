@@ -219,18 +219,26 @@ serve(async (req) => {
 
                             // Capture Meta Click-to-WhatsApp Ads referral data
                             if (msg.referral) {
-                                metadata.referral = msg.referral;
-                                metadata.source = 'Facebook Ads';
-                                metadata.ad_id = msg.referral.source_id;
-                                metadata.ad_headline = msg.referral.headline;
-                                metadata.is_ad_click = true;
+                                metadata.referral     = msg.referral;
+                                metadata.source       = 'Facebook Ads';
+                                metadata.source_slug  = 'facebook_ads';   // matches lead_sources.slug
+                                metadata.ad_id        = msg.referral.source_id;
+                                metadata.ad_headline  = msg.referral.headline;
+                                metadata.is_ad_click  = true;
+
+                                // Auto-detect product from ad headline (e.g. "Anuncio ERP Empresarial" → 'ERP')
+                                const headline = (msg.referral.headline || '').toUpperCase();
+                                if (headline.includes('ERP'))       metadata.ad_product = 'ERP';
+                                else if (headline.includes('CRM'))  metadata.ad_product = 'CRM';
+                                else if (headline.includes('SIPLE')) metadata.ad_product = 'SIPLE';
                             }
 
                             if (msg.type === 'text') {
                                 content = msg.text.body || '';
                                 if (content.includes('facebook.com') || content.includes('fb.me') || content.includes('instagram.com')) {
                                     metadata.is_social_link = true;
-                                    metadata.source = 'Facebook Ads';
+                                    metadata.source      = 'Facebook Ads';
+                                    metadata.source_slug = 'facebook_ads';
                                 }
                             } else if (msg.type === 'audio' || msg.type === 'voice') {
                                 content = '[Nota de voz recibida]';

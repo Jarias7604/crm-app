@@ -207,6 +207,8 @@ export const ACTION_TYPES = [
 
 // Lead Source Configuration
 export const SOURCE_CONFIG: Record<string, { label: string; icon: string; color: string; bgColor: string }> = {
+    'facebook_ads': { label: 'Facebook Ads', icon: '📢', color: 'text-blue-700', bgColor: 'bg-blue-100' },
+    'whatsapp':     { label: 'WhatsApp', icon: '💬', color: 'text-emerald-700', bgColor: 'bg-emerald-100' },
     'redes_sociales': { label: 'Redes Sociales', icon: '📱', color: 'text-pink-700', bgColor: 'bg-pink-100' },
     'referidos': { label: 'Referidos', icon: '🤝', color: 'text-purple-700', bgColor: 'bg-purple-100' },
     'visita_campo': { label: 'Visita Campo', icon: '🚗', color: 'text-green-700', bgColor: 'bg-green-100' },
