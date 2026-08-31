@@ -8,6 +8,9 @@ export interface ChatConversation {
     last_message: string;
     last_message_at: string;
     unread_count: number;
+    external_id?: string | null;
+    company_id?: string | null;
+    metadata?: any;
     lead: {
         id: string;
         name: string;
