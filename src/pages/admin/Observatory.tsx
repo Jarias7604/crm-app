@@ -80,8 +80,15 @@ export default function Observatory() {
 
   const load = async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc('get_all_tenant_stats');
-    if (!error && data) setTenants(data as TenantStat[]);
+    const [{ data, error }, { data: parentCos }] = await Promise.all([
+      supabase.rpc('get_all_tenant_stats'),
+      supabase.from('companies').select('id').is('parent_company_id', null)
+    ]);
+    if (!error && data) {
+      const rootIds = new Set((parentCos || []).map((c: any) => c.id));
+      const rootTenants = (data as TenantStat[]).filter(t => rootIds.has(t.company_id));
+      setTenants(rootTenants);
+    }
     setLastRefresh(new Date());
     setLoading(false);
   };

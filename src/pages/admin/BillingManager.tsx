@@ -150,7 +150,8 @@ export default function BillingManager() {
             current_period_end,
             plan_id
           )
-        `);
+        `)
+        .is('parent_company_id', null);
       if (cosErr) throw cosErr;
       setCompanies((cosData as any) || []);
 

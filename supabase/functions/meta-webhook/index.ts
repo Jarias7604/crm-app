@@ -217,8 +217,21 @@ serve(async (req) => {
                             let content  = '';
                             const metadata: any = { whatsapp_id: msg.id, phone_number_id: phoneNumberId, raw_data: msg };
 
+                            // Capture Meta Click-to-WhatsApp Ads referral data
+                            if (msg.referral) {
+                                metadata.referral = msg.referral;
+                                metadata.source = 'Facebook Ads';
+                                metadata.ad_id = msg.referral.source_id;
+                                metadata.ad_headline = msg.referral.headline;
+                                metadata.is_ad_click = true;
+                            }
+
                             if (msg.type === 'text') {
-                                content = msg.text.body;
+                                content = msg.text.body || '';
+                                if (content.includes('facebook.com') || content.includes('fb.me') || content.includes('instagram.com')) {
+                                    metadata.is_social_link = true;
+                                    metadata.source = 'Facebook Ads';
+                                }
                             } else if (msg.type === 'audio' || msg.type === 'voice') {
                                 content = '[Nota de voz recibida]';
                                 const audioObj = msg.audio || msg.voice || {};

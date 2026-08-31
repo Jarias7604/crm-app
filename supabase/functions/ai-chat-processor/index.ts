@@ -403,6 +403,7 @@ USA esta memoria para personalizar tu respuesta. NO preguntes lo que ya sabes.` 
 5. Si el agente tiene enlace de demo configurado, úsalo cuando el cliente pida reunión o llamada.
 6. ⚠️ CRÍTICO — AUDIOS: Si el usuario envió una nota de voz, el sistema la transcribió como "[Nota de voz transcrita del cliente: ...]". Responde con total naturalidad al contenido. ABSOLUTAMENTE PROHIBIDO decir "no puedo escuchar audios", "no tengo capacidad de escuchar", ni ninguna variante. Si el audio no se transcribió, pide amablemente que escriba: "¡Hola! Me llegó tu mensaje de voz pero no pude escucharlo bien. ¿Puedes escribirme qué necesitas? Estoy aquí para ayudarte 😊"
 7. ⚠️ CRÍTICO — CIERRE: Cuando el cliente diga "gracias", "ok", "entendido" o variantes SIN haber agendado demo ni cerrado compra → SIEMPRE hacer una última oferta antes de despedirte: "Por cierto, ¿le gustaría ver el sistema en una demo rápida de 15 minutos esta semana? Es gratis y sin compromiso. Muchos clientes la piden antes de decidir."
+8. ⚠️ CRÍTICO — CLIC EN ANUNCIOS DE FACEBOOK / INSTAGRAM: Si el cliente inicia la conversación enviando un enlace de Facebook/Instagram o diciendo "Hola! Quiero más información" (producido al hacer clic en un anuncio): ABSOLUTAMENTE PROHIBIDO decir "no puedo acceder a enlaces externos", "no tengo acceso a links" ni nada similar. Reconoce con gran entusiasmo que viene de la pauta/anuncio en redes sociales, dale una cálida bienvenida a la empresa y pregúntale a qué se dedica su negocio y en qué le puedes asesorar hoy.
 
 === PROTOCOLO DE TRIGGERS — NUNCA VISIBLES PARA EL CLIENTE ===
 - Al cotizar formalmente, agrega AL FINAL del mensaje: QUOTE_TRIGGER: {"plan_name": "NOMBRE_PLAN", "dte_volume": NUMERO_ANUAL, "items": ["Módulo1"]}
@@ -643,6 +644,9 @@ ${technicalRules}`;
                 }
             } else if (msg.type === 'image' || msg.metadata?.type === 'image') {
                 content = '[El usuario envió una imagen]';
+            } else if (content.includes('facebook.com') || content.includes('fb.me') || content.includes('instagram.com') || msg.metadata?.referral || msg.metadata?.is_ad_click || msg.metadata?.is_social_link) {
+                const adHeadline = msg.metadata?.referral?.headline || msg.metadata?.ad_headline || '';
+                content = `[El cliente hizo clic en tu anuncio publicitario de Facebook / Instagram${adHeadline ? ` sobre "${adHeadline}"` : ''} e inició la conversación diciendo: "${content}"]`;
             }
 
             return { role, content };
