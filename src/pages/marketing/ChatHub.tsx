@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
-    MoreVertical, Send, FileText, Smartphone, Layers,
+    MoreVertical, Send, FileText, Smartphone, Layers, Megaphone,
     Paperclip, TrendingUp, Eye, Zap, Smile, Mail, Phone as PhoneIcon, Video as VideoIcon,
     Send as TelegramIcon, MessageSquare, Trash2, UserPlus, Search, X as CloseIcon, ChevronRight, ChevronLeft, Loader2, Mic
 } from 'lucide-react';
@@ -800,6 +800,12 @@ export default function ChatHub() {
                                             <span className={`w-1.5 h-1.5 rounded-full ${selectedConv.channel === 'whatsapp' ? 'bg-emerald-500' : 'bg-sky-500'}`} />
                                             {selectedConv.channel}
                                         </span>
+                                        {(((selectedConv.lead as any)?.source?.toLowerCase().includes('facebook') || (selectedConv.lead as any)?.source?.toLowerCase().includes('ads') || (selectedConv as any)?.metadata?.source === 'Facebook Ads')) && (
+                                            <span className="hidden sm:inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200">
+                                                <Megaphone className="w-3 h-3 text-blue-600" />
+                                                Meta Ads
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="hidden sm:flex text-[11px] text-slate-500 font-medium mt-0.5 items-center gap-1.5">
                                         <span className="w-2 h-2 bg-emerald-500 rounded-full inline-block animate-pulse" /> en línea
@@ -889,6 +895,12 @@ export default function ChatHub() {
                                                 : 'bg-white text-slate-800 border-slate-200/70 rounded-tl-none'
                                         }`}>
                                             <div className="text-[15px] font-normal leading-[1.5] pr-14 pb-1 relative">
+                                                {msg.direction === 'inbound' && (msg.metadata?.is_ad_click || msg.metadata?.referral || msg.metadata?.is_social_link || msg.content?.includes('facebook.com') || msg.content?.includes('whatsapp.com/channel') || msg.content?.includes('fb.me')) && (
+                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-2 rounded-lg bg-blue-50/90 text-blue-700 border border-blue-200/80 text-[11px] font-bold">
+                                                        <Megaphone className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                                        <span>📢 {msg.metadata?.referral?.headline || msg.metadata?.ad_headline || 'Clic desde Anuncio de Facebook'}</span>
+                                                    </div>
+                                                )}
                                                 {msg.content.startsWith('__QUOTE__') ? (
                                                     <div className="w-fit max-w-[80%] min-w-[200px] mb-1">
                                                         <div className="flex items-center gap-4 mb-3 pb-3 border-b border-white/10">
