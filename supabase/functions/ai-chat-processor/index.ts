@@ -206,7 +206,7 @@ Deno.serve(async (req) => {
                 : '';
 
             const systemPrompt = `=== INSTRUCCIONES MAESTRAS DEL AGENTE ===
-${testAgent?.system_prompt || 'Eres un asesor de ventas profesional de facturación electrónica.'}
+${testAgent?.system_prompt || 'Eres un asesor comercial y de atención al cliente profesional. Atiende con calidez, califica al cliente y entiende su necesidad antes de ofrecer precios o planes.'}
 ==========================================
 
 ${catalogCtx}
@@ -281,8 +281,16 @@ ${demoSection}
         if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
         // ===========================================
-        // 2. LOAD AI AGENT (Hierarchical lookup & Brian Tracy Sales Engine)
+        // 2. LOAD AI AGENT (Multi-tenant lookup & Dynamic Brian Tracy Sales Engine)
         // ===========================================
+        const { data: compDetails } = await supabase
+            .from('companies')
+            .select('id, name, parent_company_id')
+            .eq('id', companyId)
+            .maybeSingle();
+
+        const tenantCompanyName = compDetails?.name || 'nuestra empresa';
+
         let agent: any = null;
         const { data: directAgents } = await supabase.from('marketing_ai_agents')
             .select('*')
@@ -291,76 +299,45 @@ ${demoSection}
             .order('name', { ascending: true })
             .limit(1);
 
-        if (directAgents?.[0]?.system_prompt && directAgents[0].system_prompt.length > 50) {
+        if (directAgents?.[0]?.system_prompt && directAgents[0].system_prompt.trim().length > 20) {
             agent = directAgents[0];
         }
 
-        // Fallback A: Check parent company workspace
-        if (!agent) {
-            const { data: comp } = await supabase.from('companies').select('parent_company_id').eq('id', companyId).maybeSingle();
-            if (comp?.parent_company_id) {
-                const { data: parentAgents } = await supabase.from('marketing_ai_agents')
-                    .select('*')
-                    .eq('company_id', comp.parent_company_id)
-                    .eq('is_active', true)
-                    .order('name', { ascending: true })
-                    .limit(1);
-                if (parentAgents?.[0]?.system_prompt && parentAgents[0].system_prompt.length > 50) {
-                    agent = parentAgents[0];
-                    log(`Using parent company AI Agent: ${agent.name}`);
-                }
-            }
-        }
-
-        // Fallback B: Any active configured agent in DB with a custom prompt
-        if (!agent) {
-            const { data: anyAgents } = await supabase.from('marketing_ai_agents')
+        // Fallback A: Check parent company workspace if this is a sub-department
+        if (!agent && compDetails?.parent_company_id) {
+            const { data: parentAgents } = await supabase.from('marketing_ai_agents')
                 .select('*')
+                .eq('company_id', compDetails.parent_company_id)
                 .eq('is_active', true)
-                .not('system_prompt', 'is', null)
-                .order('created_at', { ascending: false })
+                .order('name', { ascending: true })
                 .limit(1);
-            if (anyAgents?.[0]?.system_prompt && anyAgents[0].system_prompt.length > 50) {
-                agent = anyAgents[0];
-                log(`Using global configured AI Agent: ${agent.name}`);
+            if (parentAgents?.[0]?.system_prompt && parentAgents[0].system_prompt.trim().length > 20) {
+                agent = parentAgents[0];
+                log(`Using parent company AI Agent: ${agent.name}`);
             }
         }
 
-        // Fallback C: Master Brian Tracy Consultative Sales Engine
+        // Fallback B: Dynamic SaaS Master Brian Tracy Consultative Sales Engine (100% tenant-aware, ZERO hardcoding)
         if (!agent) {
             agent = {
-                name: 'Sofía',
-                system_prompt: `Eres Sofía, la mejor consultora de ventas B2B y asesora experta en facturación electrónica DTE de Arias Defense. Tu metodología de ventas está basada en el método de Venta Consultiva de Brian Tracy: el que hace las mejores preguntas tiene el control de la conversación y cierra más negocios. Tu personalidad es profesional, cálida, segura y empática.
+                name: 'Asesor Virtual',
+                system_prompt: `🚨 REGLA ABSOLUTA DE CALIFICACIÓN (NUNCA DAR PRECIOS EN EL PRIMER MENSAJE):
+Antes de dar cualquier cotización, precio o plan, DEBES entender primero qué necesita el cliente y a qué se dedica su negocio.
+Si el cliente solo saluda, envía un enlace de red social o pide precio directamente, responde con calidez, preséntate como asesor de ${tenantCompanyName} y haz 1 o 2 preguntas clave para entender su requerimiento antes de ofrecer opciones.
 
-══ METODOLOGÍA DE VENTA BRIAN TRACY (OBLIGATORIA) ══
-1. PASO 1: RAPPORT Y CALIFICACIÓN (NUNCA des precios de inmediato sin calificar primero)
-- Cuando el cliente saluda o pide información o precios, agradécele y haz UNA o DOS preguntas de diagnóstico para entender su situación antes de soltar cotizaciones:
-  a) ¿Cuál es el nombre de su negocio o empresa y a qué se dedican?
-  b) ¿Cuántas facturas o documentos tributarios (DTE) emiten al mes aproximadamente?
-  c) ¿Ya recibieron notificación de Hacienda sobre la obligatoriedad o qué sistema utilizan actualmente?
-- Si el cliente insiste en conocer precios de entrada, dale un rango de referencia amable pero enfócate en saber su volumen para recomendarle exactamente el plan que le ahorrará dinero y multas.
+Eres el asesor comercial y de atención al cliente de ${tenantCompanyName}. Tu personalidad es cálida, profesional, segura y empática. Usas la metodología de Venta Consultiva de Brian Tracy.
 
-2. PASO 2: PRESENTACIÓN DE VALOR Y AGENDAR DEMO (Demostración de 15 minutos)
-- Ofrece la demostración en vivo antes o junto con la cotización:
-  "Para que vea exactamente cómo funciona con su tipo de negocio y resolvamos todas sus dudas de Hacienda, podemos hacer una breve demo en vivo de 15 minutos sin compromiso. ¿Le vendría bien hoy por la tarde o mañana en la mañana?"
-
-3. PASO 3: COTIZACIÓN CONSULTIVA
-- Una vez que conozcas su volumen mensual/anual, cotiza el plan ideal del catálogo inyectado.
-- Presenta SIEMPRE el beneficio del pago de contado (ahorro del 20%) y la opción en cuotas mensuales para que sea accesible.
-
-4. PASO 4: MANEJO DE OBJECIONES Y CIERRE
-- "Está caro" → "Comprendo perfectamente. Precisamente por eso nuestro plan incluye todo el soporte, firma electrónica y almacenamiento seguro para evitar cualquier multa de Hacienda. Además, tenemos la opción en cuotas mensuales desde $X. ¿Revisamos la demo para que vea si se adapta a su flujo?"
-- "Déjeme pensarlo" → "Claro que sí, es una decisión importante para su empresa. ¿Hay algún punto específico sobre la integración o los DTEs que le gustaría que aclaremos en una llamada de 5 minutos?"
-
-══ REGLAS DE CONVERSACIÓN ══
-- Escribe mensajes cortos y directos (máximo 4 a 6 líneas por mensaje).
-- NUNCA menciones PDF, propuesta formal ni documentos adjuntos. Cotiza por texto.
-- Termina SIEMPRE tu mensaje con una pregunta abierta o de doble alternativa para avanzar la conversación.`,
+METODOLOGÍA DE CONVERSACIÓN:
+1. Saludo y Diagnóstico: Agradece el mensaje y pregunta en qué puedes apoyarle hoy o qué solución está buscando para su negocio.
+2. Escucha Activa: Responde a lo que el cliente realmente pregunta. No asumas productos por defecto.
+3. Propuesta de Valor y Demostración: Cuando el cliente explique su necesidad, explícale cómo ${tenantCompanyName} puede resolverla y ofrece una breve llamada o demo de 15 minutos.
+4. Cotización Oportuna: Solo cuando conozcas su necesidad/volumen, recomienda la opción más conveniente del catálogo.
+5. Mensajes Claros: Escribe respuestas concisas (máximo 4 a 5 líneas por mensaje) y termina siempre con una pregunta abierta para avanzar el diálogo.`,
                 representative_id: null,
                 demo_url: null
             };
         }
-        log(`Agent: ${agent.name} configured with Brian Tracy Consultative Sales framework`);
+        log(`Agent: ${agent.name} configured for ${tenantCompanyName} with Brian Tracy Consultative framework`);
 
         // ===========================================
         // 2B. LOAD LEAD BRAIN — Persistent Memory

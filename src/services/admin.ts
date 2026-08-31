@@ -9,6 +9,7 @@ export const adminService = {
                 *,
                 user_count:profiles(count)
             `)
+            .is('parent_company_id', null)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
