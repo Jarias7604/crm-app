@@ -221,15 +221,27 @@ ${demoSection}
 === REGLAS DE ORO — NUNCA VIOLAR ===
 - SOLO texto. NUNCA mencionar PDF, propuesta formal, enlace, ni archivo.
 - NUNCA pedir correo electrónico para enviar documentos.
+- NUNCA digas "no puedo acceder a enlaces" ni excusas técnicas. Saluda y pregunta qué requiere el negocio.
 - Cotiza SIEMPRE en el mismo mensaje de texto, con precios reales del catálogo.
 - Si el cliente dice un volumen aproximado, tómalo tal cual y recomienda el plan correcto.
 - Al final del mensaje (invisible para el cliente), incluye: QUOTE_TRIGGER: {"plan_name": "NOMBRE", "dte_volume": NUMERO, "items": []}`;
 
             // Build messages with history
-            const historyMessages = (testHistory || []).map((m: any) => ({
-                role: m.role === 'user' ? 'user' : 'assistant',
-                content: m.content
-            }));
+            const historyMessages = (testHistory || []).map((m: any) => {
+                let content = m.content || '';
+                if (content.startsWith('http') || content.includes('whatsapp.com') || content.includes('facebook.com') || content.includes('fb.me')) {
+                    content = '[El cliente compartió una publicación o anuncio publicitario para consultar información]';
+                }
+                return {
+                    role: m.role === 'user' ? 'user' : 'assistant',
+                    content
+                };
+            });
+
+            let cleanTestMessage = testMessage || 'Hola';
+            if (cleanTestMessage.startsWith('http') || cleanTestMessage.includes('whatsapp.com') || cleanTestMessage.includes('facebook.com') || cleanTestMessage.includes('fb.me')) {
+                cleanTestMessage = '[El cliente compartió una publicación o anuncio publicitario de redes sociales para pedir información]';
+            }
 
             const aiResp = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
@@ -239,7 +251,7 @@ ${demoSection}
                     messages: [
                         { role: 'system', content: systemPrompt },
                         ...historyMessages,
-                        { role: 'user', content: testMessage || 'Hola' }
+                        { role: 'user', content: cleanTestMessage }
                     ],
                     temperature: 0.2
                 })
@@ -250,6 +262,7 @@ ${demoSection}
                 .replace(/QUOTE_TRIGGER:[\s\S]*/gi, '').trim()
                 .replace(/UPDATE_LEAD:[\s\S]*?(\n|$)/gi, '').trim()
                 .replace(/(?:generar[eé]|enviar[eé]|adjunt[oa]|te mando)[^.]*?(?:pdf|propuesta formal|documento|archivo)[^.]*/gi, '')
+                .replace(/(?:lo siento|disculp[ae])[^.]*?(?:no puedo acceder|enlaces externos|abrir enlaces)[^.]*\.?/gi, '')
                 .trim();
             return new Response(JSON.stringify({ reply, logs }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
@@ -822,6 +835,8 @@ ${technicalRules}`;
             // Remove triggers
             .replace(/QUOTE_TRIGGER:[\s\S]*/gi, '')
             .replace(/UPDATE_LEAD:[\s\S]*/gi, '')
+            // Strip any accidental external link refusal
+            .replace(/(?:lo siento|disculp[ae])[^.]*?(?:no puedo acceder|enlaces externos|abrir enlaces)[^.]*\.?/gi, '')
             // Clean up extra blank lines
             .replace(/\n{3,}/g, '\n\n')
             .trim();
