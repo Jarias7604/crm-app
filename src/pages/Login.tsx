@@ -56,42 +56,54 @@ export default function Login() {
         setLoading(true);
         setError(null);
 
-        const { error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email.trim(),
+                password,
+            });
 
-        if (error) {
-            setError(translateAuthError(error.message));
+            if (error) {
+                setError(translateAuthError(error.message));
+                setLoading(false);
+            } else if (data?.session) {
+                window.location.href = '/dashboard';
+            } else {
+                navigate('/dashboard');
+            }
+        } catch (err: any) {
+            setError(translateAuthError(err?.message || ''));
             setLoading(false);
-        } else {
-            navigate('/dashboard');
         }
     };
 
     const handleSendOtp = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!email) {
+        if (!email.trim()) {
             setError("Ingresa tu correo electrónico primero.");
             return;
         }
         setLoading(true);
         setError(null);
 
-        const { error } = await supabase.auth.signInWithOtp({
-            email,
-            options: {
-                shouldCreateUser: false,
-            },
-        });
+        try {
+            const { error } = await supabase.auth.signInWithOtp({
+                email: email.trim(),
+                options: {
+                    shouldCreateUser: false,
+                },
+            });
 
-        if (error) {
-            setError(translateAuthError(error.message));
-        } else {
-            setOtpSent(true);
-            toast.success("✅ Código enviado. Revisa tu bandeja de entrada.");
+            if (error) {
+                setError(translateAuthError(error.message));
+            } else {
+                setOtpSent(true);
+                toast.success("✅ Código enviado. Revisa tu bandeja de entrada.");
+            }
+        } catch (err: any) {
+            setError(translateAuthError(err?.message || ''));
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const handleVerifyOtp = async (e: React.FormEvent) => {
@@ -99,17 +111,24 @@ export default function Login() {
         setLoading(true);
         setError(null);
 
-        const { error } = await supabase.auth.verifyOtp({
-            email,
-            token: otp,
-            type: 'email'
-        });
+        try {
+            const { data, error } = await supabase.auth.verifyOtp({
+                email: email.trim(),
+                token: otp.trim(),
+                type: 'email'
+            });
 
-        if (error) {
-            setError(translateAuthError(error.message));
+            if (error) {
+                setError(translateAuthError(error.message));
+                setLoading(false);
+            } else if (data?.session) {
+                window.location.href = '/dashboard';
+            } else {
+                navigate('/dashboard');
+            }
+        } catch (err: any) {
+            setError(translateAuthError(err?.message || ''));
             setLoading(false);
-        } else {
-            navigate('/dashboard');
         }
     };
 
