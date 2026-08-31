@@ -1207,7 +1207,16 @@ export default function ChatHub() {
                     <div className="space-y-4">
                         <div className="space-y-3">
                             <InfoItem icon={Mail} label="EMAIL" value={selectedConv.lead?.email || 'No identificado'} />
-                            <InfoItem icon={PhoneIcon} label="TELÉFONO" value={selectedConv.lead?.phone || 'Sin número'} />
+                            <InfoItem 
+                                icon={PhoneIcon} 
+                                label="TELÉFONO" 
+                                value={
+                                    selectedConv.lead?.phone 
+                                    || (selectedConv.channel === 'whatsapp' && selectedConv.external_id && !selectedConv.external_id.startsWith('notif_')
+                                        ? (selectedConv.external_id.startsWith('+') ? selectedConv.external_id : `+${selectedConv.external_id.replace(/\D/g, '')}`)
+                                        : 'Sin número')
+                                } 
+                            />
                         </div>
                         <button onClick={() => navigate('/leads', { state: { leadId: selectedConv.lead?.id } })} className="w-full py-3 rounded-xl border-2 border-slate-100 font-black text-[9px] uppercase tracking-widest text-slate-500 hover:border-slate-300 hover:text-slate-900 transition-all">Ver Perfil</button>
                     </div>

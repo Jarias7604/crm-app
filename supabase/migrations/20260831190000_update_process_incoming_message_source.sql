@@ -38,6 +38,14 @@ BEGIN
         LIMIT 1;
     END IF;
 
+    -- ── Resolve phone ────────────────────────────────────────────
+    v_phone := COALESCE(
+        NULLIF(p_metadata->>'phone', ''),
+        CASE WHEN p_channel = 'whatsapp' AND p_external_id IS NOT NULL THEN
+            CASE WHEN p_external_id LIKE '+%' THEN p_external_id ELSE '+' || regexp_replace(p_external_id, '\D', '', 'g') END
+        ELSE NULL END
+    );
+
     -- 1. Look for existing conversation
     SELECT id, lead_id INTO v_conversation_id, v_lead_id
     FROM marketing_conversations
@@ -48,11 +56,14 @@ BEGIN
     -- 2. If no lead associated, find or create one
     IF v_lead_id IS NULL THEN
         -- Try to find existing lead by phone
-        IF p_metadata->>'phone' IS NOT NULL THEN
+        IF v_phone IS NOT NULL THEN
             SELECT id INTO v_lead_id
             FROM leads
             WHERE company_id = p_company_id
-              AND phone = p_metadata->>'phone'
+              AND (
+                  phone = v_phone 
+                  OR regexp_replace(COALESCE(phone, ''), '\D', '', 'g') = regexp_replace(v_phone, '\D', '', 'g')
+              )
             LIMIT 1;
         END IF;
 
@@ -73,14 +84,15 @@ BEGIN
                 'Prospecto',
                 'medium',
                 v_source,                               -- ← 'facebook_ads' | 'whatsapp'
-                p_metadata->>'phone',
+                v_phone,                                -- ← Guaranteed phone number
                 v_product_id                            -- ← ERP/CRM/SIPLE uuid or NULL
             )
             RETURNING id INTO v_lead_id;
         ELSE
-            -- Lead exists — update source if it's unset or generic 'whatsapp' and we know better
+            -- Lead exists — update phone if missing, and update source/product
             UPDATE leads
             SET
+                phone = COALESCE(phone, v_phone),
                 source = CASE
                     WHEN (source IS NULL OR source = 'whatsapp' OR source = '')
                          AND v_source <> 'whatsapp'

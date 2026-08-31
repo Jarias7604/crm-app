@@ -215,7 +215,14 @@ serve(async (req) => {
                             const chatId     = msg.from;
 
                             let content  = '';
-                            const metadata: any = { whatsapp_id: msg.id, phone_number_id: phoneNumberId, raw_data: msg };
+                            const formattedPhone = chatId ? (chatId.startsWith('+') ? chatId : `+${chatId.replace(/\D/g, '')}`) : null;
+                            const metadata: any = { 
+                                whatsapp_id: msg.id, 
+                                phone_number_id: phoneNumberId, 
+                                raw_data: msg,
+                                phone: formattedPhone,
+                                chat_id: chatId
+                            };
 
                             // Capture Meta Click-to-WhatsApp Ads referral data
                             if (msg.referral) {
