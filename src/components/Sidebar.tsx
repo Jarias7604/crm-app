@@ -357,14 +357,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         return () => window.removeEventListener('company-branding-updated', handleBrandingUpdate);
     }, [simulatedCompanyId, profile?.company_id]);
 
-    // ⚡ Background prefetch: start loading ChatHub conversations immediately after login.
-    // By the time the user navigates to /marketing/chat the data is already cached → instant load.
-    useEffect(() => {
-        if (profile?.company_id && canAccess('chat')) {
-            prefetchConversations(profile.company_id);
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [profile?.company_id]);
+    // NOTE: ChatHub conversations are prefetched on hover of the "Mensajes" link only
+    // (see onHover below). The old always-on prefetch here fired the heavy
+    // marketing_conversations query on EVERY page load, saturating the connection pool
+    // and delaying data on Leads/Dashboard/etc. by several seconds. Removed on purpose.
 
     const loadCompany = async () => {
         try {

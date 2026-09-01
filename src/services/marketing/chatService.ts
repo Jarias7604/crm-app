@@ -105,10 +105,13 @@ export const chatService = {
     },
 
     async getConversations(companyId?: string | string[]) {
+        // Explicit column list — never SELECT *. The `metadata` blob and (for email
+        // threads) multi-MB `last_message` HTML bodies made `*` pull 50+ MB per call.
         let query = supabase
             .from('marketing_conversations')
             .select(`
-                *,
+                id, company_id, lead_id, channel, status, external_id,
+                unread_count, last_message, last_message_at,
                 lead:leads(id, name, email, company_name, phone, company_id)
             `);
 
@@ -132,7 +135,7 @@ export const chatService = {
             .limit(100);
 
         if (error) throw error;
-        return data as ChatConversation[];
+        return data as unknown as ChatConversation[];
     },
 
     async getMessages(conversationId: string) {
