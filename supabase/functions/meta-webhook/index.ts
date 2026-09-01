@@ -154,6 +154,41 @@ serve(async (req) => {
 
                 for (const entry of body.entry) {
                     for (const change of (entry.changes || [])) {
+
+                        // B0. DELIVERY STATUS UPDATES ─────────────────────────────
+                        // Meta sends { statuses: [{ id, status: sent|delivered|read|failed, errors }] }
+                        // Without this the CRM marks everything "delivered" optimistically and
+                        // never learns a message actually failed (24h window, blocked, etc.).
+                        if (Array.isArray(change.value?.statuses)) {
+                            for (const st of change.value.statuses) {
+                                if (!st?.id) continue;
+                                // Don't downgrade a message that's already further along
+                                const rank: Record<string, number> = { sent: 1, delivered: 2, read: 3, failed: 4 };
+                                const { data: existing } = await supabase
+                                    .from('marketing_messages')
+                                    .select('id, status, metadata')
+                                    .eq('external_message_id', st.id)
+                                    .maybeSingle();
+                                if (!existing) continue;
+                                if (st.status !== 'failed' && (rank[st.status] ?? 0) <= (rank[existing.status] ?? 0)) continue;
+
+                                const patch: any = { status: st.status };
+                                if (st.status === 'failed') {
+                                    const err = st.errors?.[0] || {};
+                                    patch.metadata = {
+                                        ...(existing.metadata || {}),
+                                        meta_error: err,
+                                        actionable_error: err.code === 131047
+                                            ? 'VENTANA 24H EXPIRADA: el cliente no ha escrito en más de 24 horas. Usa una plantilla aprobada.'
+                                            : (err.title || err.message || 'Meta no pudo entregar el mensaje'),
+                                        is_24h_expired: err.code === 131047,
+                                    };
+                                }
+                                await supabase.from('marketing_messages').update(patch).eq('id', existing.id);
+                            }
+                            continue;
+                        }
+
                         if (!change.value?.messages) continue;
 
                         const metadataObj   = change.value?.metadata || {};
