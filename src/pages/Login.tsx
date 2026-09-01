@@ -30,13 +30,29 @@ const translateAuthError = (rawMessage: string): string => {
         return 'El registro de nuevas cuentas no está habilitado en este momento.';
     if (msg.includes('token') || msg.includes('otp') || msg.includes('expired'))
         return 'El código ingresado no es válido o ha expirado. Solicita uno nuevo.';
-    if (msg.includes('network') || msg.includes('fetch'))
-        return 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+    if (msg.includes('network') || msg.includes('fetch') || msg.includes('timeout') || msg.includes('timed out') || msg.includes('aborted'))
+        return 'La conexión tardó demasiado. El servidor puede estar ocupado — espera unos segundos y vuelve a intentar.';
     if (msg.includes('invalid api key'))
         return 'Error de configuración: la API Key de Supabase es inválida. Revisa tu archivo .env.local.';
+    if (msg.includes('database') || msg.includes('internal') || msg.includes('unexpected_failure') || msg.includes('503') || msg.includes('502') || msg.includes('500') || msg.includes('unavailable'))
+        return 'El servidor está sobrecargado en este momento. Espera unos segundos e intenta de nuevo.';
     // Fallback: don't expose raw English error
     return 'Ocurrió un error inesperado. Por favor intenta de nuevo.';
 };
+
+// Retry wrapper: auth can spike to several seconds when the DB is under load.
+// One automatic retry with backoff turns most transient failures into a success.
+async function withRetry<T>(fn: () => Promise<T>, retries = 1, delayMs = 1500): Promise<T> {
+    try {
+        return await fn();
+    } catch (err) {
+        if (retries > 0) {
+            await new Promise(r => setTimeout(r, delayMs));
+            return withRetry(fn, retries - 1, delayMs * 2);
+        }
+        throw err;
+    }
+}
 
 export default function Login() {
     const { t } = useTranslation();
@@ -57,10 +73,10 @@ export default function Login() {
         setError(null);
 
         try {
-            const { data, error } = await supabase.auth.signInWithPassword({
+            const { data, error } = await withRetry(() => supabase.auth.signInWithPassword({
                 email: email.trim(),
                 password,
-            });
+            }));
 
             if (error) {
                 setError(translateAuthError(error.message));
