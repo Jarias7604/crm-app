@@ -16,5 +16,22 @@ if (!supabaseAnonKey) {
 const safeUrl = (supabaseUrl && supabaseUrl.startsWith('http')) ? supabaseUrl : 'https://placeholder.supabase.co';
 const safeKey = supabaseAnonKey || 'placeholder-key';
 
+// One-time cleanup: a previous build briefly pointed the client at the wrong Supabase
+// project (ikofyypxphrqkncimszt). Any auth token/lock it left in localStorage belongs to
+// a project this app no longer talks to and can only cause "Lock not released" hangs.
+// Remove it so affected users get a clean login against the correct project.
+if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+        const stale: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.includes('ikofyypxphrqkncimszt')) stale.push(k);
+        }
+        stale.forEach(k => localStorage.removeItem(k));
+    } catch {
+        /* ignore */
+    }
+}
+
 export const supabase = createClient(safeUrl, safeKey);
 
