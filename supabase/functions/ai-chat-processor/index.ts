@@ -484,6 +484,24 @@ ${technicalRules}`;
             return new Response(JSON.stringify({ skipped: true }), { headers: corsHeaders });
         }
 
+        // EARLY EXIT — conversation was already paused/flagged as junk. Do this
+        // BEFORE Whisper so we never pay to transcribe spam voice notes.
+        // Recovery: if the new message clearly mentions a real business topic,
+        // lift the pause and let the AI answer.
+        if (conv?.metadata?.ai_paused) {
+            const RECOVER_RE = /factura|dte|erp|crm|siple|sistema|precio|cotiz|plan|demo|comprar|contrat|licencia|contab|inventario|hacienda/i;
+            if (RECOVER_RE.test(lastMsg?.content || '')) {
+                log('AI was paused but new message has business intent — lifting pause');
+                const m = { ...(conv.metadata || {}) };
+                delete m.ai_paused; delete m.ai_pause_reason;
+                await supabase.from('marketing_conversations').update({ metadata: m }).eq('id', conversationId);
+                conv.metadata = m;
+            } else {
+                log(`AI paused (${conv.metadata.ai_pause_reason}) — early exit before transcription`);
+                return new Response(JSON.stringify({ gated: 'ai_paused_early' }), { headers: corsHeaders });
+            }
+        }
+
         // ===========================================
         // 7. TRANSCRIBE VOICE (Whisper)
         // ===========================================
@@ -634,7 +652,90 @@ ${technicalRules}`;
         }
 
         // ===========================================
-        // 8. BUILD MESSAGE HISTORY FOR GPT-4o
+        // 7B. JUNK GATE + AI BUDGET  (cost control)
+        // ===========================================
+        const BUSINESS_RE = /factura|dte|erp|crm|siple|sistema|software|precio|costo|cotiz|plan\b|demo|negocio|empresa|contab|inventario|ventas|hacienda|informaci[oó]n|ayuda|servicio|comprar|adquirir|implementar|asesor|contrat|licencia|m[oó]dulo/i;
+        const SPAM_RE = /tiktok|vm\.tiktok|abre tiktok|tiktoklite|#\w{3,}|castell[oó]n team|chapina|sapito|jutiapa|amorcito|cari[ñn]ito|piernita|salvadore[ñn]|te voy a estimar/i;
+
+        const inboundHist  = (history || []).filter((m: any) => m.direction === 'inbound');
+        const aiOutHist    = (history || []).filter((m: any) => m.direction === 'outbound' && m.metadata?.isAiGenerated);
+        const humanOutHist = (history || []).filter((m: any) => m.direction === 'outbound' && !m.metadata?.isAiGenerated);
+        const allInboundText = inboundHist.map((m: any) => m.metadata?.transcription || m.content || '').join(' ') + ' ' + (userMessage || '');
+        const hasBusinessIntent = BUSINESS_RE.test(allInboundText);
+        const curText = (userMessage || '').trim();
+        const curIsLinkOrSpam = /^https?:\/\/\S+\s*$/i.test(curText) || (curText.length < 200 && SPAM_RE.test(curText) && !BUSINESS_RE.test(curText));
+        const convMeta = conv?.metadata || {};
+
+        // helper: send a short canned reply through the same channel, no GPT
+        const sendCanned = async (text: string, reason: string) => {
+            const { data: cm } = await supabase.from('marketing_messages').insert({
+                conversation_id: conversationId, content: text, direction: 'outbound', type: 'text', status: 'pending',
+                metadata: { isAiGenerated: true, processed_by: 'junk-gate', canned: true, reason, leadId: lead?.id || null },
+            }).select().maybeSingle();
+            if (!cm) return;
+            if ((conv?.channel || 'whatsapp') === 'whatsapp') {
+                await supabase.functions.invoke('send-whatsapp-message', { body: { record: cm } }).catch(() => {});
+            } else {
+                const { data: tg } = await supabase.from('marketing_integrations').select('settings')
+                    .eq('company_id', companyId).eq('provider', 'telegram').eq('is_active', true).maybeSingle();
+                if (tg?.settings?.token && chatId) {
+                    await fetch(`https://api.telegram.org/bot${tg.settings.token}/sendMessage`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chat_id: chatId, text }),
+                    }).catch(() => {});
+                }
+            }
+        };
+
+        // (A) already paused → never reply
+        if (convMeta.ai_paused) {
+            log(`AI paused for this conversation (${convMeta.ai_pause_reason}) → skip`);
+            return new Response(JSON.stringify({ gated: 'ai_paused' }), { headers: corsHeaders });
+        }
+
+        // (B) 3+ inbound msgs, zero business intent → junk. Classify, pause, don't reply.
+        if (!hasBusinessIntent && inboundHist.length >= 3) {
+            log('Junk gate: 3+ inbound, no business intent → Erróneo + pause AI');
+            try {
+                if (lead?.id) {
+                    await supabase.from('leads').update({ status: 'Erróneo' }).eq('id', lead.id);
+                    await supabase.from('lead_ai_memory').upsert(
+                        { lead_id: lead.id, company_id: companyId, followup_paused: true, next_action: 'descartar' },
+                        { onConflict: 'lead_id' }
+                    );
+                }
+                await supabase.from('marketing_conversations').update({ metadata: { ...convMeta, ai_paused: true, ai_pause_reason: 'junk' } }).eq('id', conversationId);
+            } catch (e: any) { log(`junk-classify write error (non-fatal): ${e.message}`); }
+            return new Response(JSON.stringify({ gated: 'junk_classified' }), { headers: corsHeaders });
+        }
+
+        // (C) first touch is just a shared link / social spam → one greeting, no GPT
+        if (curIsLinkOrSpam && !hasBusinessIntent) {
+            if (aiOutHist.length === 0) {
+                await sendCanned(`¡Hola! 👋 Gracias por escribirnos a ${tenantCompanyName}. ¿En qué podemos ayudarte hoy — facturación electrónica, ERP o CRM?`, 'first_touch_link');
+                return new Response(JSON.stringify({ gated: 'first_touch_link' }), { headers: corsHeaders });
+            }
+            log('Junk gate: repeated link/spam after greeting → skip');
+            return new Response(JSON.stringify({ gated: 'repeat_link' }), { headers: corsHeaders });
+        }
+
+        // (D) AI reply budget — max 6 AI replies with no human, unless the lead is genuinely hot
+        const HOT_STAGES = ['cotizado', 'negociacion', 'demo_agendada'];
+        const _sent = leadMemory?.sentiment_score ?? 50;
+        const isHot = (_sent >= 50 && HOT_STAGES.includes(leadMemory?.conversation_stage)) || _sent >= 75;
+        if (aiOutHist.length >= 6 && humanOutHist.length === 0 && !isHot) {
+            log('AI budget reached (6 replies, no human, not hot) → handoff + pause');
+            await sendCanned(`Gracias por tu interés. En breve un asesor de ${tenantCompanyName} continuará contigo. 🙌`, 'budget');
+            await supabase.from('marketing_conversations').update({ metadata: { ...convMeta, ai_paused: true, ai_pause_reason: 'budget' } }).eq('id', conversationId);
+            return new Response(JSON.stringify({ gated: 'budget' }), { headers: corsHeaders });
+        }
+
+        // (E) model selection — cheap model to qualify, gpt-4o only when the lead is engaged
+        const replyModel = isHot ? 'gpt-4o' : 'gpt-4o-mini';
+        log(`Reply model: ${replyModel} (hot=${isHot}, stage=${leadMemory?.conversation_stage || 'nuevo'})`);
+
+        // ===========================================
+        // 8. BUILD MESSAGE HISTORY FOR GPT
         // ===========================================
         const previousMessages = (history || []).reverse().map((msg: any) => {
             let role = msg.direction === 'inbound' ? 'user' : 'assistant';
@@ -676,7 +777,7 @@ ${technicalRules}`;
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: 'gpt-4o', messages: openAiMessages, temperature: 0.15 }),
+            body: JSON.stringify({ model: replyModel, messages: openAiMessages, temperature: 0.15 }),
         });
         const aiData = await response.json();
         let aiContent = aiData.choices?.[0]?.message?.content || "";

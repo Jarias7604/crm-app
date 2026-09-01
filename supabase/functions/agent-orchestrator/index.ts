@@ -40,7 +40,7 @@ function oracleScore(lead: any, daysSinceContact: number): number {
 
     // Status urgency
     const urgentStatuses = ['Negociación', 'Lead calificado', 'En seguimiento'];
-    const lowStatuses = ['Cerrado', 'Cliente', 'Perdido'];
+    const lowStatuses = ['Cerrado', 'Cliente', 'Perdido', 'Erróneo'];
     if (urgentStatuses.some(s => lead.status?.includes(s))) score += 15;
     if (lowStatuses.some(s => lead.status?.includes(s))) return 0; // skip
 
@@ -175,7 +175,7 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
         .from('leads')
         .select(LEAD_FIELDS)
         .eq('company_id', companyId)
-        .not('status', 'in', '("Cerrado","Cliente","Perdido")')
+        .not('status', 'in', '("Cerrado","Cliente","Perdido","Erróneo")')
         .order('created_at', { ascending: false })
         .limit(200);
 
