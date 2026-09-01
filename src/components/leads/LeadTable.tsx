@@ -192,6 +192,19 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                                     </div>
                                                                                 )}
 
+                                                                                {colId === 'industry' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'industry' as keyof Lead,
+                                                                                            direction: sortConfig?.key === 'industry' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Rubro / Industria
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'industry' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
+
                                                                                 {colId === 'created_at' && (
                                                                                     <div
                                                                                         className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
@@ -419,6 +432,17 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                         </div>
                                                                     );
                                                                 })()}
+
+                                                                {colId === 'industry' && (
+                                                                    lead.industry ? (
+                                                                        <span className="inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-lg border w-fit bg-slate-50 text-slate-700 border-slate-200 max-w-[160px]" title={lead.industry}>
+                                                                            <span>🏢</span>
+                                                                            <span className="uppercase tracking-wider truncate">{lead.industry}</span>
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-[10px] text-slate-300 font-bold tracking-wider uppercase">—</span>
+                                                                    )
+                                                                )}
 
                                                                 {colId === 'value' && (
                                                                     <div>

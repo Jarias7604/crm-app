@@ -149,6 +149,7 @@ export default function Leads() {
         { id: 'status',            label: 'Estado',              icon: '🏷️' },
         { id: 'priority',          label: 'Prioridad',           icon: '⭐' },
         { id: 'source',            label: 'Fuente',              icon: '📡' },
+        { id: 'industry',          label: 'Rubro / Industria',   icon: '🏢' },
         { id: 'value',             label: 'Valor',               icon: '💰' },
         { id: 'assigned_to',       label: 'Asignado',            icon: '👥' },
         { id: 'last_follow_up_at', label: 'Último Seguimiento',  icon: '🕐' },
@@ -160,7 +161,7 @@ export default function Leads() {
     // Column order persistence
     const [columnOrder, setColumnOrder] = useState<string[]>(() => {
         const saved = localStorage.getItem('lead_column_order');
-        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at', 'interested_product_id'];
+        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'industry', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at', 'interested_product_id'];
         if (saved) {
             const parsed = JSON.parse(saved);
             const newCols = defaultCols.filter(c => !parsed.includes(c));
@@ -171,11 +172,17 @@ export default function Leads() {
 
     // Column visibility — persists per device
     const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'industry', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at', 'interested_product_id'];
         try {
             const saved = localStorage.getItem('lead_visible_columns');
-            if (saved) return JSON.parse(saved);
+            if (saved) {
+                const parsed: string[] = JSON.parse(saved);
+                // Auto-surface newly added default columns for returning users
+                const missing = defaultCols.filter(c => !parsed.includes(c));
+                return missing.length > 0 ? [...parsed, ...missing] : parsed;
+            }
         } catch {}
-        return ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at', 'interested_product_id'];
+        return defaultCols;
     });
     const [showColumnModal, setShowColumnModal] = useState(false);
     const columnModalRef = useRef<HTMLDivElement>(null);
@@ -201,7 +208,7 @@ export default function Leads() {
     // Column width persistence
     const DEFAULT_COL_WIDTHS: Record<string, number> = {
         name: 200, email: 180, phone: 140, status: 140,
-        priority: 120, source: 130, value: 110, assigned_to: 140,
+        priority: 120, source: 130, industry: 150, value: 110, assigned_to: 140,
         last_follow_up_at: 145, internal_won_date: 130, created_at: 120,
         interested_product_id: 140,
     };
@@ -270,6 +277,7 @@ export default function Leads() {
     const [lostAtStageFilter, setLostAtStageFilter] = useState<string | 'all' | string[]>('all');
     const [productFilter, setProductFilter] = useState<string | 'all'>('all');
     const [products, setProducts] = useState<LeadProduct[]>([]);
+    const [industryFilter, setIndustryFilter] = useState<string | 'all'>('all');
     const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
     const [isAssignedFilterOpen, setIsAssignedFilterOpen] = useState(false);
     const assignedFilterRef = useRef<HTMLDivElement>(null);
@@ -641,12 +649,17 @@ export default function Leads() {
                 if (lead.interested_product_id !== productFilter) return false;
             }
 
+            // Filter by rubro / industria (stored as the industry name)
+            if (industryFilter !== 'all') {
+                if ((lead.industry || '') !== industryFilter) return false;
+            }
+
             return true;
         });
 
         // Apply pipeline intelligence filter on top of standard filters
         return applyPipelineFilter(base, pipelineFilter, profile?.company_id);
-    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, pipelineFilter, pipelineView]);
+    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, industryFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, pipelineFilter, pipelineView]);
 
     // Leads that have passed ALL filters EXCEPT the pipeline chip filter.
     // Used so chip counters respect the active date/status/priority filters.
@@ -1403,6 +1416,9 @@ export default function Leads() {
                 productFilter={productFilter}
                 setProductFilter={setProductFilter}
                 products={products}
+                industryFilter={industryFilter}
+                setIndustryFilter={setIndustryFilter}
+                industries={industries}
                 workspaceProps={{ workspaces, canRollup, selectedWorkspace, setSelectedWorkspace }}
             />
             {/* ── Pipeline Segment Toggle Banner ─────────────────────────────────── */}

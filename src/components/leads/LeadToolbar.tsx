@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { CustomDatePicker } from '../ui/CustomDatePicker';
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '../../types';
 import { useLeadSources } from '../../hooks/useLeadSources';
-import type { Lead, LeadStatus, LeadPriority, LossReason, LeadProduct } from '../../types';
+import type { Lead, LeadStatus, LeadPriority, LossReason, LeadProduct, Industry } from '../../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -51,7 +51,10 @@ interface LeadToolbarProps {
     productFilter: string | 'all';
     setProductFilter: (v: string | 'all') => void;
     products: LeadProduct[];
-    
+    industryFilter: string | 'all';
+    setIndustryFilter: (v: string | 'all') => void;
+    industries: Industry[];
+
     // 🏢 Hierarchical Workspaces (HubSpot / Salesforce style)
     workspaceProps?: {
         workspaces: Array<{ id: string; name: string; isParent: boolean }>;
@@ -81,6 +84,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     filteredLeadId, setFilteredLeadId, filteredLeadIds, setFilteredLeadIds,
     completedLeadIds, setCompletedLeadIds, calendarDateLabel, setCalendarDateLabel,
     productFilter, setProductFilter, products,
+    industryFilter, setIndustryFilter, industries,
     handleDownloadTemplate, handleImportCSV, isImporting, setIsModalOpen,
     navigate, cameFromRef, setMinContactCountFilter, csvHelper, workspaceProps
 }) => {
@@ -94,6 +98,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
     const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
     const [isProductFilterOpen, setIsProductFilterOpen] = useState(false);
+    const [isIndustryFilterOpen, setIsIndustryFilterOpen] = useState(false);
 
     // Dynamic lead sources from DB
     const { options: dynamicSources, getBySlug } = useLeadSources();
@@ -105,6 +110,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     const lostAtStageFilterRef = useRef<HTMLDivElement>(null);
     const dateRangeRef = useRef<HTMLDivElement>(null);
     const productFilterRef = useRef<HTMLDivElement>(null);
+    const industryFilterRef = useRef<HTMLDivElement>(null);
     const exportMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -116,6 +122,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
             if (statusFilterRef.current && !statusFilterRef.current.contains(event.target as Node)) setIsStatusFilterOpen(false);
             if (dateRangeRef.current && !dateRangeRef.current.contains(event.target as Node)) setIsDateRangeOpen(false);
             if (productFilterRef.current && !productFilterRef.current.contains(event.target as Node)) setIsProductFilterOpen(false);
+            if (industryFilterRef.current && !industryFilterRef.current.contains(event.target as Node)) setIsIndustryFilterOpen(false);
             if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) setIsExportMenuOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -324,6 +331,42 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                             className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors ${productFilter === prod.id ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}
                         >
                             {prod.name}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
+    const IndustryDropdown = () => (
+        <div className="relative" ref={industryFilterRef}>
+            <button
+                onClick={() => setIsIndustryFilterOpen(!isIndustryFilterOpen)}
+                className={`flex items-center gap-2 bg-white border px-3 py-2 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all shadow-sm h-9 min-w-[140px] justify-between ${industryFilter !== 'all' ? 'border-indigo-300 text-indigo-600 bg-indigo-50/30' : 'border-gray-200 text-gray-600'}`}
+            >
+                <div className="flex items-center gap-1.5">
+                    <Filter className="h-3.5 w-3.5 opacity-60" />
+                    <span className="truncate max-w-[110px]">{industryFilter === 'all' ? 'Rubro / Industria' : industryFilter}</span>
+                </div>
+                <ChevronDown className={`h-3.5 w-3.5 opacity-40 transition-transform duration-300 ${isIndustryFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isIndustryFilterOpen && (
+                <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 py-2 animate-in fade-in slide-in-from-top-2 max-h-72 overflow-y-auto">
+                    <button
+                        onClick={() => { setIndustryFilter('all'); setIsIndustryFilterOpen(false); }}
+                        className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors ${industryFilter === 'all' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        Todos los rubros
+                    </button>
+                    <div className="border-t border-gray-100 my-1" />
+                    {industries.filter(i => i.is_active).map(ind => (
+                        <button
+                            key={ind.id}
+                            onClick={() => { setIndustryFilter(ind.name); setIsIndustryFilterOpen(false); }}
+                            className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors ${industryFilter === ind.name ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            {ind.name}
                         </button>
                     ))}
                 </div>
@@ -601,6 +644,8 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                                 setSourceFilter('all');
                                 setLossReasonFilter('all');
                                 setLostAtStageFilter('all');
+                                setProductFilter('all');
+                                setIndustryFilter('all');
                                 setStartDateFilter(null);
                                 setEndDateFilter(null);
                                 setIsMobileFilterOpen(false);
@@ -898,6 +943,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                         )}
                     </div>
                     <ProductDropdown />
+                    <IndustryDropdown />
                     <div className="w-px h-4 bg-gray-200 mx-1" />
                     <LossReasonDropdown />
                     <LossStageDropdown />
@@ -1016,7 +1062,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                 </div>
 
                 {/* ROW 3: Active filter chips */}
-                {(filteredLeadId || filteredLeadIds || calendarDateLabel || statusFilter !== 'all' || priorityFilter !== 'all' || assignedFilter !== 'all' || sourceFilter !== 'all' || lossReasonFilter !== 'all' || lostAtStageFilter !== 'all' || productFilter !== 'all' || startDateFilter || endDateFilter) && (
+                {(filteredLeadId || filteredLeadIds || calendarDateLabel || statusFilter !== 'all' || priorityFilter !== 'all' || assignedFilter !== 'all' || sourceFilter !== 'all' || lossReasonFilter !== 'all' || lostAtStageFilter !== 'all' || productFilter !== 'all' || industryFilter !== 'all' || startDateFilter || endDateFilter) && (
                     <div className="hidden md:flex items-center gap-2 flex-wrap animate-in fade-in slide-in-from-top-1 duration-200">
                         <span className="text-[11px] text-gray-400 font-medium">Activos:</span>
                         {calendarDateLabel && (
@@ -1041,6 +1087,12 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                             <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
                                 Producto: {products.find(p => p.id === productFilter)?.name || 'Producto'}
                                 <button onClick={() => setProductFilter('all')} className="hover:text-indigo-900 ml-0.5"><X className="w-3 h-3" /></button>
+                            </span>
+                        )}
+                        {industryFilter !== 'all' && (
+                            <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
+                                Rubro: {industryFilter}
+                                <button onClick={() => setIndustryFilter('all')} className="hover:text-indigo-900 ml-0.5"><X className="w-3 h-3" /></button>
                             </span>
                         )}
                         {assignedFilter !== 'all' && (
@@ -1106,6 +1158,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                                 setSourceFilter('all'); setLossReasonFilter('all'); setLostAtStageFilter('all');
                                 setStartDateFilter(null); setEndDateFilter(null); setMinContactCountFilter(null);
                                 setProductFilter('all');
+                                setIndustryFilter('all');
                             }}
                             className="text-xs font-semibold text-gray-400 hover:text-red-500 transition-colors ml-1 flex items-center gap-1"
                         >

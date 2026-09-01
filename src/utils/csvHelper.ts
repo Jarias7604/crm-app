@@ -7,6 +7,7 @@ export const CSV_COLUMNS = [
     { key: 'email', label: 'Email' },
     { key: 'phone', label: 'Teléfono' },
     { key: 'address', label: 'Dirección' },
+    { key: 'industry', label: 'Rubro / Industria' },
     { key: 'source', label: 'Fuente' },
     { key: 'priority', label: 'Prioridad' },
     { key: 'status', label: 'Estado' },
