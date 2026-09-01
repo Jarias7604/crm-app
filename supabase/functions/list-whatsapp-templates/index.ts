@@ -77,6 +77,16 @@ serve(async (req) => {
         const buttons = (t.components || []).find((c: any) => c.type === 'BUTTONS');
         const bodyText = body?.text || '';
         const varCount = (bodyText.match(/\{\{\d+\}\}/g) || []).length;
+        const footerText = footer?.text || '';
+        // "Manual safe": can a human reasonably fill this from the chat?
+        // Exclude system/auto templates (footer says "no responder"/"automático"),
+        // header attachments, hello_world, and anything with 3+ variables (those
+        // are data-driven: DTE codes, quote numbers, links).
+        const manual_safe =
+          !/no responder|autom[aá]tic/i.test(footerText) &&
+          !['DOCUMENT', 'IMAGE', 'VIDEO'].includes(header?.format) &&
+          t.name !== 'hello_world' &&
+          varCount <= 2;
         return {
           name: t.name,
           language: t.language || 'es',
@@ -84,9 +94,10 @@ serve(async (req) => {
           body_text: bodyText,
           header_text: header?.format === 'TEXT' ? (header.text || '') : '',
           header_format: header?.format || null,
-          footer_text: footer?.text || '',
+          footer_text: footerText,
           var_count: varCount,
           buttons: (buttons?.buttons || []).map((b: any) => b.text).filter(Boolean),
+          manual_safe,
         };
       })
       .sort((a: any, b: any) => a.name.localeCompare(b.name));

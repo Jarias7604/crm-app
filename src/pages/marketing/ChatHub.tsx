@@ -438,20 +438,27 @@ export default function ChatHub() {
         setShowTemplates(true);
         setActiveTpl(null);
         const companyId = selectedConv?.company_id || profile?.company_id;
-        if (!companyId || templates.length > 0) return;
+        if (!companyId) return;
         setTemplatesLoading(true);
         try {
             const { data, error } = await supabase.functions.invoke('list-whatsapp-templates', {
                 body: { company_id: companyId },
             });
             if (error) throw error;
-            setTemplates(data?.templates || []);
+            // Only templates a human can reasonably send from the chat
+            setTemplates((data?.templates || []).filter((t: any) => t.manual_safe !== false));
             if (data?.error) toast.error(data.error);
         } catch (e: any) {
             toast.error('No se pudieron cargar las plantillas');
         } finally {
             setTemplatesLoading(false);
         }
+    };
+
+    const tplVarLabel = (idx: number, tpl: any) => {
+        if (idx === 0) return 'Nombre del cliente';
+        if (idx === 1 && /producto|consulta sobre \{\{2\}\}/i.test(tpl.body_text || '')) return 'Producto de interés';
+        return `Dato ${idx + 1}`;
     };
 
     const pickTemplate = (tpl: any) => {
@@ -1226,16 +1233,19 @@ export default function ChatHub() {
                                                         const n = String(idx + 1);
                                                         return (
                                                             <div key={n} className="mb-2">
-                                                                <label className="text-[10px] font-bold text-slate-400 uppercase">{idx === 0 ? 'Nombre / dato 1' : `Dato ${n}`}</label>
+                                                                <label className="text-[10px] font-bold text-slate-400 uppercase">{tplVarLabel(idx, activeTpl)}</label>
                                                                 <input
                                                                     value={tplVars[n] || ''}
                                                                     onChange={e => setTplVars(v => ({ ...v, [n]: e.target.value }))}
                                                                     className="w-full mt-0.5 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
-                                                                    placeholder={`Valor para {{${n}}}`}
+                                                                    placeholder={tplVarLabel(idx, activeTpl)}
                                                                 />
                                                             </div>
                                                         );
                                                     })}
+                                                    {(activeTpl.var_count || 0) === 0 && (
+                                                        <p className="text-xs text-slate-400 mb-1">Esta plantilla no necesita datos. Solo revisa y envía.</p>
+                                                    )}
                                                     <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
                                                         <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Vista previa</p>
                                                         <p className="text-xs text-slate-700 whitespace-pre-line">{renderTplPreview(activeTpl, tplVars)}</p>
