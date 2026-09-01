@@ -1,20 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Production defaults to guarantee 100% uptime even if Vercel env is in transition
-const PROD_DEFAULT_URL = 'https://ikofyypxphrqkncimszt.supabase.co';
-const PROD_DEFAULT_ANON_KEY = 'sb_publishable_ku4xvR7ICmj7LS0otLEF_Q_0usehBy4';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const rawUrl = import.meta.env.VITE_SUPABASE_URL;
-const rawKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Validación de variables de entorno requeridas
+if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
+    console.error('❌ VITE_SUPABASE_URL is missing or invalid! Check Vercel Environment Variables.');
+}
 
-// If env var points to legacy paused database (mtxqq), automatically heal to active production project (ikofyy)
-const supabaseUrl = (rawUrl && rawUrl.startsWith('http') && !rawUrl.includes('mtxqq'))
-    ? rawUrl
-    : PROD_DEFAULT_URL;
+if (!supabaseAnonKey) {
+    console.error('❌ VITE_SUPABASE_ANON_KEY is missing! Check Vercel Environment Variables.');
+}
 
-const supabaseAnonKey = (rawKey && rawKey.startsWith('sb_publishable_') && !rawUrl?.includes('mtxqq'))
-    ? rawKey
-    : PROD_DEFAULT_ANON_KEY;
+// Safely create the client to prevent total app crash if env vars are missing
+const safeUrl = (supabaseUrl && supabaseUrl.startsWith('http')) ? supabaseUrl : 'https://placeholder.supabase.co';
+const safeKey = supabaseAnonKey || 'placeholder-key';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(safeUrl, safeKey);
 

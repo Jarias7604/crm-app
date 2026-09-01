@@ -18,6 +18,7 @@ DECLARE
     v_lead_id            UUID;
     v_source             TEXT;
     v_product_id         UUID;
+    v_phone              TEXT;
 BEGIN
     -- ── Resolve source ────────────────────────────────────────────
     -- Priority: metadata.source_slug > p_channel
