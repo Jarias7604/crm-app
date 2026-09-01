@@ -81,6 +81,7 @@ export default function AiAgentCockpit() {
     const { profile } = useAuth();
     const navigate = useNavigate();
     const [metrics, setMetrics] = useState<CockpitMetrics | null>(null);
+    const [aiHealth, setAiHealth] = useState<any>(null);
     const [memories, setMemories] = useState<(LeadMemory & { lead: any })[]>([]);
     const [escalations, setEscalations] = useState<(LeadMemory & { lead: any })[]>([]);
     const [priceObjections, setPriceObjections] = useState<(LeadMemory & { lead: any })[]>([]);
@@ -99,16 +100,18 @@ export default function AiAgentCockpit() {
     const loadData = useCallback(async () => {
         if (!profile?.company_id) return;
         try {
-            const [met, mems, escs, priceObjs] = await Promise.all([
+            const [met, mems, escs, priceObjs, health] = await Promise.all([
                 leadMemoryService.getCockpitMetrics(profile.company_id),
                 leadMemoryService.getCompanyMemories(profile.company_id, { limit: 100 }),
                 leadMemoryService.getEscalationQueue(profile.company_id),
                 leadMemoryService.getPriceObjections(profile.company_id),
+                Promise.resolve(supabase.rpc('get_ai_health_metrics', { p_company_id: profile.company_id, p_days: 7 })).then((r: any) => r.data).catch(() => null),
             ]);
             setMetrics(met);
             setMemories(mems as any);
             setEscalations(escs as any);
             setPriceObjections(priceObjs as any);
+            setAiHealth(health);
         } catch (e: any) {
             console.error(e);
         } finally {
@@ -816,7 +819,51 @@ export default function AiAgentCockpit() {
 
             {/* Overview Tab */}
             {activeTab === 'overview' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <>
+                {/* ── Costo y Salud de la IA ─────────────────────────────── */}
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-black text-slate-900 flex items-center gap-2">
+                            <Brain className="w-4 h-4 text-indigo-500" /> Costo y Salud de la IA
+                            <span className="text-[10px] font-bold text-slate-400">últimos 7 días</span>
+                        </h3>
+                    </div>
+                    {!aiHealth ? (
+                        <p className="text-xs text-slate-400">Cargando…</p>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="p-3 rounded-xl bg-indigo-50">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Respuestas de IA</p>
+                                    <p className="text-2xl font-black text-indigo-700">{aiHealth.ai_replies ?? 0}</p>
+                                    <p className="text-[11px] text-slate-500">{aiHealth.ai_replies_today ?? 0} hoy</p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-amber-50">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-500">Notas de voz</p>
+                                    <p className="text-2xl font-black text-amber-700">{aiHealth.voice_notes ?? 0}</p>
+                                    <p className="text-[11px] text-slate-500">transcritas (Whisper)</p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-rose-50">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-rose-500">Basura filtrada</p>
+                                    <p className="text-2xl font-black text-rose-700">{aiHealth.junk_leads ?? 0}</p>
+                                    <p className="text-[11px] text-slate-500">{aiHealth.paused_convs ?? 0} chats pausados</p>
+                                </div>
+                                <div className="p-3 rounded-xl bg-emerald-50">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Gasto estimado</p>
+                                    <p className="text-2xl font-black text-emerald-700">${aiHealth.est_cost_usd ?? 0}</p>
+                                    <p className="text-[11px] text-slate-500">aprox. en 7 días</p>
+                                </div>
+                            </div>
+                            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-[11px] text-slate-500">
+                                <span>🧠 <b>Modelo:</b> gpt-4o-mini para calificar · gpt-4o cuando el lead está cotizando/negociando</span>
+                                <span>🛑 <b>Límite:</b> 6 respuestas de IA por chat sin humano</span>
+                                <span>🚫 <b>Filtro:</b> 3 mensajes sin tema de negocio → lead a "Erróneo" y se pausa la IA</span>
+                            </div>
+                        </>
+                    )}
+                </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Escalations widget */}
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
                         <h3 className="font-black text-slate-900 flex items-center gap-2 mb-4">
@@ -870,6 +917,7 @@ export default function AiAgentCockpit() {
                         </button>
                     </div>
                 </div>
+              </>
             )}
 
             {/* ── Objeciones de Precio Tab ─────────────────────────── */}
