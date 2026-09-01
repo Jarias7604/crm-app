@@ -80,22 +80,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
-        // ⚡ OPTIMISTIC FAST-PATH: Hydrate from sessionStorage immediately (<10ms)
+        // ⚡ OPTIMISTIC FAST-PATH: pre-hydrate the profile object from sessionStorage so
+        // there's no flash once loading flips. We intentionally do NOT flip `loading`
+        // here — the initial getSession() below is the single source of truth for auth
+        // state. Flipping loading early let ProtectedRoute observe a transient
+        // session===null and bounce a just-logged-in user back to /login.
         const cachedRaw = sessionStorage.getItem('crm_cached_profile_v1');
         if (cachedRaw) {
             try {
                 const cachedProfile = JSON.parse(cachedRaw);
                 if (cachedProfile?.id) {
                     setProfile(cachedProfile);
-                    setLoading(false); // Instant mount without spinner
                 }
             } catch {
                 sessionStorage.removeItem('crm_cached_profile_v1');
             }
         }
 
+        // Failsafe: never let the app hang on a spinner if getSession() stalls.
+        const failsafe = setTimeout(() => setLoading(false), 8000);
+
         // Get initial session & revalidate in background
         supabase.auth.getSession().then(({ data: { session } }) => {
+            clearTimeout(failsafe);
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
@@ -106,6 +113,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setProfile(null);
                 setLoading(false);
             }
+        }).catch(() => {
+            clearTimeout(failsafe);
+            setLoading(false);
         });
 
         // Listen for auth changes — clear React Query cache on user switch or logout
@@ -132,7 +142,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            clearTimeout(failsafe);
+            subscription.unsubscribe();
+        };
     }, []);
 
     // ─────────────────────────────────────────────────────────────────────────

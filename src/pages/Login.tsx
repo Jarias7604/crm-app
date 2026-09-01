@@ -66,9 +66,9 @@ export default function Login() {
                 setError(translateAuthError(error.message));
                 setLoading(false);
             } else if (data?.session) {
-                window.location.href = '/dashboard';
+                navigate('/dashboard', { replace: true });
             } else {
-                navigate('/dashboard');
+                navigate('/dashboard', { replace: true });
             }
         } catch (err: any) {
             setError(translateAuthError(err?.message || ''));
@@ -122,9 +122,9 @@ export default function Login() {
                 setError(translateAuthError(error.message));
                 setLoading(false);
             } else if (data?.session) {
-                window.location.href = '/dashboard';
+                navigate('/dashboard', { replace: true });
             } else {
-                navigate('/dashboard');
+                navigate('/dashboard', { replace: true });
             }
         } catch (err: any) {
             setError(translateAuthError(err?.message || ''));
