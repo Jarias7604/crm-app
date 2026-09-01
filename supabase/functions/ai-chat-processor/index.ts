@@ -623,8 +623,12 @@ ${technicalRules}`;
                             body: formData
                         });
                         const whisperData = await whisperResp.json();
-                        if (whisperData.text && whisperData.text.trim()) {
-                            userMessage = whisperData.text.trim();
+                        // Whisper hallucinates these exact strings on non-speech audio
+                        // (silence, music, background noise). Treat them as "unaudible".
+                        const HALLUCINATION_RE = /subt[ií]tulos?.*(amara|comunidad|realizad)|amara\.org|gracias por ver( el)? (video|v[ií]deo)|subscr[ií]|www\.[a-z]/i;
+                        const wtext = (whisperData.text || '').trim();
+                        if (wtext && !HALLUCINATION_RE.test(wtext) && wtext.length > 2) {
+                            userMessage = wtext;
                             log(`Whisper transcription success: "${userMessage}"`);
                             if (lastMsg.id) {
                                 await supabase.from('marketing_messages').update({
@@ -654,16 +658,32 @@ ${technicalRules}`;
         // ===========================================
         // 7B. JUNK GATE + AI BUDGET  (cost control)
         // ===========================================
-        const BUSINESS_RE = /factura|dte|erp|crm|siple|sistema|software|precio|costo|cotiz|plan\b|demo|negocio|empresa|contab|inventario|ventas|hacienda|informaci[oó]n|ayuda|servicio|comprar|adquirir|implementar|asesor|contrat|licencia|m[oó]dulo/i;
-        const SPAM_RE = /tiktok|vm\.tiktok|abre tiktok|tiktoklite|#\w{3,}|castell[oó]n team|chapina|sapito|jutiapa|amorcito|cari[ñn]ito|piernita|salvadore[ñn]|te voy a estimar/i;
+        // Strong commercial-intent signals only — vague words like "ayuda"/"info"
+        // appear in spam too, so they don't count.
+        const BUSINESS_RE = /factura|\bdte\b|\berp\b|\bcrm\b|siple|sistema|software|programa|precio|costo|cotiz|plan(es)?\b|demo|contab|inventario|hacienda|comprar|adquirir|implementar|contrat|licencia|m[oó]dulo|suscrip|mensualidad|pago|reuni[oó]n|llamada|whatsapp business|punto de venta|\bpos\b/i;
+        const SPAM_RE = /tiktok|vm\.tiktok|abre tiktok|tiktoklite|#\w{3,}|castell[oó]n team|chapina|sapito|jutiapa|amorcito|cari[ñn]ito|piernita|salvadore[ñn]|te voy a estimar|casar[ée] contigo|mi amor|amor tarot/i;
+        // Whisper hallucinations + noise transcripts that are NOT real messages
+        const GARBAGE_RE = /subt[ií]tulos?.*(amara|comunidad|realizad)|amara\.org|gracias por ver|\bsubscr[ií]|nota de voz recibida|mensaje tipo audio|el cliente envi[oó] una nota de voz/i;
 
         const inboundHist  = (history || []).filter((m: any) => m.direction === 'inbound');
         const aiOutHist    = (history || []).filter((m: any) => m.direction === 'outbound' && m.metadata?.isAiGenerated);
         const humanOutHist = (history || []).filter((m: any) => m.direction === 'outbound' && !m.metadata?.isAiGenerated);
-        const allInboundText = inboundHist.map((m: any) => m.metadata?.transcription || m.content || '').join(' ') + ' ' + (userMessage || '');
+        const inboundTexts = inboundHist.map((m: any) => (m.metadata?.transcription || m.content || '').trim());
+        const allInboundText = inboundTexts.join(' ') + ' ' + (userMessage || '');
         const hasBusinessIntent = BUSINESS_RE.test(allInboundText);
+        // count inbound messages that carry no usable content (spam, noise, bare link, empty voice)
+        const junkishInbound = inboundTexts.filter((t: string) =>
+            !BUSINESS_RE.test(t) && (
+                t.length < 2 ||
+                GARBAGE_RE.test(t) ||
+                SPAM_RE.test(t) ||
+                /^https?:\/\/\S+$/i.test(t)
+            )
+        ).length;
         const curText = (userMessage || '').trim();
-        const curIsLinkOrSpam = /^https?:\/\/\S+\s*$/i.test(curText) || (curText.length < 200 && SPAM_RE.test(curText) && !BUSINESS_RE.test(curText));
+        const curIsLinkOrSpam = /^https?:\/\/\S+\s*$/i.test(curText)
+            || (curText.length < 200 && (SPAM_RE.test(curText) || GARBAGE_RE.test(curText)) && !BUSINESS_RE.test(curText))
+            || (curText.length < 2 && !hasBusinessIntent);
         const convMeta = conv?.metadata || {};
 
         // helper: send a short canned reply through the same channel, no GPT
@@ -693,9 +713,11 @@ ${technicalRules}`;
             return new Response(JSON.stringify({ gated: 'ai_paused' }), { headers: corsHeaders });
         }
 
-        // (B) 3+ inbound msgs, zero business intent → junk. Classify, pause, don't reply.
-        if (!hasBusinessIntent && inboundHist.length >= 3) {
-            log('Junk gate: 3+ inbound, no business intent → Erróneo + pause AI');
+        // (B) junk conversation → classify, pause, don't reply.
+        //     - 3+ inbound with zero business intent, OR
+        //     - 2+ inbound that are all noise/spam/empty-voice and none business
+        if (!hasBusinessIntent && (inboundHist.length >= 3 || (junkishInbound >= 2 && junkishInbound >= inboundHist.length))) {
+            log(`Junk gate: no business intent (inbound=${inboundHist.length}, junkish=${junkishInbound}) → Erróneo + pause AI`);
             try {
                 if (lead?.id) {
                     await supabase.from('leads').update({ status: 'Erróneo' }).eq('id', lead.id);

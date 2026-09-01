@@ -534,6 +534,10 @@ export default function ChatHub() {
 
         try {
             setIsAiProcessing(true);
+            // Manual "IA Auto" click = human override: lift any junk/budget pause on this chat
+            await supabase.from('marketing_conversations')
+                .update({ metadata: { ...(selectedConv?.metadata || {}), ai_paused: false, ai_pause_reason: null } })
+                .eq('id', cid);
             const result = await aiAgentService.processMessage(cid, providedMessage || '', profile.company_id);
 
             if (result && result.text) {
