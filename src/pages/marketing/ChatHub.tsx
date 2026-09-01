@@ -67,6 +67,12 @@ export default function ChatHub() {
     const [isAiProcessing, setIsAiProcessing] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [agentStatus, setAgentStatus] = useState<boolean>(false);
+    // WhatsApp approved templates (bypass the 24h window)
+    const [showTemplates, setShowTemplates] = useState(false);
+    const [templates, setTemplates] = useState<any[]>([]);
+    const [templatesLoading, setTemplatesLoading] = useState(false);
+    const [tplVars, setTplVars] = useState<Record<string, string>>({});
+    const [activeTpl, setActiveTpl] = useState<any>(null);
     const [pendingFile, setPendingFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -422,6 +428,94 @@ export default function ChatHub() {
         } catch (error: any) {
             toast.error('Error al enviar: ' + error.message);
             setNewMessage(content); // Restore message on failure
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    // ─── WhatsApp templates (for replies outside the 24h window) ──────────────
+    const openTemplates = async () => {
+        setShowTemplates(true);
+        setActiveTpl(null);
+        const companyId = selectedConv?.company_id || profile?.company_id;
+        if (!companyId || templates.length > 0) return;
+        setTemplatesLoading(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('list-whatsapp-templates', {
+                body: { company_id: companyId },
+            });
+            if (error) throw error;
+            setTemplates(data?.templates || []);
+            if (data?.error) toast.error(data.error);
+        } catch (e: any) {
+            toast.error('No se pudieron cargar las plantillas');
+        } finally {
+            setTemplatesLoading(false);
+        }
+    };
+
+    const pickTemplate = (tpl: any) => {
+        setActiveTpl(tpl);
+        const leadName = (selectedConv?.lead?.name || '').trim();
+        const productName = (selectedConv?.lead as any)?.interested_product || '';
+        const init: Record<string, string> = {};
+        for (let i = 1; i <= (tpl.var_count || 0); i++) {
+            init[String(i)] = i === 1 ? (leadName || '') : (i === 2 ? productName : '');
+        }
+        setTplVars(init);
+    };
+
+    const renderTplPreview = (tpl: any, vars: Record<string, string>) => {
+        let txt = tpl.body_text || '';
+        for (let i = 1; i <= (tpl.var_count || 0); i++) {
+            txt = txt.replace(new RegExp(`\\{\\{${i}\\}\\}`, 'g'), vars[String(i)] || `{{${i}}}`);
+        }
+        return txt.replace(/\\n/g, '\n');
+    };
+
+    const sendTemplate = async () => {
+        if (!activeTpl || !selectedConv || isSending) return;
+        // require all vars filled
+        for (let i = 1; i <= (activeTpl.var_count || 0); i++) {
+            if (!tplVars[String(i)]?.trim()) { toast.error(`Falta el dato {{${i}}}`); return; }
+        }
+        setIsSending(true);
+        try {
+            let convId = selectedConv.id;
+            if (convId === 'new') {
+                if (!selectedConv.lead?.id) throw new Error('Lead no identificado');
+                const cleanPhone = (selectedConv.lead.phone || '').replace(/\D/g, '');
+                const newConv = await chatService.createConversation(
+                    selectedConv.lead.id, selectedConv.channel, selectedConv.lead.company_id, cleanPhone
+                );
+                setSelectedConv(newConv);
+                convId = newConv.id;
+                setConversations(prev => [newConv, ...prev]);
+            }
+
+            const params: Array<{ type: string; text: string }> = [];
+            for (let i = 1; i <= (activeTpl.var_count || 0); i++) {
+                params.push({ type: 'text', text: tplVars[String(i)] });
+            }
+            const components = params.length ? [{ type: 'body', parameters: params }] : [];
+
+            await chatService.sendMessage(
+                convId,
+                renderTplPreview(activeTpl, tplVars),
+                'text',
+                'outbound',
+                {
+                    template_name: activeTpl.name,
+                    template_language: activeTpl.language || 'es',
+                    template_components: components,
+                    is_template: true,
+                }
+            );
+            toast.success('Plantilla enviada');
+            setShowTemplates(false);
+            setActiveTpl(null);
+        } catch (e: any) {
+            toast.error('Error al enviar plantilla: ' + (e?.message || ''));
         } finally {
             setIsSending(false);
         }
@@ -1081,6 +1175,16 @@ export default function ChatHub() {
                         <div className="px-4 pb-4 pt-3 bg-white border-t border-slate-200/70 shrink-0">
                             {/* QUICK SUGGESTIONS */}
                             <div className="flex gap-2 overflow-x-auto pb-2.5 custom-scrollbar">
+                                {selectedConv.channel === 'whatsapp' && (
+                                    <button
+                                        type="button"
+                                        onClick={openTemplates}
+                                        className="shrink-0 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-full text-[12px] font-semibold transition-all active:scale-95 shadow-xs"
+                                        title="Enviar una plantilla aprobada (funciona aunque el cliente lleve +24h sin escribir)"
+                                    >
+                                        📋 Plantilla
+                                    </button>
+                                )}
                                 {QUICK_RESPONSES.map((resp, i) => (
                                     <button
                                         key={i}
@@ -1092,6 +1196,60 @@ export default function ChatHub() {
                                     </button>
                                 ))}
                             </div>
+
+                            {/* WHATSAPP TEMPLATE PICKER */}
+                            {showTemplates && (
+                                <div className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center bg-black/40 p-3" onClick={() => setShowTemplates(false)}>
+                                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                                            <h3 className="text-sm font-black text-slate-800">📋 Plantilla de WhatsApp</h3>
+                                            <button onClick={() => setShowTemplates(false)} className="text-slate-400 hover:text-slate-700"><CloseIcon className="w-4 h-4" /></button>
+                                        </div>
+                                        <div className="p-4 overflow-y-auto">
+                                            {templatesLoading && <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-emerald-500" /></div>}
+                                            {!templatesLoading && !activeTpl && templates.length === 0 && (
+                                                <p className="text-xs text-slate-400 text-center py-6">No hay plantillas aprobadas todavía.</p>
+                                            )}
+                                            {!templatesLoading && !activeTpl && templates.map(tpl => (
+                                                <button key={tpl.name} onClick={() => pickTemplate(tpl)} className="w-full text-left p-3 mb-2 rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/40 transition-all">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-[11px] font-black text-slate-700">{tpl.name}</span>
+                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 uppercase">{tpl.category}</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-500 line-clamp-2 whitespace-pre-line">{(tpl.body_text || '').replace(/\\n/g, ' ')}</p>
+                                                </button>
+                                            ))}
+                                            {activeTpl && (
+                                                <div>
+                                                    <button onClick={() => setActiveTpl(null)} className="text-[11px] text-slate-400 hover:text-slate-700 mb-2 flex items-center gap-1"><ChevronLeft className="w-3 h-3" /> Volver</button>
+                                                    {Array.from({ length: activeTpl.var_count || 0 }).map((_, idx) => {
+                                                        const n = String(idx + 1);
+                                                        return (
+                                                            <div key={n} className="mb-2">
+                                                                <label className="text-[10px] font-bold text-slate-400 uppercase">{idx === 0 ? 'Nombre / dato 1' : `Dato ${n}`}</label>
+                                                                <input
+                                                                    value={tplVars[n] || ''}
+                                                                    onChange={e => setTplVars(v => ({ ...v, [n]: e.target.value }))}
+                                                                    className="w-full mt-0.5 px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400"
+                                                                    placeholder={`Valor para {{${n}}}`}
+                                                                />
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Vista previa</p>
+                                                        <p className="text-xs text-slate-700 whitespace-pre-line">{renderTplPreview(activeTpl, tplVars)}</p>
+                                                        {activeTpl.footer_text && <p className="text-[10px] text-slate-400 mt-1">{activeTpl.footer_text}</p>}
+                                                    </div>
+                                                    <button onClick={sendTemplate} disabled={isSending} className="w-full mt-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                                                        {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-3 h-3" /> Enviar plantilla</>}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* FILE PREVIEW */}
                             {pendingFile && (
