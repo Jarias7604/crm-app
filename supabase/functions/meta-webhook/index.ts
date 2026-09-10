@@ -304,6 +304,20 @@ serve(async (req) => {
                                 content = `[Mensaje tipo ${msg.type}]`;
                             }
 
+                            // ─── SHIELD GATE: DETECT & DROP VIRAL SPAM / OUT-OF-COUNTRY CHATS ───
+                            const SPAM_VIRAL_RE = /tiktok|vm\.tiktok|tiktoklite|#chapina|chapinahermosa|delmylopez|pedro ropero|hermosa|cariñito|amorcito/i;
+                            const isViralSpam = SPAM_VIRAL_RE.test(content) || (msg.type === 'text' && (content.includes('vm.tiktok') || content.includes('tiktok.com')));
+                            
+                            // Check allowed countries: El Salvador (+503) or USA (+1)
+                            const cleanPhone = chatId.replace(/\D/g, '');
+                            const isAllowedCountry = cleanPhone.startsWith('503') || cleanPhone.startsWith('1');
+
+                            // If it's pure viral spam or out-of-country with no real business ad click, drop it immediately
+                            if (isViralSpam || (!isAllowedCountry && !msg.referral?.headline?.match(/ERP|CRM|DTE|FACTURA|SIPLE/i))) {
+                                console.warn(`🚨 [JUNK SHIELD] Dropped junk WhatsApp message from ${chatId} (${senderName}): "${content.substring(0, 80)}"`);
+                                continue; // Do NOT create lead, do NOT create conversation, do NOT trigger AI
+                            }
+
                             const { data: convId, error } = await supabase.rpc('process_incoming_marketing_message', {
                                 p_company_id:  companyId,
                                 p_channel:     'whatsapp',

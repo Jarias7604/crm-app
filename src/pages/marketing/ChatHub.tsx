@@ -1358,12 +1358,14 @@ export default function ChatHub() {
                             <div className="w-20 h-20 rounded-[24px] bg-slate-50 mx-auto flex items-center justify-center text-4xl font-black text-slate-900 shadow-inner border border-white">
                                 {selectedConv.lead?.name?.[0] || '?'}
                             </div>
-                            <div className="absolute -bottom-2 inset-x-0 flex justify-center">
-                                <div className="bg-white/90 backdrop-blur-sm border border-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                                    <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                                    <span className="text-[8px] font-black uppercase tracking-wider text-slate-600">High Value</span>
+                            {((selectedConv.lead as any)?.ai_score ?? (selectedConv.lead as any)?.score ?? 0) >= 70 && (
+                                <div className="absolute -bottom-2 inset-x-0 flex justify-center">
+                                    <div className="bg-white/90 backdrop-blur-sm border border-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                                        <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                        <span className="text-[8px] font-black uppercase tracking-wider text-slate-600">High Value</span>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                         <div className="pt-2">
                             <h3 className="text-lg font-black text-slate-900 leading-tight truncate px-2">{selectedConv.lead?.name || 'Visitante'}</h3>
@@ -1373,7 +1375,9 @@ export default function ChatHub() {
 
                     <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[20px] border border-blue-100 text-center relative overflow-hidden group">
                         <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1 relative z-10">IA Score</p>
-                        <div className="text-3xl font-black text-blue-600 tracking-tighter relative z-10 group-hover:scale-110 transition-transform">98</div>
+                        <div className="text-3xl font-black text-blue-600 tracking-tighter relative z-10 group-hover:scale-110 transition-transform">
+                            {(selectedConv.lead as any)?.ai_score ?? (selectedConv.lead as any)?.score ?? '--'}
+                        </div>
                     </div>
 
                     <div className="space-y-4">
