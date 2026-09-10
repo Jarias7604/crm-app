@@ -304,19 +304,39 @@ serve(async (req) => {
                                 content = `[Mensaje tipo ${msg.type}]`;
                             }
 
-                            // ─── SHIELD GATE: DETECT & DROP VIRAL SPAM / OUT-OF-COUNTRY CHATS ───
-                            const SPAM_VIRAL_RE = /tiktok|vm\.tiktok|tiktoklite|#chapina|chapinahermosa|delmylopez|pedro ropero|hermosa|cariñito|amorcito/i;
+                            // ─── SHIELD GATE v3: DETECT & DROP JUNK / WRONG-NUMBER / SPAM ────
+                            
+                            // 1. Known viral spam patterns
+                            const SPAM_VIRAL_RE = /tiktok|vm\.tiktok|tiktoklite|#chapina|chapinahermosa|delmylopez|pedro ropero|cariñito|amorcito/i;
                             const isViralSpam = SPAM_VIRAL_RE.test(content) || (msg.type === 'text' && (content.includes('vm.tiktok') || content.includes('tiktok.com')));
                             
-                            // Check allowed countries: El Salvador (+503) or USA (+1)
+                            // 2. Check allowed countries: El Salvador (+503) or USA (+1 with 11 digits)
                             const cleanPhone = chatId.replace(/\D/g, '');
-                            const isAllowedCountry = cleanPhone.startsWith('503') || cleanPhone.startsWith('1');
-
-                            // If it's pure viral spam or out-of-country with no real business ad click, drop it immediately
-                            if (isViralSpam || (!isAllowedCountry && !msg.referral?.headline?.match(/ERP|CRM|DTE|FACTURA|SIPLE/i))) {
-                                console.warn(`🚨 [JUNK SHIELD] Dropped junk WhatsApp message from ${chatId} (${senderName}): "${content.substring(0, 80)}"`);
+                            const isElSalvador = cleanPhone.startsWith('503') && cleanPhone.length === 11;
+                            const isUSA = cleanPhone.startsWith('1') && cleanPhone.length === 11;
+                            const isAllowedCountry = isElSalvador || isUSA;
+                            
+                            // 3. Wrong-number / personal chat detection (only for text messages)
+                            const WRONG_NUMBER_RE = /\b(refrí|refri|nevera|doña|don\s|señora|señor|campo|pueblo|aldea|vecin|familia|cumpleaños|fiesta|boda|misa|iglesia|te quiero|te amo|amor|pisto|dinero prestado|deuda|cobrar|cobro|recoger|llevar|traer|envíame|mándame|súbeme|bájame)\b/i;
+                            const BUSINESS_INDICATORS_RE = /\b(precio|cotiza|demo|sistema|software|factura|DTE|ERP|CRM|información|info|interesa|quiero saber|cuánto cuesta|costo|plan|paquete|servicio|empresa|negocio|comprar|contratar|prueba|gratis)\b/i;
+                            
+                            let isWrongNumber = false;
+                            if (msg.type === 'text' && content.length > 10) {
+                                const hasWrongNumberSignal = WRONG_NUMBER_RE.test(content);
+                                const hasBusinessIntent = BUSINESS_INDICATORS_RE.test(content);
+                                const isFromAd = !!msg.referral; // Click-to-WhatsApp from ad always valid
+                                // Drop if clear wrong-number signals AND no business intent AND not from an ad
+                                if (hasWrongNumberSignal && !hasBusinessIntent && !isFromAd) {
+                                    isWrongNumber = true;
+                                }
+                            }
+                            
+                            // Drop if: viral spam OR out-of-country OR clear wrong-number message
+                            if (isViralSpam || (!isAllowedCountry && !msg.referral) || isWrongNumber) {
+                                console.warn(`🚨 [JUNK SHIELD v3] Dropped junk from ${chatId} (${senderName}). viral=${isViralSpam} country=${isAllowedCountry} wrongNum=${isWrongNumber}: "${content.substring(0, 80)}"`);
                                 continue; // Do NOT create lead, do NOT create conversation, do NOT trigger AI
                             }
+
 
                             const { data: convId, error } = await supabase.rpc('process_incoming_marketing_message', {
                                 p_company_id:  companyId,
