@@ -24,7 +24,7 @@ import { useWorkspaceHierarchy } from '../../hooks/useWorkspaceHierarchy';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const QUICK_RESPONSES = [
-    { label: "👋 Saludo", text: "Hola, ¿cómo estás? Te saluda el equipo de Arias Defense. ¿En qué podemos ayudarte hoy?" },
+    { label: "👋 Saludo", text: "Hola, ¿cómo estás? Te saluda nuestro equipo de ventas. ¿En qué podemos ayudarte hoy?" },
     { label: "💰 Cotización", text: "Hola, para poder generarte una cotización formal y personalizada, ¿podrías indicarnos tu correo electrónico y qué productos te interesan?" },
     { label: "📞 Agendar Llamada", text: "Hola, me gustaría coordinar una breve llamada de 5 minutos contigo para explicarte mejor los detalles. ¿Te queda bien hoy por la tarde?" },
     { label: "✍️ Datos", text: "¿Nos podrías facilitar tu nombre completo y teléfono de contacto para darte de alta en nuestro sistema?" }

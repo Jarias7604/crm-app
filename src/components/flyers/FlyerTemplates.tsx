@@ -455,7 +455,7 @@ export function deriveIndustryContent(prompt: string, data: Partial<FlyerData>):
     };
   }
   
-  if (lower.includes('segurid') || lower.includes('guardia') || lower.includes('vigilan') || lower.includes('patrulla') || lower.includes('defens')) {
+  if ((lower.includes('segurid') && (lower.includes('guardia') || lower.includes('vigilan') || lower.includes('patrull') || lower.includes('privad'))) || lower.includes('guardia de seguridad') || lower.includes('vigilancia')) {
     return {
       highlight_title: data.highlight_title || '¿Buscas la máxima seguridad?',
       highlight_desc: data.highlight_desc || 'Sistemas de protección, guardias entrenados y monitoreo permanente.',

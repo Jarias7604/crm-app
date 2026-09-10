@@ -15,7 +15,7 @@ export default function TestFlyer() {
   const dummyDataAI = {
     ...dummyData,
     bgImageUrl: 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=1080&q=80',
-    prompt: 'Promocion especial de artes marciales y defensa personal'
+    prompt: 'Título: Software DTE Facturación Electrónica. Subtítulo: La solución más rápida para emitir facturas electrónicas en El Salvador. Beneficios: Facturación Electrónica en segundos, Integración con Hacienda, Control de Clientes y Leads, Soporte 24/7. Precio: $49.99/mes. Contacto: +503 7197-8911.'
   };
 
   return (

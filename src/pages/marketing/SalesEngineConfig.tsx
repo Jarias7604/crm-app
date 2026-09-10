@@ -32,7 +32,7 @@ const DEFAULT_CONFIG: NurtureConfig = {
   whatsapp: '50371978911',
   channels: { email: true, agent_task: true },
   steps: {
-    s1: { enabled: true, delay_days: 0, subject: 'Bienvenido a Arias Defense Components', body: 'Hola {nombre},\n\nNos comunicamos para presentarle nuestra solución de Facturación Electrónica DTE y ERP empresarial...' },
+    s1: { enabled: true, delay_days: 0, subject: 'Bienvenido — conoce nuestra solución', body: 'Hola {nombre},\n\nNos comunicamos para presentarle nuestra solución de Facturación Electrónica DTE y ERP empresarial...' },
     s2: { enabled: true, delay_days: 3, subject: '¿Recibió nuestra información, {nombre}?', body: 'Hola {nombre},\n\nQueremos asegurarnos de que recibió la información que le enviamos y resolver cualquier duda...' },
     s3: { enabled: true, delay_days: 7, subject: 'Oferta especial para {empresa} — válida 48h', body: 'Hola {nombre},\n\nEste es nuestro último mensaje. Por las próximas 48 horas tenemos una oferta especial para usted...' },
     rescue: { enabled: true, delay_days: 2, subject: 'Su cotización está por vencer, {nombre}', body: 'Hola {nombre},\n\nSu cotización de Facturación Electrónica DTE está próxima a vencer. Confirme ahora para asegurar estas condiciones...' },
