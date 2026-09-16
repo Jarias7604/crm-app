@@ -304,38 +304,63 @@ serve(async (req) => {
                                 content = `[Mensaje tipo ${msg.type}]`;
                             }
 
-                            // ─── SHIELD GATE v3: DETECT & DROP JUNK / WRONG-NUMBER / SPAM ────
+                            // ─── SHIELD GATE v4: STRICT POSITIVE WHITELIST FOR NEW LEADS ───────────
                             
-                            // 1. Known viral spam patterns
-                            const SPAM_VIRAL_RE = /tiktok|vm\.tiktok|tiktoklite|#chapina|chapinahermosa|delmylopez|pedro ropero|cariñito|amorcito/i;
-                            const isViralSpam = SPAM_VIRAL_RE.test(content) || (msg.type === 'text' && (content.includes('vm.tiktok') || content.includes('tiktok.com')));
-                            
-                            // 2. Check allowed countries: El Salvador (+503) or USA (+1 with 11 digits)
+                            // Check if this sender phone is ALREADY an existing lead in CRM for this company
                             const cleanPhone = chatId.replace(/\D/g, '');
+                            const phoneWithPlus = `+${cleanPhone}`;
+                            const phoneWithoutPlus = cleanPhone;
+
+                            const { data: existingLead } = await supabase
+                                .from('leads')
+                                .select('id, name, status')
+                                .eq('company_id', companyId)
+                                .or(`phone.eq.${phoneWithPlus},phone.eq.${phoneWithoutPlus}`)
+                                .limit(1)
+                                .maybeSingle();
+
+                            const isExistingLead = !!existingLead;
+
+                            // 1. Check Meta Official Paid Ad Referral
+                            const isMetaPaidAd = !!(msg.referral && (msg.referral.source_id || msg.referral.headline || msg.referral.source_type === 'ad'));
+
+                            // 2. Check Explicit Business Intent Keywords (Strict list for sales/software)
+                            const STRICT_BUSINESS_INTENT_RE = /\b(factura|facturación|facturaciones|dte|dtes|erp|crm|siple|sistema|software|cotizad|cotiza|cotizacion|cotización|cotizar|demo|demostracion|demostración|precio|precios|costo|costos|plan|planes|paquete|paquetes|comprar|contratar|prueba|hacienda)\b/i;
+                            const hasStrictBusinessIntent = msg.type === 'text' && STRICT_BUSINESS_INTENT_RE.test(content);
+
+                            // 3. Known Junk / Social Links / Personal Spam Patterns
+                            const JUNK_SPAM_RE = /(facebook\.com\/share|fb\.me|tiktok|vm\.tiktok|instagram\.com\/reel|#chapina|chapinahermosa|delmylopez|pedro ropero|doña|don\s|señora|señor|refrí|refri|nevera|clinica|clínica|doctor|doctores|medico|médico|hospital|boda|misa|iglesia|cumpleaños|te quiero|te amo|amor|dinero prestado|deuda|cobrar|cobro)\b/i;
+                            const isJunkOrSocialLink = JUNK_SPAM_RE.test(content);
+
+                            // Allowed Country check: El Salvador (+503) or USA (+1 with 11 digits)
                             const isElSalvador = cleanPhone.startsWith('503') && cleanPhone.length === 11;
                             const isUSA = cleanPhone.startsWith('1') && cleanPhone.length === 11;
                             const isAllowedCountry = isElSalvador || isUSA;
+
+                            // ── WHITELIST DECISION GATE ──────────────────────────────────────────
+                            // IF sender is NOT an existing lead:
+                            //   ALLOW ONLY IF: (isMetaPaidAd OR hasStrictBusinessIntent) AND NOT isJunkOrSocialLink AND isAllowedCountry
+                            // IF sender IS an existing lead:
+                            //   ALLOW if NOT explicit viral spam / out of country junk
                             
-                            // 3. Wrong-number / personal chat detection (only for text messages)
-                            const WRONG_NUMBER_RE = /\b(refrí|refri|nevera|doña|don\s|señora|señor|campo|pueblo|aldea|vecin|familia|cumpleaños|fiesta|boda|misa|iglesia|te quiero|te amo|amor|pisto|dinero prestado|deuda|cobrar|cobro|recoger|llevar|traer|envíame|mándame|súbeme|bájame)\b/i;
-                            const BUSINESS_INDICATORS_RE = /\b(precio|cotiza|demo|sistema|software|factura|DTE|ERP|CRM|información|info|interesa|quiero saber|cuánto cuesta|costo|plan|paquete|servicio|empresa|negocio|comprar|contratar|prueba|gratis)\b/i;
-                            
-                            let isWrongNumber = false;
-                            if (msg.type === 'text' && content.length > 10) {
-                                const hasWrongNumberSignal = WRONG_NUMBER_RE.test(content);
-                                const hasBusinessIntent = BUSINESS_INDICATORS_RE.test(content);
-                                const isFromAd = !!msg.referral; // Click-to-WhatsApp from ad always valid
-                                // Drop if clear wrong-number signals AND no business intent AND not from an ad
-                                if (hasWrongNumberSignal && !hasBusinessIntent && !isFromAd) {
-                                    isWrongNumber = true;
-                                }
+                            let allowMessage = false;
+
+                            if (isExistingLead) {
+                                // Existing CRM contacts can send messages unless it's viral link spam
+                                allowMessage = !isJunkOrSocialLink;
+                            } else {
+                                // NEW CONTACTS MUST PROVE THEY ARE A REAL PROSPECT (Paid Ad or Strict Business Keyword)
+                                const isQualifiedProspect = (isMetaPaidAd || hasStrictBusinessIntent);
+                                allowMessage = isQualifiedProspect && !isJunkOrSocialLink && isAllowedCountry;
                             }
-                            
-                            // Drop if: viral spam OR out-of-country OR clear wrong-number message
-                            if (isViralSpam || (!isAllowedCountry && !msg.referral) || isWrongNumber) {
-                                console.warn(`🚨 [JUNK SHIELD v3] Dropped junk from ${chatId} (${senderName}). viral=${isViralSpam} country=${isAllowedCountry} wrongNum=${isWrongNumber}: "${content.substring(0, 80)}"`);
-                                continue; // Do NOT create lead, do NOT create conversation, do NOT trigger AI
+
+                            if (!allowMessage) {
+                                console.warn(`🚨 [JUNK SHIELD v4] REJECTED message from ${chatId} (${senderName}). ExistingLead=${isExistingLead} MetaPaidAd=${isMetaPaidAd} StrictBusinessIntent=${hasStrictBusinessIntent} JunkLink=${isJunkOrSocialLink} Country=${isAllowedCountry}. Content snippet: "${content.substring(0, 80)}"`);
+                                continue; // Drop message: DO NOT create lead, DO NOT log conversation, DO NOT trigger AI
                             }
+
+                            console.log(`✅ [JUNK SHIELD v4] PASSED message from ${chatId} (${senderName}). ExistingLead=${isExistingLead} MetaPaidAd=${isMetaPaidAd} StrictBusinessIntent=${hasStrictBusinessIntent}`);
+
 
 
                             const { data: convId, error } = await supabase.rpc('process_incoming_marketing_message', {
