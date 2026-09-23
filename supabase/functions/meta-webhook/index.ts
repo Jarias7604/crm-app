@@ -195,6 +195,13 @@ serve(async (req) => {
                         const phoneNumberId = metadataObj.phone_number_id;
                         const displayPhone  = metadataObj.display_phone_number ? metadataObj.display_phone_number.replace(/\D/g, '') : null;
 
+                        // 🛑 CRITICAL SECURITY FILTER: Explicitly block Patricia's number (+503 7971 8911 / 516453938224335) and any rogue IDs
+                        const BLOCKED_PHONE_NUMBER_IDS = ['516453938224335', '564050433468481'];
+                        if (BLOCKED_PHONE_NUMBER_IDS.includes(phoneNumberId) || (displayPhone && displayPhone.includes('79718911'))) {
+                            console.warn(`[SECURITY FILTER] Dropping message to blocked phone number: ${displayPhone || phoneNumberId}`);
+                            continue;
+                        }
+
                         // Resolve company
                         let companyId: string | null = url.searchParams.get('company_id');
 
@@ -231,20 +238,20 @@ serve(async (req) => {
                             if (byDisplayPhone) companyId = byDisplayPhone.company_id;
                         }
 
+                        // Strict rejection if phone number is not actively registered to a company
                         if (!companyId) {
-                            const { data: first } = await supabase
-                                .from('marketing_integrations')
-                                .select('company_id')
-                                .eq('provider', 'whatsapp')
-                                .eq('is_active', true)
-                                .limit(1)
-                                .maybeSingle();
-                            if (first) companyId = first.company_id;
+                            console.warn(`[SECURITY] Ignored WhatsApp message for unauthorized/unmapped PhoneID: ${phoneNumberId} / Phone: ${displayPhone}`);
+                            continue;
                         }
 
-                        if (!companyId) { console.error(`No company for WhatsApp PhoneID: ${phoneNumberId} / Phone: ${displayPhone}`); continue; }
-
                         for (const msg of change.value.messages) {
+                            // Block known spam/flirt numbers like Oscar (+50368273898)
+                            const BLACKLISTED_SENDERS = ['50368273898'];
+                            if (BLACKLISTED_SENDERS.includes(msg.from)) {
+                                console.warn(`[SECURITY] Dropping message from blacklisted sender: ${msg.from}`);
+                                continue;
+                            }
+
                             const contact    = change.value.contacts?.find((c: any) => c.wa_id === msg.from);
                             const senderName = contact?.profile?.name || msg.from;
                             const chatId     = msg.from;
@@ -256,7 +263,8 @@ serve(async (req) => {
                                 phone_number_id: phoneNumberId, 
                                 raw_data: msg,
                                 phone: formattedPhone,
-                                chat_id: chatId
+                                chat_id: chatId,
+                                from_user_id: msg.from_user_id || null // Meta BSUID support
                             };
 
                             // Capture Meta Click-to-WhatsApp Ads referral data
