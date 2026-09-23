@@ -5,7 +5,7 @@ import type { Profile, CustomRole, Role, Company } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { CustomSelect } from '../../components/ui/CustomSelect';
-import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send, BarChart3, Check, PauseCircle, PlayCircle, ArrowRight, UserCheck, AlertTriangle } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Shield, ShieldAlert, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send, BarChart3, Check, PauseCircle, PlayCircle, ArrowRight, UserCheck, AlertTriangle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
@@ -137,6 +137,7 @@ export default function Team() {
     };
 
 
+    const isAdmin = myProfile?.role === 'super_admin' || myProfile?.role === 'company_admin' || Boolean((myProfile as any)?.is_platform_owner);
     const isLimitReached = (members.length + invitations.length) >= maxUsers;
 
     const filteredMembers = members.filter(m => {
@@ -156,6 +157,10 @@ export default function Team() {
     });
 
     const handleOpenPauseModal = async (member: Profile) => {
+        if (!isAdmin) {
+            toast.error('⛔ No estás autorizado para pausar colaboradores. Solicita esta acción a tu administrador.');
+            return;
+        }
         setPausingMember(member);
         setIsLoadingPortfolio(true);
         // Default target agent: first active agent other than member being paused
@@ -203,6 +208,10 @@ export default function Team() {
     };
 
     const handleReactivateMember = async (member: Profile) => {
+        if (!isAdmin) {
+            toast.error('⛔ No estás autorizado para reactivar colaboradores. Solicita esta acción a tu administrador.');
+            return;
+        }
         try {
             await teamService.toggleMemberStatus({
                 userId: member.id,
@@ -219,6 +228,10 @@ export default function Team() {
     const handleCreateMember = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!myProfile?.company_id) return;
+        if (!isAdmin) {
+            toast.error('⛔ No estás autorizado para crear colaboradores. Solicita esta acción a tu administrador.');
+            return;
+        }
         if (isLimitReached) {
             toast.error('Límite de usuarios alcanzado');
             return;
@@ -315,6 +328,10 @@ export default function Team() {
     const handleSaveEdit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingMember) return;
+        if (!isAdmin && editingMember.id !== myProfile?.id) {
+            toast.error('⛔ No estás autorizado para modificar a otros colaboradores. Solicita esta acción a tu administrador.');
+            return;
+        }
 
         const selectedRole = customRoles.find(r => r.id === editingMember.custom_role_id);
 
@@ -385,6 +402,10 @@ export default function Team() {
     // Opción A: Enviar link de reset por email
     const handleSendEmailLink = async () => {
         if (!editingMember) return;
+        if (!isAdmin) {
+            toast.error('⛔ No estás autorizado para gestionar contraseñas de otros usuarios. Contacta a tu administrador.');
+            return;
+        }
         setIsSendingEmailLink(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -417,6 +438,10 @@ export default function Team() {
     const handleSaveNewPassword = async () => {
         if (!editingMember || !newPassword || newPassword.length < 6) {
             toast.error('La contraseña debe tener al menos 6 caracteres.');
+            return;
+        }
+        if (!isAdmin) {
+            toast.error('⛔ No estás autorizado para modificar contraseñas de otros usuarios. Contacta a tu administrador.');
             return;
         }
         setIsResettingPassword(true);
@@ -541,6 +566,7 @@ export default function Team() {
 
                         {/* Scrollable Form Body */}
                         <div className="flex-1 overflow-y-auto px-10 py-6 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
+                        {isAdmin ? (
                         <form onSubmit={handleCreateMember} className="space-y-4">
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.15em] ml-1">Nombre Completo</label>
@@ -732,6 +758,22 @@ export default function Team() {
                                 {isCreating ? 'Procesando...' : '🔑 Vincular con Contraseña B'}
                             </button>
                         </form>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center p-6 text-center h-full space-y-4 my-auto py-16 animate-in fade-in">
+                                <div className="w-14 h-14 rounded-3xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600 shadow-sm">
+                                    <ShieldAlert className="w-7 h-7" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <h4 className="text-xs font-black text-gray-800 uppercase tracking-widest">Acceso Restringido</h4>
+                                    <p className="text-[11px] text-gray-500 leading-relaxed max-w-xs font-medium">
+                                        Solo los <strong>Administradores</strong> tienen autorización para registrar nuevos colaboradores y gestionar accesos al CRM.
+                                    </p>
+                                </div>
+                                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-[10px] text-slate-600 font-semibold max-w-xs leading-normal">
+                                    💡 Si requieres dar de alta a un colaborador o modificar accesos, solicita la gestión a tu <strong>Administrador</strong>.
+                                </div>
+                            </div>
+                        )}
                         </div>
                     </div>
                 </div>
@@ -860,68 +902,80 @@ export default function Team() {
                                             ) : (
                                                 <RoleBadge member={member} />
                                             )}
-                                            <div className="flex items-center gap-1.5">
-                                                {/* Pause / Play Quick Actions */}
-                                                {member.id !== myProfile?.id && (
-                                                    member.is_active !== false ? (
+                                            {isAdmin ? (
+                                                <div className="flex items-center gap-1.5">
+                                                    {/* Pause / Play Quick Actions */}
+                                                    {member.id !== myProfile?.id && (
+                                                        member.is_active !== false ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenPauseModal(member)}
+                                                                className="p-1.5 rounded-xl text-slate-400 hover:text-[#4449AA] hover:bg-indigo-50 transition-all"
+                                                                title="Pausar colaborador y reasignar cartera"
+                                                            >
+                                                                <PauseCircle className="w-4 h-4" />
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleReactivateMember(member)}
+                                                                className="p-1.5 rounded-xl text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 transition-all"
+                                                                title="Reactivar colaborador"
+                                                            >
+                                                                <PlayCircle className="w-4 h-4" />
+                                                            </button>
+                                                        )
+                                                    )}
+                                                    <button
+                                                        onClick={async () => {
+                                                            const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: member.id });
+                                                            const perms = mergedPerms || {};
+                                                            const selectedRole = customRoles.find(r => r.id === member.custom_role_id);
+                                                            let roleOnlyPerms: Record<string, boolean> = {};
+                                                            if (selectedRole) {
+                                                                const { data: rolePerms } = await supabase.rpc('get_role_permissions', { role_id: selectedRole.id });
+                                                                roleOnlyPerms = rolePerms || {};
+                                                            }
+                                                            setBaselinePermissions(roleOnlyPerms);
+                                                            setEditingMember({ ...member, permissions: perms });
+                                                            setActiveTab('general');
+                                                            setShowPasswordPanel(false);
+                                                            setPasswordResetLog([]);
+                                                            loadPasswordResetLog(member.id);
+                                                        }}
+                                                        className="p-1.5 rounded-xl text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                                                        title="Editar colaborador"
+                                                    >
+                                                        <Edit2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    {member.id !== myProfile?.id ? (
                                                         <button
-                                                            type="button"
-                                                            onClick={() => handleOpenPauseModal(member)}
-                                                            className="p-1.5 rounded-xl text-slate-400 hover:text-[#4449AA] hover:bg-indigo-50 transition-all"
-                                                            title="Pausar colaborador y reasignar cartera"
+                                                            onClick={() => { if (confirm('¿Eliminar usuario definitivamente del sistema?')) teamService.deleteMember(member.id).then(loadData) }}
+                                                            className="p-1.5 rounded-xl text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                                                            title="Eliminar usuario"
                                                         >
-                                                            <PauseCircle className="w-4 h-4" />
+                                                            <Trash2 className="w-3.5 h-3.5" />
                                                         </button>
                                                     ) : (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleReactivateMember(member)}
-                                                            className="p-1.5 rounded-xl text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 transition-all"
-                                                            title="Reactivar colaborador"
-                                                        >
-                                                            <PlayCircle className="w-4 h-4" />
-                                                        </button>
-                                                    )
-                                                )}
-                                                <button
-                                                    onClick={async () => {
-                                                        // Get merged permissions (role + user overrides) for display
-                                                        const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: member.id });
-                                                        const perms = mergedPerms || {};
-
-                                                        // Get ROLE-ONLY baseline permissions (without user overrides)
-                                                        const selectedRole = customRoles.find(r => r.id === member.custom_role_id);
-                                                        let roleOnlyPerms: Record<string, boolean> = {};
-
-                                                        if (selectedRole) {
-                                                            const { data: rolePerms } = await supabase.rpc('get_role_permissions', { role_id: selectedRole.id });
-                                                            roleOnlyPerms = rolePerms || {};
-                                                        }
-
-                                                        setBaselinePermissions(roleOnlyPerms);
-                                                        setEditingMember({ ...member, permissions: perms });
-                                                        setActiveTab('general');
-                                                        setShowPasswordPanel(false);
-                                                        setPasswordResetLog([]);
-                                                        loadPasswordResetLog(member.id);
-                                                    }}
-                                                    className="p-1.5 rounded-xl text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
-                                                    title="Editar colaborador"
-                                                >
-                                                    <Edit2 className="w-3.5 h-3.5" />
-                                                </button>
-                                                {member.id !== myProfile?.id ? (
+                                                        <span className="text-[8px] font-black text-indigo-500 uppercase tracking-[0.25em] px-2.5 py-1 bg-indigo-50/50 rounded-lg border border-indigo-100/50 shadow-sm ml-2">TÚ</span>
+                                                    )}
+                                                </div>
+                                            ) : member.id === myProfile?.id ? (
+                                                <div className="flex items-center gap-1.5">
                                                     <button
-                                                        onClick={() => { if (confirm('¿Eliminar usuario definitivamente del sistema?')) teamService.deleteMember(member.id).then(loadData) }}
-                                                        className="p-1.5 rounded-xl text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
-                                                        title="Eliminar usuario"
+                                                        onClick={async () => {
+                                                            setEditingMember({ ...member, permissions: member.permissions || {} });
+                                                            setActiveTab('general');
+                                                            setShowPasswordPanel(false);
+                                                        }}
+                                                        className="p-1.5 rounded-xl text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                                                        title="Editar mis datos"
                                                     >
-                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                        <Edit2 className="w-3.5 h-3.5" />
                                                     </button>
-                                                ) : (
                                                     <span className="text-[8px] font-black text-indigo-500 uppercase tracking-[0.25em] px-2.5 py-1 bg-indigo-50/50 rounded-lg border border-indigo-100/50 shadow-sm ml-2">TÚ</span>
-                                                )}
-                                            </div>
+                                                </div>
+                                            ) : null}
                                         </div>
                                     </div>
                                 ))}
@@ -993,8 +1047,22 @@ export default function Team() {
                                                 <Input value={editingMember.full_name || ''} onChange={e => setEditingMember({ ...editingMember, full_name: e.target.value })} className="h-14 rounded-xl shadow-inner bg-gray-50/50 font-bold" placeholder="Nombre completo..." />
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Correo Electrónico</label>
-                                                <Input type="email" value={editingMember.email || ''} onChange={e => setEditingMember({ ...editingMember, email: e.target.value })} className="h-14 rounded-xl shadow-inner bg-gray-50/50 font-bold" placeholder="correo@empresa.com" />
+                                                <div className="flex items-center justify-between">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Correo Electrónico (Acceso CRM)</label>
+                                                    <span className="text-[8px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                                                        <Lock className="w-2.5 h-2.5" /> Protegido
+                                                    </span>
+                                                </div>
+                                                <Input
+                                                    type="email"
+                                                    disabled
+                                                    value={editingMember.email || ''}
+                                                    className="h-14 rounded-xl shadow-inner bg-gray-100/80 border-gray-200 text-gray-500 font-bold cursor-not-allowed select-none"
+                                                    placeholder="correo@empresa.com"
+                                                />
+                                                <p className="text-[9px] text-amber-700/80 pl-1 font-semibold leading-tight">
+                                                    🔒 El correo de acceso está protegido por el sistema de autenticación. Para agregar a un nuevo integrante, el Administrador debe crearlo desde el formulario de nuevo colaborador.
+                                                </p>
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Número de Contacto</label>
