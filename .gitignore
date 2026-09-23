@@ -33,6 +33,7 @@ CREDENCIALES_MAESTRAS.txt
 # Scratch & debug scripts
 scratch/
 *.cjs
+!scripts/audit-rls.cjs
 *.mjs
 env-keys.json
 supabase/.temp/
