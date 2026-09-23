@@ -228,27 +228,27 @@ export default function Workspaces() {
                 .maybeSingle();
 
             const settings = mktData?.settings || {};
-            const currentAgent = agentsByWorkspace[workspace.id]?.find(a => (a as any).role !== 'company_admin' && (a as any).role !== 'super_admin');
-            setFormData({
+            const currentAgent = agentsByWorkspace[workspace.id]?.find(a => (a as any).role !== 'super_admin') || agentsByWorkspace[workspace.id]?.[0];
+            setFormData(prev => ({
                 name: workspace.name,
                 waba_id: settings.wabaId || '',
                 phone_number_id: settings.phoneNumberId || '',
                 sender_phone_number: settings.phone || '',
                 whatsapp_token: settings.token || '',
                 allowed_permissions: workspace.allowed_permissions || [],
-                agentId: currentAgent?.id || ''
-            });
+                agentId: prev.agentId || currentAgent?.id || ''
+            }));
         } catch (err) {
             console.error('Error fetching workspace integration details:', err);
-            setFormData({
+            setFormData(prev => ({
                 name: workspace.name,
                 waba_id: '',
                 phone_number_id: '',
                 sender_phone_number: '',
                 whatsapp_token: '',
                 allowed_permissions: workspace.allowed_permissions || [],
-                agentId: ''
-            });
+                agentId: prev.agentId || ''
+            }));
         }
     };
 
@@ -276,7 +276,11 @@ export default function Workspaces() {
                 if (updateError) throw updateError;
                 // Assign agent to this workspace
                 if (formData.agentId) {
-                    await supabase.from('profiles').update({ company_id: editingWorkspace.id }).eq('id', formData.agentId);
+                    const { error: profError } = await supabase.from('profiles').update({ company_id: editingWorkspace.id }).eq('id', formData.agentId);
+                    if (profError) {
+                        console.error('Error assigning agent to workspace:', profError);
+                        toast.error(`No se pudo mover el agente: ${profError.message}`);
+                    }
                 }
                 toast.success('Workspace actualizado');
             } else {
@@ -469,6 +473,12 @@ export default function Workspaces() {
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">Fecha de Creación:</span>
                                         <span>{new Date(w.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-400">Agente Responsable:</span>
+                                        <span className="text-[#4449AA] font-black">
+                                            {agentsByWorkspace[w.id]?.[0]?.full_name || 'Sin asignar'}
+                                        </span>
                                     </div>
                                     {/* WhatsApp Status Badge */}
                                     <div className="flex justify-between items-center pt-1">
