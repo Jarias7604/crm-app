@@ -231,7 +231,7 @@ export default function Team() {
 
         setIsCreating(true);
         try {
-            await teamService.createMember({
+            const rawCreated = await teamService.createMember({
                 email: formData.email,
                 password: formData.password,
                 fullName: formData.fullName,
@@ -242,6 +242,39 @@ export default function Team() {
                 birthDate: formData.birthDate,
                 address: formData.address
             });
+
+            // Sincronizar contraseña en GoTrue mediante admin-reset-password Edge Function
+            // CRÍTICO: PostgreSQL crypt() en admin_create_user genera un hash incompatible con GoTrue signInWithPassword.
+            const newUserId = typeof rawCreated === 'object' && rawCreated !== null ? (rawCreated as any).id : rawCreated;
+            if (newUserId && formData.password) {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    try {
+                        const resetRes = await fetch(
+                            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
+                            {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${session.access_token}`,
+                                    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                                },
+                                body: JSON.stringify({
+                                    target_user_id: newUserId,
+                                    new_password: formData.password,
+                                    mode: 'direct'
+                                })
+                            }
+                        );
+                        const resetJson = await resetRes.json();
+                        if (!resetRes.ok || resetJson.error) {
+                            console.warn('⚠️ Advertencia al sincronizar contraseña en auth.admin:', resetJson?.error);
+                        }
+                    } catch (syncErr) {
+                        console.warn('⚠️ No se pudo invocar admin-reset-password:', syncErr);
+                    }
+                }
+            }
 
             setFormData(prev => ({
                 ...prev,
@@ -636,11 +669,12 @@ export default function Team() {
                                                         });
                                                         // Send email reset link
                                                         const { data: { session } } = await supabase.auth.getSession();
-                                                        if (session && createdMember?.id) {
+                                                        const targetId = typeof createdMember === 'object' && createdMember !== null ? (createdMember as any).id : createdMember;
+                                                        if (session && targetId) {
                                                             await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`, {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
-                                                                body: JSON.stringify({ target_user_id: createdMember.id, mode: 'email_link' })
+                                                                body: JSON.stringify({ target_user_id: targetId, mode: 'email_link' })
                                                             });
                                                         }
                                                         setFormData(prev => ({ ...prev, email: '', password: '', fullName: '', phone: '', birthDate: '', address: '' }));

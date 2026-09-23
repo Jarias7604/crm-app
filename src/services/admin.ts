@@ -96,7 +96,7 @@ export const adminService = {
             new_company_id: params.company_id,
             new_phone: null,
             new_custom_role_id: null,
-            new_address_date: null,
+            new_birth_date: null,
             new_address: null
         });
 
