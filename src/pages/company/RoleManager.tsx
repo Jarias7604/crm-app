@@ -14,6 +14,7 @@ import {
 const ALL_PERMISSIONS = [
     { key: 'leads',          label: 'Leads / Prospectos',    icon: Users,        desc: 'Ver y gestionar leads del pipeline de ventas' },
     { key: 'quotes',         label: 'Cotizaciones',          icon: FileText,     desc: 'Crear y ver cotizaciones de clientes' },
+    { key: 'invoices',       label: 'Facturas',              icon: FileText,     desc: 'Acceso al módulo de facturación y facturas' },
     { key: 'tickets',        label: 'Tickets de Soporte',    icon: CheckCircle,  desc: 'Gestionar tickets y solicitudes de servicio' },
     { key: 'calendar',       label: 'Agenda / Calendario',   icon: Calendar,     desc: 'Ver y crear eventos en la agenda global' },
     { key: 'chat',           label: 'Chat / Mensajes',       icon: MessageSquare,desc: 'Acceder al módulo de mensajería' },
@@ -46,9 +47,9 @@ const EMPTY_PERMS: Record<string, boolean> = Object.fromEntries(
 );
 
 const DEFAULT_AGENT_PERMS: Record<string, boolean> = {
-    leads: true, quotes: true, tickets: true, calendar: true,
-    chat: true, clientes: true, loss_reasons: true,
-    marketing: false, pricing: false, paquetes: false,
+    leads: true, quotes: true, invoices: false, tickets: true, calendar: true,
+    chat: true, clientes: true, proyectos: true, loss_reasons: true,
+    marketing: false, pricing: false, paquetes: false, finanzas: false,
     items: false, financial_rules: false, dashboard_full: false,
     view_financials: false,
 };

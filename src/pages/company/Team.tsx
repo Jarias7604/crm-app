@@ -13,7 +13,8 @@ import { permissionsService, type RolePermission } from '../../services/permissi
 import { supabase } from '../../services/supabase';
 import Switch from '../../components/ui/Switch';
 import { CustomDatePicker } from '../../components/ui/CustomDatePicker';
-import RoleManager from './RoleManager';
+import RoleManager from './RoleManager'; // kept for legacy — tab now redirects to /company/permissions
+import { Link } from 'react-router-dom';
 
 
 type TabType = 'general' | 'security';
@@ -537,10 +538,25 @@ export default function Team() {
                 </div>
             </header>
 
-            {/* Roles Tab */}
+            {/* Perfiles de Acceso Tab — redirects to the unified Permissions page */}
             {mainTab === 'roles' && (
-                <div className="animate-in fade-in duration-300">
-                    <RoleManager />
+                <div className="animate-in fade-in duration-300 flex flex-col items-center justify-center min-h-[60vh] gap-6">
+                    <div className="w-20 h-20 bg-indigo-50 rounded-3xl flex items-center justify-center">
+                        <Shield className="w-10 h-10 text-[#4449AA]" />
+                    </div>
+                    <div className="text-center space-y-2">
+                        <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Roles y Permisos</h2>
+                        <p className="text-sm text-gray-400 font-medium max-w-sm">
+                            Ahora gestionas los perfiles de acceso desde un panel unificado y más claro.
+                        </p>
+                    </div>
+                    <Link
+                        to="/company/permissions"
+                        className="flex items-center gap-2 h-11 px-6 bg-[#4449AA] text-white rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-[#383d8f] transition-all shadow-md"
+                    >
+                        <Shield className="w-4 h-4" />
+                        Ir a Roles y Permisos
+                    </Link>
                 </div>
             )}
 

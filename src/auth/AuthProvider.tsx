@@ -325,123 +325,107 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 
             // ─────────────────────────────────────────────────────────────────
-            // ENTERPRISE PERMISSION RESOLUTION (Single Source of Truth)
-            // Igual que HubSpot/Salesforce: el ROL es la fuente de verdad.
-            // profiles.permissions NUNCA sobrescribe al custom_role.
-            // ⚡ PARALLELIZED: permissions RPC + company license query run simultaneously
+            // PERMISSION RESOLUTION — Single Source of Truth (SSOT)
+            // The RPC get_user_permissions is the ONLY authority:
+            //   1. super_admin  → full catalog
+            //   2. custom_role  → role_permissions table (deterministic)
+            //   3. company_admin (no custom_role) → company allowed_permissions
+            //   4. everyone else → {} (no access)
+            // We only apply company license intersection as a final guardrail.
             // ─────────────────────────────────────────────────────────────────
             let activePerms: Record<string, boolean> = {};
 
-            // Run permissions RPC and company license fetch IN PARALLEL (they are independent)
-            const [permsResult, companyLicenseResult] = await Promise.all([
-                supabase.rpc('get_user_permissions', { user_id: userId }),
-                // Only fetch company license for non-super_admin users
-                (data.role !== 'super_admin' && data.company_id)
-                    ? supabase.from('companies').select('allowed_permissions').eq('id', data.company_id).single()
-                    : Promise.resolve({ data: null, error: null })
-            ]);
+            // Run RPC — it now handles all permission logic deterministically
+            const permsResult = await supabase.rpc('get_user_permissions', { user_id: userId });
 
-            const mergedPerms = permsResult.data;
-
-            if (mergedPerms && Object.keys(mergedPerms).length > 0) {
-                // RPC devolvió permisos consolidados — usar directamente
-                activePerms = mergedPerms;
-            } else if (data?.custom_role_id) {
-                // 2. Si tiene custom_role asignado → consultar la tabla role_permissions
-                const { data: rolePerms } = await supabase
-                    .from('role_permissions')
-                    .select('permission_key, is_enabled')
-                    .eq('role_id', data.custom_role_id)
-                    .eq('is_enabled', true);
-
-                if (rolePerms && rolePerms.length > 0) {
-                    activePerms = {};
-                    rolePerms.forEach(rp => {
-                        activePerms[rp.permission_key] = true;
-                    });
-                } else {
-                    const { data: roleData } = await supabase
-                        .from('custom_roles')
-                        .select('permissions')
-                        .eq('id', data.custom_role_id)
-                        .single();
-                    activePerms = (roleData?.permissions as Record<string, boolean>) || {};
-                }
-                console.info('✅ Permisos cargados desde role_permissions/custom_role (fuente única de verdad)');
-            }
-
-            // 3. Fallback para administradores de empresa sin rol personalizado (o perfiles en prueba)
-            if (Object.keys(activePerms).length === 0) {
-                if (data?.permissions && typeof data.permissions === 'object' && Object.keys(data.permissions).length > 0) {
-                    activePerms = { ...(data.permissions as Record<string, boolean>) };
-                } else if (data?.role === 'company_admin') {
-                    // HubSpot / Salesforce pattern: El Admin de la empresa tiene acceso completo a los módulos de su SaaS
-                    const defaultAdminModules = [
-                        'leads', 'clients', 'clientes', 'pipeline', 'quotes', 'invoices', 'facturas', 
-                        'marketing', 'chat', 'branding', 'dashboard_full', 'pricing', 'paquetes', 
-                        'financial_rules', 'items', 'calendar', 'loss_reasons', 'proyectos', 'finanzas', 
-                        'tickets', 'team_manage', 'team_view_assigned', 'reports', 'view_financials'
-                    ];
-                    defaultAdminModules.forEach(m => { activePerms[m] = true; });
-                }
+            if (permsResult.data && Object.keys(permsResult.data).length > 0) {
+                activePerms = permsResult.data as Record<string, boolean>;
+                console.info('✅ Permisos cargados via RPC get_user_permissions (SSOT)');
+            } else {
+                console.warn('[AuthProvider] RPC returned empty permissions for user:', userId);
             }
 
             // ─────────────────────────────────────────────────────────────────
-            // 4. INTERSECT WITH COMPANY LICENSE (allowed_permissions)
-            // Para usuarios no-superadmin, limitar los permisos cargados
-            // a los que la empresa tiene permitidos en su columna 'allowed_permissions'.
-            // Uses pre-fetched companyLicenseResult (no extra DB call needed)
+            // COMPANY LICENSE INTERSECTION (final guardrail — non-super_admin only)
+            // Limits active permissions to modules the company has licensed.
+            // Uses a direct key-match + module prefix approach.
+            // Infra keys (team_*, dashboard_*, branding, etc.) are always allowed.
             // ─────────────────────────────────────────────────────────────────
-            if (data && data.role !== 'super_admin' && data.company_id && companyLicenseResult.data) {
+            if (data && data.role !== 'super_admin' && data.company_id) {
                 try {
-                    const companyData = companyLicenseResult.data;
+                    const { data: companyData } = await supabase
+                        .from('companies')
+                        .select('allowed_permissions')
+                        .eq('id', data.company_id)
+                        .single();
 
-                    if (companyData) {
-                        const rawLicense = companyData.allowed_permissions;
-                        const companyLicense: string[] = Array.isArray(rawLicense)
-                            ? rawLicense.map(k => String(k).trim().toLowerCase())
-                            : [];
+                    const rawLicense = companyData?.allowed_permissions;
+                    const companyLicense: string[] = Array.isArray(rawLicense)
+                        ? rawLicense.map((k: any) => String(k).trim().toLowerCase())
+                        : [];
+
+                    if (companyLicense.length > 0) {
+                        // Infrastructure keys that are always permitted regardless of license
+                        const INFRA_PREFIXES = ['team', 'dashboard', 'branding', 'onboarding', 'pipeline'];
+
+                        // Module key normalization map (permission prefix → license key)
+                        const LICENSE_MAP: Record<string, string> = {
+                            leads:          'leads',
+                            quotes:         'quotes',
+                            calendar:       'calendar',
+                            marketing:      'marketing',
+                            ai_agents:      'marketing',
+                            mkt:            'marketing',
+                            chat:           'chat',
+                            pricing:        'pricing',
+                            paquetes:       'paquetes',
+                            items:          'items',
+                            financial_rules:'financial_rules',
+                            loss_reasons:   'loss_reasons',
+                            loss:           'loss_reasons',
+                            proyectos:      'proyectos',
+                            finanzas:       'finanzas',
+                            tickets:        'tickets',
+                            reports:        'reports',
+                            view_financials:'view_financials',
+                            clientes:       'leads',
+                            clients:        'leads',
+                            invoices:       'invoices',
+                            facturas:       'invoices',
+                            // dashboard_full is infra but also check for both 'reports' and 'dashboard_full'
+                            dashboard_full: 'dashboard_full',
+                        };
 
                         const filteredPerms: Record<string, boolean> = {};
                         Object.keys(activePerms).forEach(key => {
-                            if (activePerms[key] === true) {
-                                const baseModule = key.split(/[._:]/)[0].toLowerCase();
-                                
-                                // Mapear claves de permisos a los nombres de módulos en Companies/AllowedPermissions
-                                let isAllowed = false;
-                                if (baseModule === 'leads') isAllowed = companyLicense.includes('leads');
-                                else if (baseModule === 'quotes') isAllowed = companyLicense.includes('quotes');
-                                else if (baseModule === 'calendar') isAllowed = companyLicense.includes('calendar');
-                                else if (baseModule === 'marketing' || baseModule === 'ai_agents' || baseModule === 'mkt') isAllowed = companyLicense.includes('marketing');
-                                else if (baseModule === 'chat') isAllowed = companyLicense.includes('chat');
-                                else if (baseModule === 'branding') isAllowed = companyLicense.includes('branding');
-                                else if (baseModule === 'pricing') isAllowed = companyLicense.includes('pricing');
-                                else if (baseModule === 'paquetes') isAllowed = companyLicense.includes('paquetes');
-                                else if (baseModule === 'items') isAllowed = companyLicense.includes('items');
-                                else if (baseModule === 'financial_rules') isAllowed = companyLicense.includes('financial_rules');
-                                else if (baseModule === 'loss_reasons' || baseModule === 'loss') isAllowed = companyLicense.includes('loss_reasons');
-                                else if (baseModule === 'proyectos') isAllowed = companyLicense.includes('proyectos');
-                                else if (baseModule === 'finanzas') isAllowed = companyLicense.includes('finanzas');
-                                else if (baseModule === 'tickets') isAllowed = companyLicense.includes('tickets');
-                                else if (baseModule === 'reports' || baseModule === 'dashboard_full' || baseModule === 'dashboard') isAllowed = companyLicense.includes('reports');
-                                else if (baseModule === 'view_financials') isAllowed = companyLicense.includes('view_financials');
-                                else if (baseModule === 'clientes' || baseModule === 'clients') isAllowed = companyLicense.includes('leads');
-                                else if (baseModule === 'invoices' || baseModule === 'facturas') isAllowed = companyLicense.includes('invoices');
-                                else {
-                                    // Infraestructura general (team, onboarding, workspaces, pipeline) siempre se permite
-                                    isAllowed = true;
-                                }
+                            if (activePerms[key] !== true) return;
 
-                                if (isAllowed) {
-                                    filteredPerms[key] = true;
-                                }
+                            const baseModule = key.split(/[._:]/)[0].toLowerCase();
+
+                            // Always allow infra keys
+                            if (INFRA_PREFIXES.some(p => baseModule.startsWith(p))) {
+                                filteredPerms[key] = true;
+                                return;
+                            }
+
+                            // Map to license key and check
+                            const licenseKey = LICENSE_MAP[baseModule];
+                            if (licenseKey && companyLicense.includes(licenseKey)) {
+                                filteredPerms[key] = true;
+                                return;
+                            }
+
+                            // Direct match fallback (e.g. cotizaciones.create → license has 'cotizaciones')
+                            if (companyLicense.includes(key) || companyLicense.includes(baseModule)) {
+                                filteredPerms[key] = true;
                             }
                         });
                         activePerms = filteredPerms;
-                        console.info('🛡️ Permisos del usuario filtrados por la licencia de la empresa (allowed_permissions)');
+                        console.info('🛡️ Permisos intersectados con licencia de empresa');
                     }
                 } catch (e) {
-                    console.error('Error al aplicar intersección de licencia de empresa:', e);
+                    console.error('[AuthProvider] Error applying company license intersection:', e);
+                    // On error: keep activePerms as-is (fail open for non-admin, not fail closed)
                 }
             }
 
