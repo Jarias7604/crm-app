@@ -9,6 +9,19 @@ const corsHeaders = {
 };
 
 const HARDCODED: Record<string, string[]> = {
+  church: [
+    'photo-1544427920-c49ccfb85579','photo-1438232992991-995b7058bbb3','photo-1519491050282-cf00c82424b4',
+    'photo-1507692049790-de58290a4334','photo-1470225620780-dba8ba36b745','photo-1511671782779-c97d3d27a1d4',
+    'photo-1492684223066-81342ee5ff30','photo-1499209974431-9dddcece7f88','photo-1465847899084-d164df4dedc6',
+    'photo-1510525009512-ad7fc13eefab','photo-1529070538774-1843cb3265df','photo-1516450360452-9312f5e86fc7',
+    'photo-1514525253161-7a46d19cd819','photo-1523580494863-6f3031224c94','photo-1505373877841-8d25f7d46678'
+  ],
+  finance: [
+    'photo-1554224155-8d04cb21cd6c','photo-1460925895917-afdab827c52f','photo-1551288049-bebda4e38f71',
+    'photo-1559526324-4b87b5e36e44','photo-1579532537598-459ecdaf39cc','photo-1507679799987-c73779587ccf',
+    'photo-1486406146926-c627a92ad1ab','photo-1454165804606-c3d57bc86b40','photo-1551836022-d5d88e9218df',
+    'photo-1507238691740-187a5b1d37b8','photo-1590283603385-17ffb3a7f29f','photo-1611974789855-9c2a0a7236a3'
+  ],
   beach: ['photo-1507525428034-b723cf961d3e','photo-1510414842594-a61c69b5ae57','photo-1544551763-46a013bb70d5','photo-1559494007-9f5847c49d94','photo-1571003123894-1f0594d2b5d9','photo-1527489377706-5bf97e608852','photo-1501785888041-af3ef285b470','photo-1506953823976-52e1fdc0149a','photo-1573843981267-be1999ff37cd','photo-1540202404-a2f29016b523','photo-1469474968028-56623f02e42e','photo-1519046904884-53103b34b206','photo-1596178065887-1198b6148b2b','photo-1561731216-c3a4d99437d5','photo-1582610116397-edb72e9b9b4e'],
   food: ['photo-1513104890138-7c749659a591','photo-1504674900247-0877df9cc836','photo-1565299624946-b28f40a0ae38','photo-1568901346375-23c9450c58cd','photo-1579871494447-9811cf80d66c','photo-1512621776951-a57141f2eefd','photo-1544025162-d76694265947','photo-1563379091339-03b21ab4a4f8','photo-1578985545062-69928b1d9587','photo-1555396273-367ea4eb4db5','photo-1540189549336-e6e99c3679fe','photo-1482049016688-2d3e1b311543','photo-1484723091739-30a097e8f929','photo-1567620905732-2d1ec7ab7445','photo-1565299585323-38d6b0865b47'],
   dental: ['photo-1629909613654-28e377c37b09','photo-1588776814546-1ffcf47267a5','photo-1471864190281-a93a3070b6de','photo-1579684389782-64d84b5e901a','photo-1598256989800-fe5f95da9787','photo-1606811971618-4486d14f3f99','photo-1629909615184-74f495363b67','photo-1560185007-c5ca9d2c014d','photo-1468495244123-6c6c332eeece','photo-1596462502278-27bfdc403348','photo-1460157491444-f1a517793577','photo-1512223792601-592a9809eed4','photo-1552566626-52f8b828add9','photo-1576765608535-5f04d1e3f289','photo-1516549655169-df83a0774514'],
@@ -16,33 +29,43 @@ const HARDCODED: Record<string, string[]> = {
   beauty: ['photo-1560066984-138dadb4c035','photo-1522337360788-8b13dee7a37e','photo-1607779097040-26e80aa78e66','photo-1519699047748-de8e457a634e','photo-1604654894610-df63bc536371','photo-1540555700478-4be289fbecef','photo-1582095133179-bfd08e2fc6b3','photo-1512290923902-8a9f81dc236c','photo-1562322140-8baeececf3df','photo-1616394584738-fc6e612e71b9','photo-1527799820374-dcf8d9d4a438','photo-1500840216050-6ffa99d7cd76','photo-1515377905703-c4788e51af15','photo-1590156546746-c23109b257c3','photo-1596462502278-27bfdc403348'],
   gym: ['photo-1517838277536-f5f99be501cd','photo-1534438327276-14e5300c3a48','photo-1541534741688-6078c6bfb5c5','photo-1571902943202-507ec2618e8f','photo-1605296867304-46d5465a25f1','photo-1526506118085-60ce8714f8c5','photo-1517963879433-6ad2b056d712','photo-1518611012118-696072aa579a','photo-1549719386-74dfcbf7dbed','photo-1593079831268-3381b0db4a77','photo-1574680096145-d05b474e2155','photo-1594381898411-846e7d193883','photo-1584735935682-2f2b69dff9d2','photo-1518310383802-64c2de311b2','photo-1476480862126-209bfaa8edc8'],
   realestate: ['photo-1560518883-ce09059eeffa','photo-1512917774080-9991f1c4c750','photo-1564013799919-ab600027ffc6','photo-1600585154340-be6161a56a0c','photo-1600210492486-724fe5c67fb0','photo-1560520653-9e0e4c89eb11','photo-1600596542815-ffad4c1539a9','photo-1504307651254-35680f356dfd','photo-1522708323590-d24dbb6b0267','photo-1582407947304-fd86f028f716','photo-1502672260266-1c1ef2d93688','photo-1484154218962-a197022b5858','photo-1513584684374-8bab748fbf90','photo-1505691938895-1758d7feb511','photo-1600607687939-ce8a6c25118c'],
-  tech: ['photo-1518770660439-4636190af475','photo-1488590528505-98d2b5aba04b','photo-1461749280684-dccba630e2f6','photo-1504639725590-34d0984388bd','photo-1551434678-e076c223a692','photo-1542744173-8e7e53415bb0','photo-1486312338219-ce68d2c6f44d','photo-1498050108023-c5249f4df085','photo-1531297484001-80022131f5a1','photo-1519389950473-47ba0277781c','photo-1600880292203-757bb62b4baf','photo-1560472355-536de3962603','photo-1553877522-43269d4ea984','photo-1573164713714-d95e436ab8d6','photo-1522071820081-009f0129c71c'],
+  tech: ['photo-1551288049-bebda4e38f71','photo-1460925895917-afdab827c52f','photo-1504868584819-f8e8b4b6d7e3','photo-1518770660439-4636190af475','photo-1488590528505-98d2b5aba04b','photo-1461749280684-dccba630e2f6','photo-1504639725590-34d0984388bd','photo-1551434678-e076c223a692','photo-1542744173-8e7e53415bb0','photo-1486312338219-ce68d2c6f44d','photo-1498050108023-c5249f4df085','photo-1531297484001-80022131f5a1','photo-1519389950473-47ba0277781c','photo-1600880292203-757bb62b4baf','photo-1560472355-536de3962603','photo-1553877522-43269d4ea984'],
+  auto: ['photo-1486006920555-c77dce18193b','photo-1619642751034-765dfdf7c58e','photo-1568605117036-5fe5e7bab0b7','photo-1492144534655-ae79c964c9d7','photo-1525609004556-c46c7d6cf0a3','photo-1503376780353-7e6692767b70'],
+  education: ['photo-1523240795612-9a054b0db644','photo-1509062522246-3755977927d7','photo-1497633762265-9d179a990aa6','photo-1524178232363-1fb2b075b655','photo-1513542789411-b6a5d4f31634'],
   general: ['photo-1460925895917-afdab827c52f','photo-1519389950473-47ba0277781c','photo-1522071820081-009f0129c71c','photo-1454165804606-c3d57bc86b40','photo-1531403009284-440f080d1e12','photo-1486406146926-c627a92ad1ab','photo-1516321318423-f06f85e504b3','photo-1551836022-d5d88e9218df','photo-1507238691740-187a5b1d37b8','photo-1531538606174-0f90ff5dce83','photo-1522202176988-66273c2fd55f','photo-1497366216548-37526070297c','photo-1497215728101-856f4ea42174','photo-1504384308090-c894fdcc538d','photo-1517245386807-bb43f82c33c4'],
 };
 
 function regexCategory(text: string): string {
   const t = text.toLowerCase();
+  if (/iglesia|iclesia|culto|pastor|ministerio|adoraci[oó]n|cristian|fe|alabanza|congregaci[oó]n|servicio religioso|templo/i.test(t)) return 'church';
+  if (/facturaci[oó]n|factura|contab|finanz|impuesto|fiscal|auditor/i.test(t)) return 'finance';
   if (/playa|lote|terreno|vacaci|resort|tropical|caribe|costa|para[ií]so|bungal|arena|oc[eé]ano|playa|riviera|frente al mar/i.test(t)) return 'beach';
-  if (/pizza|comida|restaurante|pupusa|taco|burger|sushi|hamburguesa/i.test(t)) return 'food';
+  if (/pizza|comida|restaurante|pupusa|taco|burger|sushi|hamburguesa|caf[eé]|postre/i.test(t)) return 'food';
   if (/dental|dentista|diente|odontolog/i.test(t)) return 'dental';
   if (/doctor|m[eé]dico|farmacia|medicina|salud|hospital|cl[ií]nica|pediatra/i.test(t)) return 'medical';
-  if (/belleza|salon|spa|maquillaje|cabello|peluquer/i.test(t)) return 'beauty';
-  if (/gym|gimnasio|fitness|ejercicio|entrenamiento/i.test(t)) return 'gym';
+  if (/belleza|salon|spa|maquillaje|cabello|peluquer|uñas/i.test(t)) return 'beauty';
+  if (/gym|gimnasio|fitness|ejercicio|entrenamiento|deporte/i.test(t)) return 'gym';
   if (/casa|inmobiliaria|propiedad|apartamento|bienes ra[ií]ces|construcci/i.test(t)) return 'realestate';
-  if (/crm|software|saas|tecnolog|digital|startup|ecommerce|app/i.test(t)) return 'tech';
+  if (/taller|mec[aá]nic|carro|auto|veh[ií]culo|repuesto|llantas/i.test(t)) return 'auto';
+  if (/curso|taller|capacitaci[oó]n|escuela|universidad|estudiante|colegio|aprender/i.test(t)) return 'education';
+  if (/crm|software|saas|tecnolog|digital|startup|ecommerce|app|inventario|reportes|sistema/i.test(t)) return 'tech';
   return 'general';
 }
 
 const REGEX_TERMS: Record<string, string> = {
-  beach: 'tropical beach paradise ocean',
-  food: 'delicious food restaurant meal',
-  dental: 'dental clinic smile teeth',
-  medical: 'medical healthcare doctor clinic',
-  beauty: 'beauty salon spa hair',
-  gym: 'gym fitness workout exercise',
-  realestate: 'modern house real estate property',
-  tech: 'technology software digital innovation',
-  general: 'professional business advertising',
+  church: 'church congregation worship community',
+  finance: 'finance business dashboard analytics accounting',
+  beach: 'tropical beach paradise ocean resort',
+  food: 'delicious food restaurant gourmet dish',
+  dental: 'dental clinic smile teeth healthcare',
+  medical: 'medical healthcare doctor clinic hospital',
+  beauty: 'beauty salon spa aesthetic hair',
+  gym: 'gym fitness workout exercise athlete',
+  realestate: 'modern architecture luxury house property',
+  auto: 'modern car automotive workshop mechanic',
+  education: 'education students classroom university learning',
+  tech: 'modern software dashboard business technology analytics',
+  general: 'modern business startup innovation leadership',
 };
 
 Deno.serve(async (req) => {
@@ -63,18 +86,15 @@ Deno.serve(async (req) => {
 
       const unsplashKey = Deno.env.get('UNSPLASH_ACCESS_KEY') || '';
 
-      // Clean prompt — remove structural labels before sending to GPT
       const cleanPrompt = prompt
         .replace(/titulo:|subtitulo:|sub.?titulo:|cta:|incluye:|precio:|beneficios:|descripcion:|gancho:|oferta:/gi, '')
         .replace(/\s+/g, ' ').trim().substring(0, 300);
 
-      // Step 1: Regex detects known categories FIRST (fast, guaranteed correct)
-      // This covers beach, food, gym, etc. regardless of how the brief is worded
       const detectedCat = regexCategory(cleanPrompt + ' ' + (industry || ''));
       let searchTerms = detectedCat !== 'general' ? REGEX_TERMS[detectedCat] : '';
 
-      // Step 2: GPT only for truly unknown topics (galaxia, hormiga, lapiz, etc.)
-      if (!searchTerms && openaiKey) {
+      // GPT visual keyword extraction (prioritize clean 2-4 keywords without quotes)
+      if (openaiKey) {
         try {
           const r = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
@@ -84,47 +104,64 @@ Deno.serve(async (req) => {
               messages: [
                 {
                   role: 'system',
-                  content: 'Extract 3-4 English keywords for Unsplash photo search that match the visual theme. Return ONLY the keywords. Examples: "hormiga" → "ant insect macro", "galaxia" → "galaxy stars space", "lapiz" → "pencils colorful art".',
+                  content: 'Identify the exact visual subject of this flyer promotion and return 2-4 English stock photography search keywords. Return ONLY the words separated by spaces. Absolutely NO quotes, NO commas, NO punctuation. Examples: church sermon/service -> "church congregation worship community", billing/reports -> "modern software analytics dashboard", pizza offer -> "delicious artisan pizza restaurant", luxury homes -> "luxury modern house villa".',
                 },
-                { role: 'user', content: cleanPrompt }
+                { role: 'user', content: `Brief: ${cleanPrompt} | Industry: ${industry || 'General'}` }
               ],
-              max_tokens: 20, temperature: 0,
+              max_tokens: 25, temperature: 0.1,
             }),
           });
           if (r.ok) {
             const d = await r.json();
             const kw = d.choices?.[0]?.message?.content?.trim();
-            if (kw && kw.length > 2) searchTerms = kw;
+            if (kw) {
+              const cleaned = kw.replace(/["'.,;:!?\(\)\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+              if (cleaned.length > 2) searchTerms = cleaned;
+            }
           }
         } catch (_) {}
       }
 
-      // Step 3: Final fallback if everything failed
-      if (!searchTerms) searchTerms = REGEX_TERMS.general;
+      if (!searchTerms) searchTerms = REGEX_TERMS[detectedCat] || REGEX_TERMS.general;
 
-      // Step 3: Unsplash Search API
       let photos: string[] = [];
       if (unsplashKey) {
         try {
           const res = await fetch(
-            `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchTerms)}&per_page=15`,
+            `https://api.unsplash.com/search/photos?query=${encodeURIComponent(searchTerms)}&per_page=20&orientation=squarish`,
             { headers: { 'Authorization': `Client-ID ${unsplashKey}` } }
           );
           if (res.ok) {
             const d = await res.json();
-            photos = (d.results || []).map((p: any) => p.urls.regular);
+            photos = (d.results || []).map((p: any) => p.urls?.regular || p.urls?.small).filter(Boolean);
           }
         } catch (_) {}
+
+        // If specific search returned few photos, query fallback category
+        if (photos.length < 8 && detectedCat && REGEX_TERMS[detectedCat]) {
+          try {
+            const res2 = await fetch(
+              `https://api.unsplash.com/search/photos?query=${encodeURIComponent(REGEX_TERMS[detectedCat])}&per_page=15`,
+              { headers: { 'Authorization': `Client-ID ${unsplashKey}` } }
+            );
+            if (res2.ok) {
+              const d2 = await res2.json();
+              const more = (d2.results || []).map((p: any) => p.urls?.regular || p.urls?.small).filter(Boolean);
+              photos = Array.from(new Set([...photos, ...more]));
+            }
+          } catch (_) {}
+        }
       }
 
-      // Step 4: Hardcoded fallback if Unsplash fails
+      // Fallback if Unsplash fails or rate-limits
       if (photos.length < 4) {
         const cat = regexCategory((prompt || '') + ' ' + (industry || ''));
         const ids = HARDCODED[cat] || HARDCODED.general;
-        photos = ids.map(id => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1080&q=80`);
+        const shuffled = [...ids].sort(() => Math.random() - 0.5);
+        photos = shuffled.map(id => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1080&q=80`);
       }
 
-      return new Response(JSON.stringify({ photos }), {
+      return new Response(JSON.stringify({ photos, searchTerms, category: detectedCat }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
