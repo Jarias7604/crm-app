@@ -236,7 +236,7 @@ export default function FlyerStudio() {
   const templateRefB = useRef<HTMLDivElement>(null);
   const templateRefMarketing = useRef<HTMLDivElement>(null);
   const lastGeneratedImg = useRef<string>('');
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('cinematic-gradient');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('vibrant-gradient');
   const [previewMode, setPreviewMode] = useState<'template' | 'ai'>('template');
 
   // Form & Content States
@@ -419,16 +419,25 @@ export default function FlyerStudio() {
         brand_colors: colors,
         brand_gradient: brandGradObj
       };
-      await brandingService.updateBranding({
+      
+      const payload: any = {
         features: updatedFeatures
-      });
+      };
+
+      if (logoPreview && !logoPreview.startsWith('data:image/svg+xml;base64,PHN2Zy')) {
+        payload.logo_url = logoPreview;
+        localStorage.setItem('flyer_custom_logo', logoPreview);
+      }
+
+      await brandingService.updateBranding(payload);
       localStorage.setItem('flyer_brand_colors', JSON.stringify(colors));
       localStorage.setItem('flyer_dynamic_gradient', JSON.stringify(brandGradObj));
-      toast.success('🏢 ¡Colores y degradado guardados para toda tu empresa!');
+      toast.success('🏢 ¡Logo, colores y degradado guardados para toda tu empresa!');
     } catch (err: any) {
       console.error('Error saving brand colors:', err);
       localStorage.setItem('flyer_brand_colors', JSON.stringify(colors));
-      toast.success('💾 Colores guardados en este navegador.');
+      if (logoPreview) localStorage.setItem('flyer_custom_logo', logoPreview);
+      toast.success('💾 Guardado en este navegador.');
     } finally {
       setSavingBrandColors(false);
     }
@@ -444,6 +453,7 @@ export default function FlyerStudio() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState(DEFAULT_LOGO_SVG);
   const [isLogoCustomized, setIsLogoCustomized] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const brandingLoaded = useRef(false);
   const [isFormatModalOpen, setIsFormatModalOpen] = useState(false);
   const [isToneModalOpen, setIsToneModalOpen] = useState(false);
@@ -461,12 +471,69 @@ export default function FlyerStudio() {
   const [bgUploadPreview, setBgUploadPreview] = useState('');
   const bgUploadRef = useRef<HTMLInputElement>(null);
 
-  // Logo positioning
-  const [logoX, setLogoX] = useState(5);
-  const [logoY, setLogoY] = useState(5);
+  // Logo positioning: default to center top
+  const [logoX, setLogoX] = useState(50);
+  const [logoY, setLogoY] = useState(8);
   const [logoSize, setLogoSize] = useState(1.0);
 
   const logoRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoFileSelect = async (f: File) => {
+    if (!f) return;
+    setLogoFile(f);
+    setIsLogoCustomized(true);
+
+    // 1. Immediate local base64 preview for instant visual feedback
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const base64 = ev.target?.result as string;
+      if (base64) {
+        setLogoPreview(base64);
+        try {
+          localStorage.setItem('flyer_custom_logo', base64);
+        } catch {}
+      }
+    };
+    reader.readAsDataURL(f);
+
+    // 2. Upload to Supabase Storage & sync to company branding
+    if (profile?.company_id) {
+      setUploadingLogo(true);
+      const toastId = toast.loading('Guardando logo en tu marca...');
+      try {
+        const publicUrl = await storageService.uploadLogo(profile.company_id, f);
+        if (publicUrl) {
+          setLogoPreview(publicUrl);
+          localStorage.setItem('flyer_custom_logo', publicUrl);
+          await brandingService.updateBranding({ logo_url: publicUrl });
+          toast.success('🏢 ¡Logo guardado con éxito para toda tu empresa!', { id: toastId });
+        }
+      } catch (err: any) {
+        console.error('Error uploading logo to storage:', err);
+        toast.error('Logo cargado localmente (aviso: error al sincronizar en la nube).', { id: toastId });
+      } finally {
+        setUploadingLogo(false);
+      }
+    } else {
+      toast.success('Logo cargado');
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    setLogoFile(null);
+    setLogoPreview('');
+    setIsLogoCustomized(true);
+    localStorage.removeItem('flyer_custom_logo');
+    if (logoRef.current) logoRef.current.value = '';
+    if (profile?.company_id) {
+      try {
+        await brandingService.updateBranding({ logo_url: null });
+        toast.success('Logo removido');
+      } catch (err) {
+        console.error('Error removing logo:', err);
+      }
+    }
+  };
 
   // State
   const [generating, setGenerating] = useState(false);
@@ -907,8 +974,17 @@ export default function FlyerStudio() {
             if (data.phone) setPhone(data.phone || '');
             if (data.website) setWebsite(data.website || '');
             if (data.logo_url && !isLogoCustomized) {
-              const base64 = await urlToBase64(data.logo_url);
-              setLogoPreview(base64);
+              try {
+                const base64 = await urlToBase64(data.logo_url);
+                setLogoPreview(base64 || data.logo_url);
+                localStorage.setItem('flyer_custom_logo', base64 || data.logo_url);
+              } catch {
+                setLogoPreview(data.logo_url);
+                localStorage.setItem('flyer_custom_logo', data.logo_url);
+              }
+            } else if (!isLogoCustomized) {
+              const savedLogo = localStorage.getItem('flyer_custom_logo');
+              if (savedLogo) setLogoPreview(savedLogo);
             }
             // Load company branding colors & gradient if configured
             const feats = (data.features || {}) as any;
@@ -2366,11 +2442,19 @@ export default function FlyerStudio() {
 
             {/* Logo */}
             <div style={css.section}>
-              <label style={css.label}>Logo / Imagen de Referencia</label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ ...css.label, marginBottom: 0 }}>Logo / Imagen de Marca</label>
+                {uploadingLogo && (
+                  <span style={{ fontSize: 10, color: '#6366f1', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> Subiendo a la nube...
+                  </span>
+                )}
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <button
                   onClick={() => logoRef.current?.click()}
                   type="button"
+                  disabled={uploadingLogo}
                   style={{
                     flex: 1,
                     display: 'flex',
@@ -2384,7 +2468,7 @@ export default function FlyerStudio() {
                     color: '#475569',
                     fontSize: 11,
                     fontWeight: 700,
-                    cursor: 'pointer',
+                    cursor: uploadingLogo ? 'wait' : 'pointer',
                     transition: 'all 0.15s ease'
                   }}
                   onMouseEnter={e => {
@@ -2399,18 +2483,18 @@ export default function FlyerStudio() {
                   }}
                 >
                   <Upload size={13} />
-                  <span>{logoFile ? 'Cambiar logo' : 'Subir logo'}</span>
+                  <span>{logoPreview && !logoPreview.startsWith('data:image/svg+xml;base64,PHN2Zy') ? 'Cambiar logo' : 'Subir logo'}</span>
                 </button>
-                {logoPreview && (
+                {logoPreview && !logoPreview.startsWith('data:image/svg+xml;base64,PHN2Zy') && (
                   <div style={{ position: 'relative', display: 'inline-flex' }}>
                     <img src={logoPreview} alt="logo" style={{ height: 38, width: 38, objectFit: 'contain', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff' }} />
-                    <button onClick={() => { setLogoFile(null); setLogoPreview(''); setIsLogoCustomized(true); if (logoRef.current) logoRef.current.value = ''; }} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', border: 'none', borderRadius: '50%', width: 15, height: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                    <button onClick={handleRemoveLogo} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', border: 'none', borderRadius: '50%', width: 15, height: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                       <X size={10} color="#fff" />
                     </button>
                   </div>
                 )}
               </div>
-              {logoPreview && (
+              {logoPreview && !logoPreview.startsWith('data:image/svg+xml;base64,PHN2Zy') && (
                 <button
                   type="button"
                   onClick={() => setEditingElement('logo')}
@@ -2426,7 +2510,7 @@ export default function FlyerStudio() {
                   ⚙️ Ajustar posición y tamaño de Logo
                 </button>
               )}
-              <input ref={logoRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (!f) return; setLogoFile(f); setIsLogoCustomized(true); const r = new FileReader(); r.onload = ev => setLogoPreview(ev.target?.result as string); r.readAsDataURL(f); }} style={{ display: 'none' }} />
+              <input ref={logoRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoFileSelect(f); }} style={{ display: 'none' }} />
             </div>
 
             {/* Custom Flyer Upload */}
@@ -3439,11 +3523,7 @@ export default function FlyerStudio() {
                   }}
                 >
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-                    {selectedTemplate === 'A' 
-                      ? '✨ Template A — Glow Glassmorphic' 
-                      : selectedTemplate === 'B' 
-                      ? '🏢 Template B — Editorial Showcase' 
-                      : TEMPLATE_LIST.find(t => t.id === selectedTemplate)?.name || 'Seleccionar Plantilla'}
+                    {TEMPLATE_LIST.find(t => t.id === selectedTemplate)?.name || 'Seleccionar Plantilla'}
                   </span>
                   <ChevronRight size={14} color="#94a3b8" />
                 </button>
@@ -5471,173 +5551,8 @@ export default function FlyerStudio() {
               
               <div className="flyer-studio-col" style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Plantillas Corporativas Pro</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
-                    {/* Template A */}
-                    {(() => {
-                      const active = selectedTemplate === 'A';
-                      return (
-                        <button
-                          onClick={() => { setSelectedTemplate('A'); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
-                          style={{
-                            textAlign: 'left',
-                            padding: 0,
-                            borderRadius: 16,
-                            border: `2px solid ${active ? '#7c3aed' : '#f1f5f9'}`,
-                            background: '#fff',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            overflow: 'hidden',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            boxShadow: active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)',
-                            transform: 'none',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 12px 20px -5px rgba(0,0,0,0.08)';
-                            if (!active) e.currentTarget.style.borderColor = '#ddd6fe';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'none';
-                            e.currentTarget.style.boxShadow = active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)';
-                            if (!active) e.currentTarget.style.borderColor = '#f1f5f9';
-                          }}
-                        >
-                          <div style={{ width: '100%', height: 200, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden', position: 'relative' }}>
-                            <div style={{ width: fitW, height: fitH, position: 'relative', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.06)', borderRadius: 8, background: '#fff', flexShrink: 0 }}>
-                              <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: canvasH, pointerEvents: 'none' }}>
-                                <div style={{ position: 'relative', width: 1080, height: canvasH }}>
-                                  <FlyerTemplateA data={{
-                                    company_name: companyName || 'Mi Empresa',
-                                    containerW: 1080,
-                                    containerH: canvasH,
-                                    prompt, cta: cta || 'CONTACTAR AHORA',
-                                    headline: manualTitle || 'OFERTA INCREÍBLE',
-                                    subheadline: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
-                                    features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
-                                    price: manualPrice || '¡Precios de Locura!',
-                                    highlight_title: aiOptimizedText?.highlight_title,
-                                    highlight_desc: aiOptimizedText?.highlight_desc,
-                                    benefits: aiOptimizedText?.benefits,
-                                    mockup_info: aiOptimizedText?.mockup_info,
-                                    primaryColor: colors[0] || '#e91e8c',
-                                    secondaryColor: colors[1] || '#1a1a2e',
-                                    phone, website, logoUrl: undefined,
-                                    bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
-                                    flyerFont, titleFont, subtitleFont, benefitsFont, ctaFont, contactFont,
-                                    textScale, subtitleScale, benefitsScale, logoSize, logoX, logoY,
-                                    titleColor, highlightColor, subtitleColor, benefitsColor, cardBgColor, ctaBgColor, ctaTextColor, textY, textAlign,
-                                    subtitleBold, benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY,
-                                    titleX, subtitleX, benefitsX, ctaX, contactX, contactColor
-                                  }} />
-                                  {logoPreview && (
-                                    <FreeLogo d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'A', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY }} />
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span>✨ Template A — Glow Glassmorphic</span>
-                                {active && <span style={{ background: '#7c3aed', color: '#fff', fontSize: 8, padding: '2px 6px', borderRadius: 8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Activa</span>}
-                              </div>
-                              <div style={{ fontSize: 9, color: '#64748b', marginTop: 4, lineHeight: 1.3 }}>Diseño moderno con efecto de vidrio esmerilado y luces de neón.</div>
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })()}
-
-                    {/* Template B */}
-                    {(() => {
-                      const active = selectedTemplate === 'B';
-                      return (
-                        <button
-                          onClick={() => { setSelectedTemplate('B'); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
-                          style={{
-                            textAlign: 'left',
-                            padding: 0,
-                            borderRadius: 16,
-                            border: `2px solid ${active ? '#7c3aed' : '#f1f5f9'}`,
-                            background: '#fff',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            overflow: 'hidden',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            boxShadow: active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)',
-                            transform: 'none',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 12px 20px -5px rgba(0,0,0,0.08)';
-                            if (!active) e.currentTarget.style.borderColor = '#ddd6fe';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'none';
-                            e.currentTarget.style.boxShadow = active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)';
-                            if (!active) e.currentTarget.style.borderColor = '#f1f5f9';
-                          }}
-                        >
-                          <div style={{ width: '100%', height: 200, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden', position: 'relative' }}>
-                            <div style={{ width: fitW, height: fitH, position: 'relative', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.06)', borderRadius: 8, background: '#fff', flexShrink: 0 }}>
-                              <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: canvasH, pointerEvents: 'none' }}>
-                                <div style={{ position: 'relative', width: 1080, height: canvasH }}>
-                                  <FlyerTemplateB data={{
-                                    company_name: companyName || 'Mi Empresa',
-                                    containerW: 1080,
-                                    containerH: canvasH,
-                                    prompt, cta: cta || 'CONTACTAR AHORA',
-                                    headline: manualTitle || 'OFERTA INCREÍBLE',
-                                    subheadline: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
-                                    features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
-                                    price: manualPrice || '¡Precios de Locura!',
-                                    highlight_title: aiOptimizedText?.highlight_title,
-                                    highlight_desc: aiOptimizedText?.highlight_desc,
-                                    benefits: aiOptimizedText?.benefits,
-                                    mockup_info: aiOptimizedText?.mockup_info,
-                                    primaryColor: colors[0] || '#9b1c1c',
-                                    secondaryColor: colors[1] || '#1a1a2e',
-                                    phone, website, logoUrl: undefined,
-                                    bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
-                                    flyerFont, titleFont, subtitleFont, benefitsFont, ctaFont, contactFont,
-                                    textScale, subtitleScale, benefitsScale, logoSize, logoX, logoY,
-                                    titleColor, highlightColor, subtitleColor, benefitsColor, cardBgColor, ctaBgColor, ctaTextColor, textY, textAlign,
-                                    subtitleBold, benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY,
-                                    titleX, subtitleX, benefitsX, ctaX, contactX, contactColor
-                                  }} />
-                                  {logoPreview && (
-                                    <FreeLogo d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'B', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY }} />
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span>🏢 Template B — Editorial Showcase</span>
-                                {active && <span style={{ background: '#7c3aed', color: '#fff', fontSize: 8, padding: '2px 6px', borderRadius: 8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Activa</span>}
-                              </div>
-                              <div style={{ fontSize: 9, color: '#64748b', marginTop: 4, lineHeight: 1.3 }}>Disposición editorial limpia tipo B2B ideal para mostrar marcas corporativas.</div>
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })()}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Catálogo de Marketing (Autorescaling)</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>Plantillas Modernas Seleccionadas</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
                     {TEMPLATE_LIST.map(t => {
                       const active = selectedTemplate === t.id;
                       return (

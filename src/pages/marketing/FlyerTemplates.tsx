@@ -564,14 +564,14 @@ export const Template_VibrantGradient = ({ d }: { d: FlyerData }) => {
         padding: `${Math.round(36 * s)}px ${Math.round(32 * s)}px`
       }}
     >
-      {/* Top Logo */}
+      {/* Top Logo / Brand Name */}
       <div style={{ display: 'flex', justifyContent: 'center', zIndex: 10, width: '100%' }}>
-        {d.logoX === undefined && (
+        {!d.logoUrl && (
           <div 
             className={d.onLogoClick ? "editable-element" : undefined}
             onClick={d.onLogoClick ? (e) => { e.stopPropagation(); d.onLogoClick?.(); } : undefined}
           >
-            <Brand logo={d.logoUrl} name={d.companyName || d.industria} color="#fff" s={s * 1.15} />
+            <Brand logo={null} name={d.companyName || d.industria} color="#fff" s={s * 1.15} forceText={true} />
           </div>
         )}
       </div>
@@ -659,12 +659,12 @@ export const Template_ProblemSolution = ({ d }: { d: FlyerData }) => {
 
       {/* 2. Top Header Brand Bar */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: Math.round(75 * s), background: 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%)', display: 'flex', alignItems: 'center', padding: `0 ${Math.round(24 * s)}px`, zIndex: 10 }}>
-        {d.logoX === undefined && (
+        {!d.logoUrl && (
           <div 
             className={d.onLogoClick ? "editable-element" : undefined}
             onClick={d.onLogoClick ? (e) => { e.stopPropagation(); d.onLogoClick?.(); } : undefined}
           >
-            <Brand logo={d.logoUrl} name={d.companyName || d.industria} color="#fff" s={s} />
+            <Brand logo={null} name={d.companyName || d.industria} color="#fff" s={s} forceText={true} />
           </div>
         )}
       </div>
@@ -1020,13 +1020,13 @@ export const RenderFlyer = ({ d, onLogoMove, onLogoResize, onMove, onResize }: {
   onMove?: (x: number, y: number) => void;
   onResize?: (size: number) => void;
 }) => {
-  const Comp = TEMPLATES[d.templateId] || Template_CinematicGradient;
+  const Comp = TEMPLATES[d.templateId] || Template_VibrantGradient;
   const handleMove = onLogoMove || onMove;
   const handleResize = onLogoResize || onResize;
   return (
     <>
       <Comp d={d} />
-      {d.logoUrl && d.logoX !== undefined && d.logoY !== undefined && (
+      {d.logoUrl && (
         <FreeLogo 
           d={d} 
           onLogoMove={handleMove} 
@@ -1044,49 +1044,121 @@ export const FreeLogo = ({ d, onLogoMove, onLogoResize, onMove, onResize }: {
   onMove?: (x: number, y: number) => void;
   onResize?: (size: number) => void;
 }) => {
-  if (!d.logoUrl) return null;
-  const isCustom = d.logoX !== undefined && d.logoY !== undefined;
-  const size = d.logoSize || 100;
   const handleMove = onLogoMove || onMove;
   const handleResize = onLogoResize || onResize;
+  const isDragging = React.useRef(false);
+  const dragStart = React.useRef({ x: 0, y: 0 });
+  const parentRect = React.useRef<DOMRect | null>(null);
+
+  const startDrag = (e: React.MouseEvent) => {
+    if (!handleMove) return;
+    isDragging.current = true;
+    const parent = e.currentTarget.parentElement;
+    if (parent) {
+      parentRect.current = parent.getBoundingClientRect();
+      const logoRect = e.currentTarget.getBoundingClientRect();
+      dragStart.current = { x: e.clientX - logoRect.left, y: e.clientY - logoRect.top };
+    }
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+  };
+
+  const onDrag = (e: MouseEvent) => {
+    if (!isDragging.current || !parentRect.current || !handleMove) return;
+    const currentLeft = e.clientX - parentRect.current.left - dragStart.current.x;
+    const currentTop = e.clientY - parentRect.current.top - dragStart.current.y;
+    const pctX = Math.min(100, Math.max(0, (currentLeft / parentRect.current.width) * 100));
+    const pctY = Math.min(100, Math.max(0, (currentTop / parentRect.current.height) * 100));
+    handleMove(pctX, pctY);
+  };
+
+  const endDrag = () => {
+    isDragging.current = false;
+    document.removeEventListener('mousemove', onDrag);
+    document.removeEventListener('mouseup', endDrag);
+  };
+
+  if (!d.logoUrl) return null;
+
+  const rawSize = d.logoSize !== undefined ? d.logoSize : 1.0;
+  const isCustom = d.logoX !== undefined && d.logoY !== undefined;
+  const defaultX = d.templateId === 'vibrant-gradient' ? 50 : 18;
+  const defaultY = d.templateId === 'vibrant-gradient' ? 8 : 6;
+  const posX = isCustom ? d.logoX : defaultX;
+  const posY = isCustom ? d.logoY : defaultY;
   
   return (
     <div
       data-element-id="logo"
       className={d.onLogoClick ? "editable-element flyer-logo-element" : "flyer-logo-element"}
       onClick={d.onLogoClick ? (e) => { e.stopPropagation(); d.onLogoClick?.(); } : undefined}
+      onMouseDown={startDrag}
+      title="Arrastra para mover el logo libremente"
       style={{
         position: 'absolute',
-        left: isCustom ? `${d.logoX}%` : '50%',
-        top: isCustom ? `${d.logoY}%` : '12%',
-        transform: isCustom ? 'translate(-50%, -50%)' : 'translate(-50%, -50%)',
-        zIndex: 25,
-        cursor: 'pointer',
+        left: `${posX}%`,
+        top: `${posY}%`,
+        cursor: handleMove ? 'move' : 'pointer',
+        zIndex: 40,
+        transform: `scale(${rawSize})`,
+        transformOrigin: 'top left',
+        padding: 6,
+        background: 'rgba(255,255,255,0.92)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        borderRadius: 12,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.22)',
+        border: '1.5px solid rgba(255,255,255,0.85)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        userSelect: 'none'
       }}
     >
       <img
         src={d.logoUrl}
         alt="Logo"
         style={{
-          width: size,
-          height: 'auto',
-          maxHeight: size * 1.2,
+          maxHeight: 46,
+          maxWidth: 140,
           objectFit: 'contain',
-          filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))'
+          pointerEvents: 'none'
         }}
         crossOrigin="anonymous"
       />
+      {handleResize && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }} onMouseDown={e => e.stopPropagation()}>
+          <button 
+            type="button"
+            title="Agrandar logo"
+            onClick={(e) => { e.stopPropagation(); handleResize(Math.min(rawSize + 0.1, 2.5)); }}
+            style={{ width: 16, height: 16, fontSize: 10, fontWeight: 900, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a' }}
+          >
+            +
+          </button>
+          <button 
+            type="button"
+            title="Achicar logo"
+            onClick={(e) => { e.stopPropagation(); handleResize(Math.max(rawSize - 0.1, 0.4)); }}
+            style={{ width: 16, height: 16, fontSize: 10, fontWeight: 900, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a' }}
+          >
+            -
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
 export const TEMPLATE_LIST = [
-  { id: 'cinematic-gradient', name: '1. Foto + Degradado Cinemático', desc: 'Foto completa panorámica con degradado inferior elegante (Estilo Fotos 1 & 4)' },
-  { id: 'corporate-seal', name: '2. Corporativo Pro con Sello Dorado', desc: 'Fondo blanco limpio + personas + sello dorado de clientes satisfechos + ola roja (Estilo Fotos 2 & 3)' },
-  { id: 'vibrant-gradient', name: '3. Degradado Puro / Viral Quote', desc: 'Sin foto. Fondo degradado de alto impacto con tipografía masiva (Estilo Foto 5)' },
-  { id: 'problem-solution', name: '4. Alerta & Solución Editorial', desc: 'Foto de acción con degradado violeta profundo para problemas y soluciones (Estilo Foto 4)' },
-  { id: 'white-card', name: '5. Tarjeta Flotante Minimalista', desc: 'Foto de fondo con tarjeta flotante de cristal blanco (Estilo Apple / Canva)' },
-  { id: 'minimal-swiss', name: '6. Minimal Swiss Editorial', desc: 'Diseño minimalista moderno con tipografía sobria y espacios abiertos' },
-  { id: 'promo-pop', name: '7. Promo Comercial Pop', desc: 'Diseño de alto impacto comercial para ofertas y descuentos' },
-  { id: 'direct-mockup', name: '0. Mockup Directo (Imagen Pura)', desc: 'Muestra la imagen al 100% sin textos encima' },
+  { 
+    id: 'vibrant-gradient', 
+    name: '1. Degradado Puro / Viral Quote', 
+    desc: 'Sin foto obligatoria. Fondo degradado de alto impacto con tipografía masiva (Estilo Foto 5)' 
+  },
+  { 
+    id: 'problem-solution', 
+    name: '2. Alerta & Solución Editorial', 
+    desc: 'Foto con degradado inferior oscuro, titular de alto impacto y CTA llamativo (Estilo Foto 4)' 
+  },
 ];

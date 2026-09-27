@@ -131,7 +131,7 @@ export const storageService = {
     async uploadLogo(companyId: string, file: File) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${companyId}-logo-${Date.now()}.${fileExt}`;
-        const filePath = `logos/${fileName}`;
+        const filePath = `public/logos/${fileName}`;
 
         const { error } = await supabase.storage
             .from('avatars')
@@ -140,7 +140,10 @@ export const storageService = {
                 upsert: true
             });
 
-        if (error) throw error;
+        if (error) {
+            console.error('Storage uploadLogo error:', error);
+            throw error;
+        }
 
         const { data: { publicUrl } } = supabase.storage
             .from('avatars')
