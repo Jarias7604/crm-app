@@ -137,7 +137,9 @@ export function parsePrompt(prompt: string): ParsedPrompt {
     val = val.replace(/^[:：\s,.-]+|[:：\s,.-]+$/g, '');
 
     if (current.key === 'title') result.title = val;
-    else if (current.key === 'subtitle') result.subtitle = val;
+    else if (current.key === 'subtitle') {
+      result.subtitle = cleanPhrase(val.replace(/(?:incluye|ofrece|beneficios|caracter[íi]sticas|cta|bot[oó]n|precio|costo|tel[eé]fono|contacto|whatsapp|web|sitio)\s*[:：][\s\S]*$/i, ''));
+    }
     else if (current.key === 'price') result.price = val;
     else if (current.key === 'cta') result.cta = val;
     else if (current.key === 'phone') result.phone = val;
@@ -158,7 +160,12 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
     return { h1: 'Diseño Profesional', h2: company };
   }
 
-  // 1. Look for explicit tags like Título/Subtítulo or Headline/Subheadline. Allow punctuation within tags.
+  // Strip trailing tags so they never leak into h1 or h2
+  const sanitizedPrompt = prompt
+    .replace(/(?:incluye|ofrece|beneficios|caracter[íi]sticas|cta|bot[oó]n|precio|costo|tel[eé]fono|contacto|whatsapp|web|sitio)\s*[:：][\s\S]*$/i, '')
+    .trim();
+
+  // 1. Look for explicit tags like Título/Subtítulo or Headline/Subheadline.
   const titleMatch = prompt.match(/(?:t[íi]tulo|headline|t[íi]tulo del flyer|t[íi]tulo principal)\s*[:：]\s*([^\n|]+)/i);
   const subMatch = prompt.match(/(?:subt[íi]tulo|subheadline|descripci[oó]n corta)\s*[:：]\s*([^\n|]+)/i);
 
@@ -169,7 +176,7 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
     h1 = cleanPhrase(titleMatch[1]);
   }
   if (subMatch && subMatch[1]) {
-    h2 = cleanPhrase(subMatch[1]);
+    h2 = cleanPhrase(subMatch[1].replace(/(?:incluye|ofrece|beneficios|cta|bot[oó]n|precio|tel[eé]fono|contacto|whatsapp|web)\s*[:：][\s\S]*$/i, ''));
   }
 
   if (h1 && h2) return { h1, h2 };
@@ -180,8 +187,8 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
     return ['para', 'con', 'de', 'y', 'en', 'o', 'a', 'que', 'como', 'sin', 'sobre', 'del', 'al', 'por', 'desde', 'e', 'u'].includes(w);
   };
 
-  // 2. Look for splitters like newlines
-  const lines = prompt.split(/\n+/).map(l => l.trim()).filter(l => l.length > 0);
+  // 2. Look for splitters like newlines in sanitizedPrompt
+  const lines = sanitizedPrompt.split(/\n+/).map(l => l.trim()).filter(l => l.length > 0);
   if (!h1 && lines.length > 0) {
     const firstLine = lines[0];
     const firstLineWords = firstLine.split(/\s+/);

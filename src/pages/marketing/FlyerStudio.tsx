@@ -45,6 +45,17 @@ const BRAND_COLORS = [
   '#10b981', '#ec4899', '#06b6d4', '#111827',
 ];
 
+const GRADIENT_PRESETS = [
+  { id: 'meta-violet', name: 'Violeta Viral (Foto 5)', value: 'linear-gradient(135deg, #7928ca 0%, #ff0080 100%)', c1: '#7928ca', c2: '#ff0080', angle: 135, type: 'linear' as const },
+  { id: 'royal-indigo', name: 'Índigo Tech', value: 'linear-gradient(135deg, #1e1b4b 0%, #6366f1 100%)', c1: '#1e1b4b', c2: '#6366f1', angle: 135, type: 'linear' as const },
+  { id: 'ocean-cyan', name: 'Océano Cyan', value: 'linear-gradient(135deg, #082f49 0%, #06b6d4 100%)', c1: '#082f49', c2: '#06b6d4', angle: 135, type: 'linear' as const },
+  { id: 'sunset-fire', name: 'Atardecer Coral', value: 'linear-gradient(135deg, #7c2d12 0%, #fbbf24 100%)', c1: '#7c2d12', c2: '#fbbf24', angle: 135, type: 'linear' as const },
+  { id: 'emerald-pro', name: 'Esmeralda Pro', value: 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)', c1: '#064e3b', c2: '#10b981', angle: 135, type: 'linear' as const },
+  { id: 'gold-luxury', name: 'Oro & Bronce VIP', value: 'linear-gradient(135deg, #451a03 0%, #f59e0b 100%)', c1: '#451a03', c2: '#f59e0b', angle: 135, type: 'linear' as const },
+  { id: 'rose-wine', name: 'Rubí & Rosa', value: 'linear-gradient(135deg, #4c0519 0%, #f43f5e 100%)', c1: '#4c0519', c2: '#f43f5e', angle: 135, type: 'linear' as const },
+  { id: 'midnight-dark', name: 'Obsidiana Minimal', value: 'linear-gradient(135deg, #030712 0%, #1e293b 100%)', c1: '#030712', c2: '#1e293b', angle: 135, type: 'linear' as const },
+];
+
 const DEFAULT_BG_IMAGE = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1080&auto=format&fit=crop';
 
 const DEFAULT_LOGO_SVG = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCI+PHBvbHlnb24gcG9pbnRzPSI1MCwxNSA5MCw4MCAxMCw4MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjN2MzYWVkIiBzdHJva2Utd2lkdGg9IjgiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIxNSIgZmlsbD0iIzdjM2FlZCIvPjwvc3ZnPg==';
@@ -224,7 +235,7 @@ export default function FlyerStudio() {
   const templateRefB = useRef<HTMLDivElement>(null);
   const templateRefMarketing = useRef<HTMLDivElement>(null);
   const lastGeneratedImg = useRef<string>('');
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('bold-split');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('cinematic-gradient');
   const [previewMode, setPreviewMode] = useState<'template' | 'ai'>('template');
 
   // Form & Content States
@@ -238,6 +249,20 @@ export default function FlyerStudio() {
   const [tone, setTone] = useState('moderno');
   const [variantCount, setVariantCount] = useState<1 | 2 | 3>(1);
   const [colors, setColors] = useState<string[]>(['#7c3aed']);
+  const [gradColor1, setGradColor1] = useState<string>('#7928ca');
+  const [gradColor2, setGradColor2] = useState<string>('#ff0080');
+  const [gradAngle, setGradAngle] = useState<number>(135);
+  const [gradType, setGradType] = useState<'linear' | 'radial'>('linear');
+  const [selectedGradient, setSelectedGradient] = useState<string>('linear-gradient(135deg, #7928ca 0%, #ff0080 100%)');
+  const [badgeTop, setBadgeTop] = useState<string>('+600');
+  const [badgeBottom, setBadgeBottom] = useState<string>('CLIENTES SATISFECHOS');
+
+  const updateDynamicGradient = (c1: string, c2: string, angle: number, type: 'linear' | 'radial') => {
+    const cssGrad = type === 'radial'
+      ? `radial-gradient(circle at center, ${c1} 0%, ${c2} 100%)`
+      : `linear-gradient(${angle}deg, ${c1} 0%, ${c2} 100%)`;
+    setSelectedGradient(cssGrad);
+  };
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState(DEFAULT_LOGO_SVG);
   const [isLogoCustomized, setIsLogoCustomized] = useState(false);
@@ -2500,6 +2525,280 @@ export default function FlyerStudio() {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════
+                CREADOR DINÁMICO DE DEGRADADOS (100% Personalizable)
+            ═══════════════════════════════════════════════════════════════ */}
+            <div style={{ ...css.section, background: '#f8fafc', padding: 12, borderRadius: 12, border: '1.5px solid #e2e8f0', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Palette size={14} color="#7c3aed" />
+                  <span style={{ fontSize: 11, fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Creador Dinámico de Degradados</span>
+                </div>
+                {/* Mode toggle: Linear / Radial */}
+                <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: 6, padding: 2 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGradType('linear');
+                      updateDynamicGradient(gradColor1, gradColor2, gradAngle, 'linear');
+                    }}
+                    style={{
+                      border: 'none',
+                      background: gradType === 'linear' ? '#fff' : 'transparent',
+                      color: gradType === 'linear' ? '#0f172a' : '#64748b',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Lineal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGradType('radial');
+                      updateDynamicGradient(gradColor1, gradColor2, gradAngle, 'radial');
+                    }}
+                    style={{
+                      border: 'none',
+                      background: gradType === 'radial' ? '#fff' : 'transparent',
+                      color: gradType === 'radial' ? '#0f172a' : '#64748b',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Radial
+                  </button>
+                </div>
+              </div>
+
+              {/* Dynamic Live Preview Box */}
+              <div style={{
+                height: 48,
+                borderRadius: 10,
+                background: selectedGradient,
+                boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.08)',
+                marginBottom: 12,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0 12px',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                <span style={{ fontSize: 11, fontWeight: 900, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.6)', letterSpacing: '0.05em' }}>
+                  {gradType === 'radial' ? 'RADIAL' : `${gradAngle}°`}
+                </span>
+                <button
+                  type="button"
+                  title="Invertir Colores"
+                  onClick={() => {
+                    const temp = gradColor1;
+                    setGradColor1(gradColor2);
+                    setGradColor2(temp);
+                    updateDynamicGradient(gradColor2, temp, gradAngle, gradType);
+                  }}
+                  style={{
+                    background: 'rgba(0,0,0,0.35)',
+                    backdropFilter: 'blur(6px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    color: '#fff',
+                    borderRadius: 6,
+                    padding: '3px 8px',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4
+                  }}
+                >
+                  ⇄ Invertir
+                </button>
+              </div>
+
+              {/* Color Pickers: Color 1 y Color 2 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                {/* Color 1 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#64748b' }}>COLOR INICIO</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8, padding: '4px 6px' }}>
+                    <input
+                      type="color"
+                      value={gradColor1}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setGradColor1(val);
+                        updateDynamicGradient(val, gradColor2, gradAngle, gradType);
+                      }}
+                      style={{ width: 26, height: 26, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0, background: 'none' }}
+                    />
+                    <input
+                      type="text"
+                      value={gradColor1}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setGradColor1(val);
+                        if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                          updateDynamicGradient(val, gradColor2, gradAngle, gradType);
+                        }
+                      }}
+                      style={{ border: 'none', outline: 'none', fontSize: 11, fontWeight: 700, color: '#1e293b', width: '100%', fontFamily: 'monospace' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Color 2 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#64748b' }}>COLOR FINAL</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8, padding: '4px 6px' }}>
+                    <input
+                      type="color"
+                      value={gradColor2}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setGradColor2(val);
+                        updateDynamicGradient(gradColor1, val, gradAngle, gradType);
+                      }}
+                      style={{ width: 26, height: 26, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0, background: 'none' }}
+                    />
+                    <input
+                      type="text"
+                      value={gradColor2}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setGradColor2(val);
+                        if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                          updateDynamicGradient(gradColor1, val, gradAngle, gradType);
+                        }
+                      }}
+                      style={{ border: 'none', outline: 'none', fontSize: 11, fontWeight: 700, color: '#1e293b', width: '100%', fontFamily: 'monospace' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Angle / Direction Controls (if linear) */}
+              {gradType === 'linear' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: '#64748b' }}>DIRECCIÓN / ÁNGULO</span>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: '#7c3aed' }}>{gradAngle}°</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[
+                      { label: '↗ 45°', angle: 45 },
+                      { label: '→ 90°', angle: 90 },
+                      { label: '↘ 135°', angle: 135 },
+                      { label: '↓ 180°', angle: 180 },
+                      { label: '↙ 225°', angle: 225 },
+                    ].map((d) => (
+                      <button
+                        key={d.angle}
+                        type="button"
+                        onClick={() => {
+                          setGradAngle(d.angle);
+                          updateDynamicGradient(gradColor1, gradColor2, d.angle, 'linear');
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '4px 0',
+                          fontSize: 9,
+                          fontWeight: 800,
+                          borderRadius: 6,
+                          border: gradAngle === d.angle ? '1.5px solid #7c3aed' : '1px solid #cbd5e1',
+                          background: gradAngle === d.angle ? '#f5f3ff' : '#fff',
+                          color: gradAngle === d.angle ? '#7c3aed' : '#475569',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="5"
+                    value={gradAngle}
+                    onChange={(e) => {
+                      const a = parseInt(e.target.value);
+                      setGradAngle(a);
+                      updateDynamicGradient(gradColor1, gradColor2, a, 'linear');
+                    }}
+                    style={{ width: '100%', accentColor: '#7c3aed' }}
+                  />
+                </div>
+              )}
+
+              {/* Botón: Generar con mis colores de marca */}
+              {colors.length >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c1 = colors[0];
+                    const c2 = colors[1];
+                    setGradColor1(c1);
+                    setGradColor2(c2);
+                    updateDynamicGradient(c1, c2, gradAngle, gradType);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '6px 10px',
+                    borderRadius: 8,
+                    background: '#ede9fe',
+                    color: '#6d28d9',
+                    border: '1px solid #ddd6fe',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    marginBottom: 10
+                  }}
+                >
+                  <span>✨</span> Usar mis Colores de Marca ({colors[0]} + {colors[1]})
+                </button>
+              )}
+
+              {/* Paletas de Inicio Rápido (Click para cargar y editar) */}
+              <div>
+                <span style={{ fontSize: 9, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>Cargar Combinación Rápida</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                  {GRADIENT_PRESETS.map((gp) => (
+                    <button
+                      key={gp.id}
+                      type="button"
+                      title={gp.name}
+                      onClick={() => {
+                        setGradColor1(gp.c1);
+                        setGradColor2(gp.c2);
+                        setGradAngle(gp.angle || 135);
+                        setGradType(gp.type || 'linear');
+                        updateDynamicGradient(gp.c1, gp.c2, gp.angle || 135, gp.type || 'linear');
+                      }}
+                      style={{
+                        height: 24,
+                        borderRadius: 6,
+                        background: gp.value,
+                        border: '1px solid rgba(0,0,0,0.1)',
+                        cursor: 'pointer',
+                        padding: 0
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════════════
                 WHATSAPP CTA & QR CODE SECTION
             ═══════════════════════════════════════════════════════════════ */}
             <div style={{
@@ -3420,6 +3719,9 @@ export default function FlyerStudio() {
                                 industria: companyName || 'Mi Empresa',
                                 companyName: companyName,
                                 phone, website, templateId: selectedTemplate,
+                                gradientBg: selectedGradient,
+                                badgeTextTop: badgeTop,
+                                badgeTextBottom: badgeBottom,
                                 containerW: 1080, containerH: canvasH,
                                 logoSize, logoX, logoY,
                                 flyerFont,
@@ -3800,6 +4102,9 @@ export default function FlyerStudio() {
             industria: companyName || 'Mi Empresa',
             companyName: companyName,
             phone, website, templateId: selectedTemplate,
+            gradientBg: selectedGradient,
+            badgeTextTop: badgeTop,
+            badgeTextBottom: badgeBottom,
             containerW: 1080, containerH: canvasH,
             logoSize, logoX, logoY,
             flyerFont,
@@ -4056,6 +4361,9 @@ export default function FlyerStudio() {
                         industria: companyName || 'Mi Empresa',
                         companyName: companyName,
                         phone, website, templateId: selectedTemplate,
+                        gradientBg: selectedGradient,
+                        badgeTextTop: badgeTop,
+                        badgeTextBottom: badgeBottom,
                         containerW: 1080, containerH: canvasH,
                         logoSize, logoX, logoY,
                         flyerFont,
@@ -5077,6 +5385,9 @@ export default function FlyerStudio() {
                                   industria: companyName || 'Mi Empresa',
                                   companyName: companyName,
                                   phone, website, templateId: t.id,
+                                  gradientBg: selectedGradient,
+                                  badgeTextTop: badgeTop,
+                                  badgeTextBottom: badgeBottom,
                                   containerW: 1080, containerH: canvasH,
                                   logoSize, logoX, logoY,
                                   flyerFont, titleFont, subtitleFont, benefitsFont, ctaFont, contactFont,
