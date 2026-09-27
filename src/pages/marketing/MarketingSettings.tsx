@@ -350,16 +350,27 @@ export default function MarketingSettings() {
                                             type="text"
                                             value={formData.senderName}
                                             onChange={(v: string) => setFormData({ ...formData, senderName: v })}
-                                            placeholder="Ej: Ventas Arias Defense"
-                                            hint="El nombre que verán los clientes."
+                                            placeholder="Ej: Iclesia o Nombre de tu Empresa"
+                                            hint="El nombre de tu empresa o marca que verán los clientes."
                                         />
                                         <InputBlock
-                                            label="Email del Remitente"
+                                            label="Email del Remitente (From)"
                                             type="email"
                                             value={formData.senderEmail}
                                             onChange={(v: string) => setFormData({ ...formData, senderEmail: v })}
-                                            placeholder="Ej: ventas@ariasdefense.com"
-                                            hint="Debe estar verificado en Resend."
+                                            placeholder="Ej: info@midominio.com"
+                                            hint="Debe pertenecer a tu dominio verificado en Resend."
+                                        />
+                                    </div>
+                                    <div className="mt-4">
+                                        <InputBlock
+                                            label="Email de Respuesta (Reply-To)"
+                                            type="email"
+                                            value={formData.replyTo}
+                                            onChange={(v: string) => setFormData({ ...formData, replyTo: v })}
+                                            placeholder="Ej: contacto@midominio.com o tu email principal"
+                                            hint="Dirección donde recibirás las respuestas si un cliente hace clic en 'Responder'."
+                                            required={false}
                                         />
                                     </div>
                                 </>

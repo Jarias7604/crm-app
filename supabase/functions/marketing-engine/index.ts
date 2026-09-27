@@ -52,6 +52,9 @@ Deno.serve(async (req) => {
 
         if (campError || !campaign) throw new Error(`Campaign not found: ${campError?.message}`);
 
+        const { data: company } = await supabase
+            .from("companies").select("id, name, email").eq("id", campaign.company_id).maybeSingle();
+
         // ── Enterprise Rate Limiting (20 marketing calls/min per company) ──
         const rl = checkRateLimit(campaign.company_id, 'marketing');
         if (!rl.allowed) return rateLimitResponse(rl.resetAt);
@@ -129,24 +132,39 @@ Deno.serve(async (req) => {
             telegramToken = i?.settings?.token;
         }
 
-        // Email config — platform fallback to Arias Defense if no tenant config
-        let senderName = "CRM Marketing";
-        let senderEmail = "ventas@ariasdefense.com";
-        const { data: tenantResend } = await supabase.from('marketing_integrations').select('settings').eq('company_id', campaign.company_id).eq('provider', 'resend').eq('is_active', true).maybeSingle();
+        // Dynamic Multi-Tenant Email Config
+        const { data: tenantResend } = await supabase.from('marketing_integrations')
+            .select('settings')
+            .eq('company_id', campaign.company_id)
+            .eq('provider', 'resend')
+            .eq('is_active', true)
+            .maybeSingle();
+
         let platformResend = null;
-        if (!tenantResend) {
+        if (!tenantResend?.settings?.apiKey) {
             const { data: pr } = await supabase.from('marketing_integrations').select('settings')
-                .eq('company_id', '7a582ba5-f7d0-4ae3-9985-35788deb1c30') // Arias Defense — platform owner
-                .eq('provider', 'resend').eq('is_active', true).maybeSingle();
+                .eq('company_id', '7a582ba5-f7d0-4ae3-9985-35788deb1c30') // Platform owner
+                .eq('provider', 'resend')
+                .eq('is_active', true)
+                .maybeSingle();
             platformResend = pr;
         }
-        const activeResend = tenantResend || platformResend;
-        let resendToken = Deno.env.get("RESEND_API_KEY");
-        if (activeResend?.settings?.apiKey) resendToken = activeResend.settings.apiKey;
-        if (activeResend?.settings?.senderName) senderName = activeResend.settings.senderName;
-        if (activeResend?.settings?.senderEmail) senderEmail = activeResend.settings.senderEmail;
+
+        // 1. Sender Name: ALWAYS prioritize tenant's custom name, or tenant company name (e.g. "Iclesia")
+        const senderName = tenantResend?.settings?.senderName || company?.name || "Marketing CRM";
+
+        // 2. Sender Email: Tenant's verified email, or platform verified fallback
+        const platformEmail = platformResend?.settings?.senderEmail || "notificaciones@ariascrm.com";
+        const senderEmail = tenantResend?.settings?.senderEmail || platformEmail;
+
+        // 3. Reply-To: Lead replies will ALWAYS go directly to the tenant's email!
+        const replyTo = tenantResend?.settings?.replyTo || company?.email || undefined;
+
+        // 4. API Key: Tenant's own Resend key, or platform fallback
+        const resendToken = tenantResend?.settings?.apiKey || platformResend?.settings?.apiKey || Deno.env.get("RESEND_API_KEY");
+
         const fromDisplay = `${senderName} <${senderEmail}>`;
-        console.log(`[Marketing-Engine] Sender: ${senderEmail} (${tenantResend ? 'tenant config' : 'platform fallback'})`);
+        console.log(`[Marketing-Engine] Sender: "${fromDisplay}" | Reply-To: "${replyTo || 'none'}" (${tenantResend?.settings?.apiKey ? 'tenant custom domain' : 'platform verified sender'})`);
 
         let templateData = null;
         if (campaign.template_id) {
@@ -264,14 +282,48 @@ Deno.serve(async (req) => {
                     conversationId = conv.id;
                     if (!resendToken) throw new Error("Missing Resend API Key — configure email integration.");
 
-                    // Inject click tracking into all links, then append open pixel
+                    // Inject click tracking into all links
                     const clickTrackedContent = injectClickTracking(localizedContent, trackingBaseUrl, messageId);
-                    const trackedHtml = `${clickTrackedContent}<img src="${trackingBaseUrl}?type=open&mid=${messageId}" width="1" height="1" style="display:none;" />`;
+
+                    // Legal Anti-Spam Footer (CAN-SPAM / Google 2024 compliance)
+                    const unsubscribeFooter = `
+<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:32px;padding-top:20px;border-top:1px solid #e2e8f0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#94a3b8;text-align:center;">
+  <tr>
+    <td align="center">
+      <p style="margin:0 0 6px 0;">Mensaje enviado por <strong>${senderName}</strong></p>
+      <p style="margin:0;">Para dejar de recibir estas comunicaciones, responda a este correo indicando "Desuscribir".</p>
+    </td>
+  </tr>
+</table>`;
+
+                    // Standard 1x1 tracking pixel (avoids spam penalty of display:none)
+                    const openTrackingPixel = `<img src="${trackingBaseUrl}?type=open&mid=${messageId}" width="1" height="1" alt="" border="0" style="display:block;width:1px;height:1px;border:0;" />`;
+                    const trackedHtml = `${clickTrackedContent}${unsubscribeFooter}${openTrackingPixel}`;
+
+                    // Extract sender domain for List-Unsubscribe header
+                    const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1] : 'ariascrm.com';
+
+                    const emailPayload: any = {
+                        from: fromDisplay,
+                        to: cleanEmail,
+                        subject: campaign.subject || campaign.name,
+                        html: trackedHtml,
+                        text: richContent.cleanText, // RFC 2046 Plain Text alternative!
+                        headers: {
+                            'List-Unsubscribe': `<mailto:bounces@${senderDomain}?subject=unsubscribe>`,
+                            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+                            'X-Entity-Ref-ID': messageId
+                        }
+                    };
+
+                    if (replyTo) {
+                        emailPayload.reply_to = replyTo;
+                    }
 
                     const res = await fetch('https://api.resend.com/emails', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${resendToken}` },
-                        body: JSON.stringify({ from: fromDisplay, to: cleanEmail, subject: campaign.subject || campaign.name, html: trackedHtml })
+                        body: JSON.stringify(emailPayload)
                     });
                     if (!res.ok) { const e = await res.text(); console.error("Resend Error:", e); throw new Error(`Resend Error: ${e}`); }
                     await supabase.from('marketing_conversations').update({ last_message: campaign.subject || campaign.name, last_message_at: new Date().toISOString() }).eq('id', conversationId);

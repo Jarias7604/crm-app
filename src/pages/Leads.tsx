@@ -79,12 +79,15 @@ export default function Leads() {
         isFetchingNextPage
     } = useInfiniteQuery({
         queryKey: ['leads', activeCompanyId, queryCompanyIds, selectedWorkspace],
-        queryFn: async ({ pageParam }) => {
-            const result = await leadsService.getLeadsCursor(1000, pageParam as string | undefined, queryCompanyIds);
+        queryFn: async ({ pageParam = 0 }) => {
+            const result = await leadsService.getLeadsCursor(1000, pageParam, queryCompanyIds);
             return result;
         },
-        initialPageParam: undefined as string | undefined,
-        getNextPageParam: (lastPage) => lastPage.nextCursor,
+        initialPageParam: 0,
+        getNextPageParam: (lastPage, allPages) => {
+            if (!lastPage.data || lastPage.data.length < 1000) return undefined;
+            return allPages.length * 1000;
+        },
         staleTime: 5 * 1000, // 5 seconds — ensures newly imported leads appear immediately on navigation
         gcTime: 10 * 60 * 1000,
     });
@@ -961,37 +964,26 @@ export default function Leads() {
                 if (results.inserted.length > 0 && results.skipped.length === 0 && results.errors.length === 0) {
                     // Perfect import - all leads inserted
                     const leadText = results.inserted.length === 1 ? 'lead importado' : 'leads importados';
-                    toast.success(`? ${results.inserted.length} ${leadText} correctamente`);
+                    toast.success(`✅ ${results.inserted.length.toLocaleString()} ${leadText} correctamente`);
                 } else if (results.inserted.length > 0 && (results.skipped.length > 0 || results.errors.length > 0)) {
-                    // Partial import - some succeeded, some failed/skipped
+                    // Partial import - some succeeded, some skipped/failed
                     const messages = [
-                        `? ${results.inserted.length} importado(s)`,
-                        results.skipped.length > 0 ? `?? ${results.skipped.length} omitido(s) (duplicados)` : '',
-                        results.errors.length > 0 ? `? ${results.errors.length} error(es)` : ''
+                        `✅ ${results.inserted.length.toLocaleString()} importado(s)`,
+                        results.skipped.length > 0 ? `⚠️ ${results.skipped.length.toLocaleString()} omitido(s) (ya existían)` : '',
+                        results.errors.length > 0 ? `❌ ${results.errors.length.toLocaleString()} error(es)` : ''
                     ].filter(Boolean).join('\n');
 
-                    toast.success(messages, { duration: 5000 });
-
-                    // Log details for debugging
-                    if (results.skipped.length > 0) {
-
-                        results.skipped.forEach(({ lead, reason }) => {
-
-                        });
-                    }
+                    toast.success(messages, { duration: 6000 });
                 } else if (results.inserted.length === 0 && results.skipped.length > 0) {
-                    // All duplicates - nothing imported
-                    const duplicateText = results.skipped.length === 1 ? 'Este lead ya existe' : `Estos ${results.skipped.length} leads ya existen`;
-                    const leadName = results.skipped[0]?.lead?.name || 'Sin nombre';
+                    // All duplicates - nothing new imported
+                    const duplicateText = results.skipped.length === 1 
+                        ? 'Este lead ya existe en tu base de datos' 
+                        : `Los ${results.skipped.length.toLocaleString()} leads ya existen en tu base de datos`;
 
-                    let message = results.skipped.length === 1
-                        ? `?? ${duplicateText}: ${leadName}`
-                        : `?? ${duplicateText}`;
-
-                    toast(message, { duration: 6000, icon: '??' });
+                    toast(duplicateText, { duration: 6000, icon: 'ℹ️' });
                 } else {
                     // All failed
-                    toast.error('? No se pudo importar ningún lead. Revisa el formato del archivo.');
+                    toast.error('❌ No se pudo importar ningún lead. Revisa el formato del archivo.');
                 }
 
                 // Background sync to ensure consistency

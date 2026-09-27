@@ -20,6 +20,47 @@ export const CSV_COLUMNS = [
     { key: 'next_followup_assignee', label: 'Responsable Seguimiento' }
 ];
 
+export const normalizeHeader = (h: string): string => {
+    return String(h || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+};
+
+export const COLUMN_SYNONYMS: Record<string, string[]> = {
+    name: ['nombre', 'nombre completo', 'name', 'full name', 'fullname', 'cliente', 'lead', 'prospecto', 'contacto', 'persona'],
+    company_name: ['empresa', 'compania', 'company', 'organization', 'organizacion', 'negocio', 'institucion', 'razon social', 'empresa (opcional)'],
+    email: ['email', 'e-mail', 'correo', 'correo electronico', 'mail'],
+    phone: ['telefono', 'phone', 'celular', 'mobile', 'movil', 'whatsapp', 'wa', 'tel', 'contacto telefonico'],
+    address: ['direccion', 'address', 'ubicacion', 'ciudad', 'city', 'domicilio'],
+    industry: ['rubro', 'industria', 'industry', 'sector', 'giro', 'rubro / industria'],
+    source: ['fuente', 'origen', 'source', 'canal'],
+    priority: ['prioridad', 'priority'],
+    status: ['estado', 'status', 'etapa', 'fase'],
+    value: ['valor', 'monto', 'value', 'presupuesto', 'precio', 'amount'],
+    next_action_notes: ['notas', 'nota', 'notas iniciales', 'notes', 'comentarios', 'comentario', 'observaciones', 'descripcion'],
+    created_at: ['fecha', 'fecha de creacion', 'fecha creacion', 'creado el', 'date', 'created_at'],
+    closing_amount: ['monto cierre', 'cierre', 'closing amount'],
+    assigned_to: ['asignado', 'asignado a', 'responsable', 'assigned to', 'vendedor'],
+    next_followup_date: ['proximo seguimiento', 'siguiente seguimiento', 'next followup', 'fecha seguimiento'],
+    next_followup_assignee: ['responsable seguimiento', 'asignado seguimiento']
+};
+
+export const findHeaderIndex = (headers: string[], colKey: string, colLabel: string): number => {
+    const normalizedHeaders = headers.map(h => normalizeHeader(h));
+    const synonyms = (COLUMN_SYNONYMS[colKey] || []).map(s => normalizeHeader(s));
+    const targets = [
+        normalizeHeader(colLabel),
+        normalizeHeader(colKey),
+        normalizeHeader(colLabel.split('(')[0]),
+        normalizeHeader(colLabel.split(' ')[0]),
+        ...synonyms
+    ];
+
+    return normalizedHeaders.findIndex(h => targets.includes(h));
+};
+
 export const csvHelper = {
     generateTemplate() {
         const headers = CSV_COLUMNS.map(col => col.label).join(',');
@@ -232,14 +273,7 @@ export const csvHelper = {
                             let hasName = false;
 
                             CSV_COLUMNS.forEach((col) => {
-                                const possibleHeaders = [
-                                    col.label.toLowerCase(),
-                                    col.key.toLowerCase(),
-                                    col.label.split('(')[0].trim().toLowerCase(),
-                                    col.label.split(' ')[0].toLowerCase()
-                                ];
-
-                                const headerIndex = rawHeaders.findIndex(h => possibleHeaders.includes(h));
+                                const headerIndex = findHeaderIndex(rawHeaders, col.key, col.label);
 
                                 if (headerIndex !== -1 && headerIndex < row.length) {
                                     let val: any = row[headerIndex];
@@ -385,6 +419,11 @@ export const csvHelper = {
                                 }
                             });
 
+                            if (!hasName && lead.company_name) {
+                                lead.name = lead.company_name;
+                                hasName = true;
+                            }
+
                             return hasName ? lead : null;
                         })
                         .filter(l => l !== null);
@@ -433,15 +472,7 @@ export const csvHelper = {
                                     let hasName = false;
 
                                     CSV_COLUMNS.forEach((col) => {
-                                        // Find header index by checking multiple possible matches (Spanish, English, or exact match)
-                                        const possibleHeaders = [
-                                            col.label.toLowerCase(),
-                                            col.key.toLowerCase(),
-                                            col.label.split('(')[0].trim().toLowerCase(), // e.g., "Empresa" for "Empresa (opcional)"
-                                            col.label.split(' ')[0].toLowerCase() // e.g., "Nombre" for "Nombre completo"
-                                        ];
-
-                                        const headerIndex = rawHeaders.findIndex(h => possibleHeaders.includes(h));
+                                        const headerIndex = findHeaderIndex(rawHeaders, col.key, col.label);
 
                                         if (headerIndex !== -1 && headerIndex < values.length) {
                                             let val: any = values[headerIndex];
@@ -550,6 +581,11 @@ export const csvHelper = {
                                             }
                                         }
                                     });
+
+                                    if (!hasName && lead.company_name) {
+                                        lead.name = lead.company_name;
+                                        hasName = true;
+                                    }
 
                                     return hasName ? lead : null;
                                 })

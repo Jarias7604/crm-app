@@ -60,9 +60,9 @@ export const leadsService = {
         return { data: result.data, count: result.count };
     },
 
-    // Cursor-based Pagination for ultra-fast performance on millions of rows
+    // Cursor & Offset-based Pagination for ultra-fast performance on millions of rows
     // PROTECTED by safeSelect
-    async getLeadsCursor(limit = 50, cursor?: string, companyId?: string | string[]) {
+    async getLeadsCursor(limit = 1000, offsetOrCursor?: string | number, companyId?: string | string[]) {
         const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, last_follow_up_at, first_follow_up_at, assigned_at, interested_product_id';
 
         const resolvedCompanyId = companyId || (await this.getActiveCompanyId());
@@ -78,8 +78,22 @@ export const leadsService = {
             filters.push({ column: 'company_id', op: 'eq' as const, value: resolvedCompanyId });
         }
 
-        if (cursor) {
-            filters.push({ column: 'created_at', op: 'lt' as const, value: cursor });
+        let rangeFrom: number | undefined;
+        let rangeTo: number | undefined;
+
+        if (typeof offsetOrCursor === 'number') {
+            rangeFrom = offsetOrCursor;
+            rangeTo = offsetOrCursor + limit - 1;
+        } else if (offsetOrCursor && !isNaN(Number(offsetOrCursor))) {
+            const num = Number(offsetOrCursor);
+            rangeFrom = num;
+            rangeTo = num + limit - 1;
+        } else if (offsetOrCursor) {
+            filters.push({ column: 'created_at', op: 'lt' as const, value: offsetOrCursor });
+        } else {
+            // First page by default uses range 0..limit-1
+            rangeFrom = 0;
+            rangeTo = limit - 1;
         }
 
         const result = await safeSelect<Lead>({
@@ -87,11 +101,20 @@ export const leadsService = {
             fields,
             orderBy: 'created_at',
             orderAsc: false,
-            limit,
+            rangeFrom,
+            rangeTo,
+            limit: rangeFrom !== undefined ? undefined : limit,
             filters: filters.length > 0 ? filters : undefined,
         });
 
-        const nextCursor = result.data.length === limit ? result.data[result.data.length - 1].created_at : undefined;
+        let nextCursor: any = undefined;
+        if (result.data.length === limit) {
+            if (rangeFrom !== undefined) {
+                nextCursor = rangeFrom + limit;
+            } else {
+                nextCursor = result.data[result.data.length - 1]?.created_at;
+            }
+        }
 
         return { data: result.data, nextCursor };
     },
@@ -495,7 +518,7 @@ export const leadsService = {
     },
 
 
-    // Import multiple leads with duplicate detection
+    // Import multiple leads with pre-deduplication & high-speed batching
     async importLeads(leads: Partial<Lead>[]) {
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -512,87 +535,193 @@ export const leadsService = {
                 'name', 'company_name', 'email', 'phone', 'source',
                 'status', 'priority', 'value', 'closing_amount',
                 'next_followup_date', 'next_followup_assignee', 'next_action_notes',
-                'company_id', 'assigned_to', 'created_at', 'address'
+                'company_id', 'assigned_to', 'created_at', 'address', 'industry'
             ];
 
-            const leadsToInsert = leads.map(lead => {
-                const cleanedLead: any = {
-                    company_id: companyId,
-                    assigned_to: lead.assigned_to || user.id,
-                    priority: lead.priority || 'medium',
-                    status: lead.status || 'Prospecto',
-                    value: lead.value || 0
-                };
+            // 1. Pre-fetch existing leads for this company to guarantee duplicate prevention
+            const existingEmails = new Set<string>();
+            const existingPhoneDigits = new Set<string>();
+            const existingNames = new Set<string>();
 
-                // Only include fields that exist in the database and have a value
-                Object.keys(lead).forEach(key => {
-                    if (VALID_COLUMNS.includes(key) && (lead as any)[key] !== undefined) {
-                        cleanedLead[key] = (lead as any)[key];
+            let page = 0;
+            const FETCH_BATCH = 1000;
+            while (true) {
+                const { data: existingRows, error: fetchErr } = await supabase
+                    .from('leads')
+                    .select('email, phone, name')
+                    .eq('company_id', companyId)
+                    .range(page * FETCH_BATCH, (page + 1) * FETCH_BATCH - 1);
+
+                if (fetchErr || !existingRows || existingRows.length === 0) break;
+
+                for (const row of existingRows) {
+                    if (row.email) {
+                        existingEmails.add(row.email.trim().toLowerCase());
                     }
-                });
+                    if (row.phone) {
+                        const digits = String(row.phone).replace(/\D/g, '');
+                        if (digits.length >= 7) {
+                            existingPhoneDigits.add(digits);
+                            if (digits.length > 8) {
+                                existingPhoneDigits.add(digits.slice(-8));
+                            }
+                        }
+                    }
+                    if (row.name) {
+                        existingNames.add(row.name.trim().toLowerCase());
+                    }
+                }
 
-                // Convert empty strings to null for email and phone
-                if (cleanedLead.email === '') cleanedLead.email = null;
-                if (cleanedLead.phone === '') cleanedLead.phone = null;
+                if (existingRows.length < FETCH_BATCH) break;
+                page++;
+            }
 
-                return cleanedLead;
+            logger.info('Pre-import check: loaded existing lead identifiers', {
+                emails: existingEmails.size,
+                phones: existingPhoneDigits.size,
+                names: existingNames.size
             });
 
-            logger.debug('Attempting to import leads', { count: leadsToInsert.length });
-
-            // Insert leads one by one to handle duplicates gracefully
             const results = {
                 inserted: [] as Lead[],
                 skipped: [] as Array<{ lead: any; reason: string }>,
                 errors: [] as Array<{ lead: any; error: any }>
             };
 
-            for (const lead of leadsToInsert) {
-                try {
-                    const { data, error } = await supabase
-                        .from('leads')
-                        .insert(lead)
-                        .select()
-                        .single();
+            const seenEmails = new Set<string>(existingEmails);
+            const seenPhones = new Set<string>(existingPhoneDigits);
+            const leadsToInsert: any[] = [];
 
-                    if (error) {
-                        // Check if it's a unique constraint violation (duplicate)
-                        if (error.code === '23505') {
-                            const isDuplicateEmail = error.message.includes('leads_company_email_unique');
-                            const isDuplicatePhone = error.message.includes('leads_company_phone_unique');
+            for (const lead of leads) {
+                const name = (lead.name || '').trim();
+                if (!name) {
+                    results.skipped.push({ lead, reason: 'Sin nombre' });
+                    continue;
+                }
 
-                            let reason = 'Duplicate';
-                            if (isDuplicateEmail && isDuplicatePhone) {
-                                reason = `Duplicate email (${lead.email}) and phone (${lead.phone})`;
-                            } else if (isDuplicateEmail) {
-                                reason = `Duplicate email (${lead.email})`;
-                            } else if (isDuplicatePhone) {
-                                reason = `Duplicate phone (${lead.phone})`;
-                            }
+                const email = lead.email ? String(lead.email).trim().toLowerCase() : null;
+                const phone = lead.phone ? String(lead.phone).trim() : null;
+                const phoneDigits = phone ? phone.replace(/\D/g, '') : null;
+                const phoneLast8 = phoneDigits && phoneDigits.length >= 8 ? phoneDigits.slice(-8) : null;
 
-                            results.skipped.push({ lead, reason });
-                            logger.warn('Skipped duplicate lead', { reason, lead: lead.name });
-                        } else {
-                            // Other database error
-                            results.errors.push({ lead, error });
-                            logger.error('Failed to insert lead', error, { lead: lead.name });
-                        }
-                    } else {
-                        results.inserted.push(data);
+                // Check duplicate email
+                if (email && seenEmails.has(email)) {
+                    results.skipped.push({ lead, reason: `Email ya registrado (${email})` });
+                    continue;
+                }
+
+                // Check duplicate phone
+                if (phoneDigits && phoneDigits.length >= 7) {
+                    const isDupPhone = seenPhones.has(phoneDigits) || (phoneLast8 && seenPhones.has(phoneLast8));
+                    if (isDupPhone) {
+                        results.skipped.push({ lead, reason: `Teléfono ya registrado (${phone})` });
+                        continue;
                     }
-                } catch (err) {
-                    results.errors.push({ lead, error: err });
-                    logger.error('Exception during lead insert', err, { lead: lead.name });
+                }
+
+                // Fallback check: If lead has neither email nor phone, check duplicate name
+                if (!email && (!phoneDigits || phoneDigits.length < 7) && existingNames.has(name.toLowerCase())) {
+                    results.skipped.push({ lead, reason: `Nombre ya registrado (${name})` });
+                    continue;
+                }
+
+                const cleanedLead: any = {
+                    company_id: companyId,
+                    assigned_to: lead.assigned_to || user.id,
+                    priority: lead.priority || 'medium',
+                    status: lead.status || 'Prospecto',
+                    value: lead.value || 0,
+                    name: name
+                };
+
+                Object.keys(lead).forEach(key => {
+                    if (VALID_COLUMNS.includes(key) && (lead as any)[key] !== undefined) {
+                        cleanedLead[key] = (lead as any)[key];
+                    }
+                });
+
+                cleanedLead.email = email || null;
+                cleanedLead.phone = phone || null;
+
+                leadsToInsert.push(cleanedLead);
+
+                // Add to seen sets so intra-file duplicates are also skipped
+                if (email) seenEmails.add(email);
+                if (phoneDigits && phoneDigits.length >= 7) {
+                    seenPhones.add(phoneDigits);
+                    if (phoneLast8) seenPhones.add(phoneLast8);
                 }
             }
 
-            logger.info('Import completed', {
+            logger.info('Leads prepared for batch insert', {
+                totalToInsert: leadsToInsert.length,
+                skippedCount: results.skipped.length
+            });
+
+            // 2. Batch insert in chunks of 100 with automatic fallback to 1-by-1 if a chunk fails
+            const CHUNK_SIZE = 100;
+            for (let i = 0; i < leadsToInsert.length; i += CHUNK_SIZE) {
+                const chunk = leadsToInsert.slice(i, i + CHUNK_SIZE);
+                try {
+                    const { data, error } = await supabase
+                        .from('leads')
+                        .insert(chunk)
+                        .select();
+
+                    if (error) {
+                        logger.warn(`Batch insert failed for chunk starting at ${i}, retrying items individually`, { error: error.message });
+                        for (const singleLead of chunk) {
+                            try {
+                                const { data: singleData, error: singleError } = await supabase
+                                    .from('leads')
+                                    .insert(singleLead)
+                                    .select()
+                                    .single();
+
+                                if (singleError) {
+                                    if (singleError.code === '23505') {
+                                        results.skipped.push({ lead: singleLead, reason: 'Duplicado (BD constraint)' });
+                                    } else {
+                                        results.errors.push({ lead: singleLead, error: singleError });
+                                    }
+                                } else if (singleData) {
+                                    results.inserted.push(singleData);
+                                }
+                            } catch (singleEx) {
+                                results.errors.push({ lead: singleLead, error: singleEx });
+                            }
+                        }
+                    } else if (data) {
+                        results.inserted.push(...data);
+                    }
+                } catch (chunkErr: any) {
+                    logger.error(`Exception during chunk insert at ${i}`, { error: chunkErr?.message || chunkErr });
+                    for (const singleLead of chunk) {
+                        try {
+                            const { data: singleData, error: singleError } = await supabase
+                                .from('leads')
+                                .insert(singleLead)
+                                .select()
+                                .single();
+
+                            if (singleError) {
+                                results.errors.push({ lead: singleLead, error: singleError });
+                            } else if (singleData) {
+                                results.inserted.push(singleData);
+                            }
+                        } catch (singleEx) {
+                            results.errors.push({ lead: singleLead, error: singleEx });
+                        }
+                    }
+                }
+            }
+
+            logger.info('Import finished successfully', {
                 inserted: results.inserted.length,
                 skipped: results.skipped.length,
                 errors: results.errors.length
             });
 
-            // Return full results object
             return results;
         } catch (error: any) {
             logger.error('Lead import service failed', error, { action: 'importLeads' });

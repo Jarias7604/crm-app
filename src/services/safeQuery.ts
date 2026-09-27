@@ -85,8 +85,11 @@ export async function safeSelect<T = any>(opts: SafeQueryOptions): Promise<SafeQ
         }
 
         if (orderBy) query = query.order(orderBy, { ascending: orderAsc });
-        if (rangeFrom !== undefined && rangeTo !== undefined) query = query.range(rangeFrom, rangeTo);
-        if (limit) query = query.limit(limit);
+        if (rangeFrom !== undefined && rangeTo !== undefined) {
+            query = query.range(rangeFrom, rangeTo);
+        } else if (limit) {
+            query = query.limit(limit);
+        }
 
         const { data, count: resultCount, error } = await query;
 
@@ -124,8 +127,11 @@ export async function safeSelect<T = any>(opts: SafeQueryOptions): Promise<SafeQ
         }
 
         if (orderBy) fallbackQuery = fallbackQuery.order(orderBy, { ascending: orderAsc });
-        if (rangeFrom !== undefined && rangeTo !== undefined) fallbackQuery = fallbackQuery.range(rangeFrom, rangeTo);
-        if (limit) fallbackQuery = fallbackQuery.limit(limit);
+        if (rangeFrom !== undefined && rangeTo !== undefined) {
+            fallbackQuery = fallbackQuery.range(rangeFrom, rangeTo);
+        } else if (limit) {
+            fallbackQuery = fallbackQuery.limit(limit);
+        }
 
         const { data, count: resultCount, error } = await fallbackQuery;
 
