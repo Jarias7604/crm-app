@@ -67,6 +67,9 @@ export interface FlyerData {
   contactFont?: string;
   // New properties for modern templates
   gradientBg?: string;
+  gradColor1?: string;
+  gradColor2?: string;
+  gradColor3?: string;
   bgType?: 'photo' | 'gradient';
   badgeTextTop?: string;
   badgeTextBottom?: string;
@@ -125,8 +128,8 @@ export const PillBtn = ({ label, bg1, bg2, color = '#fff', style = {}, s = 1 }: 
   </div>
 );
 
-export const BenChip = ({ text, color = '#38bdf8', s = 1, isDark = true, bold = false }: {
-  text: string; color?: string; s?: number; isDark?: boolean; bold?: boolean;
+export const BenChip = ({ text, color = '#38bdf8', gradient, s = 1, isDark = true, bold = false }: {
+  text: string; color?: string; gradient?: string; s?: number; isDark?: boolean; bold?: boolean;
 }) => {
   if (!text) return null;
   return (
@@ -143,7 +146,14 @@ export const BenChip = ({ text, color = '#38bdf8', s = 1, isDark = true, bold = 
       fontWeight: bold ? 800 : 600,
       lineHeight: 1.3
     }}>
-      <span style={{ color, fontWeight: 900, fontSize: Math.round(11 * s) }}>✓</span>
+      <span style={{
+        background: gradient || color,
+        WebkitBackgroundClip: gradient ? 'text' : undefined,
+        WebkitTextFillColor: gradient ? 'transparent' : undefined,
+        color: gradient ? undefined : color,
+        fontWeight: 900,
+        fontSize: Math.round(12 * s)
+      }}>✓</span>
       <span>{text.replace(/^[✓\s*+•-]+/, '').trim()}</span>
     </div>
   );
@@ -225,12 +235,13 @@ export const GoldenSeal = ({ textTop = '+600', textBottom = 'CLIENTES SATISFECHO
 );
 
 // ─── CURVED WAVE FOOTER RIBBON (Exact match to Fotos 2 & 3) ─────────────────────
-export const CurvedWave = ({ color = '#dc2626', h = 75 }: { color?: string; h?: number }) => (
+export const CurvedWave = ({ color = '#dc2626', c1, c2, c3, h = 75 }: { color?: string; c1?: string; c2?: string; c3?: string; h?: number }) => (
   <svg viewBox="0 0 500 100" preserveAspectRatio="none" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: h, zIndex: 3, pointerEvents: 'none' }}>
     <defs>
       <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-        <stop offset="0%" stopColor={color} />
-        <stop offset="100%" stopColor={`${color}dd`} />
+        <stop offset="0%" stopColor={c1 || color} />
+        {c2 && <stop offset="50%" stopColor={c2} />}
+        <stop offset="100%" stopColor={c3 || `${c1 || color}dd`} />
       </linearGradient>
     </defs>
     <path d="M0,45 C150,15 350,75 500,30 L500,100 L0,100 Z" fill="url(#waveGrad)" />
@@ -381,7 +392,7 @@ export const Template_CinematicGradient = ({ d }: { d: FlyerData }) => {
           style={{ display: 'flex', flexWrap: 'wrap', gap: Math.round(6 * s), margin: `${Math.round(4 * s)}px 0`, justifyContent: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', width: '100%', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
         >
           {(d.beneficios || []).slice(0, 3).map((b, i) => (
-            <BenChip key={i} text={b} color={acc} s={s} isDark={true} bold={!!d.benefitsBold} />
+            <BenChip key={i} text={b} color={acc} gradient={d.gradientBg} s={s} isDark={true} bold={!!d.benefitsBold} />
           ))}
         </div>
         
@@ -493,7 +504,14 @@ export const Template_CorporateTrustSeal = ({ d }: { d: FlyerData }) => {
       }}>
         {(d.beneficios || []).slice(0, 3).map((b, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * s) }}>
-            <span style={{ color: acc, fontWeight: 900, fontSize: Math.round(14 * s) }}>✓</span>
+            <span style={{
+              background: d.gradientBg || `linear-gradient(135deg, ${acc} 0%, #2563eb 50%, #6d4aff 100%)`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              fontWeight: 900,
+              fontSize: Math.round(15 * s),
+              display: 'inline-block'
+            }}>✓</span>
             <span style={{ fontSize: Math.round(12 * s), fontWeight: 700, color: '#1e293b' }}>
               {b.replace(/^[✓\s*+•-]+/, '').trim()}
             </span>
@@ -517,7 +535,7 @@ export const Template_CorporateTrustSeal = ({ d }: { d: FlyerData }) => {
       </div>
 
       {/* 7. Curved Dynamic Red Wave at Bottom */}
-      <CurvedWave color={acc} h={Math.round(80 * s)} />
+      <CurvedWave color={acc} c1={d.gradColor1} c2={d.gradColor2} c3={d.gradColor3} h={Math.round(80 * s)} />
 
       {/* 8. Contact Footer */}
       <ContactFooter phone={d.phone} website={d.website} color="#fff" s={s} style={{ zIndex: 15 }} onClick={d.onContactClick} />

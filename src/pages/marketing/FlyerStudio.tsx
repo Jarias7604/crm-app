@@ -41,19 +41,20 @@ const TONES = [
 ];
 
 const BRAND_COLORS = [
-  '#0070d2', '#7c3aed', '#ef4444', '#f59e0b',
-  '#10b981', '#ec4899', '#06b6d4', '#111827',
+  '#06c7d9', '#2563eb', '#6d4aff', '#071640', '#667085', '#f7f8fc',
+  '#0070d2', '#7c3aed', '#ef4444', '#f59e0b', '#10b981', '#111827',
 ];
 
 const GRADIENT_PRESETS = [
-  { id: 'meta-violet', name: 'Violeta Viral (Foto 5)', value: 'linear-gradient(135deg, #7928ca 0%, #ff0080 100%)', c1: '#7928ca', c2: '#ff0080', angle: 135, type: 'linear' as const },
-  { id: 'royal-indigo', name: 'Índigo Tech', value: 'linear-gradient(135deg, #1e1b4b 0%, #6366f1 100%)', c1: '#1e1b4b', c2: '#6366f1', angle: 135, type: 'linear' as const },
-  { id: 'ocean-cyan', name: 'Océano Cyan', value: 'linear-gradient(135deg, #082f49 0%, #06b6d4 100%)', c1: '#082f49', c2: '#06b6d4', angle: 135, type: 'linear' as const },
-  { id: 'sunset-fire', name: 'Atardecer Coral', value: 'linear-gradient(135deg, #7c2d12 0%, #fbbf24 100%)', c1: '#7c2d12', c2: '#fbbf24', angle: 135, type: 'linear' as const },
-  { id: 'emerald-pro', name: 'Esmeralda Pro', value: 'linear-gradient(135deg, #064e3b 0%, #10b981 100%)', c1: '#064e3b', c2: '#10b981', angle: 135, type: 'linear' as const },
-  { id: 'gold-luxury', name: 'Oro & Bronce VIP', value: 'linear-gradient(135deg, #451a03 0%, #f59e0b 100%)', c1: '#451a03', c2: '#f59e0b', angle: 135, type: 'linear' as const },
-  { id: 'rose-wine', name: 'Rubí & Rosa', value: 'linear-gradient(135deg, #4c0519 0%, #f43f5e 100%)', c1: '#4c0519', c2: '#f43f5e', angle: 135, type: 'linear' as const },
-  { id: 'midnight-dark', name: 'Obsidiana Minimal', value: 'linear-gradient(135deg, #030712 0%, #1e293b 100%)', c1: '#030712', c2: '#1e293b', angle: 135, type: 'linear' as const },
+  { id: 'iclesia-brand', name: 'Iclesia Pro (#06C7D9 → #2563EB → #6D4AFF)', value: 'linear-gradient(135deg, #06c7d9 0%, #2563eb 50%, #6d4aff 100%)', c1: '#06c7d9', c2: '#2563eb', c3: '#6d4aff', angle: 135, type: 'linear' as const },
+  { id: 'meta-violet', name: 'Violeta Viral (Foto 5)', value: 'linear-gradient(135deg, #7928ca 0%, #c026d3 50%, #ff0080 100%)', c1: '#7928ca', c2: '#c026d3', c3: '#ff0080', angle: 135, type: 'linear' as const },
+  { id: 'royal-indigo', name: 'Índigo Tech', value: 'linear-gradient(135deg, #1e1b4b 0%, #4338ca 50%, #6366f1 100%)', c1: '#1e1b4b', c2: '#4338ca', c3: '#6366f1', angle: 135, type: 'linear' as const },
+  { id: 'ocean-cyan', name: 'Océano Cyan', value: 'linear-gradient(135deg, #082f49 0%, #0284c7 50%, #06b6d4 100%)', c1: '#082f49', c2: '#0284c7', c3: '#06b6d4', angle: 135, type: 'linear' as const },
+  { id: 'sunset-fire', name: 'Atardecer Coral', value: 'linear-gradient(135deg, #7c2d12 0%, #ea580c 50%, #fbbf24 100%)', c1: '#7c2d12', c2: '#ea580c', c3: '#fbbf24', angle: 135, type: 'linear' as const },
+  { id: 'emerald-pro', name: 'Esmeralda Pro', value: 'linear-gradient(135deg, #064e3b 0%, #059669 50%, #10b981 100%)', c1: '#064e3b', c2: '#059669', c3: '#10b981', angle: 135, type: 'linear' as const },
+  { id: 'gold-luxury', name: 'Oro & Bronce VIP', value: 'linear-gradient(135deg, #451a03 0%, #b45309 50%, #f59e0b 100%)', c1: '#451a03', c2: '#b45309', c3: '#f59e0b', angle: 135, type: 'linear' as const },
+  { id: 'rose-wine', name: 'Rubí & Rosa', value: 'linear-gradient(135deg, #4c0519 0%, #be123c 50%, #f43f5e 100%)', c1: '#4c0519', c2: '#be123c', c3: '#f43f5e', angle: 135, type: 'linear' as const },
+  { id: 'midnight-dark', name: 'Obsidiana Minimal', value: 'linear-gradient(135deg, #030712 0%, #0f172a 50%, #1e293b 100%)', c1: '#030712', c2: '#0f172a', c3: '#1e293b', angle: 135, type: 'linear' as const },
 ];
 
 const DEFAULT_BG_IMAGE = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1080&auto=format&fit=crop';
@@ -248,21 +249,198 @@ export default function FlyerStudio() {
   const canvasH = Math.round(1080 * (getFlyerDimensions(format).height / getFlyerDimensions(format).width));
   const [tone, setTone] = useState('moderno');
   const [variantCount, setVariantCount] = useState<1 | 2 | 3>(1);
-  const [colors, setColors] = useState<string[]>(['#7c3aed']);
-  const [gradColor1, setGradColor1] = useState<string>('#7928ca');
-  const [gradColor2, setGradColor2] = useState<string>('#ff0080');
-  const [gradAngle, setGradAngle] = useState<number>(135);
-  const [gradType, setGradType] = useState<'linear' | 'radial'>('linear');
-  const [selectedGradient, setSelectedGradient] = useState<string>('linear-gradient(135deg, #7928ca 0%, #ff0080 100%)');
+  const [colors, setColors] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('flyer_brand_colors');
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (Array.isArray(p) && p.length > 0) return p;
+      }
+    } catch {}
+    return ['#06c7d9', '#2563eb', '#6d4aff'];
+  });
+  const [gradColor1, setGradColor1] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('flyer_dynamic_gradient');
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p.c1) return p.c1;
+      }
+    } catch {}
+    return '#06c7d9';
+  });
+  const [gradColor2, setGradColor2] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('flyer_dynamic_gradient');
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p.c2) return p.c2;
+      }
+    } catch {}
+    return '#2563eb';
+  });
+  const [gradColor3, setGradColor3] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('flyer_dynamic_gradient');
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p.c3) return p.c3;
+      }
+    } catch {}
+    return '#6d4aff';
+  });
+  const [useThreeColors, setUseThreeColors] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('flyer_dynamic_gradient');
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p.threeStops !== undefined) return p.threeStops;
+      }
+    } catch {}
+    return true;
+  });
+  const [gradAngle, setGradAngle] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('flyer_dynamic_gradient');
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p.angle !== undefined) return p.angle;
+      }
+    } catch {}
+    return 135;
+  });
+  const [gradType, setGradType] = useState<'linear' | 'radial'>(() => {
+    try {
+      const saved = localStorage.getItem('flyer_dynamic_gradient');
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p.type) return p.type;
+      }
+    } catch {}
+    return 'linear';
+  });
+  const [selectedGradient, setSelectedGradient] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('flyer_dynamic_gradient');
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p.css) return p.css;
+      }
+    } catch {}
+    return 'linear-gradient(135deg, #06c7d9 0%, #2563eb 50%, #6d4aff 100%)';
+  });
   const [badgeTop, setBadgeTop] = useState<string>('+600');
   const [badgeBottom, setBadgeBottom] = useState<string>('CLIENTES SATISFECHOS');
+  const [savingBrandColors, setSavingBrandColors] = useState<boolean>(false);
 
-  const updateDynamicGradient = (c1: string, c2: string, angle: number, type: 'linear' | 'radial') => {
-    const cssGrad = type === 'radial'
-      ? `radial-gradient(circle at center, ${c1} 0%, ${c2} 100%)`
-      : `linear-gradient(${angle}deg, ${c1} 0%, ${c2} 100%)`;
+  const updateDynamicGradient = (
+    c1: string,
+    c2: string,
+    c3: string,
+    angle: number,
+    type: 'linear' | 'radial',
+    threeStops = useThreeColors
+  ) => {
+    let cssGrad = '';
+    if (threeStops) {
+      cssGrad = type === 'radial'
+        ? `radial-gradient(circle at center, ${c1} 0%, ${c2} 50%, ${c3} 100%)`
+        : `linear-gradient(${angle}deg, ${c1} 0%, ${c2} 50%, ${c3} 100%)`;
+    } else {
+      cssGrad = type === 'radial'
+        ? `radial-gradient(circle at center, ${c1} 0%, ${c3} 100%)`
+        : `linear-gradient(${angle}deg, ${c1} 0%, ${c3} 100%)`;
+    }
     setSelectedGradient(cssGrad);
+    try {
+      localStorage.setItem('flyer_dynamic_gradient', JSON.stringify({
+        c1, c2, c3, angle, type, threeStops, css: cssGrad
+      }));
+    } catch (e) {
+      console.warn('Could not save gradient to localStorage:', e);
+    }
   };
+
+  const handleColorHexInput = (
+    index: 1 | 2 | 3,
+    rawVal: string,
+    isBlur: boolean = false
+  ) => {
+    let val = rawVal.trim();
+    if (val && !val.startsWith('#')) {
+      val = '#' + val;
+    }
+    if (index === 1) setGradColor1(val);
+    if (index === 2) setGradColor2(val);
+    if (index === 3) setGradColor3(val);
+
+    if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(val)) {
+      let fullHex = val;
+      if (val.length === 4) {
+        fullHex = '#' + val[1] + val[1] + val[2] + val[2] + val[3] + val[3];
+        if (index === 1) setGradColor1(fullHex);
+        if (index === 2) setGradColor2(fullHex);
+        if (index === 3) setGradColor3(fullHex);
+      }
+      const c1 = index === 1 ? fullHex : gradColor1;
+      const c2 = index === 2 ? fullHex : gradColor2;
+      const c3 = index === 3 ? fullHex : gradColor3;
+      updateDynamicGradient(c1, c2, c3, gradAngle, gradType, useThreeColors);
+    } else if (isBlur) {
+      const fallback = index === 1 ? '#06c7d9' : index === 2 ? '#2563eb' : '#6d4aff';
+      const cur = index === 1 ? gradColor1 : index === 2 ? gradColor2 : gradColor3;
+      const safe = cur.startsWith('#') && cur.length >= 4 ? cur : fallback;
+      if (index === 1) setGradColor1(safe);
+      if (index === 2) setGradColor2(safe);
+      if (index === 3) setGradColor3(safe);
+      const c1 = index === 1 ? safe : gradColor1;
+      const c2 = index === 2 ? safe : gradColor2;
+      const c3 = index === 3 ? safe : gradColor3;
+      updateDynamicGradient(c1, c2, c3, gradAngle, gradType, useThreeColors);
+    }
+  };
+
+  const handleSaveToCompanyBranding = async () => {
+    try {
+      setSavingBrandColors(true);
+      const company = await brandingService.getMyCompany();
+      const currentFeatures = (company.features || {}) as any;
+      const brandGradObj = {
+        c1: gradColor1,
+        c2: gradColor2,
+        c3: gradColor3,
+        angle: gradAngle,
+        type: gradType,
+        threeStops: useThreeColors,
+        css: selectedGradient
+      };
+      const updatedFeatures = {
+        ...currentFeatures,
+        brand_colors: colors,
+        brand_gradient: brandGradObj
+      };
+      await brandingService.updateBranding({
+        features: updatedFeatures
+      });
+      localStorage.setItem('flyer_brand_colors', JSON.stringify(colors));
+      localStorage.setItem('flyer_dynamic_gradient', JSON.stringify(brandGradObj));
+      toast.success('🏢 ¡Colores y degradado guardados para toda tu empresa!');
+    } catch (err: any) {
+      console.error('Error saving brand colors:', err);
+      localStorage.setItem('flyer_brand_colors', JSON.stringify(colors));
+      toast.success('💾 Colores guardados en este navegador.');
+    } finally {
+      setSavingBrandColors(false);
+    }
+  };
+
+  useEffect(() => {
+    if (colors && colors.length > 0) {
+      try {
+        localStorage.setItem('flyer_brand_colors', JSON.stringify(colors));
+      } catch {}
+    }
+  }, [colors]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState(DEFAULT_LOGO_SVG);
   const [isLogoCustomized, setIsLogoCustomized] = useState(false);
@@ -731,6 +909,21 @@ export default function FlyerStudio() {
             if (data.logo_url && !isLogoCustomized) {
               const base64 = await urlToBase64(data.logo_url);
               setLogoPreview(base64);
+            }
+            // Load company branding colors & gradient if configured
+            const feats = (data.features || {}) as any;
+            if (feats.brand_colors && Array.isArray(feats.brand_colors) && feats.brand_colors.length > 0) {
+              setColors(feats.brand_colors);
+            }
+            if (feats.brand_gradient) {
+              const bg = feats.brand_gradient;
+              if (bg.c1) setGradColor1(bg.c1);
+              if (bg.c2) setGradColor2(bg.c2);
+              if (bg.c3) setGradColor3(bg.c3);
+              if (bg.angle !== undefined) setGradAngle(bg.angle);
+              if (bg.type) setGradType(bg.type);
+              if (bg.threeStops !== undefined) setUseThreeColors(bg.threeStops);
+              if (bg.css) setSelectedGradient(bg.css);
             }
           }
         })
@@ -1217,6 +1410,15 @@ export default function FlyerStudio() {
         ctaTextColor,
         contactColor,
         cardBgColor,
+        selectedGradient,
+        gradColor1,
+        gradColor2,
+        gradColor3,
+        gradAngle,
+        gradType,
+        useThreeColors,
+        badgeTop,
+        badgeBottom,
         phone,
         website,
         syncFonts,
@@ -1305,6 +1507,15 @@ export default function FlyerStudio() {
       if (s.manualPrice !== undefined) setManualPrice(s.manualPrice);
       if (s.cta !== undefined) setCta(s.cta);
       if (s.colors !== undefined) setColors(s.colors);
+      if (s.selectedGradient !== undefined) setSelectedGradient(s.selectedGradient);
+      if (s.gradColor1 !== undefined) setGradColor1(s.gradColor1);
+      if (s.gradColor2 !== undefined) setGradColor2(s.gradColor2);
+      if (s.gradColor3 !== undefined) setGradColor3(s.gradColor3);
+      if (s.gradAngle !== undefined) setGradAngle(s.gradAngle);
+      if (s.gradType !== undefined) setGradType(s.gradType);
+      if (s.useThreeColors !== undefined) setUseThreeColors(s.useThreeColors);
+      if (s.badgeTop !== undefined) setBadgeTop(s.badgeTop);
+      if (s.badgeBottom !== undefined) setBadgeBottom(s.badgeBottom);
       
       if (s.bgUploadPreview !== undefined) setBgUploadPreview(s.bgUploadPreview);
       if (s.logoPreview !== undefined) setLogoPreview(s.logoPreview);
@@ -2525,13 +2736,13 @@ export default function FlyerStudio() {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════
-                CREADOR DINÁMICO DE DEGRADADOS (100% Personalizable)
+                CREADOR DINÁMICO DE DEGRADADOS (3 Colores 100% Personalizable)
             ═══════════════════════════════════════════════════════════════ */}
             <div style={{ ...css.section, background: '#f8fafc', padding: 12, borderRadius: 12, border: '1.5px solid #e2e8f0', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Palette size={14} color="#7c3aed" />
-                  <span style={{ fontSize: 11, fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Creador Dinámico de Degradados</span>
+                  <span style={{ fontSize: 11, fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Creador Dinámico (3 Colores)</span>
                 </div>
                 {/* Mode toggle: Linear / Radial */}
                 <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: 6, padding: 2 }}>
@@ -2539,7 +2750,7 @@ export default function FlyerStudio() {
                     type="button"
                     onClick={() => {
                       setGradType('linear');
-                      updateDynamicGradient(gradColor1, gradColor2, gradAngle, 'linear');
+                      updateDynamicGradient(gradColor1, gradColor2, gradColor3, gradAngle, 'linear');
                     }}
                     style={{
                       border: 'none',
@@ -2558,7 +2769,7 @@ export default function FlyerStudio() {
                     type="button"
                     onClick={() => {
                       setGradType('radial');
-                      updateDynamicGradient(gradColor1, gradColor2, gradAngle, 'radial');
+                      updateDynamicGradient(gradColor1, gradColor2, gradColor3, gradAngle, 'radial');
                     }}
                     style={{
                       border: 'none',
@@ -2591,16 +2802,16 @@ export default function FlyerStudio() {
                 overflow: 'hidden'
               }}>
                 <span style={{ fontSize: 11, fontWeight: 900, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.6)', letterSpacing: '0.05em' }}>
-                  {gradType === 'radial' ? 'RADIAL' : `${gradAngle}°`}
+                  {gradType === 'radial' ? 'RADIAL' : `${gradAngle}°`} {useThreeColors ? '(3 PUNTOS)' : '(2 PUNTOS)'}
                 </span>
                 <button
                   type="button"
                   title="Invertir Colores"
                   onClick={() => {
                     const temp = gradColor1;
-                    setGradColor1(gradColor2);
-                    setGradColor2(temp);
-                    updateDynamicGradient(gradColor2, temp, gradAngle, gradType);
+                    setGradColor1(gradColor3);
+                    setGradColor3(temp);
+                    updateDynamicGradient(gradColor3, gradColor2, temp, gradAngle, gradType, useThreeColors);
                   }}
                   style={{
                     background: 'rgba(0,0,0,0.35)',
@@ -2621,62 +2832,114 @@ export default function FlyerStudio() {
                 </button>
               </div>
 
-              {/* Color Pickers: Color 1 y Color 2 */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-                {/* Color 1 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={{ fontSize: 10, fontWeight: 800, color: '#64748b' }}>COLOR INICIO</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8, padding: '4px 6px' }}>
+              {/* Color Stops Controls: 2 vs 3 Colores Toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: '#64748b' }}>PUNTOS DE COLOR</span>
+                <div style={{ display: 'flex', background: '#e2e8f0', borderRadius: 6, padding: 2 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseThreeColors(false);
+                      updateDynamicGradient(gradColor1, gradColor2, gradColor3, gradAngle, gradType, false);
+                    }}
+                    style={{
+                      border: 'none',
+                      background: !useThreeColors ? '#fff' : 'transparent',
+                      color: !useThreeColors ? '#0f172a' : '#64748b',
+                      fontSize: 9,
+                      fontWeight: 800,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    2 Colores
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseThreeColors(true);
+                      updateDynamicGradient(gradColor1, gradColor2, gradColor3, gradAngle, gradType, true);
+                    }}
+                    style={{
+                      border: 'none',
+                      background: useThreeColors ? '#7c3aed' : 'transparent',
+                      color: useThreeColors ? '#fff' : '#64748b',
+                      fontSize: 9,
+                      fontWeight: 800,
+                      padding: '2px 6px',
+                      borderRadius: 4,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    3 Colores (Pro)
+                  </button>
+                </div>
+              </div>
+
+              {/* 3 Color Pickers: Inicio (0%), Medio (50%), Final (100%) */}
+              <div style={{ display: 'grid', gridTemplateColumns: useThreeColors ? '1fr 1fr 1fr' : '1fr 1fr', gap: 6, marginBottom: 12 }}>
+                {/* Color 1: Inicio */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, color: '#64748b' }}>INICIO (0%)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8, padding: '4px' }}>
                     <input
                       type="color"
-                      value={gradColor1}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setGradColor1(val);
-                        updateDynamicGradient(val, gradColor2, gradAngle, gradType);
-                      }}
-                      style={{ width: 26, height: 26, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0, background: 'none' }}
+                      value={gradColor1.startsWith('#') && gradColor1.length === 7 ? gradColor1 : '#06c7d9'}
+                      onChange={(e) => handleColorHexInput(1, e.target.value)}
+                      style={{ width: 22, height: 22, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0, background: 'none' }}
                     />
                     <input
                       type="text"
                       value={gradColor1}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setGradColor1(val);
-                        if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-                          updateDynamicGradient(val, gradColor2, gradAngle, gradType);
-                        }
-                      }}
-                      style={{ border: 'none', outline: 'none', fontSize: 11, fontWeight: 700, color: '#1e293b', width: '100%', fontFamily: 'monospace' }}
+                      placeholder="#06c7d9"
+                      onChange={(e) => handleColorHexInput(1, e.target.value)}
+                      onBlur={() => handleColorHexInput(1, gradColor1, true)}
+                      style={{ border: 'none', outline: 'none', fontSize: 10, fontWeight: 700, color: '#1e293b', width: '100%', fontFamily: 'monospace' }}
                     />
                   </div>
                 </div>
 
-                {/* Color 2 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={{ fontSize: 10, fontWeight: 800, color: '#64748b' }}>COLOR FINAL</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8, padding: '4px 6px' }}>
+                {/* Color 2: Medio (if 3 colors enabled) */}
+                {useThreeColors && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <span style={{ fontSize: 9, fontWeight: 800, color: '#7c3aed' }}>MEDIO (50%)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fff', border: '1.5px solid #c4b5fd', borderRadius: 8, padding: '4px' }}>
+                      <input
+                        type="color"
+                        value={gradColor2.startsWith('#') && gradColor2.length === 7 ? gradColor2 : '#2563eb'}
+                        onChange={(e) => handleColorHexInput(2, e.target.value)}
+                        style={{ width: 22, height: 22, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0, background: 'none' }}
+                      />
+                      <input
+                        type="text"
+                        value={gradColor2}
+                        placeholder="#2563eb"
+                        onChange={(e) => handleColorHexInput(2, e.target.value)}
+                        onBlur={() => handleColorHexInput(2, gradColor2, true)}
+                        style={{ border: 'none', outline: 'none', fontSize: 10, fontWeight: 700, color: '#1e293b', width: '100%', fontFamily: 'monospace' }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Color 3: Final */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, color: '#64748b' }}>FINAL (100%)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8, padding: '4px' }}>
                     <input
                       type="color"
-                      value={gradColor2}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setGradColor2(val);
-                        updateDynamicGradient(gradColor1, val, gradAngle, gradType);
-                      }}
-                      style={{ width: 26, height: 26, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0, background: 'none' }}
+                      value={gradColor3.startsWith('#') && gradColor3.length === 7 ? gradColor3 : '#6d4aff'}
+                      onChange={(e) => handleColorHexInput(3, e.target.value)}
+                      style={{ width: 22, height: 22, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0, background: 'none' }}
                     />
                     <input
                       type="text"
-                      value={gradColor2}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setGradColor2(val);
-                        if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
-                          updateDynamicGradient(gradColor1, val, gradAngle, gradType);
-                        }
-                      }}
-                      style={{ border: 'none', outline: 'none', fontSize: 11, fontWeight: 700, color: '#1e293b', width: '100%', fontFamily: 'monospace' }}
+                      value={gradColor3}
+                      placeholder="#6d4aff"
+                      onChange={(e) => handleColorHexInput(3, e.target.value)}
+                      onBlur={() => handleColorHexInput(3, gradColor3, true)}
+                      style={{ border: 'none', outline: 'none', fontSize: 10, fontWeight: 700, color: '#1e293b', width: '100%', fontFamily: 'monospace' }}
                     />
                   </div>
                 </div>
@@ -2702,7 +2965,7 @@ export default function FlyerStudio() {
                         type="button"
                         onClick={() => {
                           setGradAngle(d.angle);
-                          updateDynamicGradient(gradColor1, gradColor2, d.angle, 'linear');
+                          updateDynamicGradient(gradColor1, gradColor2, gradColor3, d.angle, 'linear', useThreeColors);
                         }}
                         style={{
                           flex: 1,
@@ -2729,7 +2992,7 @@ export default function FlyerStudio() {
                     onChange={(e) => {
                       const a = parseInt(e.target.value);
                       setGradAngle(a);
-                      updateDynamicGradient(gradColor1, gradColor2, a, 'linear');
+                      updateDynamicGradient(gradColor1, gradColor2, gradColor3, a, 'linear', useThreeColors);
                     }}
                     style={{ width: '100%', accentColor: '#7c3aed' }}
                   />
@@ -2742,10 +3005,14 @@ export default function FlyerStudio() {
                   type="button"
                   onClick={() => {
                     const c1 = colors[0];
-                    const c2 = colors[1];
+                    const c2 = colors[1] || colors[0];
+                    const c3 = colors[2] || colors[1] || colors[0];
                     setGradColor1(c1);
                     setGradColor2(c2);
-                    updateDynamicGradient(c1, c2, gradAngle, gradType);
+                    setGradColor3(c3);
+                    const three = colors.length >= 3;
+                    setUseThreeColors(three);
+                    updateDynamicGradient(c1, c2, c3, gradAngle, gradType, three);
                   }}
                   style={{
                     width: '100%',
@@ -2761,12 +3028,40 @@ export default function FlyerStudio() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 6,
-                    marginBottom: 10
+                    marginBottom: 6
                   }}
                 >
-                  <span>✨</span> Usar mis Colores de Marca ({colors[0]} + {colors[1]})
+                  <span>✨</span> Usar mis Colores de Marca ({colors.slice(0, 3).join(' + ')})
                 </button>
               )}
+
+              {/* Botón: Guardar en Marca de Empresa (Persistencia Nube) */}
+              <button
+                type="button"
+                onClick={handleSaveToCompanyBranding}
+                disabled={savingBrandColors}
+                style={{
+                  width: '100%',
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  background: '#f0fdf4',
+                  color: '#15803d',
+                  border: '1px solid #bbf7d0',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: savingBrandColors ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  marginBottom: 10,
+                  transition: 'all 0.15s ease'
+                }}
+                title="Guarda este degradado y colores en la configuración de tu empresa para que todos los usuarios los tengan guardados siempre"
+              >
+                <Building2 size={13} color="#15803d" />
+                <span>{savingBrandColors ? 'Guardando en Empresa...' : '💾 Guardar en Marca de Empresa'}</span>
+              </button>
 
               {/* Paletas de Inicio Rápido (Click para cargar y editar) */}
               <div>
@@ -2780,9 +3075,11 @@ export default function FlyerStudio() {
                       onClick={() => {
                         setGradColor1(gp.c1);
                         setGradColor2(gp.c2);
+                        setGradColor3(gp.c3);
                         setGradAngle(gp.angle || 135);
                         setGradType(gp.type || 'linear');
-                        updateDynamicGradient(gp.c1, gp.c2, gp.angle || 135, gp.type || 'linear');
+                        setUseThreeColors(true);
+                        updateDynamicGradient(gp.c1, gp.c2, gp.c3, gp.angle || 135, gp.type || 'linear', true);
                       }}
                       style={{
                         height: 24,
@@ -3720,6 +4017,9 @@ export default function FlyerStudio() {
                                 companyName: companyName,
                                 phone, website, templateId: selectedTemplate,
                                 gradientBg: selectedGradient,
+                                gradColor1,
+                                gradColor2,
+                                gradColor3,
                                 badgeTextTop: badgeTop,
                                 badgeTextBottom: badgeBottom,
                                 containerW: 1080, containerH: canvasH,
