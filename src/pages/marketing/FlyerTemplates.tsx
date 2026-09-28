@@ -1118,13 +1118,13 @@ export const FreeLogo = ({ d, onLogoMove, onLogoResize, onMove, onResize }: {
         zIndex: 40,
         transform: `scale(${rawSize})`,
         transformOrigin: 'top left',
-        padding: '5px 8px',
-        background: 'rgba(255,255,255,0.88)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        borderRadius: 10,
-        boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-        border: '1px solid rgba(255,255,255,0.7)',
+        padding: 0,
+        background: 'transparent',
+        backdropFilter: 'none',
+        WebkitBackdropFilter: 'none',
+        borderRadius: 0,
+        boxShadow: 'none',
+        border: 'none',
         display: 'inline-flex',
         alignItems: 'center',
         gap: 0,
@@ -1135,8 +1135,8 @@ export const FreeLogo = ({ d, onLogoMove, onLogoResize, onMove, onResize }: {
         src={d.logoUrl}
         alt="Logo"
         style={{
-          maxHeight: 42,
-          maxWidth: 130,
+          maxHeight: 80,
+          maxWidth: 180,
           objectFit: 'contain',
           pointerEvents: 'none',
           display: 'block'
@@ -1149,7 +1149,7 @@ export const FreeLogo = ({ d, onLogoMove, onLogoResize, onMove, onResize }: {
             display: 'flex', 
             flexDirection: 'column', 
             gap: 2, 
-            marginLeft: 4,
+            marginLeft: 6,
             opacity: 0,
             transition: 'opacity 0.15s ease',
           }} 
@@ -1158,16 +1158,16 @@ export const FreeLogo = ({ d, onLogoMove, onLogoResize, onMove, onResize }: {
           <button 
             type="button"
             title="Agrandar logo"
-            onClick={(e) => { e.stopPropagation(); handleResize(Math.min(rawSize + 0.1, 2.5)); }}
-            style={{ width: 16, height: 16, fontSize: 11, fontWeight: 900, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a', lineHeight: 1 }}
+            onClick={(e) => { e.stopPropagation(); handleResize(Math.min(rawSize + 0.15, 3.0)); }}
+            style={{ width: 18, height: 18, fontSize: 13, fontWeight: 900, background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', lineHeight: 1 }}
           >
             +
           </button>
           <button 
             type="button"
             title="Achicar logo"
-            onClick={(e) => { e.stopPropagation(); handleResize(Math.max(rawSize - 0.1, 0.3)); }}
-            style={{ width: 16, height: 16, fontSize: 11, fontWeight: 900, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a', lineHeight: 1 }}
+            onClick={(e) => { e.stopPropagation(); handleResize(Math.max(rawSize - 0.15, 0.2)); }}
+            style={{ width: 18, height: 18, fontSize: 13, fontWeight: 900, background: 'rgba(0,0,0,0.65)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', lineHeight: 1 }}
           >
             −
           </button>
