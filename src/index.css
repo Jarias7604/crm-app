@@ -433,4 +433,19 @@ a:active,
 }
 .flyer-contact-element, .flyer-contact-element * {
   font-family: var(--flyer-contact-font, inherit) !important;
-}
+}
+
+/* Logo element — override generic editable hover with logo-specific styles */
+.flyer-logo-element.editable-element:hover {
+  outline: 2px dashed rgba(124, 58, 237, 0.6) !important;
+  outline-offset: 4px !important;
+  background: rgba(255,255,255,0.92) !important;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.22) !important;
+  border-radius: 10px !important;
+}
+
+/* Show resize controls when hovering over the logo */
+.flyer-logo-element:hover .logo-resize-controls {
+  opacity: 1 !important;
+}
+

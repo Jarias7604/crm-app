@@ -1049,9 +1049,31 @@ export const FreeLogo = ({ d, onLogoMove, onLogoResize, onMove, onResize }: {
   const isDragging = React.useRef(false);
   const dragStart = React.useRef({ x: 0, y: 0 });
   const parentRect = React.useRef<DOMRect | null>(null);
+  // Store stable function refs to ensure addEventListener/removeEventListener use same reference
+  const handleMoveRef = React.useRef(handleMove);
+  handleMoveRef.current = handleMove;
+  
+  const onDragRef = React.useRef<((e: MouseEvent) => void) | undefined>(undefined);
+
+  onDragRef.current = (e: MouseEvent) => {
+    if (!isDragging.current || !parentRect.current || !handleMoveRef.current) return;
+    const currentLeft = e.clientX - parentRect.current.left - dragStart.current.x;
+    const currentTop = e.clientY - parentRect.current.top - dragStart.current.y;
+    const pctX = Math.min(95, Math.max(0, (currentLeft / parentRect.current.width) * 100));
+    const pctY = Math.min(90, Math.max(0, (currentTop / parentRect.current.height) * 100));
+    handleMoveRef.current(pctX, pctY);
+  };
+
+  const stableOnDrag = React.useRef((e: MouseEvent) => onDragRef.current?.(e));
+  const stableEndDrag = React.useRef(() => {
+    isDragging.current = false;
+    document.removeEventListener('mousemove', stableOnDrag.current);
+    document.removeEventListener('mouseup', stableEndDrag.current);
+  });
 
   const startDrag = (e: React.MouseEvent) => {
-    if (!handleMove) return;
+    if (!handleMoveRef.current) return;
+    e.preventDefault();
     isDragging.current = true;
     const parent = e.currentTarget.parentElement;
     if (parent) {
@@ -1059,31 +1081,25 @@ export const FreeLogo = ({ d, onLogoMove, onLogoResize, onMove, onResize }: {
       const logoRect = e.currentTarget.getBoundingClientRect();
       dragStart.current = { x: e.clientX - logoRect.left, y: e.clientY - logoRect.top };
     }
-    document.addEventListener('mousemove', onDrag);
-    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('mousemove', stableOnDrag.current);
+    document.addEventListener('mouseup', stableEndDrag.current);
   };
 
-  const onDrag = (e: MouseEvent) => {
-    if (!isDragging.current || !parentRect.current || !handleMove) return;
-    const currentLeft = e.clientX - parentRect.current.left - dragStart.current.x;
-    const currentTop = e.clientY - parentRect.current.top - dragStart.current.y;
-    const pctX = Math.min(100, Math.max(0, (currentLeft / parentRect.current.width) * 100));
-    const pctY = Math.min(100, Math.max(0, (currentTop / parentRect.current.height) * 100));
-    handleMove(pctX, pctY);
-  };
-
-  const endDrag = () => {
-    isDragging.current = false;
-    document.removeEventListener('mousemove', onDrag);
-    document.removeEventListener('mouseup', endDrag);
-  };
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      document.removeEventListener('mousemove', stableOnDrag.current);
+      document.removeEventListener('mouseup', stableEndDrag.current);
+    };
+  }, []);
 
   if (!d.logoUrl) return null;
 
   const rawSize = d.logoSize !== undefined ? d.logoSize : 1.0;
   const isCustom = d.logoX !== undefined && d.logoY !== undefined;
-  const defaultX = d.templateId === 'vibrant-gradient' ? 50 : 18;
-  const defaultY = d.templateId === 'vibrant-gradient' ? 8 : 6;
+  // Better default: top-left corner with a bit of margin
+  const defaultX = 4;
+  const defaultY = 4;
   const posX = isCustom ? d.logoX : defaultX;
   const posY = isCustom ? d.logoY : defaultY;
   
@@ -1093,25 +1109,25 @@ export const FreeLogo = ({ d, onLogoMove, onLogoResize, onMove, onResize }: {
       className={d.onLogoClick ? "editable-element flyer-logo-element" : "flyer-logo-element"}
       onClick={d.onLogoClick ? (e) => { e.stopPropagation(); d.onLogoClick?.(); } : undefined}
       onMouseDown={startDrag}
-      title="Arrastra para mover el logo libremente"
+      title={handleMove ? "Arrastra para mover el logo" : undefined}
       style={{
         position: 'absolute',
         left: `${posX}%`,
         top: `${posY}%`,
-        cursor: handleMove ? 'move' : 'pointer',
+        cursor: handleMove ? 'move' : 'default',
         zIndex: 40,
         transform: `scale(${rawSize})`,
         transformOrigin: 'top left',
-        padding: 6,
-        background: 'rgba(255,255,255,0.92)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
-        borderRadius: 12,
-        boxShadow: '0 8px 24px rgba(0,0,0,0.22)',
-        border: '1.5px solid rgba(255,255,255,0.85)',
+        padding: '5px 8px',
+        background: 'rgba(255,255,255,0.88)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        borderRadius: 10,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+        border: '1px solid rgba(255,255,255,0.7)',
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
+        gap: 0,
         userSelect: 'none'
       }}
     >
@@ -1119,36 +1135,48 @@ export const FreeLogo = ({ d, onLogoMove, onLogoResize, onMove, onResize }: {
         src={d.logoUrl}
         alt="Logo"
         style={{
-          maxHeight: 46,
-          maxWidth: 140,
+          maxHeight: 42,
+          maxWidth: 130,
           objectFit: 'contain',
-          pointerEvents: 'none'
+          pointerEvents: 'none',
+          display: 'block'
         }}
-        crossOrigin="anonymous"
       />
       {handleResize && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }} onMouseDown={e => e.stopPropagation()}>
+        <div 
+          className="logo-resize-controls"
+          style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 2, 
+            marginLeft: 4,
+            opacity: 0,
+            transition: 'opacity 0.15s ease',
+          }} 
+          onMouseDown={e => e.stopPropagation()}
+        >
           <button 
             type="button"
             title="Agrandar logo"
             onClick={(e) => { e.stopPropagation(); handleResize(Math.min(rawSize + 0.1, 2.5)); }}
-            style={{ width: 16, height: 16, fontSize: 10, fontWeight: 900, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a' }}
+            style={{ width: 16, height: 16, fontSize: 11, fontWeight: 900, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a', lineHeight: 1 }}
           >
             +
           </button>
           <button 
             type="button"
             title="Achicar logo"
-            onClick={(e) => { e.stopPropagation(); handleResize(Math.max(rawSize - 0.1, 0.4)); }}
-            style={{ width: 16, height: 16, fontSize: 10, fontWeight: 900, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a' }}
+            onClick={(e) => { e.stopPropagation(); handleResize(Math.max(rawSize - 0.1, 0.3)); }}
+            style={{ width: 16, height: 16, fontSize: 11, fontWeight: 900, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0f172a', lineHeight: 1 }}
           >
-            -
+            −
           </button>
         </div>
       )}
     </div>
   );
 };
+
 
 export const TEMPLATE_LIST = [
   { 

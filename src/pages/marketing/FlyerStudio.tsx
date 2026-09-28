@@ -451,7 +451,7 @@ export default function FlyerStudio() {
     }
   }, [colors]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState(DEFAULT_LOGO_SVG);
+  const [logoPreview, setLogoPreview] = useState('');
   const [isLogoCustomized, setIsLogoCustomized] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const brandingLoaded = useRef(false);
@@ -471,9 +471,9 @@ export default function FlyerStudio() {
   const [bgUploadPreview, setBgUploadPreview] = useState('');
   const bgUploadRef = useRef<HTMLInputElement>(null);
 
-  // Logo positioning: default to center top
-  const [logoX, setLogoX] = useState(50);
-  const [logoY, setLogoY] = useState(8);
+  // Logo positioning: default to top-left corner
+  const [logoX, setLogoX] = useState(4);
+  const [logoY, setLogoY] = useState(4);
   const [logoSize, setLogoSize] = useState(1.0);
 
   const logoRef = useRef<HTMLInputElement>(null);
@@ -482,6 +482,10 @@ export default function FlyerStudio() {
     if (!f) return;
     setLogoFile(f);
     setIsLogoCustomized(true);
+    // Reset logo position to top-left on new upload
+    setLogoX(4);
+    setLogoY(4);
+    setLogoSize(1.0);
 
     // 1. Immediate local base64 preview for instant visual feedback
     const reader = new FileReader();
@@ -496,15 +500,20 @@ export default function FlyerStudio() {
     };
     reader.readAsDataURL(f);
 
+
     // 2. Upload to Supabase Storage & sync to company branding
+    // NOTE: We keep the base64 as logoPreview (already set above) to avoid CORS issues
+    // with Supabase Storage URLs rendering as white/blank images.
+    // The remote URL is only stored in DB/localStorage for next-session persistence.
     if (profile?.company_id) {
       setUploadingLogo(true);
       const toastId = toast.loading('Guardando logo en tu marca...');
       try {
         const publicUrl = await storageService.uploadLogo(profile.company_id, f);
         if (publicUrl) {
-          setLogoPreview(publicUrl);
-          localStorage.setItem('flyer_custom_logo', publicUrl);
+          // Do NOT replace logoPreview with publicUrl - keep base64 for display
+          // Only update localStorage with URL for persistence reference
+          localStorage.setItem('flyer_logo_remote_url', publicUrl);
           await brandingService.updateBranding({ logo_url: publicUrl });
           toast.success('🏢 ¡Logo guardado con éxito para toda tu empresa!', { id: toastId });
         }
@@ -1388,10 +1397,10 @@ export default function FlyerStudio() {
     // Reset styling
     setColors(BRAND_COLORS);
     setBgUploadPreview('');
-    setLogoPreview(DEFAULT_LOGO_SVG);
-    setLogoX(50);
-    setLogoY(10);
-    setLogoSize(120);
+    setLogoPreview('');
+    setLogoX(4);
+    setLogoY(4);
+    setLogoSize(1.0);
     setTextY(30);
     setTextAlign('center');
     
