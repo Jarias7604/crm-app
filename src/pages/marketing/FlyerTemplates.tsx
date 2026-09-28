@@ -564,6 +564,14 @@ export const Template_VibrantGradient = ({ d }: { d: FlyerData }) => {
         padding: `${Math.round(36 * s)}px ${Math.round(32 * s)}px`
       }}
     >
+      {/* Subtle modern ambient light flare */}
+      <div style={{
+        position: 'absolute', top: '30%', left: '50%', transform: 'translate(-50%, -50%)',
+        width: Math.round(650 * s), height: Math.round(650 * s),
+        background: 'radial-gradient(circle, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0) 70%)',
+        pointerEvents: 'none', zIndex: 1
+      }} />
+
       {/* Top Logo / Brand Name */}
       <div style={{ display: 'flex', justifyContent: 'center', zIndex: 10, width: '100%' }}>
         {!d.logoUrl && (
@@ -609,27 +617,56 @@ export const Template_VibrantGradient = ({ d }: { d: FlyerData }) => {
           </p>
         )}
 
-        {/* CTA Button */}
+        {/* Optional Benefit Chips */}
+        {d.beneficios && d.beneficios.filter(b => b.trim() !== '').length > 0 && (
+          <div 
+            data-element-id="benefits" 
+            className={d.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
+            onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
+            style={{ 
+              display: 'flex', flexWrap: 'wrap', gap: Math.round(8 * s), 
+              justifyContent: 'center', margin: `${Math.round(4 * s)}px 0`, 
+              maxWidth: Math.round(480 * s),
+              transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined 
+            }}
+          >
+            {d.beneficios.filter(b => b.trim() !== '').slice(0, 3).map((b, i) => (
+              <BenChip key={i} text={b} color="#38bdf8" s={s * (d.benefitsScale ?? 1)} isDark={true} bold={!!d.benefitsBold} />
+            ))}
+          </div>
+        )}
+
+        {/* CTA Button — Guaranteed High Contrast */}
         <div 
           data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
           onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
-          style={{ marginTop: Math.round(12 * s), transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
+          style={{ marginTop: Math.round(10 * s), transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
         >
-          <div style={{
-            background: d.ctaBgColor || '#ffffff',
-            color: d.ctaTextColor || '#0f172a',
-            fontWeight: 900,
-            fontSize: Math.round(13 * s * (d.ctaScale ?? 1)),
-            letterSpacing: '0.04em',
-            borderRadius: 999,
-            padding: `${Math.round(12 * s)}px ${Math.round(28 * s)}px`,
-            display: 'inline-flex', alignItems: 'center', gap: Math.round(6 * s),
-            boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
-            textTransform: 'uppercase', cursor: 'pointer'
-          }}>
-            <span>{d.cta || 'PRUÉBALO GRATIS'}</span>
-            <span>➔</span>
-          </div>
+          {(() => {
+            const bg = d.ctaBgColor || '#ffffff';
+            const isLightBg = !d.ctaBgColor || d.ctaBgColor.toLowerCase() === '#ffffff' || d.ctaBgColor.toLowerCase() === '#fff' || d.ctaBgColor.toLowerCase() === '#f8fafc';
+            const hasExplicitDarkText = d.ctaTextColor && d.ctaTextColor.toLowerCase() !== '#ffffff' && d.ctaTextColor.toLowerCase() !== '#fff';
+            const textColor = isLightBg ? (hasExplicitDarkText ? d.ctaTextColor : '#0f172a') : (d.ctaTextColor || '#ffffff');
+            const ctaLabel = (d.cta && d.cta.trim() !== '') ? d.cta.trim() : 'PRUÉBALO GRATIS';
+
+            return (
+              <div style={{
+                background: bg,
+                color: textColor,
+                fontWeight: 900,
+                fontSize: Math.round(13 * s * (d.ctaScale ?? 1)),
+                letterSpacing: '0.04em',
+                borderRadius: 999,
+                padding: `${Math.round(12 * s)}px ${Math.round(28 * s)}px`,
+                display: 'inline-flex', alignItems: 'center', gap: Math.round(6 * s),
+                boxShadow: isLightBg ? '0 10px 25px rgba(0,0,0,0.25)' : '0 10px 25px rgba(0,0,0,0.3)',
+                textTransform: 'uppercase', cursor: 'pointer'
+              }}>
+                <span style={{ color: textColor }}>{ctaLabel}</span>
+                <span style={{ color: textColor }}>➔</span>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
