@@ -1074,10 +1074,21 @@ export const FreeLogo = ({ d, onLogoMove, onLogoResize, onMove, onResize }: {
   const startDrag = (e: React.MouseEvent) => {
     if (!handleMoveRef.current) return;
     e.preventDefault();
+    e.stopPropagation();
     isDragging.current = true;
-    const parent = e.currentTarget.parentElement;
-    if (parent) {
-      parentRect.current = parent.getBoundingClientRect();
+    // Find the canvas container (position:relative parent that holds the flyer)
+    // Walk up the DOM to find the element with data-flyer-canvas attribute, 
+    // or fall back to the immediate parentElement
+    let canvasEl: HTMLElement | null = e.currentTarget.parentElement;
+    let walker: HTMLElement | null = e.currentTarget.parentElement;
+    while (walker) {
+      if (walker.dataset && walker.dataset.flyerCanvas) { canvasEl = walker; break; }
+      walker = walker.parentElement;
+    }
+    if (canvasEl) {
+      const canvasRect = canvasEl.getBoundingClientRect();
+      parentRect.current = canvasRect;
+      // dragStart offset = where inside the logo the user clicked (in visual/scaled px)
       const logoRect = e.currentTarget.getBoundingClientRect();
       dragStart.current = { x: e.clientX - logoRect.left, y: e.clientY - logoRect.top };
     }

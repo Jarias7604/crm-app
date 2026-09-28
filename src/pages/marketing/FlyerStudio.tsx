@@ -3937,7 +3937,7 @@ export default function FlyerStudio() {
                           width: 1080, height: canvasH, pointerEvents: 'auto'
                         }}>
                           {selectedTemplate === 'A' ? (
-                            <div style={{ position: 'relative', width: 1080, height: canvasH }}>
+                            <div data-flyer-canvas="true" style={{ position: 'relative', width: 1080, height: canvasH, '--flyer-title-font': `"${titleFont}",sans-serif`, '--flyer-subtitle-font': `"${subtitleFont}",sans-serif`, '--flyer-benefits-font': `"${benefitsFont}",sans-serif`, '--flyer-cta-font': `"${ctaFont}",sans-serif`, '--flyer-contact-font': `"${contactFont}",sans-serif` } as React.CSSProperties}>
                               <FlyerTemplateA data={{
                                 company_name: companyName || 'Mi Empresa',
                                 containerW: 1080,
@@ -4015,7 +4015,7 @@ export default function FlyerStudio() {
                               )}
                             </div>
                           ) : selectedTemplate === 'B' ? (
-                            <div style={{ position: 'relative', width: 1080, height: canvasH }}>
+                            <div data-flyer-canvas="true" style={{ position: 'relative', width: 1080, height: canvasH, '--flyer-title-font': `"${titleFont}",sans-serif`, '--flyer-subtitle-font': `"${subtitleFont}",sans-serif`, '--flyer-benefits-font': `"${benefitsFont}",sans-serif`, '--flyer-cta-font': `"${ctaFont}",sans-serif`, '--flyer-contact-font': `"${contactFont}",sans-serif` } as React.CSSProperties}>
                               <FlyerTemplateB data={{
                                 company_name: companyName || 'Mi Empresa',
                                 containerW: 1080,
@@ -4093,7 +4093,7 @@ export default function FlyerStudio() {
                               )}
                             </div>
                           ) : (
-                            <div style={{ position: 'relative', width: 1080, height: canvasH }}>
+                            <div data-flyer-canvas="true" style={{ position: 'relative', width: 1080, height: canvasH, '--flyer-title-font': `"${titleFont}",sans-serif`, '--flyer-subtitle-font': `"${subtitleFont}",sans-serif`, '--flyer-benefits-font': `"${benefitsFont}",sans-serif`, '--flyer-cta-font': `"${ctaFont}",sans-serif`, '--flyer-contact-font': `"${contactFont}",sans-serif` } as React.CSSProperties}>
                               <RenderFlyer d={{
                                 title: manualTitle || 'TU OFERTA',
                                 subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
