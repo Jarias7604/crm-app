@@ -73,6 +73,15 @@ export interface FlyerData {
   bgType?: 'photo' | 'gradient';
   badgeTextTop?: string;
   badgeTextBottom?: string;
+  bgOverlayColor?: string;
+  bgOverlayOpacity?: number;
+  bgOverlayBlendMode?: 'multiply' | 'overlay' | 'darken' | 'normal';
+  bulletShape?: 'check' | 'dot' | 'circle' | 'star' | 'sparkle' | 'arrow' | 'zap' | 'diamond' | 'fire' | 'heart' | 'number' | 'dash' | string;
+  bulletColor?: string;
+  benefitsAlign?: 'left' | 'center' | 'right';
+  benefitsLayout?: 'chips' | 'column';
+  showBenefits?: boolean;
+  showCta?: boolean;
 }
 
 // ─── PHOTO HELPERS ────────────────────────────────────────────────────────────
@@ -109,29 +118,112 @@ export const cleanSubtitle = (s?: string) => {
     .trim();
 };
 
+export const isColorLight = (color?: string): boolean => {
+  if (!color) return false;
+  const c = color.trim().toLowerCase();
+  if (['#fff', '#ffffff', 'white', '#f8fafc', '#f1f5f9', '#e2e8f0', '#fef08a', '#fef9c3', '#fef3c7', '#fed7aa', '#fbcfe8', '#e0e7ff', '#ccfbf1'].includes(c)) return true;
+  if (c.startsWith('#')) {
+    const hex = c.replace('#', '');
+    const full = hex.length === 3 ? hex.split('').map(x => x + x).join('') : hex;
+    if (full.length === 6) {
+      const r = parseInt(full.substring(0, 2), 16);
+      const g = parseInt(full.substring(2, 4), 16);
+      const b = parseInt(full.substring(4, 6), 16);
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+        const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+        return yiq >= 140;
+      }
+    }
+  }
+  return false;
+};
+
+export const resolveCtaTextColor = (ctaBgColor?: string, ctaTextColor?: string, defaultBgIsLight = false): string => {
+  const bgIsLight = ctaBgColor ? isColorLight(ctaBgColor) : defaultBgIsLight;
+  
+  if (ctaTextColor && ctaTextColor.trim() !== '') {
+    const textIsLight = isColorLight(ctaTextColor);
+    // If background is light AND text is also light, force dark text for guaranteed readability
+    if (bgIsLight && textIsLight) {
+      return '#0f172a';
+    }
+    // If background is dark AND text is also dark, force white text for guaranteed readability
+    if (!bgIsLight && !textIsLight && (ctaBgColor && !isColorLight(ctaBgColor))) {
+      return '#ffffff';
+    }
+    return ctaTextColor;
+  }
+  
+  return bgIsLight ? '#0f172a' : '#ffffff';
+};
+
 // ─── MODERN SHARED COMPONENTS ─────────────────────────────────────────────────
 
-export const PillBtn = ({ label, bg1, bg2, color = '#fff', style = {}, s = 1 }: {
+export const PillBtn = ({ label, bg1, bg2, color, style = {}, s = 1 }: {
   label: string; bg1: string; bg2: string; color?: string; style?: React.CSSProperties; s?: number;
-}) => (
-  <div style={{
-    background: `linear-gradient(135deg, ${bg1}, ${bg2})`,
-    color, fontWeight: 900, fontSize: Math.round(13 * s),
-    letterSpacing: '0.04em', borderRadius: 999,
-    padding: `${Math.round(11 * s)}px ${Math.round(24 * s)}px`,
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: Math.round(6 * s),
-    boxShadow: `0 ${Math.round(6 * s)}px ${Math.round(20 * s)}px -4px ${bg1}66`,
-    textAlign: 'center', textTransform: 'uppercase', cursor: 'pointer', ...style,
-  }}>
-    <span>{label}</span>
-    <span style={{ fontSize: Math.round(13 * s), opacity: 0.9 }}>➔</span>
-  </div>
-);
+}) => {
+  const textColor = resolveCtaTextColor(bg1, color, false);
+  return (
+    <div style={{
+      background: `linear-gradient(135deg, ${bg1}, ${bg2})`,
+      color: textColor, fontWeight: 900, fontSize: Math.round(13 * s),
+      letterSpacing: '0.04em', borderRadius: 999,
+      padding: `${Math.round(11 * s)}px ${Math.round(24 * s)}px`,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: Math.round(6 * s),
+      boxShadow: `0 ${Math.round(6 * s)}px ${Math.round(20 * s)}px -4px ${bg1}66`,
+      textAlign: 'center', textTransform: 'uppercase', cursor: 'pointer', ...style,
+    }}>
+      <span style={{ color: textColor }}>{label}</span>
+      <span style={{ color: textColor, fontSize: Math.round(13 * s), opacity: 0.9 }}>➔</span>
+    </div>
+  );
+};
 
-export const BenChip = ({ text, color = '#38bdf8', gradient, s = 1, isDark = true, bold = false }: {
-  text: string; color?: string; gradient?: string; s?: number; isDark?: boolean; bold?: boolean;
+export const renderBulletIcon = (shape?: string, index: number = 0): string => {
+  switch (shape) {
+    case 'dot': return '●';
+    case 'circle': return '○';
+    case 'star': return '★';
+    case 'sparkle': return '✨';
+    case 'arrow': return '➔';
+    case 'zap': return '⚡';
+    case 'diamond': return '◆';
+    case 'fire': return '🔥';
+    case 'heart': return '❤️';
+    case 'number': return `${index + 1}.`;
+    case 'dash': return '—';
+    case 'check':
+    default:
+      return '✓';
+  }
+};
+
+export const BenChip = ({ 
+  text, 
+  color, 
+  gradient, 
+  s = 1, 
+  isDark = true, 
+  bold = false,
+  bulletShape = 'check',
+  bulletColor,
+  index = 0
+}: {
+  text: string; 
+  color?: string; 
+  gradient?: string; 
+  s?: number; 
+  isDark?: boolean; 
+  bold?: boolean;
+  bulletShape?: string;
+  bulletColor?: string;
+  index?: number;
 }) => {
   if (!text) return null;
+  const effectiveBulletColor = bulletColor || color || '#38bdf8';
+  const icon = renderBulletIcon(bulletShape, index);
+  const isEmoji = ['✨', '⚡', '🔥', '❤️'].includes(icon);
+
   return (
     <div style={{
       display: 'inline-flex', alignItems: 'center', gap: Math.round(6 * s),
@@ -147,14 +239,19 @@ export const BenChip = ({ text, color = '#38bdf8', gradient, s = 1, isDark = tru
       lineHeight: 1.3
     }}>
       <span style={{
-        background: gradient || color,
-        WebkitBackgroundClip: gradient ? 'text' : undefined,
-        WebkitTextFillColor: gradient ? 'transparent' : undefined,
-        color: gradient ? undefined : color,
+        background: (!bulletColor && gradient && !isEmoji) ? gradient : undefined,
+        WebkitBackgroundClip: (!bulletColor && gradient && !isEmoji) ? 'text' : undefined,
+        WebkitTextFillColor: (!bulletColor && gradient && !isEmoji) ? 'transparent' : undefined,
+        color: isEmoji ? undefined : effectiveBulletColor,
         fontWeight: 900,
-        fontSize: Math.round(12 * s)
-      }}>✓</span>
-      <span>{text.replace(/^[✓\s*+•-]+/, '').trim()}</span>
+        fontSize: Math.round((bulletShape === 'dot' ? 14 : 12) * s),
+        lineHeight: 1,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0
+      }}>{icon}</span>
+      <span>{text.replace(/^[✓\s*+•●○★✨➔⚡◆🔥❤️\d.-]+/, '').trim()}</span>
     </div>
   );
 };
@@ -340,6 +437,17 @@ export const Template_CinematicGradient = ({ d }: { d: FlyerData }) => {
       {/* 1. Full Image Background */}
       <div style={{ position: 'absolute', inset: 0, ...imgBg(d.bgImageUrl, d.bgImagePosition) }} />
 
+      {/* Color / Gradient tint overlay for contrast and branding */}
+      {d.bgOverlayColor && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: d.bgOverlayColor,
+          opacity: d.bgOverlayOpacity !== undefined ? d.bgOverlayOpacity : 0.65,
+          mixBlendMode: d.bgOverlayBlendMode || 'multiply',
+          zIndex: 1
+        }} />
+      )}
+
       {/* 2. Top Header Brand Scrim */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: Math.round(90 * s), background: 'linear-gradient(180deg, rgba(3,7,18,0.7) 0%, transparent 100%)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: `0 ${Math.round(26 * s)}px`, zIndex: 10 }}>
         {d.logoX === undefined && (
@@ -385,25 +493,50 @@ export const Template_CinematicGradient = ({ d }: { d: FlyerData }) => {
           </div>
         )}
         
-        {/* Horizontal Chips */}
-        <div 
-          data-element-id="benefits" className={d.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
-          onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
-          style={{ display: 'flex', flexWrap: 'wrap', gap: Math.round(6 * s), margin: `${Math.round(4 * s)}px 0`, justifyContent: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', width: '100%', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
-        >
-          {(d.beneficios || []).slice(0, 3).map((b, i) => (
-            <BenChip key={i} text={b} color={acc} gradient={d.gradientBg} s={s} isDark={true} bold={!!d.benefitsBold} />
-          ))}
-        </div>
+        {/* Horizontal Chips / Vertical Column Benefits */}
+        {d.showBenefits !== false && (d.beneficios || []).filter(b => b.trim() !== '').length > 0 && (
+          <div 
+            data-element-id="benefits" className={d.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
+            onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
+            style={{ 
+              display: 'flex', 
+              flexDirection: d.benefitsLayout === 'column' ? 'column' : 'row',
+              flexWrap: d.benefitsLayout === 'column' ? 'nowrap' : 'wrap', 
+              gap: Math.round(6 * s), 
+              margin: `${Math.round(4 * s)}px 0`, 
+              justifyContent: d.benefitsAlign === 'center' ? 'center' : d.benefitsAlign === 'right' ? 'flex-end' : 'flex-start',
+              alignItems: d.benefitsAlign === 'center' ? 'center' : d.benefitsAlign === 'right' ? 'flex-end' : 'flex-start', 
+              width: '100%', 
+              transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined 
+            }}
+          >
+            {(d.beneficios || []).filter(b => b.trim() !== '').map((b, i) => (
+              <BenChip 
+                key={i} 
+                text={b} 
+                color={d.benefitsColor || acc} 
+                bulletColor={d.bulletColor || d.benefitsColor} 
+                bulletShape={d.bulletShape} 
+                gradient={d.benefitsColor ? undefined : d.gradientBg} 
+                s={s} 
+                isDark={true} 
+                bold={!!d.benefitsBold} 
+                index={i} 
+              />
+            ))}
+          </div>
+        )}
         
-        {/* CTA Button */}
-        <div 
-          data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
-          onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
-          style={{ display: 'inline-block', marginTop: Math.round(4 * s), transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
-        >
-          <PillBtn label={d.cta || 'INICIAR HOY'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : acc + 'dd'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} />
-        </div>
+        {/* CTA Button (Opcional) */}
+        {d.showCta !== false && d.cta && d.cta.trim() !== '' && (
+          <div 
+            data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
+            onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
+            style={{ display: 'inline-block', marginTop: Math.round(4 * s), transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
+          >
+            <PillBtn label={d.cta.trim()} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : acc + 'dd'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} />
+          </div>
+        )}
       </div>
 
       {/* 5. Sleek Contact Footer */}
@@ -497,27 +630,38 @@ export const Template_CorporateTrustSeal = ({ d }: { d: FlyerData }) => {
       </div>
 
       {/* 4. Left Feature Checklist (from Foto 3) */}
-      <div style={{
-        position: 'absolute', left: Math.round(24 * s), top: Math.round(220 * s),
-        display: 'flex', flexDirection: 'column', gap: Math.round(8 * s), zIndex: 6,
-        maxWidth: '52%'
-      }}>
-        {(d.beneficios || []).slice(0, 3).map((b, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * s) }}>
-            <span style={{
-              background: d.gradientBg || `linear-gradient(135deg, ${acc} 0%, #2563eb 50%, #6d4aff 100%)`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              fontWeight: 900,
-              fontSize: Math.round(15 * s),
-              display: 'inline-block'
-            }}>✓</span>
-            <span style={{ fontSize: Math.round(12 * s), fontWeight: 700, color: '#1e293b' }}>
-              {b.replace(/^[✓\s*+•-]+/, '').trim()}
-            </span>
-          </div>
-        ))}
-      </div>
+      {d.showBenefits !== false && (d.beneficios || []).filter(b => b.trim() !== '').length > 0 && (
+        <div style={{
+          position: 'absolute', left: Math.round(24 * s), top: Math.round(220 * s),
+          display: 'flex', flexDirection: 'column', gap: Math.round(8 * s), zIndex: 6,
+          maxWidth: '52%',
+          transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined,
+          alignItems: d.benefitsAlign === 'center' ? 'center' : d.benefitsAlign === 'right' ? 'flex-end' : 'flex-start'
+        }}>
+          {(d.beneficios || []).filter(b => b.trim() !== '').map((b, i) => {
+            const bColor = d.bulletColor || d.benefitsColor || acc;
+            const bShape = d.bulletShape || 'check';
+            const bIcon = renderBulletIcon(bShape, i);
+            const isEmoji = ['✨', '⚡', '🔥', '❤️'].includes(bIcon);
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * s) }}>
+                <span style={{
+                  background: (!d.bulletColor && !d.benefitsColor && d.gradientBg && !isEmoji) ? d.gradientBg : undefined,
+                  WebkitBackgroundClip: (!d.bulletColor && !d.benefitsColor && d.gradientBg && !isEmoji) ? 'text' : undefined,
+                  WebkitTextFillColor: (!d.bulletColor && !d.benefitsColor && d.gradientBg && !isEmoji) ? 'transparent' : undefined,
+                  color: isEmoji ? undefined : bColor,
+                  fontWeight: 900,
+                  fontSize: Math.round((bShape === 'dot' ? 17 : 15) * s),
+                  display: 'inline-block'
+                }}>{bIcon}</span>
+                <span style={{ fontSize: Math.round(12 * s), fontWeight: d.benefitsBold ? 900 : 700, color: '#1e293b' }}>
+                  {b.replace(/^[✓\s*+•●○★✨➔⚡◆🔥❤️\d.-]+/, '').trim()}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* 5. Subject / People Photo (rested cleanly in bottom right/center) */}
       {d.bgImageUrl && (
@@ -559,17 +703,36 @@ export const Template_VibrantGradient = ({ d }: { d: FlyerData }) => {
       style={{ 
         width: W, height: H, position: 'relative', overflow: 'hidden', 
         fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', 
-        background: grad, cursor: d.onBgClick ? 'pointer' : 'default',
+        background: d.bgImageUrl ? '#0a0a14' : grad, cursor: d.onBgClick ? 'pointer' : 'default',
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
         padding: `${Math.round(36 * s)}px ${Math.round(32 * s)}px`
       }}
     >
+      {/* Background photo support: if photo is provided, show photo with modern ambient gradient overlay */}
+      {d.bgImageUrl && (
+        <>
+          <div style={{ position: 'absolute', inset: 0, ...imgBg(d.bgImageUrl, d.bgImagePosition), zIndex: 0 }} />
+          <div style={{ 
+            position: 'absolute', inset: 0, 
+            background: d.bgOverlayColor || grad, 
+            opacity: d.bgOverlayOpacity !== undefined ? d.bgOverlayOpacity : 0.65, 
+            mixBlendMode: d.bgOverlayBlendMode || 'multiply',
+            zIndex: 1 
+          }} />
+          <div style={{ 
+            position: 'absolute', inset: 0, 
+            background: 'linear-gradient(180deg, rgba(10,10,20,0.65) 0%, rgba(10,10,20,0.2) 45%, rgba(10,10,20,0.85) 100%)',
+            zIndex: 1 
+          }} />
+        </>
+      )}
+
       {/* Subtle modern ambient light flare */}
       <div style={{
         position: 'absolute', top: '30%', left: '50%', transform: 'translate(-50%, -50%)',
         width: Math.round(650 * s), height: Math.round(650 * s),
         background: 'radial-gradient(circle, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0) 70%)',
-        pointerEvents: 'none', zIndex: 1
+        pointerEvents: 'none', zIndex: 2
       }} />
 
       {/* Top Logo / Brand Name */}
@@ -618,60 +781,77 @@ export const Template_VibrantGradient = ({ d }: { d: FlyerData }) => {
         )}
 
         {/* Optional Benefit Chips */}
-        {d.beneficios && d.beneficios.filter(b => b.trim() !== '').length > 0 && (
+        {d.showBenefits !== false && d.beneficios && d.beneficios.filter(b => b.trim() !== '').length > 0 && (
           <div 
             data-element-id="benefits" 
             className={d.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
             onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
             style={{ 
-              display: 'flex', flexWrap: 'wrap', gap: Math.round(8 * s), 
-              justifyContent: 'center', margin: `${Math.round(4 * s)}px 0`, 
-              maxWidth: Math.round(480 * s),
+              display: 'flex', 
+              flexDirection: d.benefitsLayout === 'column' ? 'column' : 'row',
+              flexWrap: d.benefitsLayout === 'column' ? 'nowrap' : 'wrap', 
+              gap: Math.round(8 * s), 
+              justifyContent: d.benefitsAlign === 'center' ? 'center' : d.benefitsAlign === 'right' ? 'flex-end' : 'flex-start',
+              alignItems: d.benefitsAlign === 'center' ? 'center' : d.benefitsAlign === 'right' ? 'flex-end' : 'flex-start',
+              margin: `${Math.round(4 * s)}px 0`, 
+              maxWidth: Math.round(520 * s),
+              width: '100%',
               transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined 
             }}
           >
-            {d.beneficios.filter(b => b.trim() !== '').slice(0, 3).map((b, i) => (
-              <BenChip key={i} text={b} color="#38bdf8" s={s * (d.benefitsScale ?? 1)} isDark={true} bold={!!d.benefitsBold} />
+            {d.beneficios.filter(b => b.trim() !== '').map((b, i) => (
+              <BenChip 
+                key={i} 
+                text={b} 
+                color={d.benefitsColor || '#38bdf8'} 
+                bulletColor={d.bulletColor || d.benefitsColor} 
+                bulletShape={d.bulletShape} 
+                s={s * (d.benefitsScale ?? 1)} 
+                isDark={true} 
+                bold={!!d.benefitsBold} 
+                index={i} 
+              />
             ))}
           </div>
         )}
 
-        {/* CTA Button — Guaranteed High Contrast */}
-        <div 
-          data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
-          onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
-          style={{ marginTop: Math.round(10 * s), transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
-        >
-          {(() => {
-            const bg = d.ctaBgColor || '#ffffff';
-            const isLightBg = !d.ctaBgColor || d.ctaBgColor.toLowerCase() === '#ffffff' || d.ctaBgColor.toLowerCase() === '#fff' || d.ctaBgColor.toLowerCase() === '#f8fafc';
-            const hasExplicitDarkText = d.ctaTextColor && d.ctaTextColor.toLowerCase() !== '#ffffff' && d.ctaTextColor.toLowerCase() !== '#fff';
-            const textColor = isLightBg ? (hasExplicitDarkText ? d.ctaTextColor : '#0f172a') : (d.ctaTextColor || '#ffffff');
-            const ctaLabel = (d.cta && d.cta.trim() !== '') ? d.cta.trim() : 'PRUÉBALO GRATIS';
+        {/* CTA Button — Guaranteed High Contrast (Opcional) */}
+        {d.showCta !== false && d.cta && d.cta.trim() !== '' && (
+          <div 
+            data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
+            onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
+            style={{ marginTop: Math.round(10 * s), transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
+          >
+            {(() => {
+              const bg = d.ctaBgColor || '#ffffff';
+              const isLightBg = isColorLight(bg);
+              const textColor = resolveCtaTextColor(bg, d.ctaTextColor, true);
+              const ctaLabel = d.cta.trim();
 
-            return (
-              <div style={{
-                background: bg,
-                color: textColor,
-                fontWeight: 900,
-                fontSize: Math.round(13 * s * (d.ctaScale ?? 1)),
-                letterSpacing: '0.04em',
-                borderRadius: 999,
-                padding: `${Math.round(12 * s)}px ${Math.round(28 * s)}px`,
-                display: 'inline-flex', alignItems: 'center', gap: Math.round(6 * s),
-                boxShadow: isLightBg ? '0 10px 25px rgba(0,0,0,0.25)' : '0 10px 25px rgba(0,0,0,0.3)',
-                textTransform: 'uppercase', cursor: 'pointer'
-              }}>
-                <span style={{ color: textColor }}>{ctaLabel}</span>
-                <span style={{ color: textColor }}>➔</span>
-              </div>
-            );
-          })()}
-        </div>
+              return (
+                <div style={{
+                  background: bg,
+                  color: textColor,
+                  fontWeight: 900,
+                  fontSize: Math.round(13 * s * (d.ctaScale ?? 1)),
+                  letterSpacing: '0.04em',
+                  borderRadius: 999,
+                  padding: `${Math.round(12 * s)}px ${Math.round(28 * s)}px`,
+                  display: 'inline-flex', alignItems: 'center', gap: Math.round(6 * s),
+                  boxShadow: isLightBg ? '0 10px 25px rgba(0,0,0,0.25)' : '0 10px 25px rgba(0,0,0,0.3)',
+                  textTransform: 'uppercase', cursor: 'pointer'
+                }}>
+                  <span style={{ color: textColor }}>{ctaLabel}</span>
+                  <span style={{ fontSize: Math.round(14 * s) }}>➔</span>
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       {/* Bottom Contact Footer */}
-      <ContactFooter phone={d.phone} website={d.website} color="#fff" s={s} onClick={d.onContactClick} />
+      <ContactFooter phone={d.phone} website={d.website} color="#fff" s={s} style={{ zIndex: 10 }} onClick={d.onContactClick} />
     </div>
   );
 };
@@ -693,6 +873,17 @@ export const Template_ProblemSolution = ({ d }: { d: FlyerData }) => {
     >
       {/* 1. Full Image Background */}
       <div style={{ position: 'absolute', inset: 0, ...imgBg(d.bgImageUrl, d.bgImagePosition) }} />
+
+      {/* Color / Gradient tint overlay */}
+      {d.bgOverlayColor && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: d.bgOverlayColor,
+          opacity: d.bgOverlayOpacity !== undefined ? d.bgOverlayOpacity : 0.55,
+          mixBlendMode: d.bgOverlayBlendMode || 'multiply',
+          zIndex: 1
+        }} />
+      )}
 
       {/* 2. Top Header Brand Bar */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: Math.round(75 * s), background: 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%)', display: 'flex', alignItems: 'center', padding: `0 ${Math.round(24 * s)}px`, zIndex: 10 }}>
@@ -738,28 +929,39 @@ export const Template_ProblemSolution = ({ d }: { d: FlyerData }) => {
           </p>
         )}
 
-        {/* Action Button (Bright Neon CTA like Foto 4) */}
-        <div 
-          data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
-          onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
-          style={{ display: 'inline-block', marginTop: Math.round(6 * s), transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
-        >
-          <div style={{
-            background: d.ctaBgColor || `linear-gradient(135deg, ${acc} 0%, #db2777 100%)`,
-            color: d.ctaTextColor || '#ffffff',
-            fontWeight: 900,
-            fontSize: Math.round(12 * s * (d.ctaScale ?? 1)),
-            letterSpacing: '0.04em',
-            borderRadius: Math.round(8 * s),
-            padding: `${Math.round(10 * s)}px ${Math.round(22 * s)}px`,
-            display: 'inline-flex', alignItems: 'center', gap: Math.round(6 * s),
-            boxShadow: `0 8px 20px ${acc}55`,
-            textTransform: 'uppercase', cursor: 'pointer'
-          }}>
-            <span>{d.cta || '¡LLÁMANOS YA!'}</span>
-            <span>➔</span>
+        {/* Action Button (Bright Neon CTA like Foto 4 - Opcional) */}
+        {d.showCta !== false && d.cta && d.cta.trim() !== '' && (
+          <div 
+            data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
+            onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
+            style={{ display: 'inline-block', marginTop: Math.round(6 * s), transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
+          >
+            {(() => {
+              const bg = d.ctaBgColor || `linear-gradient(135deg, ${acc} 0%, #db2777 100%)`;
+              const isLightBg = isColorLight(d.ctaBgColor);
+              const textColor = resolveCtaTextColor(d.ctaBgColor, d.ctaTextColor, false);
+              const ctaLabel = d.cta.trim();
+
+              return (
+                <div style={{
+                  background: bg,
+                  color: textColor,
+                  fontWeight: 900,
+                  fontSize: Math.round(12 * s * (d.ctaScale ?? 1)),
+                  letterSpacing: '0.04em',
+                  borderRadius: Math.round(8 * s),
+                  padding: `${Math.round(10 * s)}px ${Math.round(22 * s)}px`,
+                  display: 'inline-flex', alignItems: 'center', gap: Math.round(6 * s),
+                  boxShadow: isLightBg ? '0 8px 20px rgba(0,0,0,0.25)' : `0 8px 20px ${acc}55`,
+                  textTransform: 'uppercase', cursor: 'pointer'
+                }}>
+                  <span style={{ color: textColor }}>{ctaLabel}</span>
+                  <span style={{ color: textColor }}>➔</span>
+                </div>
+              );
+            })()}
           </div>
-        </div>
+        )}
       </div>
 
       <ContactFooter phone={d.phone} website={d.website} color={d.contactColor} s={s} onClick={d.onContactClick} />
@@ -784,7 +986,17 @@ export const Template_WhiteCardMinimal = ({ d }: { d: FlyerData }) => {
     >
       {/* Background Image */}
       <div style={{ position: 'absolute', inset: 0, ...imgBg(d.bgImageUrl, d.bgImagePosition) }} />
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.3)' }} />
+      {d.bgOverlayColor ? (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: d.bgOverlayColor,
+          opacity: d.bgOverlayOpacity !== undefined ? d.bgOverlayOpacity : 0.6,
+          mixBlendMode: d.bgOverlayBlendMode || 'multiply',
+          zIndex: 1
+        }} />
+      ) : (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.3)', zIndex: 1 }} />
+      )}
       
       {/* Top Header */}
       <div style={{ position: 'absolute', top: Math.round(18 * s), left: Math.round(20 * s), right: Math.round(20 * s), display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
@@ -833,23 +1045,47 @@ export const Template_WhiteCardMinimal = ({ d }: { d: FlyerData }) => {
           </div>
         )}
 
-        <div 
-          data-element-id="benefits" className={d.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
-          onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
-          style={{ display: 'flex', flexWrap: 'wrap', gap: Math.round(6 * s), margin: `${Math.round(2 * s)}px 0`, width: '100%', justifyContent: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
-        >
-          {(d.beneficios || []).slice(0, 3).map((b, i) => (
-            <BenChip key={i} text={b} color={acc} s={s} isDark={false} bold={!!d.benefitsBold} />
-          ))}
-        </div>
+        {d.showBenefits !== false && (d.beneficios || []).filter(b => b.trim() !== '').length > 0 && (
+          <div 
+            data-element-id="benefits" className={d.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
+            onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
+            style={{ 
+              display: 'flex', 
+              flexDirection: d.benefitsLayout === 'column' ? 'column' : 'row',
+              flexWrap: d.benefitsLayout === 'column' ? 'nowrap' : 'wrap', 
+              gap: Math.round(6 * s), 
+              margin: `${Math.round(2 * s)}px 0`, 
+              width: '100%', 
+              justifyContent: d.benefitsAlign === 'center' ? 'center' : d.benefitsAlign === 'right' ? 'flex-end' : 'flex-start',
+              alignItems: d.benefitsAlign === 'center' ? 'center' : d.benefitsAlign === 'right' ? 'flex-end' : 'flex-start',
+              transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined 
+            }}
+          >
+            {(d.beneficios || []).filter(b => b.trim() !== '').map((b, i) => (
+              <BenChip 
+                key={i} 
+                text={b} 
+                color={d.benefitsColor || acc} 
+                bulletColor={d.bulletColor || d.benefitsColor} 
+                bulletShape={d.bulletShape} 
+                s={s} 
+                isDark={false} 
+                bold={!!d.benefitsBold} 
+                index={i} 
+              />
+            ))}
+          </div>
+        )}
 
-        <div 
-          data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
-          onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
-          style={{ width: '100%', marginTop: Math.round(4 * s), transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
-        >
-          <PillBtn label={d.cta || 'SABER MÁS'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : acc + 'dd'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} style={{ width: '100%' }} />
-        </div>
+        {d.showCta !== false && d.cta && d.cta.trim() !== '' && (
+          <div 
+            data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
+            onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
+            style={{ width: '100%', marginTop: Math.round(4 * s), transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
+          >
+            <PillBtn label={d.cta.trim()} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : acc + 'dd'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} style={{ width: '100%' }} />
+          </div>
+        )}
       </div>
 
       <ContactFooter phone={d.phone} website={d.website} color="#fff" s={s} onClick={d.onContactClick} />
@@ -901,23 +1137,27 @@ export const Template_MinimalSwiss = ({ d }: { d: FlyerData }) => {
               {sub}
             </p>
           )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-            {(d.beneficios || []).slice(0, 3).map((b, i) => (
-              <div key={i} style={{ fontSize: Math.round(12 * s), color: '#292524', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: acc }}>—</span> {b}
-              </div>
-            ))}
-          </div>
+          {d.showBenefits !== false && (d.beneficios || []).filter(b => b.trim() !== '').length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8, alignItems: d.benefitsAlign === 'center' ? 'center' : d.benefitsAlign === 'right' ? 'flex-end' : 'flex-start' }}>
+              {(d.beneficios || []).filter(b => b.trim() !== '').map((b, i) => (
+                <div key={i} style={{ fontSize: Math.round(12 * s), color: '#292524', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: d.bulletColor || d.benefitsColor || acc }}>{renderBulletIcon(d.bulletShape || 'dash', i)}</span> {b.replace(/^[✓\s*+•●○★✨➔⚡◆🔥❤️\d.-]+/, '').trim()}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div 
-            data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
-            onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
-          >
-            <PillBtn label={d.cta || 'INGRESAR'} bg1={acc} bg2={acc} color="#fff" s={s} />
+        {d.showCta !== false && d.cta && d.cta.trim() !== '' && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div 
+              data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
+              onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
+            >
+              <PillBtn label={d.cta.trim()} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : acc + 'dd'} color={d.ctaTextColor} s={s} />
+            </div>
           </div>
-        </div>
+        )}
       </div>
       <ContactFooter phone={d.phone} website={d.website} color="#0f172a" s={s} onClick={d.onContactClick} />
     </div>
@@ -939,7 +1179,16 @@ export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
       style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', background: '#0f172a', cursor: d.onBgClick ? 'pointer' : 'default' }}
     >
       <div style={{ position: 'absolute', inset: 0, ...imgBg(d.bgImageUrl, d.bgImagePosition) }} />
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.6) 50%, rgba(15,23,42,0.92) 100%)' }} />
+      {d.bgOverlayColor && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: d.bgOverlayColor,
+          opacity: d.bgOverlayOpacity !== undefined ? d.bgOverlayOpacity : 0.65,
+          mixBlendMode: d.bgOverlayBlendMode || 'multiply',
+          zIndex: 1
+        }} />
+      )}
+      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.6) 50%, rgba(15,23,42,0.92) 100%)', zIndex: 2 }} />
 
       <div style={{ position: 'relative', zIndex: 5, padding: `${Math.round(28 * s)}px ${Math.round(24 * s)}px`, display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -973,18 +1222,40 @@ export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
               {sub}
             </p>
           )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
-            {(d.beneficios || []).slice(0, 3).map((b, i) => (
-              <BenChip key={i} text={b} color={acc} s={s} isDark={true} />
-            ))}
-          </div>
-          <div 
-            data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
-            onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
-            style={{ marginTop: 8 }}
-          >
-            <PillBtn label={d.cta || 'OBTENER DESCUENTO'} bg1={acc} bg2={acc} color="#000" s={s} />
-          </div>
+          {d.showBenefits !== false && (d.beneficios || []).filter(b => b.trim() !== '').length > 0 && (
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: d.benefitsLayout === 'column' ? 'column' : 'row',
+              flexWrap: d.benefitsLayout === 'column' ? 'nowrap' : 'wrap', 
+              gap: 6, 
+              justifyContent: d.benefitsAlign === 'center' ? 'center' : d.benefitsAlign === 'right' ? 'flex-end' : 'flex-start',
+              alignItems: d.benefitsAlign === 'center' ? 'center' : d.benefitsAlign === 'right' ? 'flex-end' : 'flex-start',
+              width: '100%'
+            }}>
+              {(d.beneficios || []).filter(b => b.trim() !== '').map((b, i) => (
+                <BenChip 
+                  key={i} 
+                  text={b} 
+                  color={d.benefitsColor || acc} 
+                  bulletColor={d.bulletColor || d.benefitsColor} 
+                  bulletShape={d.bulletShape} 
+                  s={s} 
+                  isDark={true} 
+                  bold={!!d.benefitsBold} 
+                  index={i} 
+                />
+              ))}
+            </div>
+          )}
+          {d.showCta !== false && d.cta && d.cta.trim() !== '' && (
+            <div 
+              data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
+              onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
+              style={{ marginTop: 8 }}
+            >
+              <PillBtn label={d.cta.trim()} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : acc + 'dd'} color={d.ctaTextColor} s={s} />
+            </div>
+          )}
         </div>
 
         <ContactFooter phone={d.phone} website={d.website} color="#fff" s={s} onClick={d.onContactClick} />

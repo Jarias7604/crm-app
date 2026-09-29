@@ -3,7 +3,7 @@
 // Captured to PNG using html-to-image library
 
 import React from 'react';
-import { renderTitleWithHighlights } from '../../pages/marketing/FlyerTemplates';
+import { renderTitleWithHighlights, resolveCtaTextColor } from '../../pages/marketing/FlyerTemplates';
 
 export interface FlyerData {
   company_name: string;
@@ -1731,7 +1731,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
               onClick={data.onCtaClick ? (e) => { e.stopPropagation(); data.onCtaClick?.(); } : undefined}
               style={{
                 background: data.ctaBgColor || primary,
-                color: data.ctaTextColor || '#ffffff',
+                color: resolveCtaTextColor(data.ctaBgColor || primary, data.ctaTextColor, false),
                 fontWeight: 900,
                 fontSize: 16 * (data.ctaScale ?? 1),
                 letterSpacing: '0.05em',
@@ -2051,7 +2051,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
               onClick={data.onCtaClick ? (e) => { e.stopPropagation(); data.onCtaClick?.(); } : undefined}
               style={{
                 background: data.ctaBgColor || '#ffffff',
-                color: data.ctaTextColor || '#1a1a1a',
+                color: resolveCtaTextColor(data.ctaBgColor || '#ffffff', data.ctaTextColor, true),
                 fontWeight: 900,
                 fontSize: 16 * (data.ctaScale ?? 1),
                 letterSpacing: '0.05em',

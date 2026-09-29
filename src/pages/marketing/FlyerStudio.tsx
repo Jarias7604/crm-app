@@ -808,6 +808,11 @@ export default function FlyerStudio() {
   const [titleColor, setTitleColor] = useState('');
   const [subtitleColor, setSubtitleColor] = useState('');
   const [benefitsColor, setBenefitsColor] = useState('');
+  const [bulletShape, setBulletShape] = useState<string>('check');
+  const [showBenefits, setShowBenefits] = useState<boolean>(true);
+  const [benefitsAlign, setBenefitsAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [benefitsLayout, setBenefitsLayout] = useState<'chips' | 'column'>('chips');
+  const [showCta, setShowCta] = useState<boolean>(true);
   const [cardBgColor, setCardBgColor] = useState('');
   const [ctaBgColor, setCtaBgColor] = useState('');
   const [ctaTextColor, setCtaTextColor] = useState('');
@@ -815,6 +820,13 @@ export default function FlyerStudio() {
   const [highlightColor, setHighlightColor] = useState('#FFD700');
   const [textY, setTextY] = useState(0);
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [bgOverlayColor, setBgOverlayColor] = useState<string>('linear-gradient(135deg, rgba(88, 28, 135, 0.92) 0%, rgba(124, 58, 237, 0.78) 50%, rgba(15, 23, 42, 0.95) 100%)');
+  const [bgOverlayOpacity, setBgOverlayOpacity] = useState<number>(0.65);
+  const [bgOverlayBlendMode, setBgOverlayBlendMode] = useState<'multiply' | 'overlay' | 'darken' | 'normal'>('multiply');
+  const [overlayType, setOverlayType] = useState<'preset' | 'solid' | 'gradient' | 'branding'>('preset');
+  const [overlaySolidColor, setOverlaySolidColor] = useState<string>('#581c87');
+  const [overlayGrad1, setOverlayGrad1] = useState<string>('#581c87');
+  const [overlayGrad2, setOverlayGrad2] = useState<string>('#0f172a');
 
   // Manual text & design overrides (Client Request)
   const [editingElement, setEditingElement] = useState<'title' | 'logo' | 'background' | 'subtitle' | 'benefits' | 'cta' | 'contact' | null>(null);
@@ -4097,8 +4109,12 @@ export default function FlyerStudio() {
                               <RenderFlyer d={{
                                 title: manualTitle || 'TU OFERTA',
                                 subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
-                                cta: cta || 'CONTACTAR AHORA',
-                                beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                                cta: showCta ? (cta || '') : '',
+                                showCta,
+                                beneficios: showBenefits ? manualFeatures.filter(f => f.trim() !== '') : [],
+                                showBenefits,
+                                benefitsAlign,
+                                benefitsLayout,
                                 accent: colors[0] || '#0070d2',
                                 bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
                                 logoUrl: logoPreview || null,
@@ -4109,6 +4125,11 @@ export default function FlyerStudio() {
                                 gradColor1,
                                 gradColor2,
                                 gradColor3,
+                                bgOverlayColor,
+                                bgOverlayOpacity,
+                                bgOverlayBlendMode,
+                                bulletColor: benefitsColor,
+                                bulletShape,
                                 badgeTextTop: badgeTop,
                                 badgeTextBottom: badgeBottom,
                                 containerW: 1080, containerH: canvasH,
@@ -4483,8 +4504,12 @@ export default function FlyerStudio() {
           <RenderFlyer d={{
             title: manualTitle || 'TU OFERTA',
             subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
-            cta: cta || 'CONTACTAR AHORA',
-            beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+            cta: showCta ? (cta || '') : '',
+            showCta,
+            beneficios: showBenefits ? manualFeatures.filter(f => f.trim() !== '') : [],
+            showBenefits,
+            benefitsAlign,
+            benefitsLayout,
             accent: colors[0] || '#0070d2',
             bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
             logoUrl: logoPreview || null,
@@ -4492,6 +4517,11 @@ export default function FlyerStudio() {
             companyName: companyName,
             phone, website, templateId: selectedTemplate,
             gradientBg: selectedGradient,
+            bgOverlayColor,
+            bgOverlayOpacity,
+            bgOverlayBlendMode,
+            bulletColor: benefitsColor,
+            bulletShape,
             badgeTextTop: badgeTop,
             badgeTextBottom: badgeBottom,
             containerW: 1080, containerH: canvasH,
@@ -4742,8 +4772,12 @@ export default function FlyerStudio() {
                       <RenderFlyer d={{
                         title: manualTitle || 'TU OFERTA',
                         subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
-                        cta: cta || 'CONTACTAR AHORA',
-                        beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                        cta: showCta ? (cta || '') : '',
+                        showCta,
+                        beneficios: showBenefits ? manualFeatures.filter(f => f.trim() !== '') : [],
+                        showBenefits,
+                        benefitsAlign,
+                        benefitsLayout,
                         accent: colors[0] || '#0070d2',
                         bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
                         logoUrl: logoPreview || null,
@@ -4751,6 +4785,11 @@ export default function FlyerStudio() {
                         companyName: companyName,
                         phone, website, templateId: selectedTemplate,
                         gradientBg: selectedGradient,
+                        bgOverlayColor,
+                        bgOverlayOpacity,
+                        bgOverlayBlendMode,
+                        bulletColor: benefitsColor,
+                        bulletShape,
                         badgeTextTop: badgeTop,
                         badgeTextBottom: badgeBottom,
                         containerW: 1080, containerH: canvasH,
@@ -5030,22 +5069,186 @@ export default function FlyerStudio() {
 
               {editingElement === 'benefits' && (
                 <>
+                  {/* Interruptor de Visibilidad */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: showBenefits ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${showBenefits ? '#86efac' : '#cbd5e1'}`, borderRadius: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: showBenefits ? '#15803d' : '#64748b' }}>
+                        {showBenefits ? '✓ Bloque de Beneficios Visible' : '✕ Bloque de Beneficios Oculto'}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#64748b' }}>
+                        {showBenefits ? 'Se muestra en el diseño del flyer' : 'Completamente oculto en el diseño final'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowBenefits(!showBenefits)}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        border: 'none',
+                        background: showBenefits ? '#16a34a' : '#94a3b8',
+                        color: '#fff',
+                        transition: '0.15s'
+                      }}
+                    >
+                      {showBenefits ? 'Desactivar' : 'Activar'}
+                    </button>
+                  </div>
+
+                  {/* Alineación de Beneficios */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Características / Beneficios</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                      Alineación de Beneficios
+                    </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                      {[
+                        { id: 'left', label: '⬅️ Izquierda' },
+                        { id: 'center', label: '↔️ Centrado' },
+                        { id: 'right', label: '➡️ Derecha' }
+                      ].map(al => {
+                        const isSel = benefitsAlign === al.id;
+                        return (
+                          <button
+                            key={al.id}
+                            type="button"
+                            onClick={() => setBenefitsAlign(al.id as any)}
+                            style={{
+                              padding: '7px 4px',
+                              borderRadius: 8,
+                              border: isSel ? '1.5px solid #7c3aed' : '1px solid #cbd5e1',
+                              background: isSel ? '#f5f3ff' : '#fff',
+                              color: isSel ? '#6b21a8' : '#334155',
+                              fontWeight: 800,
+                              fontSize: 11,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {al.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Disposición / Formato */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                      Disposición / Formato
+                    </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+                      {[
+                        { id: 'column', label: '📋 Lista Vertical' },
+                        { id: 'chips', label: '🏷️ Pastillas en Línea' }
+                      ].map(lay => {
+                        const isSel = benefitsLayout === lay.id;
+                        return (
+                          <button
+                            key={lay.id}
+                            type="button"
+                            onClick={() => setBenefitsLayout(lay.id as any)}
+                            style={{
+                              padding: '7px 4px',
+                              borderRadius: 8,
+                              border: isSel ? '1.5px solid #7c3aed' : '1px solid #cbd5e1',
+                              background: isSel ? '#f5f3ff' : '#fff',
+                              color: isSel ? '#6b21a8' : '#334155',
+                              fontWeight: 800,
+                              fontSize: 10,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {lay.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Lista dinámica de Beneficios */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                        Características / Beneficios ({manualFeatures.length})
+                      </span>
+                      {manualFeatures.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualFeatures([]);
+                            setKeepCustomText(true);
+                          }}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Vaciar todos
+                        </button>
+                      )}
+                    </div>
                     {manualFeatures.map((feat, idx) => (
-                      <input
-                        key={idx}
-                        style={css.input}
-                        value={feat}
-                        onChange={e => {
-                          const copy = [...manualFeatures];
-                          copy[idx] = e.target.value;
-                          setManualFeatures(copy);
-                          setKeepCustomText(true);
-                        }}
-                        placeholder={`Beneficio ${idx + 1}`}
-                      />
+                      <div key={idx} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <input
+                          style={{ ...css.input, flex: 1 }}
+                          value={feat}
+                          onChange={e => {
+                            const copy = [...manualFeatures];
+                            copy[idx] = e.target.value;
+                            setManualFeatures(copy);
+                            setKeepCustomText(true);
+                          }}
+                          placeholder={`Beneficio ${idx + 1}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const copy = manualFeatures.filter((_, i) => i !== idx);
+                            setManualFeatures(copy);
+                            setKeepCustomText(true);
+                          }}
+                          style={{
+                            width: 32,
+                            height: 36,
+                            borderRadius: 6,
+                            border: '1px solid #fecaca',
+                            background: '#fef2f2',
+                            color: '#ef4444',
+                            fontSize: 14,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0
+                          }}
+                          title="Eliminar este beneficio"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManualFeatures([...manualFeatures, 'Nuevo Beneficio']);
+                        setKeepCustomText(true);
+                      }}
+                      style={{
+                        padding: '7px 12px',
+                        borderRadius: 8,
+                        border: '1px dashed #7c3aed',
+                        background: '#f5f3ff',
+                        color: '#7c3aed',
+                        fontSize: 11,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6
+                      }}
+                    >
+                      + Agregar Beneficio
+                    </button>
                   </div>
 
                   {renderFontSelector(benefitsFont, 'benefits')}
@@ -5058,12 +5261,66 @@ export default function FlyerStudio() {
                     <input type="range" min="0.5" max="2.0" step="0.05" value={benefitsScale} onChange={e => setBenefitsScale(parseFloat(e.target.value))} style={{ width: '100%' }} />
                   </div>
 
+                  {/* Selector de Figura / Icono de Viñetas */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Color de Viñetas</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                        Figura de Viñetas / Puntos
+                      </span>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: '#7c3aed' }}>
+                        {bulletShape.toUpperCase()}
+                      </span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
+                      {[
+                        { id: 'check', label: 'Check', icon: '✓' },
+                        { id: 'dot', label: 'Punto', icon: '●' },
+                        { id: 'circle', label: 'Círculo', icon: '○' },
+                        { id: 'star', label: 'Estrella', icon: '★' },
+                        { id: 'sparkle', label: 'Destello', icon: '✨' },
+                        { id: 'arrow', label: 'Flecha', icon: '➔' },
+                        { id: 'zap', label: 'Rayo', icon: '⚡' },
+                        { id: 'diamond', label: 'Rombo', icon: '◆' },
+                        { id: 'fire', label: 'Fuego', icon: '🔥' },
+                        { id: 'number', label: '1, 2, 3', icon: '1.' },
+                      ].map(shape => {
+                        const isSelected = bulletShape === shape.id;
+                        return (
+                          <button
+                            key={shape.id}
+                            type="button"
+                            onClick={() => setBulletShape(shape.id)}
+                            style={{
+                              padding: '6px 4px',
+                              borderRadius: 8,
+                              border: isSelected ? '1.5px solid #7c3aed' : '1px solid #cbd5e1',
+                              background: isSelected ? '#f5f3ff' : '#fff',
+                              color: isSelected ? '#6b21a8' : '#334155',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: 2,
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <span style={{ fontSize: 14, fontWeight: 900, lineHeight: 1 }}>{shape.icon}</span>
+                            <span style={{ fontSize: 8, fontWeight: 700 }}>{shape.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Selector y Swatches de Color de Viñetas */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>
+                      Color de Viñetas / Puntos
+                    </span>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input 
                         type="color" 
-                        value={benefitsColor || '#000000'} 
+                        value={benefitsColor || '#38bdf8'} 
                         onChange={e => setBenefitsColor(e.target.value)} 
                         style={{ width: 36, height: 36, padding: 0, border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 6, flexShrink: 0 }} 
                       />
@@ -5071,9 +5328,35 @@ export default function FlyerStudio() {
                         type="text" 
                         value={benefitsColor} 
                         onChange={e => setBenefitsColor(e.target.value)} 
-                        placeholder="Por defecto"
+                        placeholder="#38bdf8"
                         style={css.input} 
                       />
+                    </div>
+                    {/* Swatches rápidos para los puntos */}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                      {[
+                        { color: colors[0] || '#06c7d9', label: 'Branding' },
+                        { color: '#06c7d9', label: 'Cyan' },
+                        { color: '#f59e0b', label: 'Dorado' },
+                        { color: '#10b981', label: 'Verde' },
+                        { color: '#8b5cf6', label: 'Morado' },
+                        { color: '#ffffff', label: 'Blanco' },
+                        { color: '#ef4444', label: 'Rojo' },
+                        { color: '#38bdf8', label: 'Azul Cielo' }
+                      ].map(sw => (
+                        <button
+                          key={sw.label}
+                          type="button"
+                          onClick={() => setBenefitsColor(sw.color)}
+                          style={{
+                            flex: 1, minWidth: 28, height: 24, borderRadius: 5, background: sw.color,
+                            border: benefitsColor === sw.color ? '2px solid #7c3aed' : '1px solid rgba(0,0,0,0.15)',
+                            boxShadow: benefitsColor === sw.color ? '0 0 0 2px #7c3aed' : 'none',
+                            cursor: 'pointer'
+                          }}
+                          title={sw.label}
+                        />
+                      ))}
                     </div>
                   </div>
 
@@ -5094,8 +5377,48 @@ export default function FlyerStudio() {
 
               {editingElement === 'cta' && (
                 <>
+                  {/* Interruptor de Visibilidad del Botón CTA */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: (showCta && cta.trim() !== '') ? '#f0fdf4' : '#f8fafc', border: `1.5px solid ${(showCta && cta.trim() !== '') ? '#86efac' : '#cbd5e1'}`, borderRadius: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: (showCta && cta.trim() !== '') ? '#15803d' : '#64748b' }}>
+                        {(showCta && cta.trim() !== '') ? '✓ Botón CTA Visible' : '✕ Botón CTA Oculto (Opcional)'}
+                      </div>
+                      <div style={{ fontSize: 10, color: '#64748b' }}>
+                        {(showCta && cta.trim() !== '') ? 'El botón de llamado a la acción se muestra' : 'El flyer no mostrará botón si lo apagas o borras'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowCta(!showCta)}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        border: 'none',
+                        background: showCta ? '#16a34a' : '#94a3b8',
+                        color: '#fff',
+                        transition: '0.15s'
+                      }}
+                    >
+                      {showCta ? 'Desactivar' : 'Activar'}
+                    </button>
+                  </div>
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Texto del Botón CTA</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Texto del Botón CTA</span>
+                      {cta && (
+                        <button
+                          type="button"
+                          onClick={() => { setCta(''); setKeepCustomText(true); }}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
+                        >
+                          Borrar texto (Ocultar)
+                        </button>
+                      )}
+                    </div>
                     <input 
                       style={css.input} 
                       value={cta} 
@@ -5103,7 +5426,7 @@ export default function FlyerStudio() {
                         setCta(e.target.value);
                         setKeepCustomText(true);
                       }}
-                      placeholder="Ej: REGÍSTRATE HOY"
+                      placeholder="Dejar vacío si no deseas botón"
                     />
                   </div>
 

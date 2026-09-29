@@ -20,7 +20,9 @@ const HARDCODED: Record<string, string[]> = {
     'photo-1554224155-8d04cb21cd6c','photo-1460925895917-afdab827c52f','photo-1551288049-bebda4e38f71',
     'photo-1559526324-4b87b5e36e44','photo-1579532537598-459ecdaf39cc','photo-1507679799987-c73779587ccf',
     'photo-1486406146926-c627a92ad1ab','photo-1454165804606-c3d57bc86b40','photo-1551836022-d5d88e9218df',
-    'photo-1507238691740-187a5b1d37b8','photo-1590283603385-17ffb3a7f29f','photo-1611974789855-9c2a0a7236a3'
+    'photo-1507238691740-187a5b1d37b8','photo-1590283603385-17ffb3a7f29f','photo-1611974789855-9c2a0a7236a3',
+    'photo-1563986768609-322da13575f3','photo-1554224154-26032ffc0d07','photo-1554224155-6726b3ff858f',
+    'photo-1450133064473-71024230f91b','photo-1556742049-0a67c5574f73','photo-1526304640581-d334cdbbf45e'
   ],
   beach: ['photo-1507525428034-b723cf961d3e','photo-1510414842594-a61c69b5ae57','photo-1544551763-46a013bb70d5','photo-1559494007-9f5847c49d94','photo-1571003123894-1f0594d2b5d9','photo-1527489377706-5bf97e608852','photo-1501785888041-af3ef285b470','photo-1506953823976-52e1fdc0149a','photo-1573843981267-be1999ff37cd','photo-1540202404-a2f29016b523','photo-1469474968028-56623f02e42e','photo-1519046904884-53103b34b206','photo-1596178065887-1198b6148b2b','photo-1561731216-c3a4d99437d5','photo-1582610116397-edb72e9b9b4e'],
   food: ['photo-1513104890138-7c749659a591','photo-1504674900247-0877df9cc836','photo-1565299624946-b28f40a0ae38','photo-1568901346375-23c9450c58cd','photo-1579871494447-9811cf80d66c','photo-1512621776951-a57141f2eefd','photo-1544025162-d76694265947','photo-1563379091339-03b21ab4a4f8','photo-1578985545062-69928b1d9587','photo-1555396273-367ea4eb4db5','photo-1540189549336-e6e99c3679fe','photo-1482049016688-2d3e1b311543','photo-1484723091739-30a097e8f929','photo-1567620905732-2d1ec7ab7445','photo-1565299585323-38d6b0865b47'],
@@ -29,7 +31,14 @@ const HARDCODED: Record<string, string[]> = {
   beauty: ['photo-1560066984-138dadb4c035','photo-1522337360788-8b13dee7a37e','photo-1607779097040-26e80aa78e66','photo-1519699047748-de8e457a634e','photo-1604654894610-df63bc536371','photo-1540555700478-4be289fbecef','photo-1582095133179-bfd08e2fc6b3','photo-1512290923902-8a9f81dc236c','photo-1562322140-8baeececf3df','photo-1616394584738-fc6e612e71b9','photo-1527799820374-dcf8d9d4a438','photo-1500840216050-6ffa99d7cd76','photo-1515377905703-c4788e51af15','photo-1590156546746-c23109b257c3','photo-1596462502278-27bfdc403348'],
   gym: ['photo-1517838277536-f5f99be501cd','photo-1534438327276-14e5300c3a48','photo-1541534741688-6078c6bfb5c5','photo-1571902943202-507ec2618e8f','photo-1605296867304-46d5465a25f1','photo-1526506118085-60ce8714f8c5','photo-1517963879433-6ad2b056d712','photo-1518611012118-696072aa579a','photo-1549719386-74dfcbf7dbed','photo-1593079831268-3381b0db4a77','photo-1574680096145-d05b474e2155','photo-1594381898411-846e7d193883','photo-1584735935682-2f2b69dff9d2','photo-1518310383802-64c2de311b2','photo-1476480862126-209bfaa8edc8'],
   realestate: ['photo-1560518883-ce09059eeffa','photo-1512917774080-9991f1c4c750','photo-1564013799919-ab600027ffc6','photo-1600585154340-be6161a56a0c','photo-1600210492486-724fe5c67fb0','photo-1560520653-9e0e4c89eb11','photo-1600596542815-ffad4c1539a9','photo-1504307651254-35680f356dfd','photo-1522708323590-d24dbb6b0267','photo-1582407947304-fd86f028f716','photo-1502672260266-1c1ef2d93688','photo-1484154218962-a197022b5858','photo-1513584684374-8bab748fbf90','photo-1505691938895-1758d7feb511','photo-1600607687939-ce8a6c25118c'],
-  tech: ['photo-1551288049-bebda4e38f71','photo-1460925895917-afdab827c52f','photo-1504868584819-f8e8b4b6d7e3','photo-1518770660439-4636190af475','photo-1488590528505-98d2b5aba04b','photo-1461749280684-dccba630e2f6','photo-1504639725590-34d0984388bd','photo-1551434678-e076c223a692','photo-1542744173-8e7e53415bb0','photo-1486312338219-ce68d2c6f44d','photo-1498050108023-c5249f4df085','photo-1531297484001-80022131f5a1','photo-1519389950473-47ba0277781c','photo-1600880292203-757bb62b4baf','photo-1560472355-536de3962603','photo-1553877522-43269d4ea984'],
+  tech: [
+    'photo-1551288049-bebda4e38f71','photo-1460925895917-afdab827c52f','photo-1504868584819-f8e8b4b6d7e3',
+    'photo-1518770660439-4636190af475','photo-1488590528505-98d2b5aba04b','photo-1461749280684-dccba630e2f6',
+    'photo-1504639725590-34d0984388bd','photo-1551434678-e076c223a692','photo-1542744173-8e7e53415bb0',
+    'photo-1486312338219-ce68d2c6f44d','photo-1498050108023-c5249f4df085','photo-1531297484001-80022131f5a1',
+    'photo-1519389950473-47ba0277781c','photo-1600880292203-757bb62b4baf','photo-1560472355-536de3962603',
+    'photo-1553877522-43269d4ea984','photo-1522071820081-009f0129c71c','photo-1531403009284-440f080d1e12'
+  ],
   auto: ['photo-1486006920555-c77dce18193b','photo-1619642751034-765dfdf7c58e','photo-1568605117036-5fe5e7bab0b7','photo-1492144534655-ae79c964c9d7','photo-1525609004556-c46c7d6cf0a3','photo-1503376780353-7e6692767b70'],
   education: ['photo-1523240795612-9a054b0db644','photo-1509062522246-3755977927d7','photo-1497633762265-9d179a990aa6','photo-1524178232363-1fb2b075b655','photo-1513542789411-b6a5d4f31634'],
   general: ['photo-1460925895917-afdab827c52f','photo-1519389950473-47ba0277781c','photo-1522071820081-009f0129c71c','photo-1454165804606-c3d57bc86b40','photo-1531403009284-440f080d1e12','photo-1486406146926-c627a92ad1ab','photo-1516321318423-f06f85e504b3','photo-1551836022-d5d88e9218df','photo-1507238691740-187a5b1d37b8','photo-1531538606174-0f90ff5dce83','photo-1522202176988-66273c2fd55f','photo-1497366216548-37526070297c','photo-1497215728101-856f4ea42174','photo-1504384308090-c894fdcc538d','photo-1517245386807-bb43f82c33c4'],
@@ -37,18 +46,18 @@ const HARDCODED: Record<string, string[]> = {
 
 function regexCategory(text: string): string {
   const t = text.toLowerCase();
-  if (/iglesia|iclesia|culto|pastor|ministerio|adoraci[oó]n|cristian|fe|alabanza|congregaci[oó]n|servicio religioso|templo/i.test(t)) return 'church';
-  if (/facturaci[oó]n|factura|contab|finanz|impuesto|fiscal|auditor/i.test(t)) return 'finance';
-  if (/playa|lote|terreno|vacaci|resort|tropical|caribe|costa|para[ií]so|bungal|arena|oc[eé]ano|playa|riviera|frente al mar/i.test(t)) return 'beach';
+  if (/iglesia|iclesia|culto|pastor|ministerio|adoraci[oó]n|cristian|fe|alabanza|congregaci[oó]n|servicio religioso|templo|church|worship/i.test(t)) return 'church';
+  if (/contab|factur|finanz|impuesto|fiscal|auditor|balance|cpa|ingresos|gastos|presupuesto|banco|dinero|accounting|finance/i.test(t)) return 'finance';
+  if (/playa|lotes?|terreno|vacaci|resort|tropical|caribe|costa|para[ií]so|bungal|arena|oc[eé]ano|playa|riviera|frente al mar/i.test(t)) return 'beach';
   if (/pizza|comida|restaurante|pupusa|taco|burger|sushi|hamburguesa|caf[eé]|postre/i.test(t)) return 'food';
   if (/dental|dentista|diente|odontolog/i.test(t)) return 'dental';
   if (/doctor|m[eé]dico|farmacia|medicina|salud|hospital|cl[ií]nica|pediatra/i.test(t)) return 'medical';
   if (/belleza|salon|spa|maquillaje|cabello|peluquer|uñas/i.test(t)) return 'beauty';
   if (/gym|gimnasio|fitness|ejercicio|entrenamiento|deporte/i.test(t)) return 'gym';
   if (/casa|inmobiliaria|propiedad|apartamento|bienes ra[ií]ces|construcci/i.test(t)) return 'realestate';
-  if (/taller|mec[aá]nic|carro|auto|veh[ií]culo|repuesto|llantas/i.test(t)) return 'auto';
-  if (/curso|taller|capacitaci[oó]n|escuela|universidad|estudiante|colegio|aprender/i.test(t)) return 'education';
-  if (/crm|software|saas|tecnolog|digital|startup|ecommerce|app|inventario|reportes|sistema/i.test(t)) return 'tech';
+  if (/\b(taller|mec[aá]nico?|carro|automotriz|veh[ií]culo|repuestos?|llantas)\b/i.test(t)) return 'auto';
+  if (/curso|capacitaci[oó]n|escuela|universidad|estudiante|colegio|aprender/i.test(t)) return 'education';
+  if (/crm|software|saas|tecnolog|digital|startup|ecommerce|app|inventario|reportes|sistema|dashboard/i.test(t)) return 'tech';
   return 'general';
 }
 
@@ -75,6 +84,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action, prompt, industria, oferta, tono, idioma = 'es', images, industry } = body;
     const openaiKey = Deno.env.get('OPENAI_API_KEY') || '';
+    const cleanIndustry = (!industry || industry === 'auto' || String(industry).toLowerCase().includes('detectar') || String(industry).toLowerCase().includes('automático')) ? '' : String(industry).trim();
 
     // ── SEARCH PHOTOS ─────────────────────────────────────────────────────────
     if (action === 'search-photos') {
@@ -90,7 +100,7 @@ Deno.serve(async (req) => {
         .replace(/titulo:|subtitulo:|sub.?titulo:|cta:|incluye:|precio:|beneficios:|descripcion:|gancho:|oferta:/gi, '')
         .replace(/\s+/g, ' ').trim().substring(0, 300);
 
-      const detectedCat = regexCategory(cleanPrompt + ' ' + (industry || ''));
+      const detectedCat = regexCategory(cleanPrompt + (cleanIndustry ? ' ' + cleanIndustry : ''));
       let searchTerms = detectedCat !== 'general' ? REGEX_TERMS[detectedCat] : '';
 
       // GPT visual keyword extraction (prioritize clean 2-4 keywords without quotes)
@@ -104,9 +114,9 @@ Deno.serve(async (req) => {
               messages: [
                 {
                   role: 'system',
-                  content: 'Identify the exact visual subject of this flyer promotion and return 2-4 English stock photography search keywords. Return ONLY the words separated by spaces. Absolutely NO quotes, NO commas, NO punctuation. Examples: church sermon/service -> "church congregation worship community", billing/reports -> "modern software analytics dashboard", pizza offer -> "delicious artisan pizza restaurant", luxury homes -> "luxury modern house villa".',
+                  content: 'Identify the exact visual subject of this flyer promotion and return 2-4 English stock photography search keywords. Return ONLY the words separated by spaces. Absolutely NO quotes, NO commas, NO punctuation. Examples: church sermon/service -> "church congregation worship community", billing/reports/accounting -> "modern software analytics accounting dashboard", pizza offer -> "delicious artisan pizza restaurant", luxury homes -> "luxury modern house villa".',
                 },
-                { role: 'user', content: `Brief: ${cleanPrompt} | Industry: ${industry || 'General'}` }
+                { role: 'user', content: `Brief: ${cleanPrompt} | Industry: ${cleanIndustry || 'General'}` }
               ],
               max_tokens: 25, temperature: 0.1,
             }),
@@ -155,11 +165,14 @@ Deno.serve(async (req) => {
 
       // Fallback if Unsplash fails or rate-limits
       if (photos.length < 4) {
-        const cat = regexCategory((prompt || '') + ' ' + (industry || ''));
+        const cat = regexCategory((prompt || '') + (cleanIndustry ? ' ' + cleanIndustry : ''));
         const ids = HARDCODED[cat] || HARDCODED.general;
         const shuffled = [...ids].sort(() => Math.random() - 0.5);
         photos = shuffled.map(id => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1080&q=80`);
       }
+
+      // Always randomize order so each click gives fresh photos
+      photos = [...photos].sort(() => Math.random() - 0.5);
 
       return new Response(JSON.stringify({ photos, searchTerms, category: detectedCat }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
