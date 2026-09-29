@@ -9,7 +9,7 @@ import {
   ExternalLink, Star, Cpu, Crown, Smile, Building2,
   Instagram, Facebook, Linkedin, Smartphone, Video,
   FolderOpen, Save, Loader2, Trash2, Edit2,
-  Info, Target, Award, Globe
+  Info, Target, Award, Globe, Moon, Sun, Sliders
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
@@ -238,6 +238,7 @@ export default function FlyerStudio() {
   const lastGeneratedImg = useRef<string>('');
   const [selectedTemplate, setSelectedTemplate] = useState<string>('vibrant-gradient');
   const [previewMode, setPreviewMode] = useState<'template' | 'ai'>('template');
+  const [bgMode, setBgMode] = useState<'gradient' | 'photo'>('gradient');
 
   // Form & Content States
   const [prompt, setPrompt] = useState('Flyer promocional para nuestra oferta especial de temporada.');
@@ -352,6 +353,8 @@ export default function FlyerStudio() {
         : `linear-gradient(${angle}deg, ${c1} 0%, ${c3} 100%)`;
     }
     setSelectedGradient(cssGrad);
+    setBgMode('gradient');
+    setSelectedTemplate('vibrant-gradient');
     try {
       localStorage.setItem('flyer_dynamic_gradient', JSON.stringify({
         c1, c2, c3, angle, type, threeStops, css: cssGrad
@@ -548,6 +551,9 @@ export default function FlyerStudio() {
   const [generating, setGenerating] = useState(false);
   const [variants, setVariants] = useState<string[]>([]);
   const [selected, setSelected] = useState(0);
+  const effectiveBgImage = bgMode === 'photo'
+    ? (bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE)
+    : null;
   const [credits, setCredits] = useState<number | null>(null);
   const [companyName, setCompanyName] = useState('');
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
@@ -820,11 +826,12 @@ export default function FlyerStudio() {
   const [highlightColor, setHighlightColor] = useState('#FFD700');
   const [textY, setTextY] = useState(0);
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
-  const [bgOverlayColor, setBgOverlayColor] = useState<string>('linear-gradient(135deg, rgba(88, 28, 135, 0.92) 0%, rgba(124, 58, 237, 0.78) 50%, rgba(15, 23, 42, 0.95) 100%)');
-  const [bgOverlayOpacity, setBgOverlayOpacity] = useState<number>(0.65);
+  const [bgOverlayEnabled, setBgOverlayEnabled] = useState<boolean>(true);
+  const [bgOverlayColor, setBgOverlayColor] = useState<string>('rgba(0, 0, 0, 0.5)');
+  const [bgOverlayOpacity, setBgOverlayOpacity] = useState<number>(0.35);
   const [bgOverlayBlendMode, setBgOverlayBlendMode] = useState<'multiply' | 'overlay' | 'darken' | 'normal'>('multiply');
-  const [overlayType, setOverlayType] = useState<'preset' | 'solid' | 'gradient' | 'branding'>('preset');
-  const [overlaySolidColor, setOverlaySolidColor] = useState<string>('#581c87');
+  const [overlayType, setOverlayType] = useState<'dark' | 'solid' | 'gradient' | 'branding'>('dark');
+  const [overlaySolidColor, setOverlaySolidColor] = useState<string>('#000000');
   const [overlayGrad1, setOverlayGrad1] = useState<string>('#581c87');
   const [overlayGrad2, setOverlayGrad2] = useState<string>('#0f172a');
 
@@ -2840,10 +2847,79 @@ export default function FlyerStudio() {
               </div>
             </div>
 
+            {/* ─── SELECTOR PRINCIPAL: DEGRADADO DE COLOR VS FOTO DE FONDO ─── */}
+            <div style={{ ...css.section, marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ ...css.label, marginBottom: 0 }}>Tipo de Fondo del Flyer</label>
+                <span style={{
+                  fontSize: 9,
+                  fontWeight: 900,
+                  color: bgMode === 'gradient' ? '#7c3aed' : '#059669',
+                  background: bgMode === 'gradient' ? '#f5f3ff' : '#ecfdf5',
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                  border: `1px solid ${bgMode === 'gradient' ? '#ddd6fe' : '#a7f3d0'}`
+                }}>
+                  {bgMode === 'gradient' ? '🎨 Degradado Puro Activo' : '📷 Foto de Fondo Activa'}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, background: '#f1f5f9', padding: 4, borderRadius: 10 }}>
+                <button
+                  type="button"
+                  id="btn-bg-gradient"
+                  onClick={() => {
+                    setBgMode('gradient');
+                    setSelectedTemplate('vibrant-gradient');
+                    toast.success('🎨 Modo Degradado Activado: Mostrando tus 2 o 3 colores');
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    padding: '9px 12px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: bgMode === 'gradient' ? '#7c3aed' : 'transparent',
+                    color: bgMode === 'gradient' ? '#fff' : '#64748b',
+                    fontWeight: 800,
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    boxShadow: bgMode === 'gradient' ? '0 2px 6px rgba(124,58,237,0.25)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Palette size={13} />
+                  Degradado (2 o 3 Colores)
+                </button>
+                <button
+                  type="button"
+                  id="btn-bg-photo"
+                  onClick={() => {
+                    setBgMode('photo');
+                    toast.success('📷 Modo Foto Activado');
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    padding: '9px 12px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: bgMode === 'photo' ? '#7c3aed' : 'transparent',
+                    color: bgMode === 'photo' ? '#fff' : '#64748b',
+                    fontWeight: 800,
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    boxShadow: bgMode === 'photo' ? '0 2px 6px rgba(124,58,237,0.25)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Image size={13} />
+                  Foto de Fondo
+                </button>
+              </div>
+            </div>
+
             {/* ═══════════════════════════════════════════════════════════════
                 CREADOR DINÁMICO DE DEGRADADOS (3 Colores 100% Personalizable)
             ═══════════════════════════════════════════════════════════════ */}
-            <div style={{ ...css.section, background: '#f8fafc', padding: 12, borderRadius: 12, border: '1.5px solid #e2e8f0', marginBottom: 16 }}>
+            <div style={{ ...css.section, background: '#f8fafc', padding: 12, borderRadius: 12, border: bgMode === 'gradient' ? '1.5px solid #c4b5fd' : '1.5px solid #e2e8f0', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Palette size={14} color="#7c3aed" />
@@ -3197,6 +3273,224 @@ export default function FlyerStudio() {
                     />
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════════════════
+                AJUSTE DE OSCURIDAD / CAPA DE CONTRASTE DEL FONDO
+                (Para quitar o poner oscuridad, aclarar fotos y degradados)
+            ═══════════════════════════════════════════════════════════════ */}
+            <div style={{
+              marginBottom: 16,
+              background: '#f8fafc',
+              border: (bgOverlayEnabled && bgOverlayOpacity > 0) ? '1.5px solid #cbd5e1' : '1.5px solid #e2e8f0',
+              borderRadius: 14,
+              padding: 12,
+              transition: 'all 0.2s ease'
+            }}>
+              {/* Header with ON/OFF Toggle */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {bgOverlayOpacity === 0 ? <Sun size={15} color="#f59e0b" /> : <Moon size={15} color="#6366f1" />}
+                  <span style={{ fontSize: 11, fontWeight: 900, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Oscuridad & Contraste del Fondo
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  id="toggle-dark-overlay"
+                  onClick={() => {
+                    if (bgOverlayEnabled && bgOverlayOpacity > 0) {
+                      setBgOverlayOpacity(0);
+                      setBgOverlayEnabled(false);
+                      toast.success('☀️ Oscuridad quitada: Fondo 100% claro');
+                    } else {
+                      setBgOverlayOpacity(0.35);
+                      setBgOverlayEnabled(true);
+                      toast.success('🌙 Capa oscura activada al 35%');
+                    }
+                  }}
+                  style={{
+                    border: 'none',
+                    background: (bgOverlayEnabled && bgOverlayOpacity > 0) ? '#6366f1' : '#e2e8f0',
+                    color: (bgOverlayEnabled && bgOverlayOpacity > 0) ? '#fff' : '#64748b',
+                    fontSize: 10,
+                    fontWeight: 800,
+                    padding: '3px 9px',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  {(bgOverlayEnabled && bgOverlayOpacity > 0) ? 'Oscuridad: ON' : 'Oscuridad: OFF'}
+                </button>
+              </div>
+
+              {/* Slider de Oscuridad / Opacidad */}
+              <div style={{ marginBottom: 12, background: '#fff', padding: '10px 12px', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>Nivel de Oscuridad</span>
+                  <span style={{
+                    fontSize: 11,
+                    fontWeight: 900,
+                    color: bgOverlayOpacity === 0 ? '#10b981' : bgOverlayOpacity < 0.4 ? '#6366f1' : '#0f172a',
+                    background: bgOverlayOpacity === 0 ? '#ecfdf5' : '#f1f5f9',
+                    padding: '2px 8px',
+                    borderRadius: 6
+                  }}>
+                    {bgOverlayOpacity === 0 ? '0% (100% Claro / Sin Oscuridad)' : `${Math.round(bgOverlayOpacity * 100)}%`}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  id="slider-dark-opacity"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={bgOverlayOpacity}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setBgOverlayOpacity(val);
+                    setBgOverlayEnabled(val > 0);
+                  }}
+                  style={{ width: '100%', accentColor: '#6366f1', cursor: 'pointer' }}
+                />
+
+                {/* 4 Botones Rápidos de Oscuridad */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5, marginTop: 8 }}>
+                  {[
+                    { label: '☀️ 0% Claro', val: 0 },
+                    { label: '🌤️ 20% Suave', val: 0.2 },
+                    { label: '⛅ 45% Medio', val: 0.45 },
+                    { label: '🌑 75% Oscuro', val: 0.75 },
+                  ].map((p) => {
+                    const active = Math.abs(bgOverlayOpacity - p.val) < 0.05;
+                    return (
+                      <button
+                        key={p.val}
+                        type="button"
+                        onClick={() => {
+                          setBgOverlayOpacity(p.val);
+                          setBgOverlayEnabled(p.val > 0);
+                        }}
+                        style={{
+                          padding: '5px 2px',
+                          fontSize: 9,
+                          fontWeight: 800,
+                          borderRadius: 6,
+                          border: active ? '1.5px solid #6366f1' : '1px solid #e2e8f0',
+                          background: active ? '#ede9fe' : '#f8fafc',
+                          color: active ? '#6366f1' : '#64748b',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          transition: 'all 0.1s ease'
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Selector de Tono de Oscuridad (Color / Branding) */}
+              <div style={{ marginBottom: 4 }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: '#64748b', display: 'block', marginBottom: 6 }}>Tono del Filtro / Superposición</span>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOverlayType('dark');
+                      setBgOverlayColor('rgba(0, 0, 0, 0.65)');
+                    }}
+                    style={{
+                      padding: '6px 8px',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      borderRadius: 7,
+                      border: overlayType === 'dark' ? '1.5px solid #6366f1' : '1px solid #cbd5e1',
+                      background: overlayType === 'dark' ? '#f5f3ff' : '#fff',
+                      color: overlayType === 'dark' ? '#6366f1' : '#475569',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}
+                  >
+                    <span>⬛</span> Negro
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOverlayType('branding');
+                      const brandColor = colors[0] || '#6366f1';
+                      setBgOverlayColor(brandColor);
+                    }}
+                    style={{
+                      padding: '6px 8px',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      borderRadius: 7,
+                      border: overlayType === 'branding' ? '1.5px solid #6366f1' : '1px solid #cbd5e1',
+                      background: overlayType === 'branding' ? '#f5f3ff' : '#fff',
+                      color: overlayType === 'branding' ? '#6366f1' : '#475569',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}
+                  >
+                    <span>✨</span> Marca
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOverlayType('solid');
+                    }}
+                    style={{
+                      padding: '6px 8px',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      borderRadius: 7,
+                      border: overlayType === 'solid' ? '1.5px solid #6366f1' : '1px solid #cbd5e1',
+                      background: overlayType === 'solid' ? '#f5f3ff' : '#fff',
+                      color: overlayType === 'solid' ? '#6366f1' : '#475569',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4
+                    }}
+                  >
+                    <span>🎨</span> Elegir
+                  </button>
+                </div>
+
+                {overlayType === 'solid' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, background: '#fff', padding: 6, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                    <input
+                      type="color"
+                      value={overlaySolidColor}
+                      onChange={(e) => {
+                        setOverlaySolidColor(e.target.value);
+                        setBgOverlayColor(e.target.value);
+                      }}
+                      style={{ width: 26, height: 26, border: 'none', borderRadius: 4, cursor: 'pointer', padding: 0 }}
+                    />
+                    <input
+                      type="text"
+                      value={overlaySolidColor}
+                      onChange={(e) => {
+                        setOverlaySolidColor(e.target.value);
+                        setBgOverlayColor(e.target.value);
+                      }}
+                      placeholder="#000000"
+                      style={{ ...css.input, padding: '4px 8px', fontSize: 11 }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -4116,7 +4410,8 @@ export default function FlyerStudio() {
                                 benefitsAlign,
                                 benefitsLayout,
                                 accent: colors[0] || '#0070d2',
-                                bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
+                                bgImageUrl: effectiveBgImage,
+                                bgType: bgMode,
                                 logoUrl: logoPreview || null,
                                 industria: companyName || 'Mi Empresa',
                                 companyName: companyName,
@@ -4126,7 +4421,7 @@ export default function FlyerStudio() {
                                 gradColor2,
                                 gradColor3,
                                 bgOverlayColor,
-                                bgOverlayOpacity,
+                                bgOverlayOpacity: (bgOverlayEnabled && bgOverlayOpacity > 0) ? bgOverlayOpacity : 0,
                                 bgOverlayBlendMode,
                                 bulletColor: benefitsColor,
                                 bulletShape,
@@ -4511,14 +4806,15 @@ export default function FlyerStudio() {
             benefitsAlign,
             benefitsLayout,
             accent: colors[0] || '#0070d2',
-            bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
+            bgImageUrl: effectiveBgImage,
+            bgType: bgMode,
             logoUrl: logoPreview || null,
             industria: companyName || 'Mi Empresa',
             companyName: companyName,
             phone, website, templateId: selectedTemplate,
             gradientBg: selectedGradient,
             bgOverlayColor,
-            bgOverlayOpacity,
+            bgOverlayOpacity: (bgOverlayEnabled && bgOverlayOpacity > 0) ? bgOverlayOpacity : 0,
             bgOverlayBlendMode,
             bulletColor: benefitsColor,
             bulletShape,
@@ -4779,14 +5075,15 @@ export default function FlyerStudio() {
                         benefitsAlign,
                         benefitsLayout,
                         accent: colors[0] || '#0070d2',
-                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
+                        bgImageUrl: effectiveBgImage,
+                        bgType: bgMode,
                         logoUrl: logoPreview || null,
                         industria: companyName || 'Mi Empresa',
                         companyName: companyName,
                         phone, website, templateId: selectedTemplate,
                         gradientBg: selectedGradient,
                         bgOverlayColor,
-                        bgOverlayOpacity,
+                        bgOverlayOpacity: (bgOverlayEnabled && bgOverlayOpacity > 0) ? bgOverlayOpacity : 0,
                         bgOverlayBlendMode,
                         bulletColor: benefitsColor,
                         bulletShape,
@@ -5596,6 +5893,86 @@ export default function FlyerStudio() {
 
               {editingElement === 'background' && (
                 <>
+                  {/* Mode switch */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Tipo de Fondo</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, background: '#f1f5f9', padding: 4, borderRadius: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => { setBgMode('gradient'); setSelectedTemplate('vibrant-gradient'); }}
+                        style={{
+                          padding: '8px 10px', borderRadius: 6, border: 'none',
+                          background: bgMode === 'gradient' ? '#7c3aed' : 'transparent',
+                          color: bgMode === 'gradient' ? '#fff' : '#64748b',
+                          fontSize: 11, fontWeight: 800, cursor: 'pointer'
+                        }}
+                      >
+                        🎨 Degradado (2 o 3 Colores)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBgMode('photo')}
+                        style={{
+                          padding: '8px 10px', borderRadius: 6, border: 'none',
+                          background: bgMode === 'photo' ? '#7c3aed' : 'transparent',
+                          color: bgMode === 'photo' ? '#fff' : '#64748b',
+                          fontSize: 11, fontWeight: 800, cursor: 'pointer'
+                        }}
+                      >
+                        📷 Foto de Fondo
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Nivel de Oscuridad / Aclarar fondo */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Nivel de Oscuridad</span>
+                      <span style={{ fontSize: 11, fontWeight: 900, color: bgOverlayOpacity === 0 ? '#10b981' : '#6366f1' }}>
+                        {bgOverlayOpacity === 0 ? '0% (100% Claro / Sin Oscuridad)' : `${Math.round(bgOverlayOpacity * 100)}%`}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={bgOverlayOpacity}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value);
+                        setBgOverlayOpacity(val);
+                        setBgOverlayEnabled(val > 0);
+                      }}
+                      style={{ width: '100%', accentColor: '#6366f1' }}
+                    />
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5 }}>
+                      {[
+                        { label: '☀️ 0% Claro', val: 0 },
+                        { label: '🌤️ 20% Suave', val: 0.2 },
+                        { label: '⛅ 45% Medio', val: 0.45 },
+                        { label: '🌑 75% Oscuro', val: 0.75 },
+                      ].map(p => (
+                        <button
+                          key={p.val}
+                          type="button"
+                          onClick={() => {
+                            setBgOverlayOpacity(p.val);
+                            setBgOverlayEnabled(p.val > 0);
+                          }}
+                          style={{
+                            padding: '4px 2px', fontSize: 9, fontWeight: 800, borderRadius: 5,
+                            border: Math.abs(bgOverlayOpacity - p.val) < 0.05 ? '1.5px solid #6366f1' : '1px solid #cbd5e1',
+                            background: Math.abs(bgOverlayOpacity - p.val) < 0.05 ? '#ede9fe' : '#f8fafc',
+                            color: Math.abs(bgOverlayOpacity - p.val) < 0.05 ? '#6366f1' : '#64748b',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Fondo Personalizado (Imagen)</span>
                     <button onClick={() => bgUploadRef.current?.click()} style={{ ...css.btn, background: '#0f172a' }}>
@@ -5609,25 +5986,6 @@ export default function FlyerStudio() {
                         Eliminar Fondo Personalizado
                       </button>
                     )}
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Color de Tarjeta / Superposición</span>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <input 
-                        type="color" 
-                        value={cardBgColor || '#000000'} 
-                        onChange={e => setCardBgColor(e.target.value)} 
-                        style={{ width: 36, height: 36, padding: 0, border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 6, flexShrink: 0 }} 
-                      />
-                      <input 
-                        type="text" 
-                        value={cardBgColor} 
-                        onChange={e => setCardBgColor(e.target.value)} 
-                        placeholder="Por defecto"
-                        style={css.input} 
-                      />
-                    </div>
                   </div>
                 </>
               )}
@@ -5890,7 +6248,19 @@ export default function FlyerStudio() {
                       return (
                         <button
                           key={t.id}
-                          onClick={() => { setSelectedTemplate(t.id); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
+                          onClick={() => {
+                            setSelectedTemplate(t.id);
+                            setPreviewMode('template');
+                            setShowFullAiResult(false);
+                            setIsTemplateModalOpen(false);
+                            if (t.id === 'vibrant-gradient') {
+                              setBgMode('gradient');
+                              toast.success('🎨 Modo Degradado Puro Activado');
+                            } else {
+                              setBgMode('photo');
+                              toast.success('📷 Modo Foto Editorial Activado');
+                            }
+                          }}
                           style={{
                             textAlign: 'left',
                             padding: 0,
@@ -5927,12 +6297,14 @@ export default function FlyerStudio() {
                                   cta: cta || 'CONTACTAR AHORA',
                                   beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                                   accent: colors[0] || '#0070d2',
-                                  bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
+                                  bgImageUrl: t.id === 'vibrant-gradient' ? null : (bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE),
+                                  bgType: t.id === 'vibrant-gradient' ? 'gradient' : 'photo',
                                   logoUrl: logoPreview || null,
                                   industria: companyName || 'Mi Empresa',
                                   companyName: companyName,
                                   phone, website, templateId: t.id,
                                   gradientBg: selectedGradient,
+                                  bgOverlayOpacity: (bgOverlayEnabled && bgOverlayOpacity > 0) ? bgOverlayOpacity : 0,
                                   badgeTextTop: badgeTop,
                                   badgeTextBottom: badgeBottom,
                                   containerW: 1080, containerH: canvasH,

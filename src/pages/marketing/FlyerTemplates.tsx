@@ -428,17 +428,21 @@ export const Template_CinematicGradient = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#7c3aed';
   const sub = cleanSubtitle(d.subtitle);
+  const grad = d.gradientBg || '#030712';
+  const hasPhoto = d.bgType === 'photo' && Boolean(d.bgImageUrl);
 
   return (
     <div 
       onClick={d.onBgClick ? (e) => { e.stopPropagation(); d.onBgClick?.(); } : undefined}
-      style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', background: '#030712', cursor: d.onBgClick ? 'pointer' : 'default' }}
+      style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', background: hasPhoto ? '#030712' : grad, cursor: d.onBgClick ? 'pointer' : 'default' }}
     >
       {/* 1. Full Image Background */}
-      <div style={{ position: 'absolute', inset: 0, ...imgBg(d.bgImageUrl, d.bgImagePosition) }} />
+      {hasPhoto && (
+        <div style={{ position: 'absolute', inset: 0, ...imgBg(d.bgImageUrl, d.bgImagePosition) }} />
+      )}
 
       {/* Color / Gradient tint overlay for contrast and branding */}
-      {d.bgOverlayColor && (
+      {d.bgOverlayColor && d.bgOverlayOpacity !== 0 && (
         <div style={{
           position: 'absolute', inset: 0,
           background: d.bgOverlayColor,
@@ -696,6 +700,7 @@ export const Template_VibrantGradient = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const grad = d.gradientBg || d.cardBgColor || 'linear-gradient(135deg, #7928ca 0%, #ff0080 100%)';
   const sub = cleanSubtitle(d.subtitle);
+  const hasPhoto = d.bgType === 'photo' && Boolean(d.bgImageUrl);
 
   return (
     <div 
@@ -703,28 +708,44 @@ export const Template_VibrantGradient = ({ d }: { d: FlyerData }) => {
       style={{ 
         width: W, height: H, position: 'relative', overflow: 'hidden', 
         fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', 
-        background: d.bgImageUrl ? '#0a0a14' : grad, cursor: d.onBgClick ? 'pointer' : 'default',
+        background: hasPhoto ? '#0a0a14' : grad, cursor: d.onBgClick ? 'pointer' : 'default',
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
         padding: `${Math.round(36 * s)}px ${Math.round(32 * s)}px`
       }}
     >
-      {/* Background photo support: if photo is provided, show photo with modern ambient gradient overlay */}
-      {d.bgImageUrl && (
+      {/* Background photo support: ONLY if photo mode is active and image exists */}
+      {hasPhoto && (
         <>
           <div style={{ position: 'absolute', inset: 0, ...imgBg(d.bgImageUrl, d.bgImagePosition), zIndex: 0 }} />
-          <div style={{ 
-            position: 'absolute', inset: 0, 
-            background: d.bgOverlayColor || grad, 
-            opacity: d.bgOverlayOpacity !== undefined ? d.bgOverlayOpacity : 0.65, 
-            mixBlendMode: d.bgOverlayBlendMode || 'multiply',
-            zIndex: 1 
-          }} />
-          <div style={{ 
-            position: 'absolute', inset: 0, 
-            background: 'linear-gradient(180deg, rgba(10,10,20,0.65) 0%, rgba(10,10,20,0.2) 45%, rgba(10,10,20,0.85) 100%)',
-            zIndex: 1 
-          }} />
+          {d.bgOverlayOpacity !== 0 && (
+            <>
+              <div style={{ 
+                position: 'absolute', inset: 0, 
+                background: d.bgOverlayColor || grad, 
+                opacity: d.bgOverlayOpacity !== undefined ? d.bgOverlayOpacity : 0.45, 
+                mixBlendMode: d.bgOverlayBlendMode || 'multiply',
+                zIndex: 1 
+              }} />
+              <div style={{ 
+                position: 'absolute', inset: 0, 
+                background: `linear-gradient(180deg, rgba(10,10,20,${0.65 * (d.bgOverlayOpacity ?? 0.65)}) 0%, rgba(10,10,20,${0.2 * (d.bgOverlayOpacity ?? 0.65)}) 45%, rgba(10,10,20,${0.85 * (d.bgOverlayOpacity ?? 0.65)}) 100%)`,
+                zIndex: 1 
+              }} />
+            </>
+          )}
         </>
+      )}
+
+      {/* Optional dark contrast tint on pure gradient if user explicitly wants it */}
+      {!hasPhoto && d.bgOverlayOpacity !== undefined && d.bgOverlayOpacity > 0 && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: d.bgOverlayColor || 'rgba(0,0,0,0.4)',
+          opacity: d.bgOverlayOpacity,
+          mixBlendMode: d.bgOverlayBlendMode || 'multiply',
+          pointerEvents: 'none',
+          zIndex: 1
+        }} />
       )}
 
       {/* Subtle modern ambient light flare */}
@@ -865,28 +886,32 @@ export const Template_ProblemSolution = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#ec4899'; // Bright magenta like in Foto 4
   const sub = cleanSubtitle(d.subtitle);
+  const grad = d.gradientBg || '#0a0a14';
+  const hasPhoto = d.bgType === 'photo' && Boolean(d.bgImageUrl);
 
   return (
     <div 
       onClick={d.onBgClick ? (e) => { e.stopPropagation(); d.onBgClick?.(); } : undefined}
-      style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', background: '#0a0a14', cursor: d.onBgClick ? 'pointer' : 'default' }}
+      style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', background: hasPhoto ? '#0a0a14' : grad, cursor: d.onBgClick ? 'pointer' : 'default' }}
     >
       {/* 1. Full Image Background */}
-      <div style={{ position: 'absolute', inset: 0, ...imgBg(d.bgImageUrl, d.bgImagePosition) }} />
+      {hasPhoto && (
+        <div style={{ position: 'absolute', inset: 0, ...imgBg(d.bgImageUrl, d.bgImagePosition) }} />
+      )}
 
       {/* Color / Gradient tint overlay */}
-      {d.bgOverlayColor && (
+      {d.bgOverlayColor && d.bgOverlayOpacity !== 0 && (
         <div style={{
           position: 'absolute', inset: 0,
           background: d.bgOverlayColor,
-          opacity: d.bgOverlayOpacity !== undefined ? d.bgOverlayOpacity : 0.55,
+          opacity: d.bgOverlayOpacity !== undefined ? d.bgOverlayOpacity : 0.4,
           mixBlendMode: d.bgOverlayBlendMode || 'multiply',
           zIndex: 1
         }} />
       )}
 
       {/* 2. Top Header Brand Bar */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: Math.round(75 * s), background: 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%)', display: 'flex', alignItems: 'center', padding: `0 ${Math.round(24 * s)}px`, zIndex: 10 }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: Math.round(75 * s), background: `linear-gradient(180deg, rgba(0,0,0,${0.7 * (d.bgOverlayOpacity !== undefined ? d.bgOverlayOpacity : 0.7)}) 0%, transparent 100%)`, display: 'flex', alignItems: 'center', padding: `0 ${Math.round(24 * s)}px`, zIndex: 10 }}>
         {!d.logoUrl && (
           <div 
             className={d.onLogoClick ? "editable-element" : undefined}
@@ -897,12 +922,14 @@ export const Template_ProblemSolution = ({ d }: { d: FlyerData }) => {
         )}
       </div>
 
-      {/* 3. Deep Violet Bottom-Up Gradient (Foto 4 style) */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, height: '58%',
-        background: 'linear-gradient(180deg, transparent 0%, rgba(15, 10, 30, 0.4) 20%, rgba(15, 10, 30, 0.92) 65%, #0d091a 100%)',
-        zIndex: 2
-      }} />
+      {/* 3. Deep Violet Bottom-Up Gradient (Scales with darkness control so user can lighten or remove it) */}
+      {d.bgOverlayOpacity !== 0 && (
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: '58%',
+          background: `linear-gradient(180deg, transparent 0%, rgba(15, 10, 30, ${0.4 * (d.bgOverlayOpacity !== undefined ? Math.min(1, d.bgOverlayOpacity * 1.2) : 0.7)}) 20%, rgba(15, 10, 30, ${0.92 * (d.bgOverlayOpacity !== undefined ? Math.min(1, d.bgOverlayOpacity * 1.2) : 0.7)}) 65%, rgba(13, 9, 26, ${1 * (d.bgOverlayOpacity !== undefined ? Math.min(1, d.bgOverlayOpacity * 1.2) : 0.7)}) 100%)`,
+          zIndex: 2
+        }} />
+      )}
 
       {/* 4. Bottom Content */}
       <div style={{ 
