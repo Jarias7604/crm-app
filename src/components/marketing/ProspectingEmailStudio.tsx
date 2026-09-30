@@ -74,8 +74,11 @@ export default function ProspectingEmailStudio({
     const { profile } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const logoInputRef = useRef<HTMLInputElement>(null);
+    const sigLogoInputRef = useRef<HTMLInputElement>(null);
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+    const [isUploadingSigLogo, setIsUploadingSigLogo] = useState(false);
     const [customHeaderLogo, setCustomHeaderLogo] = useState<string>('');
+    const [customSigLogo, setCustomSigLogo] = useState<string>('');
 
     // View device mode: 'desktop', 'mobile', or 'dual'
     const [viewMode, setViewMode] = useState<'desktop' | 'mobile' | 'dual'>('desktop');
@@ -94,7 +97,7 @@ export default function ProspectingEmailStudio({
         return raw.replace(/{{nombre_iglesia}}/gi, '{{nombre_empresa}}');
     });
 
-    const defaultSenderName = profile?.full_name || companyName;
+    const defaultSenderName = (profile?.full_name && profile.full_name !== 'Platform Owner') ? profile.full_name : (isIclesia ? 'Jimmy Arias' : companyName);
     const defaultSenderEmail = company?.email || profile?.email || 'contacto@empresa.com';
     const [senderIdentity, setSenderIdentity] = useState(() => `${defaultSenderName} <${defaultSenderEmail}>`);
 
@@ -123,7 +126,7 @@ export default function ProspectingEmailStudio({
     const [hasPhoto, setHasPhoto] = useState(true);
     const [photoShape, setPhotoShape] = useState<'circle' | 'rounded' | 'square'>('circle');
     const [avatarUrl, setAvatarUrl] = useState<string>(() => profile?.avatar_url || '');
-    const [sigName, setSigName] = useState(() => profile?.full_name || companyName);
+    const [sigName, setSigName] = useState(() => (profile?.full_name && profile.full_name !== 'Platform Owner') ? profile.full_name : (isIclesia ? 'Jimmy Arias' : companyName));
     const [sigTitle, setSigTitle] = useState(() => `${(profile as any)?.job_title || 'Asesor Comercial'} | ${companyName}`);
     const [sigPhone, setSigPhone] = useState(() => company?.phone || profile?.phone || '');
     const [sigWebsite, setSigWebsite] = useState(() => company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/$/, '') : '');
@@ -140,7 +143,7 @@ export default function ProspectingEmailStudio({
 
     // Logo Resolution: Custom uploaded in studio > Company profile logo > (Iclesia logo if Iclesia, else empty)
     const effectiveHeaderLogo = customHeaderLogo || company?.logo_url || (isIclesia ? '/images/marketing/iclesia-header-logo.png' : '');
-    const effectiveSigLogo = company?.logo_url || (isIclesia ? '/images/marketing/iclesia-brand-logo.png' : '');
+    const effectiveSigLogo = customSigLogo || customHeaderLogo || company?.logo_url || (isIclesia ? '/images/marketing/iclesia-brand-logo.png' : '');
 
     // Active simulated lead index
     const [leadIndex, setLeadIndex] = useState(0);
@@ -178,6 +181,7 @@ export default function ProspectingEmailStudio({
                 if (typeof parsed.hasLogo === 'boolean') setHasLogo(parsed.hasLogo);
                 if (typeof parsed.hasPhoto === 'boolean') setHasPhoto(parsed.hasPhoto);
                 if (parsed.customHeaderLogo) setCustomHeaderLogo(parsed.customHeaderLogo);
+                if (parsed.customSigLogo) setCustomSigLogo(parsed.customSigLogo);
                 return;
             } catch { /* ignore */ }
         }
@@ -196,8 +200,9 @@ export default function ProspectingEmailStudio({
             setButtonText('Ver cómo funciona Iclesia');
             setYoutubeUrl('https://youtu.be/dvRSzR1x3os');
             setCustomHeaderLogo('/images/marketing/iclesia-header-logo.png');
+            setCustomSigLogo('/images/marketing/iclesia-brand-logo.png');
         } else {
-            const senderName = profile?.full_name || compName;
+            const senderName = (profile?.full_name && profile.full_name !== 'Platform Owner') ? profile.full_name : compName;
             const senderEmail = company.email || profile?.email || 'contacto@empresa.com';
             setSigName(senderName);
             setSigTitle(`${(profile as any)?.job_title || 'Asesor Comercial'} | ${compName}`);
@@ -211,6 +216,7 @@ export default function ProspectingEmailStudio({
             setButtonText(`Conocer más sobre ${compName}`);
             setCampaignName(`Prospección - ${compName}`);
             setCustomHeaderLogo(company.logo_url || '');
+            setCustomSigLogo(company.logo_url || '');
         }
     }, [company?.id, company?.name]);
 
@@ -219,14 +225,14 @@ export default function ProspectingEmailStudio({
         try {
             const storageKey = `crm_user_signature_${company?.id || 'default'}`;
             localStorage.setItem(storageKey, JSON.stringify({
-                sigName, sigTitle, sigPhone, sigWebsite, avatarUrl, photoShape, hasLogo, hasPhoto, customHeaderLogo
+                sigName, sigTitle, sigPhone, sigWebsite, avatarUrl, photoShape, hasLogo, hasPhoto, customHeaderLogo, customSigLogo
             }));
         } catch { /* ignore */ }
     };
 
     useEffect(() => {
         persistSignature();
-    }, [sigName, sigTitle, sigPhone, sigWebsite, avatarUrl, photoShape, hasLogo, hasPhoto, customHeaderLogo]);
+    }, [sigName, sigTitle, sigPhone, sigWebsite, avatarUrl, photoShape, hasLogo, hasPhoto, customHeaderLogo, customSigLogo]);
 
     // Simulated lead resolution
     const currentLead = (previewLeads && previewLeads.length > 0 && previewLeads[leadIndex]) ? previewLeads[leadIndex] : {
@@ -329,7 +335,7 @@ export default function ProspectingEmailStudio({
         }
     };
 
-    // Upload custom header logo
+    // Upload custom header logo (syncs to signature logo by default so user doesn't have to upload twice)
     const handleHeaderLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -339,18 +345,46 @@ export default function ProspectingEmailStudio({
             const publicUrl = await storageService.uploadAvatar(compId, file);
             if (publicUrl) {
                 setCustomHeaderLogo(publicUrl);
-                toast.success('Logo del correo actualizado con éxito');
+                setCustomSigLogo(publicUrl);
+                toast.success('Logo del correo y firma actualizados con éxito');
             }
         } catch (err: any) {
             console.error(err);
             const reader = new FileReader();
             reader.onload = () => {
-                setCustomHeaderLogo(reader.result as string);
+                const dataUrl = reader.result as string;
+                setCustomHeaderLogo(dataUrl);
+                setCustomSigLogo(dataUrl);
                 toast.success('Logo del correo cargado');
             };
             reader.readAsDataURL(file);
         } finally {
             setIsUploadingLogo(false);
+        }
+    };
+
+    // Upload custom signature logo specifically
+    const handleSigLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            setIsUploadingSigLogo(true);
+            const compId = company?.id || profile?.company_id || 'marketing';
+            const publicUrl = await storageService.uploadAvatar(compId, file);
+            if (publicUrl) {
+                setCustomSigLogo(publicUrl);
+                toast.success('Logo de la firma actualizado con éxito');
+            }
+        } catch (err: any) {
+            console.error(err);
+            const reader = new FileReader();
+            reader.onload = () => {
+                setCustomSigLogo(reader.result as string);
+                toast.success('Logo de la firma cargado');
+            };
+            reader.readAsDataURL(file);
+        } finally {
+            setIsUploadingSigLogo(false);
         }
     };
 
@@ -512,9 +546,9 @@ export default function ProspectingEmailStudio({
                       <div style="font-size:15px;font-weight:800;color:#0F172A;line-height:1.2;">${sigName}</div>
                       <div style="font-size:12px;font-weight:600;color:#64748B;margin-top:2px;">${sigTitle}</div>
                       <div style="font-size:12.5px;color:#334155;margin-top:4px;">
-                        <a href="tel:${cleanPhone}" style="color:#334155;text-decoration:none;font-weight:500;">${sigPhone}</a>
-                        &nbsp;•&nbsp;
-                        <a href="https://${cleanWeb}" target="_blank" style="color:#0066FF;text-decoration:none;font-weight:bold;">${sigWebsite}</a>
+                        ${sigPhone ? `<a href="tel:${cleanPhone}" style="color:#334155;text-decoration:none;font-weight:500;">${sigPhone}</a>` : ''}
+                        ${sigPhone && sigWebsite ? '&nbsp;•&nbsp;' : ''}
+                        ${sigWebsite ? `<a href="https://${cleanWeb}" target="_blank" style="color:#0066FF;text-decoration:none;font-weight:bold;">${sigWebsite}</a>` : ''}
                       </div>
                     </td>
                     ${hasLogo ? `
@@ -726,7 +760,10 @@ export default function ProspectingEmailStudio({
                                 {customHeaderLogo && (
                                     <button
                                         type="button"
-                                        onClick={() => setCustomHeaderLogo('')}
+                                        onClick={() => {
+                                            setCustomHeaderLogo('');
+                                            setCustomSigLogo('');
+                                        }}
                                         className="px-2 py-1 text-[10px] font-bold text-gray-500 hover:text-gray-700 bg-gray-100 rounded-lg transition"
                                         title="Restaurar logo predeterminado de la empresa"
                                     >
@@ -914,6 +951,47 @@ export default function ProspectingEmailStudio({
                             </label>
                         </div>
 
+                        {hasLogo && (
+                            <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-bold text-gray-500 uppercase">Logo de la Firma:</span>
+                                    {effectiveSigLogo ? (
+                                        <img src={effectiveSigLogo} alt="Logo Firma" className="h-5 max-h-5 max-w-[80px] object-contain" />
+                                    ) : (
+                                        <span className="text-[10px] font-bold text-gray-700">{companyName}</span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    {customSigLogo && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setCustomSigLogo('')}
+                                            className="px-2 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-200 rounded-lg text-[10px] font-bold text-gray-600 transition"
+                                            title="Restaurar logo predeterminado de la firma"
+                                        >
+                                            Restaurar
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => sigLogoInputRef.current?.click()}
+                                        disabled={isUploadingSigLogo}
+                                        className="flex-1 py-1.5 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 flex items-center justify-center gap-1.5 transition"
+                                    >
+                                        <Upload className="w-3.5 h-3.5 text-blue-600" />
+                                        {isUploadingSigLogo ? 'Subiendo...' : (effectiveSigLogo ? 'Cambiar Logo de Firma' : 'Subir Logo de Firma')}
+                                    </button>
+                                </div>
+                                <input
+                                    ref={sigLogoInputRef}
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                    className="hidden"
+                                    onChange={handleSigLogoUpload}
+                                />
+                            </div>
+                        )}
+
                         {hasPhoto && (
                             <div className="p-2.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
                                 <div className="flex items-center justify-between">
@@ -953,6 +1031,54 @@ export default function ProspectingEmailStudio({
                                 </button>
                             </div>
                         )}
+
+                        {/* Campos de Texto de la Firma */}
+                        <div className="pt-2 border-t border-gray-200/60 space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Nombre:</label>
+                                    <input
+                                        type="text"
+                                        value={sigName}
+                                        onChange={(e) => setSigName(e.target.value)}
+                                        placeholder="Tu Nombre"
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Cargo / Rol:</label>
+                                    <input
+                                        type="text"
+                                        value={sigTitle}
+                                        onChange={(e) => setSigTitle(e.target.value)}
+                                        placeholder="Cargo | Empresa"
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Teléfono:</label>
+                                    <input
+                                        type="text"
+                                        value={sigPhone}
+                                        onChange={(e) => setSigPhone(e.target.value)}
+                                        placeholder="+1 555 000-0000"
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 mb-0.5">Sitio Web:</label>
+                                    <input
+                                        type="text"
+                                        value={sigWebsite}
+                                        onChange={(e) => setSigWebsite(e.target.value)}
+                                        placeholder="miempresa.com"
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Primary Actions */}
@@ -1249,29 +1375,70 @@ export default function ProspectingEmailStudio({
                                                                 </>
                                                             )}
                                                             <div className="text-left space-y-0.5">
-                                                                <p className="text-sm font-black text-gray-900 leading-tight">{sigName}</p>
-                                                                <p className="text-xs font-semibold text-gray-500">{sigTitle}</p>
-                                                                <p className="text-xs text-gray-600 font-medium">
-                                                                    <span>{sigPhone}</span>
-                                                                    <span className="mx-1.5">•</span>
-                                                                    <a href={`https://${sigWebsite}`} target="_blank" rel="noreferrer" className="text-blue-600 font-bold hover:underline">
+                                                                <p
+                                                                    contentEditable
+                                                                    suppressContentEditableWarning
+                                                                    onBlur={(e) => setSigName(e.currentTarget.innerText)}
+                                                                    className="text-sm font-black text-gray-900 leading-tight outline-none hover:bg-blue-50/50 rounded px-1 transition"
+                                                                    title="Haz clic para editar tu nombre"
+                                                                >
+                                                                    {sigName}
+                                                                </p>
+                                                                <p
+                                                                    contentEditable
+                                                                    suppressContentEditableWarning
+                                                                    onBlur={(e) => setSigTitle(e.currentTarget.innerText)}
+                                                                    className="text-xs font-semibold text-gray-500 outline-none hover:bg-blue-50/50 rounded px-1 transition"
+                                                                    title="Haz clic para editar tu cargo"
+                                                                >
+                                                                    {sigTitle}
+                                                                </p>
+                                                                <p className="text-xs text-gray-600 font-medium flex items-center gap-1 flex-wrap">
+                                                                    <span
+                                                                        contentEditable
+                                                                        suppressContentEditableWarning
+                                                                        onBlur={(e) => setSigPhone(e.currentTarget.innerText)}
+                                                                        className="outline-none hover:bg-blue-50/50 rounded px-1 transition"
+                                                                        title="Haz clic para editar teléfono"
+                                                                    >
+                                                                        {sigPhone}
+                                                                    </span>
+                                                                    {sigPhone && sigWebsite && (
+                                                                        <span className="text-gray-400">•</span>
+                                                                    )}
+                                                                    <span
+                                                                        contentEditable
+                                                                        suppressContentEditableWarning
+                                                                        onBlur={(e) => setSigWebsite(e.currentTarget.innerText)}
+                                                                        className="text-blue-600 font-bold hover:underline outline-none hover:bg-blue-50/50 rounded px-1 transition"
+                                                                        title="Haz clic para editar sitio web"
+                                                                    >
                                                                         {sigWebsite}
-                                                                    </a>
+                                                                    </span>
                                                                 </p>
                                                             </div>
                                                         </div>
                                                         {hasLogo && (
-                                                            effectiveSigLogo ? (
-                                                                <img
-                                                                    src={effectiveSigLogo}
-                                                                    alt={companyName}
-                                                                    className="h-8 max-h-9 w-auto object-contain"
-                                                                />
-                                                            ) : (
-                                                                <div className="text-sm font-black text-gray-900 tracking-tight">
-                                                                    {companyName}
-                                                                </div>
-                                                            )
+                                                            <div
+                                                                onClick={() => sigLogoInputRef.current?.click()}
+                                                                className="cursor-pointer group relative flex items-center gap-1.5 p-1 -mr-1 rounded-xl hover:bg-blue-50/70 transition"
+                                                                title="Haz clic para cambiar o subir el logo de la firma"
+                                                            >
+                                                                <span className="text-[10px] text-blue-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity bg-blue-100/90 px-2 py-0.5 rounded-md">
+                                                                    Cambiar Logo
+                                                                </span>
+                                                                {effectiveSigLogo ? (
+                                                                    <img
+                                                                        src={effectiveSigLogo}
+                                                                        alt={companyName}
+                                                                        className="h-8 max-h-9 w-auto object-contain"
+                                                                    />
+                                                                ) : (
+                                                                    <div className="text-sm font-black text-gray-900 tracking-tight">
+                                                                        {companyName}
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         )}
                                                     </div>
                                                 )}
@@ -1389,17 +1556,23 @@ export default function ProspectingEmailStudio({
                                             </div>
                                         </div>
                                         {hasLogo && (
-                                            effectiveSigLogo ? (
-                                                <img
-                                                    src={effectiveSigLogo}
-                                                    alt={companyName}
-                                                    className="h-6 max-h-7 w-auto object-contain"
-                                                />
-                                            ) : (
-                                                <div className="text-[10px] font-black text-gray-900 tracking-tight">
-                                                    {companyName}
-                                                </div>
-                                            )
+                                            <div
+                                                onClick={() => sigLogoInputRef.current?.click()}
+                                                className="cursor-pointer hover:opacity-80 transition"
+                                                title="Haz clic para cambiar el logo de la firma"
+                                            >
+                                                {effectiveSigLogo ? (
+                                                    <img
+                                                        src={effectiveSigLogo}
+                                                        alt={companyName}
+                                                        className="h-6 max-h-7 w-auto object-contain"
+                                                    />
+                                                ) : (
+                                                    <div className="text-[10px] font-black text-gray-900 tracking-tight">
+                                                        {companyName}
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 </div>
