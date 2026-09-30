@@ -1171,6 +1171,138 @@ export default function CampaignBuilder() {
                             </button>
                         </div>
 
+                        {/* Segmentation Filter Section (Estados & Rubros) */}
+                        <div className="px-6 py-3.5 bg-slate-50 border-b border-gray-100 space-y-3 flex-shrink-0">
+                            {/* Filter by Estado */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 inline-block" />
+                                        Filtrar por Estado:
+                                    </span>
+                                    {formData.audience_filter.status.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsDirectConnect(false);
+                                                setFormData({
+                                                    ...formData,
+                                                    audience_filter: { ...formData.audience_filter, status: [], specificIds: [] }
+                                                });
+                                            }}
+                                            className="text-[10px] font-bold text-indigo-600 hover:underline"
+                                        >
+                                            Ver todos los estados
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsDirectConnect(false);
+                                            setFormData({
+                                                ...formData,
+                                                audience_filter: { ...formData.audience_filter, status: [], specificIds: [] }
+                                            });
+                                        }}
+                                        className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all border ${formData.audience_filter.status.length === 0
+                                            ? 'bg-indigo-600 text-white border-transparent shadow-xs'
+                                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        Todos ({totalCount})
+                                    </button>
+                                    {possibleStatuses.map(status => {
+                                        const isSelected = formData.audience_filter.status.some(
+                                            s => s.toLowerCase() === status.toLowerCase()
+                                        );
+                                        return (
+                                            <button
+                                                key={status}
+                                                type="button"
+                                                onClick={() => {
+                                                    setIsDirectConnect(false);
+                                                    const current = formData.audience_filter.status || [];
+                                                    const newStatus = isSelected
+                                                        ? current.filter(s => s.toLowerCase() !== status.toLowerCase())
+                                                        : [...current.filter(s => s.toLowerCase() !== status.toLowerCase()), status];
+                                                    setFormData({
+                                                        ...formData,
+                                                        audience_filter: {
+                                                            ...formData.audience_filter,
+                                                            status: newStatus,
+                                                            specificIds: []
+                                                        }
+                                                    });
+                                                }}
+                                                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all border ${isSelected
+                                                    ? 'bg-indigo-600 text-white border-transparent shadow-xs'
+                                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-100'
+                                                }`}
+                                            >
+                                                {statusLabels[status] || status}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Filter by Rubro / Industria */}
+                            <div className="pt-2 border-t border-gray-200/60 flex items-center justify-between gap-3 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-500">
+                                        Rubro / Industria:
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowIndustryModal(true)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 transition"
+                                    >
+                                        <Search className="w-3 h-3 text-gray-400" />
+                                        {(formData.audience_filter.industry?.length || 0) === 0
+                                            ? 'Todos los Rubros'
+                                            : `${formData.audience_filter.industry!.length} seleccionado${formData.audience_filter.industry!.length > 1 ? 's' : ''}`
+                                        }
+                                        <ChevronRight className="w-3 h-3 text-gray-400" />
+                                    </button>
+                                </div>
+
+                                {/* Selected Industry Pills */}
+                                {(formData.audience_filter.industry?.length || 0) > 0 && (
+                                    <div className="flex flex-wrap gap-1 items-center">
+                                        {formData.audience_filter.industry!.map((ind: string) => (
+                                            <span
+                                                key={ind}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                            >
+                                                {ind}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newIndustry = formData.audience_filter.industry!.filter((i: string) => i !== ind);
+                                                        setFormData({ ...formData, audience_filter: { ...formData.audience_filter, industry: newIndustry } });
+                                                    }}
+                                                    className="hover:text-red-600"
+                                                >
+                                                    <X className="w-2.5 h-2.5" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData({ ...formData, audience_filter: { ...formData.audience_filter, industry: [] } });
+                                            }}
+                                            className="text-[10px] font-bold text-gray-400 hover:text-red-500 ml-1"
+                                        >
+                                            Limpiar
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Smart Controls Bar */}
                         <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center gap-3 flex-shrink-0">
                             {/* Search */}
@@ -1241,9 +1373,21 @@ export default function CampaignBuilder() {
 
                                                 {/* Info */}
                                                 <div className="flex-1 min-w-0">
-                                                    <h4 className={`font-black text-sm truncate ${isExcluded ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-                                                        {lead.name || 'Sin nombre'}
-                                                    </h4>
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h4 className={`font-black text-sm truncate ${isExcluded ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                                                            {lead.name || 'Sin nombre'}
+                                                        </h4>
+                                                        {lead.company_name && (
+                                                            <span className="text-[10px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md truncate max-w-[150px]">
+                                                                {lead.company_name}
+                                                            </span>
+                                                        )}
+                                                        {lead.industry && (
+                                                            <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded-md truncate max-w-[130px]">
+                                                                {lead.industry}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <div className="flex items-center gap-2 mt-0.5">
                                                         {selectedChannel === 'email' ? (
                                                             lead.email ? (
