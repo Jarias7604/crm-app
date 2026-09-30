@@ -33,6 +33,16 @@ export interface EmailBlock {
     visible: boolean;
 }
 
+export function getYouTubeVideoId(url: string): string | null {
+    if (!url) return null;
+    const cleanUrl = url.trim();
+    const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = cleanUrl.match(regExp);
+    if (match && match[1]) return match[1];
+    if (/^[a-zA-Z0-9_-]{11}$/.test(cleanUrl)) return cleanUrl;
+    return null;
+}
+
 interface ProspectingEmailStudioProps {
     initialSubject?: string;
     initialName?: string;
@@ -76,7 +86,17 @@ export default function ProspectingEmailStudio({
     // Video Controls
     const [youtubeUrl, setYoutubeUrl] = useState('https://youtu.be/dvR5zR1x3os');
     const [videoCaption, setVideoCaption] = useState('Vea en 45 segundos cómo funciona Iclesia');
-    const [customVideoThumb, setCustomVideoThumb] = useState<string>('/images/marketing/jimmy-video-preview.png');
+    const [thumbMode, setThumbMode] = useState<'youtube' | 'custom'>('youtube');
+    const [customUploadedThumb, setCustomUploadedThumb] = useState<string>('');
+    const [isUploadingThumb, setIsUploadingThumb] = useState(false);
+    const videoThumbInputRef = useRef<HTMLInputElement>(null);
+
+    const detectedYtId = getYouTubeVideoId(youtubeUrl);
+    const effectiveVideoThumb = (thumbMode === 'custom' && customUploadedThumb)
+        ? customUploadedThumb
+        : (detectedYtId
+            ? `https://img.youtube.com/vi/${detectedYtId}/hqdefault.jpg`
+            : '/images/marketing/jimmy-video-preview.png');
 
     // Button Controls
     const [buttonText, setButtonText] = useState('Ver cómo funciona Iclesia');
@@ -225,6 +245,32 @@ export default function ProspectingEmailStudio({
         }
     };
 
+    // Upload custom video thumbnail
+    const handleVideoThumbUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            setIsUploadingThumb(true);
+            const userId = profile?.id || 'marketing';
+            const publicUrl = await storageService.uploadAvatar(userId, file);
+            if (publicUrl) {
+                setCustomUploadedThumb(publicUrl);
+                setThumbMode('custom');
+                toast.success('Portada personalizada cargada');
+            }
+        } catch (err: any) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                setCustomUploadedThumb(reader.result as string);
+                setThumbMode('custom');
+                toast.success('Portada cargada');
+            };
+            reader.readAsDataURL(file);
+        } finally {
+            setIsUploadingThumb(false);
+        }
+    };
+
     // Compile to ultra-clean, bulletproof Email HTML (Gmail, Apple Mail, Outlook compatible)
     const compileToEmailHtml = () => {
         const photoBorderRadius = photoShape === 'circle' ? '50%' : photoShape === 'rounded' ? '12px' : '0px';
@@ -321,10 +367,17 @@ export default function ProspectingEmailStudio({
 
                 case 'videoCard':
                     html += `
-              <!-- Video Card (Compact / Half-width for content focus) -->
-              <div style="margin:20px auto 24px auto;max-width:440px;border-radius:18px;overflow:hidden;background-color:#0F172A;border:1px solid #1E293B;box-shadow:0 8px 24px rgba(0,0,0,0.12);text-align:center;">
+              <!-- Video Card (Auto YouTube Thumbnail + Play Button) -->
+              <div style="margin:20px auto 24px auto;max-width:440px;border-radius:18px;overflow:hidden;background-color:#0F172A;border:1px solid #1E293B;box-shadow:0 8px 24px rgba(0,0,0,0.12);text-align:center;position:relative;">
                 <a href="${youtubeUrl}" target="_blank" style="display:block;text-decoration:none;position:relative;">
-                  <img src="https://raw.githubusercontent.com/Jarias7604/crm-app/develop/public/images/marketing/jimmy-video-preview.png" alt="Video" width="440" style="display:block;width:100%;max-width:440px;margin:0 auto;border:0;" />
+                  <img src="${effectiveVideoThumb}" alt="Ver Video" width="440" style="display:block;width:100%;max-width:440px;margin:0 auto;border:0;" />
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="position:absolute;top:0;left:0;width:100%;height:100%;">
+                    <tr>
+                      <td align="center" style="vertical-align:middle;">
+                        <div style="width:62px;height:62px;border-radius:50%;background-color:#0066FF;color:#FFFFFF;line-height:62px;font-size:24px;text-align:center;margin:0 auto;box-shadow:0 6px 20px rgba(0,0,0,0.45);font-family:Arial,sans-serif;">▶</div>
+                      </td>
+                    </tr>
+                  </table>
                 </a>
               </div>
 `;
@@ -440,6 +493,15 @@ export default function ProspectingEmailStudio({
                 accept="image/*"
                 className="hidden"
                 onChange={handleAvatarUpload}
+            />
+
+            {/* Hidden file input for custom video thumbnail */}
+            <input
+                ref={videoThumbInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleVideoThumbUpload}
             />
 
             {/* ── UNIFIED EXECUTIVE HEADER BAR ── */}
@@ -623,6 +685,40 @@ export default function ProspectingEmailStudio({
                             />
                             <LinkIcon className="w-3.5 h-3.5 text-blue-500 absolute right-3 top-1/2 -translate-y-1/2" />
                         </div>
+
+                        {/* Selector de Portada: Automática de YouTube vs Subir Propia */}
+                        <div className="pt-1 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase">Portada:</span>
+                            <div className="flex bg-gray-100 rounded-lg p-0.5 text-[10px]">
+                                <button
+                                    type="button"
+                                    onClick={() => setThumbMode('youtube')}
+                                    className={`px-2 py-0.5 rounded font-bold transition ${thumbMode === 'youtube' ? 'bg-white text-blue-600 shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
+                                >
+                                    Auto YouTube
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setThumbMode('custom');
+                                        videoThumbInputRef.current?.click();
+                                    }}
+                                    className={`px-2 py-0.5 rounded font-bold transition ${thumbMode === 'custom' ? 'bg-white text-blue-600 shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
+                                >
+                                    {isUploadingThumb ? 'Subiendo...' : 'Subir Propia'}
+                                </button>
+                            </div>
+                        </div>
+                        {thumbMode === 'youtube' && detectedYtId && (
+                            <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                                <Check className="w-3 h-3" /> Portada real de YouTube sincronizada
+                            </p>
+                        )}
+                        {thumbMode === 'custom' && customUploadedThumb && (
+                            <p className="text-[10px] text-blue-600 font-semibold flex items-center gap-1">
+                                <Check className="w-3 h-3" /> Portada personalizada activa
+                            </p>
+                        )}
                     </div>
 
                     {/* 5. Botón de Acción (CTA) */}
@@ -915,15 +1011,21 @@ export default function ProspectingEmailStudio({
                                                     </p>
                                                 )}
 
-                                                {/* BLOCK 6: VIDEO CARD (Compact half-width on desktop for copy interest) */}
+                                                {/* BLOCK 6: VIDEO CARD (Auto YouTube Thumbnail + Play Button) */}
                                                 {block.type === 'videoCard' && (
                                                     <div className="w-full max-w-[460px] mx-auto rounded-2xl overflow-hidden bg-slate-900 border border-slate-200/80 shadow-md group/vid relative cursor-pointer text-center">
                                                         <a href={youtubeUrl} target="_blank" rel="noreferrer" className="block relative">
                                                             <img
-                                                                src={customVideoThumb}
+                                                                src={effectiveVideoThumb}
                                                                 alt="Video"
                                                                 className="w-full h-auto object-cover group-hover/vid:scale-[1.01] transition-transform duration-300"
                                                             />
+                                                            {/* Center Play Button Overlay */}
+                                                            <div className="absolute inset-0 flex items-center justify-center bg-black/15 group-hover/vid:bg-black/25 transition-colors">
+                                                                <div className="w-16 h-16 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-black/40 group-hover/vid:scale-110 transition-transform">
+                                                                    <Play className="w-7 h-7 fill-white ml-1" />
+                                                                </div>
+                                                            </div>
                                                         </a>
                                                     </div>
                                                 )}
@@ -1054,10 +1156,15 @@ export default function ProspectingEmailStudio({
                                     <div className="rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shadow-sm relative group text-center">
                                         <a href={youtubeUrl} target="_blank" rel="noreferrer" className="block relative">
                                             <img
-                                                src={customVideoThumb}
+                                                src={effectiveVideoThumb}
                                                 alt="Video Thumbnail"
                                                 className="w-full h-auto object-cover"
                                             />
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/15">
+                                                <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md">
+                                                    <Play className="w-4 h-4 fill-white ml-0.5" />
+                                                </div>
+                                            </div>
                                         </a>
                                     </div>
 
