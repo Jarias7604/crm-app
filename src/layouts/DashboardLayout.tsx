@@ -21,6 +21,7 @@ export default function DashboardLayout() {
     // NOTE: Only ChatHub needs the locked h-screen/overflow-hidden layout.
     // CotizacionDetalle has its own sticky header and needs free scroll — do NOT include it here.
     const isImmersiveView = location.pathname === '/marketing/chat';
+    const isFullWidthView = location.pathname.startsWith('/marketing/campaign') || location.pathname.startsWith('/marketing/email');
 
     // Initialize session timeout
     useSessionTimeout();
@@ -46,8 +47,14 @@ export default function DashboardLayout() {
             )}>
                 {/* Optimized Global Header - Hidden on Quote Detail & Chat for immersion */}
                 {!isImmersiveView && (
-                    <header className="w-full px-4 md:px-8 pt-4 pb-6">
-                        <div className="max-w-[1580px] mx-auto flex items-center justify-between">
+                    <header className={cn(
+                        "w-full pt-3 pb-4",
+                        isFullWidthView ? "px-3 md:px-5" : "px-4 md:px-8"
+                    )}>
+                        <div className={cn(
+                            "flex items-center justify-between",
+                            isFullWidthView ? "w-full" : "max-w-[1580px] mx-auto"
+                        )}>
                             <div className="flex flex-col items-start gap-0 group cursor-default">
                                 <h2 className="text-[13px] md:text-[14px] font-black text-gray-800 tracking-tight flex items-center gap-1.5 transition-all group-hover:text-indigo-600">
                                     {t('common.greeting', { name: profile?.full_name?.split(' ')[0] || profile?.email?.split('@')[0] })}
@@ -92,7 +99,9 @@ export default function DashboardLayout() {
                     "w-full transition-all",
                     isImmersiveView
                         ? "flex-1 overflow-hidden flex flex-col pt-0 px-0 pb-0"
-                        : "flex-1 pb-8 max-w-[1580px] mx-auto px-4 md:px-8"
+                        : isFullWidthView
+                            ? "flex-1 pb-6 w-full px-2 md:px-4"
+                            : "flex-1 pb-8 max-w-[1580px] mx-auto px-4 md:px-8"
                 )}>
                     <Outlet />
                 </main>

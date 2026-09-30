@@ -7,6 +7,7 @@ import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
 import RichTextEditor from '../../components/marketing/RichTextEditor';
+import ProspectingEmailStudio from '../../components/marketing/ProspectingEmailStudio';
 
 export default function CampaignBuilder() {
     const { profile, simulatedCompanyId } = useAuth();
@@ -16,6 +17,7 @@ export default function CampaignBuilder() {
     const location = useLocation();
 
     const [selectedChannel, setSelectedChannel] = useState<'email' | 'whatsapp' | 'telegram'>('email');
+    const [emailMode, setEmailMode] = useState<'prospecting' | 'standard'>('prospecting');
     const [onlyConnected, setOnlyConnected] = useState(false);
 
     const DRAFT_KEY = 'crm_campaign_draft';
@@ -177,13 +179,15 @@ export default function CampaignBuilder() {
         const nameFallback = lead?.name || 'Juan Pérez Santos';
         const firstNameFallback = (lead?.name || 'Juan').split(' ')[0];
         const phoneFallback = lead?.phone || '50377443322';
+        const companyFallback = lead?.company_name || 'Iglesia Bautista Gracia';
         const greeting = getGreeting();
 
-        // Substitution Logic - Use groups to avoid partial matching if nested (though rare in curly braces)
-        rendered = rendered.replace(/{{greeting}}/g, `<strong>${greeting}</strong>`);
-        rendered = rendered.replace(/{{name}}/g, `<strong>${nameFallback}</strong>`);
-        rendered = rendered.replace(/{{first_name}}/g, `<strong>${firstNameFallback}</strong>`);
-        rendered = rendered.replace(/{{phone}}/g, `<strong>${phoneFallback}</strong>`);
+        // Substitution Logic - Case insensitive and supporting church/company variations
+        rendered = rendered.replace(/{{greeting}}/gi, `<strong>${greeting}</strong>`);
+        rendered = rendered.replace(/{{name}}/gi, `<strong>${nameFallback}</strong>`);
+        rendered = rendered.replace(/{{first_name}}/gi, `<strong>${firstNameFallback}</strong>`);
+        rendered = rendered.replace(/{{phone}}/gi, `<strong>${phoneFallback}</strong>`);
+        rendered = rendered.replace(/{{(company_name|empresa|nombre iglesia|nombre_iglesia|iglesia)}}/gi, `<strong>${companyFallback}</strong>`);
 
         return rendered;
     };
@@ -262,14 +266,18 @@ export default function CampaignBuilder() {
     const selectAllLeads = () => setExcludedLeadIds(new Set());
     const deselectAllLeads = () => setExcludedLeadIds(new Set(filteredByChannel.map(l => l.id)));
 
-    const handleSave = async (isDraft: boolean) => {
+    const handleSave = async (isDraft: boolean, overrideData?: { name?: string; subject?: string; content?: string }) => {
         try {
-            if (!formData.name) {
+            const effName = overrideData?.name !== undefined ? overrideData.name : formData.name;
+            const effSubject = overrideData?.subject !== undefined ? overrideData.subject : formData.subject;
+            const effContent = overrideData?.content !== undefined ? overrideData.content : formData.content;
+
+            if (!effName) {
                 toast.error('El nombre de la campaña es obligatorio');
                 return;
             }
 
-            if (selectedChannel === 'email' && !formData.subject) {
+            if (selectedChannel === 'email' && !effSubject) {
                 toast.error('El asunto es obligatorio para Email');
                 return;
             }
@@ -286,9 +294,9 @@ export default function CampaignBuilder() {
                 : null;
 
             const campaignData = {
-                name: formData.name,
-                subject: selectedChannel === 'email' ? formData.subject : null,
-                content: formData.content,
+                name: effName,
+                subject: selectedChannel === 'email' ? effSubject : null,
+                content: effContent,
                 // 'telegram' is now allowed in DB check constraint
                 // 'email' | 'whatsapp' | 'telegram' | 'social' | 'sms'
                 type: selectedChannel,
@@ -368,7 +376,7 @@ export default function CampaignBuilder() {
     };
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+        <div className="w-full space-y-4 animate-in fade-in duration-500">
             {/* Maya Agent Modal */}
             {showMayaModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -436,66 +444,106 @@ export default function CampaignBuilder() {
                 </div>
             )}
 
-            {/* Header */}
-            <div className="flex items-center gap-4 mb-8 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                <button
-                    onClick={() => navigate('/marketing/email')}
-                    className="p-3 bg-gray-50 hover:bg-white border border-gray-100 rounded-2xl transition-all text-gray-500 hover:text-[#4449AA] shadow-sm"
-                >
-                    <ArrowLeft className="w-6 h-6" />
-                </button>
-                <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${selectedChannel === 'email' ? 'bg-amber-100 text-amber-600' :
-                            selectedChannel === 'whatsapp' ? 'bg-green-100 text-green-600' :
-                                'bg-sky-100 text-sky-600'
-                            }`}>
-                            {selectedChannel} Campaign
-                        </span>
-                    </div>
-                    <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">
-                        {isEditMode ? 'Editar Campaña Unificada' : 'Nueva Campaña Omnicanal'}
-                    </h1>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                {/* Main Config */}
-                <div className="lg:col-span-8 space-y-6">
-                    {/* Canal Selector - Senior Experience */}
-                    <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-                        <h2 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2">
-                            <Zap className="w-5 h-5 text-indigo-600" />
-                            Selecciona el Canal de Comunicación
-                        </h2>
-                        <div className="grid grid-cols-3 gap-4">
-                            {[
-                                { id: 'email', icon: Mail, label: 'Email', color: 'amber' },
-                                { id: 'whatsapp', icon: WhatsAppIcon, label: 'WhatsApp', color: 'green' },
-                                { id: 'telegram', icon: Send, label: 'Telegram', color: 'sky' }
-                            ].map((channel) => (
-                                <button
-                                    key={channel.id}
-                                    onClick={() => setSelectedChannel(channel.id as any)}
-                                    className={`relative flex flex-col items-center gap-3 p-6 rounded-2xl border-2 transition-all group ${selectedChannel === channel.id
-                                        ? `border-${channel.color}-500 bg-${channel.color}-50 shadow-md`
-                                        : 'border-gray-50 bg-white hover:border-gray-200 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    <div className={`p-4 rounded-xl transition-colors ${selectedChannel === channel.id
-                                        ? `bg-${channel.color}-500 text-white`
-                                        : 'bg-gray-100 text-gray-400 group-hover:bg-gray-200'
-                                        }`}>
-                                        <channel.icon className="w-6 h-6" />
-                                    </div>
-                                    <span className={`text-sm font-black uppercase tracking-widest ${selectedChannel === channel.id ? `text-${channel.color}-700` : 'text-gray-500'
-                                        }`}>
-                                        {channel.label}
-                                    </span>
-                                </button>
-                            ))}
+            {selectedChannel === 'email' && emailMode === 'prospecting' ? (
+                <ProspectingEmailStudio
+                    initialName={formData.name || 'Prospección - Visitas (Video)'}
+                    initialSubject={formData.subject || 'Una pregunta para {{nombre_empresa}}'}
+                    reachCount={reachCount}
+                    previewLeads={displayedLeads}
+                    onBack={() => navigate('/marketing/email')}
+                    onSwitchToFreeEditor={() => setEmailMode('standard')}
+                    onOpenAudienceModal={async () => {
+                        await handlePreviewAudience();
+                        setShowAudienceModal(true);
+                    }}
+                    onSaveDraft={async (data) => {
+                        setFormData(prev => ({ ...prev, name: data.name, subject: data.subject, content: data.htmlContent }));
+                        await handleSave(true, { name: data.name, subject: data.subject, content: data.htmlContent });
+                    }}
+                    onSendCampaign={async (data) => {
+                        setFormData(prev => ({ ...prev, name: data.name, subject: data.subject, content: data.htmlContent }));
+                        await handleSave(false, { name: data.name, subject: data.subject, content: data.htmlContent });
+                    }}
+                />
+            ) : (
+                <>
+                    {/* Header */}
+                    <div className="flex items-center gap-4 mb-8 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                        <button
+                            onClick={() => navigate('/marketing/email')}
+                            className="p-3 bg-gray-50 hover:bg-white border border-gray-100 rounded-2xl transition-all text-gray-500 hover:text-[#4449AA] shadow-sm"
+                        >
+                            <ArrowLeft className="w-6 h-6" />
+                        </button>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest ${selectedChannel === 'email' ? 'bg-amber-100 text-amber-600' :
+                                    selectedChannel === 'whatsapp' ? 'bg-green-100 text-green-600' :
+                                        'bg-sky-100 text-sky-600'
+                                    }`}>
+                                    {selectedChannel} Campaign
+                                </span>
+                            </div>
+                            <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">
+                                {isEditMode ? 'Editar Campaña Unificada' : 'Nueva Campaña Omnicanal'}
+                            </h1>
                         </div>
                     </div>
+
+                    {/* Channel Selector & Studio Mode Bar */}
+                    <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                <Zap className="w-4 h-4 text-indigo-600" /> Canal:
+                            </span>
+                            <div className="flex bg-gray-100 p-1 rounded-2xl gap-1">
+                                {[
+                                    { id: 'email', icon: Mail, label: 'Email', color: 'amber' },
+                                    { id: 'whatsapp', icon: WhatsAppIcon, label: 'WhatsApp', color: 'green' },
+                                    { id: 'telegram', icon: Send, label: 'Telegram', color: 'sky' }
+                                ].map((channel) => (
+                                    <button
+                                        key={channel.id}
+                                        type="button"
+                                        onClick={() => setSelectedChannel(channel.id as any)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all ${selectedChannel === channel.id
+                                            ? `bg-white text-${channel.color}-600 shadow-sm`
+                                            : 'text-gray-500 hover:text-gray-900'
+                                            }`}
+                                    >
+                                        <channel.icon className="w-3.5 h-3.5" />
+                                        {channel.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {selectedChannel === 'email' && (
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest hidden sm:inline">Editor:</span>
+                                <div className="flex bg-gray-100 p-1 rounded-2xl gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEmailMode('prospecting')}
+                                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${emailMode === 'prospecting' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-900'}`}
+                                    >
+                                        <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Plantilla Pro (Video)
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEmailMode('standard')}
+                                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 ${emailMode === 'standard' ? 'bg-slate-900 text-white shadow-md' : 'text-gray-500 hover:text-gray-900'}`}
+                                    >
+                                        <FileText className="w-3.5 h-3.5" /> Editor Libre
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mt-6">
+                    {/* Main Config */}
+                    <div className="lg:col-span-8 space-y-6">
 
                     <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
                         <div className="flex items-center justify-between border-b border-gray-100 pb-4">
@@ -772,6 +820,8 @@ export default function CampaignBuilder() {
                     </div>
                 </div>
             </div>
+            </>
+            )}
 
             {/* Visual Simulator Modal */}
             {showSimulator && (
@@ -805,8 +855,8 @@ export default function CampaignBuilder() {
                                                 <div className="w-3 h-3 rounded-full bg-amber-400" />
                                                 <div className="w-3 h-3 rounded-full bg-green-400" />
                                             </div>
-                                            <div className="bg-white px-4 py-1.5 rounded-lg text-[10px] font-bold text-gray-400 flex-1 border border-gray-200">
-                                                {formData.subject || 'Sin Asunto'}
+                                            <div className="bg-white px-4 py-1.5 rounded-lg text-[10px] font-bold text-gray-700 flex-1 border border-gray-200">
+                                                <span dangerouslySetInnerHTML={{ __html: renderPreviewContent(formData.subject, previewLeads[currentLeadIndex]) || 'Sin Asunto' }} />
                                             </div>
                                         </div>
                                         <div className="p-8 h-[800px] overflow-y-auto">

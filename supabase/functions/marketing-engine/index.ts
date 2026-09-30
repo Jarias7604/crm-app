@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
         if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
         const filters = campaign.audience_filters || {};
-        let query = supabase.from("leads").select("id, name, email, phone, priority").eq("company_id", campaign.company_id);
+        let query = supabase.from("leads").select("id, name, company_name, email, phone, priority, address, industry").eq("company_id", campaign.company_id);
 
         if (filters.specificIds && filters.specificIds.length > 0) {
             query = query.in(filters.idType || 'id', filters.specificIds);
@@ -187,11 +187,17 @@ Deno.serve(async (req) => {
                 const hour = new Date().getHours();
                 const greeting = hour >= 5 && hour < 12 ? 'Buenos días' : hour >= 12 && hour < 19 ? 'Buenas tardes' : 'Buenas noches';
                 const firstName = (lead.name || '').split(' ')[0] || 'Hola';
+                const companyName = (lead.company_name && lead.company_name !== 'Individual') ? lead.company_name : (lead.name || '');
+                const city = (lead.address || '').split(',')[0] || '';
+                const industry = lead.industry || 'su sector';
                 localizedContent = localizedContent
-                    .replace(/{{greeting}}/g, greeting)
-                    .replace(/{{name}}/g, lead.name || '')
-                    .replace(/{{first_name}}/g, firstName)
-                    .replace(/{{phone}}/g, lead.phone || '');
+                    .replace(/{{greeting}}/gi, greeting)
+                    .replace(/{{(name|nombre)}}/gi, lead.name || '')
+                    .replace(/{{(first_name|nombre_contacto)}}/gi, firstName)
+                    .replace(/{{phone}}/gi, lead.phone || '')
+                    .replace(/{{(nombre_empresa|company_name|empresa|nombre_iglesia|nombre iglesia|iglesia)}}/gi, companyName)
+                    .replace(/{{(ciudad|city)}}/gi, city)
+                    .replace(/{{(rubro|industria|industry)}}/gi, industry);
 
                 const extractMediaAndText = (html: string) => {
                     let mediaUrl: string | null = null;
@@ -303,10 +309,20 @@ Deno.serve(async (req) => {
                     // Extract sender domain for List-Unsubscribe header
                     const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1] : 'ariascrm.com';
 
+                    const rawSubject = campaign.subject || campaign.name || '';
+                    const localizedSubject = rawSubject
+                        .replace(/{{greeting}}/gi, greeting)
+                        .replace(/{{(name|nombre)}}/gi, lead.name || '')
+                        .replace(/{{(first_name|nombre_contacto)}}/gi, firstName)
+                        .replace(/{{phone}}/gi, lead.phone || '')
+                        .replace(/{{(nombre_empresa|company_name|empresa|nombre_iglesia|nombre iglesia|iglesia)}}/gi, companyName)
+                        .replace(/{{(ciudad|city)}}/gi, city)
+                        .replace(/{{(rubro|industria|industry)}}/gi, industry);
+
                     const emailPayload: any = {
                         from: fromDisplay,
                         to: cleanEmail,
-                        subject: campaign.subject || campaign.name,
+                        subject: localizedSubject,
                         html: trackedHtml,
                         text: richContent.cleanText, // RFC 2046 Plain Text alternative!
                         headers: {
@@ -326,7 +342,7 @@ Deno.serve(async (req) => {
                         body: JSON.stringify(emailPayload)
                     });
                     if (!res.ok) { const e = await res.text(); console.error("Resend Error:", e); throw new Error(`Resend Error: ${e}`); }
-                    await supabase.from('marketing_conversations').update({ last_message: campaign.subject || campaign.name, last_message_at: new Date().toISOString() }).eq('id', conversationId);
+                    await supabase.from('marketing_conversations').update({ last_message: localizedSubject, last_message_at: new Date().toISOString() }).eq('id', conversationId);
                 }
 
                 // D. Record message
