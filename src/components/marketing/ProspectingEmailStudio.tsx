@@ -35,7 +35,10 @@ export interface EmailBlock {
 
 export function getYouTubeVideoId(url: string): string | null {
     if (!url) return null;
-    const cleanUrl = url.trim();
+    let cleanUrl = url.trim();
+    if (cleanUrl.includes('dvR5zR1x3os')) {
+        cleanUrl = cleanUrl.replace('dvR5zR1x3os', 'dvRSzR1x3os');
+    }
     const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
     const match = cleanUrl.match(regExp);
     if (match && match[1]) return match[1];
@@ -84,7 +87,7 @@ export default function ProspectingEmailStudio({
     const [senderIdentity, setSenderIdentity] = useState('Jimmy Arias <jimmy@iclesia.ai>');
 
     // Video Controls
-    const [youtubeUrl, setYoutubeUrl] = useState('https://youtu.be/dvR5zR1x3os');
+    const [youtubeUrl, setYoutubeUrl] = useState('https://youtu.be/dvRSzR1x3os');
     const [videoCaption, setVideoCaption] = useState('Vea en 45 segundos cómo funciona Iclesia');
     const [thumbMode, setThumbMode] = useState<'youtube' | 'custom'>('youtube');
     const [customUploadedThumb, setCustomUploadedThumb] = useState<string>('');
@@ -95,13 +98,13 @@ export default function ProspectingEmailStudio({
     const effectiveVideoThumb = (thumbMode === 'custom' && customUploadedThumb)
         ? customUploadedThumb
         : (detectedYtId
-            ? `https://img.youtube.com/vi/${detectedYtId}/hqdefault.jpg`
+            ? `https://img.youtube.com/vi/${detectedYtId}/maxresdefault.jpg`
             : '/images/marketing/jimmy-video-preview.png');
 
     // Button Controls
     const [buttonText, setButtonText] = useState('Ver cómo funciona Iclesia');
     const [buttonColor, setButtonColor] = useState('#0066FF');
-    const [buttonLink, setButtonLink] = useState('https://youtu.be/dvR5zR1x3os');
+    const [buttonLink, setButtonLink] = useState('https://youtu.be/dvRSzR1x3os');
 
     // Signature Controls
     const [hasLogo, setHasLogo] = useState(true);
@@ -367,14 +370,14 @@ export default function ProspectingEmailStudio({
 
                 case 'videoCard':
                     html += `
-              <!-- Video Card (Auto YouTube Thumbnail + Play Button) -->
-              <div style="margin:20px auto 24px auto;max-width:440px;border-radius:18px;overflow:hidden;background-color:#0F172A;border:1px solid #1E293B;box-shadow:0 8px 24px rgba(0,0,0,0.12);text-align:center;position:relative;">
-                <a href="${youtubeUrl}" target="_blank" style="display:block;text-decoration:none;position:relative;">
-                  <img src="${effectiveVideoThumb}" alt="Ver Video" width="440" style="display:block;width:100%;max-width:440px;margin:0 auto;border:0;" />
+              <!-- Video Card (Auto YouTube Thumbnail 16:9 + Oval Rounded Corners) -->
+              <div style="margin:20px auto 24px auto;max-width:380px;border-radius:18px;overflow:hidden;background-color:#0F172A;box-shadow:0 10px 28px rgba(0,0,0,0.15);text-align:center;position:relative;">
+                <a href="${youtubeUrl}" target="_blank" style="display:block;text-decoration:none;position:relative;line-height:0;font-size:0;">
+                  <img src="${effectiveVideoThumb}" alt="Ver Video" width="380" style="display:block;width:100%;max-width:380px;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:18px;margin:0 auto;border:0;" />
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="position:absolute;top:0;left:0;width:100%;height:100%;">
                     <tr>
                       <td align="center" style="vertical-align:middle;">
-                        <div style="width:62px;height:62px;border-radius:50%;background-color:#0066FF;color:#FFFFFF;line-height:62px;font-size:24px;text-align:center;margin:0 auto;box-shadow:0 6px 20px rgba(0,0,0,0.45);font-family:Arial,sans-serif;">▶</div>
+                        <div style="width:58px;height:58px;border-radius:50%;background-color:#0066FF;color:#FFFFFF;line-height:58px;font-size:22px;text-align:center;margin:0 auto;box-shadow:0 6px 20px rgba(0,0,0,0.45);font-family:Arial,sans-serif;">▶</div>
                       </td>
                     </tr>
                   </table>
@@ -1013,17 +1016,22 @@ export default function ProspectingEmailStudio({
 
                                                 {/* BLOCK 6: VIDEO CARD (Auto YouTube Thumbnail + Play Button) */}
                                                 {block.type === 'videoCard' && (
-                                                    <div className="w-full max-w-[460px] mx-auto rounded-2xl overflow-hidden bg-slate-900 border border-slate-200/80 shadow-md group/vid relative cursor-pointer text-center">
-                                                        <a href={youtubeUrl} target="_blank" rel="noreferrer" className="block relative">
+                                                    <div className="w-full max-w-[380px] mx-auto aspect-video rounded-2xl overflow-hidden bg-slate-900 border border-slate-200/80 shadow-md group/vid relative cursor-pointer text-center">
+                                                        <a href={youtubeUrl} target="_blank" rel="noreferrer" className="block w-full h-full relative">
                                                             <img
                                                                 src={effectiveVideoThumb}
                                                                 alt="Video"
-                                                                className="w-full h-auto object-cover group-hover/vid:scale-[1.01] transition-transform duration-300"
+                                                                onError={(e) => {
+                                                                    if (detectedYtId && !e.currentTarget.src.includes('hqdefault.jpg')) {
+                                                                        e.currentTarget.src = `https://img.youtube.com/vi/${detectedYtId}/hqdefault.jpg`;
+                                                                    }
+                                                                }}
+                                                                className="w-full h-full object-cover group-hover/vid:scale-[1.02] transition-transform duration-300"
                                                             />
                                                             {/* Center Play Button Overlay */}
                                                             <div className="absolute inset-0 flex items-center justify-center bg-black/15 group-hover/vid:bg-black/25 transition-colors">
-                                                                <div className="w-16 h-16 rounded-full bg-blue-600/90 hover:bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-black/40 group-hover/vid:scale-110 transition-transform">
-                                                                    <Play className="w-7 h-7 fill-white ml-1" />
+                                                                <div className="w-14 h-14 rounded-full bg-blue-600/95 hover:bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-black/40 group-hover/vid:scale-110 transition-transform">
+                                                                    <Play className="w-6 h-6 fill-white ml-0.5" />
                                                                 </div>
                                                             </div>
                                                         </a>
@@ -1153,12 +1161,17 @@ export default function ProspectingEmailStudio({
                                     </p>
 
                                     {/* Mobile Video Card */}
-                                    <div className="rounded-xl overflow-hidden bg-slate-900 border border-slate-800 shadow-sm relative group text-center">
-                                        <a href={youtubeUrl} target="_blank" rel="noreferrer" className="block relative">
+                                    <div className="rounded-2xl overflow-hidden aspect-video bg-slate-900 border border-slate-800 shadow-sm relative group text-center">
+                                        <a href={youtubeUrl} target="_blank" rel="noreferrer" className="block w-full h-full relative">
                                             <img
                                                 src={effectiveVideoThumb}
                                                 alt="Video Thumbnail"
-                                                className="w-full h-auto object-cover"
+                                                onError={(e) => {
+                                                    if (detectedYtId && !e.currentTarget.src.includes('hqdefault.jpg')) {
+                                                        e.currentTarget.src = `https://img.youtube.com/vi/${detectedYtId}/hqdefault.jpg`;
+                                                    }
+                                                }}
+                                                className="w-full h-full object-cover"
                                             />
                                             <div className="absolute inset-0 flex items-center justify-center bg-black/15">
                                                 <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md">

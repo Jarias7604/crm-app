@@ -232,7 +232,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
     <tr>
       <td align="center" style="padding:0;line-height:0;background-color:#000000;position:relative;">
         <a href="${cleanYtUrl}" target="_blank" style="display:block;text-decoration:none;">
-          <img src="https://img.youtube.com/vi/${ytId}/hqdefault.jpg" alt="${title}" width="540" style="display:block;width:100%;max-width:540px;height:auto;border:0;" />
+          <img src="https://img.youtube.com/vi/${ytId}/maxresdefault.jpg" alt="${title}" width="540" style="display:block;width:100%;max-width:540px;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:16px 16px 0 0;border:0;" />
         </a>
       </td>
     </tr>
@@ -684,8 +684,13 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                             {currentYtId && (
                                 <div className="p-3 bg-gray-900 rounded-xl space-y-2 border border-gray-800">
                                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Vista Previa de la Tarjeta</p>
-                                    <div className="relative rounded-lg overflow-hidden max-h-36 bg-black flex items-center justify-center">
-                                        <img src={`https://img.youtube.com/vi/${currentYtId}/hqdefault.jpg`} alt="Preview" className="w-full h-auto object-cover opacity-80" />
+                                    <div className="relative rounded-lg overflow-hidden aspect-video bg-black flex items-center justify-center">
+                                        <img
+                                            src={`https://img.youtube.com/vi/${currentYtId}/maxresdefault.jpg`}
+                                            alt="Preview"
+                                            onError={(e) => { e.currentTarget.src = `https://img.youtube.com/vi/${currentYtId}/hqdefault.jpg`; }}
+                                            className="w-full h-full object-cover opacity-90"
+                                        />
                                         <div className="absolute w-12 h-12 bg-red-600 text-white rounded-full flex items-center justify-center shadow-2xl pl-0.5">
                                             <Play className="w-5 h-5 fill-current" />
                                         </div>
