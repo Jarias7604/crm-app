@@ -20,6 +20,25 @@ export default function CampaignBuilder() {
     const [emailMode, setEmailMode] = useState<'prospecting' | 'standard'>('prospecting');
     const [onlyConnected, setOnlyConnected] = useState(false);
 
+    // Active Company Resolution (Respects super_admin simulatedCompanyId)
+    const isSuperAdmin = profile?.role === 'super_admin';
+    const effectiveCompanyId = (isSuperAdmin && simulatedCompanyId)
+        ? simulatedCompanyId
+        : profile?.company_id;
+    const [company, setCompany] = useState<any>(null);
+
+    useEffect(() => {
+        if (!effectiveCompanyId) return;
+        supabase
+            .from('companies')
+            .select('*')
+            .eq('id', effectiveCompanyId)
+            .single()
+            .then(({ data }) => {
+                if (data) setCompany(data);
+            });
+    }, [effectiveCompanyId]);
+
     const DRAFT_KEY = 'crm_campaign_draft';
 
     const [formData, setFormData] = useState(() => {
@@ -446,7 +465,8 @@ export default function CampaignBuilder() {
 
             {selectedChannel === 'email' && emailMode === 'prospecting' ? (
                 <ProspectingEmailStudio
-                    initialName={formData.name || 'Prospección - Visitas (Video)'}
+                    company={company}
+                    initialName={formData.name || (company?.name ? `Prospección - ${company.name}` : 'Prospección - Comercial')}
                     initialSubject={formData.subject || 'Una pregunta para {{nombre_empresa}}'}
                     reachCount={reachCount}
                     previewLeads={displayedLeads}

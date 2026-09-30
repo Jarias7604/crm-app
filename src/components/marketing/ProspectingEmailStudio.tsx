@@ -47,6 +47,7 @@ export function getYouTubeVideoId(url: string): string | null {
 }
 
 interface ProspectingEmailStudioProps {
+    company?: any;
     initialSubject?: string;
     initialName?: string;
     onSaveDraft: (data: { name: string; subject: string; htmlContent: string }) => Promise<void>;
@@ -59,8 +60,9 @@ interface ProspectingEmailStudioProps {
 }
 
 export default function ProspectingEmailStudio({
+    company,
     initialSubject = 'Una pregunta para {{nombre_empresa}}',
-    initialName = 'Prospección - Visitas (Video)',
+    initialName = 'Prospección Comercial (Video)',
     onSaveDraft,
     onSendCampaign,
     reachCount = 966,
@@ -71,6 +73,9 @@ export default function ProspectingEmailStudio({
 }: ProspectingEmailStudioProps) {
     const { profile } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const logoInputRef = useRef<HTMLInputElement>(null);
+    const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+    const [customHeaderLogo, setCustomHeaderLogo] = useState<string>('');
 
     // View device mode: 'desktop', 'mobile', or 'dual'
     const [viewMode, setViewMode] = useState<'desktop' | 'mobile' | 'dual'>('desktop');
@@ -78,17 +83,24 @@ export default function ProspectingEmailStudio({
     const [isSending, setIsSending] = useState(false);
     const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
 
+    // Determine company context
+    const isIclesia = Boolean(company?.name?.toLowerCase().includes('iclesia'));
+    const companyName = company?.name || 'Nuestra Empresa';
+
     // Form Controls (Left Panel)
-    const [campaignName, setCampaignName] = useState(initialName);
+    const [campaignName, setCampaignName] = useState(() => initialName || `Prospección - ${companyName}`);
     const [subject, setSubject] = useState(() => {
         const raw = initialSubject || 'Una pregunta para {{nombre_empresa}}';
         return raw.replace(/{{nombre_iglesia}}/gi, '{{nombre_empresa}}');
     });
-    const [senderIdentity, setSenderIdentity] = useState('Jimmy Arias <jimmy@iclesia.ai>');
+
+    const defaultSenderName = profile?.full_name || companyName;
+    const defaultSenderEmail = company?.email || profile?.email || 'contacto@empresa.com';
+    const [senderIdentity, setSenderIdentity] = useState(() => `${defaultSenderName} <${defaultSenderEmail}>`);
 
     // Video Controls
     const [youtubeUrl, setYoutubeUrl] = useState('https://youtu.be/dvRSzR1x3os');
-    const [videoCaption, setVideoCaption] = useState('Vea en 45 segundos cómo funciona Iclesia');
+    const [videoCaption, setVideoCaption] = useState(() => `Vea en 45 segundos cómo funciona ${companyName}`);
     const [thumbMode, setThumbMode] = useState<'youtube' | 'custom'>('youtube');
     const [customUploadedThumb, setCustomUploadedThumb] = useState<string>('');
     const [isUploadingThumb, setIsUploadingThumb] = useState(false);
@@ -102,7 +114,7 @@ export default function ProspectingEmailStudio({
             : '/images/marketing/jimmy-video-preview.png');
 
     // Button Controls
-    const [buttonText, setButtonText] = useState('Ver cómo funciona Iclesia');
+    const [buttonText, setButtonText] = useState(() => `Conocer más sobre ${companyName}`);
     const [buttonColor, setButtonColor] = useState('#0066FF');
     const [buttonLink, setButtonLink] = useState('https://youtu.be/dvRSzR1x3os');
 
@@ -110,21 +122,25 @@ export default function ProspectingEmailStudio({
     const [hasLogo, setHasLogo] = useState(true);
     const [hasPhoto, setHasPhoto] = useState(true);
     const [photoShape, setPhotoShape] = useState<'circle' | 'rounded' | 'square'>('circle');
-    const [avatarUrl, setAvatarUrl] = useState<string>('/images/marketing/jimmy-avatar.png');
-    const [sigName, setSigName] = useState('Jimmy Arias');
-    const [sigTitle, setSigTitle] = useState('Founder | Iclesia');
-    const [sigPhone, setSigPhone] = useState('703-945-9240');
-    const [sigWebsite, setSigWebsite] = useState('iclesia.ai');
+    const [avatarUrl, setAvatarUrl] = useState<string>(() => profile?.avatar_url || '');
+    const [sigName, setSigName] = useState(() => profile?.full_name || companyName);
+    const [sigTitle, setSigTitle] = useState(() => `${(profile as any)?.job_title || 'Asesor Comercial'} | ${companyName}`);
+    const [sigPhone, setSigPhone] = useState(() => company?.phone || profile?.phone || '');
+    const [sigWebsite, setSigWebsite] = useState(() => company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/$/, '') : '');
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
-    // Dynamic Text Content (Adapted for any business/SaaS)
+    // Dynamic Text Content (Adapted for current tenant company)
     const [greeting, setGreeting] = useState('Hola, cordial saludo.');
-    const [introText, setIntroText] = useState('Mi nombre es Jimmy Arias y quería hacerles una pregunta muy sencilla:');
-    const [calloutText, setCalloutText] = useState('Cuando una persona visita {{nombre_empresa}} por primera vez, ¿pueden saber si después del servicio alguien realmente la llamó, le escribió o le dio seguimiento?');
-    const [solutionText, setSolutionText] = useState('Creamos Iclesia para ayudar precisamente con esto: registrar cada contacto, asignarlo a un responsable y saber quién ya recibió seguimiento y quién sigue pendiente.');
-    const [leadInText, setLeadInText] = useState('Preparé un video de 45 segundos para mostrarles cómo funciona:');
-    const [closingText, setClosingText] = useState('Si esto es algo que desean mejorar en su empresa, pueden responder directamente a este correo. Con gusto conversamos.');
+    const [introText, setIntroText] = useState(() => `Mi nombre es ${defaultSenderName} de ${companyName} y quería hacerles una consulta:`);
+    const [calloutText, setCalloutText] = useState(() => `¿Cuentan actualmente en {{nombre_empresa}} con un proceso ágil para atender y dar seguimiento inmediato a cada cliente que solicita información?`);
+    const [solutionText, setSolutionText] = useState(() => `En ${companyName} ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.`);
+    const [leadInText, setLeadInText] = useState('Les comparto un breve video de 45 segundos para mostrarles cómo funciona:');
+    const [closingText, setClosingText] = useState('Si esto es algo que desean mejorar en su empresa, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.');
     const [signoffText, setSignoffText] = useState('Atentamente,');
+
+    // Logo Resolution: Custom uploaded in studio > Company profile logo > (Iclesia logo if Iclesia, else empty)
+    const effectiveHeaderLogo = customHeaderLogo || company?.logo_url || (isIclesia ? '/images/marketing/iclesia-header-logo.png' : '');
+    const effectiveSigLogo = company?.logo_url || (isIclesia ? '/images/marketing/iclesia-brand-logo.png' : '');
 
     // Active simulated lead index
     const [leadIndex, setLeadIndex] = useState(0);
@@ -142,36 +158,75 @@ export default function ProspectingEmailStudio({
         { id: 'signature', type: 'signature', label: 'Firma Profesional', visible: true }
     ]);
 
-    // Load persisted signature from localStorage
+    // Handle Company Switching / Initialization
     useEffect(() => {
-        try {
-            const saved = localStorage.getItem('crm_user_signature_v2');
-            if (saved) {
+        if (!company) return;
+        const compIsIclesia = Boolean(company.name?.toLowerCase().includes('iclesia'));
+        const compName = company.name || 'Nuestra Empresa';
+        const storageKey = `crm_user_signature_${company.id || 'default'}`;
+
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try {
                 const parsed = JSON.parse(saved);
                 if (parsed.sigName) setSigName(parsed.sigName);
                 if (parsed.sigTitle) setSigTitle(parsed.sigTitle);
                 if (parsed.sigPhone) setSigPhone(parsed.sigPhone);
                 if (parsed.sigWebsite) setSigWebsite(parsed.sigWebsite);
-                if (parsed.avatarUrl) setAvatarUrl(parsed.avatarUrl);
+                if (parsed.avatarUrl !== undefined) setAvatarUrl(parsed.avatarUrl);
                 if (parsed.photoShape) setPhotoShape(parsed.photoShape);
                 if (typeof parsed.hasLogo === 'boolean') setHasLogo(parsed.hasLogo);
                 if (typeof parsed.hasPhoto === 'boolean') setHasPhoto(parsed.hasPhoto);
-            }
-        } catch { /* ignore */ }
-    }, []);
+                if (parsed.customHeaderLogo) setCustomHeaderLogo(parsed.customHeaderLogo);
+                return;
+            } catch { /* ignore */ }
+        }
 
-    // Save signature changes
+        // Apply clean company defaults
+        if (compIsIclesia) {
+            setSigName('Jimmy Arias');
+            setSigTitle('Founder | Iclesia');
+            setSigPhone('703-945-9240');
+            setSigWebsite('iclesia.ai');
+            setAvatarUrl('/images/marketing/jimmy-avatar.png');
+            setSenderIdentity('Jimmy Arias <jimmy@iclesia.ai>');
+            setIntroText('Mi nombre es Jimmy Arias y quería hacerles una pregunta muy sencilla:');
+            setCalloutText('Cuando una persona visita {{nombre_empresa}} por primera vez, ¿pueden saber si después del servicio alguien realmente la llamó, le escribió o le dio seguimiento?');
+            setSolutionText('Creamos Iclesia para ayudar precisamente con esto: registrar cada contacto, asignarlo a un responsable y saber quién ya recibió seguimiento y quién sigue pendiente.');
+            setButtonText('Ver cómo funciona Iclesia');
+            setYoutubeUrl('https://youtu.be/dvRSzR1x3os');
+            setCustomHeaderLogo('/images/marketing/iclesia-header-logo.png');
+        } else {
+            const senderName = profile?.full_name || compName;
+            const senderEmail = company.email || profile?.email || 'contacto@empresa.com';
+            setSigName(senderName);
+            setSigTitle(`${(profile as any)?.job_title || 'Asesor Comercial'} | ${compName}`);
+            setSigPhone(company.phone || profile?.phone || '');
+            setSigWebsite(company.website ? company.website.replace(/^https?:\/\//, '').replace(/\/$/, '') : '');
+            setAvatarUrl(profile?.avatar_url || '');
+            setSenderIdentity(`${senderName} <${senderEmail}>`);
+            setIntroText(`Mi nombre es ${senderName} de ${compName} y quería hacerles una consulta muy sencilla:`);
+            setCalloutText(`¿Cuentan actualmente en {{nombre_empresa}} con un proceso ágil para atender y dar seguimiento inmediato a cada cliente que solicita información?`);
+            setSolutionText(`En ${compName} ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.`);
+            setButtonText(`Conocer más sobre ${compName}`);
+            setCampaignName(`Prospección - ${compName}`);
+            setCustomHeaderLogo(company.logo_url || '');
+        }
+    }, [company?.id, company?.name]);
+
+    // Save signature changes per company
     const persistSignature = () => {
         try {
-            localStorage.setItem('crm_user_signature_v2', JSON.stringify({
-                sigName, sigTitle, sigPhone, sigWebsite, avatarUrl, photoShape, hasLogo, hasPhoto
+            const storageKey = `crm_user_signature_${company?.id || 'default'}`;
+            localStorage.setItem(storageKey, JSON.stringify({
+                sigName, sigTitle, sigPhone, sigWebsite, avatarUrl, photoShape, hasLogo, hasPhoto, customHeaderLogo
             }));
         } catch { /* ignore */ }
     };
 
     useEffect(() => {
         persistSignature();
-    }, [sigName, sigTitle, sigPhone, sigWebsite, avatarUrl, photoShape, hasLogo, hasPhoto]);
+    }, [sigName, sigTitle, sigPhone, sigWebsite, avatarUrl, photoShape, hasLogo, hasPhoto, customHeaderLogo]);
 
     // Simulated lead resolution
     const currentLead = (previewLeads && previewLeads.length > 0 && previewLeads[leadIndex]) ? previewLeads[leadIndex] : {
@@ -274,6 +329,31 @@ export default function ProspectingEmailStudio({
         }
     };
 
+    // Upload custom header logo
+    const handleHeaderLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            setIsUploadingLogo(true);
+            const compId = company?.id || profile?.company_id || 'marketing';
+            const publicUrl = await storageService.uploadAvatar(compId, file);
+            if (publicUrl) {
+                setCustomHeaderLogo(publicUrl);
+                toast.success('Logo del correo actualizado con éxito');
+            }
+        } catch (err: any) {
+            console.error(err);
+            const reader = new FileReader();
+            reader.onload = () => {
+                setCustomHeaderLogo(reader.result as string);
+                toast.success('Logo del correo cargado');
+            };
+            reader.readAsDataURL(file);
+        } finally {
+            setIsUploadingLogo(false);
+        }
+    };
+
     // Compile to ultra-clean, bulletproof Email HTML (Gmail, Apple Mail, Outlook compatible)
     const compileToEmailHtml = () => {
         const photoBorderRadius = photoShape === 'circle' ? '50%' : photoShape === 'rounded' ? '12px' : '0px';
@@ -306,13 +386,19 @@ export default function ProspectingEmailStudio({
             if (!block.visible) return;
 
             switch (block.type) {
-                case 'header':
+                case 'header': {
+                    const headerLogoImg = effectiveHeaderLogo
+                        ? (effectiveHeaderLogo.startsWith('/') ? 'https://raw.githubusercontent.com/Jarias7604/crm-app/develop/public' + effectiveHeaderLogo : effectiveHeaderLogo)
+                        : '';
                     html += `
               <!-- Header -->
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
                 <tr>
                   <td align="left" style="vertical-align:middle;">
-                    <img src="https://raw.githubusercontent.com/Jarias7604/crm-app/develop/public/images/marketing/iclesia-header-logo.png" alt="Logo" height="34" style="height:34px;display:block;border:0;" />
+                    ${headerLogoImg
+                        ? `<img src="${headerLogoImg}" alt="${companyName}" height="36" style="height:36px;max-height:42px;width:auto;display:block;border:0;object-fit:contain;" />`
+                        : `<div style="font-family:Arial,sans-serif;font-size:22px;font-weight:900;color:#0F172A;letter-spacing:-0.5px;">${companyName}</div>`
+                    }
                   </td>
                   <td align="right" style="vertical-align:middle;">
                     <a href="https://${cleanWeb}" target="_blank" style="font-size:12px;color:#94A3B8;text-decoration:none;font-weight:500;">Ver en el navegador</a>
@@ -321,6 +407,7 @@ export default function ProspectingEmailStudio({
               </table>
 `;
                     break;
+                }
 
                 case 'intro':
                     html += `
@@ -432,7 +519,10 @@ export default function ProspectingEmailStudio({
                     </td>
                     ${hasLogo ? `
                     <td align="right" style="vertical-align:middle;padding-left:14px;">
-                      <img src="https://raw.githubusercontent.com/Jarias7604/crm-app/develop/public/images/marketing/iclesia-brand-logo.png" alt="Logo" height="32" style="height:32px;display:block;border:0;" />
+                      ${effectiveSigLogo
+                          ? `<img src="${effectiveSigLogo.startsWith('/') ? 'https://raw.githubusercontent.com/Jarias7604/crm-app/develop/public' + effectiveSigLogo : effectiveSigLogo}" alt="${companyName}" height="32" style="height:32px;max-height:36px;width:auto;display:block;border:0;object-fit:contain;" />`
+                          : `<div style="font-family:Arial,sans-serif;font-size:14px;font-weight:900;color:#0F172A;">${companyName}</div>`
+                      }
                     </td>
                     ` : ''}
                   </tr>
@@ -613,7 +703,56 @@ export default function ProspectingEmailStudio({
                         <p className="text-[11px] text-gray-400 font-medium">Configura los datos del mensaje</p>
                     </div>
 
-                    {/* 1. Nombre Interno */}
+                    {/* 1. Logo del Correo (Header Brand) */}
+                    <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-2xl space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
+                                Logo del Correo
+                            </label>
+                            <span className="text-[10px] text-gray-500 font-bold truncate max-w-[120px]" title={companyName}>
+                                {companyName}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2.5 bg-white p-2 rounded-xl border border-gray-200">
+                            {effectiveHeaderLogo ? (
+                                <img src={effectiveHeaderLogo} alt="Logo" className="h-7 max-h-7 max-w-[100px] object-contain" />
+                            ) : (
+                                <div className="text-xs font-black text-gray-800 flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-blue-600 inline-block" />
+                                    {companyName}
+                                </div>
+                            )}
+                            <div className="flex-1 text-right flex items-center justify-end gap-1">
+                                {customHeaderLogo && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setCustomHeaderLogo('')}
+                                        className="px-2 py-1 text-[10px] font-bold text-gray-500 hover:text-gray-700 bg-gray-100 rounded-lg transition"
+                                        title="Restaurar logo predeterminado de la empresa"
+                                    >
+                                        Restaurar
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => logoInputRef.current?.click()}
+                                    disabled={isUploadingLogo}
+                                    className="px-2.5 py-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
+                                >
+                                    {isUploadingLogo ? 'Subiendo...' : (effectiveHeaderLogo ? 'Cambiar Logo' : 'Subir Logo')}
+                                </button>
+                            </div>
+                        </div>
+                        <input
+                            ref={logoInputRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                            className="hidden"
+                            onChange={handleHeaderLogoUpload}
+                        />
+                    </div>
+
+                    {/* 2. Nombre Interno */}
                     <div>
                         <label className="block text-[11px] font-bold text-gray-600 mb-1">
                             Nombre de Campaña
@@ -935,11 +1074,27 @@ export default function ProspectingEmailStudio({
                                                 {/* BLOCK 1: HEADER */}
                                                 {block.type === 'header' && (
                                                     <div className="flex items-center justify-between pb-2">
-                                                        <img
-                                                            src="/images/marketing/iclesia-header-logo.png"
-                                                            alt="Logo"
-                                                            className="h-8 object-contain"
-                                                        />
+                                                        <div
+                                                            onClick={() => logoInputRef.current?.click()}
+                                                            className="cursor-pointer group relative flex items-center gap-2 p-1 -ml-1 rounded-xl hover:bg-blue-50/70 transition"
+                                                            title="Haz clic para cambiar o subir el logo"
+                                                        >
+                                                            {effectiveHeaderLogo ? (
+                                                                <img
+                                                                    src={effectiveHeaderLogo}
+                                                                    alt={companyName}
+                                                                    className="h-8 max-h-9 w-auto object-contain"
+                                                                />
+                                                            ) : (
+                                                                <div className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                                                                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" />
+                                                                    {companyName}
+                                                                </div>
+                                                            )}
+                                                            <span className="text-[10px] text-blue-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity bg-blue-100/90 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                                                Cambiar Logo
+                                                            </span>
+                                                        </div>
                                                         <a href={`https://${sigWebsite}`} target="_blank" rel="noreferrer" className="text-xs text-gray-400 hover:text-blue-600 font-medium">
                                                             Ver en el navegador
                                                         </a>
@@ -1106,11 +1261,17 @@ export default function ProspectingEmailStudio({
                                                             </div>
                                                         </div>
                                                         {hasLogo && (
-                                                            <img
-                                                                src="/images/marketing/iclesia-brand-logo.png"
-                                                                alt="Logo"
-                                                                className="h-8 object-contain"
-                                                            />
+                                                            effectiveSigLogo ? (
+                                                                <img
+                                                                    src={effectiveSigLogo}
+                                                                    alt={companyName}
+                                                                    className="h-8 max-h-9 w-auto object-contain"
+                                                                />
+                                                            ) : (
+                                                                <div className="text-sm font-black text-gray-900 tracking-tight">
+                                                                    {companyName}
+                                                                </div>
+                                                            )
                                                         )}
                                                     </div>
                                                 )}
@@ -1133,11 +1294,18 @@ export default function ProspectingEmailStudio({
                                 <div className="bg-white rounded-[2.3rem] overflow-hidden pt-8 pb-6 px-4 space-y-3.5 text-left text-xs max-h-[640px] overflow-y-auto custom-scrollbar">
                                     {/* Mobile Header */}
                                     <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-                                        <img
-                                            src="/images/marketing/iclesia-header-logo.png"
-                                            alt="Logo"
-                                            className="h-6 object-contain"
-                                        />
+                                        {effectiveHeaderLogo ? (
+                                            <img
+                                                src={effectiveHeaderLogo}
+                                                alt={companyName}
+                                                className="h-6 max-h-7 w-auto object-contain"
+                                            />
+                                        ) : (
+                                            <div className="text-xs font-black text-gray-900 tracking-tight flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-600 inline-block" />
+                                                {companyName}
+                                            </div>
+                                        )}
                                     </div>
 
                                     <p className="font-bold text-gray-900 text-xs">{greeting}</p>
@@ -1221,11 +1389,17 @@ export default function ProspectingEmailStudio({
                                             </div>
                                         </div>
                                         {hasLogo && (
-                                            <img
-                                                src="/images/marketing/iclesia-brand-logo.png"
-                                                alt="Logo"
-                                                className="h-6 object-contain"
-                                            />
+                                            effectiveSigLogo ? (
+                                                <img
+                                                    src={effectiveSigLogo}
+                                                    alt={companyName}
+                                                    className="h-6 max-h-7 w-auto object-contain"
+                                                />
+                                            ) : (
+                                                <div className="text-[10px] font-black text-gray-900 tracking-tight">
+                                                    {companyName}
+                                                </div>
+                                            )
                                         )}
                                     </div>
                                 </div>
