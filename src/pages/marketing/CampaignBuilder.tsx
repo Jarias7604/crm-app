@@ -20,12 +20,10 @@ export default function CampaignBuilder() {
     const [emailMode, setEmailMode] = useState<'prospecting' | 'standard'>('prospecting');
     const [onlyConnected, setOnlyConnected] = useState(false);
 
-    // Active Company Resolution (Respects super_admin simulatedCompanyId)
-    const isSuperAdmin = profile?.role === 'super_admin';
-    const effectiveCompanyId = (isSuperAdmin && simulatedCompanyId)
-        ? simulatedCompanyId
-        : profile?.company_id;
+    // Active Company Resolution (Respects simulated company for platform owners/admins)
+    const effectiveCompanyId = simulatedCompanyId || profile?.company_id;
     const [company, setCompany] = useState<any>(null);
+    const [isLoadingCampaign, setIsLoadingCampaign] = useState<boolean>(Boolean(campaignId));
 
     useEffect(() => {
         if (!effectiveCompanyId) return;
@@ -75,6 +73,7 @@ export default function CampaignBuilder() {
 
     useEffect(() => {
         if (campaignId) {
+            setIsLoadingCampaign(true);
             campaignService.getCampaignById(campaignId).then(campaign => {
                 setSelectedChannel(campaign.type as any);
                 const specIds = campaign.audience_filters?.specificIds || [];
@@ -99,6 +98,8 @@ export default function CampaignBuilder() {
                 console.error(err);
                 toast.error('Error al cargar la campaña');
                 navigate('/marketing/email');
+            }).finally(() => {
+                setIsLoadingCampaign(false);
             });
         } else if (location.state?.preSelectedLeads) {
             const leadIds = location.state.preSelectedLeads;
@@ -318,32 +319,42 @@ export default function CampaignBuilder() {
                 ? formData.template_id
                 : null;
 
-            const campaignData = {
+            const campaignData: any = {
                 name: effName,
                 subject: selectedChannel === 'email' ? effSubject : null,
                 content: effContent,
-                // 'telegram' is now allowed in DB check constraint
-                // 'email' | 'whatsapp' | 'telegram' | 'social' | 'sms'
                 type: selectedChannel,
-                status: 'draft' as 'draft',
+                status: 'draft',
                 total_recipients: reachCount,
-                company_id: profile?.company_id || undefined,
-                // Note: created_by omitted — FK references auth.users which
-                // causes violation in simulation mode (simulated profile id ≠ auth user)
                 audience_filters: audienceFilters,
                 template_id: templateId,
-                stats: { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0 }
+                stats: { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0 },
+                updated_at: new Date().toISOString()
             };
+
+            // Only attach company_id on NEW campaigns — NEVER overwrite company_id on existing campaigns
+            if (!isEditMode) {
+                campaignData.company_id = effectiveCompanyId || profile?.company_id;
+            }
 
             let savedId: string;
 
             if (isEditMode && campaignId) {
-                await campaignService.updateCampaign(campaignId, campaignData as any);
+                await campaignService.updateCampaign(campaignId, campaignData);
                 savedId = campaignId;
             } else {
-                const data = await campaignService.createCampaign(campaignData as any);
+                const data = await campaignService.createCampaign(campaignData);
                 savedId = data.id;
             }
+
+            // Sync in-memory formData immediately
+            setFormData(prev => ({
+                ...prev,
+                name: effName,
+                subject: effSubject,
+                content: effContent,
+                prospecting_studio_state: effStudioState
+            }));
 
             if (!isDraft) {
                 toast.loading('Ejecutando campaña...', { id: 'sending' });
@@ -363,7 +374,7 @@ export default function CampaignBuilder() {
                     return;
                 }
             } else {
-                toast.success(isEditMode ? '✓ Campaña actualizada correctamente' : '✓ Borrador guardado correctamente');
+                toast.success(isEditMode ? '✓ Borrador actualizado correctamente' : '✓ Borrador guardado correctamente');
                 if (!isEditMode && savedId) {
                     navigate(`/marketing/campaign/${savedId}/edit`, { replace: true });
                 }
@@ -468,11 +479,18 @@ export default function CampaignBuilder() {
                 </div>
             )}
 
-            {selectedChannel === 'email' && emailMode === 'prospecting' ? (
+            {isLoadingCampaign ? (
+                <div className="flex flex-col items-center justify-center min-h-[55vh] gap-3 bg-white/50 backdrop-blur-sm rounded-2xl border border-gray-100 p-8 shadow-xs">
+                    <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+                    <p className="text-sm font-bold text-gray-700">Cargando borrador de la campaña...</p>
+                    <p className="text-xs text-gray-400">Recuperando diseño, textos y configuración guardada</p>
+                </div>
+            ) : selectedChannel === 'email' && emailMode === 'prospecting' ? (
                 <ProspectingEmailStudio
+                    key={`prospecting-studio-${campaignId || 'new'}`}
                     company={company}
                     campaignId={campaignId}
-                    initialName={formData.name || (company?.name ? `Prospección - ${company.name}` : 'Prospección - Comercial')}
+                    initialName={formData.name || (company?.name ? `Prospección - ${company.name}` : (company?.name?.toLowerCase().includes('iclesia') ? 'Prospección - Iglesias' : 'Prospección - Comercial'))}
                     initialSubject={formData.subject || (company?.name?.toLowerCase().includes('iclesia') ? 'Una pregunta para {{nombre_iglesia}}' : 'Una pregunta para {{nombre_empresa}}')}
                     initialContent={formData.content}
                     initialStudioState={(formData as any).prospecting_studio_state || formData.audience_filter?.prospecting_studio_state}

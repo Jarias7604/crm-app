@@ -265,13 +265,64 @@ export default function ProspectingEmailStudio({
         { id: 'signature', type: 'signature', label: 'Firma Profesional', visible: true }
     ]);
 
-    // Handle Company Switching / Initialization
+    // 2. Hydrate from props whenever initialStudioState or initialContent changes
+    useEffect(() => {
+        const stateToLoad = initialStudioState || (initialContent ? parseStudioStateFromHtml(initialContent) : null);
+        if (!stateToLoad) return;
+
+        if (stateToLoad.campaignName) setCampaignName(stateToLoad.campaignName);
+        if (stateToLoad.subject) setSubject(stateToLoad.subject);
+        if (stateToLoad.senderIdentity) setSenderIdentity(stateToLoad.senderIdentity);
+        if (stateToLoad.greeting) setGreeting(stateToLoad.greeting);
+        if (stateToLoad.introText) setIntroText(stateToLoad.introText);
+        if (stateToLoad.calloutText) setCalloutText(stateToLoad.calloutText);
+        if (stateToLoad.solutionText) setSolutionText(stateToLoad.solutionText);
+        if (stateToLoad.leadInText) setLeadInText(stateToLoad.leadInText);
+        if (stateToLoad.closingText) setClosingText(stateToLoad.closingText);
+        if (stateToLoad.signoffText) setSignoffText(stateToLoad.signoffText);
+        if (stateToLoad.youtubeUrl) setYoutubeUrl(stateToLoad.youtubeUrl);
+        if (stateToLoad.videoCaption) setVideoCaption(stateToLoad.videoCaption);
+        if (stateToLoad.thumbMode) setThumbMode(stateToLoad.thumbMode);
+        if (stateToLoad.customUploadedThumb) setCustomUploadedThumb(stateToLoad.customUploadedThumb);
+        if (stateToLoad.buttonText) setButtonText(stateToLoad.buttonText);
+        if (stateToLoad.buttonColor) setButtonColor(stateToLoad.buttonColor);
+        if (stateToLoad.buttonLink) setButtonLink(stateToLoad.buttonLink);
+        if (typeof stateToLoad.hasLogo === 'boolean') setHasLogo(stateToLoad.hasLogo);
+        if (typeof stateToLoad.hasPhoto === 'boolean') setHasPhoto(stateToLoad.hasPhoto);
+        if (stateToLoad.photoShape) setPhotoShape(stateToLoad.photoShape);
+        if (stateToLoad.avatarUrl) setAvatarUrl(stateToLoad.avatarUrl);
+        if (stateToLoad.sigName) setSigName(stateToLoad.sigName);
+        if (stateToLoad.sigTitle) setSigTitle(stateToLoad.sigTitle);
+        if (stateToLoad.sigPhone) setSigPhone(stateToLoad.sigPhone);
+        if (stateToLoad.sigWebsite) setSigWebsite(stateToLoad.sigWebsite);
+        if (stateToLoad.customHeaderLogo) setCustomHeaderLogo(stateToLoad.customHeaderLogo);
+        if (stateToLoad.customSigLogo) setCustomSigLogo(stateToLoad.customSigLogo);
+        if (stateToLoad.blocks && stateToLoad.blocks.length > 0) setBlocks(stateToLoad.blocks);
+
+        isHydratedRef.current = true;
+    }, [initialStudioState, initialContent]);
+
+    // Keep initialName and initialSubject in sync if passed explicitly and not customized
+    useEffect(() => {
+        if (initialName && (!campaignName || campaignName === 'Prospección - Comercial')) {
+            setCampaignName(initialName);
+        }
+    }, [initialName]);
+
+    useEffect(() => {
+        if (initialSubject && (!subject || subject === 'Una pregunta para {{nombre_empresa}}' || subject === 'Una pregunta para {{nombre_iglesia}}')) {
+            setSubject(initialSubject);
+        }
+    }, [initialSubject]);
+
+    // Handle Company Switching / Initialization (ONLY for brand new campaigns, NEVER overwrites custom copy)
     useEffect(() => {
         if (!company) return;
-        // If state is already hydrated from DB or draft, NEVER overwrite custom copy!
-        if (isHydratedRef.current) return;
+        // Never touch message copy if editing an existing campaign or already hydrated!
+        if (campaignId || isHydratedRef.current || initialStudioState || initialContent) return;
+
         const compIsIclesia = Boolean(company.name?.toLowerCase().includes('iclesia'));
-        const compName = company.name || 'Nuestra Empresa';
+        const compName = company.name?.trim() || (compIsIclesia ? 'Iclesia' : 'Nuestra Empresa');
         const storageKey = `crm_user_signature_${company.id || 'default'}`;
 
         const saved = localStorage.getItem(storageKey);
@@ -292,18 +343,20 @@ export default function ProspectingEmailStudio({
             } catch { /* ignore */ }
         }
 
-        // Apply clean company defaults
+        // Apply clean company defaults for new campaigns
         if (compIsIclesia) {
             setSigName('Jimmy Arias');
             setSigTitle('Founder | Iclesia');
             setSigPhone('703-945-9240');
             setSigWebsite('iclesia.ai');
             setAvatarUrl('/images/marketing/jimmy-avatar.png');
-            setSenderIdentity('Jimmy Arias <jimmy@iclesia.ai>');
-            setIntroText('Mi nombre es Jimmy Arias y quería hacerles una pregunta muy sencilla:');
-            setCalloutText('Cuando una persona visita {{nombre_empresa}} por primera vez, ¿pueden saber si después del servicio alguien realmente la llamó, le escribió o le dio seguimiento?');
-            setSolutionText('Creamos Iclesia para ayudar precisamente con esto: registrar cada contacto, asignarlo a un responsable y saber quién ya recibió seguimiento y quién sigue pendiente.');
-            setButtonText('Ver cómo funciona Iclesia');
+            setSenderIdentity('Jimmy Arias <support@iclesia.ai>');
+            setIntroText('Mi nombre es Jimmy Arias de Iclesia y quería hacerles una consulta:');
+            setCalloutText('¿Cuentan actualmente en {{nombre_iglesia}} con un proceso ágil para atender y dar seguimiento inmediato a cada visitante o miembro que solicita información?');
+            setSolutionText('En Iclesia ayudamos a congregaciones a automatizar el seguimiento de visitas, coordinar a los líderes de grupos y asegurar que ninguna persona se quede sin atención pastoral.');
+            setButtonText('Conocer más sobre Iclesia');
+            setCampaignName('Prospección - Iglesias');
+            setSubject('Una pregunta para {{nombre_iglesia}}');
             setYoutubeUrl('https://youtu.be/dvRSzR1x3os');
             setCustomHeaderLogo('/images/marketing/iclesia-header-logo.png');
             setCustomSigLogo('/images/marketing/iclesia-brand-logo.png');
@@ -316,15 +369,16 @@ export default function ProspectingEmailStudio({
             setSigWebsite(company.website ? company.website.replace(/^https?:\/\//, '').replace(/\/$/, '') : '');
             setAvatarUrl(profile?.avatar_url || '');
             setSenderIdentity(`${senderName} <${senderEmail}>`);
-            setIntroText(`Mi nombre es ${senderName} de ${compName} y quería hacerles una consulta muy sencilla:`);
+            setIntroText(`Mi nombre es ${senderName} de ${compName} y quería hacerles una consulta:`);
             setCalloutText(`¿Cuentan actualmente en {{nombre_empresa}} con un proceso ágil para atender y dar seguimiento inmediato a cada cliente que solicita información?`);
             setSolutionText(`En ${compName} ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.`);
             setButtonText(`Conocer más sobre ${compName}`);
             setCampaignName(`Prospección - ${compName}`);
+            setSubject('Una pregunta para {{nombre_empresa}}');
             setCustomHeaderLogo(company.logo_url || '');
             setCustomSigLogo(company.logo_url || '');
         }
-    }, [company?.id, company?.name]);
+    }, [company?.id, company?.name, campaignId, initialStudioState, initialContent]);
 
     // Save signature changes per company
     const persistSignature = () => {
@@ -872,6 +926,38 @@ export default function ProspectingEmailStudio({
                             </button>
                         )}
                     </div>
+
+                    {/* Template Quick Presets */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 p-1 rounded-xl">
+                        <button
+                            type="button"
+                            onClick={applyChurchTemplate}
+                            className="px-2.5 py-1 bg-white hover:bg-indigo-50 border border-slate-200 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs"
+                            title="Cargar plantilla redactada para Iglesias / Congregaciones"
+                        >
+                            ⛪ Plantilla Iglesias
+                        </button>
+                        <button
+                            type="button"
+                            onClick={applyBusinessTemplate}
+                            className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs"
+                            title="Cargar plantilla redactada para Empresas Comerciales"
+                        >
+                            🏢 Plantilla Empresas
+                        </button>
+                    </div>
+
+                    {/* Quick Save Button in Top Bar */}
+                    <button
+                        type="button"
+                        onClick={handleTriggerSave}
+                        disabled={isSaving}
+                        className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                        title="Guardar borrador actual"
+                    >
+                        <Save className="w-3.5 h-3.5" />
+                        {isSaving ? 'Guardando...' : 'Guardar Borrador'}
+                    </button>
 
                     {/* Audience Button */}
                     {onOpenAudienceModal && (
