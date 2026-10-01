@@ -46,12 +46,102 @@ export function getYouTubeVideoId(url: string): string | null {
     return null;
 }
 
+export interface ProspectingStudioState {
+    campaignName?: string;
+    subject?: string;
+    senderIdentity?: string;
+    greeting?: string;
+    introText?: string;
+    calloutText?: string;
+    solutionText?: string;
+    leadInText?: string;
+    closingText?: string;
+    signoffText?: string;
+    youtubeUrl?: string;
+    videoCaption?: string;
+    thumbMode?: 'youtube' | 'custom';
+    customUploadedThumb?: string;
+    buttonText?: string;
+    buttonColor?: string;
+    buttonLink?: string;
+    hasLogo?: boolean;
+    hasPhoto?: boolean;
+    photoShape?: 'circle' | 'rounded' | 'square';
+    avatarUrl?: string;
+    sigName?: string;
+    sigTitle?: string;
+    sigPhone?: string;
+    sigWebsite?: string;
+    customHeaderLogo?: string;
+    customSigLogo?: string;
+    blocks?: EmailBlock[];
+}
+
+export function parseStudioStateFromHtml(html: string): Partial<ProspectingStudioState> | null {
+    if (!html || typeof html !== 'string') return null;
+    const state: Partial<ProspectingStudioState> = {};
+
+    try {
+        // 1. Callout text
+        const calloutMatch = html.match(/<!-- Callout Box -->[\s\S]*?<p[^>]*style="[^"]*font-weight:\s*800[^"]*"[^>]*>([\s\S]*?)<\/p>/i);
+        if (calloutMatch && calloutMatch[1]) {
+            state.calloutText = calloutMatch[1].trim();
+        }
+
+        // 2. Intro text & greeting
+        const introMatch = html.match(/<!-- Intro -->[\s\S]*?<p[^>]*font-weight:\s*bold[^"]*"[^>]*>([\s\S]*?)<\/p>\s*<p[^>]*>([\s\S]*?)<\/p>/i);
+        if (introMatch) {
+            if (introMatch[1]) state.greeting = introMatch[1].trim();
+            if (introMatch[2]) state.introText = introMatch[2].trim();
+        }
+
+        // 3. Solution text
+        const solutionMatch = html.match(/<!-- Solution Text -->\s*<p[^>]*>([\s\S]*?)<\/p>/i);
+        if (solutionMatch && solutionMatch[1]) {
+            state.solutionText = solutionMatch[1].trim();
+        }
+
+        // 4. Lead-in text
+        const leadInMatch = html.match(/<!-- Lead-in -->\s*<p[^>]*>([\s\S]*?)<\/p>/i);
+        if (leadInMatch && leadInMatch[1]) {
+            state.leadInText = leadInMatch[1].trim();
+        }
+
+        // 5. Closing & Signoff
+        const closingMatch = html.match(/<!-- Closing -->[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>\s*<p[^>]*font-weight:\s*bold[^"]*"[^>]*>([\s\S]*?)<\/p>/i);
+        if (closingMatch) {
+            if (closingMatch[1]) state.closingText = closingMatch[1].trim();
+            if (closingMatch[2]) state.signoffText = closingMatch[2].trim();
+        }
+
+        // 6. Video URL
+        const videoMatch = html.match(/<!-- Video Card[\s\S]*?<a\s+href="([^"]+)"/i);
+        if (videoMatch && videoMatch[1]) {
+            state.youtubeUrl = videoMatch[1].trim();
+        }
+
+        // 7. CTA Button
+        const buttonMatch = html.match(/<!-- CTA Button -->[\s\S]*?<a\s+href="([^"]+)"[^>]*background-color:\s*([^;"]+)[^>]*>[\s\S]*?(?:&nbsp;|\s)*([^<&>]+)(?:&nbsp;|\s)*&gt;<\/a>/i);
+        if (buttonMatch) {
+            if (buttonMatch[1]) state.buttonLink = buttonMatch[1].trim();
+            if (buttonMatch[2]) state.buttonColor = buttonMatch[2].trim();
+            if (buttonMatch[3]) state.buttonText = buttonMatch[3].trim().replace(/^[▶►]\s*/, '');
+        }
+    } catch { /* ignore parse errors */ }
+
+    return Object.keys(state).length > 0 ? state : null;
+}
+
+
 interface ProspectingEmailStudioProps {
     company?: any;
+    campaignId?: string;
     initialSubject?: string;
     initialName?: string;
-    onSaveDraft: (data: { name: string; subject: string; htmlContent: string }) => Promise<void>;
-    onSendCampaign: (data: { name: string; subject: string; htmlContent: string }) => Promise<void>;
+    initialContent?: string;
+    initialStudioState?: ProspectingStudioState | null;
+    onSaveDraft: (data: { name: string; subject: string; htmlContent: string; studioState: ProspectingStudioState }) => Promise<void>;
+    onSendCampaign: (data: { name: string; subject: string; htmlContent: string; studioState: ProspectingStudioState }) => Promise<void>;
     reachCount?: number;
     previewLeads?: any[];
     onOpenAudienceModal?: () => void;
@@ -61,8 +151,11 @@ interface ProspectingEmailStudioProps {
 
 export default function ProspectingEmailStudio({
     company,
-    initialSubject = 'Una pregunta para {{nombre_empresa}}',
-    initialName = 'Prospección Comercial (Video)',
+    campaignId,
+    initialSubject = 'Una pregunta para {{nombre_iglesia}}',
+    initialName = 'Prospección - Iglesias',
+    initialContent,
+    initialStudioState,
     onSaveDraft,
     onSendCampaign,
     reachCount = 966,
@@ -77,8 +170,6 @@ export default function ProspectingEmailStudio({
     const sigLogoInputRef = useRef<HTMLInputElement>(null);
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
     const [isUploadingSigLogo, setIsUploadingSigLogo] = useState(false);
-    const [customHeaderLogo, setCustomHeaderLogo] = useState<string>('');
-    const [customSigLogo, setCustomSigLogo] = useState<string>('');
 
     // View device mode: 'desktop', 'mobile', or 'dual'
     const [viewMode, setViewMode] = useState<'desktop' | 'mobile' | 'dual'>('desktop');
@@ -90,22 +181,33 @@ export default function ProspectingEmailStudio({
     const isIclesia = Boolean(company?.name?.toLowerCase().includes('iclesia'));
     const companyName = company?.name || 'Nuestra Empresa';
 
-    // Form Controls (Left Panel)
-    const [campaignName, setCampaignName] = useState(() => initialName || `Prospección - ${companyName}`);
-    const [subject, setSubject] = useState(() => {
-        const raw = initialSubject || 'Una pregunta para {{nombre_empresa}}';
-        return raw.replace(/{{nombre_iglesia}}/gi, '{{nombre_empresa}}');
-    });
+    // 1. Resolve stored draft from localStorage or initialStudioState or parsedFromHtml
+    const savedLocalDraft = (() => {
+        try {
+            const key = campaignId ? `crm_prospecting_studio_${campaignId}` : 'crm_prospecting_studio_new';
+            const raw = localStorage.getItem(key);
+            if (raw) return JSON.parse(raw) as Partial<ProspectingStudioState>;
+        } catch { /* ignore */ }
+        return null;
+    })();
+
+    const parsedFromHtml = initialContent ? parseStudioStateFromHtml(initialContent) : null;
+    const effectiveInitial: Partial<ProspectingStudioState> = initialStudioState || parsedFromHtml || savedLocalDraft || {};
+    const isHydratedRef = useRef(Boolean(initialStudioState || parsedFromHtml || savedLocalDraft));
 
     const defaultSenderName = (profile?.full_name && profile.full_name !== 'Platform Owner') ? profile.full_name : (isIclesia ? 'Jimmy Arias' : companyName);
     const defaultSenderEmail = company?.email || profile?.email || 'contacto@empresa.com';
-    const [senderIdentity, setSenderIdentity] = useState(() => `${defaultSenderName} <${defaultSenderEmail}>`);
+
+    // Form Controls (Left Panel)
+    const [campaignName, setCampaignName] = useState(() => effectiveInitial.campaignName || initialName || (company?.name ? `Prospección - ${company.name}` : 'Prospección - Iglesias'));
+    const [subject, setSubject] = useState(() => effectiveInitial.subject || initialSubject || 'Una pregunta para {{nombre_iglesia}}');
+    const [senderIdentity, setSenderIdentity] = useState(() => effectiveInitial.senderIdentity || `${defaultSenderName} <${defaultSenderEmail}>`);
 
     // Video Controls
-    const [youtubeUrl, setYoutubeUrl] = useState('https://youtu.be/dvRSzR1x3os');
-    const [videoCaption, setVideoCaption] = useState(() => `Vea en 45 segundos cómo funciona ${companyName}`);
-    const [thumbMode, setThumbMode] = useState<'youtube' | 'custom'>('youtube');
-    const [customUploadedThumb, setCustomUploadedThumb] = useState<string>('');
+    const [youtubeUrl, setYoutubeUrl] = useState(() => effectiveInitial.youtubeUrl || 'https://youtu.be/dvRSzR1x3os');
+    const [videoCaption, setVideoCaption] = useState(() => effectiveInitial.videoCaption || `Vea en 45 segundos cómo funciona ${companyName}`);
+    const [thumbMode, setThumbMode] = useState<'youtube' | 'custom'>(() => effectiveInitial.thumbMode || 'youtube');
+    const [customUploadedThumb, setCustomUploadedThumb] = useState<string>(() => effectiveInitial.customUploadedThumb || '');
     const [isUploadingThumb, setIsUploadingThumb] = useState(false);
     const videoThumbInputRef = useRef<HTMLInputElement>(null);
 
@@ -117,29 +219,31 @@ export default function ProspectingEmailStudio({
             : '/images/marketing/jimmy-video-preview.png');
 
     // Button Controls
-    const [buttonText, setButtonText] = useState(() => `Conocer más sobre ${companyName}`);
-    const [buttonColor, setButtonColor] = useState('#0066FF');
-    const [buttonLink, setButtonLink] = useState('https://youtu.be/dvRSzR1x3os');
+    const [buttonText, setButtonText] = useState(() => effectiveInitial.buttonText || (isIclesia ? 'Ver cómo funciona Iclesia' : `Conocer más sobre ${companyName}`));
+    const [buttonColor, setButtonColor] = useState(() => effectiveInitial.buttonColor || '#0066FF');
+    const [buttonLink, setButtonLink] = useState(() => effectiveInitial.buttonLink || 'https://youtu.be/dvRSzR1x3os');
 
     // Signature Controls
-    const [hasLogo, setHasLogo] = useState(true);
-    const [hasPhoto, setHasPhoto] = useState(true);
-    const [photoShape, setPhotoShape] = useState<'circle' | 'rounded' | 'square'>('circle');
-    const [avatarUrl, setAvatarUrl] = useState<string>(() => profile?.avatar_url || '');
-    const [sigName, setSigName] = useState(() => (profile?.full_name && profile.full_name !== 'Platform Owner') ? profile.full_name : (isIclesia ? 'Jimmy Arias' : companyName));
-    const [sigTitle, setSigTitle] = useState(() => `${(profile as any)?.job_title || 'Asesor Comercial'} | ${companyName}`);
-    const [sigPhone, setSigPhone] = useState(() => company?.phone || profile?.phone || '');
-    const [sigWebsite, setSigWebsite] = useState(() => company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/$/, '') : '');
+    const [hasLogo, setHasLogo] = useState(() => typeof effectiveInitial.hasLogo === 'boolean' ? effectiveInitial.hasLogo : true);
+    const [hasPhoto, setHasPhoto] = useState(() => typeof effectiveInitial.hasPhoto === 'boolean' ? effectiveInitial.hasPhoto : true);
+    const [photoShape, setPhotoShape] = useState<'circle' | 'rounded' | 'square'>(() => effectiveInitial.photoShape || 'circle');
+    const [avatarUrl, setAvatarUrl] = useState<string>(() => effectiveInitial.avatarUrl || profile?.avatar_url || (isIclesia ? '/images/marketing/jimmy-avatar.png' : ''));
+    const [sigName, setSigName] = useState(() => effectiveInitial.sigName || ((profile?.full_name && profile.full_name !== 'Platform Owner') ? profile.full_name : (isIclesia ? 'Jimmy Arias' : companyName)));
+    const [sigTitle, setSigTitle] = useState(() => effectiveInitial.sigTitle || (isIclesia ? 'Founder | Iclesia' : `${(profile as any)?.job_title || 'Asesor Comercial'} | ${companyName}`));
+    const [sigPhone, setSigPhone] = useState(() => effectiveInitial.sigPhone || (isIclesia ? '703-945-9240' : (company?.phone || profile?.phone || '')));
+    const [sigWebsite, setSigWebsite] = useState(() => effectiveInitial.sigWebsite || (isIclesia ? 'iclesia.ai' : (company?.website ? company.website.replace(/^https?:\/\//, '').replace(/\/$/, '') : '')));
+    const [customHeaderLogo, setCustomHeaderLogo] = useState<string>(() => effectiveInitial.customHeaderLogo || '');
+    const [customSigLogo, setCustomSigLogo] = useState<string>(() => effectiveInitial.customSigLogo || '');
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
-    // Dynamic Text Content (Adapted for current tenant company)
-    const [greeting, setGreeting] = useState('Hola, cordial saludo.');
-    const [introText, setIntroText] = useState(() => `Mi nombre es ${defaultSenderName} de ${companyName} y quería hacerles una consulta:`);
-    const [calloutText, setCalloutText] = useState(() => `¿Cuentan actualmente en {{nombre_empresa}} con un proceso ágil para atender y dar seguimiento inmediato a cada cliente que solicita información?`);
-    const [solutionText, setSolutionText] = useState(() => `En ${companyName} ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.`);
-    const [leadInText, setLeadInText] = useState('Les comparto un breve video de 45 segundos para mostrarles cómo funciona:');
-    const [closingText, setClosingText] = useState('Si esto es algo que desean mejorar en su empresa, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.');
-    const [signoffText, setSignoffText] = useState('Atentamente,');
+    // Dynamic Text Content (Adapted for current tenant company / churches)
+    const [greeting, setGreeting] = useState(() => effectiveInitial.greeting || 'Hola, cordial saludo.');
+    const [introText, setIntroText] = useState(() => effectiveInitial.introText || (isIclesia ? 'Mi nombre es Jimmy Arias de Iclesia y quería hacerles una consulta:' : `Mi nombre es ${defaultSenderName} de ${companyName} y quería hacerles una consulta:`));
+    const [calloutText, setCalloutText] = useState(() => effectiveInitial.calloutText || (isIclesia ? '¿Cuentan actualmente en {{nombre_iglesia}} con un proceso ágil para atender y dar seguimiento inmediato a cada visitante o miembro que solicita información?' : '¿Cuentan actualmente en {{nombre_empresa}} con un proceso ágil para atender y dar seguimiento inmediato a cada cliente que solicita información?'));
+    const [solutionText, setSolutionText] = useState(() => effectiveInitial.solutionText || (isIclesia ? 'En Iclesia ayudamos a congregaciones a automatizar el seguimiento de visitas, coordinar a los líderes de grupos y asegurar que ninguna persona se quede sin atención pastoral.' : `En ${companyName} ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.`));
+    const [leadInText, setLeadInText] = useState(() => effectiveInitial.leadInText || 'Les comparto un breve video de 45 segundos para mostrarles cómo funciona:');
+    const [closingText, setClosingText] = useState(() => effectiveInitial.closingText || (isIclesia ? 'Si esto es algo que desean mejorar en su congregación, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.' : 'Si esto es algo que desean mejorar en su empresa, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.'));
+    const [signoffText, setSignoffText] = useState(() => effectiveInitial.signoffText || 'Atentamente,');
 
     // Logo Resolution: Custom uploaded in studio > Company profile logo > (Iclesia logo if Iclesia, else empty)
     const effectiveHeaderLogo = customHeaderLogo || company?.logo_url || (isIclesia ? '/images/marketing/iclesia-header-logo.png' : '');
@@ -149,7 +253,7 @@ export default function ProspectingEmailStudio({
     const [leadIndex, setLeadIndex] = useState(0);
 
     // Blocks list for in-canvas direct manipulation
-    const [blocks, setBlocks] = useState<EmailBlock[]>([
+    const [blocks, setBlocks] = useState<EmailBlock[]>(() => effectiveInitial.blocks || [
         { id: 'header', type: 'header', label: 'Logo y Encabezado', visible: true },
         { id: 'intro', type: 'intro', label: 'Saludo e Introducción', visible: true },
         { id: 'callout', type: 'callout', label: 'Pregunta Destacada', visible: true },
@@ -164,6 +268,8 @@ export default function ProspectingEmailStudio({
     // Handle Company Switching / Initialization
     useEffect(() => {
         if (!company) return;
+        // If state is already hydrated from DB or draft, NEVER overwrite custom copy!
+        if (isHydratedRef.current) return;
         const compIsIclesia = Boolean(company.name?.toLowerCase().includes('iclesia'));
         const compName = company.name || 'Nuestra Empresa';
         const storageKey = `crm_user_signature_${company.id || 'default'}`;
@@ -253,7 +359,7 @@ export default function ProspectingEmailStudio({
         const industry = currentLead.industry || currentLead.denomination || 'su rubro';
 
         return text
-            .replace(/{{(nombre_empresa|company_name|empresa|nombre_iglesia|iglesia)}}/gi, companyOrLeadName)
+            .replace(/{{(nombre_empresa|company_name|empresa|nombre_iglesia|iglesia|congregacion)}}/gi, companyOrLeadName)
             .replace(/{{(first_name|nombre)}}/gi, firstName)
             .replace(/{{(ciudad|city)}}/gi, city)
             .replace(/{{(rubro|industria|denominacion|congregacion)}}/gi, industry);
@@ -579,15 +685,78 @@ export default function ProspectingEmailStudio({
         return html;
     };
 
+        // Template Presets
+    const applyChurchTemplate = () => {
+        setSubject('Una pregunta para {{nombre_iglesia}}');
+        setCalloutText('¿Cuentan actualmente en {{nombre_iglesia}} con un proceso ágil para atender y dar seguimiento inmediato a cada visitante o miembro que solicita información?');
+        setIntroText(`Mi nombre es ${sigName || 'Jimmy Arias'} de Iclesia y quería hacerles una consulta:`);
+        setSolutionText('En Iclesia ayudamos a congregaciones a automatizar el seguimiento de visitas, coordinar a los líderes de grupos y asegurar que ninguna persona se quede sin atención pastoral.');
+        setButtonText('Conocer más sobre Iclesia');
+        setLeadInText('Les comparto un breve video de 45 segundos para mostrarles cómo funciona:');
+        setClosingText('Si esto es algo que desean mejorar en su congregación, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.');
+        setCampaignName('Prospección - Iglesias');
+        toast.success('⛪ Plantilla para iglesias aplicada');
+    };
+
+    const applyBusinessTemplate = () => {
+        setSubject('Una pregunta para {{nombre_empresa}}');
+        setCalloutText('¿Cuentan actualmente en {{nombre_empresa}} con un proceso ágil para atender y dar seguimiento inmediato a cada cliente que solicita información?');
+        setIntroText(`Mi nombre es ${defaultSenderName} de ${companyName} y quería hacerles una consulta:`);
+        setSolutionText(`En ${companyName} ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.`);
+        setButtonText(`Conocer más sobre ${companyName}`);
+        setLeadInText('Les comparto un breve video de 45 segundos para mostrarles cómo funciona:');
+        setClosingText('Si esto es algo que desean mejorar en su empresa, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.');
+        setCampaignName(`Prospección - ${companyName}`);
+        toast.success('🏢 Plantilla para empresas aplicada');
+    };
+
+    const getCurrentStudioState = (): ProspectingStudioState => ({
+        campaignName,
+        subject,
+        senderIdentity,
+        greeting,
+        introText,
+        calloutText,
+        solutionText,
+        leadInText,
+        closingText,
+        signoffText,
+        youtubeUrl,
+        videoCaption,
+        thumbMode,
+        customUploadedThumb,
+        buttonText,
+        buttonColor,
+        buttonLink,
+        hasLogo,
+        hasPhoto,
+        photoShape,
+        avatarUrl,
+        sigName,
+        sigTitle,
+        sigPhone,
+        sigWebsite,
+        customHeaderLogo,
+        customSigLogo,
+        blocks
+    });
+
     // Save Draft
     const handleTriggerSave = async () => {
         try {
             setIsSaving(true);
             const html = compileToEmailHtml();
+            const studioState = getCurrentStudioState();
+            try {
+                const key = campaignId ? `crm_prospecting_studio_${campaignId}` : 'crm_prospecting_studio_new';
+                localStorage.setItem(key, JSON.stringify(studioState));
+            } catch { /* ignore */ }
+            isHydratedRef.current = true;
             await onSaveDraft({
                 name: campaignName,
                 subject: subject,
-                htmlContent: html
+                htmlContent: html,
+                studioState
             });
         } finally {
             setIsSaving(false);
@@ -601,10 +770,12 @@ export default function ProspectingEmailStudio({
         try {
             setIsSending(true);
             const html = compileToEmailHtml();
+            const studioState = getCurrentStudioState();
             await onSendCampaign({
                 name: campaignName,
                 subject: subject,
-                htmlContent: html
+                htmlContent: html,
+                studioState
             });
         } finally {
             setIsSending(false);

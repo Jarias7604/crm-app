@@ -79,11 +79,13 @@ export default function CampaignBuilder() {
                 setSelectedChannel(campaign.type as any);
                 const specIds = campaign.audience_filters?.specificIds || [];
                 if (specIds.length > 0) setIsDirectConnect(true);
+                const savedStudioState = campaign.audience_filters?.prospecting_studio_state || campaign.audience_filters?.studio_state || null;
                 setFormData({
                     name: campaign.name || '',
                     subject: campaign.subject || '',
                     content: campaign.content || '',
                     template_id: (campaign as any).template_id || null,
+                    prospecting_studio_state: savedStudioState,
                     audience_filter: {
                         status: campaign.audience_filters?.status || [],
                         industry: campaign.audience_filters?.industry || [],
@@ -285,11 +287,14 @@ export default function CampaignBuilder() {
     const selectAllLeads = () => setExcludedLeadIds(new Set());
     const deselectAllLeads = () => setExcludedLeadIds(new Set(filteredByChannel.map(l => l.id)));
 
-    const handleSave = async (isDraft: boolean, overrideData?: { name?: string; subject?: string; content?: string }) => {
+    const handleSave = async (isDraft: boolean, overrideData?: { name?: string; subject?: string; content?: string; studioState?: any }) => {
         try {
             const effName = overrideData?.name !== undefined ? overrideData.name : formData.name;
             const effSubject = overrideData?.subject !== undefined ? overrideData.subject : formData.subject;
             const effContent = overrideData?.content !== undefined ? overrideData.content : formData.content;
+            const effStudioState = overrideData?.studioState !== undefined
+                ? overrideData.studioState
+                : (formData as any).prospecting_studio_state;
 
             if (!effName) {
                 toast.error('El nombre de la campaña es obligatorio');
@@ -304,7 +309,8 @@ export default function CampaignBuilder() {
             // Build audience filter with excluded leads
             const audienceFilters = {
                 ...formData.audience_filter,
-                excludedIds: excludedLeadIds.size > 0 ? Array.from(excludedLeadIds) : undefined
+                excludedIds: excludedLeadIds.size > 0 ? Array.from(excludedLeadIds) : undefined,
+                prospecting_studio_state: effStudioState || undefined
             };
 
             // Fix: template_id must be null (not '') for UUID column
@@ -357,12 +363,11 @@ export default function CampaignBuilder() {
                     return;
                 }
             } else {
-                toast.success(isEditMode ? 'Campaña actualizada' : 'Borrador guardado');
+                toast.success(isEditMode ? '✓ Campaña actualizada correctamente' : '✓ Borrador guardado correctamente');
+                if (!isEditMode && savedId) {
+                    navigate(`/marketing/campaign/${savedId}/edit`, { replace: true });
+                }
             }
-
-            // Clear draft from localStorage after successful save
-            localStorage.removeItem(DRAFT_KEY);
-            navigate('/marketing/email');
         } catch (error: any) {
             console.error('Campaign save error:', error);
             const msg = error?.message || error?.error_description || 'Error al procesar campaña';
@@ -466,8 +471,11 @@ export default function CampaignBuilder() {
             {selectedChannel === 'email' && emailMode === 'prospecting' ? (
                 <ProspectingEmailStudio
                     company={company}
+                    campaignId={campaignId}
                     initialName={formData.name || (company?.name ? `Prospección - ${company.name}` : 'Prospección - Comercial')}
-                    initialSubject={formData.subject || 'Una pregunta para {{nombre_empresa}}'}
+                    initialSubject={formData.subject || (company?.name?.toLowerCase().includes('iclesia') ? 'Una pregunta para {{nombre_iglesia}}' : 'Una pregunta para {{nombre_empresa}}')}
+                    initialContent={formData.content}
+                    initialStudioState={(formData as any).prospecting_studio_state || formData.audience_filter?.prospecting_studio_state}
                     reachCount={reachCount}
                     previewLeads={displayedLeads}
                     onBack={() => navigate('/marketing/email')}
@@ -477,12 +485,34 @@ export default function CampaignBuilder() {
                         setShowAudienceModal(true);
                     }}
                     onSaveDraft={async (data) => {
-                        setFormData(prev => ({ ...prev, name: data.name, subject: data.subject, content: data.htmlContent }));
-                        await handleSave(true, { name: data.name, subject: data.subject, content: data.htmlContent });
+                        setFormData(prev => ({
+                            ...prev,
+                            name: data.name,
+                            subject: data.subject,
+                            content: data.htmlContent,
+                            prospecting_studio_state: data.studioState
+                        }));
+                        await handleSave(true, {
+                            name: data.name,
+                            subject: data.subject,
+                            content: data.htmlContent,
+                            studioState: data.studioState
+                        });
                     }}
                     onSendCampaign={async (data) => {
-                        setFormData(prev => ({ ...prev, name: data.name, subject: data.subject, content: data.htmlContent }));
-                        await handleSave(false, { name: data.name, subject: data.subject, content: data.htmlContent });
+                        setFormData(prev => ({
+                            ...prev,
+                            name: data.name,
+                            subject: data.subject,
+                            content: data.htmlContent,
+                            prospecting_studio_state: data.studioState
+                        }));
+                        await handleSave(false, {
+                            name: data.name,
+                            subject: data.subject,
+                            content: data.htmlContent,
+                            studioState: data.studioState
+                        });
                     }}
                 />
             ) : (
