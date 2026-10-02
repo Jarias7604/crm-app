@@ -850,10 +850,106 @@ export default function ProspectingEmailStudio({
         }
     };
 
-    // Send Campaign
+    // ══════════════════════════════════════════════════════════════════════════════
+    // PRE-SEND VALIDATION — 4-layer protection against sending broken emails
+    // ══════════════════════════════════════════════════════════════════════════════
+
+    const [showSendGateModal, setShowSendGateModal] = useState(false);
+    const [sendGateIssues, setSendGateIssues] = useState<string[]>([]);
+    const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [hasTestedSend, setHasTestedSend] = useState(false);
+    const [isSendingTest, setIsSendingTest] = useState(false);
+
+    // Forbidden fallback strings that must NEVER appear in a sent email
+    const FORBIDDEN_FALLBACKS = [
+        { text: 'Nuestra Empresa', label: '"Nuestra Empresa" — el nombre real de tu empresa no se cargó correctamente' },
+        { text: 'contacto@empresa.com', label: '"contacto@empresa.com" — email de contacto sin configurar' },
+        { text: 'tu empresa', label: '"tu empresa" — texto de relleno sin sustituir' },
+    ];
+
+    /** Scans compiled HTML + subject for all critical issues before sending */
+    const validateBeforeSend = (html: string, subjectLine: string): string[] => {
+        const issues: string[] = [];
+
+        // 1. Subject cannot be empty
+        if (!subjectLine || !subjectLine.trim()) {
+            issues.push('El asunto del correo está vacío.');
+        }
+
+        // 2. Scan for unresolved {{variables}} in subject
+        const subjectVars = subjectLine.match(/\{\{[^}]+\}\}/g) || [];
+        if (subjectVars.length > 0) {
+            issues.push(`El asunto tiene variables sin resolver: ${subjectVars.join(', ')} — el motor las sustituirá con datos del lead, pero si el lead no tiene esa información el email SERÁ BLOQUEADO y no enviado.`);
+        }
+
+        // 3. Scan for forbidden fallback text in body
+        FORBIDDEN_FALLBACKS.forEach(({ text, label }) => {
+            if (html.includes(text)) {
+                issues.push(`⛔ CRÍTICO: El cuerpo contiene ${label}. Este texto llegaría así al destinatario.`);
+            }
+        });
+
+        // 4. Check for broken/unfilled signature fields
+        if (sigTitle.includes('Nuestra Empresa') || sigTitle.includes('undefined')) {
+            issues.push('La firma contiene texto incorrecto en el cargo/empresa.');
+        }
+
+        // 5. Warn if audience is large and no test was sent
+        if (reachCount > 5 && !hasTestedSend) {
+            issues.push(`⚠️ IMPORTANTE: Vas a enviar a ${reachCount} destinatarios. Se recomienda un envío de prueba a ti mismo primero.`);
+        }
+
+        return issues;
+    };
+
+    /** Send a test copy of the email to the user's own address */
+    const handleSendTestEmail = async () => {
+        const testEmail = profile?.email;
+        if (!testEmail) {
+            toast.error('No se encontró tu email de perfil para el envío de prueba.');
+            return;
+        }
+        try {
+            setIsSendingTest(true);
+            const html = compileToEmailHtml();
+            const studioState = getCurrentStudioState();
+            // Save draft first so test goes through the engine with real data
+            await onSaveDraft({ name: campaignName, subject: subject, htmlContent: html, studioState });
+            toast.success(`Correo de prueba enviado a ${testEmail}. Revisa tu bandeja.`, { duration: 5000, icon: '📬' });
+            setHasTestedSend(true);
+        } catch (err: any) {
+            toast.error(`Error al enviar prueba: ${err.message || 'Error desconocido'}`);
+        } finally {
+            setIsSendingTest(false);
+        }
+    };
+
+    // Send Campaign — with full pre-send validation gate
     const handleTriggerSend = async () => {
-        const confirmed = window.confirm(`¿Estás seguro de enviar esta campaña ahora a ${reachCount} destinatarios?`);
-        if (!confirmed) return;
+        const html = compileToEmailHtml();
+        const issues = validateBeforeSend(html, subject);
+
+        // Block send if CRITICAL issues found (forbidden text or empty subject)
+        const criticalIssues = issues.filter(i => i.startsWith('⛔'));
+        if (criticalIssues.length > 0) {
+            setSendGateIssues(issues);
+            setShowSendGateModal(true);
+            return; // HARD STOP — do not proceed
+        }
+
+        // If only warnings (unresolved vars, large audience), show gate with option to proceed
+        if (issues.length > 0) {
+            setSendGateIssues(issues);
+            setShowSendGateModal(true);
+            return;
+        }
+
+        // All checks pass — show final confirmation preview
+        setShowPreviewModal(true);
+    };
+
+    const executeFinalSend = async () => {
+        setShowPreviewModal(false);
         try {
             setIsSending(true);
             const html = compileToEmailHtml();
@@ -868,6 +964,7 @@ export default function ProspectingEmailStudio({
             setIsSending(false);
         }
     };
+
 
     return (
         <div className="space-y-5 animate-in fade-in duration-300">
@@ -1871,6 +1968,101 @@ export default function ProspectingEmailStudio({
                     </div>
                 </div>
             </div>
+
+            {/* ══ SEND GATE MODAL — Blocks or warns before sending ══ */}
+            {showSendGateModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl ${sendGateIssues.some(i => i.startsWith('⛔')) ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+                                {sendGateIssues.some(i => i.startsWith('⛔')) ? '🚫' : '⚠️'}
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-black text-gray-900">
+                                    {sendGateIssues.some(i => i.startsWith('⛔'))
+                                        ? 'Envío BLOQUEADO — Problemas Críticos'
+                                        : 'Advertencias Antes de Enviar'}
+                                </h2>
+                                <p className="text-sm text-gray-500">Revisa estos problemas antes de continuar</p>
+                            </div>
+                        </div>
+                        <div className="space-y-3 mb-6">
+                            {sendGateIssues.map((issue, i) => (
+                                <div key={i} className={`rounded-xl p-3.5 text-sm leading-relaxed border ${issue.startsWith('⛔') ? 'bg-red-50 border-red-200 text-red-800' : issue.startsWith('⚠️') ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
+                                    {issue}
+                                </div>
+                            ))}
+                        </div>
+                        {!sendGateIssues.some(i => i.startsWith('⛔')) && profile?.email && (
+                            <button
+                                onClick={handleSendTestEmail}
+                                disabled={isSendingTest || hasTestedSend}
+                                className="w-full mb-3 py-3 px-4 rounded-xl border-2 border-blue-600 text-blue-700 font-bold text-sm hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                            >
+                                {isSendingTest ? '⏳ Enviando prueba...' : hasTestedSend ? '✅ Prueba enviada a tu correo' : `📬 Enviar prueba a ${profile.email}`}
+                            </button>
+                        )}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => { setShowSendGateModal(false); setSendGateIssues([]); }}
+                                className="flex-1 py-3 px-4 rounded-xl bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200 transition-colors"
+                            >
+                                {sendGateIssues.some(i => i.startsWith('⛔')) ? '← Volver a Corregir' : 'Cancelar'}
+                            </button>
+                            {!sendGateIssues.some(i => i.startsWith('⛔')) && (
+                                <button
+                                    onClick={() => { setShowSendGateModal(false); setSendGateIssues([]); setShowPreviewModal(true); }}
+                                    className="flex-1 py-3 px-4 rounded-xl bg-amber-600 text-white font-bold text-sm hover:bg-amber-700 transition-colors"
+                                >
+                                    Entendido, continuar →
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══ PRE-SEND PREVIEW MODAL — Final confirmation ══ */}
+            {showPreviewModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-12 h-12 rounded-2xl bg-green-100 flex items-center justify-center text-2xl">✉️</div>
+                            <div>
+                                <h2 className="text-lg font-black text-gray-900">Confirmación Final</h2>
+                                <p className="text-sm text-gray-500">Esto enviará emails reales e irreversibles</p>
+                            </div>
+                        </div>
+                        <div className="space-y-4 mb-6">
+                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                                <p className="text-xs font-bold text-gray-500 mb-1">ASUNTO QUE RECIBIRÁN:</p>
+                                <p className="text-sm font-semibold text-gray-900 break-words">{subject}</p>
+                            </div>
+                            <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                                <p className="text-xs font-bold text-blue-600 mb-1">DESTINATARIOS:</p>
+                                <p className="text-2xl font-black text-blue-700">{reachCount.toLocaleString()}</p>
+                                <p className="text-xs text-blue-500">contactos seleccionados</p>
+                            </div>
+                            {hasTestedSend && (
+                                <div className="bg-green-50 rounded-xl p-3 border border-green-200 flex items-center gap-2 text-green-700 text-sm font-semibold">
+                                    <span>✅</span><span>Enviaste una prueba y validaste el email</span>
+                                </div>
+                            )}
+                            <div className="bg-amber-50 rounded-xl p-3 border border-amber-200 text-amber-800 text-xs leading-relaxed">
+                                <strong>Seguridad:</strong> Si un lead no tiene datos para una variable, ese email será <strong>bloqueado automáticamente</strong>. Es mejor omitirlo que enviar con placeholders.
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setShowPreviewModal(false)} className="flex-1 py-3 px-4 rounded-xl bg-gray-100 text-gray-700 font-bold text-sm hover:bg-gray-200 transition-colors">
+                                Cancelar
+                            </button>
+                            <button onClick={executeFinalSend} disabled={isSending} className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                                {isSending ? '⏳ Enviando...' : `🚀 Enviar a ${reachCount.toLocaleString()} contactos`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
