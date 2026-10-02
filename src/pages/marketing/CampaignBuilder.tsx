@@ -34,17 +34,17 @@ export default function CampaignBuilder() {
             return;
         }
         setIsCompanyLoading(true);
-        supabase
-            .from('companies')
-            .select('*')
-            .eq('id', effectiveCompanyId)
-            .single()
-            .then(({ data }) => {
-                if (data) setCompany(data);
-            })
-            .finally(() => {
-                setIsCompanyLoading(false);
-            });
+        Promise.resolve(
+            supabase
+                .from('companies')
+                .select('*')
+                .eq('id', effectiveCompanyId)
+                .single()
+        ).then(({ data }) => {
+            if (data) setCompany(data);
+        }).finally(() => {
+            setIsCompanyLoading(false);
+        });
     }, [effectiveCompanyId]);
 
     const DRAFT_KEY = `crm_campaign_draft_${effectiveCompanyId || 'default'}`;
