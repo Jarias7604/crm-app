@@ -472,33 +472,102 @@ export default function ProspectingEmailStudio({
             .replace(/{{(rubro|industria|denominacion|congregacion)}}/gi, industry);
     };
 
-    // Insert variable tag into subject — prevents duplicate insertion + scrolls input to end so user sees it
-    const insertVariableIntoSubject = (variableTag: string) => {
+    // ─────────────────────────────────────────────────────────────────────────
+    // UNIVERSAL VARIABLE INSERTION — cursor-aware, works in any field
+    // The user clicks anywhere in a text field → positions cursor → clicks a
+    // variable button → the variable appears exactly where the cursor was.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Track the last focused editable element and its setter
+    const lastFocusedFieldRef = useRef<{
+        type: 'input' | 'contenteditable';
+        el: HTMLInputElement | HTMLTextAreaElement | HTMLElement | null;
+        setter?: (val: string) => void;
+        label?: string;
+    } | null>(null);
+
+    /** Register a plain input/textarea as the active target for variable insertion */
+    const trackInputFocus = (
+        el: HTMLInputElement | HTMLTextAreaElement | null,
+        setter: (val: string) => void,
+        label: string
+    ) => {
+        if (!el) return;
+        lastFocusedFieldRef.current = { type: 'input', el, setter, label };
+    };
+
+    /** Register a contentEditable element as the active target */
+    const trackContentEditableFocus = (el: HTMLElement | null, label: string) => {
+        if (!el) return;
+        lastFocusedFieldRef.current = { type: 'contenteditable', el, label };
+    };
+
+    /** Insert variable at cursor position in whichever field the user last touched */
+    const insertVariable = (variableTag: string) => {
+        const target = lastFocusedFieldRef.current;
+
+        // ── Case 1: contentEditable element (body text blocks) ──────────────
+        if (target?.type === 'contenteditable' && target.el) {
+            target.el.focus();
+            // Use execCommand to insert at caret (works across all browsers for contentEditable)
+            const inserted = document.execCommand('insertText', false, variableTag);
+            if (!inserted) {
+                // Fallback: append at end of element
+                target.el.innerText = (target.el.innerText || '') + variableTag;
+            }
+            // Trigger onBlur manually to sync state
+            target.el.dispatchEvent(new Event('blur', { bubbles: true }));
+            toast.success(`✅ ${variableTag} insertado en "${target.label}"`, { duration: 2000 });
+            return;
+        }
+
+        // ── Case 2: regular input / textarea ────────────────────────────────
+        if (target?.type === 'input' && target.el && target.setter) {
+            const inputEl = target.el as HTMLInputElement | HTMLTextAreaElement;
+            inputEl.focus();
+            const start = inputEl.selectionStart ?? inputEl.value.length;
+            const end = inputEl.selectionEnd ?? inputEl.value.length;
+            const before = inputEl.value.slice(0, start);
+            const after = inputEl.value.slice(end);
+            const newVal = `${before}${variableTag}${after}`;
+            target.setter(newVal);
+            // Restore cursor position after React re-render
+            setTimeout(() => {
+                const newPos = start + variableTag.length;
+                inputEl.setSelectionRange(newPos, newPos);
+                inputEl.focus();
+                if (inputEl === subjectInputRef.current) {
+                    inputEl.scrollLeft = inputEl.scrollWidth;
+                }
+            }, 20);
+            toast.success(`✅ ${variableTag} insertado en "${target.label}"`, { duration: 2000 });
+            return;
+        }
+
+        // ── Fallback: no field focused → append to subject ──────────────────
         if (subject.includes(variableTag)) {
-            toast.error(`¿Ya está! La variable ${variableTag} ya aparece en el asunto`, { duration: 3000 });
-            // Scroll to end so user sees it
+            toast.error(`¿Ya está! ${variableTag} ya aparece en el asunto`, { duration: 2500 });
             setTimeout(() => {
                 if (subjectInputRef.current) {
                     subjectInputRef.current.focus();
-                    const len = subjectInputRef.current.value.length;
-                    subjectInputRef.current.setSelectionRange(len, len);
                     subjectInputRef.current.scrollLeft = subjectInputRef.current.scrollWidth;
                 }
             }, 50);
             return;
         }
         setSubject(prev => `${prev} ${variableTag}`.trim());
-        toast.success(`✅ Variable ${variableTag} agregada al final del asunto`, { duration: 2000 });
-        // Scroll input to end so user sees the inserted variable
+        toast.success(`✅ ${variableTag} agregado al asunto`, { duration: 2000 });
         setTimeout(() => {
             if (subjectInputRef.current) {
                 subjectInputRef.current.focus();
-                const len = subjectInputRef.current.value.length;
-                subjectInputRef.current.setSelectionRange(len, len);
                 subjectInputRef.current.scrollLeft = subjectInputRef.current.scrollWidth;
             }
         }, 50);
     };
+
+    // Legacy alias — keeps existing "Insertar Variable en Asunto" buttons working,
+    // but now they also respect cursor position if the subject field is focused.
+    const insertVariableIntoSubject = (variableTag: string) => insertVariable(variableTag);
 
     // In-canvas block movement
     const moveBlock = (index: number, direction: 'up' | 'down') => {
@@ -1244,6 +1313,7 @@ export default function ProspectingEmailStudio({
                             className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
                             value={subject}
                             onChange={(e) => setSubject(e.target.value)}
+                            onFocus={(e) => trackInputFocus(e.currentTarget, setSubject, 'Asunto del Correo')}
                             placeholder="Una pregunta para {{nombre_empresa}}"
                         />
                     </div>
@@ -1252,9 +1322,11 @@ export default function ProspectingEmailStudio({
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
                             <label className="text-[11px] font-bold text-gray-600">
-                                Insertar Variable en Asunto
+                                Insertar Variable
                             </label>
-                            <span className="text-[10px] text-gray-400">Clic para añadir</span>
+                            <span className="text-[10px] text-blue-500 font-semibold">
+                                Clic en un campo de texto, posiciona el cursor, luego presiona la variable
+                            </span>
                         </div>
                         <div className="grid grid-cols-2 gap-1.5">
                             {[
@@ -1677,18 +1749,20 @@ export default function ProspectingEmailStudio({
                                                         <p
                                                             contentEditable
                                                             suppressContentEditableWarning
+                                                            onFocus={(e) => trackContentEditableFocus(e.currentTarget, 'Saludo')}
                                                             onBlur={(e) => setGreeting(e.currentTarget.innerText)}
-                                                            className="text-base font-bold text-gray-900 outline-none hover:bg-blue-50/50 rounded px-1 transition"
-                                                            title="Haz clic para editar saludo"
+                                                            className="text-base font-bold text-gray-900 outline-none hover:bg-blue-50/50 focus:bg-blue-50/70 rounded px-1 transition cursor-text"
+                                                            title="Haz clic para editar saludo — luego presiona un botón de variable para insertar"
                                                         >
                                                             {greeting}
                                                         </p>
                                                         <p
                                                             contentEditable
                                                             suppressContentEditableWarning
+                                                            onFocus={(e) => trackContentEditableFocus(e.currentTarget, 'Texto Intro')}
                                                             onBlur={(e) => setIntroText(e.currentTarget.innerText)}
-                                                            className="text-sm font-medium text-gray-700 leading-relaxed outline-none hover:bg-blue-50/50 rounded px-1 transition"
-                                                            title="Haz clic para editar texto"
+                                                            className="text-sm font-medium text-gray-700 leading-relaxed outline-none hover:bg-blue-50/50 focus:bg-blue-50/70 rounded px-1 transition cursor-text"
+                                                            title="Haz clic para editar texto — luego presiona un botón de variable para insertar"
                                                         >
                                                             {introText}
                                                         </p>
@@ -1704,9 +1778,10 @@ export default function ProspectingEmailStudio({
                                                         <p
                                                             contentEditable
                                                             suppressContentEditableWarning
+                                                            onFocus={(e) => trackContentEditableFocus(e.currentTarget, 'Pregunta Destacada')}
                                                             onBlur={(e) => setCalloutText(e.currentTarget.innerText)}
-                                                            className="text-sm sm:text-[15px] font-extrabold text-[#0F172A] leading-snug outline-none hover:bg-blue-100/50 rounded px-1 transition"
-                                                            title="Haz clic para editar pregunta destacada"
+                                                            className="text-sm sm:text-[15px] font-extrabold text-[#0F172A] leading-snug outline-none hover:bg-blue-100/50 focus:bg-blue-100/70 rounded px-1 transition cursor-text"
+                                                            title="Haz clic para editar pregunta — luego presiona un botón de variable para insertar"
                                                         >
                                                             {substituteVariables(calloutText)}
                                                         </p>
@@ -1718,9 +1793,10 @@ export default function ProspectingEmailStudio({
                                                     <p
                                                         contentEditable
                                                         suppressContentEditableWarning
+                                                        onFocus={(e) => trackContentEditableFocus(e.currentTarget, 'Texto de Solución')}
                                                         onBlur={(e) => setSolutionText(e.currentTarget.innerText)}
-                                                        className="text-sm font-medium text-gray-700 leading-relaxed outline-none hover:bg-blue-50/50 rounded px-1 transition"
-                                                        title="Haz clic para editar texto de solución"
+                                                        className="text-sm font-medium text-gray-700 leading-relaxed outline-none hover:bg-blue-50/50 focus:bg-blue-50/70 rounded px-1 transition cursor-text"
+                                                        title="Haz clic para editar texto de solución — luego presiona un botón de variable para insertar"
                                                     >
                                                         {solutionText}
                                                     </p>
@@ -1731,8 +1807,9 @@ export default function ProspectingEmailStudio({
                                                     <p
                                                         contentEditable
                                                         suppressContentEditableWarning
+                                                        onFocus={(e) => trackContentEditableFocus(e.currentTarget, 'Texto Previo al Video')}
                                                         onBlur={(e) => setLeadInText(e.currentTarget.innerText)}
-                                                        className="text-sm font-bold text-gray-900 outline-none hover:bg-blue-50/50 rounded px-1 transition"
+                                                        className="text-sm font-bold text-gray-900 outline-none hover:bg-blue-50/50 focus:bg-blue-50/70 rounded px-1 transition cursor-text"
                                                         title="Haz clic para editar texto previo al video"
                                                     >
                                                         {leadInText}
