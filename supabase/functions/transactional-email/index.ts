@@ -269,7 +269,10 @@ serve(async (req) => {
     const platformBrand = 'Arias CRM';
     const senderName = (type === 'welcome') ? platformBrand : (resendConfig.senderName || platformBrand);
     const senderEmail = resendConfig.senderEmail || 'notificaciones@ariascrm.com';
-    const appUrl = Deno.env.get('APP_URL') || 'https://ariascrm.com';
+    const rawAppUrl = Deno.env.get('APP_URL');
+    const appUrl = (rawAppUrl && !rawAppUrl.includes('vercel.app') && !rawAppUrl.includes('88ff4cb4'))
+      ? rawAppUrl
+      : 'https://ariascrm.com';
 
     let subject = '';
     let html = '';
@@ -281,7 +284,7 @@ serve(async (req) => {
         adminName: adminName || adminEmail,
         adminEmail,
         trialDays: trialDays || 14,
-        loginUrl: `${appUrl}/login`,
+        loginUrl: 'https://ariascrm.com/login',
         senderName: platformBrand,
       });
     } else if (type === 'trial_expiry') {
@@ -292,7 +295,7 @@ serve(async (req) => {
         adminName: adminName || adminEmail,
         daysLeft: days,
         expiryDate: expiryDate || 'pronto',
-        billingUrl: `${appUrl}/company/billing`,
+        billingUrl: 'https://ariascrm.com/company/billing',
         senderName,
       });
     } else {
