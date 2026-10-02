@@ -28,13 +28,15 @@ function substituteLeadVariables(
 
     const firstName = (lead.name || '').split(' ')[0] || '';
     // company_name is the definitive org name. Fall back to personal name if missing.
-    const companyName = (lead.company_name && lead.company_name.trim() !== '' && lead.company_name !== 'Individual')
+    // If BOTH are empty, companyName stays undefined so safety gate catches it.
+    const rawCompany = (lead.company_name && lead.company_name.trim() !== '' && lead.company_name !== 'Individual')
         ? lead.company_name.trim()
         : (lead.name || '').trim();
+    const companyName = rawCompany || null; // null = unresolvable
     const city  = (lead.address || '').split(',')[0].trim();
     const industry = lead.industry || '';
 
-    const result = text
+    let result = text
         // Time-based greeting
         .replace(/\{\{greeting\}\}/gi, greeting)
         // Full name
@@ -43,12 +45,20 @@ function substituteLeadVariables(
         .replace(/\{\{(first_name|nombre_contacto)\}\}/gi, firstName)
         // Phone
         .replace(/\{\{phone\}\}/gi, lead.phone || '')
-        // Organization / Church / Company — ALL recognized variants mapped to companyName
-        .replace(/\{\{(nombre_empresa|company_name|empresa|nombre_iglesia|nombre iglesia|iglesia|nombre_congregacion|congregacion|organizacion|nombre_organizacion)\}\}/gi, companyName)
         // City / Location
         .replace(/\{\{(ciudad|city)\}\}/gi, city)
         // Industry / denomination
         .replace(/\{\{(rubro|industria|industry|denominacion|denomination)\}\}/gi, industry);
+
+    // Organization / Church / Company — only substitute if we actually have a value.
+    // If companyName is null (lead has no name AND no company_name), leave {{...}} intact
+    // so the safety gate detects it and blocks the send.
+    if (companyName !== null) {
+        result = result.replace(
+            /\{\{(nombre_empresa|company_name|empresa|nombre_iglesia|nombre iglesia|iglesia|nombre_congregacion|congregacion|organizacion|nombre_organizacion)\}\}/gi,
+            companyName
+        );
+    }
 
     // Detect ANY remaining unresolved {{...}} — these must block sending
     const missingVars = result.match(/\{\{[^}]+\}\}/g) || [];
