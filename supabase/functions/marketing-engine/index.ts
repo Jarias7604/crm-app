@@ -15,6 +15,47 @@ function normalizePhone(phone: string, defaultCountryCode = '503'): string {
 }
 
 /**
+ * Substitutes ALL lead-specific template variables in a text/HTML string.
+ * Returns the substituted result AND a list of any variables that could NOT be resolved.
+ * If missingVars.length > 0 the caller MUST block sending — never send with raw {{...}} placeholders.
+ */
+function substituteLeadVariables(
+    text: string,
+    lead: { name?: string; company_name?: string; phone?: string; address?: string; industry?: string },
+    greeting: string
+): { result: string; missingVars: string[] } {
+    if (!text) return { result: '', missingVars: [] };
+
+    const firstName = (lead.name || '').split(' ')[0] || '';
+    // company_name is the definitive org name. Fall back to personal name if missing.
+    const companyName = (lead.company_name && lead.company_name.trim() !== '' && lead.company_name !== 'Individual')
+        ? lead.company_name.trim()
+        : (lead.name || '').trim();
+    const city  = (lead.address || '').split(',')[0].trim();
+    const industry = lead.industry || '';
+
+    const result = text
+        // Time-based greeting
+        .replace(/\{\{greeting\}\}/gi, greeting)
+        // Full name
+        .replace(/\{\{(name|nombre)\}\}/gi, lead.name || '')
+        // First name
+        .replace(/\{\{(first_name|nombre_contacto)\}\}/gi, firstName)
+        // Phone
+        .replace(/\{\{phone\}\}/gi, lead.phone || '')
+        // Organization / Church / Company — ALL recognized variants mapped to companyName
+        .replace(/\{\{(nombre_empresa|company_name|empresa|nombre_iglesia|nombre iglesia|iglesia|nombre_congregacion|congregacion|organizacion|nombre_organizacion)\}\}/gi, companyName)
+        // City / Location
+        .replace(/\{\{(ciudad|city)\}\}/gi, city)
+        // Industry / denomination
+        .replace(/\{\{(rubro|industria|industry|denominacion|denomination)\}\}/gi, industry);
+
+    // Detect ANY remaining unresolved {{...}} — these must block sending
+    const missingVars = result.match(/\{\{[^}]+\}\}/g) || [];
+    return { result, missingVars };
+}
+
+/**
  * Injects click tracking into all <a href="..."> links in the HTML.
  * Replaces original URLs with a tracked redirect URL.
  */
@@ -182,22 +223,27 @@ Deno.serve(async (req) => {
             try {
                 const messageId = crypto.randomUUID();
                 let conversationId = null;
-                let localizedContent = campaign.content || '';
 
                 const hour = new Date().getHours();
                 const greeting = hour >= 5 && hour < 12 ? 'Buenos días' : hour >= 12 && hour < 19 ? 'Buenas tardes' : 'Buenas noches';
-                const firstName = (lead.name || '').split(' ')[0] || 'Hola';
-                const companyName = (lead.company_name && lead.company_name !== 'Individual') ? lead.company_name : (lead.name || '');
-                const city = (lead.address || '').split(',')[0] || '';
-                const industry = lead.industry || 'su sector';
-                localizedContent = localizedContent
-                    .replace(/{{greeting}}/gi, greeting)
-                    .replace(/{{(name|nombre)}}/gi, lead.name || '')
-                    .replace(/{{(first_name|nombre_contacto)}}/gi, firstName)
-                    .replace(/{{phone}}/gi, lead.phone || '')
-                    .replace(/{{(nombre_empresa|company_name|empresa|nombre_iglesia|nombre iglesia|iglesia)}}/gi, companyName)
-                    .replace(/{{(ciudad|city)}}/gi, city)
-                    .replace(/{{(rubro|industria|industry)}}/gi, industry);
+
+                // ── Substitute variables in BOTH body and subject upfront ──
+                const { result: substitutedContent, missingVars: contentMissing } = substituteLeadVariables(campaign.content || '', lead, greeting);
+                const rawSubject = campaign.subject || campaign.name || '';
+                const { result: localizedSubject, missingVars: subjectMissing } = substituteLeadVariables(rawSubject, lead, greeting);
+                let localizedContent = substitutedContent;
+
+                // ══ SAFETY GATE ══════════════════════════════════════════════════════════
+                // If ANY {{variable}} is still unresolved in subject or body → BLOCK send.
+                // Sending emails with raw {{nombre_iglesia}} placeholders is UNACCEPTABLE.
+                // ═════════════════════════════════════════════════════════════════════════
+                const allMissingVars = [...new Set([...contentMissing, ...subjectMissing])];
+                if (allMissingVars.length > 0) {
+                    const reason = `Variables sin datos del lead: ${allMissingVars.join(', ')}`;
+                    console.warn(`[Marketing-Engine] ⛔ BLOQUEADO lead ${lead.id} (${lead.name || 'sin-nombre'}) — ${reason}`);
+                    results.failed++;
+                    continue; // Do NOT send — move to next lead
+                }
 
                 const extractMediaAndText = (html: string) => {
                     let mediaUrl: string | null = null;
@@ -309,15 +355,7 @@ Deno.serve(async (req) => {
                     // Extract sender domain for List-Unsubscribe header
                     const senderDomain = senderEmail.includes('@') ? senderEmail.split('@')[1] : 'ariascrm.com';
 
-                    const rawSubject = campaign.subject || campaign.name || '';
-                    const localizedSubject = rawSubject
-                        .replace(/{{greeting}}/gi, greeting)
-                        .replace(/{{(name|nombre)}}/gi, lead.name || '')
-                        .replace(/{{(first_name|nombre_contacto)}}/gi, firstName)
-                        .replace(/{{phone}}/gi, lead.phone || '')
-                        .replace(/{{(nombre_empresa|company_name|empresa|nombre_iglesia|nombre iglesia|iglesia)}}/gi, companyName)
-                        .replace(/{{(ciudad|city)}}/gi, city)
-                        .replace(/{{(rubro|industria|industry)}}/gi, industry);
+                    // localizedSubject is already computed and validated at the top of this try-block
 
                     const emailPayload: any = {
                         from: fromDisplay,
