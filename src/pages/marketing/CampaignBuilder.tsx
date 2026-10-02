@@ -24,9 +24,16 @@ export default function CampaignBuilder() {
     const effectiveCompanyId = simulatedCompanyId || profile?.company_id;
     const [company, setCompany] = useState<any>(null);
     const [isLoadingCampaign, setIsLoadingCampaign] = useState<boolean>(Boolean(campaignId));
+    // isCompanyLoading ensures ProspectingEmailStudio NEVER mounts before company data arrives.
+    // This prevents the 'Nuestra Empresa' fallback from being baked into the compiled HTML.
+    const [isCompanyLoading, setIsCompanyLoading] = useState<boolean>(true);
 
     useEffect(() => {
-        if (!effectiveCompanyId) return;
+        if (!effectiveCompanyId) {
+            setIsCompanyLoading(false);
+            return;
+        }
+        setIsCompanyLoading(true);
         supabase
             .from('companies')
             .select('*')
@@ -34,6 +41,9 @@ export default function CampaignBuilder() {
             .single()
             .then(({ data }) => {
                 if (data) setCompany(data);
+            })
+            .finally(() => {
+                setIsCompanyLoading(false);
             });
     }, [effectiveCompanyId]);
 
@@ -480,15 +490,17 @@ export default function CampaignBuilder() {
                 </div>
             )}
 
-            {isLoadingCampaign ? (
+            {isLoadingCampaign || isCompanyLoading ? (
                 <div className="flex flex-col items-center justify-center min-h-[55vh] gap-3 bg-white/50 backdrop-blur-sm rounded-2xl border border-gray-100 p-8 shadow-xs">
                     <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
-                    <p className="text-sm font-bold text-gray-700">Cargando borrador de la campaña...</p>
+                    <p className="text-sm font-bold text-gray-700">
+                        {isLoadingCampaign ? 'Cargando borrador de la campaña...' : 'Cargando datos de empresa...'}
+                    </p>
                     <p className="text-xs text-gray-400">Recuperando diseño, textos y configuración guardada</p>
                 </div>
             ) : selectedChannel === 'email' && emailMode === 'prospecting' ? (
                 <ProspectingEmailStudio
-                    key={`prospecting-studio-${effectiveCompanyId || 'default'}-${campaignId || 'new'}`}
+                    key={`prospecting-studio-${effectiveCompanyId || 'default'}-${company?.id || 'no-company'}-${campaignId || 'new'}`}
                     company={company}
                     campaignId={campaignId}
                     initialName={formData.name || (company?.name ? `Prospección - ${company.name}` : (company?.name?.toLowerCase().includes('iclesia') ? 'Prospección - Iglesias' : 'Prospección - Comercial'))}

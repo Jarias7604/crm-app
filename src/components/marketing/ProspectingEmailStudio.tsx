@@ -177,9 +177,14 @@ export default function ProspectingEmailStudio({
     const [isSending, setIsSending] = useState(false);
     const [hoveredBlockId, setHoveredBlockId] = useState<string | null>(null);
 
-    // Determine company context
+    // Determine company context — wait for company to be loaded (CampaignBuilder ensures this)
     const isIclesia = Boolean(company?.name?.toLowerCase().includes('iclesia'));
-    const companyName = company?.name || 'Nuestra Empresa';
+    // NEVER fallback to a hardcoded string that could end up in compiled HTML.
+    // If company is not loaded yet (should not happen due to CampaignBuilder gate), use a
+    // recognizable variable so marketing-engine or the user can catch it.
+    const companyName = company?.name?.trim() || '';
+    // Guard: do not allow studio to render with empty company when company is expected
+    const companyDisplayName = companyName || (isIclesia ? 'Iclesia' : '');
 
     // 1. Resolve stored draft from localStorage or initialStudioState or parsedFromHtml
     const companyDraftKey = company?.id ? `crm_prospecting_studio_new_${company.id}` : 'crm_prospecting_studio_new_default';
@@ -222,7 +227,13 @@ export default function ProspectingEmailStudio({
             : (isIclesia ? '/images/marketing/jimmy-video-preview.png' : 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=800&q=80'));
 
     // Button Controls
-    const [buttonText, setButtonText] = useState(() => effectiveInitial.buttonText || (isIclesia ? 'Ver cómo funciona Iclesia' : `Conocer más sobre ${companyName}`));
+    const [buttonText, setButtonText] = useState(() => effectiveInitial.buttonText || (
+        isIclesia
+            ? 'Ver cómo funciona Iclesia'
+            : companyDisplayName
+                ? `Conocer más sobre ${companyDisplayName}`
+                : 'Conocer más'
+    ));
     const [buttonColor, setButtonColor] = useState(() => effectiveInitial.buttonColor || '#0066FF');
     const [buttonLink, setButtonLink] = useState(() => effectiveInitial.buttonLink || (isIclesia ? 'https://youtu.be/dvRSzR1x3os' : (company?.website || 'https://ariascrm.com')));
 
@@ -240,10 +251,22 @@ export default function ProspectingEmailStudio({
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
     // Dynamic Text Content (Adapted for current tenant company / churches)
-    const [greeting, setGreeting] = useState(() => effectiveInitial.greeting || 'Hola, cordial saludo.');
-    const [introText, setIntroText] = useState(() => effectiveInitial.introText || (isIclesia ? 'Mi nombre es Jimmy Arias de Iclesia y quería hacerles una consulta:' : `Mi nombre es ${defaultSenderName} de ${companyName} y quería hacerles una consulta:`));
+    const [greeting, setGreeting] = useState(() => effectiveInitial.greeting || 'Hola, bendiciones.');
+    const [introText, setIntroText] = useState(() => effectiveInitial.introText || (
+        isIclesia
+            ? 'Mi nombre es Jimmy Arias de Iclesia y quería hacerles una consulta:'
+            : companyDisplayName
+                ? `Mi nombre es ${defaultSenderName} de ${companyDisplayName} y quería hacerles una consulta:`
+                : `Mi nombre es ${defaultSenderName} y quería hacerles una consulta:`
+    ));
     const [calloutText, setCalloutText] = useState(() => effectiveInitial.calloutText || (isIclesia ? '¿Cuentan actualmente en {{nombre_iglesia}} con un proceso ágil para atender y dar seguimiento inmediato a cada visitante o miembro que solicita información?' : '¿Cuentan actualmente en {{nombre_empresa}} con un proceso ágil para atender y dar seguimiento inmediato a cada cliente que solicita información?'));
-    const [solutionText, setSolutionText] = useState(() => effectiveInitial.solutionText || (isIclesia ? 'En Iclesia ayudamos a congregaciones a automatizar el seguimiento de visitas, coordinar a los líderes de grupos y asegurar que ninguna persona se quede sin atención pastoral.' : `En ${companyName} ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.`));
+    const [solutionText, setSolutionText] = useState(() => effectiveInitial.solutionText || (
+        isIclesia
+            ? 'En Iclesia ayudamos a congregaciones a automatizar el seguimiento de visitas, coordinar a los líderes de grupos y asegurar que ninguna persona se quede sin atención pastoral.'
+            : companyDisplayName
+                ? `En ${companyDisplayName} ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.`
+                : 'Ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.'
+    ));
     const [leadInText, setLeadInText] = useState(() => effectiveInitial.leadInText || 'Les comparto un breve video de 45 segundos para mostrarles cómo funciona:');
     const [closingText, setClosingText] = useState(() => effectiveInitial.closingText || (isIclesia ? 'Si esto es algo que desean mejorar en su congregación, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.' : 'Si esto es algo que desean mejorar en su empresa, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.'));
     const [signoffText, setSignoffText] = useState(() => effectiveInitial.signoffText || 'Atentamente,');
@@ -424,9 +447,13 @@ export default function ProspectingEmailStudio({
             .replace(/{{(rubro|industria|denominacion|congregacion)}}/gi, industry);
     };
 
-    // Insert variable tag into subject
+    // Insert variable tag into subject — prevents duplicate insertion
     const insertVariableIntoSubject = (variableTag: string) => {
-        setSubject(prev => `${prev} ${variableTag}`);
+        if (subject.includes(variableTag)) {
+            toast.error(`La variable ${variableTag} ya está en el asunto`, { duration: 2500 });
+            return;
+        }
+        setSubject(prev => `${prev} ${variableTag}`.trim());
         toast.success(`Variable ${variableTag} agregada`, { duration: 1500 });
     };
 
