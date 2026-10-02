@@ -508,7 +508,7 @@ export default function OnboardingWizard() {
         </div>
       </div>
       <div className="py-6 text-center">
-        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">© 2026 Arias Defense · Nivel Empresarial</p>
+        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">© 2026 Arias CRM · Nivel Empresarial</p>
       </div>
     </div>
   );

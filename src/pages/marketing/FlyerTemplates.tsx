@@ -259,7 +259,7 @@ export const BenChip = ({
 export const Brand = ({ logo, name, color = '#fff', s = 1, forceText = false }: {
   logo: string | null; name?: string; color?: string; s?: number; forceText?: boolean;
 }) => {
-  const brandName = name && name !== 'auto' && name !== 'Mi Empresa' && !name.includes('ARIAS') ? name : 'Iclesia';
+  const brandName = (name && name !== 'auto') ? name : 'Mi Empresa';
   if (logo && !forceText) {
     return (
       <div style={{ display: 'inline-flex', alignItems: 'center' }}>

@@ -182,9 +182,12 @@ export default function ProspectingEmailStudio({
     const companyName = company?.name || 'Nuestra Empresa';
 
     // 1. Resolve stored draft from localStorage or initialStudioState or parsedFromHtml
+    const companyDraftKey = company?.id ? `crm_prospecting_studio_new_${company.id}` : 'crm_prospecting_studio_new_default';
     const savedLocalDraft = (() => {
         try {
-            const key = campaignId ? `crm_prospecting_studio_${campaignId}` : 'crm_prospecting_studio_new';
+            // Clean up legacy unscoped key so it never bleeds into other tenants
+            localStorage.removeItem('crm_prospecting_studio_new');
+            const key = campaignId ? `crm_prospecting_studio_${campaignId}` : companyDraftKey;
             const raw = localStorage.getItem(key);
             if (raw) return JSON.parse(raw) as Partial<ProspectingStudioState>;
         } catch { /* ignore */ }
@@ -199,12 +202,12 @@ export default function ProspectingEmailStudio({
     const defaultSenderEmail = company?.email || profile?.email || 'contacto@empresa.com';
 
     // Form Controls (Left Panel)
-    const [campaignName, setCampaignName] = useState(() => effectiveInitial.campaignName || initialName || (company?.name ? `Prospección - ${company.name}` : 'Prospección - Iglesias'));
-    const [subject, setSubject] = useState(() => effectiveInitial.subject || initialSubject || 'Una pregunta para {{nombre_iglesia}}');
+    const [campaignName, setCampaignName] = useState(() => effectiveInitial.campaignName || initialName || (company?.name ? `Prospección - ${company.name}` : 'Prospección - Comercial'));
+    const [subject, setSubject] = useState(() => effectiveInitial.subject || initialSubject || (isIclesia ? 'Una pregunta para {{nombre_iglesia}}' : 'Una pregunta para {{nombre_empresa}}'));
     const [senderIdentity, setSenderIdentity] = useState(() => effectiveInitial.senderIdentity || `${defaultSenderName} <${defaultSenderEmail}>`);
 
     // Video Controls
-    const [youtubeUrl, setYoutubeUrl] = useState(() => effectiveInitial.youtubeUrl || 'https://youtu.be/dvRSzR1x3os');
+    const [youtubeUrl, setYoutubeUrl] = useState(() => effectiveInitial.youtubeUrl || (isIclesia ? 'https://youtu.be/dvRSzR1x3os' : ''));
     const [videoCaption, setVideoCaption] = useState(() => effectiveInitial.videoCaption || `Vea en 45 segundos cómo funciona ${companyName}`);
     const [thumbMode, setThumbMode] = useState<'youtube' | 'custom'>(() => effectiveInitial.thumbMode || 'youtube');
     const [customUploadedThumb, setCustomUploadedThumb] = useState<string>(() => effectiveInitial.customUploadedThumb || '');
@@ -216,16 +219,16 @@ export default function ProspectingEmailStudio({
         ? customUploadedThumb
         : (detectedYtId
             ? `https://img.youtube.com/vi/${detectedYtId}/maxresdefault.jpg`
-            : '/images/marketing/jimmy-video-preview.png');
+            : (isIclesia ? '/images/marketing/jimmy-video-preview.png' : 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=800&q=80'));
 
     // Button Controls
     const [buttonText, setButtonText] = useState(() => effectiveInitial.buttonText || (isIclesia ? 'Ver cómo funciona Iclesia' : `Conocer más sobre ${companyName}`));
     const [buttonColor, setButtonColor] = useState(() => effectiveInitial.buttonColor || '#0066FF');
-    const [buttonLink, setButtonLink] = useState(() => effectiveInitial.buttonLink || 'https://youtu.be/dvRSzR1x3os');
+    const [buttonLink, setButtonLink] = useState(() => effectiveInitial.buttonLink || (isIclesia ? 'https://youtu.be/dvRSzR1x3os' : (company?.website || 'https://ariascrm.com')));
 
     // Signature Controls
     const [hasLogo, setHasLogo] = useState(() => typeof effectiveInitial.hasLogo === 'boolean' ? effectiveInitial.hasLogo : true);
-    const [hasPhoto, setHasPhoto] = useState(() => typeof effectiveInitial.hasPhoto === 'boolean' ? effectiveInitial.hasPhoto : true);
+    const [hasPhoto, setHasPhoto] = useState(() => typeof effectiveInitial.hasPhoto === 'boolean' ? effectiveInitial.hasPhoto : (isIclesia ? true : Boolean(profile?.avatar_url)));
     const [photoShape, setPhotoShape] = useState<'circle' | 'rounded' | 'square'>(() => effectiveInitial.photoShape || 'circle');
     const [avatarUrl, setAvatarUrl] = useState<string>(() => effectiveInitial.avatarUrl || profile?.avatar_url || (isIclesia ? '/images/marketing/jimmy-avatar.png' : ''));
     const [sigName, setSigName] = useState(() => effectiveInitial.sigName || ((profile?.full_name && profile.full_name !== 'Platform Owner') ? profile.full_name : (isIclesia ? 'Jimmy Arias' : companyName)));
@@ -373,8 +376,10 @@ export default function ProspectingEmailStudio({
             setCalloutText(`¿Cuentan actualmente en {{nombre_empresa}} con un proceso ágil para atender y dar seguimiento inmediato a cada cliente que solicita información?`);
             setSolutionText(`En ${compName} ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.`);
             setButtonText(`Conocer más sobre ${compName}`);
+            setButtonLink(company.website || 'https://ariascrm.com');
             setCampaignName(`Prospección - ${compName}`);
             setSubject('Una pregunta para {{nombre_empresa}}');
+            setYoutubeUrl('');
             setCustomHeaderLogo(company.logo_url || '');
             setCustomSigLogo(company.logo_url || '');
         }
@@ -802,7 +807,8 @@ export default function ProspectingEmailStudio({
             const html = compileToEmailHtml();
             const studioState = getCurrentStudioState();
             try {
-                const key = campaignId ? `crm_prospecting_studio_${campaignId}` : 'crm_prospecting_studio_new';
+                const companyDraftKey = company?.id ? `crm_prospecting_studio_new_${company.id}` : 'crm_prospecting_studio_new_default';
+                const key = campaignId ? `crm_prospecting_studio_${campaignId}` : companyDraftKey;
                 localStorage.setItem(key, JSON.stringify(studioState));
             } catch { /* ignore */ }
             isHydratedRef.current = true;
@@ -1117,7 +1123,7 @@ export default function ProspectingEmailStudio({
                                     setYoutubeUrl(e.target.value);
                                     setButtonLink(e.target.value);
                                 }}
-                                placeholder="https://youtu.be/dvR5zR1x3os"
+                                placeholder="https://youtu.be/..."
                             />
                             <LinkIcon className="w-3.5 h-3.5 text-blue-500 absolute right-3 top-1/2 -translate-y-1/2" />
                         </div>
@@ -1167,7 +1173,7 @@ export default function ProspectingEmailStudio({
                             className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             value={buttonText}
                             onChange={(e) => setButtonText(e.target.value)}
-                            placeholder="Ver cómo funciona Iclesia"
+                            placeholder={isIclesia ? 'Ver cómo funciona Iclesia' : `Conocer más sobre ${companyName}`}
                         />
                         <div className="flex items-center gap-2 p-1.5 bg-gray-50 border border-gray-200 rounded-xl">
                             <input

@@ -266,22 +266,23 @@ serve(async (req) => {
       });
     }
 
-    const senderName = resendConfig.senderName || 'Arias CRM';
-    const senderEmail = resendConfig.senderEmail || 'noreply@ariasdefense.com';
-    const appUrl = Deno.env.get('APP_URL') || 'https://crm-app-v2-jimmy-s-projects-88ff4cb4.vercel.app';
+    const platformBrand = 'Arias CRM';
+    const senderName = (type === 'welcome') ? platformBrand : (resendConfig.senderName || platformBrand);
+    const senderEmail = resendConfig.senderEmail || 'notificaciones@ariascrm.com';
+    const appUrl = Deno.env.get('APP_URL') || 'https://ariascrm.com';
 
     let subject = '';
     let html = '';
 
     if (type === 'welcome') {
-      subject = `¡Bienvenido a ${senderName}, ${(adminName || adminEmail).split(' ')[0]}! 🎉`;
+      subject = `¡Bienvenido a ${platformBrand}, ${(adminName || adminEmail).split(' ')[0]}! 🎉`;
       html = buildWelcomeEmail({
         companyName: companyName || 'Tu Empresa',
         adminName: adminName || adminEmail,
         adminEmail,
         trialDays: trialDays || 14,
         loginUrl: `${appUrl}/login`,
-        senderName,
+        senderName: platformBrand,
       });
     } else if (type === 'trial_expiry') {
       const days = daysLeft ?? 3;

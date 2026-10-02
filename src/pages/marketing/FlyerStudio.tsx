@@ -250,16 +250,7 @@ export default function FlyerStudio() {
   const canvasH = Math.round(1080 * (getFlyerDimensions(format).height / getFlyerDimensions(format).width));
   const [tone, setTone] = useState('moderno');
   const [variantCount, setVariantCount] = useState<1 | 2 | 3>(1);
-  const [colors, setColors] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('flyer_brand_colors');
-      if (saved) {
-        const p = JSON.parse(saved);
-        if (Array.isArray(p) && p.length > 0) return p;
-      }
-    } catch {}
-    return ['#06c7d9', '#2563eb', '#6d4aff'];
-  });
+  const [colors, setColors] = useState<string[]>(['#06c7d9', '#2563eb', '#6d4aff']);
   const [gradColor1, setGradColor1] = useState<string>(() => {
     try {
       const saved = localStorage.getItem('flyer_dynamic_gradient');
@@ -429,17 +420,23 @@ export default function FlyerStudio() {
 
       if (logoPreview && !logoPreview.startsWith('data:image/svg+xml;base64,PHN2Zy')) {
         payload.logo_url = logoPreview;
-        localStorage.setItem('flyer_custom_logo', logoPreview);
+        const companyLogoKey = profile?.company_id ? `flyer_custom_logo_${profile.company_id}` : 'flyer_custom_logo_default';
+        localStorage.setItem(companyLogoKey, logoPreview);
       }
 
       await brandingService.updateBranding(payload);
-      localStorage.setItem('flyer_brand_colors', JSON.stringify(colors));
+      const companyColorsKey = profile?.company_id ? `flyer_brand_colors_${profile.company_id}` : 'flyer_brand_colors_default';
+      localStorage.setItem(companyColorsKey, JSON.stringify(colors));
       localStorage.setItem('flyer_dynamic_gradient', JSON.stringify(brandGradObj));
       toast.success('🏢 ¡Logo, colores y degradado guardados para toda tu empresa!');
     } catch (err: any) {
       console.error('Error saving brand colors:', err);
-      localStorage.setItem('flyer_brand_colors', JSON.stringify(colors));
-      if (logoPreview) localStorage.setItem('flyer_custom_logo', logoPreview);
+      const companyColorsKey = profile?.company_id ? `flyer_brand_colors_${profile.company_id}` : 'flyer_brand_colors_default';
+      localStorage.setItem(companyColorsKey, JSON.stringify(colors));
+      if (logoPreview) {
+        const companyLogoKey = profile?.company_id ? `flyer_custom_logo_${profile.company_id}` : 'flyer_custom_logo_default';
+        localStorage.setItem(companyLogoKey, logoPreview);
+      }
       toast.success('💾 Guardado en este navegador.');
     } finally {
       setSavingBrandColors(false);
@@ -449,10 +446,11 @@ export default function FlyerStudio() {
   useEffect(() => {
     if (colors && colors.length > 0) {
       try {
-        localStorage.setItem('flyer_brand_colors', JSON.stringify(colors));
+        const companyColorsKey = profile?.company_id ? `flyer_brand_colors_${profile.company_id}` : 'flyer_brand_colors_default';
+        localStorage.setItem(companyColorsKey, JSON.stringify(colors));
       } catch {}
     }
-  }, [colors]);
+  }, [colors, profile?.company_id]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState('');
   const [isLogoCustomized, setIsLogoCustomized] = useState(false);
@@ -490,6 +488,8 @@ export default function FlyerStudio() {
     setLogoY(4);
     setLogoSize(1.0);
 
+    const companyLogoKey = profile?.company_id ? `flyer_custom_logo_${profile.company_id}` : 'flyer_custom_logo_default';
+
     // 1. Immediate local base64 preview for instant visual feedback
     const reader = new FileReader();
     reader.onload = ev => {
@@ -497,7 +497,8 @@ export default function FlyerStudio() {
       if (base64) {
         setLogoPreview(base64);
         try {
-          localStorage.setItem('flyer_custom_logo', base64);
+          localStorage.setItem(companyLogoKey, base64);
+          localStorage.removeItem('flyer_custom_logo'); // Clean up unscoped legacy
         } catch {}
       }
     };
@@ -505,18 +506,14 @@ export default function FlyerStudio() {
 
 
     // 2. Upload to Supabase Storage & sync to company branding
-    // NOTE: We keep the base64 as logoPreview (already set above) to avoid CORS issues
-    // with Supabase Storage URLs rendering as white/blank images.
-    // The remote URL is only stored in DB/localStorage for next-session persistence.
     if (profile?.company_id) {
       setUploadingLogo(true);
       const toastId = toast.loading('Guardando logo en tu marca...');
       try {
         const publicUrl = await storageService.uploadLogo(profile.company_id, f);
         if (publicUrl) {
-          // Do NOT replace logoPreview with publicUrl - keep base64 for display
-          // Only update localStorage with URL for persistence reference
-          localStorage.setItem('flyer_logo_remote_url', publicUrl);
+          const remoteUrlKey = `flyer_logo_remote_url_${profile.company_id}`;
+          localStorage.setItem(remoteUrlKey, publicUrl);
           await brandingService.updateBranding({ logo_url: publicUrl });
           toast.success('🏢 ¡Logo guardado con éxito para toda tu empresa!', { id: toastId });
         }
@@ -535,7 +532,9 @@ export default function FlyerStudio() {
     setLogoFile(null);
     setLogoPreview('');
     setIsLogoCustomized(true);
-    localStorage.removeItem('flyer_custom_logo');
+    const companyLogoKey = profile?.company_id ? `flyer_custom_logo_${profile.company_id}` : 'flyer_custom_logo_default';
+    localStorage.removeItem(companyLogoKey);
+    localStorage.removeItem('flyer_custom_logo'); // Purge legacy global key
     if (logoRef.current) logoRef.current.value = '';
     if (profile?.company_id) {
       try {
@@ -1001,18 +1000,26 @@ export default function FlyerStudio() {
             if (data.name) setCompanyName(data.name);
             if (data.phone) setPhone(data.phone || '');
             if (data.website) setWebsite(data.website || '');
+            const companyLogoKey = `flyer_custom_logo_${profile.company_id}`;
+            localStorage.removeItem('flyer_custom_logo'); // Purge legacy unscoped key so it never leaks across tenants
+            localStorage.removeItem('flyer_brand_colors'); // Purge legacy unscoped colors
+
             if (data.logo_url && !isLogoCustomized) {
               try {
                 const base64 = await urlToBase64(data.logo_url);
                 setLogoPreview(base64 || data.logo_url);
-                localStorage.setItem('flyer_custom_logo', base64 || data.logo_url);
+                localStorage.setItem(companyLogoKey, base64 || data.logo_url);
               } catch {
                 setLogoPreview(data.logo_url);
-                localStorage.setItem('flyer_custom_logo', data.logo_url);
+                localStorage.setItem(companyLogoKey, data.logo_url);
               }
             } else if (!isLogoCustomized) {
-              const savedLogo = localStorage.getItem('flyer_custom_logo');
-              if (savedLogo) setLogoPreview(savedLogo);
+              const savedLogo = localStorage.getItem(companyLogoKey);
+              if (savedLogo) {
+                setLogoPreview(savedLogo);
+              } else {
+                setLogoPreview('');
+              }
             }
             // Load company branding colors & gradient if configured
             const feats = (data.features || {}) as any;

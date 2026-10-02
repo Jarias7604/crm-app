@@ -59,64 +59,66 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
     const [phoneNumber, setPhoneNumber] = useState('');
 
     // CTA Pro state
-    const [ctaWhatsapp, setCtaWhatsapp] = useState('50379718911');
+    const [ctaWhatsapp, setCtaWhatsapp] = useState(() => (profile?.phone ? profile.phone.replace(/\D/g, '') : ''));
     const [ctaWhatsappMsg, setCtaWhatsappMsg] = useState('Hola, me interesa la información');
     const [ctaBookingUrl, setCtaBookingUrl] = useState('');
-    const [ctaEmail, setCtaEmail] = useState('contacto@iclesia.ai');
-    const [ctaCompanyName, setCtaCompanyName] = useState('Iclesia LLC');
+    const [ctaEmail, setCtaEmail] = useState(() => profile?.email || '');
+    const [ctaCompanyName, setCtaCompanyName] = useState(() => (profile as any)?.company_name || 'Mi Empresa');
 
     // Video modal state
     const [videoTab, setVideoTab] = useState<'youtube' | 'upload'>('youtube');
-    const [youtubeUrl, setYoutubeUrl] = useState('https://youtu.be/dvR5zR1x3os');
-    const [videoTitle, setVideoTitle] = useState('Ver cómo funciona Iclesia (Video 45 seg)');
+    const [youtubeUrl, setYoutubeUrl] = useState('');
+    const [videoTitle, setVideoTitle] = useState('Ver video de presentación');
     const [isUploadingVideo, setIsUploadingVideo] = useState(false);
 
-    // Signature state (persisted in localStorage)
+    // Signature state (persisted per company in localStorage)
+    const sigKey = `crm_user_signature_${profile?.company_id || 'default'}`;
     const [sigName, setSigName] = useState(() => {
         try {
-            const saved = localStorage.getItem('crm_user_signature_v1');
+            localStorage.removeItem('crm_user_signature_v1'); // Purge legacy unscoped key
+            const saved = localStorage.getItem(sigKey);
             if (saved) return JSON.parse(saved).name || '';
         } catch {}
-        return profile?.full_name || 'Jimmy Arias';
+        return (profile?.full_name && profile.full_name !== 'Platform Owner') ? profile.full_name : '';
     });
     const [sigTitle, setSigTitle] = useState(() => {
         try {
-            const saved = localStorage.getItem('crm_user_signature_v1');
+            const saved = localStorage.getItem(sigKey);
             if (saved) return JSON.parse(saved).title || '';
         } catch {}
-        return 'Fundador';
+        return (profile as any)?.job_title || 'Asesor Comercial';
     });
     const [sigCompany, setSigCompany] = useState(() => {
         try {
-            const saved = localStorage.getItem('crm_user_signature_v1');
+            const saved = localStorage.getItem(sigKey);
             if (saved) return JSON.parse(saved).company || '';
         } catch {}
-        return 'Iclesia';
+        return (profile as any)?.company_name || '';
     });
     const [sigPhone, setSigPhone] = useState(() => {
         try {
-            const saved = localStorage.getItem('crm_user_signature_v1');
+            const saved = localStorage.getItem(sigKey);
             if (saved) return JSON.parse(saved).phone || '';
         } catch {}
-        return profile?.phone || '703 945 9240';
+        return profile?.phone || '';
     });
     const [sigWebsite, setSigWebsite] = useState(() => {
         try {
-            const saved = localStorage.getItem('crm_user_signature_v1');
+            const saved = localStorage.getItem(sigKey);
             if (saved) return JSON.parse(saved).website || '';
         } catch {}
-        return 'iclesia.ai';
+        return profile?.website || '';
     });
     const [sigAvatar, setSigAvatar] = useState(() => {
         try {
-            const saved = localStorage.getItem('crm_user_signature_v1');
+            const saved = localStorage.getItem(sigKey);
             if (saved) return JSON.parse(saved).avatar || '';
         } catch {}
         return profile?.avatar_url || '';
     });
     const [sigLogo, setSigLogo] = useState(() => {
         try {
-            const saved = localStorage.getItem('crm_user_signature_v1');
+            const saved = localStorage.getItem(sigKey);
             if (saved) return JSON.parse(saved).logo || '';
         } catch {}
         return '';
@@ -315,7 +317,8 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
 
         // Save preferences
         try {
-            localStorage.setItem('crm_user_signature_v1', JSON.stringify({
+            const sigStorageKey = `crm_user_signature_${profile?.company_id || 'default'}`;
+            localStorage.setItem(sigStorageKey, JSON.stringify({
                 name: sigName,
                 title: sigTitle,
                 company: sigCompany,
@@ -324,6 +327,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                 avatar: sigAvatar,
                 logo: sigLogo
             }));
+            localStorage.removeItem('crm_user_signature_v1');
         } catch {}
 
         const cleanPhone = sigPhone.replace(/\D/g, '');
@@ -598,7 +602,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                             <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1 block">Dirección Web (URL)</label>
                             <input
                                 type="text"
-                                placeholder="https://youtu.be/... o https://iclesia.ai"
+                                placeholder="https://youtu.be/... o https://tu-empresa.com"
                                 className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-gray-700"
                                 value={linkUrl}
                                 onChange={(e) => setLinkUrl(e.target.value)}
@@ -663,7 +667,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1 block">Enlace de YouTube</label>
                                 <input
                                     type="text"
-                                    placeholder="https://youtu.be/dvR5zR1x3os o https://www.youtube.com/watch?v=..."
+                                    placeholder="https://youtu.be/... o https://www.youtube.com/watch?v=..."
                                     className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-red-500 font-bold text-gray-700"
                                     value={youtubeUrl}
                                     onChange={(e) => setYoutubeUrl(e.target.value)}
@@ -673,7 +677,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1 block">Título / Texto del Video</label>
                                 <input
                                     type="text"
-                                    placeholder="Ej: Ver cómo funciona Iclesia (Video 45 seg)"
+                                    placeholder="Ej: Ver cómo funciona nuestra solución (Video 45 seg)"
                                     className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-red-500 font-bold text-gray-700"
                                     value={videoTitle}
                                     onChange={(e) => setVideoTitle(e.target.value)}
@@ -749,7 +753,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                                 className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-gray-800"
                                 value={sigName}
                                 onChange={(e) => setSigName(e.target.value)}
-                                placeholder="Jimmy Arias"
+                                placeholder="Tu Nombre Completo"
                             />
                         </div>
                         <div>
@@ -759,7 +763,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                                 className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-gray-800"
                                 value={sigTitle}
                                 onChange={(e) => setSigTitle(e.target.value)}
-                                placeholder="Fundador"
+                                placeholder="Asesor Comercial"
                             />
                         </div>
                         <div>
@@ -769,7 +773,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                                 className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-gray-800"
                                 value={sigCompany}
                                 onChange={(e) => setSigCompany(e.target.value)}
-                                placeholder="Iclesia"
+                                placeholder="Nombre de tu Empresa"
                             />
                         </div>
                         <div>
@@ -779,7 +783,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                                 className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-gray-800"
                                 value={sigPhone}
                                 onChange={(e) => setSigPhone(e.target.value)}
-                                placeholder="703 945 9240"
+                                placeholder="+1 (555) 000-0000"
                             />
                         </div>
                         <div>
@@ -789,7 +793,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                                 className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-gray-800"
                                 value={sigWebsite}
                                 onChange={(e) => setSigWebsite(e.target.value)}
-                                placeholder="iclesia.ai"
+                                placeholder="tuempresa.com"
                             />
                         </div>
                         <div>
@@ -871,7 +875,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                     <button
                         onClick={() => { execCommand('insertHTML', '{{first_name}}'); setShowVariables(false); }}
                         className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition shadow-sm"
-                        title="Nombre del lead (Ej: Jimmy)"
+                        title="Nombre del lead (Ej: Carlos)"
                     >
                         Nombre
                     </button>
@@ -943,7 +947,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                     <div className="space-y-3">
                         <div>
                             <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1 block">WhatsApp — Número</label>
-                            <input type="text" className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 outline-none focus:border-green-400" value={ctaWhatsapp} onChange={(e) => setCtaWhatsapp(e.target.value)} placeholder="50379718911" />
+                            <input type="text" className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 outline-none focus:border-green-400" value={ctaWhatsapp} onChange={(e) => setCtaWhatsapp(e.target.value)} placeholder="+1 (555) 000-0000" />
                         </div>
                         <div>
                             <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1 block">WhatsApp — Mensaje Pre-llenado</label>
@@ -951,7 +955,7 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                         </div>
                         <div>
                             <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1 block">📅 URL de Agenda (Booking Page)</label>
-                            <input type="text" className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 outline-none focus:border-indigo-400" value={ctaBookingUrl} onChange={(e) => setCtaBookingUrl(e.target.value)} placeholder="https://crm-app-v2.vercel.app/book/mi-agenda" />
+                            <input type="text" className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 outline-none focus:border-indigo-400" value={ctaBookingUrl} onChange={(e) => setCtaBookingUrl(e.target.value)} placeholder="https://ariascrm.com/book/mi-agenda" />
                         </div>
                         <div>
                             <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1 block">📧 Email de Respuesta</label>

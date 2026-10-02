@@ -37,12 +37,13 @@ export default function CampaignBuilder() {
             });
     }, [effectiveCompanyId]);
 
-    const DRAFT_KEY = 'crm_campaign_draft';
+    const DRAFT_KEY = `crm_campaign_draft_${effectiveCompanyId || 'default'}`;
 
     const [formData, setFormData] = useState(() => {
         // Restore draft from localStorage on first render (new campaigns only)
         if (!window.location.pathname.includes('/campaign/') || window.location.pathname.endsWith('/new')) {
             try {
+                localStorage.removeItem('crm_campaign_draft'); // Clean legacy unscoped key
                 const saved = localStorage.getItem(DRAFT_KEY);
                 if (saved) {
                     const parsed = JSON.parse(saved);
@@ -123,7 +124,7 @@ export default function CampaignBuilder() {
         try {
             localStorage.setItem(DRAFT_KEY, JSON.stringify({ formData, selectedChannel }));
         } catch { /* ignore quota errors */ }
-    }, [formData, selectedChannel, isEditMode]);
+    }, [formData, selectedChannel, isEditMode, DRAFT_KEY]);
 
     // Restore channel from draft
     useEffect(() => {
@@ -487,7 +488,7 @@ export default function CampaignBuilder() {
                 </div>
             ) : selectedChannel === 'email' && emailMode === 'prospecting' ? (
                 <ProspectingEmailStudio
-                    key={`prospecting-studio-${campaignId || 'new'}`}
+                    key={`prospecting-studio-${effectiveCompanyId || 'default'}-${campaignId || 'new'}`}
                     company={company}
                     campaignId={campaignId}
                     initialName={formData.name || (company?.name ? `Prospección - ${company.name}` : (company?.name?.toLowerCase().includes('iclesia') ? 'Prospección - Iglesias' : 'Prospección - Comercial'))}
