@@ -168,6 +168,7 @@ export default function ProspectingEmailStudio({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const logoInputRef = useRef<HTMLInputElement>(null);
     const sigLogoInputRef = useRef<HTMLInputElement>(null);
+    const subjectInputRef = useRef<HTMLInputElement>(null); // for scroll-to-end after variable insert
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
     const [isUploadingSigLogo, setIsUploadingSigLogo] = useState(false);
 
@@ -203,8 +204,13 @@ export default function ProspectingEmailStudio({
     const effectiveInitial: Partial<ProspectingStudioState> = initialStudioState || parsedFromHtml || savedLocalDraft || {};
     const isHydratedRef = useRef(Boolean(initialStudioState || parsedFromHtml || savedLocalDraft));
 
-    const defaultSenderName = (profile?.full_name && profile.full_name !== 'Platform Owner') ? profile.full_name : (isIclesia ? 'Jimmy Arias' : companyName);
-    const defaultSenderEmail = company?.email || profile?.email || 'contacto@empresa.com';
+    const defaultSenderName = (profile?.full_name && profile.full_name !== 'Platform Owner' && profile.full_name !== companyName)
+        ? profile.full_name
+        : (isIclesia ? 'Jimmy Arias' : (profile?.full_name || companyName));
+    // Never use 'contacto@empresa.com' as a fallback — it is a forbidden placeholder string
+    const defaultSenderEmail = company?.email || profile?.email || '';
+    // True if the sender's name is the same as the company name (some admin accounts)
+    const senderNameIsCompanyName = defaultSenderName === companyDisplayName;
 
     // Form Controls (Left Panel)
     const [campaignName, setCampaignName] = useState(() => effectiveInitial.campaignName || initialName || (company?.name ? `Prospección - ${company.name}` : 'Prospección - Comercial'));
@@ -255,9 +261,12 @@ export default function ProspectingEmailStudio({
     const [introText, setIntroText] = useState(() => effectiveInitial.introText || (
         isIclesia
             ? 'Mi nombre es Jimmy Arias de Iclesia y quería hacerles una consulta:'
-            : companyDisplayName
-                ? `Mi nombre es ${defaultSenderName} de ${companyDisplayName} y quería hacerles una consulta:`
-                : `Mi nombre es ${defaultSenderName} y quería hacerles una consulta:`
+            : senderNameIsCompanyName
+                // Avoid: "Mi nombre es ACME de ACME" — just say the company is writing
+                ? (companyDisplayName ? `Les escribe ${companyDisplayName} y queríamos hacerles una consulta:` : 'Les escribimos y queríamos hacerles una consulta:')
+                : companyDisplayName
+                    ? `Mi nombre es ${defaultSenderName} de ${companyDisplayName} y quería hacerles una consulta:`
+                    : `Mi nombre es ${defaultSenderName} y quería hacerles una consulta:`
     ));
     const [calloutText, setCalloutText] = useState(() => effectiveInitial.calloutText || (isIclesia ? '¿Cuentan actualmente en {{nombre_iglesia}} con un proceso ágil para atender y dar seguimiento inmediato a cada visitante o miembro que solicita información?' : '¿Cuentan actualmente en {{nombre_empresa}} con un proceso ágil para atender y dar seguimiento inmediato a cada cliente que solicita información?'));
     const [solutionText, setSolutionText] = useState(() => effectiveInitial.solutionText || (
@@ -296,21 +305,37 @@ export default function ProspectingEmailStudio({
         const stateToLoad = initialStudioState || (initialContent ? parseStudioStateFromHtml(initialContent) : null);
         if (!stateToLoad) return;
 
+        /**
+         * Sanitize a loaded text field: replace broken placeholder strings saved
+         * from previous sessions where company was null.
+         * This ensures campaigns saved with 'Nuestra Empresa' are auto-corrected.
+         */
+        const sanitize = (text: string | undefined): string | undefined => {
+            if (!text) return text;
+            // If company is now known, replace old broken fallbacks with real name
+            if (companyDisplayName) {
+                return text
+                    .replace(/Nuestra Empresa/g, companyDisplayName)
+                    .replace(/contacto@empresa\.com/g, defaultSenderEmail || '');
+            }
+            return text;
+        };
+
         if (stateToLoad.campaignName) setCampaignName(stateToLoad.campaignName);
         if (stateToLoad.subject) setSubject(stateToLoad.subject);
         if (stateToLoad.senderIdentity) setSenderIdentity(stateToLoad.senderIdentity);
         if (stateToLoad.greeting) setGreeting(stateToLoad.greeting);
-        if (stateToLoad.introText) setIntroText(stateToLoad.introText);
+        if (stateToLoad.introText) setIntroText(sanitize(stateToLoad.introText) || stateToLoad.introText);
         if (stateToLoad.calloutText) setCalloutText(stateToLoad.calloutText);
-        if (stateToLoad.solutionText) setSolutionText(stateToLoad.solutionText);
+        if (stateToLoad.solutionText) setSolutionText(sanitize(stateToLoad.solutionText) || stateToLoad.solutionText);
         if (stateToLoad.leadInText) setLeadInText(stateToLoad.leadInText);
         if (stateToLoad.closingText) setClosingText(stateToLoad.closingText);
         if (stateToLoad.signoffText) setSignoffText(stateToLoad.signoffText);
         if (stateToLoad.youtubeUrl) setYoutubeUrl(stateToLoad.youtubeUrl);
-        if (stateToLoad.videoCaption) setVideoCaption(stateToLoad.videoCaption);
+        if (stateToLoad.videoCaption) setVideoCaption(sanitize(stateToLoad.videoCaption) || stateToLoad.videoCaption);
         if (stateToLoad.thumbMode) setThumbMode(stateToLoad.thumbMode);
         if (stateToLoad.customUploadedThumb) setCustomUploadedThumb(stateToLoad.customUploadedThumb);
-        if (stateToLoad.buttonText) setButtonText(stateToLoad.buttonText);
+        if (stateToLoad.buttonText) setButtonText(sanitize(stateToLoad.buttonText) || stateToLoad.buttonText);
         if (stateToLoad.buttonColor) setButtonColor(stateToLoad.buttonColor);
         if (stateToLoad.buttonLink) setButtonLink(stateToLoad.buttonLink);
         if (typeof stateToLoad.hasLogo === 'boolean') setHasLogo(stateToLoad.hasLogo);
@@ -318,7 +343,7 @@ export default function ProspectingEmailStudio({
         if (stateToLoad.photoShape) setPhotoShape(stateToLoad.photoShape);
         if (stateToLoad.avatarUrl) setAvatarUrl(stateToLoad.avatarUrl);
         if (stateToLoad.sigName) setSigName(stateToLoad.sigName);
-        if (stateToLoad.sigTitle) setSigTitle(stateToLoad.sigTitle);
+        if (stateToLoad.sigTitle) setSigTitle(sanitize(stateToLoad.sigTitle) || stateToLoad.sigTitle);
         if (stateToLoad.sigPhone) setSigPhone(stateToLoad.sigPhone);
         if (stateToLoad.sigWebsite) setSigWebsite(stateToLoad.sigWebsite);
         if (stateToLoad.customHeaderLogo) setCustomHeaderLogo(stateToLoad.customHeaderLogo);
@@ -447,14 +472,32 @@ export default function ProspectingEmailStudio({
             .replace(/{{(rubro|industria|denominacion|congregacion)}}/gi, industry);
     };
 
-    // Insert variable tag into subject — prevents duplicate insertion
+    // Insert variable tag into subject — prevents duplicate insertion + scrolls input to end so user sees it
     const insertVariableIntoSubject = (variableTag: string) => {
         if (subject.includes(variableTag)) {
-            toast.error(`La variable ${variableTag} ya está en el asunto`, { duration: 2500 });
+            toast.error(`¿Ya está! La variable ${variableTag} ya aparece en el asunto`, { duration: 3000 });
+            // Scroll to end so user sees it
+            setTimeout(() => {
+                if (subjectInputRef.current) {
+                    subjectInputRef.current.focus();
+                    const len = subjectInputRef.current.value.length;
+                    subjectInputRef.current.setSelectionRange(len, len);
+                    subjectInputRef.current.scrollLeft = subjectInputRef.current.scrollWidth;
+                }
+            }, 50);
             return;
         }
         setSubject(prev => `${prev} ${variableTag}`.trim());
-        toast.success(`Variable ${variableTag} agregada`, { duration: 1500 });
+        toast.success(`✅ Variable ${variableTag} agregada al final del asunto`, { duration: 2000 });
+        // Scroll input to end so user sees the inserted variable
+        setTimeout(() => {
+            if (subjectInputRef.current) {
+                subjectInputRef.current.focus();
+                const len = subjectInputRef.current.value.length;
+                subjectInputRef.current.setSelectionRange(len, len);
+                subjectInputRef.current.scrollLeft = subjectInputRef.current.scrollWidth;
+            }
+        }, 50);
     };
 
     // In-canvas block movement
@@ -1196,6 +1239,7 @@ export default function ProspectingEmailStudio({
                             Asunto del Correo
                         </label>
                         <input
+                            ref={subjectInputRef}
                             type="text"
                             className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
                             value={subject}
@@ -1214,7 +1258,7 @@ export default function ProspectingEmailStudio({
                         </div>
                         <div className="grid grid-cols-2 gap-1.5">
                             {[
-                                { tag: '{{nombre_empresa}}', label: 'Empresa' },
+                                { tag: isIclesia ? '{{nombre_iglesia}}' : '{{nombre_empresa}}', label: isIclesia ? 'Iglesia' : 'Empresa' },
                                 { tag: '{{first_name}}', label: 'Contacto' },
                                 { tag: '{{ciudad}}', label: 'Ciudad' },
                                 { tag: '{{rubro}}', label: 'Rubro / Industria' }
@@ -1223,14 +1267,27 @@ export default function ProspectingEmailStudio({
                                     key={v.tag}
                                     type="button"
                                     onClick={() => insertVariableIntoSubject(v.tag)}
-                                    className="flex items-center justify-between px-2.5 py-1.5 bg-blue-50/70 hover:bg-blue-100 border border-blue-200/60 rounded-lg text-blue-700 text-[11px] font-bold transition text-left group"
-                                    title={`Añadir ${v.tag} al asunto`}
+                                    className={`flex items-center justify-between px-2.5 py-1.5 border rounded-lg text-[11px] font-bold transition text-left group ${
+                                        subject.includes(v.tag)
+                                            ? 'bg-green-50 border-green-300 text-green-700 cursor-default'
+                                            : 'bg-blue-50/70 hover:bg-blue-100 border-blue-200/60 text-blue-700'
+                                    }`}
+                                    title={subject.includes(v.tag) ? `${v.tag} ya está en el asunto` : `Añadir ${v.tag} al asunto`}
                                 >
                                     <span className="truncate">{v.label}</span>
-                                    <Plus className="w-3 h-3 text-blue-600 group-hover:scale-125 transition-transform shrink-0 ml-1" />
+                                    {subject.includes(v.tag)
+                                        ? <Check className="w-3 h-3 text-green-600 shrink-0 ml-1" />
+                                        : <Plus className="w-3 h-3 text-blue-600 group-hover:scale-125 transition-transform shrink-0 ml-1" />
+                                    }
                                 </button>
                             ))}
                         </div>
+                        {/* Live preview of what the subject looks like */}
+                        {subject && (
+                            <p className="text-[10px] text-gray-400 mt-1.5 truncate">
+                                Vista previa: <span className="font-semibold text-gray-600">{subject}</span>
+                            </p>
+                        )}
                     </div>
 
                     {/* 4. Video de YouTube */}
