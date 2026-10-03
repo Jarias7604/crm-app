@@ -1050,30 +1050,19 @@ export default function ProspectingEmailStudio({
 
         // 1. Subject cannot be empty
         if (!subjectLine || !subjectLine.trim()) {
-            issues.push('El asunto del correo está vacío.');
+            issues.push('⛔ CRÍTICO: El asunto del correo está vacío.');
         }
 
-        // 2. Scan for unresolved {{variables}} in subject
-        const subjectVars = subjectLine.match(/\{\{[^}]+\}\}/g) || [];
-        if (subjectVars.length > 0) {
-            issues.push(`El asunto tiene variables sin resolver: ${subjectVars.join(', ')} — el motor las sustituirá con datos del lead, pero si el lead no tiene esa información el email SERÁ BLOQUEADO y no enviado.`);
-        }
-
-        // 3. Scan for forbidden fallback text in body
+        // 2. Scan for forbidden fallback text in body
         FORBIDDEN_FALLBACKS.forEach(({ text, label }) => {
             if (html.includes(text)) {
                 issues.push(`⛔ CRÍTICO: El cuerpo contiene ${label}. Este texto llegaría así al destinatario.`);
             }
         });
 
-        // 4. Check for broken/unfilled signature fields
+        // 3. Check for broken/unfilled signature fields
         if (sigTitle.includes('Nuestra Empresa') || sigTitle.includes('undefined')) {
-            issues.push('La firma contiene texto incorrecto en el cargo/empresa.');
-        }
-
-        // 5. Warn if audience is large and no test was sent
-        if (reachCount > 5 && !hasTestedSend) {
-            issues.push(`⚠️ IMPORTANTE: Vas a enviar a ${reachCount} destinatarios. Se recomienda un envío de prueba a ti mismo primero.`);
+            issues.push('⛔ CRÍTICO: La firma contiene texto incorrecto en el cargo/empresa.');
         }
 
         return issues;
