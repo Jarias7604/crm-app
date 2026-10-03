@@ -264,7 +264,9 @@ export default function ProspectingEmailStudio({
 
     const effectiveVideoThumb = (thumbMode === 'custom' && customUploadedThumb && !customUploadedThumb.includes('unsplash.com'))
         ? customUploadedThumb
-        : defaultThumbImage;
+        : (detectedYtId
+            ? (detectedYtId === 'dvRSzR1x3os' ? '/images/marketing/yt_dvRSzR1x3os_play.jpg' : `https://img.youtube.com/vi/${detectedYtId}/maxresdefault.jpg`)
+            : defaultThumbImage);
 
     // Button Controls
     const [buttonText, setButtonText] = useState(() => effectiveInitial.buttonText || (
@@ -846,8 +848,37 @@ export default function ProspectingEmailStudio({
         }
     };
 
+    // Helper: Guarantee that the video thumbnail used for emails has the centered play button badge
+    const ensureBakedThumbnail = async (): Promise<string> => {
+        if (thumbMode === 'custom' && customUploadedThumb) {
+            return customUploadedThumb;
+        }
+        if (detectedYtId) {
+            if (detectedYtId === 'dvRSzR1x3os') {
+                return 'https://raw.githubusercontent.com/Jarias7604/crm-app/develop/public/images/marketing/yt_dvRSzR1x3os_play.jpg';
+            }
+            try {
+                const ytMaxRes = `https://img.youtube.com/vi/${detectedYtId}/maxresdefault.jpg`;
+                const blob = await compositePlayBadgeOnImage(ytMaxRes).catch(() =>
+                    compositePlayBadgeOnImage(`https://img.youtube.com/vi/${detectedYtId}/hqdefault.jpg`)
+                );
+                const file = new File([blob], `yt_thumb_${detectedYtId}.jpg`, { type: 'image/jpeg' });
+                const userId = profile?.id || 'marketing';
+                const publicUrl = await storageService.uploadAvatar(userId, file);
+                if (publicUrl) return publicUrl;
+            } catch (e) {
+                console.warn('Auto composite on send skipped, using raw thumbnail:', e);
+            }
+            return `https://img.youtube.com/vi/${detectedYtId}/maxresdefault.jpg`;
+        }
+        const fallbackLocal = isIclesia
+            ? '/images/marketing/jimmy-video-preview.png'
+            : '/images/marketing/prospecting-video-preview.png';
+        return 'https://raw.githubusercontent.com/Jarias7604/crm-app/develop/public' + fallbackLocal;
+    };
+
     // Compile to ultra-clean, bulletproof Email HTML (Gmail, Apple Mail, Outlook compatible)
-    const compileToEmailHtml = () => {
+    const compileToEmailHtml = (overrideVideoThumb?: string) => {
         const photoBorderRadius = photoShape === 'circle' ? '50%' : photoShape === 'rounded' ? '12px' : '0px';
         const cleanPhone = sigPhone.replace(/\D/g, '');
         const cleanWeb = sigWebsite.replace(/^https?:\/\//, '');
@@ -957,10 +988,11 @@ export default function ProspectingEmailStudio({
                     break;
 
                 case 'videoCard': {
-                    const videoThumbImg = effectiveVideoThumb
-                        ? (effectiveVideoThumb.startsWith('/')
-                            ? 'https://raw.githubusercontent.com/Jarias7604/crm-app/develop/public' + effectiveVideoThumb
-                            : effectiveVideoThumb)
+                    const chosenThumb = overrideVideoThumb || effectiveVideoThumb;
+                    const videoThumbImg = chosenThumb
+                        ? (chosenThumb.startsWith('/')
+                            ? 'https://raw.githubusercontent.com/Jarias7604/crm-app/develop/public' + chosenThumb
+                            : chosenThumb)
                         : '';
                     html += `
               <!-- Video Card (Clean Linked 16:9 Thumbnail with Baked Play Button) -->
@@ -1216,7 +1248,8 @@ export default function ProspectingEmailStudio({
                 }
             }
 
-            const rawHtml = compileToEmailHtml();
+            const bakedThumb = await ensureBakedThumbnail();
+            const rawHtml = compileToEmailHtml(bakedThumb);
             const studioState = getCurrentStudioState();
             // Save draft first
             await onSaveDraft({ name: campaignName, subject: subject, htmlContent: rawHtml, studioState });
@@ -1275,7 +1308,8 @@ export default function ProspectingEmailStudio({
         setShowPreviewModal(false);
         try {
             setIsSending(true);
-            const html = compileToEmailHtml();
+            const bakedThumb = await ensureBakedThumbnail();
+            const html = compileToEmailHtml(bakedThumb);
             const studioState = getCurrentStudioState();
             await onSendCampaign({
                 name: campaignName,
@@ -1617,19 +1651,19 @@ export default function ProspectingEmailStudio({
                             <LinkIcon className="w-3.5 h-3.5 text-blue-500 absolute right-3 top-1/2 -translate-y-1/2" />
                         </div>
 
-                        {/* Selector de Portada: Predeterminada con Play vs Subir Propia */}
+                        {/* Selector de Portada: Miniatura de Video vs Subir Propia */}
                         <div className="pt-1 flex items-center justify-between">
                             <span className="text-[10px] font-bold text-gray-500 uppercase">Portada:</span>
                             <div className="flex bg-gray-100 rounded-lg p-0.5 text-[10px]">
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        setThumbMode('default');
+                                        setThumbMode('youtube');
                                         setCustomUploadedThumb('');
                                     }}
                                     className={`px-2 py-0.5 rounded font-bold transition ${thumbMode !== 'custom' ? 'bg-white text-blue-600 shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
                                 >
-                                    Con Botón Play
+                                    Auto Video (YouTube)
                                 </button>
                                 <button
                                     type="button"
@@ -1643,9 +1677,14 @@ export default function ProspectingEmailStudio({
                                 </button>
                             </div>
                         </div>
-                        {thumbMode !== 'custom' && (
+                        {thumbMode !== 'custom' && detectedYtId && (
                             <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                                <Check className="w-3 h-3" /> Portada oficial con botón Play integrada
+                                <Check className="w-3 h-3" /> Portada sincronizada con el video de YouTube
+                            </p>
+                        )}
+                        {thumbMode !== 'custom' && !detectedYtId && (
+                            <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                                <Check className="w-3 h-3" /> Portada predeterminada activa
                             </p>
                         )}
                         {thumbMode === 'custom' && customUploadedThumb && (
@@ -2086,7 +2125,7 @@ export default function ProspectingEmailStudio({
                                                                 className="w-full h-full object-cover group-hover/vid:scale-[1.02] transition-transform duration-300"
                                                             />
                                                             {/* Center Play Button Overlay — only shown if image does not already have it baked in */}
-                                                            {!effectiveVideoThumb.includes('video-preview') && !effectiveVideoThumb.includes('video_thumb_') && (
+                                                            {!effectiveVideoThumb.includes('video-preview') && !effectiveVideoThumb.includes('video_thumb_') && !effectiveVideoThumb.includes('_play.') && (
                                                                 <div className="absolute inset-0 flex items-center justify-center bg-black/15 group-hover/vid:bg-black/25 transition-colors">
                                                                     <div className="w-14 h-14 rounded-full bg-blue-600/95 hover:bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-black/40 group-hover/vid:scale-110 transition-transform">
                                                                         <Play className="w-6 h-6 fill-white ml-0.5" />
@@ -2286,7 +2325,7 @@ export default function ProspectingEmailStudio({
                                                 }}
                                                 className="w-full h-full object-cover"
                                             />
-                                            {!effectiveVideoThumb.includes('video-preview') && !effectiveVideoThumb.includes('video_thumb_') && (
+                                            {!effectiveVideoThumb.includes('video-preview') && !effectiveVideoThumb.includes('video_thumb_') && !effectiveVideoThumb.includes('_play.') && (
                                                 <div className="absolute inset-0 flex items-center justify-center bg-black/15">
                                                     <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md">
                                                         <Play className="w-4 h-4 fill-white ml-0.5" />
