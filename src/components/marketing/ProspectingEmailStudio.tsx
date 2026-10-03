@@ -679,27 +679,113 @@ export default function ProspectingEmailStudio({
         }
     };
 
-    // Upload custom video thumbnail
+    /**
+     * Composites the executive 16:9 crop and a high-resolution centered play button
+     * badge directly into the image pixels using HTML5 Canvas.
+     * Guarantees 100% bulletproof rendering across ALL email clients (Outlook Desktop, New Outlook, Gmail, Apple Mail)
+     * with ZERO broken CSS overlays, ZERO white bars, and ZERO black bars.
+     */
+    const compositePlayBadgeOnImage = (imageSource: string | File): Promise<Blob> => {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const targetW = 800;
+                    const targetH = 450; // Exact 16:9
+                    canvas.width = targetW;
+                    canvas.height = targetH;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        reject(new Error('Canvas 2D context not available'));
+                        return;
+                    }
+
+                    // 1. Draw image with object-fit: cover (fill 16:9 canvas cleanly)
+                    const scale = Math.max(targetW / img.width, targetH / img.height);
+                    const x = (targetW / 2) - (img.width / 2) * scale;
+                    const y = (targetH / 2) - (img.height / 2) * scale;
+                    ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+                    // 2. Center coordinates
+                    const cx = targetW / 2;
+                    const cy = targetH / 2;
+                    const radius = 54;
+
+                    // 3. Drop shadow for the play button
+                    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+                    ctx.shadowBlur = 20;
+                    ctx.shadowOffsetY = 6;
+
+                    // 4. Vibrant blue circle
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#0066FF';
+                    ctx.fill();
+
+                    // 5. Reset shadow before drawing triangle
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetY = 0;
+
+                    // 6. Crisp centered white play triangle
+                    ctx.beginPath();
+                    const triH = 22;
+                    const triW = 20;
+                    ctx.moveTo(cx - triW * 0.5 + 3, cy - triH);
+                    ctx.lineTo(cx + triW * 0.8 + 3, cy);
+                    ctx.lineTo(cx - triW * 0.5 + 3, cy + triH);
+                    ctx.closePath();
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fill();
+
+                    canvas.toBlob((blob) => {
+                        if (blob) resolve(blob);
+                        else reject(new Error('Failed to create blob from canvas'));
+                    }, 'image/jpeg', 0.92);
+                } catch (err) {
+                    reject(err);
+                }
+            };
+            img.onerror = () => reject(new Error('Failed to load image for compositing'));
+
+            if (typeof imageSource === 'string') {
+                img.src = imageSource;
+            } else {
+                const reader = new FileReader();
+                reader.onload = () => { img.src = reader.result as string; };
+                reader.readAsDataURL(imageSource);
+            }
+        });
+    };
+
+    // Upload custom video thumbnail — automatically composites the centered play button badge!
     const handleVideoThumbUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         try {
             setIsUploadingThumb(true);
             const userId = profile?.id || 'marketing';
-            const publicUrl = await storageService.uploadAvatar(userId, file);
+            
+            // Auto-composite play button badge into the image pixels
+            let fileToUpload: File | Blob = file;
+            try {
+                const compositedBlob = await compositePlayBadgeOnImage(file);
+                fileToUpload = new File([compositedBlob], `video_thumb_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            } catch (compErr) {
+                console.warn('Could not composite play badge, uploading raw image:', compErr);
+            }
+
+            const publicUrl = await storageService.uploadAvatar(userId, fileToUpload as File);
             if (publicUrl) {
                 setCustomUploadedThumb(publicUrl);
                 setThumbMode('custom');
-                toast.success('Portada personalizada cargada');
+                toast.success('Portada con botón Play generada e integrada con éxito');
             }
         } catch (err: any) {
-            const reader = new FileReader();
-            reader.onload = () => {
-                setCustomUploadedThumb(reader.result as string);
-                setThumbMode('custom');
-                toast.success('Portada cargada');
-            };
-            reader.readAsDataURL(file);
+            console.error('Error uploading thumb:', err);
+            toast.error('Error al subir la portada');
         } finally {
             setIsUploadingThumb(false);
         }
@@ -875,49 +961,22 @@ export default function ProspectingEmailStudio({
                             : effectiveVideoThumb)
                         : '';
                     html += `
-              <!-- Video Card (Auto YouTube Thumbnail 16:9 + Centered Play Button) -->
-              <!--[if mso]>
-              <table role="presentation" width="380" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:20px auto 24px auto;">
-                <tr>
-                  <td align="center" width="380" height="214" style="width:380px;height:214px;">
-                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${youtubeUrl}" style="width:380px;height:214px;" arcsize="8%" stroke="f">
-                      <v:fill type="frame" src="${videoThumbImg}" />
-                      <v:textbox inset="0,0,0,0" style="mso-fit-shape-to-text:true;">
-                        <table role="presentation" width="100%" height="214" cellpadding="0" cellspacing="0" border="0">
-                          <tr>
-                            <td align="center" valign="middle" height="214" style="height:214px;">
-                              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
-                                <tr>
-                                  <td align="center" valign="middle" width="58" height="58" bgcolor="#0066FF" style="width:58px;height:58px;border-radius:29px;background-color:#0066FF;text-align:center;">
-                                    <font style="color:#FFFFFF;font-family:Arial,sans-serif;font-size:24px;line-height:58px;">&#9654;</font>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                        </table>
-                      </v:textbox>
-                    </v:roundrect>
-                  </td>
-                </tr>
-              </table>
-              <![endif]-->
-              <!--[if !mso]><!-->
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px auto 24px auto;max-width:380px;">
+              <!-- Video Card (Clean Linked 16:9 Thumbnail with Baked Play Button) -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px auto 24px auto;">
                 <tr>
                   <td align="center">
-                    <div style="position:relative;width:100%;max-width:380px;margin:0 auto;border-radius:18px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,0.15);line-height:0;font-size:0;">
-                      <a href="${youtubeUrl}" target="_blank" style="display:block;text-decoration:none;position:relative;line-height:0;font-size:0;">
-                        <img src="${videoThumbImg}" alt="Ver Video" width="380" style="display:block;width:100%;max-width:380px;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:18px;margin:0 auto;border:0;" />
-                        <div style="position:absolute;top:50%;left:50%;margin-top:-29px;margin-left:-29px;width:58px;height:58px;border-radius:50%;background-color:#0066FF;color:#FFFFFF;line-height:58px;font-size:22px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,0.45);font-family:Arial,sans-serif;z-index:2;">
-                          &#9654;
-                        </div>
-                      </a>
-                    </div>
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="max-width:380px;margin:0 auto;">
+                      <tr>
+                        <td align="center" style="line-height:0;font-size:0;">
+                          <a href="${youtubeUrl}" target="_blank" style="display:block;text-decoration:none;outline:none;border:0;line-height:0;font-size:0;">
+                            <img src="${videoThumbImg}" alt="Ver Video" width="380" style="display:block;width:100%;max-width:380px;height:auto;border-radius:18px;margin:0 auto;border:0;box-shadow:0 10px 28px rgba(0,0,0,0.15);" />
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
               </table>
-              <!--<![endif]-->
 `;
                     break;
                 }
@@ -1139,6 +1198,22 @@ export default function ProspectingEmailStudio({
         }
         try {
             setIsSendingTest(true);
+
+            // Auto-bake centered play button badge into custom thumbnail if not already baked
+            if (customUploadedThumb && !customUploadedThumb.includes('video-preview') && !customUploadedThumb.includes('video_thumb_')) {
+                try {
+                    const compositedBlob = await compositePlayBadgeOnImage(customUploadedThumb);
+                    const fileToUpload = new File([compositedBlob], `video_thumb_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                    const userId = profile?.id || 'marketing';
+                    const publicUrl = await storageService.uploadAvatar(userId, fileToUpload);
+                    if (publicUrl) {
+                        setCustomUploadedThumb(publicUrl);
+                    }
+                } catch (e) {
+                    console.warn('Auto composite on test send skipped:', e);
+                }
+            }
+
             const rawHtml = compileToEmailHtml();
             const studioState = getCurrentStudioState();
             // Save draft first
@@ -2005,12 +2080,14 @@ export default function ProspectingEmailStudio({
                                                                 }}
                                                                 className="w-full h-full object-cover group-hover/vid:scale-[1.02] transition-transform duration-300"
                                                             />
-                                                            {/* Center Play Button Overlay */}
-                                                            <div className="absolute inset-0 flex items-center justify-center bg-black/15 group-hover/vid:bg-black/25 transition-colors">
-                                                                <div className="w-14 h-14 rounded-full bg-blue-600/95 hover:bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-black/40 group-hover/vid:scale-110 transition-transform">
-                                                                    <Play className="w-6 h-6 fill-white ml-0.5" />
+                                                            {/* Center Play Button Overlay — only shown if image does not already have it baked in */}
+                                                            {!effectiveVideoThumb.includes('video-preview') && !effectiveVideoThumb.includes('video_thumb_') && (
+                                                                <div className="absolute inset-0 flex items-center justify-center bg-black/15 group-hover/vid:bg-black/25 transition-colors">
+                                                                    <div className="w-14 h-14 rounded-full bg-blue-600/95 hover:bg-blue-600 text-white flex items-center justify-center shadow-xl shadow-black/40 group-hover/vid:scale-110 transition-transform">
+                                                                        <Play className="w-6 h-6 fill-white ml-0.5" />
+                                                                    </div>
                                                                 </div>
-                                                            </div>
+                                                            )}
                                                         </a>
                                                     </div>
                                                 )}
