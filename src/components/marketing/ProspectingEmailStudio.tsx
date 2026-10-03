@@ -190,7 +190,7 @@ export default function ProspectingEmailStudio({
     initialStudioState,
     onSaveDraft,
     onSendCampaign,
-    reachCount = 966,
+    reachCount = 0,
     previewLeads = [],
     onOpenAudienceModal,
     onBack,
@@ -245,8 +245,8 @@ export default function ProspectingEmailStudio({
     const senderNameIsCompanyName = defaultSenderName === companyDisplayName;
 
     // Form Controls (Left Panel)
-    const [campaignName, setCampaignName] = useState(() => effectiveInitial.campaignName || initialName || (company?.name ? `Prospección - ${company.name}` : 'Prospección - Comercial'));
-    const [subject, setSubject] = useState(() => repairTemplateVariables(effectiveInitial.subject || initialSubject || (isIclesia ? 'Una pregunta para {{nombre_iglesia}}' : 'Una pregunta para {{nombre_empresa}}'), isIclesia));
+    const [campaignName, setCampaignName] = useState(() => initialName || effectiveInitial.campaignName || (company?.name ? `Prospección - ${company.name}` : 'Prospección - Comercial'));
+    const [subject, setSubject] = useState(() => repairTemplateVariables(initialSubject || effectiveInitial.subject || (isIclesia ? 'Una pregunta para {{nombre_iglesia}}' : 'Una pregunta para {{nombre_empresa}}'), isIclesia));
     const [senderIdentity, setSenderIdentity] = useState(() => effectiveInitial.senderIdentity || `${defaultSenderName} <${defaultSenderEmail}>`);
 
     // Video Controls
@@ -399,16 +399,16 @@ export default function ProspectingEmailStudio({
 
     // Keep initialName and initialSubject in sync if passed explicitly and not customized
     useEffect(() => {
-        if (initialName && (!campaignName || campaignName === 'Prospección - Comercial')) {
+        if (initialName && (!campaignName || campaignName === 'Prospección - Comercial' || initialName.startsWith('[RE]'))) {
             setCampaignName(initialName);
         }
     }, [initialName]);
 
     useEffect(() => {
-        if (initialSubject && (!subject || subject === 'Una pregunta para {{nombre_empresa}}' || subject === 'Una pregunta para {{nombre_iglesia}}')) {
-            setSubject(initialSubject);
+        if (initialSubject && (!subject || subject === 'Una pregunta para {{nombre_empresa}}' || subject === 'Una pregunta para {{nombre_iglesia}}' || initialSubject.startsWith('[RE]'))) {
+            setSubject(repairTemplateVariables(initialSubject, isIclesia));
         }
-    }, [initialSubject]);
+    }, [initialSubject, isIclesia]);
 
     // Handle Company Switching / Initialization (ONLY for brand new campaigns, NEVER overwrites custom copy)
     useEffect(() => {
@@ -1478,7 +1478,7 @@ export default function ProspectingEmailStudio({
                             onClick={onOpenAudienceModal}
                             className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
                         >
-                            <Eye className="w-3.5 h-3.5 text-blue-400" /> Audiencia ({reachCount})
+                            <Eye className="w-3.5 h-3.5 text-blue-400" /> Audiencia ({reachCount > 0 ? reachCount : (previewLeads?.length || 0)})
                         </button>
                     )}
 

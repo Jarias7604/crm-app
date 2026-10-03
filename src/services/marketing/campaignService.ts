@@ -264,7 +264,10 @@ export const campaignService = {
             }
         }
 
-        const { data, error } = await query.limit(1000);
+        const fetchLimit = (filters.specificIds && filters.specificIds.length > 0)
+            ? Math.max(1000, filters.specificIds.length)
+            : 1000;
+        const { data, error } = await query.limit(fetchLimit);
 
         // Throw so the UI shows the real error — never swallow it silently
         if (error) throw new Error(`Error cargando audiencia: ${error.message}`);

@@ -123,8 +123,12 @@ export default function CampaignReport() {
         navigate('/marketing/campaign/new', {
             state: {
                 prefillIds: unopenedIds,
+                preSelectedLeads: unopenedIds,
+                campaignSource: 'resend-unopened',
+                prefillName: `[RE] ${campaign?.name || 'Re-envío a no abiertos'}`,
                 prefillSubject: `[RE] ${campaign?.subject || campaign?.name || ''}`,
-                prefillContent: campaign?.content || ''
+                prefillContent: campaign?.content || '',
+                initialStudioState: (campaign as any)?.audience_filters?.prospecting_studio_state || (campaign as any)?.audience_filters?.studio_state || null
             }
         });
     };

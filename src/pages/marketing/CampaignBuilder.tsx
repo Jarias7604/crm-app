@@ -49,7 +49,40 @@ export default function CampaignBuilder() {
 
     const DRAFT_KEY = `crm_campaign_draft_${effectiveCompanyId || 'default'}`;
 
+    const locationState = location.state as any;
+    const urlParams = new URLSearchParams(location.search);
+    const queryLeadIds = urlParams.get('preSelectedLeads') ? urlParams.get('preSelectedLeads')!.split(',').map(s => s.trim()).filter(Boolean) : null;
+    const incomingLeadIds = locationState?.preSelectedLeads || locationState?.prefillIds || queryLeadIds;
+    const hasIncomingLeads = Array.isArray(incomingLeadIds) && incomingLeadIds.length > 0;
+
     const [formData, setFormData] = useState(() => {
+        // If coming with preselected leads or specific re-send state, do NOT load an unrelated draft from localStorage!
+        if (hasIncomingLeads) {
+            const isResend = locationState?.campaignSource === 'resend-unopened' || locationState?.campaignSource === 'leads-resend' || urlParams.get('campaignSource') === 'resend-unopened';
+            const isBulk = locationState?.campaignSource === 'leads-bulk' || urlParams.get('campaignSource') === 'leads-bulk';
+            const defaultName = locationState?.prefillName
+                || urlParams.get('prefillName')
+                || (isBulk ? `Campaña Grupal - ${new Date().toLocaleDateString()}` : '')
+                || (isResend ? `Re-envío - ${new Date().toLocaleDateString()}` : '')
+                || '';
+
+            return {
+                name: defaultName,
+                subject: locationState?.prefillSubject || urlParams.get('prefillSubject') || '',
+                content: locationState?.prefillContent || '',
+                template_id: null as string | null,
+                prospecting_studio_state: locationState?.initialStudioState || null,
+                audience_filter: {
+                    status: [] as string[],
+                    industry: [] as string[],
+                    dateRange: 'all' as 'all' | 'new',
+                    priority: 'all' as string,
+                    specificIds: incomingLeadIds,
+                    idType: ((locationState?.campaignSource === 'lead-hunter' || urlParams.get('campaignSource') === 'lead-hunter') ? 'google_place_id' : 'id') as 'id' | 'google_place_id'
+                }
+            };
+        }
+
         // Restore draft from localStorage on first render (new campaigns only)
         if (!window.location.pathname.includes('/campaign/') || window.location.pathname.endsWith('/new')) {
             try {
@@ -80,7 +113,7 @@ export default function CampaignBuilder() {
         };
     });
 
-    const [isDirectConnect, setIsDirectConnect] = useState(false);
+    const [isDirectConnect, setIsDirectConnect] = useState(hasIncomingLeads);
 
     useEffect(() => {
         if (campaignId) {
@@ -116,21 +149,24 @@ export default function CampaignBuilder() {
             }).finally(() => {
                 setIsLoadingCampaign(false);
             });
-        } else if (location.state?.preSelectedLeads) {
-            const leadIds = location.state.preSelectedLeads;
+        } else if (hasIncomingLeads) {
+            const leadIds = incomingLeadIds;
             setFormData(prev => ({
                 ...prev,
-                name: location.state.campaignSource === 'leads-bulk' ? `Campaña Grupal - ${new Date().toLocaleDateString()}` : prev.name,
+                name: locationState?.prefillName || urlParams.get('prefillName') || (locationState?.campaignSource === 'leads-bulk' || urlParams.get('campaignSource') === 'leads-bulk' ? `Campaña Grupal - ${new Date().toLocaleDateString()}` : prev.name),
+                subject: locationState?.prefillSubject || urlParams.get('prefillSubject') || prev.subject,
+                content: locationState?.prefillContent || prev.content,
+                prospecting_studio_state: locationState?.initialStudioState || (prev as any).prospecting_studio_state,
                 audience_filter: {
                     ...prev.audience_filter,
                     specificIds: leadIds,
-                    idType: 'id'
+                    idType: (locationState?.campaignSource === 'lead-hunter' || urlParams.get('campaignSource') === 'lead-hunter') ? 'google_place_id' : 'id'
                 }
             }));
             setIsDirectConnect(true);
             handlePreviewAudience(leadIds, selectedChannel);
         }
-    }, [campaignId, location.state]);
+    }, [campaignId, location.state, location.search]);
 
     // Auto-save draft to localStorage every time form changes (new campaigns only)
     useEffect(() => {
@@ -183,12 +219,13 @@ export default function CampaignBuilder() {
     const [mayaAudience, setMayaAudience] = useState('Prospectos Generales');
     const [isGeneratingMaya, setIsGeneratingMaya] = useState(false);
 
-    // Auto-update audience preview when filters change
+    // Auto-update audience preview when filters or specific targeted IDs change
     useEffect(() => {
-        if ((simulatedCompanyId || profile?.company_id) && formData.audience_filter) {
+        const effId = simulatedCompanyId || profile?.company_id;
+        if (effId && formData.audience_filter) {
             handlePreviewAudience();
         }
-    }, [formData.audience_filter.status, formData.audience_filter.priority, formData.audience_filter.dateRange, formData.audience_filter.industry, selectedChannel, simulatedCompanyId]);
+    }, [formData.audience_filter.status, formData.audience_filter.priority, formData.audience_filter.dateRange, formData.audience_filter.industry, formData.audience_filter.specificIds, selectedChannel, simulatedCompanyId, profile?.company_id]);
 
     // Load available industries
     useEffect(() => {
@@ -235,7 +272,6 @@ export default function CampaignBuilder() {
         const effectiveCompanyId = simulatedCompanyId || profile?.company_id;
 
         if (!effectiveCompanyId) {
-            toast.error('No se encontró información de la empresa. Verifica el modo simulación.');
             return;
         }
 
@@ -504,7 +540,7 @@ export default function CampaignBuilder() {
                 </div>
             ) : selectedChannel === 'email' && emailMode === 'prospecting' ? (
                 <ProspectingEmailStudio
-                    key={`prospecting-studio-${effectiveCompanyId || 'default'}-${company?.id || 'no-company'}-${campaignId || 'new'}`}
+                    key={`prospecting-studio-${effectiveCompanyId || 'default'}-${company?.id || 'no-company'}-${campaignId || (hasIncomingLeads ? `resend-${incomingLeadIds.length}` : 'new')}`}
                     company={company}
                     campaignId={campaignId}
                     initialName={formData.name || (company?.name ? `Prospección - ${company.name}` : (company?.name?.toLowerCase().includes('iclesia') ? 'Prospección - Iglesias' : 'Prospección - Comercial'))}
