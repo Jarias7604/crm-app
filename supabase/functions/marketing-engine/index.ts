@@ -55,12 +55,12 @@ function substituteLeadVariables(
  * Replaces original URLs with a tracked redirect URL.
  */
 function injectClickTracking(html: string, trackingBase: string, messageId: string): string {
-    return html.replace(/<a(\s+[^>]*?)href="([^"]+)"([^>]*?)>/gi, (_match, before, href, after) => {
+    return html.replace(/<(a|v:roundrect)(\s+[^>]*?)href="([^"]+)"([^>]*?)>/gi, (_match, tag, before, href, after) => {
         if (href.startsWith('mailto:') || href.startsWith('#') || href.includes(trackingBase)) {
             return _match; // Skip mailto, anchors, and already-tracked links
         }
         const trackedUrl = `${trackingBase}?type=click&mid=${messageId}&url=${encodeURIComponent(href)}`;
-        return `<a${before}href="${trackedUrl}"${after}>`;
+        return `<${tag}${before}href="${trackedUrl}"${after}>`;
     });
 }
 

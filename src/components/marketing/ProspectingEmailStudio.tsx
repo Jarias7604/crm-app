@@ -765,15 +765,24 @@ export default function ProspectingEmailStudio({
         const cleanWeb = sigWebsite.replace(/^https?:\/\//, '');
 
         let html = `<!DOCTYPE html>
-<html lang="es">
+<html lang="es" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!--[if gte mso 9]>
+  <xml>
+    <o:OfficeDocumentSettings>
+      <o:AllowPNG/>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml>
+  <![endif]-->
   <title>${subject}</title>
   <style>
     body { margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
-    table, td { border-collapse: collapse; }
-    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+    table, td { border-collapse: collapse; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
   </style>
 </head>
 <body style="margin:0;padding:24px 12px;background-color:#F8FAFC;color:#0F172A;">
@@ -859,31 +868,83 @@ export default function ProspectingEmailStudio({
 `;
                     break;
 
-                case 'videoCard':
+                case 'videoCard': {
+                    const videoThumbImg = effectiveVideoThumb
+                        ? (effectiveVideoThumb.startsWith('/')
+                            ? 'https://raw.githubusercontent.com/Jarias7604/crm-app/develop/public' + effectiveVideoThumb
+                            : effectiveVideoThumb)
+                        : '';
                     html += `
-              <!-- Video Card (Auto YouTube Thumbnail 16:9 + Oval Rounded Corners) -->
-              <div style="margin:20px auto 24px auto;max-width:380px;border-radius:18px;overflow:hidden;background-color:#0F172A;box-shadow:0 10px 28px rgba(0,0,0,0.15);text-align:center;position:relative;">
-                <a href="${youtubeUrl}" target="_blank" style="display:block;text-decoration:none;position:relative;line-height:0;font-size:0;">
-                  <img src="${effectiveVideoThumb}" alt="Ver Video" width="380" style="display:block;width:100%;max-width:380px;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:18px;margin:0 auto;border:0;" />
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="position:absolute;top:0;left:0;width:100%;height:100%;">
-                    <tr>
-                      <td align="center" style="vertical-align:middle;">
-                        <div style="width:58px;height:58px;border-radius:50%;background-color:#0066FF;color:#FFFFFF;line-height:58px;font-size:22px;text-align:center;margin:0 auto;box-shadow:0 6px 20px rgba(0,0,0,0.45);font-family:Arial,sans-serif;">▶</div>
-                      </td>
-                    </tr>
-                  </table>
-                </a>
-              </div>
+              <!-- Video Card (Auto YouTube Thumbnail 16:9 + Centered Play Button) -->
+              <!--[if mso]>
+              <table role="presentation" width="380" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:20px auto 24px auto;">
+                <tr>
+                  <td align="center" width="380" height="214" style="width:380px;height:214px;">
+                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${youtubeUrl}" style="width:380px;height:214px;" arcsize="8%" stroke="f">
+                      <v:fill type="frame" src="${videoThumbImg}" />
+                      <v:textbox inset="0,0,0,0" style="mso-fit-shape-to-text:true;">
+                        <table role="presentation" width="100%" height="214" cellpadding="0" cellspacing="0" border="0">
+                          <tr>
+                            <td align="center" valign="middle" height="214" style="height:214px;">
+                              <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
+                                <tr>
+                                  <td align="center" valign="middle" width="58" height="58" bgcolor="#0066FF" style="width:58px;height:58px;border-radius:29px;background-color:#0066FF;text-align:center;">
+                                    <font style="color:#FFFFFF;font-family:Arial,sans-serif;font-size:24px;line-height:58px;">&#9654;</font>
+                                  </td>
+                                </tr>
+                              </table>
+                            </td>
+                          </tr>
+                        </table>
+                      </v:textbox>
+                    </v:roundrect>
+                  </td>
+                </tr>
+              </table>
+              <![endif]-->
+              <!--[if !mso]><!-->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px auto 24px auto;max-width:380px;">
+                <tr>
+                  <td align="center">
+                    <div style="position:relative;width:100%;max-width:380px;margin:0 auto;border-radius:18px;overflow:hidden;box-shadow:0 10px 28px rgba(0,0,0,0.15);line-height:0;font-size:0;">
+                      <a href="${youtubeUrl}" target="_blank" style="display:block;text-decoration:none;position:relative;line-height:0;font-size:0;">
+                        <img src="${videoThumbImg}" alt="Ver Video" width="380" style="display:block;width:100%;max-width:380px;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:18px;margin:0 auto;border:0;" />
+                        <div style="position:absolute;top:50%;left:50%;margin-top:-29px;margin-left:-29px;width:58px;height:58px;border-radius:50%;background-color:#0066FF;color:#FFFFFF;line-height:58px;font-size:22px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,0.45);font-family:Arial,sans-serif;z-index:2;">
+                          &#9654;
+                        </div>
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+              <!--<![endif]-->
 `;
                     break;
+                }
 
                 case 'ctaButton':
                     html += `
-              <!-- CTA Button -->
+              <!-- CTA Button (Bulletproof VML for Outlook + Modern Pill for Webmail) -->
               <div style="margin:24px 0 28px 0;text-align:center;">
-                <a href="${buttonLink || youtubeUrl}" target="_blank" style="display:inline-block;background-color:${buttonColor};color:#FFFFFF;padding:15px 38px;border-radius:9999px;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;text-decoration:none;letter-spacing:0.3px;box-shadow:0 8px 20px rgba(0,102,255,0.3);text-align:center;">
-                  ▶&nbsp;&nbsp;${buttonText}&nbsp;&nbsp;&gt;
-                </a>
+                <!--[if mso]>
+                <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${buttonLink || youtubeUrl}" style="height:52px;v-text-anchor:middle;width:380px;" arcsize="50%" fillcolor="${buttonColor}" stroke="f">
+                  <w:anchorlock/>
+                  <center style="color:#FFFFFF;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;letter-spacing:0.3px;">
+                    &#9654;&nbsp;&nbsp;${buttonText}&nbsp;&nbsp;&gt;
+                  </center>
+                </v:roundrect>
+                <![endif]-->
+                <!--[if !mso]><!-->
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
+                  <tr>
+                    <td align="center" bgcolor="${buttonColor}" style="border-radius:9999px;background-color:${buttonColor};box-shadow:0 8px 24px rgba(0,102,255,0.32);">
+                      <a href="${buttonLink || youtubeUrl}" target="_blank" style="display:inline-block;padding:16px 38px;color:#FFFFFF;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;text-decoration:none;letter-spacing:0.3px;border-radius:9999px;mso-padding-alt:0;">
+                        &#9654;&nbsp;&nbsp;${buttonText}&nbsp;&nbsp;&gt;
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <!--<![endif]-->
               </div>
 `;
                     break;
