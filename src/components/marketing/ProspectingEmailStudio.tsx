@@ -91,7 +91,7 @@ export interface ProspectingStudioState {
     signoffText?: string;
     youtubeUrl?: string;
     videoCaption?: string;
-    thumbMode?: 'youtube' | 'custom';
+    thumbMode?: 'default' | 'youtube' | 'custom';
     customUploadedThumb?: string;
     buttonText?: string;
     buttonColor?: string;
@@ -252,17 +252,19 @@ export default function ProspectingEmailStudio({
     // Video Controls
     const [youtubeUrl, setYoutubeUrl] = useState(() => effectiveInitial.youtubeUrl || (isIclesia ? 'https://youtu.be/dvRSzR1x3os' : ''));
     const [videoCaption, setVideoCaption] = useState(() => effectiveInitial.videoCaption || `Vea en 45 segundos cómo funciona ${companyName}`);
-    const [thumbMode, setThumbMode] = useState<'youtube' | 'custom'>(() => effectiveInitial.thumbMode || 'youtube');
+    const [thumbMode, setThumbMode] = useState<'default' | 'youtube' | 'custom'>(() => effectiveInitial.thumbMode || 'default');
     const [customUploadedThumb, setCustomUploadedThumb] = useState<string>(() => effectiveInitial.customUploadedThumb || '');
     const [isUploadingThumb, setIsUploadingThumb] = useState(false);
     const videoThumbInputRef = useRef<HTMLInputElement>(null);
 
     const detectedYtId = getYouTubeVideoId(youtubeUrl);
-    const effectiveVideoThumb = (thumbMode === 'custom' && customUploadedThumb)
+    const defaultThumbImage = isIclesia
+        ? '/images/marketing/jimmy-video-preview.png'
+        : '/images/marketing/prospecting-video-preview.png';
+
+    const effectiveVideoThumb = (thumbMode === 'custom' && customUploadedThumb && !customUploadedThumb.includes('unsplash.com'))
         ? customUploadedThumb
-        : (detectedYtId
-            ? `https://img.youtube.com/vi/${detectedYtId}/maxresdefault.jpg`
-            : (isIclesia ? '/images/marketing/jimmy-video-preview.png' : 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=800&q=80'));
+        : defaultThumbImage;
 
     // Button Controls
     const [buttonText, setButtonText] = useState(() => effectiveInitial.buttonText || (
@@ -1615,16 +1617,19 @@ export default function ProspectingEmailStudio({
                             <LinkIcon className="w-3.5 h-3.5 text-blue-500 absolute right-3 top-1/2 -translate-y-1/2" />
                         </div>
 
-                        {/* Selector de Portada: Automática de YouTube vs Subir Propia */}
+                        {/* Selector de Portada: Predeterminada con Play vs Subir Propia */}
                         <div className="pt-1 flex items-center justify-between">
                             <span className="text-[10px] font-bold text-gray-500 uppercase">Portada:</span>
                             <div className="flex bg-gray-100 rounded-lg p-0.5 text-[10px]">
                                 <button
                                     type="button"
-                                    onClick={() => setThumbMode('youtube')}
-                                    className={`px-2 py-0.5 rounded font-bold transition ${thumbMode === 'youtube' ? 'bg-white text-blue-600 shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
+                                    onClick={() => {
+                                        setThumbMode('default');
+                                        setCustomUploadedThumb('');
+                                    }}
+                                    className={`px-2 py-0.5 rounded font-bold transition ${thumbMode !== 'custom' ? 'bg-white text-blue-600 shadow-xs' : 'text-gray-500 hover:text-gray-900'}`}
                                 >
-                                    Auto YouTube
+                                    Con Botón Play
                                 </button>
                                 <button
                                     type="button"
@@ -1638,14 +1643,14 @@ export default function ProspectingEmailStudio({
                                 </button>
                             </div>
                         </div>
-                        {thumbMode === 'youtube' && detectedYtId && (
+                        {thumbMode !== 'custom' && (
                             <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                                <Check className="w-3 h-3" /> Portada real de YouTube sincronizada
+                                <Check className="w-3 h-3" /> Portada oficial con botón Play integrada
                             </p>
                         )}
                         {thumbMode === 'custom' && customUploadedThumb && (
                             <p className="text-[10px] text-blue-600 font-semibold flex items-center gap-1">
-                                <Check className="w-3 h-3" /> Portada personalizada activa
+                                <Check className="w-3 h-3" /> Portada personalizada activa (con Play)
                             </p>
                         )}
                     </div>
@@ -2281,11 +2286,13 @@ export default function ProspectingEmailStudio({
                                                 }}
                                                 className="w-full h-full object-cover"
                                             />
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/15">
-                                                <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md">
-                                                    <Play className="w-4 h-4 fill-white ml-0.5" />
+                                            {!effectiveVideoThumb.includes('video-preview') && !effectiveVideoThumb.includes('video_thumb_') && (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/15">
+                                                    <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-md">
+                                                        <Play className="w-4 h-4 fill-white ml-0.5" />
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </a>
                                     </div>
 
