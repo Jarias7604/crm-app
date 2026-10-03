@@ -2636,7 +2636,7 @@ export default function ProspectingEmailStudio({
                             </div>
                             <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
                                 <p className="text-xs font-bold text-blue-600 mb-1">DESTINATARIOS:</p>
-                                <p className="text-2xl font-black text-blue-700">{reachCount.toLocaleString()}</p>
+                                <p className="text-2xl font-black text-blue-700">{(reachCount > 0 ? reachCount : (previewLeads?.length || 0)).toLocaleString()}</p>
                                 <p className="text-xs text-blue-500">contactos seleccionados</p>
                             </div>
                             {hasTestedSend && (
@@ -2653,7 +2653,7 @@ export default function ProspectingEmailStudio({
                                 Cancelar
                             </button>
                             <button onClick={executeFinalSend} disabled={isSending} className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold text-sm hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2">
-                                {isSending ? '⏳ Enviando...' : `🚀 Enviar a ${reachCount.toLocaleString()} contactos`}
+                                {isSending ? '⏳ Enviando...' : `🚀 Enviar a ${(reachCount > 0 ? reachCount : (previewLeads?.length || 0)).toLocaleString()} contactos`}
                             </button>
                         </div>
                     </div>
