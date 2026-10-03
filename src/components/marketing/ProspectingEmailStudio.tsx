@@ -20,7 +20,14 @@ import {
     Check,
     HelpCircle,
     User,
-    Sparkles
+    Sparkles,
+    Users,
+    Search,
+    Mail,
+    ChevronLeft,
+    ChevronRight,
+    Building2,
+    MapPin
 } from 'lucide-react';
 import { storageService } from '../../services/storage';
 import { useAuth } from '../../auth/AuthProvider';
@@ -31,6 +38,30 @@ export interface EmailBlock {
     type: 'header' | 'intro' | 'callout' | 'solution' | 'leadIn' | 'videoCard' | 'ctaButton' | 'closing' | 'signature';
     label: string;
     visible: boolean;
+}
+
+export function repairTemplateVariables(text: string | undefined, isChurch: boolean): string {
+    if (!text) return text || '';
+    let result = text;
+    // Replace any legacy frozen church names with variable
+    result = result.replace(/Iglesia\s+B[ií]blica\s+Gracia\s+Eterna(\s*\([^\)]*\))?/gi, isChurch ? '{{nombre_iglesia}}' : '{{nombre_empresa}}');
+    result = result.replace(/Cl[ií]nica\s+Salud\s+Plus/gi, isChurch ? '{{nombre_iglesia}}' : '{{nombre_empresa}}');
+    result = result.replace(/Nuestra\s+Empresa/gi, isChurch ? 'Iclesia' : '{{nombre_empresa}}');
+    result = result.replace(/contacto@empresa\.com/gi, '');
+
+    // Smart repair for callout: "¿Cuentan actualmente en ... con un proceso ágil"
+    result = result.replace(/(¿Cuentan actualmente en\s+)(.+?)(\s+con un proceso ágil)/i, (match, p1, middle, p3) => {
+        if (middle.includes('{{')) return match;
+        return `${p1}${isChurch ? '{{nombre_iglesia}}' : '{{nombre_empresa}}'}${p3}`;
+    });
+
+    // Smart repair for subject: "Una pregunta para ..."
+    result = result.replace(/(Una pregunta para\s+)(.+)/i, (match, p1, middle) => {
+        if (middle.includes('{{')) return match;
+        return `${p1}${isChurch ? '{{nombre_iglesia}}' : '{{nombre_empresa}}'}`;
+    });
+
+    return result;
 }
 
 export function getYouTubeVideoId(url: string): string | null {
@@ -214,7 +245,7 @@ export default function ProspectingEmailStudio({
 
     // Form Controls (Left Panel)
     const [campaignName, setCampaignName] = useState(() => effectiveInitial.campaignName || initialName || (company?.name ? `Prospección - ${company.name}` : 'Prospección - Comercial'));
-    const [subject, setSubject] = useState(() => effectiveInitial.subject || initialSubject || (isIclesia ? 'Una pregunta para {{nombre_iglesia}}' : 'Una pregunta para {{nombre_empresa}}'));
+    const [subject, setSubject] = useState(() => repairTemplateVariables(effectiveInitial.subject || initialSubject || (isIclesia ? 'Una pregunta para {{nombre_iglesia}}' : 'Una pregunta para {{nombre_empresa}}'), isIclesia));
     const [senderIdentity, setSenderIdentity] = useState(() => effectiveInitial.senderIdentity || `${defaultSenderName} <${defaultSenderEmail}>`);
 
     // Video Controls
@@ -258,7 +289,7 @@ export default function ProspectingEmailStudio({
 
     // Dynamic Text Content (Adapted for current tenant company / churches)
     const [greeting, setGreeting] = useState(() => effectiveInitial.greeting || 'Hola, bendiciones.');
-    const [introText, setIntroText] = useState(() => effectiveInitial.introText || (
+    const [introText, setIntroText] = useState(() => repairTemplateVariables(effectiveInitial.introText, isIclesia) || (
         isIclesia
             ? 'Mi nombre es Jimmy Arias de Iclesia y quería hacerles una consulta:'
             : senderNameIsCompanyName
@@ -268,24 +299,32 @@ export default function ProspectingEmailStudio({
                     ? `Mi nombre es ${defaultSenderName} de ${companyDisplayName} y quería hacerles una consulta:`
                     : `Mi nombre es ${defaultSenderName} y quería hacerles una consulta:`
     ));
-    const [calloutText, setCalloutText] = useState(() => effectiveInitial.calloutText || (isIclesia ? '¿Cuentan actualmente en {{nombre_iglesia}} con un proceso ágil para atender y dar seguimiento inmediato a cada visitante o miembro que solicita información?' : '¿Cuentan actualmente en {{nombre_empresa}} con un proceso ágil para atender y dar seguimiento inmediato a cada cliente que solicita información?'));
-    const [solutionText, setSolutionText] = useState(() => effectiveInitial.solutionText || (
+    const [calloutText, setCalloutText] = useState(() => repairTemplateVariables(effectiveInitial.calloutText, isIclesia) || (isIclesia ? '¿Cuentan actualmente en {{nombre_iglesia}} con un proceso ágil para atender y dar seguimiento inmediato a cada visitante o miembro que solicita información?' : '¿Cuentan actualmente en {{nombre_empresa}} con un proceso ágil para atender y dar seguimiento inmediato a cada cliente que solicita información?'));
+    const [solutionText, setSolutionText] = useState(() => repairTemplateVariables(effectiveInitial.solutionText, isIclesia) || (
         isIclesia
             ? 'En Iclesia ayudamos a congregaciones a automatizar el seguimiento de visitas, coordinar a los líderes de grupos y asegurar que ninguna persona se quede sin atención pastoral.'
             : companyDisplayName
                 ? `En ${companyDisplayName} ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.`
                 : 'Ayudamos a empresas a optimizar sus tiempos de respuesta, coordinar al equipo comercial y asegurar que ninguna oportunidad de venta se pierda.'
     ));
-    const [leadInText, setLeadInText] = useState(() => effectiveInitial.leadInText || 'Les comparto un breve video de 45 segundos para mostrarles cómo funciona:');
-    const [closingText, setClosingText] = useState(() => effectiveInitial.closingText || (isIclesia ? 'Si esto es algo que desean mejorar en su congregación, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.' : 'Si esto es algo que desean mejorar en su empresa, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.'));
+    const [leadInText, setLeadInText] = useState(() => repairTemplateVariables(effectiveInitial.leadInText, isIclesia) || 'Les comparto un breve video de 45 segundos para mostrarles cómo funciona:');
+    const [closingText, setClosingText] = useState(() => repairTemplateVariables(effectiveInitial.closingText, isIclesia) || (isIclesia ? 'Si esto es algo que desean mejorar en su congregación, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.' : 'Si esto es algo que desean mejorar en su empresa, pueden responder directamente a este correo. Con gusto coordinamos una breve conversación.'));
     const [signoffText, setSignoffText] = useState(() => effectiveInitial.signoffText || 'Atentamente,');
 
     // Logo Resolution: Custom uploaded in studio > Company profile logo > (Iclesia logo if Iclesia, else empty)
     const effectiveHeaderLogo = customHeaderLogo || company?.logo_url || (isIclesia ? '/images/marketing/iclesia-header-logo.png' : '');
     const effectiveSigLogo = customSigLogo || customHeaderLogo || company?.logo_url || (isIclesia ? '/images/marketing/iclesia-brand-logo.png' : '');
 
-    // Active simulated lead index
+    // Active simulated lead index & Recipient modal controls
     const [leadIndex, setLeadIndex] = useState(0);
+
+    // Reset leadIndex whenever previewLeads changes to prevent out-of-bounds or stale index
+    useEffect(() => {
+        setLeadIndex(0);
+    }, [previewLeads]);
+
+    const [showRecipientsModal, setShowRecipientsModal] = useState(false);
+    const [recipientsSearch, setRecipientsSearch] = useState('');
 
     // Blocks list for in-canvas direct manipulation
     const [blocks, setBlocks] = useState<EmailBlock[]>(() => effectiveInitial.blocks || [
@@ -312,24 +351,24 @@ export default function ProspectingEmailStudio({
          */
         const sanitize = (text: string | undefined): string | undefined => {
             if (!text) return text;
+            let s = text;
             // If company is now known, replace old broken fallbacks with real name
             if (companyDisplayName) {
-                return text
-                    .replace(/Nuestra Empresa/g, companyDisplayName)
-                    .replace(/contacto@empresa\.com/g, defaultSenderEmail || '');
+                s = s.replace(/Nuestra Empresa/g, companyDisplayName)
+                     .replace(/contacto@empresa\.com/g, defaultSenderEmail || '');
             }
-            return text;
+            return repairTemplateVariables(s, isIclesia);
         };
 
         if (stateToLoad.campaignName) setCampaignName(stateToLoad.campaignName);
-        if (stateToLoad.subject) setSubject(stateToLoad.subject);
+        if (stateToLoad.subject) setSubject(repairTemplateVariables(stateToLoad.subject, isIclesia));
         if (stateToLoad.senderIdentity) setSenderIdentity(stateToLoad.senderIdentity);
         if (stateToLoad.greeting) setGreeting(stateToLoad.greeting);
-        if (stateToLoad.introText) setIntroText(sanitize(stateToLoad.introText) || stateToLoad.introText);
-        if (stateToLoad.calloutText) setCalloutText(stateToLoad.calloutText);
-        if (stateToLoad.solutionText) setSolutionText(sanitize(stateToLoad.solutionText) || stateToLoad.solutionText);
-        if (stateToLoad.leadInText) setLeadInText(stateToLoad.leadInText);
-        if (stateToLoad.closingText) setClosingText(stateToLoad.closingText);
+        if (stateToLoad.introText) setIntroText(repairTemplateVariables(sanitize(stateToLoad.introText) || stateToLoad.introText, isIclesia));
+        if (stateToLoad.calloutText) setCalloutText(repairTemplateVariables(sanitize(stateToLoad.calloutText) || stateToLoad.calloutText, isIclesia));
+        if (stateToLoad.solutionText) setSolutionText(repairTemplateVariables(sanitize(stateToLoad.solutionText) || stateToLoad.solutionText, isIclesia));
+        if (stateToLoad.leadInText) setLeadInText(repairTemplateVariables(stateToLoad.leadInText, isIclesia));
+        if (stateToLoad.closingText) setClosingText(repairTemplateVariables(stateToLoad.closingText, isIclesia));
         if (stateToLoad.signoffText) setSignoffText(stateToLoad.signoffText);
         if (stateToLoad.youtubeUrl) setYoutubeUrl(stateToLoad.youtubeUrl);
         if (stateToLoad.videoCaption) setVideoCaption(sanitize(stateToLoad.videoCaption) || stateToLoad.videoCaption);
@@ -413,7 +452,7 @@ export default function ProspectingEmailStudio({
             setCustomSigLogo('/images/marketing/iclesia-brand-logo.png');
         } else {
             const senderName = (profile?.full_name && profile.full_name !== 'Platform Owner') ? profile.full_name : compName;
-            const senderEmail = company.email || profile?.email || 'contacto@empresa.com';
+            const senderEmail = company.email || profile?.email || '';
             setSigName(senderName);
             setSigTitle(`${(profile as any)?.job_title || 'Asesor Comercial'} | ${compName}`);
             setSigPhone(company.phone || profile?.phone || '');
@@ -448,11 +487,37 @@ export default function ProspectingEmailStudio({
     }, [sigName, sigTitle, sigPhone, sigWebsite, avatarUrl, photoShape, hasLogo, hasPhoto, customHeaderLogo, customSigLogo]);
 
     // Simulated lead resolution
-    const currentLead = (previewLeads && previewLeads.length > 0 && previewLeads[leadIndex]) ? previewLeads[leadIndex] : {
-        company_name: 'Clínica Salud Plus',
-        name: 'Dr. Roberto Mendoza',
-        city: 'Miami',
-        industry: 'Salud y Bienestar'
+    const validLeadIndex = (previewLeads && previewLeads.length > 0)
+        ? Math.min(Math.max(0, leadIndex), previewLeads.length - 1)
+        : 0;
+
+    const currentLead = (previewLeads && previewLeads.length > 0 && previewLeads[validLeadIndex])
+        ? previewLeads[validLeadIndex]
+        : {
+            company_name: isIclesia ? 'Iglesia Gateway Community' : 'Clínica Salud Plus',
+            name: isIclesia ? 'Jimmy Arias' : 'Dr. Roberto Mendoza',
+            email: isIclesia ? 'jarias7604@gmail.com' : 'lead@ejemplo.com',
+            city: 'Miami',
+            industry: isIclesia ? 'Ministerio Cristiano' : 'Salud y Bienestar'
+        };
+
+    const leadRecipientName = currentLead.company_name || currentLead.name || (isIclesia ? 'Iglesia Destinataria' : 'Destinatario');
+    const leadRecipientEmail = currentLead.email || currentLead.contact_email || '';
+
+    // Blur handler for contentEditable: converts substituted lead name back to template variable
+    const handleTextBlur = (
+        e: React.FocusEvent<HTMLElement>,
+        setter: (val: string) => void
+    ) => {
+        let text = e.currentTarget.innerText || '';
+        const leadName = (currentLead.company_name && currentLead.company_name !== 'Individual')
+            ? currentLead.company_name
+            : (currentLead.name || '');
+
+        if (leadName && text.includes(leadName)) {
+            text = text.replace(leadName, isIclesia ? '{{nombre_iglesia}}' : '{{nombre_empresa}}');
+        }
+        setter(repairTemplateVariables(text, isIclesia));
     };
 
     // Replace variables (STRICTLY SAAS / BUSINESS VARIABLES)
@@ -460,10 +525,10 @@ export default function ProspectingEmailStudio({
         if (!text) return '';
         const companyOrLeadName = (currentLead.company_name && currentLead.company_name !== 'Individual')
             ? currentLead.company_name
-            : (currentLead.name || 'Su Empresa');
+            : (currentLead.name || (isIclesia ? 'Su Iglesia' : 'Su Empresa'));
         const firstName = currentLead.name ? currentLead.name.split(' ')[0] : 'Estimado/a';
         const city = currentLead.city || 'su ciudad';
-        const industry = currentLead.industry || currentLead.denomination || 'su rubro';
+        const industry = currentLead.industry || currentLead.denomination || (isIclesia ? 'Ministerio Cristiano' : 'su rubro');
 
         return text
             .replace(/{{(nombre_empresa|company_name|empresa|nombre_iglesia|iglesia|congregacion)}}/gi, companyOrLeadName)
@@ -1150,22 +1215,35 @@ export default function ProspectingEmailStudio({
                         </button>
                     </div>
 
-                    {/* Simulated Lead Pill (Business Name) */}
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50/70 border border-blue-200/60 rounded-xl text-xs font-semibold text-blue-900">
-                        <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                        <span className="text-[11px] text-gray-500">Empresa:</span>
-                        <strong className="max-w-[170px] truncate text-blue-900" title={currentLead.company_name}>
-                            {currentLead.company_name}
+                    {/* Simulated Lead Pill */}
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50/80 border border-blue-200/80 rounded-xl text-xs font-semibold text-blue-900 shadow-xs">
+                        <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shrink-0" />
+                        <span className="text-[11px] text-gray-500 font-bold">{isIclesia ? 'Iglesia:' : 'Empresa:'}</span>
+                        <strong className="max-w-[170px] truncate text-blue-900" title={leadRecipientName}>
+                            {leadRecipientName}
                         </strong>
                         {previewLeads && previewLeads.length > 1 && (
-                            <button
-                                type="button"
-                                onClick={() => setLeadIndex(prev => (prev + 1) % previewLeads.length)}
-                                className="p-0.5 text-blue-600 hover:text-blue-900 rounded"
-                                title="Probar con otro lead"
-                            >
-                                <RefreshCw className="w-3 h-3" />
-                            </button>
+                            <div className="flex items-center gap-1 border-l border-blue-200 pl-2">
+                                <span className="text-[10px] text-blue-700 font-black tracking-tight whitespace-nowrap">
+                                    {validLeadIndex + 1} de {previewLeads.length}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setLeadIndex(prev => (prev - 1 + previewLeads.length) % previewLeads.length)}
+                                    className="p-1 text-blue-700 hover:text-blue-950 hover:bg-blue-100 rounded-md transition"
+                                    title="Ver anterior destinatario"
+                                >
+                                    <ChevronLeft className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setLeadIndex(prev => (prev + 1) % previewLeads.length)}
+                                    className="p-1 text-blue-700 hover:text-blue-950 hover:bg-blue-100 rounded-md transition"
+                                    title="Ver siguiente destinatario"
+                                >
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
                         )}
                     </div>
 
@@ -1647,11 +1725,27 @@ export default function ProspectingEmailStudio({
                                         <span className="text-gray-400 font-semibold w-12 shrink-0">De:</span>
                                         <span className="font-medium text-gray-800">{senderIdentity}</span>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <span className="text-gray-400 font-semibold w-12 shrink-0">Para:</span>
-                                        <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">
-                                            {currentLead.company_name} &lt;contacto@empresa.com&gt;
+                                        <span className="font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-md flex items-center gap-1.5">
+                                            <span>{leadRecipientName}</span>
+                                            {leadRecipientEmail ? (
+                                                <span className="text-blue-950 font-normal">&lt;{leadRecipientEmail}&gt;</span>
+                                            ) : (
+                                                <span className="text-amber-700 text-[10px] font-bold bg-amber-100/80 px-1 rounded">(Sin correo registrado)</span>
+                                            )}
                                         </span>
+                                        {previewLeads && previewLeads.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowRecipientsModal(true)}
+                                                className="text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-0.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                                title="Ver la lista completa de destinatarios que recibirán esta campaña"
+                                            >
+                                                <Users className="w-3.5 h-3.5 text-indigo-600" />
+                                                + {previewLeads.length - 1} destinatarios más (Ver lista)
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-gray-400 font-semibold w-12 shrink-0">Asunto:</span>
@@ -1750,21 +1844,21 @@ export default function ProspectingEmailStudio({
                                                             contentEditable
                                                             suppressContentEditableWarning
                                                             onFocus={(e) => trackContentEditableFocus(e.currentTarget, 'Saludo')}
-                                                            onBlur={(e) => setGreeting(e.currentTarget.innerText)}
+                                                            onBlur={(e) => handleTextBlur(e, setGreeting)}
                                                             className="text-base font-bold text-gray-900 outline-none hover:bg-blue-50/50 focus:bg-blue-50/70 rounded px-1 transition cursor-text"
                                                             title="Haz clic para editar saludo — luego presiona un botón de variable para insertar"
                                                         >
-                                                            {greeting}
+                                                            {substituteVariables(greeting)}
                                                         </p>
                                                         <p
                                                             contentEditable
                                                             suppressContentEditableWarning
                                                             onFocus={(e) => trackContentEditableFocus(e.currentTarget, 'Texto Intro')}
-                                                            onBlur={(e) => setIntroText(e.currentTarget.innerText)}
+                                                            onBlur={(e) => handleTextBlur(e, setIntroText)}
                                                             className="text-sm font-medium text-gray-700 leading-relaxed outline-none hover:bg-blue-50/50 focus:bg-blue-50/70 rounded px-1 transition cursor-text"
                                                             title="Haz clic para editar texto — luego presiona un botón de variable para insertar"
                                                         >
-                                                            {introText}
+                                                            {substituteVariables(introText)}
                                                         </p>
                                                     </div>
                                                 )}
@@ -1779,7 +1873,7 @@ export default function ProspectingEmailStudio({
                                                             contentEditable
                                                             suppressContentEditableWarning
                                                             onFocus={(e) => trackContentEditableFocus(e.currentTarget, 'Pregunta Destacada')}
-                                                            onBlur={(e) => setCalloutText(e.currentTarget.innerText)}
+                                                            onBlur={(e) => handleTextBlur(e, setCalloutText)}
                                                             className="text-sm sm:text-[15px] font-extrabold text-[#0F172A] leading-snug outline-none hover:bg-blue-100/50 focus:bg-blue-100/70 rounded px-1 transition cursor-text"
                                                             title="Haz clic para editar pregunta — luego presiona un botón de variable para insertar"
                                                         >
@@ -1794,11 +1888,11 @@ export default function ProspectingEmailStudio({
                                                         contentEditable
                                                         suppressContentEditableWarning
                                                         onFocus={(e) => trackContentEditableFocus(e.currentTarget, 'Texto de Solución')}
-                                                        onBlur={(e) => setSolutionText(e.currentTarget.innerText)}
+                                                        onBlur={(e) => handleTextBlur(e, setSolutionText)}
                                                         className="text-sm font-medium text-gray-700 leading-relaxed outline-none hover:bg-blue-50/50 focus:bg-blue-50/70 rounded px-1 transition cursor-text"
                                                         title="Haz clic para editar texto de solución — luego presiona un botón de variable para insertar"
                                                     >
-                                                        {solutionText}
+                                                        {substituteVariables(solutionText)}
                                                     </p>
                                                 )}
 
@@ -1808,11 +1902,11 @@ export default function ProspectingEmailStudio({
                                                         contentEditable
                                                         suppressContentEditableWarning
                                                         onFocus={(e) => trackContentEditableFocus(e.currentTarget, 'Texto Previo al Video')}
-                                                        onBlur={(e) => setLeadInText(e.currentTarget.innerText)}
+                                                        onBlur={(e) => handleTextBlur(e, setLeadInText)}
                                                         className="text-sm font-bold text-gray-900 outline-none hover:bg-blue-50/50 focus:bg-blue-50/70 rounded px-1 transition cursor-text"
                                                         title="Haz clic para editar texto previo al video"
                                                     >
-                                                        {leadInText}
+                                                        {substituteVariables(leadInText)}
                                                     </p>
                                                 )}
 
@@ -1862,16 +1956,16 @@ export default function ProspectingEmailStudio({
                                                         <p
                                                             contentEditable
                                                             suppressContentEditableWarning
-                                                            onBlur={(e) => setClosingText(e.currentTarget.innerText)}
+                                                            onBlur={(e) => handleTextBlur(e, setClosingText)}
                                                             className="text-sm font-medium text-gray-700 leading-relaxed outline-none hover:bg-blue-50/50 rounded px-1 transition"
                                                             title="Haz clic para editar despedida"
                                                         >
-                                                            {closingText}
+                                                            {substituteVariables(closingText)}
                                                         </p>
                                                         <p
                                                             contentEditable
                                                             suppressContentEditableWarning
-                                                            onBlur={(e) => setSignoffText(e.currentTarget.innerText)}
+                                                            onBlur={(e) => handleTextBlur(e, setSignoffText)}
                                                             className="text-sm font-bold text-gray-900 outline-none hover:bg-blue-50/50 rounded px-1 transition"
                                                             title="Haz clic para editar firma de despedida"
                                                         >
@@ -1996,8 +2090,8 @@ export default function ProspectingEmailStudio({
                                         )}
                                     </div>
 
-                                    <p className="font-bold text-gray-900 text-xs">{greeting}</p>
-                                    <p className="text-gray-700 text-[11px] leading-relaxed">{introText}</p>
+                                    <p className="font-bold text-gray-900 text-xs">{substituteVariables(greeting)}</p>
+                                    <p className="text-gray-700 text-[11px] leading-relaxed">{substituteVariables(introText)}</p>
 
                                     {/* Mobile Callout */}
                                     <div className="bg-[#EFF6FF] border border-[#DBEAFE] rounded-xl p-3 flex items-start gap-2.5">
@@ -2010,10 +2104,10 @@ export default function ProspectingEmailStudio({
                                     </div>
 
                                     <p className="text-gray-700 text-[11px] leading-relaxed">
-                                        {solutionText}
+                                        {substituteVariables(solutionText)}
                                     </p>
                                     <p className="font-bold text-gray-900 text-[11px]">
-                                        {leadInText}
+                                        {substituteVariables(leadInText)}
                                     </p>
 
                                     {/* Mobile Video Card */}
@@ -2051,7 +2145,7 @@ export default function ProspectingEmailStudio({
                                         </a>
                                     </div>
 
-                                    <p className="text-gray-700 text-[11px] leading-relaxed">{closingText}</p>
+                                    <p className="text-gray-700 text-[11px] leading-relaxed">{substituteVariables(closingText)}</p>
                                     <p className="font-bold text-gray-900 text-[11px]">{signoffText}</p>
 
                                     {/* Mobile Signature */}
@@ -2102,6 +2196,170 @@ export default function ProspectingEmailStudio({
                     </div>
                 </div>
             </div>
+
+            {/* ══ RECIPIENTS LIST MODAL — Allows inspecting all recipients and switching preview ══ */}
+            {showRecipientsModal && (
+                <div
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9990] flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    onClick={() => setShowRecipientsModal(false)}
+                >
+                    <div
+                        className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 p-6 flex items-center justify-between text-white flex-shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-white/20 rounded-2xl backdrop-blur-xs">
+                                    <Users className="w-6 h-6 text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black tracking-tight">
+                                        Destinatarios de la Campaña ({previewLeads.length})
+                                    </h3>
+                                    <p className="text-white/80 text-xs font-medium">
+                                        {previewLeads.length === 1 ? '1 contacto seleccionado' : `${previewLeads.length} contactos recibirán este correo personalizado`}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowRecipientsModal(false)}
+                                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition text-white"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Search & Actions */}
+                        <div className="p-4 bg-slate-50 border-b border-gray-100 flex items-center gap-3 flex-shrink-0">
+                            <div className="flex-1 relative">
+                                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por iglesia, nombre o email..."
+                                    value={recipientsSearch}
+                                    onChange={(e) => setRecipientsSearch(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                    autoFocus
+                                />
+                            </div>
+                            {onOpenAudienceModal && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowRecipientsModal(false);
+                                        onOpenAudienceModal();
+                                    }}
+                                    className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap"
+                                >
+                                    Segmentar / Cambiar
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Recipients List */}
+                        <div className="p-4 overflow-y-auto flex-1 space-y-2">
+                            {previewLeads.length === 0 ? (
+                                <div className="text-center py-12 text-gray-400 text-xs font-semibold">
+                                    No hay destinatarios seleccionados. Abre el segmentador para incluir contactos.
+                                </div>
+                            ) : (
+                                previewLeads
+                                    .filter((l) => {
+                                        if (!recipientsSearch.trim()) return true;
+                                        const q = recipientsSearch.toLowerCase();
+                                        return (
+                                            (l.name || '').toLowerCase().includes(q) ||
+                                            (l.company_name || '').toLowerCase().includes(q) ||
+                                            (l.email || l.contact_email || '').toLowerCase().includes(q)
+                                        );
+                                    })
+                                    .map((lead, idx) => {
+                                        const originalIndex = previewLeads.indexOf(lead);
+                                        const isCurrent = originalIndex === validLeadIndex;
+                                        const leadEmail = lead.email || lead.contact_email;
+                                        const churchOrComp = lead.company_name || (isIclesia ? 'Sin iglesia asignada' : 'Sin empresa');
+
+                                        return (
+                                            <div
+                                                key={lead.id || idx}
+                                                className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                                                    isCurrent
+                                                        ? 'bg-blue-50/70 border-blue-300 ring-2 ring-blue-500/20'
+                                                        : 'bg-white hover:bg-gray-50 border-gray-200/80'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                                                        {(lead.name || 'C').charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="font-bold text-xs text-gray-900 truncate">
+                                                                {lead.name || 'Sin nombre'}
+                                                            </span>
+                                                            <span className="text-[10px] font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md truncate max-w-[200px]">
+                                                                {churchOrComp}
+                                                            </span>
+                                                            {lead.status && (
+                                                                <span className="text-[9px] font-bold uppercase text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                                                                    {lead.status}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-[11px] text-gray-500 font-medium truncate mt-0.5">
+                                                            {leadEmail ? (
+                                                                <span className="flex items-center gap-1">
+                                                                    <Mail className="w-3 h-3 text-gray-400" /> {leadEmail}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-red-500 font-semibold">(Sin correo electrónico)</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="shrink-0 flex items-center gap-2">
+                                                    {isCurrent ? (
+                                                        <span className="px-2.5 py-1 bg-blue-600 text-white text-[10px] font-black uppercase rounded-lg shadow-xs">
+                                                            En Vista Previa
+                                                        </span>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setLeadIndex(originalIndex);
+                                                                setShowRecipientsModal(false);
+                                                                toast.success(`Vista previa: ${churchOrComp}`, { duration: 2000, icon: '👁️' });
+                                                            }}
+                                                            className="px-2.5 py-1 bg-gray-100 hover:bg-blue-600 hover:text-white text-gray-700 text-[10px] font-bold rounded-lg transition"
+                                                        >
+                                                            Previsualizar
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+                            <span>
+                                Mostrando <strong>{previewLeads.length}</strong> {previewLeads.length === 1 ? 'destinatario' : 'destinatarios'}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setShowRecipientsModal(false)}
+                                className="px-4 py-2 bg-gray-900 hover:bg-black text-white font-bold rounded-xl transition text-xs"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ══ SEND GATE MODAL — Blocks or warns before sending ══ */}
             {showSendGateModal && (

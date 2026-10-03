@@ -89,6 +89,10 @@ export default function CampaignBuilder() {
                 setSelectedChannel(campaign.type as any);
                 const specIds = campaign.audience_filters?.specificIds || [];
                 if (specIds.length > 0) setIsDirectConnect(true);
+                const savedExcluded = campaign.audience_filters?.excludedIds || [];
+                if (savedExcluded.length > 0) {
+                    setExcludedLeadIds(new Set(savedExcluded));
+                }
                 const savedStudioState = campaign.audience_filters?.prospecting_studio_state || campaign.audience_filters?.studio_state || null;
                 setFormData({
                     name: campaign.name || '',
@@ -508,7 +512,7 @@ export default function CampaignBuilder() {
                     initialContent={formData.content}
                     initialStudioState={(formData as any).prospecting_studio_state || formData.audience_filter?.prospecting_studio_state}
                     reachCount={reachCount}
-                    previewLeads={displayedLeads}
+                    previewLeads={selectedLeads}
                     onBack={() => navigate('/marketing/email')}
                     onSwitchToFreeEditor={() => setEmailMode('standard')}
                     onOpenAudienceModal={async () => {
