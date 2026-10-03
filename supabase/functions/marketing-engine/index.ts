@@ -85,7 +85,8 @@ Deno.serve(async (req) => {
     }
 
     try {
-        const { campaignId } = await req.json();
+        const body = await req.json();
+        const { campaignId, mode, testEmail, subject: customSubject, html: customHtml, companyId: customCompanyId, sampleLead } = body;
 
         // Security: require a valid Supabase anon key or user token
         const authHeader = req.headers.get('Authorization') || '';
@@ -97,6 +98,111 @@ Deno.serve(async (req) => {
         const supabaseUrl = Deno.env.get("CRM_SUPABASE_URL") || Deno.env.get("SUPABASE_URL") || "";
         const supabaseKey = Deno.env.get("CRM_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
         const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // ── TEST EMAIL DISPATCH MODE (Single preview send) ────────────────────────
+        if (mode === 'test' || testEmail) {
+            const recipientEmail = (testEmail || '').trim();
+            if (!recipientEmail) {
+                return new Response(JSON.stringify({ error: 'Email de prueba no especificado' }), { status: 400, headers: corsHeaders });
+            }
+
+            let targetCompanyId = customCompanyId;
+            let currentCampaign = null;
+
+            if (campaignId) {
+                const { data: c } = await supabase.from("marketing_campaigns").select("*").eq("id", campaignId).maybeSingle();
+                currentCampaign = c;
+                if (c?.company_id) targetCompanyId = c.company_id;
+            }
+
+            const { data: company } = targetCompanyId 
+                ? await supabase.from("companies").select("id, name, email").eq("id", targetCompanyId).maybeSingle()
+                : { data: null };
+
+            // Dynamic Multi-Tenant Email Config
+            const { data: tenantResend } = targetCompanyId ? await supabase.from('marketing_integrations')
+                .select('settings')
+                .eq('company_id', targetCompanyId)
+                .eq('provider', 'resend')
+                .eq('is_active', true)
+                .maybeSingle() : { data: null };
+
+            let platformResend = null;
+            if (!tenantResend?.settings?.apiKey) {
+                const { data: pr } = await supabase.from('marketing_integrations').select('settings')
+                    .eq('company_id', '7a582ba5-f7d0-4ae3-9985-35788deb1c30') // Platform owner
+                    .eq('provider', 'resend')
+                    .eq('is_active', true)
+                    .maybeSingle();
+                platformResend = pr;
+            }
+
+            const senderName = tenantResend?.settings?.senderName || company?.name || "Iclesia";
+            const platformEmail = platformResend?.settings?.senderEmail || "notificaciones@ariascrm.com";
+            const senderEmail = tenantResend?.settings?.senderEmail || platformEmail;
+            const replyTo = tenantResend?.settings?.replyTo || company?.email || undefined;
+            const resendToken = tenantResend?.settings?.apiKey || platformResend?.settings?.apiKey || Deno.env.get("RESEND_API_KEY");
+
+            if (!resendToken) {
+                return new Response(JSON.stringify({ error: 'Falta configurar API Key de Resend en el sistema' }), { status: 422, headers: corsHeaders });
+            }
+
+            const fromDisplay = `${senderName} <${senderEmail}>`;
+
+            // Prepare sample lead for variable substitution
+            const previewLead = sampleLead || {
+                name: 'Jimmy Arias',
+                company_name: 'Iglesia Gateway Community Church',
+                email: recipientEmail,
+                address: 'San Salvador',
+                industry: 'Iglesia'
+            };
+
+            const hour = new Date().getHours();
+            const greeting = hour >= 5 && hour < 12 ? 'Buenos días' : hour >= 12 && hour < 19 ? 'Buenas tardes' : 'Buenas noches';
+
+            const rawSubject = customSubject || currentCampaign?.subject || 'Prueba de Campaña';
+            const rawContent = customHtml || currentCampaign?.content || '';
+
+            const { result: testSubject } = substituteLeadVariables(rawSubject, previewLead, greeting);
+            const { result: testContent } = substituteLeadVariables(rawContent, previewLead, greeting);
+
+            const emailPayload: any = {
+                from: fromDisplay,
+                to: recipientEmail,
+                subject: `[PRUEBA] ${testSubject}`,
+                html: testContent,
+            };
+
+            if (replyTo) {
+                emailPayload.reply_to = replyTo;
+            }
+
+            console.log(`[marketing-engine test] Sending test email from "${fromDisplay}" to "${recipientEmail}"`);
+
+            const res = await fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${resendToken}` },
+                body: JSON.stringify(emailPayload)
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                console.error("[marketing-engine test] Resend error:", errText);
+                return new Response(JSON.stringify({ error: `Resend error: ${errText}` }), { status: 502, headers: corsHeaders });
+            }
+
+            const resData = await res.json();
+            return new Response(JSON.stringify({ 
+                success: true, 
+                test: true, 
+                message: `Correo de prueba enviado con éxito a ${recipientEmail}`, 
+                id: resData.id 
+            }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+            });
+        }
+        // ──────────────────────────────────────────────────────────────────────────
 
         const { data: campaign, error: campError } = await supabase
             .from("marketing_campaigns").select("*").eq("id", campaignId).single();

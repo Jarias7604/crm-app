@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { storageService } from '../../services/storage';
 import { useAuth } from '../../auth/AuthProvider';
+import { campaignService } from '../../services/marketing/campaignService';
 import toast from 'react-hot-toast';
 
 export interface EmailBlock {
@@ -1068,7 +1069,7 @@ export default function ProspectingEmailStudio({
         return issues;
     };
 
-    /** Send a test copy of the email to the user's own address */
+    /** Send a real test copy of the email to the user's own address via Resend */
     const handleSendTestEmail = async () => {
         const testEmail = profile?.email;
         if (!testEmail) {
@@ -1079,11 +1080,25 @@ export default function ProspectingEmailStudio({
             setIsSendingTest(true);
             const html = compileToEmailHtml();
             const studioState = getCurrentStudioState();
-            // Save draft first so test goes through the engine with real data
+            // Save draft first
             await onSaveDraft({ name: campaignName, subject: subject, htmlContent: html, studioState });
-            toast.success(`Correo de prueba enviado a ${testEmail}. Revisa tu bandeja.`, { duration: 5000, icon: '📬' });
+
+            // ACTUALLY dispatch the test email through marketing-engine
+            const toastId = toast.loading(`Enviando correo de prueba a ${testEmail}...`);
+            const result = await campaignService.sendTestEmail({
+                campaignId: campaignId || undefined,
+                testEmail,
+                subject,
+                htmlContent: html,
+                companyId: company?.id || profile?.company_id,
+                sampleLead: currentLead || undefined
+            });
+
+            toast.dismiss(toastId);
+            toast.success(result?.message || `¡Correo de prueba enviado a ${testEmail}! Revisa tu bandeja de entrada o spam.`, { duration: 6000, icon: '📬' });
             setHasTestedSend(true);
         } catch (err: any) {
+            console.error('Error enviando prueba:', err);
             toast.error(`Error al enviar prueba: ${err.message || 'Error desconocido'}`);
         } finally {
             setIsSendingTest(false);
@@ -1266,6 +1281,18 @@ export default function ProspectingEmailStudio({
                     >
                         <Save className="w-3.5 h-3.5" />
                         {isSaving ? 'Guardando...' : 'Guardar Borrador'}
+                    </button>
+
+                    {/* Quick Test Email Button in Top Bar */}
+                    <button
+                        type="button"
+                        onClick={handleSendTestEmail}
+                        disabled={isSendingTest}
+                        className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                        title={profile?.email ? `Enviar prueba real a ${profile.email}` : 'Enviar prueba a mi correo'}
+                    >
+                        <Mail className="w-3.5 h-3.5" />
+                        {isSendingTest ? 'Enviando...' : 'Enviar Prueba'}
                     </button>
 
                     {/* Audience Button */}

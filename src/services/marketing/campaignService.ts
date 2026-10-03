@@ -170,6 +170,36 @@ export const campaignService = {
         return data;
     },
 
+    // Sends a single real test email with variables resolved
+    async sendTestEmail(params: {
+        campaignId?: string;
+        testEmail: string;
+        subject: string;
+        htmlContent: string;
+        companyId?: string;
+        sampleLead?: any;
+    }) {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        const { data, error } = await supabase.functions.invoke('marketing-engine', {
+            body: {
+                mode: 'test',
+                campaignId: params.campaignId,
+                testEmail: params.testEmail,
+                subject: params.subject,
+                html: params.htmlContent,
+                companyId: params.companyId,
+                sampleLead: params.sampleLead
+            },
+            headers: {
+                Authorization: `Bearer ${session?.access_token}`
+            }
+        });
+
+        if (error) throw error;
+        return data;
+    },
+
     // Get audience preview based on advanced filters
     async getAudiencePreview(filters: {
         status?: string[],
