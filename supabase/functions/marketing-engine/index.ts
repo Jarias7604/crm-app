@@ -238,7 +238,7 @@ Deno.serve(async (req) => {
 
         if (campaign.type === 'email') query = query.not('email', 'is', null).neq('email', '');
 
-        const { data: leads, error: leadError } = await query;
+        const { data: leads, error: leadError } = await query.limit(10000);
         if (leadError) throw leadError;
         if (!leads || leads.length === 0) {
             return new Response(JSON.stringify({ message: "No audience found" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

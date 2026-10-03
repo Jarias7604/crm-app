@@ -55,6 +55,8 @@ export default function CampaignBuilder() {
     const incomingLeadIds = locationState?.preSelectedLeads || locationState?.prefillIds || queryLeadIds;
     const hasIncomingLeads = Array.isArray(incomingLeadIds) && incomingLeadIds.length > 0;
 
+    const isFreshParam = urlParams.get('fresh') === 'true';
+
     const [formData, setFormData] = useState(() => {
         // If coming with preselected leads or specific re-send state, do NOT load an unrelated draft from localStorage!
         if (hasIncomingLeads) {
@@ -84,17 +86,43 @@ export default function CampaignBuilder() {
             };
         }
 
+        // Fresh or generic new campaign:
+        if (isFreshParam) {
+            try {
+                localStorage.removeItem(DRAFT_KEY);
+                localStorage.removeItem('crm_campaign_draft');
+                const studioKey = effectiveCompanyId ? `crm_prospecting_studio_new_${effectiveCompanyId}` : 'crm_prospecting_studio_new_default';
+                localStorage.removeItem(studioKey);
+                localStorage.removeItem('crm_prospecting_studio_new');
+            } catch { /* ignore */ }
+        }
+
         // Restore draft from localStorage on first render (new campaigns only)
-        if (!window.location.pathname.includes('/campaign/') || window.location.pathname.endsWith('/new')) {
+        if (!isFreshParam && (!window.location.pathname.includes('/campaign/') || window.location.pathname.endsWith('/new'))) {
             try {
                 localStorage.removeItem('crm_campaign_draft'); // Clean legacy unscoped key
                 const saved = localStorage.getItem(DRAFT_KEY);
                 if (saved) {
                     const parsed = JSON.parse(saved);
-                    return parsed.formData || {
-                        name: '', subject: '', content: '', template_id: '' as string | null,
-                        audience_filter: { status: [] as string[], industry: [] as string[], dateRange: 'all' as 'all' | 'new', priority: 'all' as string, specificIds: [] as string[], idType: 'id' as 'id' | 'google_place_id', contactFatigue: 'all' as 'all' | 'never_contacted' | 'exclude_7_days' | 'exclude_15_days' | 'exclude_30_days' }
-                    };
+                    const draft = parsed.formData;
+                    if (draft) {
+                        // CRITICAL PROTECTION: If saved draft was a targeted re-send (has specificIds or starts with [RE]),
+                        // purge it so it NEVER infects a generic new campaign.
+                        const isResendDraft = (draft.audience_filter?.specificIds && draft.audience_filter.specificIds.length > 0)
+                            || draft.name?.startsWith('[RE]')
+                            || draft.name?.toLowerCase().startsWith('re-envío');
+                        if (isResendDraft) {
+                            localStorage.removeItem(DRAFT_KEY);
+                        } else {
+                            return {
+                                ...draft,
+                                audience_filter: {
+                                    ...draft.audience_filter,
+                                    specificIds: [] // ALWAYS clean for generic campaigns
+                                }
+                            };
+                        }
+                    }
                 }
             } catch { /* ignore */ }
         }
@@ -168,16 +196,33 @@ export default function CampaignBuilder() {
             }));
             setIsDirectConnect(true);
             handlePreviewAudience(leadIds, selectedChannel);
+        } else {
+            // Regular / fresh new campaign: guarantee direct connect is false and specificIds is empty
+            setIsDirectConnect(false);
+            setFormData(prev => {
+                if (prev.audience_filter?.specificIds && prev.audience_filter.specificIds.length > 0) {
+                    return {
+                        ...prev,
+                        audience_filter: {
+                            ...prev.audience_filter,
+                            specificIds: []
+                        }
+                    };
+                }
+                return prev;
+            });
         }
     }, [campaignId, location.state, location.search]);
 
-    // Auto-save draft to localStorage every time form changes (new campaigns only)
+    // Auto-save draft to localStorage every time form changes (generic new campaigns only, NEVER targeted re-sends)
     useEffect(() => {
-        if (isEditMode) return; // Don't overwrite draft in edit mode
+        if (isEditMode || hasIncomingLeads) return; // Don't overwrite draft in edit mode or targeted re-sends
+        if (formData.name?.startsWith('[RE]') || formData.name?.toLowerCase().startsWith('re-envío')) return;
+        if (formData.audience_filter?.specificIds && formData.audience_filter.specificIds.length > 0) return;
         try {
             localStorage.setItem(DRAFT_KEY, JSON.stringify({ formData, selectedChannel }));
         } catch { /* ignore quota errors */ }
-    }, [formData, selectedChannel, isEditMode, DRAFT_KEY]);
+    }, [formData, selectedChannel, isEditMode, hasIncomingLeads, DRAFT_KEY]);
 
     // Restore channel from draft
     useEffect(() => {
@@ -431,6 +476,14 @@ export default function CampaignBuilder() {
                     } else {
                         toast.success(`¡Procesado! ${sent} enviados, ${failed} fallidos`, { id: 'sending', duration: 5000 });
                     }
+                    // Clean drafts from localStorage so future new campaigns start 100% clean
+                    try {
+                        localStorage.removeItem(DRAFT_KEY);
+                        localStorage.removeItem('crm_campaign_draft');
+                        const studioKey = effectiveCompanyId ? `crm_prospecting_studio_new_${effectiveCompanyId}` : 'crm_prospecting_studio_new_default';
+                        localStorage.removeItem(studioKey);
+                        localStorage.removeItem('crm_prospecting_studio_new');
+                    } catch { /* ignore */ }
                 } catch (sendError: any) {
                     console.error('Campaign send error:', sendError);
                     const sendMsg = sendError?.message || sendError?.error_description || 'Error al ejecutar envío de campaña';

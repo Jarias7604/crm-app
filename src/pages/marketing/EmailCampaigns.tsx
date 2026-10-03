@@ -137,7 +137,7 @@ export default function EmailCampaigns() {
                         <CompactStat label="Clicks" value={campaigns.reduce((acc, c) => acc + (c.stats?.clicked || 0), 0)} color="text-blue-600" />
                     </div>
                     <Link
-                        to="/marketing/campaign/new"
+                        to="/marketing/campaign/new?fresh=true"
                         className="bg-indigo-600 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2"
                     >
                         <Plus className="w-4 h-4" />

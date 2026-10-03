@@ -237,7 +237,15 @@ export default function ProspectingEmailStudio({
             localStorage.removeItem('crm_prospecting_studio_new');
             const key = campaignId ? `crm_prospecting_studio_${campaignId}` : companyDraftKey;
             const raw = localStorage.getItem(key);
-            if (raw) return JSON.parse(raw) as Partial<ProspectingStudioState>;
+            if (raw) {
+                const parsed = JSON.parse(raw) as Partial<ProspectingStudioState>;
+                // If this is a new campaign (not editing existing campaignId) and the draft has [RE] or re-send, discard it!
+                if (!campaignId && (parsed.campaignName?.startsWith('[RE]') || parsed.campaignName?.toLowerCase().startsWith('re-envío'))) {
+                    localStorage.removeItem(key);
+                    return null;
+                }
+                return parsed;
+            }
         } catch { /* ignore */ }
         return null;
     })();
@@ -255,7 +263,13 @@ export default function ProspectingEmailStudio({
     const senderNameIsCompanyName = defaultSenderName === companyDisplayName;
 
     // Form Controls (Left Panel)
-    const [campaignName, setCampaignName] = useState(() => initialName || effectiveInitial.campaignName || (company?.name ? `Prospección - ${company.name}` : 'Prospección - Comercial'));
+    const [campaignName, setCampaignName] = useState(() => {
+        const candidate = initialName || effectiveInitial.campaignName;
+        if (!campaignId && (candidate?.startsWith('[RE]') || candidate?.toLowerCase().startsWith('re-envío'))) {
+            return company?.name ? `Prospección - ${company.name}` : (isIclesia ? 'Prospección - Iglesias' : 'Prospección - Comercial');
+        }
+        return candidate || (company?.name ? `Prospección - ${company.name}` : (isIclesia ? 'Prospección - Iglesias' : 'Prospección - Comercial'));
+    });
     const [subject, setSubject] = useState(() => repairTemplateVariables(initialSubject || effectiveInitial.subject || (isIclesia ? 'Una pregunta para {{nombre_iglesia}}' : 'Una pregunta para {{nombre_empresa}}'), isIclesia));
     const [senderIdentity, setSenderIdentity] = useState(() => effectiveInitial.senderIdentity || `${defaultSenderName} <${defaultSenderEmail}>`);
 
@@ -1178,7 +1192,9 @@ export default function ProspectingEmailStudio({
             try {
                 const companyDraftKey = company?.id ? `crm_prospecting_studio_new_${company.id}` : 'crm_prospecting_studio_new_default';
                 const key = campaignId ? `crm_prospecting_studio_${campaignId}` : companyDraftKey;
-                localStorage.setItem(key, JSON.stringify(studioState));
+                if (campaignId || (!campaignName?.startsWith('[RE]') && !campaignName?.toLowerCase().startsWith('re-envío'))) {
+                    localStorage.setItem(key, JSON.stringify(studioState));
+                }
             } catch { /* ignore */ }
             isHydratedRef.current = true;
             await onSaveDraft({

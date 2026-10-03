@@ -110,7 +110,7 @@ export default function MarketingDashboard() {
                         <Settings className="w-3.5 h-3.5" />
                         Ajustes
                     </Link>
-                    <Link to="/marketing/campaign/new" className="bg-indigo-600 hover:bg-slate-900 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-600/10 transition-all flex items-center gap-2">
+                    <Link to="/marketing/campaign/new?fresh=true" className="bg-indigo-600 hover:bg-slate-900 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-600/10 transition-all flex items-center gap-2">
                         <PlusIcon className="w-3.5 h-3.5" />
                         Nueva Campaña
                     </Link>
@@ -253,7 +253,7 @@ export default function MarketingDashboard() {
                                 <div className="py-6 text-center">
                                     <Zap className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                                     <p className="text-[11px] text-slate-400 font-black uppercase tracking-widest">Pausa de Campaña</p>
-                                    <Link to="/marketing/campaign/new" className="mt-4 inline-block text-[10px] font-black text-indigo-600 hover:text-indigo-700 tracking-widest border-b-2 border-indigo-100 hover:border-indigo-600 transition-all">
+                                    <Link to="/marketing/campaign/new?fresh=true" className="mt-4 inline-block text-[10px] font-black text-indigo-600 hover:text-indigo-700 tracking-widest border-b-2 border-indigo-100 hover:border-indigo-600 transition-all">
                                         LANZAR AHORA +
                                     </Link>
                                 </div>
