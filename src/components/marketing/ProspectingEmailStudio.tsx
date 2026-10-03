@@ -181,6 +181,16 @@ interface ProspectingEmailStudioProps {
     onSwitchToFreeEditor?: () => void;
 }
 
+const formatLastContactDate = (isoString?: string | null) => {
+    if (!isoString) return null;
+    const date = new Date(isoString);
+    const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Hoy';
+    if (diffDays === 1) return 'Ayer';
+    if (diffDays < 30) return `Hace ${diffDays}d`;
+    return date.toLocaleDateString();
+};
+
 export default function ProspectingEmailStudio({
     company,
     campaignId,
@@ -2509,6 +2519,15 @@ export default function ProspectingEmailStudio({
                                                             {lead.status && (
                                                                 <span className="text-[9px] font-bold uppercase text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
                                                                     {lead.status}
+                                                                </span>
+                                                            )}
+                                                            {lead.last_contacted_at ? (
+                                                                <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                                                    ✉️ {formatLastContactDate(lead.last_contacted_at)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                                                    ✨ Nunca contactado
                                                                 </span>
                                                             )}
                                                         </div>

@@ -247,9 +247,60 @@ Deno.serve(async (req) => {
         const excludedIds = new Set(filters.excludedIds || []);
         const afterExclusion = excludedIds.size > 0 ? leads.filter(l => !excludedIds.has(l.id)) : leads;
 
+        // Anti-Fatigue filtering on backend
+        let fatigueFilteredLeads = afterExclusion;
+        if (filters.contactFatigue && filters.contactFatigue !== 'all') {
+            const fatigueDays = filters.contactFatigue === 'exclude_7_days' ? 7
+                : filters.contactFatigue === 'exclude_15_days' ? 15
+                : filters.contactFatigue === 'exclude_30_days' ? 30
+                : null; // 'never_contacted'
+
+            const { data: convData } = await supabase
+                .from('marketing_conversations')
+                .select('lead_id, last_message_at')
+                .eq('company_id', campaign.company_id)
+                .not('last_message_at', 'is', null);
+
+            const excludedByFatigue = new Set<string>();
+            const now = Date.now();
+
+            convData?.forEach((c: any) => {
+                if (!c.lead_id) return;
+                if (fatigueDays === null) {
+                    excludedByFatigue.add(c.lead_id);
+                } else {
+                    const diffMs = now - new Date(c.last_message_at).getTime();
+                    if (diffMs < fatigueDays * 24 * 60 * 60 * 1000) {
+                        excludedByFatigue.add(c.lead_id);
+                    }
+                }
+            });
+
+            const { data: msgData } = await supabase
+                .from('marketing_messages')
+                .select('created_at, metadata, marketing_conversations!inner(company_id)')
+                .eq('direction', 'outbound')
+                .eq('marketing_conversations.company_id', campaign.company_id);
+
+            msgData?.forEach((m: any) => {
+                const leadId = (m.metadata as any)?.lead_id;
+                if (!leadId) return;
+                if (fatigueDays === null) {
+                    excludedByFatigue.add(leadId);
+                } else {
+                    const diffMs = now - new Date(m.created_at).getTime();
+                    if (diffMs < fatigueDays * 24 * 60 * 60 * 1000) {
+                        excludedByFatigue.add(leadId);
+                    }
+                }
+            });
+
+            fatigueFilteredLeads = afterExclusion.filter(l => !excludedByFatigue.has(l.id));
+        }
+
         const { data: sentMessages } = await supabase.from('marketing_messages').select('metadata').eq('metadata->>campaign_id', campaignId);
         const sentLeadIds = new Set(sentMessages?.map((m: any) => m.metadata?.lead_id).filter(Boolean) || []);
-        const filteredLeads = afterExclusion.filter(l => !sentLeadIds.has(l.id));
+        const filteredLeads = fatigueFilteredLeads.filter(l => !sentLeadIds.has(l.id));
 
         if (filteredLeads.length === 0) {
             return new Response(JSON.stringify({

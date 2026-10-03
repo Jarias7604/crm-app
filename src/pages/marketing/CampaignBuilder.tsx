@@ -78,7 +78,8 @@ export default function CampaignBuilder() {
                     dateRange: 'all' as 'all' | 'new',
                     priority: 'all' as string,
                     specificIds: incomingLeadIds,
-                    idType: ((locationState?.campaignSource === 'lead-hunter' || urlParams.get('campaignSource') === 'lead-hunter') ? 'google_place_id' : 'id') as 'id' | 'google_place_id'
+                    idType: ((locationState?.campaignSource === 'lead-hunter' || urlParams.get('campaignSource') === 'lead-hunter') ? 'google_place_id' : 'id') as 'id' | 'google_place_id',
+                    contactFatigue: 'all' as 'all' | 'never_contacted' | 'exclude_7_days' | 'exclude_15_days' | 'exclude_30_days'
                 }
             };
         }
@@ -92,7 +93,7 @@ export default function CampaignBuilder() {
                     const parsed = JSON.parse(saved);
                     return parsed.formData || {
                         name: '', subject: '', content: '', template_id: '' as string | null,
-                        audience_filter: { status: [] as string[], industry: [] as string[], dateRange: 'all' as 'all' | 'new', priority: 'all' as string, specificIds: [] as string[], idType: 'id' as 'id' | 'google_place_id' }
+                        audience_filter: { status: [] as string[], industry: [] as string[], dateRange: 'all' as 'all' | 'new', priority: 'all' as string, specificIds: [] as string[], idType: 'id' as 'id' | 'google_place_id', contactFatigue: 'all' as 'all' | 'never_contacted' | 'exclude_7_days' | 'exclude_15_days' | 'exclude_30_days' }
                     };
                 }
             } catch { /* ignore */ }
@@ -108,7 +109,8 @@ export default function CampaignBuilder() {
                 dateRange: 'all' as 'all' | 'new',
                 priority: 'all' as string,
                 specificIds: [] as string[],
-                idType: 'id' as 'id' | 'google_place_id'
+                idType: 'id' as 'id' | 'google_place_id',
+                contactFatigue: 'all' as 'all' | 'never_contacted' | 'exclude_7_days' | 'exclude_15_days' | 'exclude_30_days'
             }
         };
     });
@@ -139,7 +141,8 @@ export default function CampaignBuilder() {
                         dateRange: campaign.audience_filters?.dateRange || 'all',
                         priority: campaign.audience_filters?.priority || 'all',
                         specificIds: specIds,
-                        idType: campaign.audience_filters?.idType || 'id'
+                        idType: campaign.audience_filters?.idType || 'id',
+                        contactFatigue: campaign.audience_filters?.contactFatigue || 'all'
                     }
                 });
             }).catch(err => {
@@ -225,7 +228,7 @@ export default function CampaignBuilder() {
         if (effId && formData.audience_filter) {
             handlePreviewAudience();
         }
-    }, [formData.audience_filter.status, formData.audience_filter.priority, formData.audience_filter.dateRange, formData.audience_filter.industry, formData.audience_filter.specificIds, selectedChannel, simulatedCompanyId, profile?.company_id]);
+    }, [formData.audience_filter.status, formData.audience_filter.priority, formData.audience_filter.dateRange, formData.audience_filter.industry, formData.audience_filter.specificIds, formData.audience_filter.contactFatigue, selectedChannel, simulatedCompanyId, profile?.company_id]);
 
     // Load available industries
     useEffect(() => {
@@ -237,6 +240,16 @@ export default function CampaignBuilder() {
             });
         }
     }, [simulatedCompanyId, profile?.company_id]);
+
+    const formatLastContactDate = (isoString?: string | null) => {
+        if (!isoString) return null;
+        const date = new Date(isoString);
+        const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) return 'Hoy';
+        if (diffDays === 1) return 'Ayer';
+        if (diffDays < 30) return `Hace ${diffDays}d`;
+        return date.toLocaleDateString();
+    };
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -781,6 +794,25 @@ export default function CampaignBuilder() {
                                     <option value="high">Alta Prioridad</option>
                                     <option value="medium">Prioridad Media</option>
                                     <option value="low">Baja Prioridad</option>
+                                </select>
+                            </div>
+
+                            {/* Contact Fatigue Filter */}
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Frecuencia / Anti-Fatiga</label>
+                                <select
+                                    className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-xs"
+                                    value={formData.audience_filter.contactFatigue || 'all'}
+                                    onChange={e => setFormData({
+                                        ...formData,
+                                        audience_filter: { ...formData.audience_filter, contactFatigue: e.target.value as any }
+                                    })}
+                                >
+                                    <option value="all">Incluir todos (Sin restricción)</option>
+                                    <option value="never_contacted">✨ Solo nunca contactados</option>
+                                    <option value="exclude_7_days">🛡️ Excluir contactados &lt; 7 días</option>
+                                    <option value="exclude_15_days">🛡️ Excluir contactados &lt; 15 días</option>
+                                    <option value="exclude_30_days">🛡️ Excluir contactados &lt; 30 días</option>
                                 </select>
                             </div>
 
@@ -1402,6 +1434,62 @@ export default function CampaignBuilder() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Filter by Anti-Fatiga / Frecuencia de Contacto */}
+                            <div className="pt-2 border-t border-gray-200/60">
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                                        Filtro Anti-Fatiga (Evitar Duplicados):
+                                    </span>
+                                    {formData.audience_filter.contactFatigue && formData.audience_filter.contactFatigue !== 'all' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setFormData({
+                                                    ...formData,
+                                                    audience_filter: { ...formData.audience_filter, contactFatigue: 'all' }
+                                                });
+                                            }}
+                                            className="text-[10px] font-bold text-emerald-600 hover:underline"
+                                        >
+                                            Ver todos (sin exclusión)
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {[
+                                        { id: 'all', label: 'Todos (Sin restricción)' },
+                                        { id: 'never_contacted', label: '✨ Solo nunca contactados' },
+                                        { id: 'exclude_7_days', label: '🛡️ Excluir contactados < 7 días' },
+                                        { id: 'exclude_15_days', label: '🛡️ Excluir contactados < 15 días' },
+                                        { id: 'exclude_30_days', label: '🛡️ Excluir contactados < 30 días' }
+                                    ].map(opt => {
+                                        const isSelected = (formData.audience_filter.contactFatigue || 'all') === opt.id;
+                                        return (
+                                            <button
+                                                key={opt.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setFormData({
+                                                        ...formData,
+                                                        audience_filter: {
+                                                            ...formData.audience_filter,
+                                                            contactFatigue: opt.id as any
+                                                        }
+                                                    });
+                                                }}
+                                                className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all border ${isSelected
+                                                    ? 'bg-emerald-600 text-white border-transparent shadow-xs'
+                                                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-100'
+                                                }`}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
                         </div>
 
                         {/* Smart Controls Bar */}
@@ -1507,6 +1595,17 @@ export default function CampaignBuilder() {
                                                         )}
                                                     </div>
                                                 </div>
+
+                                                {/* Contact Fatigue Badge */}
+                                                {lead.last_contacted_at ? (
+                                                    <span className="px-2 py-0.5 rounded-lg text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex-shrink-0" title={`Último contacto registrado: ${new Date(lead.last_contacted_at).toLocaleString()}`}>
+                                                        ✉️ {formatLastContactDate(lead.last_contacted_at)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2 py-0.5 rounded-lg text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex-shrink-0">
+                                                        ✨ Nunca contactado
+                                                    </span>
+                                                )}
 
                                                 {/* Status Badge */}
                                                 <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase flex-shrink-0 ${isExcluded ? 'bg-gray-100 text-gray-400' :

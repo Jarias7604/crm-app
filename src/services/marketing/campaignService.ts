@@ -207,7 +207,8 @@ export const campaignService = {
         priority?: string,
         dateRange?: 'all' | 'new',
         specificIds?: string[],
-        idType?: 'id' | 'google_place_id'
+        idType?: 'id' | 'google_place_id',
+        contactFatigue?: 'all' | 'never_contacted' | 'exclude_7_days' | 'exclude_15_days' | 'exclude_30_days'
     }, companyId: string, channel: string = 'email') {
         if (!companyId) return [];
 
@@ -274,9 +275,75 @@ export const campaignService = {
 
         const leads = data || [];
 
+        // Fetch contact history to power Anti-Fatigue filtering & visual badges
+        const leadLastContactMap: Record<string, string> = {};
+        try {
+            // A. Check marketing_conversations (indexed on company_id, last_message_at)
+            const { data: convData } = await supabase
+                .from('marketing_conversations')
+                .select('lead_id, last_message_at')
+                .eq('company_id', companyId)
+                .not('last_message_at', 'is', null);
+
+            convData?.forEach((c: any) => {
+                if (c.lead_id && c.last_message_at) {
+                    if (!leadLastContactMap[c.lead_id] || new Date(c.last_message_at) > new Date(leadLastContactMap[c.lead_id])) {
+                        leadLastContactMap[c.lead_id] = c.last_message_at;
+                    }
+                }
+            });
+
+            // B. Also check marketing_messages for outbound campaign sends to be 100% comprehensive
+            const { data: msgData } = await supabase
+                .from('marketing_messages')
+                .select('created_at, metadata, marketing_conversations!inner(company_id)')
+                .eq('direction', 'outbound')
+                .eq('marketing_conversations.company_id', companyId)
+                .order('created_at', { ascending: false })
+                .limit(5000);
+
+            msgData?.forEach((m: any) => {
+                const leadId = (m.metadata as any)?.lead_id;
+                if (leadId && m.created_at) {
+                    if (!leadLastContactMap[leadId] || new Date(m.created_at) > new Date(leadLastContactMap[leadId])) {
+                        leadLastContactMap[leadId] = m.created_at;
+                    }
+                }
+            });
+        } catch (contactErr) {
+            console.warn('Could not fetch contact history for fatigue filter:', contactErr);
+        }
+
+        // Apply Anti-Fatigue filter if requested
+        const now = Date.now();
+        const fatigue = filters.contactFatigue;
+
+        let filteredLeads = leads;
+        if (fatigue && fatigue !== 'all') {
+            filteredLeads = leads.filter((lead: any) => {
+                const lastContact = leadLastContactMap[lead.id];
+                if (fatigue === 'never_contacted') {
+                    return !lastContact;
+                }
+                if (!lastContact) {
+                    return true;
+                }
+                const daysDiff = (now - new Date(lastContact).getTime()) / (1000 * 60 * 60 * 24);
+                if (fatigue === 'exclude_7_days') return daysDiff >= 7;
+                if (fatigue === 'exclude_15_days') return daysDiff >= 15;
+                if (fatigue === 'exclude_30_days') return daysDiff >= 30;
+                return true;
+            });
+        }
+
+        let enrichedLeads = filteredLeads.map((l: any) => ({
+            ...l,
+            last_contacted_at: leadLastContactMap[l.id] || null
+        }));
+
         // For Telegram: fetch connected lead IDs in a separate isolated query
-        if (channel === 'telegram' && leads.length > 0) {
-            const leadIds = leads.map((l: any) => l.id);
+        if (channel === 'telegram' && enrichedLeads.length > 0) {
+            const leadIds = enrichedLeads.map((l: any) => l.id);
             const { data: convData } = await supabase
                 .from('marketing_conversations')
                 .select('lead_id, external_id')
@@ -285,7 +352,7 @@ export const campaignService = {
                 .in('lead_id', leadIds);
 
             const connectedIds = new Set((convData || []).map((c: any) => c.lead_id));
-            return leads.map((l: any) => ({
+            enrichedLeads = enrichedLeads.map((l: any) => ({
                 ...l,
                 marketing_conversations: connectedIds.has(l.id)
                     ? [{ channel: 'telegram', external_id: true }]
@@ -293,7 +360,7 @@ export const campaignService = {
             }));
         }
 
-        return leads;
+        return enrichedLeads;
     },
 
     /**
