@@ -1078,18 +1078,22 @@ export default function ProspectingEmailStudio({
         }
         try {
             setIsSendingTest(true);
-            const html = compileToEmailHtml();
+            const rawHtml = compileToEmailHtml();
             const studioState = getCurrentStudioState();
             // Save draft first
-            await onSaveDraft({ name: campaignName, subject: subject, htmlContent: html, studioState });
+            await onSaveDraft({ name: campaignName, subject: subject, htmlContent: rawHtml, studioState });
+
+            // Bulletproof: Resolve variables for the active lead so the test email matches the live preview 100%
+            const resolvedSubject = substituteVariables(subject);
+            const resolvedHtml = substituteVariables(rawHtml);
 
             // ACTUALLY dispatch the test email through marketing-engine
             const toastId = toast.loading(`Enviando correo de prueba a ${testEmail}...`);
             const result = await campaignService.sendTestEmail({
                 campaignId: campaignId || undefined,
                 testEmail,
-                subject,
-                htmlContent: html,
+                subject: resolvedSubject,
+                htmlContent: resolvedHtml,
                 companyId: company?.id || profile?.company_id,
                 sampleLead: currentLead || undefined
             });
