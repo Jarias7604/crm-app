@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import { queryClient } from '../lib/queryClient';
 import type { Profile, Role } from '../types';
+import { isPermissionAllowedByCompanyLicense } from '../utils/permissionNormalizer';
 
 interface AuthContextType {
     session: Session | null;
@@ -365,63 +366,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         : [];
 
                     if (companyLicense.length > 0) {
-                        // Infrastructure keys that are always permitted regardless of license
-                        const INFRA_PREFIXES = ['team', 'dashboard', 'branding', 'onboarding', 'pipeline'];
-
-                        // Module key normalization map (permission prefix → license key)
-                        const LICENSE_MAP: Record<string, string> = {
-                            leads:          'leads',
-                            quotes:         'quotes',
-                            calendar:       'calendar',
-                            marketing:      'marketing',
-                            ai_agents:      'marketing',
-                            mkt:            'marketing',
-                            chat:           'chat',
-                            pricing:        'pricing',
-                            paquetes:       'paquetes',
-                            items:          'items',
-                            financial_rules:'financial_rules',
-                            loss_reasons:   'loss_reasons',
-                            loss:           'loss_reasons',
-                            proyectos:      'proyectos',
-                            finanzas:       'finanzas',
-                            tickets:        'tickets',
-                            reports:        'reports',
-                            view_financials:'view_financials',
-                            clientes:       'leads',
-                            clients:        'leads',
-                            invoices:       'invoices',
-                            facturas:       'invoices',
-                            // dashboard_full is infra but also check for both 'reports' and 'dashboard_full'
-                            dashboard_full: 'dashboard_full',
-                        };
-
                         const filteredPerms: Record<string, boolean> = {};
                         Object.keys(activePerms).forEach(key => {
-                            if (activePerms[key] !== true) return;
-
-                            const baseModule = key.split(/[._:]/)[0].toLowerCase();
-
-                            // Always allow infra keys
-                            if (INFRA_PREFIXES.some(p => baseModule.startsWith(p))) {
-                                filteredPerms[key] = true;
-                                return;
-                            }
-
-                            // Map to license key and check
-                            const licenseKey = LICENSE_MAP[baseModule];
-                            if (licenseKey && companyLicense.includes(licenseKey)) {
-                                filteredPerms[key] = true;
-                                return;
-                            }
-
-                            // Direct match fallback (e.g. cotizaciones.create → license has 'cotizaciones')
-                            if (companyLicense.includes(key) || companyLicense.includes(baseModule)) {
+                            if (activePerms[key] === true && isPermissionAllowedByCompanyLicense(key, companyLicense)) {
                                 filteredPerms[key] = true;
                             }
                         });
                         activePerms = filteredPerms;
-                        console.info('🛡️ Permisos intersectados con licencia de empresa');
+                        console.info('🛡️ Permisos intersectados con licencia de empresa (SSOT)');
                     }
                 } catch (e) {
                     console.error('[AuthProvider] Error applying company license intersection:', e);
@@ -530,16 +482,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                                     simPermissions = {};
                                     (rolePerms || []).forEach((rp: any) => {
-                                        if (rp.is_enabled) {
-                                            const moduleKey = rp.permission_key.split(/[._:]/)[0];
-                                            const isLicensed = companyLicense.includes(rp.permission_key)
-                                                || companyLicense.includes(moduleKey)
-                                                || (rp.permission_key.startsWith('mkt_') && companyLicense.includes('marketing'))
-                                                || (rp.permission_key.startsWith('cotizaciones.') && companyLicense.includes('quotes'));
-
-                                            if (isLicensed) {
-                                                simPermissions![rp.permission_key] = true;
-                                            }
+                                        if (rp.is_enabled && isPermissionAllowedByCompanyLicense(rp.permission_key, companyLicense)) {
+                                            simPermissions![rp.permission_key] = true;
                                         }
                                     });
                                 }

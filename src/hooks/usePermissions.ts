@@ -21,11 +21,12 @@ export function usePermissions() {
         if (!profile?.permissions) return false;
 
         // Verificar el permiso específico en el mapa de permisos consolidados
-        // Se admite tanto el nombre completo como categorías base
-        if (profile.permissions[permissionKey] === true) return true;
+        // Se admite tanto el nombre completo, minúsculas, como categorías base
+        const lowerKey = permissionKey.toLowerCase();
+        if (profile.permissions[permissionKey] === true || profile.permissions[lowerKey] === true) return true;
 
         // Lógica de herencia/granularidad (Ej: 'leads' habilita 'leads_view' si no hay restricción)
-        const moduleKey = permissionKey.split(/[._:]/)[0];
+        const moduleKey = lowerKey.split(/[._:]/)[0];
         if (profile.permissions[moduleKey] === true) return true;
 
         return false;

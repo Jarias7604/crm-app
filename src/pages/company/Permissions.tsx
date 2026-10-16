@@ -17,6 +17,7 @@ import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import toast from 'react-hot-toast';
+import { isPermissionAllowedByCompanyLicense } from '../../utils/permissionNormalizer';
 
 // ─── Category icon map ────────────────────────────────────────────────────────
 const CATEGORY_ICONS: Record<string, any> = {
@@ -210,20 +211,7 @@ export default function Permissions() {
         if (def.is_system_only) return false;
         // Always show infra permissions
         if (['Equipo', 'Dashboard', 'Seguimientos'].includes(def.category)) return true;
-        // Check company license
-        if (allowedPerms.includes(def.permission_key)) return true;
-        const base = def.permission_key.split(/[._]/)[0];
-        if (allowedPerms.includes(base)) return true;
-        // Key mismatch mappings (DB uses English, license uses Spanish)
-        if ((base === 'projects' || base === 'proyectos') && (allowedPerms.includes('proyectos') || allowedPerms.includes('projects'))) return true;
-        if (base === 'tickets' && allowedPerms.includes('tickets')) return true;
-        if (base === 'invoices' && (allowedPerms.includes('invoices') || allowedPerms.includes('facturas'))) return true;
-        if (base === 'finanzas' && (allowedPerms.includes('finanzas') || allowedPerms.includes('finance'))) return true;
-        // Special mappings
-        if (def.permission_key.startsWith('mkt_') && allowedPerms.includes('marketing')) return true;
-        if (def.permission_key.startsWith('cotizaciones.') && allowedPerms.includes('quotes')) return true;
-        if ((def.permission_key.startsWith('clientes.') || def.permission_key === 'clientes') && allowedPerms.includes('leads')) return true;
-        return false;
+        return isPermissionAllowedByCompanyLicense(def.permission_key, allowedPerms);
     };
 
 
