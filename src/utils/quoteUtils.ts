@@ -407,3 +407,80 @@ export function getVolumeLabel(industry?: string | null): string {
     }
     return 'DTEs/año';
 }
+
+/**
+ * Retorna la unidad de medida humanizada y respetando plural/singular.
+ * Protege contra items físicos/productos/equipos que tengan 'servicio' como default de base de datos.
+ */
+export function formatUnitLabel(rawUnit?: string, qty = 1, tipo?: string): string {
+    const isPhysical = tipo === 'equipo' || tipo === 'partes' || tipo === 'repuestos' || tipo === 'producto' || tipo === 'hardware';
+    let base = (rawUnit || '').trim().toLowerCase();
+
+    // Si es un ítem físico y la unidad vino como "servicio" (por default de base de datos) o vacía
+    if (isPhysical && (!base || base === 'servicio')) {
+        base = 'unidad';
+    }
+
+    if (!base) {
+        base = isPhysical ? 'unidad' : (tipo === 'servicio' ? 'servicio' : 'unidad');
+    }
+
+    // Normalizaciones
+    if (base === 'und' || base === 'ud') {
+        return qty === 1 ? 'und' : 'unds';
+    }
+    if (base === 'unidad') {
+        return qty === 1 ? 'unidad' : 'unidades';
+    }
+    if (base === 'servicio') {
+        return qty === 1 ? 'servicio' : 'servicios';
+    }
+    if (base === 'equipo') {
+        return qty === 1 ? 'equipo' : 'equipos';
+    }
+    if (base === 'parte') {
+        return qty === 1 ? 'parte' : 'partes';
+    }
+    if (base === 'pieza') {
+        return qty === 1 ? 'pieza' : 'piezas';
+    }
+    if (base === 'hora' || base === 'hr') {
+        return qty === 1 ? 'hora' : 'horas';
+    }
+    if (base === 'mes') {
+        return qty === 1 ? 'mes' : 'meses';
+    }
+    if (base === 'año') {
+        return qty === 1 ? 'año' : 'años';
+    }
+    if (base === 'licencia') {
+        return qty === 1 ? 'licencia' : 'licencias';
+    }
+    if (base === 'usuario') {
+        return qty === 1 ? 'usuario' : 'usuarios';
+    }
+    if (base === 'dte') {
+        return qty === 1 ? 'DTE' : 'DTEs';
+    }
+
+    if (qty > 1 && !base.endsWith('s')) {
+        return `${base}s`;
+    }
+    return base;
+}
+
+/**
+ * Retorna la unidad base (singular) limpia para etiquetas tipo "por unidad"
+ */
+export function getBaseUnit(rawUnit?: string, tipo?: string): string {
+    const isPhysical = tipo === 'equipo' || tipo === 'partes' || tipo === 'repuestos' || tipo === 'producto' || tipo === 'hardware';
+    let base = (rawUnit || '').trim().toLowerCase();
+    if (isPhysical && (!base || base === 'servicio')) {
+        return 'unidad';
+    }
+    if (!base) {
+        return isPhysical ? 'unidad' : (tipo === 'servicio' ? 'servicio' : 'und');
+    }
+    return base;
+}
+

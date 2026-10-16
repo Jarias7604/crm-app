@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { supabase } from './supabase';
 import { format } from 'date-fns';
-import { calculateQuoteFinancialsV2, parseModules, type CotizacionData } from '../utils/quoteUtils';
+import { calculateQuoteFinancialsV2, parseModules, formatUnitLabel, type CotizacionData } from '../utils/quoteUtils';
 import { imageCache } from '../utils/imageCache';
 
 /**
@@ -881,7 +881,7 @@ export const pdfService = {
                         doc.setFont('helvetica', 'normal');
                         const qty = Number(serv.cantidad) || 1;
                         const label = qty > 1 
-                            ? `${(serv.nombre || '').substring(0, 22)} (${qty} ${serv.unidad || 'und'} × $${Number(serv.precio_unitario || Math.round(Number(serv.pago_unico) / qty)).toLocaleString()})`
+                            ? `${(serv.nombre || '').substring(0, 22)} (${qty} ${formatUnitLabel(serv.unidad, qty, serv.tipo)} × $${Number(serv.precio_unitario || Math.round(Number(serv.pago_unico) / qty)).toLocaleString()})`
                             : (serv.nombre || '').substring(0, 30);
                         doc.text(label, margin + 6, iy);
                         doc.setFont('helvetica', 'bold');

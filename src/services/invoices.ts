@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { formatUnitLabel } from '../utils/quoteUtils';
 
 export interface InvoiceItem {
     tag_number?: string;
@@ -152,14 +153,16 @@ class InvoicesService {
         const numeroFactura = `INV-${nextNum}`;
 
         // 3. Map items from quote to invoice format
-        // Check if there are modulos_adicionales or base plan items
         const itemsList: InvoiceItem[] = [];
         
-        // Add base plan item
-        if (quote.plan_nombre) {
+        // Add base plan item if it exists and has a real cost or is an explicit plan
+        const planCost = Number(quote.costo_plan_anual) || Number(quote.costo_plan_mensual) || 0;
+        const isGenericPlan = !quote.plan_nombre || quote.plan_nombre === 'Cotización Personalizada' || quote.plan_nombre === 'Sin Plan';
+        
+        if (quote.plan_nombre && (!isGenericPlan || planCost > 0)) {
             itemsList.push({
-                item_detail: `Plan: ${quote.plan_nombre} (${quote.volumen_dtes} DTEs/mes) - Pago Anual`,
-                amount: Number(quote.costo_plan_anual) || 0
+                item_detail: `Plan: ${quote.plan_nombre}${quote.volumen_dtes ? ` (${quote.volumen_dtes} DTEs/mes)` : ''}`,
+                amount: planCost
             });
         }
 
@@ -171,8 +174,8 @@ class InvoicesService {
             });
         }
 
-        // Add additional modules
-        let parsedModules = [];
+        // Add additional items (equipos, partes, repuestos, módulos y servicios)
+        let parsedModules: any[] = [];
         try {
             parsedModules = typeof quote.modulos_adicionales === 'string'
                 ? JSON.parse(quote.modulos_adicionales)
@@ -183,52 +186,82 @@ class InvoicesService {
 
         if (Array.isArray(parsedModules)) {
             parsedModules.forEach((m: any) => {
+                const qty = Number(m.cantidad) || 1;
+                const totalItem = Number(m.total ?? m.precio ?? m.costo_anual ?? m.amount ?? 0);
+                const unitPrice = Number(m.precio_unitario) || (qty > 0 ? totalItem / qty : totalItem);
+                const unitLabel = formatUnitLabel(m.unidad, qty, m.tipo);
+
+                let detail = m.nombre || m.item_detail || 'Ítem';
+                if (qty > 1) {
+                    detail += ` (${qty} ${unitLabel} × $${unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+                }
+
                 itemsList.push({
-                    item_detail: `Módulo Adicional: ${m.nombre || m.item_detail || 'Módulo'}`,
-                    amount: Number(m.costo_anual || m.amount) || 0
+                    stock_number: m.codigo || m.sku || m.stock_number || undefined,
+                    item_detail: detail,
+                    amount: totalItem
                 });
             });
         }
 
         // Add WhatsApp service
-        if (quote.servicio_whatsapp) {
+        if (quote.servicio_whatsapp && Number(quote.costo_whatsapp) > 0) {
             itemsList.push({
                 item_detail: 'Servicio de WhatsApp Business API (volumen estimado)',
-                amount: Number(quote.volumen_dtes * 0.025) || 0
+                amount: Number(quote.costo_whatsapp) || (quote.volumen_dtes ? Number(quote.volumen_dtes * 0.025) : 0)
             });
         }
 
         // Add customization service
-        if (quote.servicio_personalizacion) {
+        if (quote.servicio_personalizacion && Number(quote.costo_personalizacion) > 0) {
             itemsList.push({
                 item_detail: 'Servicio de Personalización de Plantillas DTE',
-                amount: 150.00
+                amount: Number(quote.costo_personalizacion) || 150.00
             });
         }
 
-        // 4. Populate invoice structure
+        // 4. Resolve client / billing details
+        const clientName = quote.nombre_cliente || quote.lead?.name || 'Cliente sin nombre';
+        const clientCompany = quote.empresa_cliente || quote.lead?.company_name || quote.nombre_cliente || '';
+        const clientEmail = quote.email_cliente || quote.lead?.email || '';
+        const clientPhone = quote.telefono_cliente || quote.lead?.phone || '';
+        const clientAddress = quote.direccion_cliente || '';
+
+        // 5. Calculate financials with precision
+        const quoteSubtotal = Number(quote.subtotal_anual ?? quote.subtotal ?? 0);
+        const quoteIva = Number(quote.iva_monto ?? quote.iva ?? 0);
+        const quoteTotal = Number(quote.total_anual ?? quote.total ?? 0);
+
+        // Fallback calculations if quote totals were not explicitly set
+        const calculatedSubtotal = itemsList.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        const finalSubtotal = quoteSubtotal > 0 ? quoteSubtotal : calculatedSubtotal;
+        const finalIva = quoteIva > 0 ? quoteIva : (quote.iva_porcentaje ? finalSubtotal * (Number(quote.iva_porcentaje) / 100) : 0);
+        const finalTotal = quoteTotal > 0 ? quoteTotal : (finalSubtotal + finalIva);
+
+        // 6. Populate invoice structure
         const invoiceData: Omit<Invoice, 'id' | 'created_at' | 'updated_at'> = {
             company_id: companyId,
             cotizacion_id: quoteId,
             numero_factura: numeroFactura,
             status: 'unpaid',
-            nombre_cliente: quote.lead?.name || 'Cliente sin nombre',
-            empresa_cliente: quote.lead?.company_name || quote.nombre_cliente || '',
-            email_cliente: quote.lead?.email || '',
-            telefono_cliente: quote.lead?.phone || '',
+            nombre_cliente: clientName,
+            empresa_cliente: clientCompany,
+            email_cliente: clientEmail,
+            telefono_cliente: clientPhone,
             
             // Default Bill To
-            bill_to_name: quote.lead?.name || '',
-            bill_to_company: quote.lead?.company_name || quote.nombre_cliente || '',
+            bill_to_name: clientName,
+            bill_to_company: clientCompany,
+            bill_to_address: clientAddress,
             
             items: itemsList,
-            subtotal: Number(quote.subtotal_anual) || 0,
-            iva: Number(quote.iva_monto) || 0,
-            total: Number(quote.total_anual) || 0,
+            subtotal: Math.round(finalSubtotal * 100) / 100,
+            iva: Math.round(finalIva * 100) / 100,
+            total: Math.round(finalTotal * 100) / 100,
             notas: quote.notas || 'Generado automáticamente a partir de Cotización aceptada.'
         };
 
-        // 5. Create Invoice
+        // 7. Create Invoice
         return this.createInvoice(invoiceData);
     }
 }

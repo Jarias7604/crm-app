@@ -11,6 +11,7 @@ import { cotizacionesService } from '../services/cotizaciones';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
 import { pdfService } from '../services/pdfService';
+import { formatUnitLabel, getBaseUnit } from '../utils/quoteUtils';
 import toast from 'react-hot-toast';
 import { logger } from '../utils/logger';
 
@@ -304,7 +305,21 @@ export default function CotizadorPro() {
                     };
                 });
 
-            const allItems: CotizadorItem[] = [...itemsData, ...extraItems];
+            const rawAllItems: CotizadorItem[] = [...itemsData, ...extraItems];
+            const allItems: CotizadorItem[] = rawAllItems.map(item => {
+                const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos' || item.tipo === 'producto' || item.tipo === 'hardware';
+                const controlaStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
+                const modeloPrecio = item.modelo_precio ?? item.metadata?.modelo_precio ?? (controlaStock || isPhysical ? 'por_unidad' : undefined);
+                const unitClean = getBaseUnit(item.unidad || item.metadata?.unidad_medida, item.tipo);
+
+                return {
+                    ...item,
+                    controla_stock: controlaStock,
+                    modelo_precio: modeloPrecio,
+                    unidad: unitClean
+                };
+            });
+
             setModulos(allItems.filter(i => i.tipo === 'modulo'));
             // Capturar TODOS los ítems no-modulo (servicio, equipo, implementacion, etc.)
             setServicios(allItems.filter(i => i.tipo !== 'modulo'));
@@ -624,7 +639,7 @@ export default function CotizadorPro() {
                     cantidad: needsQty ? qty : 1,
                     precio_unitario: baseUnit,
                     total: costoCalculado,
-                    unidad: item.unidad || item.metadata?.unidad_medida || 'und',
+                    unidad: getBaseUnit(item.unidad || item.metadata?.unidad_medida, item.tipo),
                     // Si es pago único, guardarlo en pago_unico; si no, en costo_anual
                     pago_unico: esPagoUnico ? costoCalculado : 0,
                     costo_anual: esPagoUnico ? 0 : costoCalculado,
@@ -1020,7 +1035,7 @@ export default function CotizadorPro() {
                             const needsQty = modelo === 'por_hora' || modelo === 'por_unidad' || tracksStock;
                             const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
                             const stockActual = Number(item.stock_actual ?? item.metadata?.stock_actual ?? 0);
-                            const unitLabel = item.unidad || (modelo === 'por_hora' ? 'hr' : 'und');
+                            const unitLabel = getBaseUnit(item.unidad, item.tipo);
 
                             const baseUnitPrice = item.precio_por_dte > 0
                                 ? item.precio_por_dte
@@ -1132,7 +1147,7 @@ export default function CotizadorPro() {
                             const needsQty = modelo === 'por_hora' || modelo === 'por_unidad' || tracksStock;
                             const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
                             const stockActual = Number(item.stock_actual ?? item.metadata?.stock_actual ?? 0);
-                            const unitLabel = item.unidad || (modelo === 'por_hora' ? 'hr' : 'und');
+                            const unitLabel = getBaseUnit(item.unidad, item.tipo);
 
                             // Precio base por unidad/hora
                             const baseUnitPrice = item.precio_por_dte > 0
@@ -1324,7 +1339,7 @@ export default function CotizadorPro() {
                             <div className="space-y-5">
                                 <div className="flex items-start justify-between">
                                     <div>
-                                        <h2 className="text-lg font-bold text-[#4449AA]">Servicios e Ítems Adicionales</h2>
+                                        <h2 className="text-lg font-bold text-[#4449AA]">Catálogo de Productos, Equipos y Servicios</h2>
                                         <p className="text-xs text-gray-400 mt-0.5">Selecciona los ítems que forman esta propuesta</p>
                                     </div>
                                     {(formData.modulos_ids.length + formData.servicios_ids.length + (formData.paquete_id ? 1 : 0)) > 0 && (
@@ -1874,7 +1889,7 @@ export default function CotizadorPro() {
                                                                     <span>{d.nombre}</span>
                                                                     {d.cantidad && d.cantidad > 1 && (
                                                                         <span className="text-[10px] text-orange-600/80 font-bold shrink-0">
-                                                                            ({d.cantidad} {d.unidad || 'und'} × ${d.precio_unitario?.toLocaleString()})
+                                                                            ({d.cantidad} {formatUnitLabel(d.unidad, d.cantidad, d.tipo)} × ${d.precio_unitario?.toLocaleString()})
                                                                         </span>
                                                                     )}
                                                                 </span>

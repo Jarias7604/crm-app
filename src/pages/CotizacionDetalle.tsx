@@ -5,9 +5,10 @@ import { format } from 'date-fns';
 import { Building2, Mail, Phone, Package, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CheckCircle2, Share2, Copy, Check, Eye, X, ChevronRight, Receipt } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { pdfService } from '../services/pdfService';
-import { parseModules, calculateQuoteFinancialsV2, type CotizacionData } from '../utils/quoteUtils';
+import { parseModules, calculateQuoteFinancialsV2, formatUnitLabel, getBaseUnit, type CotizacionData } from '../utils/quoteUtils';
 import toast from 'react-hot-toast';
 import { useAuth } from '../auth/AuthProvider';
+import { usePermissions } from '../hooks/usePermissions';
 import { invoicesService } from '../services/invoices';
 
 interface FinancingPlan {
@@ -28,6 +29,7 @@ export default function CotizacionDetalle() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { profile } = useAuth();
+    const { hasPermission } = usePermissions();
     const [cotizacion, setCotizacion] = useState<CotizacionData | null>(null);
     const [financingPlan, setFinancingPlan] = useState<FinancingPlan | null>(null);
     const [allPlans, setAllPlans] = useState<FinancingPlan[]>([]);
@@ -316,14 +318,25 @@ export default function CotizacionDetalle() {
     };
 
     const handleConvertToInvoice = async () => {
-        if (!cotizacion || !profile?.company_id) {
-            toast.error('No se pudo identificar la empresa actual o la cotización.');
+        const companyId = cotizacion?.company_id || profile?.company_id;
+        if (!cotizacion || !companyId) {
+            toast.error('No se pudo identificar la empresa de la cotización.');
             return;
         }
-        if (!window.confirm('¿Deseas convertir esta cotización en una factura oficial?')) return;
         setIsConverting(true);
         try {
-            const inv = await invoicesService.convertQuoteToInvoice(cotizacion.id, profile.company_id);
+            // Auto-accept quote if not yet accepted
+            if (cotizacion.estado !== 'aceptada') {
+                await supabase
+                    .from('cotizaciones')
+                    .update({
+                        estado: 'aceptada',
+                        descripcion_pago: cotizacion.descripcion_pago || `Aceptada al convertir a factura el ${new Date().toLocaleString()}`
+                    })
+                    .eq('id', cotizacion.id);
+            }
+
+            const inv = await invoicesService.convertQuoteToInvoice(cotizacion.id, companyId);
             toast.success(`¡Factura ${inv.numero_factura} creada correctamente!`);
             navigate(`/facturas/${inv.id}`);
         } catch (error: any) {
@@ -436,7 +449,7 @@ export default function CotizacionDetalle() {
                             </>
                         )}
 
-                        {cotizacion.estado === 'aceptada' && (profile?.permissions?.invoices === true || profile?.role === 'super_admin') && (
+                        {(hasPermission('invoices') || hasPermission('facturas') || profile?.role === 'super_admin' || profile?.role === 'company_admin' || profile?.permissions?.invoices === true) && (
                             convertedInvoice ? (
                                 <Button
                                     variant="default"
@@ -599,7 +612,7 @@ export default function CotizacionDetalle() {
                         {/* Section 3: Tables */}
                         <div className="space-y-6">
                             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                                <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">DESGLOSE DE SERVICIOS</p>
+                                <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">DESGLOSE DE PRODUCTOS Y SERVICIOS</p>
                                 <p className="text-[8px] font-bold text-slate-400 uppercase">Valores en USD</p>
                             </div>
 
@@ -669,7 +682,7 @@ export default function CotizacionDetalle() {
                                                         <span className="font-black text-slate-900 text-sm sm:text-base">{mod.nombre}</span>
                                                         {Number(mod.cantidad) > 1 && (
                                                             <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2 py-0.5 rounded-full border border-slate-200">
-                                                                {mod.cantidad} {mod.unidad || 'und'} × ${Number(mod.precio_unitario || (monto / Number(mod.cantidad))).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                                {mod.cantidad} {formatUnitLabel(mod.unidad, Number(mod.cantidad), mod.tipo)} × ${Number(mod.precio_unitario || (monto / Number(mod.cantidad))).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                                             </span>
                                                         )}
                                                         {esPagoUnico && (
@@ -720,7 +733,14 @@ export default function CotizacionDetalle() {
                                 const modulosArr = Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [];
                                 const serviciosUnicos = modulosArr
                                     .filter((mod: any) => (Number(mod.pago_unico) || 0) > 0)
-                                    .map((mod: any) => ({ nombre: mod.nombre, monto: Number(mod.pago_unico) || 0 }));
+                                    .map((mod: any) => ({
+                                        nombre: mod.nombre,
+                                        monto: Number(mod.pago_unico) || 0,
+                                        cantidad: Number(mod.cantidad) || 1,
+                                        unidad: mod.unidad,
+                                        tipo: mod.tipo,
+                                        precio_unitario: Number(mod.precio_unitario) || (Number(mod.pago_unico) / (Number(mod.cantidad) || 1))
+                                    }));
                                 return (
                                     <>
                                         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -870,7 +890,14 @@ export default function CotizacionDetalle() {
                                                     )}
                                                     {serviciosUnicos.map((serv: any, sidx: number) => (
                                                         <div key={sidx} className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
-                                                            <span className="truncate flex-1">{serv.nombre}</span>
+                                                            <span className="truncate flex-1">
+                                                                {serv.nombre}
+                                                                {serv.cantidad > 1 && (
+                                                                    <span className="text-[10px] text-orange-600 font-bold ml-1.5">
+                                                                        ({serv.cantidad} {formatUnitLabel(serv.unidad, serv.cantidad, serv.tipo)} × ${Number(serv.precio_unitario).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })})
+                                                                    </span>
+                                                                )}
+                                                            </span>
                                                             <span className="font-bold text-slate-800 whitespace-nowrap">${serv.monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                         </div>
                                                     ))}

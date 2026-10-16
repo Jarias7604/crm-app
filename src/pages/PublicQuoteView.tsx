@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { Building2, Package, Download, FileText, CheckCircle2, PencilLine, Mail, Phone, Settings, MessageSquare, CreditCard, Loader2, Shield } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { parseModules, calculateQuoteFinancialsV2, type CotizacionData } from '../utils/quoteUtils';
+import { parseModules, calculateQuoteFinancialsV2, formatUnitLabel, type CotizacionData } from '../utils/quoteUtils';
 import { pdfService } from '../services/pdfService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -523,7 +523,7 @@ export default function PublicQuoteView() {
                                                 <p className="font-black text-slate-900 text-sm leading-none m-0 uppercase">{mod.nombre}</p>
                                                 {Number(mod.cantidad) > 1 && (
                                                     <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200">
-                                                        {mod.cantidad} {mod.unidad || 'und'} × ${Number(mod.precio_unitario || (monto / Number(mod.cantidad))).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                        {mod.cantidad} {formatUnitLabel(mod.unidad, Number(mod.cantidad), mod.tipo)} × ${Number(mod.precio_unitario || (monto / Number(mod.cantidad))).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                                     </span>
                                                 )}
                                             </div>
@@ -757,7 +757,14 @@ export default function PublicQuoteView() {
                                     )}
                                     {serviciosUnicos.map((serv: any, idx: number) => (
                                         <div key={idx} className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
-                                            <span className="truncate flex-1">{serv.nombre}</span>
+                                            <span className="truncate flex-1">
+                                                {serv.nombre}
+                                                {Number(serv.cantidad) > 1 && (
+                                                    <span className="text-[10px] text-orange-600 font-bold ml-1.5">
+                                                        ({serv.cantidad} {formatUnitLabel(serv.unidad, Number(serv.cantidad), serv.tipo)} × ${Number(serv.precio_unitario || (Number(serv.pago_unico) / Number(serv.cantidad))).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })})
+                                                    </span>
+                                                )}
+                                            </span>
                                             <span className="font-bold text-slate-800 whitespace-nowrap">${Number(serv.pago_unico).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                     ))}
