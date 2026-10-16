@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Box, Layers, Zap, ArrowUpDown, Tag, DollarSign, Copy, Clock, Hash, RefreshCw, Repeat, ChevronDown, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search, Box, Layers, Zap, ArrowUpDown, Tag, DollarSign, Copy, Clock, Hash, RefreshCw, Repeat, ChevronDown, CheckCircle, AlertTriangle, TrendingUp, AlertCircle, ShoppingCart, Package } from 'lucide-react';
 import { pricingService } from '../services/pricing';
 import type { PricingItem } from '../types/pricing';
 import { useAuth } from '../auth/AuthProvider';
@@ -70,7 +70,11 @@ export default function CatalogoProductos() {
         precio_base: 0,
         tiene_setup: false,
         setup_fee: 0,
-        unidad_medida: ''
+        unidad_medida: '',
+        precio_compra: 0,
+        stock_actual: 0,
+        stock_minimo: 0,
+        controla_stock: false
     });
     
     // Filters
@@ -141,14 +145,21 @@ export default function CatalogoProductos() {
         const isRecurring = item.precio_mensual > 0 || item.precio_anual > 0;
         const isAnnual = item.precio_anual > 0 && item.precio_mensual === 0;
         const hasSetup = isRecurring && item.costo_unico > 0;
+        const meta = item.metadata || {};
+        const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
+        const controlaStock = item.controla_stock ?? meta.controla_stock ?? isPhysical;
         
         setUiState({
             frecuencia_cobro: isRecurring ? 'recurrente' : 'unico',
             intervalo: isAnnual ? 'anual' : 'mensual',
-            precio_base: isRecurring ? (isAnnual ? item.precio_anual : item.precio_mensual) : item.costo_unico,
+            precio_base: isRecurring ? (isAnnual ? item.precio_anual : item.precio_mensual) : (item.precio_unitario || item.costo_unico),
             tiene_setup: hasSetup,
             setup_fee: hasSetup ? item.costo_unico : 0,
-            unidad_medida: item.metadata?.unidad_medida || '',
+            unidad_medida: item.unidad || item.metadata?.unidad_medida || '',
+            precio_compra: item.precio_compra ?? meta.precio_compra ?? 0,
+            stock_actual: item.stock_actual ?? meta.stock_actual ?? 0,
+            stock_minimo: item.stock_minimo ?? meta.stock_minimo ?? 0,
+            controla_stock: Boolean(controlaStock)
         });
         
         setShowForm(true);
@@ -209,10 +220,23 @@ export default function CatalogoProductos() {
                 finalUpdate.costo_unico = uiState.tiene_setup ? uiState.setup_fee : 0;
             }
             
-            // Guardar unidad de medida en metadata
+            // Si controla stock o es producto físico, asegurar modelo_precio
+            if (uiState.controla_stock || finalUpdate.tipo === 'equipo' || finalUpdate.tipo === 'partes' || finalUpdate.tipo === 'repuestos') {
+                finalUpdate.modelo_precio = 'por_unidad';
+                finalUpdate.unidad = uiState.unidad_medida || 'unidad';
+                finalUpdate.precio_unitario = uiState.precio_base;
+            }
+
+            // Guardar unidad de medida, stock y costos en metadata de forma segura
             finalUpdate.metadata = {
                 ...(finalUpdate.metadata || {}),
-                unidad_medida: uiState.unidad_medida
+                unidad_medida: uiState.unidad_medida,
+                precio_compra: Number(uiState.precio_compra) || 0,
+                stock_actual: Number(uiState.stock_actual) || 0,
+                stock_minimo: Number(uiState.stock_minimo) || 0,
+                controla_stock: Boolean(uiState.controla_stock),
+                precio_unitario: uiState.precio_base,
+                modelo_precio: finalUpdate.modelo_precio || (uiState.frecuencia_cobro === 'unico' ? 'precio_fijo' : 'suscripcion_mensual')
             };
 
             if (editingId) {
@@ -270,7 +294,11 @@ export default function CatalogoProductos() {
             precio_base: 0,
             tiene_setup: false,
             setup_fee: 0,
-            unidad_medida: ''
+            unidad_medida: '',
+            precio_compra: 0,
+            stock_actual: 0,
+            stock_minimo: 0,
+            controla_stock: false
         });
         setFormData({
             tipo: types[0]?.slug ?? 'modulo',
@@ -625,7 +653,11 @@ export default function CatalogoProductos() {
                                                                     key={type.slug}
                                                                     type="button"
                                                                     onClick={() => {
+                                                                        const isPhysical = type.slug === 'equipo' || type.slug === 'partes' || type.slug === 'repuestos';
                                                                         setFormData({ ...formData, tipo: type.slug });
+                                                                        if (isPhysical && !uiState.controla_stock) {
+                                                                            setUiState(prev => ({ ...prev, controla_stock: true, unidad_medida: prev.unidad_medida || 'unidad' }));
+                                                                        }
                                                                         setIsDropdownOpen(false);
                                                                     }}
                                                                     className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${formData.tipo === type.slug ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700 hover:bg-gray-50 font-medium'}`}
@@ -820,6 +852,110 @@ export default function CatalogoProductos() {
                                         </div>
                                     </div>
 
+                                    {/* Sección Inventario y Costos (Para equipos, partes, o cualquier ítem con stock) */}
+                                    <div className="bg-white rounded-2xl p-6 border border-slate-200/60 shadow-sm space-y-5">
+                                        <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+                                                    <Box className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-black text-gray-900 leading-tight">Inventario y Costos</h4>
+                                                    <p className="text-[11px] text-gray-500 font-medium">Control de stock y rentabilidad</p>
+                                                </div>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={uiState.controla_stock}
+                                                    onChange={(e) => setUiState({ ...uiState, controla_stock: e.target.checked })}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                                            </label>
+                                        </div>
+
+                                        {uiState.controla_stock && (
+                                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-xs font-bold text-gray-600 mb-1.5 flex items-center justify-between">
+                                                            <span>Stock Actual</span>
+                                                            <span className="text-[10px] text-gray-400 font-normal">En bodega</span>
+                                                        </label>
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            value={uiState.stock_actual}
+                                                            onChange={(e) => setUiState({ ...uiState, stock_actual: Math.max(0, Number(e.target.value)) })}
+                                                            className="bg-white font-black text-gray-900"
+                                                            placeholder="0"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs font-bold text-gray-600 mb-1.5 flex items-center justify-between">
+                                                            <span>Stock Mínimo</span>
+                                                            <span className="text-[10px] text-amber-500 font-semibold">Alerta</span>
+                                                        </label>
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            value={uiState.stock_minimo}
+                                                            onChange={(e) => setUiState({ ...uiState, stock_minimo: Math.max(0, Number(e.target.value)) })}
+                                                            className="bg-white font-bold text-gray-900"
+                                                            placeholder="0"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="text-xs font-bold text-gray-600 mb-1.5 block">
+                                                        Precio de Compra / Costo ($)
+                                                    </label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                                                        <Input
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={uiState.precio_compra}
+                                                            onChange={(e) => setUiState({ ...uiState, precio_compra: Math.max(0, Number(e.target.value)) })}
+                                                            className="pl-8 bg-white font-bold text-gray-900"
+                                                            placeholder="0.00"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Calculadora en vivo de margen y ganancia */}
+                                                {uiState.precio_base > 0 && (
+                                                    <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                                                        <div className="flex items-center justify-between text-xs">
+                                                            <span className="text-gray-500 font-medium">Ganancia por unidad:</span>
+                                                            <span className={`font-black ${uiState.precio_base - uiState.precio_compra >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                                ${(uiState.precio_base - uiState.precio_compra).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </span>
+                                                        </div>
+                                                        {uiState.precio_compra > 0 && (
+                                                            <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200">
+                                                                <span className="text-gray-500 font-medium">Margen bruto:</span>
+                                                                {(() => {
+                                                                    const margen = ((uiState.precio_base - uiState.precio_compra) / uiState.precio_base) * 100;
+                                                                    const isPositive = margen >= 0;
+                                                                    const colorClass = margen >= 30 ? 'bg-emerald-100 text-emerald-800' : margen >= 15 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
+                                                                    return (
+                                                                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${colorClass}`}>
+                                                                            {isPositive ? `+${margen.toFixed(1)}%` : `${margen.toFixed(1)}%`}
+                                                                        </span>
+                                                                    );
+                                                                })()}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
                                     <div className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
                                         <div>
                                             <h4 className="text-sm font-bold text-gray-900">Estado del Producto</h4>
@@ -875,6 +1011,7 @@ export default function CatalogoProductos() {
                                     <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest">Tipo</th>
                                     <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest">Modelo</th>
                                     <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Precio</th>
+                                    <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Stock</th>
                                     <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Estado</th>
                                     <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Acciones</th>
                                 </tr>
@@ -921,6 +1058,41 @@ export default function CatalogoProductos() {
                                                 {item.costo_unico > 0 && item.precio_mensual === 0 && item.precio_anual === 0 && <p className="text-sm font-black text-gray-900">${item.costo_unico.toLocaleString()}<span className="text-xs font-normal text-gray-400"> {item.metadata?.unidad_medida ? `por ${item.metadata.unidad_medida}` : ''}</span></p>}
                                                 {item.costo_unico > 0 && (item.precio_mensual > 0 || item.precio_anual > 0) && <p className="text-sm font-bold text-amber-600">+ ${item.costo_unico.toLocaleString()}<span className="text-xs font-normal text-amber-600/70"> setup</span></p>}
                                             </div>
+                                        </td>
+                                        <td className="py-4 px-6 text-center">
+                                            {(() => {
+                                                const meta = item.metadata || {};
+                                                const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
+                                                const tracksStock = item.controla_stock ?? meta.controla_stock ?? isPhysical;
+                                                if (!tracksStock) {
+                                                    return <span className="text-gray-300 text-xs font-medium">—</span>;
+                                                }
+                                                const stockActual = Number(item.stock_actual ?? meta.stock_actual ?? 0);
+                                                const stockMinimo = Number(item.stock_minimo ?? meta.stock_minimo ?? 0);
+
+                                                if (stockActual <= 0) {
+                                                    return (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-50 text-rose-700 border border-rose-200/60" title="Sin unidades en inventario">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                                            Agotado
+                                                        </span>
+                                                    );
+                                                }
+                                                if (stockActual <= stockMinimo) {
+                                                    return (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200/60" title={`Stock mínimo configurado: ${stockMinimo}`}>
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                            Bajo ({stockActual})
+                                                        </span>
+                                                    );
+                                                }
+                                                return (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                        {stockActual} {item.unidad || meta.unidad_medida || 'und'}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="py-4 px-6 text-center">
                                             <div className="flex justify-center">

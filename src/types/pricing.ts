@@ -19,6 +19,15 @@ export interface PricingItem {
     margen_ganancia?: number;
     mostrar_en_wizard?: boolean;
     grupo?: string;
+    // Campos para productos físicos / equipos / partes
+    precio_compra?: number;
+    stock_actual?: number;
+    stock_minimo?: number;
+    controla_stock?: boolean;
+    modelo_precio?: string;
+    unidad?: string;
+    precio_unitario?: number;
+    cantidad_default?: number;
     metadata: {
         caracteristicas?: string[];
         icono?: string;
@@ -26,6 +35,11 @@ export interface PricingItem {
         formula_calculo?: 'fijo' | 'por_dte' | 'por_cantidad' | 'personalizado';
         precio_base_dte?: number;
         margen_ganancia?: number;
+        precio_compra?: number;
+        stock_actual?: number;
+        stock_minimo?: number;
+        controla_stock?: boolean;
+        unidad_medida?: string;
         [key: string]: any;
     };
     created_at: string;

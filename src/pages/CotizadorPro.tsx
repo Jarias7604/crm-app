@@ -139,11 +139,25 @@ export default function CotizadorPro() {
             // 1. Restaurar paquete por nombre
             const paqueteFound = paqList.find((p: CotizadorPaquete) => p.paquete === cot.plan_nombre);
 
-            // 2. Restaurar módulos por nombre
+            // 2. Restaurar módulos por nombre y restaurar cantidades
             const modulosArr = Array.isArray(cot.modulos_adicionales) ? cot.modulos_adicionales : [];
             const modulosIds = modulosArr
                 .map((m: any) => modulosList.find((mod: CotizadorItem) => mod.nombre === m.nombre)?.id)
                 .filter(Boolean) as string[];
+
+            const restoredQtys: Record<string, number> = {};
+            const restoredOverrides: Record<string, number> = {};
+            modulosArr.forEach((m: any) => {
+                const found = modulosList.find((mod: CotizadorItem) => mod.nombre === m.nombre);
+                if (found) {
+                    if (m.cantidad) restoredQtys[found.id] = Number(m.cantidad);
+                    if (m.pago_unico || m.costo_anual) {
+                        restoredOverrides[found.id] = Number(m.pago_unico || m.costo_anual);
+                    }
+                }
+            });
+            if (Object.keys(restoredQtys).length > 0) setItemQtys(prev => ({ ...prev, ...restoredQtys }));
+            if (Object.keys(restoredOverrides).length > 0) setOverrides(prev => ({ ...prev, ...restoredOverrides }));
 
             // 3. Restaurar plan de financiamiento
             const planesComparativa = (cot as any).planes_comparativa as string[] | null;
@@ -251,24 +265,44 @@ export default function CotizadorPro() {
             const existingIds = new Set(itemsData.map((i: CotizadorItem) => i.id));
             const extraItems: CotizadorItem[] = pricingItemsData
                 .filter((p: any) => p.activo && !existingIds.has(p.id) && p.tipo !== 'plan')
-                .map((p: any): CotizadorItem => ({
-                    id: p.id,
-                    company_id: p.company_id ?? null,
-                    tipo: p.tipo,
-                    nombre: p.nombre,
-                    codigo: p.codigo,
-                    pago_unico: p.costo_unico ?? 0,       // pricing_items uses costo_unico
-                    precio_anual: p.precio_anual ?? 0,
-                    precio_mensual: p.precio_mensual ?? 0,
-                    precio_por_dte: p.precio_por_dte ?? 0,
-                    incluye_en_paquete: false,
-                    activo: p.activo,
-                    orden: p.orden ?? 0,
-                    descripcion: p.descripcion,
-                    metadata: p.metadata,
-                    created_at: p.created_at,
-                    updated_at: p.updated_at ?? p.created_at,
-                }));
+                .map((p: any): CotizadorItem => {
+                    const meta = p.metadata || {};
+                    const isPhysical = p.tipo === 'equipo' || p.tipo === 'partes' || p.tipo === 'repuestos';
+                    const controlaStock = Boolean(p.controla_stock ?? meta.controla_stock ?? isPhysical);
+                    const modeloPrecio = p.modelo_precio ?? meta.modelo_precio ?? (controlaStock || isPhysical ? 'por_unidad' : undefined);
+                    const stockActual = Number(p.stock_actual ?? meta.stock_actual ?? 0);
+                    const stockMinimo = Number(p.stock_minimo ?? meta.stock_minimo ?? 0);
+                    const precioCompra = Number(p.precio_compra ?? meta.precio_compra ?? 0);
+                    const precioUnit = Number(p.precio_unitario ?? meta.precio_unitario ?? p.costo_unico ?? 0);
+                    const unidadMedida = p.unidad || meta.unidad_medida || 'und';
+
+                    return {
+                        id: p.id,
+                        company_id: p.company_id ?? null,
+                        tipo: p.tipo,
+                        nombre: p.nombre,
+                        codigo: p.codigo,
+                        pago_unico: precioUnit > 0 ? precioUnit : (p.costo_unico ?? 0),
+                        precio_anual: p.precio_anual ?? 0,
+                        precio_mensual: p.precio_mensual ?? 0,
+                        precio_por_dte: p.precio_por_dte ?? 0,
+                        incluye_en_paquete: false,
+                        activo: p.activo,
+                        orden: p.orden ?? 0,
+                        descripcion: p.descripcion,
+                        modelo_precio: modeloPrecio,
+                        unidad: unidadMedida,
+                        precio_unitario: precioUnit,
+                        cantidad_default: p.cantidad_default ?? 1,
+                        stock_actual: stockActual,
+                        stock_minimo: stockMinimo,
+                        controla_stock: controlaStock,
+                        precio_compra: precioCompra,
+                        metadata: p.metadata,
+                        created_at: p.created_at,
+                        updated_at: p.updated_at ?? p.created_at,
+                    };
+                });
 
             const allItems: CotizadorItem[] = [...itemsData, ...extraItems];
             setModulos(allItems.filter(i => i.tipo === 'modulo'));
@@ -382,23 +416,36 @@ export default function CotizadorPro() {
             ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
             ...servicios.filter(s => formData.servicios_ids.includes(s.id))
         ].map(item => {
-            // Aplicar override si existe, preservando si es pago único o recurrente
-            if (overrides[item.id] !== undefined) {
-                const esPagoUnico = (item.pago_unico || 0) > 0;
-                const overrideVal = overrides[item.id];
-                return {
-                    ...item,
-                    // Pago único: el override va a pago_unico; Recurrente: el override va a precio_anual
-                    pago_unico: esPagoUnico ? overrideVal : 0,
-                    precio_anual: esPagoUnico ? 0 : overrideVal,
-                    // CRÍTICO: sincronizar precio_mensual para evitar el fallback incorrecto en el motor
-                    // cotizador.ts usa `precio_anual || precio_mensual*12` — si precio_anual=0 (falsy en JS)
-                    // sin este fix usaría precio_mensual original ignorando el 0 del usuario
-                    precio_mensual: esPagoUnico ? item.precio_mensual : overrideVal / 12,
-                    precio_por_dte: 0,
-                };
-            }
-            return item;
+            const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
+            const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
+            const needsQty = item.modelo_precio === 'por_unidad' || item.modelo_precio === 'por_hora' || tracksStock;
+            const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
+
+            const baseUnit = item.precio_por_dte > 0
+                ? item.precio_por_dte
+                : (item.precio_mensual > 0
+                    ? item.precio_mensual
+                    : (item.precio_unitario || item.pago_unico || item.precio_anual || 0));
+
+            const defaultPrice = item.precio_por_dte > 0
+                ? (formData.volumen_dtes * item.precio_por_dte)
+                : needsQty
+                    ? baseUnit * qty
+                    : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual);
+
+            const calculatedTotal = overrides[item.id] !== undefined ? overrides[item.id] : defaultPrice;
+            const esPagoUnico = (item.pago_unico || 0) > 0 || isPhysical || tracksStock || item.modelo_precio === 'por_unidad';
+
+            return {
+                ...item,
+                pago_unico: esPagoUnico ? calculatedTotal : 0,
+                precio_anual: esPagoUnico ? 0 : calculatedTotal,
+                precio_mensual: esPagoUnico ? item.precio_mensual : calculatedTotal / 12,
+                precio_por_dte: 0,
+                cantidad_default: qty,
+                precio_unitario: baseUnit,
+                unidad: item.unidad || (item.modelo_precio === 'por_hora' ? 'hr' : 'und'),
+            };
         });
 
         // Aplicar override de paquete (precio del plan) y/o implementación
@@ -474,21 +521,29 @@ export default function CotizadorPro() {
     };
 
     const toggleModulo = (id: string) => {
-        setFormData(prev => ({
-            ...prev,
-            modulos_ids: prev.modulos_ids.includes(id)
-                ? prev.modulos_ids.filter(m => m !== id)
-                : [...prev.modulos_ids, id]
-        }));
+        setFormData(prev => {
+            const isRemoving = prev.modulos_ids.includes(id);
+            if (!isRemoving && !itemQtys[id]) {
+                setItemQtys(q => ({ ...q, [id]: 1 }));
+            }
+            return {
+                ...prev,
+                modulos_ids: isRemoving ? prev.modulos_ids.filter(m => m !== id) : [...prev.modulos_ids, id]
+            };
+        });
     };
 
     const toggleServicio = (id: string) => {
-        setFormData(prev => ({
-            ...prev,
-            servicios_ids: prev.servicios_ids.includes(id)
-                ? prev.servicios_ids.filter(s => s !== id)
-                : [...prev.servicios_ids, id]
-        }));
+        setFormData(prev => {
+            const isRemoving = prev.servicios_ids.includes(id);
+            if (!isRemoving && !itemQtys[id]) {
+                setItemQtys(q => ({ ...q, [id]: 1 }));
+            }
+            return {
+                ...prev,
+                servicios_ids: isRemoving ? prev.servicios_ids.filter(s => s !== id) : [...prev.servicios_ids, id]
+            };
+        });
     };
 
     const handleGenerar = async () => {
@@ -532,7 +587,7 @@ export default function CotizadorPro() {
                 s.nombre.toLowerCase().includes('personaliz')
             );
 
-            // Preparar modulos y servicios generales para modulos_adicionales
+            // Preparar modulos y servicios generales para modulos_adicionales con desglose completo
             const todosLosItems = [
                 ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
                 ...servicios.filter(s =>
@@ -541,18 +596,35 @@ export default function CotizadorPro() {
                     !s.nombre.toLowerCase().includes('personaliz')
                 )
             ].map(item => {
+                const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
+                const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
+                const needsQty = item.modelo_precio === 'por_unidad' || item.modelo_precio === 'por_hora' || tracksStock;
+                const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
+
+                const baseUnit = item.precio_por_dte > 0
+                    ? item.precio_por_dte
+                    : (item.precio_mensual > 0
+                        ? item.precio_mensual
+                        : (item.precio_unitario || item.pago_unico || item.precio_anual || 0));
+
                 const manualPrice = overrides[item.id];
-                const esPagoUnico = (item.pago_unico || 0) > 0;
                 const costoCalculado = manualPrice !== undefined
                     ? manualPrice
                     : (item.precio_por_dte > 0
                         ? formData.volumen_dtes * item.precio_por_dte
-                        : (item.pago_unico || item.precio_anual));
+                        : (needsQty ? baseUnit * qty : (item.pago_unico || item.precio_anual)));
+
+                const esPagoUnico = (item.pago_unico || 0) > 0 || isPhysical || tracksStock || item.modelo_precio === 'por_unidad';
 
                 return {
+                    id: item.id,
                     nombre: item.nombre,
                     tipo: item.tipo,
                     descripcion: item.descripcion || '',
+                    cantidad: needsQty ? qty : 1,
+                    precio_unitario: baseUnit,
+                    total: costoCalculado,
+                    unidad: item.unidad || item.metadata?.unidad_medida || 'und',
                     // Si es pago único, guardarlo en pago_unico; si no, en costo_anual
                     pago_unico: esPagoUnico ? costoCalculado : 0,
                     costo_anual: esPagoUnico ? 0 : costoCalculado,
@@ -941,27 +1013,85 @@ export default function CotizadorPro() {
                         const renderItemCard = (item: typeof todosLosItems[0], isModulo: boolean) => {
                             const isSelected = isModulo ? formData.modulos_ids.includes(item.id) : formData.servicios_ids.includes(item.id);
                             const toggle = isModulo ? () => toggleModulo(item.id) : () => toggleServicio(item.id);
-                            const modelo = (item as any).modelo_precio || (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual');
+                            const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
+                            const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
+                            const modelo = (item as any).modelo_precio || (tracksStock || isPhysical ? 'por_unidad' : (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual'));
                             const meta = MODELO_LABELS[modelo] || MODELO_LABELS.precio_fijo;
-                            const defaultPrice = item.precio_por_dte > 0 ? (formData.volumen_dtes * item.precio_por_dte) : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual);
+                            const needsQty = modelo === 'por_hora' || modelo === 'por_unidad' || tracksStock;
+                            const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
+                            const stockActual = Number(item.stock_actual ?? item.metadata?.stock_actual ?? 0);
+                            const unitLabel = item.unidad || (modelo === 'por_hora' ? 'hr' : 'und');
+
+                            const baseUnitPrice = item.precio_por_dte > 0
+                                ? item.precio_por_dte
+                                : (item.precio_mensual > 0 ? item.precio_mensual : (item.precio_unitario || item.pago_unico || item.precio_anual || 0));
+
+                            const defaultPrice = item.precio_por_dte > 0
+                                ? (formData.volumen_dtes * item.precio_por_dte)
+                                : needsQty
+                                    ? baseUnitPrice * qty
+                                    : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual);
                             const currentPrice = overrides[item.id] ?? defaultPrice;
+
                             return (
                                 <div key={item.id} onClick={toggle}
                                     className={`relative flex flex-col p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 min-h-[180px] ${
                                         isSelected ? 'border-[#4449AA] bg-[#4449AA]/5 shadow-md' : 'border-gray-100 hover:border-[#4449AA]/40 bg-white hover:shadow-md'
                                     }`}>
-                                    <div className="flex items-start justify-between mb-3">
-                                        <span className="text-[10px] font-black px-2 py-1 rounded-full" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>{meta.icon} {meta.label}</span>
+                                    <div className="flex items-start justify-between mb-2">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>{meta.icon} {meta.label}</span>
+                                            {tracksStock && (
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                                                    stockActual <= 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
+                                                }`}>
+                                                    Stock: {stockActual}
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${isSelected ? 'bg-[#4449AA] border-[#4449AA]' : 'border-gray-300'}`}>
                                             {isSelected && <Check className="w-3 h-3 text-white" />}
                                         </div>
                                     </div>
                                     <p className={`text-sm font-bold leading-snug ${isSelected ? 'text-[#4449AA]' : 'text-gray-800'}`}>{item.nombre}</p>
-                                    {item.descripcion && <p className="text-[11px] text-gray-400 mt-2 line-clamp-3 flex-1 leading-relaxed">{item.descripcion}</p>}
-                                    <div className="mt-auto pt-3 border-t border-gray-100">
-                                        <p className={`text-base font-black ${isSelected ? 'text-[#4449AA]' : 'text-gray-700'}`}>${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
-                                        <p className="text-[10px] text-gray-400">{item.pago_unico > 0 ? 'Pago único' : item.precio_por_dte > 0 ? 'Por volumen' : '/año'}</p>
-                                    </div>
+                                    {item.descripcion && <p className="text-[11px] text-gray-400 mt-1 line-clamp-2 flex-1 leading-relaxed">{item.descripcion}</p>}
+                                    
+                                    {isSelected && needsQty ? (
+                                        <div className="flex items-center justify-between mt-auto pt-3 border-t border-gray-100" onClick={e => e.stopPropagation()}>
+                                            <div className="flex items-center bg-amber-50 border border-amber-200 rounded-lg p-0.5">
+                                                <button
+                                                    type="button"
+                                                    className="w-6 h-6 rounded flex items-center justify-center font-black text-amber-700 hover:bg-amber-100 text-xs"
+                                                    onClick={() => {
+                                                        const q = Math.max(1, qty - 1);
+                                                        setItemQtys(prev => ({ ...prev, [item.id]: q }));
+                                                        setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q }));
+                                                    }}
+                                                >-</button>
+                                                <span className="w-7 text-center font-black text-amber-700 text-xs">{qty}</span>
+                                                <button
+                                                    type="button"
+                                                    className="w-6 h-6 rounded flex items-center justify-center font-black text-amber-700 hover:bg-amber-100 text-xs"
+                                                    onClick={() => {
+                                                        const q = qty + 1;
+                                                        setItemQtys(prev => ({ ...prev, [item.id]: q }));
+                                                        setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q }));
+                                                    }}
+                                                >+</button>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-black text-[#4449AA]">${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+                                                <p className="text-[9px] text-gray-400">${baseUnitPrice.toLocaleString()}/{unitLabel}</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="mt-auto pt-3 border-t border-gray-100 flex items-end justify-between">
+                                            <div>
+                                                <p className="text-[10px] text-gray-400">{needsQty ? `por ${unitLabel}` : item.pago_unico > 0 ? 'Pago único' : item.precio_por_dte > 0 ? 'Por volumen' : '/año'}</p>
+                                            </div>
+                                            <p className={`text-base font-black ${isSelected ? 'text-[#4449AA]' : 'text-gray-700'}`}>${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         };
@@ -995,21 +1125,25 @@ export default function CotizadorPro() {
                                 ? formData.modulos_ids.includes(item.id)
                                 : formData.servicios_ids.includes(item.id);
                             const toggle = isModulo ? () => toggleModulo(item.id) : () => toggleServicio(item.id);
-                            const modelo = (item as any).modelo_precio || (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual');
+                            const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
+                            const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
+                            const modelo = (item as any).modelo_precio || (tracksStock || isPhysical ? 'por_unidad' : (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual'));
                             const meta = MODELO_LABELS[modelo] || MODELO_LABELS.precio_fijo;
-                            const needsQty = modelo === 'por_hora' || modelo === 'por_unidad';
-                            const qty = itemQtys[item.id] ?? 1;
+                            const needsQty = modelo === 'por_hora' || modelo === 'por_unidad' || tracksStock;
+                            const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
+                            const stockActual = Number(item.stock_actual ?? item.metadata?.stock_actual ?? 0);
+                            const unitLabel = item.unidad || (modelo === 'por_hora' ? 'hr' : 'und');
+
                             // Precio base por unidad/hora
                             const baseUnitPrice = item.precio_por_dte > 0
                                 ? item.precio_por_dte
-                                : (item.precio_mensual > 0 ? item.precio_mensual : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual));
+                                : (item.precio_mensual > 0 ? item.precio_mensual : (item.precio_unitario || item.pago_unico || item.precio_anual || 0));
                             const defaultPrice = item.precio_por_dte > 0
                                 ? (formData.volumen_dtes * item.precio_por_dte)
                                 : needsQty
                                     ? baseUnitPrice * qty
                                     : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual);
                             const currentPrice = overrides[item.id] ?? defaultPrice;
-                            const unitLabel = modelo === 'por_hora' ? 'hr' : modelo === 'por_unidad' ? 'und' : '';
 
                             const isExpanded = expandedItems.has(item.id);
                             return (
@@ -1024,6 +1158,17 @@ export default function CotizadorPro() {
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <p className={`text-sm font-bold truncate ${isSelected ? 'text-[#4449AA]' : 'text-gray-800'}`}>{item.nombre}</p>
                                                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>{meta.icon} {meta.label}</span>
+                                                    {tracksStock && (
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                                            stockActual <= 0
+                                                                ? 'bg-rose-100 text-rose-700'
+                                                                : stockActual < qty && isSelected
+                                                                    ? 'bg-amber-100 text-amber-800'
+                                                                    : 'bg-emerald-50 text-emerald-700'
+                                                        }`}>
+                                                            {stockActual <= 0 ? 'Sin stock' : `Stock: ${stockActual}`}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 {item.descripcion && <p className="text-[11px] text-gray-400 mt-0.5 line-clamp-1">{item.descripcion}</p>}
                                             </div>
@@ -1033,13 +1178,42 @@ export default function CotizadorPro() {
                                             <div onClick={e => e.stopPropagation()}>
                                                 {isSelected && needsQty ? (
                                                     <div className="flex flex-col items-end gap-1">
-                                                        <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
-                                                            <input type="number" min={1} className="w-12 text-center font-black text-amber-700 bg-transparent outline-none text-sm" value={qty}
-                                                                onChange={e => { const q = Math.max(1, Number(e.target.value)); setItemQtys(prev => ({ ...prev, [item.id]: q })); setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q })); }} />
-                                                            <span className="text-[10px] text-amber-500 font-bold">{unitLabel}</span>
+                                                        <div className="flex items-center bg-amber-50 border border-amber-200 rounded-lg p-0.5">
+                                                            <button
+                                                                type="button"
+                                                                className="w-6 h-6 rounded flex items-center justify-center font-black text-amber-700 hover:bg-amber-200/60 transition-colors text-xs"
+                                                                onClick={() => {
+                                                                    const q = Math.max(1, qty - 1);
+                                                                    setItemQtys(prev => ({ ...prev, [item.id]: q }));
+                                                                    setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q }));
+                                                                }}
+                                                            >-</button>
+                                                            <input
+                                                                type="number"
+                                                                min={1}
+                                                                className="w-12 text-center font-black text-amber-800 bg-transparent outline-none text-xs"
+                                                                value={qty}
+                                                                onChange={e => {
+                                                                    const q = Math.max(1, Number(e.target.value));
+                                                                    setItemQtys(prev => ({ ...prev, [item.id]: q }));
+                                                                    setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q }));
+                                                                }}
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                className="w-6 h-6 rounded flex items-center justify-center font-black text-amber-700 hover:bg-amber-200/60 transition-colors text-xs"
+                                                                onClick={() => {
+                                                                    const q = qty + 1;
+                                                                    setItemQtys(prev => ({ ...prev, [item.id]: q }));
+                                                                    setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q }));
+                                                                }}
+                                                            >+</button>
+                                                            <span className="text-[10px] text-amber-600 font-bold pr-1.5">{unitLabel}</span>
                                                         </div>
-                                                        <p className="text-sm font-black text-[#4449AA]">${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
-                                                        <p className="text-[10px] text-gray-400">${baseUnitPrice}/{unitLabel}</p>
+                                                        <div className="text-right">
+                                                            <p className="text-sm font-black text-[#4449AA]">${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
+                                                            <p className="text-[10px] text-gray-400">${baseUnitPrice.toLocaleString()} / {unitLabel}</p>
+                                                        </div>
                                                     </div>
                                                 ) : isSelected && canEditPrices ? (
                                                     <div className="flex items-center gap-1">
@@ -1086,7 +1260,7 @@ export default function CotizadorPro() {
                         }, {});
                         const TIPO_LABELS: Record<string, string> = {
                             plan: 'Plan', modulo: 'Módulos', servicio: 'Servicios',
-                            implementacion: 'Implementación', equipo: 'Equipo', otros: 'Otros',
+                            implementacion: 'Implementación', equipo: 'Equipos', partes: 'Partes', repuestos: 'Repuestos', otros: 'Otros',
                         };
                         const categoriasBase = [
                             ...(paquetes.length > 0 ? ['plan'] : []),
@@ -1691,13 +1865,20 @@ export default function CotizadorPro() {
                                                     </div>
                                                 </div>
                                                 <div className="space-y-1.5">
-                                                    {/* Listar cada ítem de pago único por separado */}
+                                                    {/* Listar cada ítem de pago único por separado con cantidades */}
                                                     {totales.desglose
                                                         .filter(d => d.es_pago_unico)
                                                         .map((d, i) => (
                                                             <div key={i} className="flex justify-between text-[11px] text-gray-600 font-medium leading-none">
-                                                                <span>{d.nombre}</span>
-                                                                <span>${d.precio_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                <span className="flex items-center gap-1.5 truncate pr-2">
+                                                                    <span>{d.nombre}</span>
+                                                                    {d.cantidad && d.cantidad > 1 && (
+                                                                        <span className="text-[10px] text-orange-600/80 font-bold shrink-0">
+                                                                            ({d.cantidad} {d.unidad || 'und'} × ${d.precio_unitario?.toLocaleString()})
+                                                                        </span>
+                                                                    )}
+                                                                </span>
+                                                                <span className="shrink-0 font-bold">${d.precio_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                             </div>
                                                         ))
                                                     }

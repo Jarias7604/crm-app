@@ -507,7 +507,9 @@ export const pdfService = {
 
                     serviciosUnicos.forEach((serv: any) => {
                         const monto = Number(serv.pago_unico) || 0;
-                        doc.text(serv.nombre.substring(0, 18), x + 7, lineY);
+                        const qty = Number(serv.cantidad) || 1;
+                        const label = qty > 1 ? `${serv.nombre.substring(0, 14)} (${qty}x)` : serv.nombre.substring(0, 18);
+                        doc.text(label, x + 7, lineY);
                         doc.text(`$${monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
                         lineY += lineHeight;
                     });
@@ -877,7 +879,11 @@ export const pdfService = {
                         doc.setTextColor(71, 85, 105);
                         doc.setFontSize(iFontSize);
                         doc.setFont('helvetica', 'normal');
-                        doc.text((serv.nombre || '').substring(0, 30), margin + 6, iy);
+                        const qty = Number(serv.cantidad) || 1;
+                        const label = qty > 1 
+                            ? `${(serv.nombre || '').substring(0, 22)} (${qty} ${serv.unidad || 'und'} × $${Number(serv.precio_unitario || Math.round(Number(serv.pago_unico) / qty)).toLocaleString()})`
+                            : (serv.nombre || '').substring(0, 30);
+                        doc.text(label, margin + 6, iy);
                         doc.setFont('helvetica', 'bold');
                         const monto = Number(serv.pago_unico) || 0;
                         doc.text(`$${monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2 - 6, iy, { align: 'right' });

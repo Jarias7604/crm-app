@@ -519,7 +519,14 @@ export default function PublicQuoteView() {
                                             <Package className="w-6 h-6" />
                                         </div>
                                         <div className="flex flex-col gap-1">
-                                            <p className="font-black text-slate-900 text-sm leading-none m-0 uppercase">{mod.nombre}</p>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <p className="font-black text-slate-900 text-sm leading-none m-0 uppercase">{mod.nombre}</p>
+                                                {Number(mod.cantidad) > 1 && (
+                                                    <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200">
+                                                        {mod.cantidad} {mod.unidad || 'und'} × ${Number(mod.precio_unitario || (monto / Number(mod.cantidad))).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                    </span>
+                                                )}
+                                            </div>
                                             {mod.descripcion && (
                                                 <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">{mod.descripcion}</p>
                                             )}

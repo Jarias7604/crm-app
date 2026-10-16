@@ -667,6 +667,11 @@ export default function CotizacionDetalle() {
                                                 <div className="flex flex-col gap-1 flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <span className="font-black text-slate-900 text-sm sm:text-base">{mod.nombre}</span>
+                                                        {Number(mod.cantidad) > 1 && (
+                                                            <span className="bg-slate-100 text-slate-700 text-xs font-bold px-2 py-0.5 rounded-full border border-slate-200">
+                                                                {mod.cantidad} {mod.unidad || 'und'} × ${Number(mod.precio_unitario || (monto / Number(mod.cantidad))).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                            </span>
+                                                        )}
                                                         {esPagoUnico && (
                                                             <span className="bg-orange-100 text-orange-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter flex-shrink-0">PAGO ÚNICO</span>
                                                         )}

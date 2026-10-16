@@ -35,6 +35,14 @@ export interface CotizadorItem {
     activo: boolean;
     orden: number;
     descripcion?: string;
+    modelo_precio?: string;
+    unidad?: string;
+    precio_unitario?: number;
+    cantidad_default?: number;
+    stock_actual?: number;
+    stock_minimo?: number;
+    controla_stock?: boolean;
+    precio_compra?: number;
     metadata: any;
     created_at: string;
     updated_at: string;
@@ -47,6 +55,9 @@ export interface DetalleLinea {
     precio_mensual: number;
     es_pago_unico: boolean;
     descripcion: string;
+    cantidad?: number;
+    precio_unitario?: number;
+    unidad?: string;
 }
 
 export interface CotizacionCalculada {
@@ -314,11 +325,14 @@ class CotizadorService {
                 subtotal_pagos_unicos += item.pago_unico;
                 desglose.push({
                     es_pago_unico: true,
-                    tipo: item.tipo === 'modulo' ? 'Módulo' : 'Servicio',
+                    tipo: item.tipo === 'modulo' ? 'Módulo' : (item.tipo === 'equipo' ? 'Equipo' : (item.tipo === 'partes' ? 'Partes' : 'Servicio')),
                     nombre: item.nombre,
                     precio_anual: item.pago_unico,
                     precio_mensual: 0,
-                    descripcion: item.descripcion || 'Pago único'
+                    descripcion: item.descripcion || 'Pago único',
+                    cantidad: item.cantidad_default,
+                    precio_unitario: item.precio_unitario,
+                    unidad: item.unidad
                 });
             } else if (item.precio_por_dte > 0) {
                 const precio = cantidad_dtes * item.precio_por_dte;
