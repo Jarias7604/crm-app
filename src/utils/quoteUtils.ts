@@ -39,6 +39,7 @@ export interface CotizacionData {
     cuotas?: number;
     descripcion_pago?: string; // Para almacenar la firma/confirmación digital
     metadata?: any;
+    company_id?: string;
     company?: {
         name: string;
         logo_url?: string;
