@@ -22,8 +22,13 @@ export interface ContractSeedData {
     address?: string | null;
     tax_id?: string | null;
   } | null;
+  client?: any | null;
   cotizacion?: any | null;
   creatorName?: string;
+  fechaInicio?: string;
+  vigenciaMeses?: number;
+  mesesGracia?: number;
+  notas?: string;
 }
 
 export function generateContractDefaults(seed: ContractSeedData): {
@@ -39,15 +44,22 @@ export function generateContractDefaults(seed: ContractSeedData): {
   vigencia_meses: number;
   fecha_inicio: string;
   fecha_fin: string;
+  meses_gracia?: number;
+  fecha_primer_cobro?: string;
+  notas?: string;
   jurisdiccion: string;
   datos_empresa: ContractCompanyData;
   datos_cliente: ContractClientData;
 } {
-  const { company, lead, cotizacion, creatorName } = seed;
-  const hoy = new Date();
+  const { company, lead, client, cotizacion, creatorName } = seed;
+  const hoy = seed.fechaInicio ? new Date(`${seed.fechaInicio.substring(0, 10)}T12:00:00`) : new Date();
   const fechaInicioStr = format(hoy, 'yyyy-MM-dd');
-  const vigenciaMeses = cotizacion?.plazo_meses || 12;
-  const fechaFinStr = format(addMonths(hoy, vigenciaMeses), 'yyyy-MM-dd');
+  const vigenciaMeses = seed.vigenciaMeses || cotizacion?.plazo_meses || 12;
+  const mesesGracia = seed.mesesGracia || 0;
+  const fechaFin = addMonths(hoy, vigenciaMeses);
+  const fechaFinStr = format(fechaFin, 'yyyy-MM-dd');
+  const fechaPrimerCobro = mesesGracia > 0 ? addMonths(hoy, mesesGracia) : hoy;
+  const fechaPrimerCobroStr = format(fechaPrimerCobro, 'yyyy-MM-dd');
 
   // Código correlativo de contrato
   const year = hoy.getFullYear();
@@ -56,8 +68,8 @@ export function generateContractDefaults(seed: ContractSeedData): {
   const contract_number = `CON-${year}-${cotCode}`;
 
   const empresaNombre = company.name || 'La Empresa';
-  const clienteNombre = lead?.name || cotizacion?.nombre_cliente || 'El Cliente';
-  const clienteEmpresa = lead?.company_name || cotizacion?.empresa_cliente || clienteNombre;
+  const clienteNombre = client?.nombre || lead?.name || cotizacion?.nombre_cliente || 'El Cliente';
+  const clienteEmpresa = client?.company_name_lead || lead?.company_name || cotizacion?.empresa_cliente || clienteNombre;
   const planNombre = cotizacion?.plan_nombre || 'Servicios Profesionales Especializados';
 
   // Montos
@@ -88,22 +100,27 @@ export function generateContractDefaults(seed: ContractSeedData): {
   const datos_cliente: ContractClientData = {
     nombre: clienteNombre,
     empresa: clienteEmpresa,
-    tax_id: lead?.tax_id || '',
-    email: lead?.email || cotizacion?.email_cliente || '',
-    telefono: lead?.phone || cotizacion?.telefono_cliente || '',
-    direccion: lead?.address || cotizacion?.direccion_cliente || '',
+    tax_id: client?.tax_id || lead?.tax_id || '',
+    email: client?.email || lead?.email || cotizacion?.email_cliente || '',
+    telefono: client?.telefono || lead?.phone || cotizacion?.telefono_cliente || '',
+    direccion: client?.direccion || lead?.address || cotizacion?.direccion_cliente || '',
     cargo: 'Representante Autorizado',
   };
 
-  const formaPagoTexto = cotizacion?.tipo_pago === 'credito'
+  let formaPagoTexto = cotizacion?.tipo_pago === 'credito'
     ? `Financiado en ${cuotas} cuotas de $${valorCuota.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD con anticipo de $${anticipo.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD.`
     : cotizacion?.monto_anticipo > 0
     ? `Anticipo inicial de $${anticipo.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD y saldo contra entrega.`
     : `Pago de contado por un monto total de $${totalStr} USD.`;
 
+  if (mesesGracia > 0) {
+    const primerCobroTexto = format(fechaPrimerCobro, "d 'de' MMMM 'de' yyyy", { locale: es });
+    formaPagoTexto += ` Se otorga un periodo de gracia promocional de ${mesesGracia} mes(es) sin cobro (Go-Live diferido), programándose el primer cobro efectivo para el día ${primerCobroTexto}.`;
+  }
+
   const jurisdiccion = datos_empresa.ciudad_pais || 'San Salvador, El Salvador';
   const fechaInicioTexto = format(hoy, "d 'de' MMMM 'de' yyyy", { locale: es });
-  const fechaFinTexto = format(addMonths(hoy, vigenciaMeses), "d 'de' MMMM 'de' yyyy", { locale: es });
+  const fechaFinTexto = format(fechaFin, "d 'de' MMMM 'de' yyyy", { locale: es });
 
   const objetoTexto = `Prestación de servicios, suministro y/o licenciamiento correspondientes a "${planNombre}"${
     modulos ? ` con alcance en: ${modulos}` : ''
@@ -197,6 +214,9 @@ export function generateContractDefaults(seed: ContractSeedData): {
     vigencia_meses: vigenciaMeses,
     fecha_inicio: fechaInicioStr,
     fecha_fin: fechaFinStr,
+    meses_gracia: mesesGracia,
+    fecha_primer_cobro: fechaPrimerCobroStr,
+    notas: seed.notas || '',
     jurisdiccion,
     datos_empresa,
     datos_cliente,

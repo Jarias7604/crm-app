@@ -7,14 +7,22 @@ import { contractPdfService } from '../../services/contractPdfService';
 import { ContractShareModal } from './ContractShareModal';
 import toast from 'react-hot-toast';
 
+import { calculateContractDates, getContractExpirationInfo, formatContractDate } from '../../utils/contractReminders';
+import { addMonths, format } from 'date-fns';
+import { Sparkles, Gift, Clock, AlertCircle } from 'lucide-react';
+
 interface ContractEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   existingContract?: Contract | null;
   cotizacion?: any | null;
   lead?: any | null;
+  client?: any | null;
   company: any;
   creatorName?: string;
+  initialVigenciaMeses?: number;
+  initialMesesGracia?: number;
+  initialFechaInicio?: string;
   onSaved?: (contract: Contract) => void;
 }
 
@@ -24,8 +32,12 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
   existingContract,
   cotizacion,
   lead,
+  client,
   company,
   creatorName,
+  initialVigenciaMeses,
+  initialMesesGracia,
+  initialFechaInicio,
   onSaved,
 }) => {
   const [formData, setFormData] = useState<CreateContractInput>({
@@ -42,6 +54,9 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
     vigencia_meses: 12,
     fecha_inicio: '',
     fecha_fin: '',
+    meses_gracia: 0,
+    fecha_primer_cobro: '',
+    notas: '',
     jurisdiccion: '',
     datos_empresa: { nombre: '' },
     datos_cliente: { nombre: '' },
@@ -62,7 +77,7 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
       setFormData({
         company_id: existingContract.company_id,
         lead_id: existingContract.lead_id,
-        client_id: existingContract.client_id,
+        client_id: existingContract.client_id || client?.id || null,
         cotizacion_id: existingContract.cotizacion_id,
         contract_number: existingContract.contract_number,
         title: existingContract.title,
@@ -77,6 +92,9 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
         vigencia_meses: existingContract.vigencia_meses,
         fecha_inicio: existingContract.fecha_inicio,
         fecha_fin: existingContract.fecha_fin,
+        meses_gracia: existingContract.meses_gracia ?? 0,
+        fecha_primer_cobro: existingContract.fecha_primer_cobro ?? '',
+        notas: existingContract.notas ?? '',
         jurisdiccion: existingContract.jurisdiccion,
         datos_empresa: {
           ...existingContract.datos_empresa,
@@ -94,22 +112,48 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
           logo_url: effectiveCompany?.logo_url || (cotizacion as any)?.company?.logo_url || null,
         },
         lead,
+        client,
         cotizacion,
         creatorName,
+        fechaInicio: initialFechaInicio,
+        vigenciaMeses: initialVigenciaMeses,
+        mesesGracia: initialMesesGracia,
       });
 
       setContractId(null);
       setFormData({
         ...defaults,
-        company_id: effectiveCompany?.id || cotizacion?.company_id || '',
-        lead_id: lead?.id || cotizacion?.lead_id || null,
-        client_id: null,
+        company_id: effectiveCompany?.id || cotizacion?.company_id || client?.company_id || '',
+        lead_id: lead?.id || cotizacion?.lead_id || client?.lead_id || null,
+        client_id: client?.id || null,
         cotizacion_id: cotizacion?.id || null,
         status: 'borrador',
+        meses_gracia: initialMesesGracia !== undefined ? initialMesesGracia : (defaults.meses_gracia ?? 0),
+        fecha_primer_cobro: defaults.fecha_primer_cobro ?? '',
+        notas: defaults.notas ?? '',
       });
       setCurrentContractForShare(null);
     }
-  }, [isOpen, existingContract, cotizacion, lead, company]);
+  }, [isOpen, existingContract, cotizacion, lead, client, company, initialVigenciaMeses, initialMesesGracia, initialFechaInicio]);
+
+  const handleDatesChange = (updates: { fecha_inicio?: string; vigencia_meses?: number; meses_gracia?: number }) => {
+    setFormData(prev => {
+      const nextInicio = updates.fecha_inicio !== undefined ? updates.fecha_inicio : prev.fecha_inicio;
+      const nextVigencia = updates.vigencia_meses !== undefined ? updates.vigencia_meses : prev.vigencia_meses;
+      const nextGracia = updates.meses_gracia !== undefined ? updates.meses_gracia : (prev.meses_gracia || 0);
+
+      const calculated = calculateContractDates(nextInicio, nextVigencia, nextGracia);
+
+      return {
+        ...prev,
+        fecha_inicio: calculated.fechaInicio,
+        fecha_fin: calculated.fechaFin,
+        vigencia_meses: nextVigencia,
+        meses_gracia: nextGracia,
+        fecha_primer_cobro: calculated.fechaPrimerCobro,
+      };
+    });
+  };
 
   if (!isOpen) return null;
 
@@ -429,10 +473,10 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
               {/* Card 2: Condiciones Económicas y Fechas */}
               <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
-                  <DollarSign className="w-4 h-4 text-emerald-600" /> Condiciones Económicas y Vigencia
+                  <DollarSign className="w-4 h-4 text-emerald-600" /> Condiciones Económicas, Go-Live y Vigencia
                 </h3>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="text-[11px] font-bold text-slate-600">Valor Total ($ USD)</label>
                     <input
@@ -460,15 +504,149 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                       className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
                     />
                   </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-600">Vigencia (Meses)</label>
-                    <input
-                      type="number"
-                      value={formData.vigencia_meses}
-                      onChange={(e) => setFormData(prev => ({ ...prev, vigencia_meses: Number(e.target.value) }))}
-                      className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
-                    />
+                </div>
+
+                {/* ── Sub-bloque Go-Live & Vigencia ── */}
+                <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/80 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase text-indigo-900 tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> Fechas de Go-Live y Vigencia Contractual
+                    </span>
+                    <span className="text-[10px] font-bold text-indigo-600 bg-white px-2 py-0.5 rounded-full border border-indigo-100 shadow-2xs">
+                      Control de Vencimiento
+                    </span>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Fecha de Inicio / Go Live */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span>Fecha Inicio (Go-Live)</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.fecha_inicio ? formData.fecha_inicio.substring(0, 10) : ''}
+                        onChange={(e) => handleDatesChange({ fecha_inicio: e.target.value })}
+                        className="mt-1 w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                      <div className="flex gap-1.5 mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleDatesChange({ fecha_inicio: format(new Date(), 'yyyy-MM-dd') })}
+                          className="px-2 py-0.5 text-[10px] font-bold text-indigo-700 bg-white border border-indigo-200 rounded-md hover:bg-indigo-50 cursor-pointer"
+                        >
+                          Hoy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const now = new Date();
+                            const nextMonthFirst = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+                            handleDatesChange({ fecha_inicio: format(nextMonthFirst, 'yyyy-MM-dd') });
+                          }}
+                          className="px-2 py-0.5 text-[10px] font-bold text-indigo-700 bg-white border border-indigo-200 rounded-md hover:bg-indigo-50 cursor-pointer"
+                        >
+                          1° Próx Mes
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Vigencia con botones rápidos */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700">Vigencia del Contrato</label>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <input
+                          type="number"
+                          min={1}
+                          value={formData.vigencia_meses}
+                          onChange={(e) => handleDatesChange({ vigencia_meses: Number(e.target.value) || 1 })}
+                          className="w-16 px-2.5 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-black text-slate-800 text-center"
+                        />
+                        <span className="text-xs font-bold text-slate-500">meses</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {[3, 6, 12, 24].map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => handleDatesChange({ vigencia_meses: m })}
+                            className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                              formData.vigencia_meses === m
+                                ? 'bg-indigo-600 text-white shadow-xs'
+                                : 'bg-white text-indigo-700 border border-indigo-200 hover:bg-indigo-50'
+                            }`}
+                          >
+                            {m}m
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Meses gratis / Gracia */}
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                        <Gift className="w-3 h-3 text-amber-500" /> Meses Gratis (Gracia)
+                      </label>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <input
+                          type="number"
+                          min={0}
+                          value={formData.meses_gracia ?? 0}
+                          onChange={(e) => handleDatesChange({ meses_gracia: Math.max(0, Number(e.target.value) || 0) })}
+                          className="w-16 px-2.5 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-black text-slate-800 text-center"
+                        />
+                        <span className="text-xs font-bold text-slate-500">meses sin cobro</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {[0, 1, 2, 3].map((g) => (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => handleDatesChange({ meses_gracia: g })}
+                            className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                              (formData.meses_gracia ?? 0) === g
+                                ? 'bg-amber-500 text-white shadow-xs'
+                                : 'bg-white text-amber-700 border border-amber-200 hover:bg-amber-50'
+                            }`}
+                          >
+                            {g === 0 ? 'Sin gracia' : `${g}m gratis`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Resumen dinámico de fechas y recordatorio */}
+                  {(() => {
+                    const expInfo = getContractExpirationInfo(formData.fecha_fin);
+                    return (
+                      <div className="bg-white p-3 rounded-xl border border-indigo-100 shadow-2xs space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                            <span className="text-slate-600 font-medium">
+                              Vence el: <strong className="text-slate-900 font-black">{formatContractDate(formData.fecha_fin)}</strong>
+                            </span>
+                          </div>
+                          <span className={`px-2 py-0.5 text-[10px] font-black uppercase rounded-full border ${expInfo.colorClass.badge}`}>
+                            {expInfo.label}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] pt-1.5 border-t border-slate-100 text-slate-500">
+                          <span>
+                            Primer cobro recurrente: <strong className="text-emerald-700 font-bold">{formatContractDate(formData.fecha_primer_cobro || formData.fecha_inicio)}</strong>
+                            {(formData.meses_gracia ?? 0) > 0 && (
+                              <span className="ml-1 text-amber-600 font-bold">({formData.meses_gracia} mes gratis aplicado)</span>
+                            )}
+                          </span>
+                          <span className="font-semibold text-indigo-700">
+                            Duración: {formData.vigencia_meses} meses ({formatContractDate(formData.fecha_inicio)} ➔ {formatContractDate(formData.fecha_fin)})
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -490,6 +668,17 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                       className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600">Notas Internas de Go-Live / Acuerdos Especiales</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: 1 mes de prueba técnica sin cargo, inicio formal de facturación el 1° de diciembre..."
+                    value={formData.notas || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, notas: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
                 </div>
               </div>
 
@@ -603,11 +792,16 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                     <span>{formData.contract_number}</span>
                   </div>
                   <div className="text-[10px] text-slate-500 space-y-0.5">
-                    <p><span className="text-slate-400">Emisión:</span> <strong className="text-slate-700">{formData.fecha_inicio}</strong></p>
+                    <p><span className="text-slate-400">Inicio (Go-Live):</span> <strong className="text-slate-700">{formatContractDate(formData.fecha_inicio)}</strong></p>
                     <p><span className="text-slate-400">Vigencia:</span> <strong className="text-slate-700">{formData.vigencia_meses} meses</strong></p>
-                    <p><span className="text-slate-400">Vence:</span> <strong className="text-slate-700">{formData.fecha_fin}</strong></p>
+                    <p><span className="text-slate-400">Vencimiento:</span> <strong className="text-slate-700">{formatContractDate(formData.fecha_fin)}</strong></p>
+                    {(formData.meses_gracia ?? 0) > 0 && (
+                      <p className="text-amber-700 font-bold bg-amber-50 px-1 py-0.5 rounded">
+                        🎁 {formData.meses_gracia} mes gratis (1er cobro: {formatContractDate(formData.fecha_primer_cobro)})
+                      </p>
+                    )}
                   </div>
-                  <div className="pt-1.5 border-t border-slate-200">
+                  <div className="pt-1.5 border-t border-slate-200 flex flex-col gap-1 items-end">
                     <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
                       existingContract?.status === 'firmado'
                         ? 'bg-emerald-100 text-emerald-800'
@@ -616,6 +810,14 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                       <span className={`w-1.5 h-1.5 rounded-full ${existingContract?.status === 'firmado' ? 'bg-emerald-500 animate-pulse' : 'bg-indigo-500'}`} />
                       {existingContract?.status === 'firmado' ? 'Firmado Digitalmente' : 'Documento Oficial'}
                     </span>
+                    {(() => {
+                      const exp = getContractExpirationInfo(formData.fecha_fin);
+                      return (
+                        <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${exp.colorClass.badge}`}>
+                          {exp.label}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

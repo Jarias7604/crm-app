@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Users, TrendingUp, Clock, CheckCircle2, Search, CalendarCheck, Building2 } from 'lucide-react';
+import { Users, TrendingUp, Clock, CheckCircle2, Search, CalendarCheck, Building2, ShieldCheck, AlertTriangle, AlertCircle } from 'lucide-react';
 import { clientsService, pipelineStagesService } from '../../services/clients';
+import { contractsService } from '../../services/contracts';
 import type { Client, ClientPipelineStage } from '../../types/clients';
+import type { Contract } from '../../types/contracts';
 import OnboardingPipeline from '../../components/clientes/OnboardingPipeline';
 import ClienteDetail from '../../components/clientes/ClienteDetail';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAuth } from '../../auth/AuthProvider';
 import { pagosService } from '../../services/pagos';
 import { useWorkspaceHierarchy } from '../../hooks/useWorkspaceHierarchy';
+import { getContractExpirationInfo, formatContractDate } from '../../utils/contractReminders';
 
 type Tab = 'pipeline' | 'activos';
 
@@ -35,16 +38,18 @@ export default function Clientes() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [clientesCuentas, setClientesCuentas] = useState<Record<string, any>>({});
+  const [contractsMap, setContractsMap] = useState<Record<string, Contract>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const queryCompanyIds = targetCompanyIds.length > 0 ? targetCompanyIds : profile?.company_id;
-      // All 3 queries in parallel
-      const [clientResult, stageResult, cuentasResult] = await Promise.allSettled([
+      // All queries in parallel
+      const [clientResult, stageResult, cuentasResult, contractsResult] = await Promise.allSettled([
         clientsService.getAll({ companyId: queryCompanyIds }),
         pipelineStagesService.getAll(),
-        profile?.company_id ? pagosService.getClientesCuentas(profile.company_id) : Promise.resolve([])
+        profile?.company_id ? pagosService.getClientesCuentas(profile.company_id) : Promise.resolve([]),
+        queryCompanyIds ? contractsService.getByCompany(queryCompanyIds) : Promise.resolve([])
       ]);
       setClients(clientResult.status === 'fulfilled' ? clientResult.value : []);
       setStages(stageResult.status === 'fulfilled' ? stageResult.value : []);
@@ -56,9 +61,19 @@ export default function Clientes() {
         });
         setClientesCuentas(cuentasMap);
       }
+
+      if (contractsResult.status === 'fulfilled') {
+        const cMap: Record<string, Contract> = {};
+        (contractsResult.value as Contract[]).forEach(ct => {
+          if (ct.client_id) cMap[ct.client_id] = ct;
+          if (ct.lead_id && !cMap[ct.lead_id]) cMap[ct.lead_id] = ct;
+        });
+        setContractsMap(cMap);
+      }
     } catch {
       setClients([]);
       setStages([]);
+      setContractsMap({});
     } finally {
       setLoading(false);
     }
@@ -374,6 +389,71 @@ export default function Clientes() {
                       <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-bold flex-shrink-0">
                         <CheckCircle2 className="w-3 h-3" />
                         {docCount} doc{docCount !== 1 ? 's' : ''}
+                      </span>
+                    );
+                  })()}
+
+                  {/* Contract & Expiration Status Badge */}
+                  {(() => {
+                    const contract = contractsMap[client.id] || (client.lead_id ? contractsMap[client.lead_id] : null);
+                    const currentStage = stages.find(s => s.id === client.etapa_actual_id);
+                    const isFinalStage = currentStage?.es_final || false;
+
+                    if (tab === 'pipeline') {
+                      if (isFinalStage) {
+                        if (!contract) {
+                          return (
+                            <span className="flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-300 rounded-full text-[10px] font-black flex-shrink-0 animate-pulse" title="Cliente en Go-Live sin contrato formalizado">
+                              <AlertTriangle className="w-3 h-3 text-amber-600" />
+                              Falta Contrato Go-Live
+                            </span>
+                          );
+                        }
+                        return (
+                          <span className="flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full text-[10px] font-bold flex-shrink-0" title={`Contrato ${contract.contract_number} (${contract.vigencia_meses}m)`}>
+                            <ShieldCheck className="w-3 h-3 text-indigo-600" />
+                            {contract.status === 'firmado' ? 'Contrato Firmado' : 'Contrato Go-Live'}
+                          </span>
+                        );
+                      }
+                      if (contract) {
+                        return (
+                          <span className="flex items-center gap-1 px-2 py-0.5 bg-slate-50 text-slate-600 border border-slate-200 rounded-full text-[10px] font-semibold flex-shrink-0" title={`Contrato ${contract.contract_number}`}>
+                            <ShieldCheck className="w-3 h-3 text-slate-500" />
+                            {contract.contract_number}
+                          </span>
+                        );
+                      }
+                      return null;
+                    }
+
+                    // tab === 'activos'
+                    if (contract) {
+                      const expInfo = getContractExpirationInfo(contract.fecha_fin);
+                      return (
+                        <div className="flex flex-col items-end gap-0.5 flex-shrink-0" title={`Vigencia de ${contract.vigencia_meses} meses (${formatContractDate(contract.fecha_inicio)} al ${formatContractDate(contract.fecha_fin)})`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${expInfo.colorClass.badge}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${expInfo.colorClass.dot}`} />
+                            {expInfo.status === 'expired'
+                              ? 'Vencido'
+                              : expInfo.status === 'urgent'
+                              ? `¡Vence en ${expInfo.daysLeft}d!`
+                              : expInfo.status === 'warning'
+                              ? `Renovar en ${expInfo.daysLeft}d`
+                              : `Vence ${formatContractDate(contract.fecha_fin)}`}
+                          </span>
+                          {(contract.meses_gracia ?? 0) > 0 && (
+                            <span className="text-[9px] font-bold text-amber-600 mr-1">
+                              🎁 {contract.meses_gracia}m gratis
+                            </span>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200 flex-shrink-0">
+                        Sin contrato
                       </span>
                     );
                   })()}
