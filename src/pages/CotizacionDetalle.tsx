@@ -10,6 +10,10 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
 import { invoicesService } from '../services/invoices';
+import { contractsService } from '../services/contracts';
+import type { Contract } from '../types/contracts';
+import { ContractEditorModal } from '../components/contracts/ContractEditorModal';
+import { ContractShareModal } from '../components/contracts/ContractShareModal';
 
 interface FinancingPlan {
     id: string;
@@ -44,6 +48,9 @@ export default function CotizacionDetalle() {
     const [copied, setCopied] = useState(false);
     const [convertedInvoice, setConvertedInvoice] = useState<{ id: string; numero_factura: string } | null>(null);
     const [isConverting, setIsConverting] = useState(false);
+    const [contract, setContract] = useState<Contract | null>(null);
+    const [showContractEditor, setShowContractEditor] = useState(false);
+    const [showContractShare, setShowContractShare] = useState(false);
 
     useEffect(() => {
         fetchCotizacion();
@@ -177,6 +184,16 @@ export default function CotizacionDetalle() {
                 }
             } catch (err) {
                 console.error('Error fetching converted invoice:', err);
+            }
+
+            // Cargar contrato vinculado si existe
+            if (id) {
+                try {
+                    const cotContract = await contractsService.getByCotizacion(id);
+                    setContract(cotContract);
+                } catch (err) {
+                    console.warn('Contrato no encontrado:', err);
+                }
             }
         } catch (error: any) {
             console.error('Error fetching cotizacion:', error);
@@ -411,6 +428,23 @@ export default function CotizacionDetalle() {
                                 <span className="flex items-center gap-0.5 bg-indigo-50 text-[#4449AA] text-[9px] font-black px-1.5 py-0.5 rounded-full">
                                     <Eye className="w-2.5 h-2.5" />
                                     {(cotizacion as any).viewed_count}
+                                </span>
+                            )}
+                        </Button>
+
+                        {/* Botón Contrato de Servicios */}
+                        <Button
+                            variant="default"
+                            onClick={() => setShowContractEditor(true)}
+                            className="h-10 sm:h-12 px-3 sm:px-5 bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-400 font-bold text-[11px] uppercase tracking-widest rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+                        >
+                            <FileText className="w-4 h-4 text-indigo-600" />
+                            <span className="hidden sm:inline">{contract ? 'Contrato' : 'Crear Contrato'}</span>
+                            {contract && (
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                                    contract.status === 'firmado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                    {contract.status === 'firmado' ? 'Firmado' : 'Emitido'}
                                 </span>
                             )}
                         </Button>
@@ -1178,6 +1212,31 @@ export default function CotizacionDetalle() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Modal Editor de Contratos */}
+            {cotizacion && (
+                <ContractEditorModal
+                    isOpen={showContractEditor}
+                    onClose={() => setShowContractEditor(false)}
+                    existingContract={contract}
+                    cotizacion={cotizacion}
+                    lead={(cotizacion as any).lead}
+                    company={(cotizacion as any).company}
+                    creatorName={(cotizacion as any).creator?.full_name}
+                    onSaved={(savedContract) => {
+                        setContract(savedContract);
+                    }}
+                />
+            )}
+
+            {/* Modal Compartir Contrato */}
+            {contract && (
+                <ContractShareModal
+                    contract={contract}
+                    isOpen={showContractShare}
+                    onClose={() => setShowContractShare(false)}
+                />
             )}
 
             {/* Print Styling */}

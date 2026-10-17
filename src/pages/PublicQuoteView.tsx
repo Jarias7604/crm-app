@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { Building2, Package, Download, FileText, CheckCircle2, PencilLine, Mail, Phone, Settings, MessageSquare, CreditCard, Loader2, Shield } from 'lucide-react';
+import { Building2, Package, Download, FileText, CheckCircle2, PencilLine, Mail, Phone, Settings, MessageSquare, CreditCard, Loader2, Shield, ShieldCheck, ExternalLink } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { parseModules, calculateQuoteFinancialsV2, formatUnitLabel, type CotizacionData } from '../utils/quoteUtils';
 import { pdfService } from '../services/pdfService';
+import { contractsService } from '../services/contracts';
+import type { Contract } from '../types/contracts';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -39,6 +41,7 @@ export default function PublicQuoteView() {
     const [isProcessingPayment, setIsProcessingPayment] = useState(false);
     const [paymentStep, setPaymentStep] = useState(0); // 0 = details, 1 = loading, 2 = success
     const [paymentCardName, setPaymentCardName] = useState('');
+    const [contract, setContract] = useState<Contract | null>(null);
 
     const handleStripePayment = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -143,6 +146,16 @@ export default function PublicQuoteView() {
                 // Pre-seleccionar el primer plan (el que pidió el prospecto)
                 if (!financing_plan && comparison_plans[0]?.id) {
                     setClientSelectedPlanId(comparison_plans[0].id);
+                }
+            }
+
+            // Consultar si hay contrato vinculado
+            if (id) {
+                try {
+                    const cotContract = await contractsService.getByCotizacion(id);
+                    setContract(cotContract);
+                } catch {
+                    // Fallback silencioso
                 }
             }
         } catch (error: any) {
@@ -328,6 +341,51 @@ export default function PublicQuoteView() {
                         </div>
                     )}
                 </div>
+
+                {/* ── BANNER CONTRATO DE SERVICIOS ASOCIADO ── */}
+                {contract && (
+                    <div className={`mb-6 p-4 sm:p-5 rounded-3xl border shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all ${
+                        contract.status === 'firmado'
+                            ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200'
+                            : 'bg-gradient-to-r from-indigo-50 to-slate-50 border-indigo-200'
+                    }`}>
+                        <div className="flex items-center gap-3.5">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-white shadow-md ${
+                                contract.status === 'firmado' ? 'bg-emerald-600 shadow-emerald-600/25' : 'bg-indigo-600 shadow-indigo-600/25'
+                            }`}>
+                                <ShieldCheck className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                                    contract.status === 'firmado' ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'
+                                }`}>
+                                    {contract.status === 'firmado' ? '✅ Contrato Formalizado' : '📝 Contrato de Servicios Listo'}
+                                </span>
+                                <h4 className="text-sm font-black text-slate-900 mt-1">
+                                    {contract.title} ({contract.contract_number})
+                                </h4>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    {contract.status === 'firmado'
+                                        ? 'Firmado digitalmente • Validez vinculante'
+                                        : 'Revise las cláusulas y firme electrónicamente con su dedo o ratón'}
+                                </p>
+                            </div>
+                        </div>
+                        <a
+                            href={`/contrato/${contract.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 text-white ${
+                                contract.status === 'firmado'
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20'
+                            }`}
+                        >
+                            <span>{contract.status === 'firmado' ? 'Ver Contrato Firmado' : 'Firmar Contrato Digital'}</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                    </div>
+                )}
 
                 {/* Header Section - App-like Hero */}
                 <div className="bg-[#0f172a] rounded-[2.5rem] p-8 md:p-12 text-white relative overflow-hidden mb-8 shadow-2xl shadow-slate-900/20">

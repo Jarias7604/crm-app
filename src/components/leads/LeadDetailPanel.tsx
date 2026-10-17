@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode, Box } from 'lucide-react';
+import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode, Box, ShieldCheck, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { leadProductsService } from '../../services/leadProducts';
@@ -13,6 +13,11 @@ import { PRIORITY_CONFIG, STATUS_CONFIG, SOURCE_CONFIG, ACTION_TYPES } from '../
 import { useLeadSources } from '../../hooks/useLeadSources';
 import type { Lead, FollowUp, LeadStatus, LeadPriority } from '../../types';
 import { type CallActivity } from '../../services/callActivity';
+import { contractsService } from '../../services/contracts';
+import type { Contract } from '../../types/contracts';
+import { ContractEditorModal } from '../contracts/ContractEditorModal';
+import { ContractShareModal } from '../contracts/ContractShareModal';
+import { contractPdfService } from '../../services/contractPdfService';
 import { QuickActionLogger } from '../QuickCallLogger';
 import toast from 'react-hot-toast';
 
@@ -101,6 +106,12 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const [isFollowUpLoggerOpen, setIsFollowUpLoggerOpen] = useState(false);
     const [isQrModalOpen, setIsQrModalOpen] = useState(false);
     const [customMessage, setCustomMessage] = useState('');
+    const [leadContracts, setLeadContracts] = useState<Contract[]>([]);
+    const [selectedContractForEdit, setSelectedContractForEdit] = useState<Contract | null>(null);
+    const [isContractEditorOpen, setIsContractEditorOpen] = useState(false);
+    const [contractForShare, setContractForShare] = useState<Contract | null>(null);
+    const [isContractShareOpen, setIsContractShareOpen] = useState(false);
+    const [companyInfo, setCompanyInfo] = useState<any>(null);
 
     const getWhatsAppLink = (phone: string) => {
         if (!phone) return '';
@@ -138,14 +149,26 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
         if (!lead) return;
         setIsLoadingDetails(true);
         try {
-            const [followUpsData, messagesData, activitiesData] = await Promise.all([
+            const [followUpsData, messagesData, activitiesData, contractsData] = await Promise.all([
                 leadsService.getFollowUps(lead.id),
                 leadsService.getLeadMessages(lead.id),
                 callActivityService.getLeadCalls(lead.id),
+                contractsService.getByLead(lead.id).catch(() => []),
             ]);
             setFollowUps(followUpsData || []);
             setMessages(messagesData || []);
             setCallActivities(activitiesData || []);
+            setLeadContracts(contractsData || []);
+
+            // Cargar info de empresa si no está
+            if (lead.company_id) {
+                const { data: comp } = await supabase
+                    .from('companies')
+                    .select('id, name, logo_url, website, address, phone, tax_id')
+                    .eq('id', lead.company_id)
+                    .maybeSingle();
+                if (comp) setCompanyInfo(comp);
+            }
         } catch (error) {
             logger.error('Failed to load details', error);
         } finally {
@@ -569,6 +592,122 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 )}
                             </div>
 
+                            {/* ── Contratos de Servicios Profesionales ── */}
+                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-4">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                        <ShieldCheck className="w-4 h-4 text-indigo-600" /> Contratos de Servicios ({leadContracts.length})
+                                    </h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedContractForEdit(null);
+                                            setIsContractEditorOpen(true);
+                                        }}
+                                        className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" /> Nuevo Contrato
+                                    </button>
+                                </div>
+
+                                {leadContracts.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {leadContracts.map((c) => (
+                                            <div
+                                                key={c.id}
+                                                className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-indigo-200 transition-all space-y-2.5"
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-mono font-bold text-indigo-600 bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-2xs">
+                                                                {c.contract_number}
+                                                            </span>
+                                                            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                                                c.status === 'firmado'
+                                                                    ? 'bg-emerald-100 text-emerald-800'
+                                                                    : c.status === 'enviado'
+                                                                    ? 'bg-blue-100 text-blue-800'
+                                                                    : 'bg-amber-100 text-amber-800'
+                                                            }`}>
+                                                                {c.status === 'firmado' ? '✅ Firmado' : c.status === 'enviado' ? '📤 Enviado' : '📝 Borrador'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-xs font-bold text-slate-800 mt-1 line-clamp-1">{c.title}</p>
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Monto: ${c.monto_total?.toLocaleString()} USD • {c.vigencia_meses} meses
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
+                                                    <a
+                                                        href={`/contrato/${c.id}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 text-[11px]"
+                                                    >
+                                                        <ExternalLink className="w-3 h-3" /> Ver Enlace
+                                                    </a>
+
+                                                    <div className="flex items-center gap-1.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setContractForShare(c);
+                                                                setIsContractShareOpen(true);
+                                                            }}
+                                                            className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                                            title="Compartir enlace / WhatsApp"
+                                                        >
+                                                            <Send className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                try {
+                                                                    await contractPdfService.downloadContractPDF(c);
+                                                                    toast.success('PDF descargado');
+                                                                } catch {
+                                                                    toast.error('Error al generar PDF');
+                                                                }
+                                                            }}
+                                                            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                                                            title="Descargar PDF"
+                                                        >
+                                                            <Download className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedContractForEdit(c);
+                                                                setIsContractEditorOpen(true);
+                                                            }}
+                                                            className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg font-bold text-[11px] border border-slate-200 shadow-2xs cursor-pointer"
+                                                        >
+                                                            Editar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-6 px-4 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                                        <p className="text-xs text-slate-500">No hay contratos generados para este prospecto.</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedContractForEdit(null);
+                                                setIsContractEditorOpen(true);
+                                            }}
+                                            className="mt-2 text-xs font-bold text-indigo-600 hover:text-indigo-700 cursor-pointer"
+                                        >
+                                            + Crear Contrato de Servicios
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* ── Call Bot AI Results ───────────────────────────────────────── */}
                             {selectedLead.call_bot_data && Object.keys(selectedLead.call_bot_data as object).length > 0 && (() => {
@@ -896,6 +1035,39 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         onClose={() => setIsManageModalOpen(false)}
                         onProductsChanged={loadProducts}
                     />
+
+                    {/* Contract Modals */}
+                    {isContractEditorOpen && (
+                        <ContractEditorModal
+                            isOpen={isContractEditorOpen}
+                            onClose={() => {
+                                setIsContractEditorOpen(false);
+                                setSelectedContractForEdit(null);
+                            }}
+                            existingContract={selectedContractForEdit}
+                            lead={selectedLead}
+                            company={companyInfo || { id: selectedLead.company_id, name: 'Mi Empresa' }}
+                            creatorName={profile?.full_name}
+                            onSaved={(saved) => {
+                                setLeadContracts(prev => {
+                                    const exists = prev.some(c => c.id === saved.id);
+                                    if (exists) return prev.map(c => c.id === saved.id ? saved : c);
+                                    return [saved, ...prev];
+                                });
+                            }}
+                        />
+                    )}
+
+                    {contractForShare && isContractShareOpen && (
+                        <ContractShareModal
+                            contract={contractForShare}
+                            isOpen={isContractShareOpen}
+                            onClose={() => {
+                                setIsContractShareOpen(false);
+                                setContractForShare(null);
+                            }}
+                        />
+                    )}
                 </div>
             );
 };

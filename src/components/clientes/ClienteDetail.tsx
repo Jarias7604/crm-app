@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone, UserCircle2, DollarSign, ClipboardList, Trash2, AlertTriangle } from 'lucide-react';
+import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone, UserCircle2, DollarSign, ClipboardList, Trash2, AlertTriangle, ShieldCheck, FileText, Download, ExternalLink, Plus } from 'lucide-react';
 import type { Client, ClientPipelineStage, ClientDocument, ClientStageDocumentType } from '../../types/clients';
 import { clientsService, pipelineStagesService } from '../../services/clients';
+import { contractsService } from '../../services/contracts';
+import type { Contract } from '../../types/contracts';
+import { ContractEditorModal } from '../contracts/ContractEditorModal';
+import { ContractShareModal } from '../contracts/ContractShareModal';
+import { contractPdfService } from '../../services/contractPdfService';
 import StageDocumentUpload from './StageDocumentUpload';
 import { notificationsService } from '../../services/notifications';
 import { auditLogService } from '../../services/auditLog';
@@ -32,7 +37,13 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [savingAssign, setSavingAssign] = useState(false);
   const [reverting, setReverting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'pagos'>('pipeline');
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'pagos' | 'contratos'>('pipeline');
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [selectedContractForEdit, setSelectedContractForEdit] = useState<Contract | null>(null);
+  const [isContractEditorOpen, setIsContractEditorOpen] = useState(false);
+  const [contractForShare, setContractForShare] = useState<Contract | null>(null);
+  const [isContractShareOpen, setIsContractShareOpen] = useState(false);
+  const [companyData, setCompanyData] = useState<any>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -51,6 +62,20 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
       // Abrir la etapa actual por defecto
       const idx = s.findIndex(st => st.id === c?.etapa_actual_id);
       setActiveStageIdx(idx >= 0 ? idx : 0);
+
+      // Cargar contratos del cliente/lead
+      if (c) {
+        if (c.lead_id) {
+          contractsService.getByLead(c.lead_id).then(cts => setContracts(cts || [])).catch(() => {});
+        } else {
+          contractsService.getByClient(c.id).then(cts => setContracts(cts || [])).catch(() => {});
+        }
+        if (c.company_id) {
+          supabase.from('companies').select('*').eq('id', c.company_id).maybeSingle().then(({ data }) => {
+            if (data) setCompanyData(data);
+          });
+        }
+      }
     } catch {
       toast.error('Error al cargar cliente');
     } finally {
@@ -379,7 +404,153 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
             <DollarSign className="w-3.5 h-3.5" />
             Pagos
           </button>
+          <button
+            onClick={() => setActiveTab('contratos')}
+            className={`flex items-center gap-1.5 px-5 py-3 text-xs font-black transition-all border-b-2 ${
+              activeTab === 'contratos'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Contratos ({contracts.length})
+          </button>
         </div>
+
+        {/* Contratos Tab */}
+        {activeTab === 'contratos' && client && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div>
+                <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  Contratos de Servicio del Cliente
+                </h4>
+                <p className="text-[11px] text-slate-400">Documentos legales y acuerdos suscritos</p>
+              </div>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedContractForEdit(null);
+                    setIsContractEditorOpen(true);
+                  }}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Nuevo Contrato
+                </button>
+              )}
+            </div>
+
+            {contracts.length > 0 ? (
+              <div className="space-y-3">
+                {contracts.map(c => (
+                  <div
+                    key={c.id}
+                    className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 hover:bg-white hover:border-indigo-200 transition-all space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-2xs">
+                            {c.contract_number}
+                          </span>
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            c.status === 'firmado'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : c.status === 'enviado'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {c.status === 'firmado' ? '✅ Firmado' : c.status === 'enviado' ? '📤 Enviado' : '📝 Borrador'}
+                          </span>
+                        </div>
+                        <h5 className="text-xs font-bold text-slate-900 mt-1">{c.title}</h5>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Valor: <strong>${c.monto_total?.toLocaleString()} USD</strong> • Vigencia: {c.vigencia_meses} meses
+                        </p>
+                        {c.firmado_digitalmente && (
+                          <p className="text-[10px] text-emerald-700 font-semibold mt-1">
+                            Firmado por: {c.firmante_nombre} ({c.firmante_identificacion || 'ID Verificado'}) el {c.firmado_en ? new Date(c.firmado_en).toLocaleDateString() : ''}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
+                      <a
+                        href={`/contrato/${c.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 text-[11px]"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" /> Enlace de Firma
+                      </a>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setContractForShare(c);
+                            setIsContractShareOpen(true);
+                          }}
+                          className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                          title="Enviar por WhatsApp / Email"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await contractPdfService.downloadContractPDF(c);
+                              toast.success('PDF descargado');
+                            } catch {
+                              toast.error('Error al generar PDF');
+                            }
+                          }}
+                          className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                          title="Descargar PDF"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedContractForEdit(c);
+                              setIsContractEditorOpen(true);
+                            }}
+                            className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg font-bold text-[11px] border border-slate-200 shadow-2xs cursor-pointer"
+                          >
+                            Editar
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-xs font-semibold text-slate-600">No hay contratos registrados para este cliente.</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Puedes crear un contrato de servicios formal con un clic.</p>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedContractForEdit(null);
+                      setIsContractEditorOpen(true);
+                    }}
+                    className="mt-3 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer"
+                  >
+                    + Crear Contrato de Servicios
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Pagos Tab */}
         {activeTab === 'pagos' && client && (
@@ -530,6 +701,39 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
           </div>
         )}
       </div>
+
+      {/* Contract Modals */}
+      {isContractEditorOpen && client && (
+        <ContractEditorModal
+          isOpen={isContractEditorOpen}
+          onClose={() => {
+            setIsContractEditorOpen(false);
+            setSelectedContractForEdit(null);
+          }}
+          existingContract={selectedContractForEdit}
+          lead={client.lead_id ? { id: client.lead_id, name: client.nombre, company_name: (client as any).company_name_lead || client.nombre, email: client.email, phone: client.telefono } : null}
+          company={companyData || { id: client.company_id, name: 'Mi Empresa' }}
+          creatorName={currentUser?.user_metadata?.full_name || currentUser?.email}
+          onSaved={(saved) => {
+            setContracts(prev => {
+              const exists = prev.some(c => c.id === saved.id);
+              if (exists) return prev.map(c => c.id === saved.id ? saved : c);
+              return [saved, ...prev];
+            });
+          }}
+        />
+      )}
+
+      {contractForShare && isContractShareOpen && (
+        <ContractShareModal
+          contract={contractForShare}
+          isOpen={isContractShareOpen}
+          onClose={() => {
+            setIsContractShareOpen(false);
+            setContractForShare(null);
+          }}
+        />
+      )}
     </>
   );
 }

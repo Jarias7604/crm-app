@@ -49,6 +49,7 @@ const AgentNetworkMap   = lazy(() => import('./pages/marketing/AgentNetworkMap')
 const MarketingSettings = lazy(() => import('./pages/marketing/MarketingSettings'));
 const ChatHub           = lazy(() => import('./pages/marketing/ChatHub'));
 const PublicQuoteView   = lazy(() => import('./pages/PublicQuoteView'));
+const PublicContractView= lazy(() => import('./pages/public/PublicContractView'));
 const PublicInvoiceView = lazy(() => import('./pages/PublicInvoiceView'));
 const PublicFlyerView   = lazy(() => import('./pages/public/PublicFlyerView'));
 const AuditLog          = lazy(() => import('./pages/admin/AuditLog'));
@@ -325,6 +326,7 @@ function App() {
               {/* Public routes (no auth required) */}
               <Route path="/test-flyer" element={<TestFlyer />} />
               <Route path="/propuesta/:id" element={<PublicQuoteView />} />
+              <Route path="/contrato/:id" element={<PublicContractView />} />
               <Route path="/factura/publica/:id" element={<PublicInvoiceView />} />
               <Route path="/public/flyer/:id" element={<PublicFlyerView />} />
               <Route path="/portal/cliente/:token" element={<ClientPortal />} />
