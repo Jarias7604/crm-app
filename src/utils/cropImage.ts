@@ -20,21 +20,37 @@ export async function getCroppedImg(
     }
 
     // Set canvas size to the cropped size
-    canvas.width = pixelCrop.width
-    canvas.height = pixelCrop.height
+    canvas.width = Math.max(1, Math.round(pixelCrop.width))
+    canvas.height = Math.max(1, Math.round(pixelCrop.height))
 
-    // Draw the cropped image onto the canvas
-    ctx.drawImage(
-        image,
-        pixelCrop.x,
-        pixelCrop.y,
-        pixelCrop.width,
-        pixelCrop.height,
-        0,
-        0,
-        pixelCrop.width,
-        pixelCrop.height
-    )
+    // Clear transparent background
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    // Calculate source and destination coordinates to support negative sx, sy or outside bounds
+    // (when user zooms out smaller than the crop box or adds padding)
+    const sx = Math.max(0, pixelCrop.x)
+    const sy = Math.max(0, pixelCrop.y)
+    const sWidth = Math.max(0, Math.min(image.naturalWidth - sx, pixelCrop.width - (sx - pixelCrop.x)))
+    const sHeight = Math.max(0, Math.min(image.naturalHeight - sy, pixelCrop.height - (sy - pixelCrop.y)))
+
+    const dx = pixelCrop.x < 0 ? -pixelCrop.x : 0
+    const dy = pixelCrop.y < 0 ? -pixelCrop.y : 0
+    const dWidth = sWidth
+    const dHeight = sHeight
+
+    if (dWidth > 0 && dHeight > 0) {
+        ctx.drawImage(
+            image,
+            sx,
+            sy,
+            sWidth,
+            sHeight,
+            dx,
+            dy,
+            dWidth,
+            dHeight
+        )
+    }
 
     // Return as a blob
     return new Promise((resolve) => {

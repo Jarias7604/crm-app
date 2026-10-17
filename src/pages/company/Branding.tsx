@@ -4,7 +4,7 @@ import { brandingService } from '../../services/branding';
 import { storageService } from '../../services/storage';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Building2, Save, Upload, Globe, Image as ImageIcon, CheckCircle2, X, Maximize2, Square, FileText, ChevronDown, Languages } from 'lucide-react';
+import { Building2, Save, Upload, Globe, Image as ImageIcon, CheckCircle2, X, Maximize2, Square, FileText, ChevronDown, Languages, Sparkles, RectangleHorizontal, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Company } from '../../types';
 import Cropper from 'react-easy-crop';
@@ -36,10 +36,12 @@ export default function Branding() {
 
     // Cropping state
     const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+    const [originalFile, setOriginalFile] = useState<File | null>(null);
+    const [naturalAspect, setNaturalAspect] = useState<number>(3);
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
-    const [aspectRatio, setAspectRatio] = useState<number>(1); // Default to square
+    const [aspectRatio, setAspectRatio] = useState<number>(3);
 
     useEffect(() => {
         loadBranding();
@@ -79,11 +81,41 @@ export default function Branding() {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        setOriginalFile(file);
         const reader = new FileReader();
         reader.addEventListener('load', () => {
-            setImageToCrop(reader.result as string);
+            const dataUrl = reader.result as string;
+            const img = new Image();
+            img.onload = () => {
+                const aspect = img.naturalWidth / img.naturalHeight;
+                setNaturalAspect(aspect);
+                // Set default aspect ratio to the image's natural aspect ratio so 100% of wide logos fit immediately
+                setAspectRatio(aspect);
+                setZoom(1);
+                setCrop({ x: 0, y: 0 });
+                setImageToCrop(dataUrl);
+            };
+            img.src = dataUrl;
         });
         reader.readAsDataURL(file);
+    };
+
+    const handleUseOriginal = async () => {
+        if (!originalFile || !company) return;
+
+        try {
+            setUploading(true);
+            const publicUrl = await storageService.uploadLogo(company.id, originalFile);
+            setFormData(prev => ({ ...prev, logo_url: publicUrl }));
+            setImageToCrop(null);
+            setOriginalFile(null);
+            toast.success('Logo original subido exitosamente (sin recorte)');
+        } catch (error) {
+            console.error('Error uploading original logo:', error);
+            toast.error('Error al subir el logo original');
+        } finally {
+            setUploading(false);
+        }
     };
 
     const handleConfirmCrop = async () => {
@@ -99,7 +131,8 @@ export default function Branding() {
 
             const publicUrl = await storageService.uploadLogo(company.id, file);
             setFormData(prev => ({ ...prev, logo_url: publicUrl }));
-            setImageToCrop(null); // Close modal
+            setImageToCrop(null);
+            setOriginalFile(null);
             toast.success('Logo recortado y subido correctamente');
         } catch (error) {
             console.error('Error cropping/uploading:', error);
@@ -447,7 +480,7 @@ export default function Branding() {
                                             </div>
                                         </div>
                                         <div className="relative inline-block">
-                                            <input type="file" accept="image/*" onChange={handleFileSelect} disabled={uploading} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
+                                            <input type="file" accept="image/*" onChange={handleFileSelect} onClick={(e) => { (e.target as HTMLInputElement).value = ''; }} disabled={uploading} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" />
                                             <Button type="button" variant="outline" disabled={uploading} className="rounded-xl border-gray-300 hover:border-blue-500 hover:text-blue-600 bg-white shadow-sm font-black text-xs h-10 px-6 relative z-10 transition-all">
                                                 <Upload className="w-4 h-4 mr-2" />
                                                 {uploading ? 'Cargando...' : 'Seleccionar Nuevo Logo'}
@@ -584,87 +617,174 @@ export default function Branding() {
 
             {/* Cropping Modal */}
             {imageToCrop && createPortal(
-                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 md:p-10">
-                    <div className="absolute inset-0 bg-[#0f172a]/95 backdrop-blur-xl animate-in fade-in duration-500" onClick={() => setImageToCrop(null)} />
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 md:p-8">
+                    <div className="absolute inset-0 bg-[#0f172a]/95 backdrop-blur-xl animate-in fade-in duration-300" onClick={() => { setImageToCrop(null); setOriginalFile(null); }} />
 
-                    <div className="relative bg-white w-full max-w-4xl rounded-[3rem] overflow-hidden shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-10 duration-500 border border-white/20">
-                        <div className="grid grid-cols-1 lg:grid-cols-12 h-content lg:h-[700px]">
-                            {/* Left: Settings */}
-                            <div className="lg:col-span-4 p-10 bg-gray-50 flex flex-col justify-between border-r border-gray-100">
-                                <div className="space-y-10">
+                    <div className="relative bg-white w-full max-w-5xl rounded-[2.5rem] overflow-hidden shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-6 duration-300 border border-white/20">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[580px] lg:h-[640px]">
+                            {/* Left: Controls & Settings */}
+                            <div className="lg:col-span-5 p-6 md:p-8 bg-gray-50 flex flex-col justify-between border-r border-gray-100 overflow-y-auto">
+                                <div className="space-y-6">
                                     <div>
-                                        <h3 className="text-3xl font-black text-[#0f172a] tracking-tight">Editar Logo</h3>
-                                        <p className="text-xs text-gray-400 font-bold uppercase tracking-[0.2em] mt-3">Ajustes de proporción y zoom</p>
+                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-wider mb-2">
+                                            <Sparkles className="w-3.5 h-3.5" />
+                                            Ajuste Inteligente
+                                        </div>
+                                        <h3 className="text-2xl font-black text-[#0f172a] tracking-tight">Editar Logo</h3>
+                                        <p className="text-xs text-gray-500 font-medium mt-1">Ajusta el encuadre o usa el archivo original completo sin recorte.</p>
                                     </div>
 
-                                    <div className="space-y-6">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Proporción de Corte</label>
-                                        <div className="grid grid-cols-2 gap-3">
+                                    {/* Aspect Ratio Options */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Proporción de Corte</label>
+                                            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                                                {Math.abs(aspectRatio - naturalAspect) < 0.05 ? 'Completo' : aspectRatio >= 4 ? 'Panorámico (4:1)' : aspectRatio >= 2.5 ? 'Horizontal (3:1)' : 'Cuadrado (1:1)'}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
                                             <button
-                                                onClick={() => setAspectRatio(1)}
-                                                className={`flex flex-col items-center gap-3 p-5 rounded-3xl border-2 transition-all ${aspectRatio === 1 ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-lg shadow-blue-500/10' : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300'}`}
+                                                type="button"
+                                                onClick={() => setAspectRatio(naturalAspect)}
+                                                className={`flex items-center gap-2.5 p-3 rounded-2xl border-2 transition-all text-left ${Math.abs(aspectRatio - naturalAspect) < 0.05 ? 'border-blue-600 bg-blue-50/80 text-blue-600 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
                                             >
-                                                <Square className="w-8 h-8" />
-                                                <span className="text-[10px] font-black uppercase tracking-widest">Cuadrado</span>
+                                                <Sparkles className="w-5 h-5 shrink-0 text-blue-600" />
+                                                <div>
+                                                    <div className="text-[11px] font-black uppercase leading-tight">Completo</div>
+                                                    <div className="text-[9px] font-medium text-gray-400">Todo el logo</div>
+                                                </div>
                                             </button>
+
                                             <button
-                                                onClick={() => setAspectRatio(3 / 1)}
-                                                className={`flex flex-col items-center gap-3 p-5 rounded-3xl border-2 transition-all ${aspectRatio === 3 / 1 ? 'border-blue-600 bg-blue-50 text-blue-600 shadow-lg shadow-blue-500/10' : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300'}`}
+                                                type="button"
+                                                onClick={() => setAspectRatio(4 / 1)}
+                                                className={`flex items-center gap-2.5 p-3 rounded-2xl border-2 transition-all text-left ${Math.abs(aspectRatio - 4) < 0.05 ? 'border-blue-600 bg-blue-50/80 text-blue-600 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
                                             >
-                                                <Maximize2 className="w-8 h-8" />
-                                                <span className="text-[10px] font-black uppercase tracking-widest">Horizontal</span>
+                                                <RectangleHorizontal className="w-5 h-5 shrink-0 text-slate-600" />
+                                                <div>
+                                                    <div className="text-[11px] font-black uppercase leading-tight">Panorámico</div>
+                                                    <div className="text-[9px] font-medium text-gray-400">4:1 Ancho</div>
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setAspectRatio(3 / 1)}
+                                                className={`flex items-center gap-2.5 p-3 rounded-2xl border-2 transition-all text-left ${Math.abs(aspectRatio - 3) < 0.05 ? 'border-blue-600 bg-blue-50/80 text-blue-600 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+                                            >
+                                                <Maximize2 className="w-5 h-5 shrink-0 text-slate-600" />
+                                                <div>
+                                                    <div className="text-[11px] font-black uppercase leading-tight">Horizontal</div>
+                                                    <div className="text-[9px] font-medium text-gray-400">3:1 Estándar</div>
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => setAspectRatio(1)}
+                                                className={`flex items-center gap-2.5 p-3 rounded-2xl border-2 transition-all text-left ${Math.abs(aspectRatio - 1) < 0.05 ? 'border-blue-600 bg-blue-50/80 text-blue-600 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+                                            >
+                                                <Square className="w-5 h-5 shrink-0 text-slate-600" />
+                                                <div>
+                                                    <div className="text-[11px] font-black uppercase leading-tight">Cuadrado</div>
+                                                    <div className="text-[9px] font-medium text-gray-400">1:1 Ícono</div>
+                                                </div>
                                             </button>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-6">
+                                    {/* Zoom Slider */}
+                                    <div className="space-y-3 bg-white p-4 rounded-2xl border border-gray-200/80 shadow-sm">
                                         <div className="flex justify-between items-center">
                                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nivel de Zoom</label>
-                                            <span className="text-xs font-black text-blue-600">{(zoom * 100).toFixed(0)}%</span>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setZoom(1)}
+                                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 hover:text-blue-600 bg-gray-100 hover:bg-blue-50 px-2 py-0.5 rounded-lg transition-colors"
+                                                    title="Restablecer al 100%"
+                                                >
+                                                    <RotateCcw className="w-3 h-3" />
+                                                    Reset
+                                                </button>
+                                                <span className="text-xs font-black text-blue-600 min-w-[42px] text-right">{(zoom * 100).toFixed(0)}%</span>
+                                            </div>
                                         </div>
                                         <input
                                             type="range"
                                             value={zoom}
-                                            min={1}
+                                            min={0.5}
                                             max={3}
-                                            step={0.1}
+                                            step={0.05}
                                             onChange={(e) => setZoom(Number(e.target.value))}
-                                            className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer accent-blue-600 ring-4 ring-gray-100"
+                                            className="w-full h-2 bg-gray-200 rounded-full appearance-none cursor-pointer accent-blue-600"
                                         />
+                                        <div className="flex justify-between text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                                            <span>50% (Alejar)</span>
+                                            <span>Ajuste libre</span>
+                                            <span>300% (Acercar)</span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col gap-3 pt-10">
+                                {/* Action Buttons */}
+                                <div className="flex flex-col gap-2.5 pt-6 mt-4 border-t border-gray-200/60">
                                     <Button
-                                        onClick={handleConfirmCrop}
+                                        type="button"
+                                        onClick={handleUseOriginal}
                                         disabled={uploading}
-                                        className="w-full h-16 rounded-2xl bg-[#0f172a] hover:bg-black text-white font-black shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 text-lg"
+                                        className="w-full h-12 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black shadow-lg shadow-blue-500/25 transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
                                     >
                                         {uploading ? (
-                                            <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                                         ) : (
                                             <>
-                                                <CheckCircle2 className="w-5 h-5" />
-                                                Confirmar Logo
+                                                <Sparkles className="w-4 h-4 text-blue-200" />
+                                                Usar Logo Completo (Sin Recortar)
                                             </>
                                         )}
                                     </Button>
+
+                                    <Button
+                                        type="button"
+                                        onClick={handleConfirmCrop}
+                                        disabled={uploading}
+                                        className="w-full h-12 rounded-2xl bg-[#0f172a] hover:bg-black text-white font-black shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-2 text-sm"
+                                    >
+                                        {uploading ? (
+                                            <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <>
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                                Confirmar Recorte Seleccionado
+                                            </>
+                                        )}
+                                    </Button>
+
                                     <button
-                                        onClick={() => setImageToCrop(null)}
-                                        className="w-full h-12 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-red-500 transition-colors"
+                                        type="button"
+                                        onClick={() => {
+                                            setImageToCrop(null);
+                                            setOriginalFile(null);
+                                        }}
+                                        className="w-full h-8 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-red-500 transition-colors"
                                     >
                                         Descartar cambios
                                     </button>
                                 </div>
                             </div>
 
-                            {/* Right: Cropper */}
-                            <div className="lg:col-span-8 relative bg-[#0a0a0a] overflow-hidden">
+                            {/* Right: Cropper Preview Area */}
+                            <div className="lg:col-span-7 relative bg-[#0a0a0a] overflow-hidden min-h-[350px]">
                                 <button
-                                    onClick={() => setImageToCrop(null)}
-                                    className="absolute top-8 right-8 z-[10001] w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white transition-all active:scale-90"
+                                    type="button"
+                                    onClick={() => {
+                                        setImageToCrop(null);
+                                        setOriginalFile(null);
+                                    }}
+                                    className="absolute top-5 right-5 z-[10001] w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white transition-all active:scale-90"
                                 >
-                                    <X className="w-6 h-6" />
+                                    <X className="w-5 h-5" />
                                 </button>
 
                                 <Cropper
@@ -672,6 +792,9 @@ export default function Branding() {
                                     crop={crop}
                                     zoom={zoom}
                                     aspect={aspectRatio}
+                                    minZoom={0.5}
+                                    maxZoom={3}
+                                    restrictPosition={false}
                                     onCropChange={setCrop}
                                     onZoomChange={setZoom}
                                     onCropComplete={onCropComplete}
@@ -679,13 +802,13 @@ export default function Branding() {
                                     showGrid={true}
                                     style={{
                                         containerStyle: { background: '#0a0a0a' },
-                                        cropAreaStyle: { border: '2px solid rgba(255,255,255,0.7)', boxShadow: '0 0 0 9999px rgba(0,0,0,0.8)' }
+                                        cropAreaStyle: { border: '2px solid rgba(255,255,255,0.85)', boxShadow: '0 0 0 9999px rgba(0,0,0,0.85)' }
                                     }}
                                 />
 
-                                <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-[10001] bg-white/10 backdrop-blur-xl px-6 py-3 rounded-full border border-white/10">
-                                    <p className="text-[10px] text-white/70 font-black uppercase tracking-widest text-center">
-                                        Arrastra el logotipo para centrarlo correctamente
+                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[10001] bg-black/70 backdrop-blur-xl px-5 py-2 rounded-full border border-white/15 pointer-events-none shadow-xl">
+                                    <p className="text-[10px] text-white/90 font-bold uppercase tracking-wider text-center whitespace-nowrap">
+                                        Arrastra para centrar • Zoom libre de 50% a 300%
                                     </p>
                                 </div>
                             </div>
