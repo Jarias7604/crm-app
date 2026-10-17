@@ -4,6 +4,8 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { leadProductsService } from '../../services/leadProducts';
 import { ManageProductsModal } from './ManageProductsModal';
+import { ManageLeadSourcesModal } from './ManageLeadSourcesModal';
+import { ManageIndustriesModal } from './ManageIndustriesModal';
 import type { LeadProduct } from '../../types';
 import { supabase } from '../../services/supabase';
 import { leadsService } from '../../services/leads';
@@ -39,6 +41,7 @@ interface LeadDetailPanelProps {
     storageService: any;
 
     industries: any[];
+    onIndustriesChanged?: () => void;
     handleFileDownload: (e: any) => Promise<void>;
     handleFileDelete: (e: any) => Promise<void>;
     handleFileUpload: (e: any) => Promise<void>;
@@ -67,7 +70,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     isAdmin,
     navigate,
     storageService,
-    industries, handleFileDownload, handleFileDelete, handleFileUpload, isUploading, isCallLoggerOpen, setIsCallLoggerOpen, callStartedAt, setCallStartedAt, handleUpdateLead, handleDeleteLead, StatusBadge, PriorityBadge
+    industries, onIndustriesChanged, handleFileDownload, handleFileDelete, handleFileUpload, isUploading, isCallLoggerOpen, setIsCallLoggerOpen, callStartedAt, setCallStartedAt, handleUpdateLead, handleDeleteLead, StatusBadge, PriorityBadge
 }) => {
     const [followUps, setFollowUps] = useState<FollowUp[]>([]);
     const [messages, setMessages] = useState<any[]>([]);
@@ -97,9 +100,11 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const [activeTab, setActiveTab] = useState<'activity' | 'info' | 'quotes'>('activity');
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+    const [isManageSourcesOpen, setIsManageSourcesOpen] = useState(false);
+    const [isManageIndustriesOpen, setIsManageIndustriesOpen] = useState(false);
 
     // Dynamic lead sources from DB
-    const { options: sourceOptions } = useLeadSources();
+    const { options: sourceOptions, reload: reloadSources } = useLeadSources();
 
     // Dialog states
     const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
@@ -447,30 +452,71 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         )}
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Fuente de Origen</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center justify-between">
+                                            <span>Fuente de Origen</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsManageSourcesOpen(true)}
+                                                className="text-indigo-600 hover:text-indigo-800 font-bold text-[9px] lowercase tracking-wide cursor-pointer font-black"
+                                            >
+                                                + gestionar
+                                            </button>
+                                        </label>
                                         <div className="relative">
                                             <CustomSelect
                                                 value={selectedLead.source || ''}
                                                 onChange={(val) => handleUpdateLead({ source: val || null })}
-                                                options={[
-                                                    { value: '', label: 'Sin especificar' },
-                                                    ...sourceOptions.map(opt => ({ value: opt.value, label: opt.label, icon: opt.icon }))
-                                                ]}
+                                                options={(() => {
+                                                    const list = [
+                                                        { value: '', label: 'Sin especificar' },
+                                                        ...sourceOptions.map(opt => ({ value: opt.value, label: opt.label, icon: opt.icon }))
+                                                    ];
+                                                    // Ensure current lead source is present even if legacy string
+                                                    if (selectedLead.source && !list.some(o => o.value === selectedLead.source || (typeof o.label === 'string' && o.label.toLowerCase() === selectedLead.source?.toLowerCase()))) {
+                                                        list.push({
+                                                            value: selectedLead.source,
+                                                            label: selectedLead.source,
+                                                            icon: '📋'
+                                                        });
+                                                    }
+                                                    return list;
+                                                })()}
                                                 placeholder="Sin especificar"
+                                                searchable={true}
                                             />
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Rubro / Industria</label>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center justify-between">
+                                            <span>Rubro / Industria</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsManageIndustriesOpen(true)}
+                                                className="text-indigo-600 hover:text-indigo-800 font-bold text-[9px] lowercase tracking-wide cursor-pointer font-black"
+                                            >
+                                                + gestionar
+                                            </button>
+                                        </label>
                                         <div className="relative">
                                             <CustomSelect
                                                 value={selectedLead.industry || ''}
                                                 onChange={(val) => handleUpdateLead({ industry: val || null })}
-                                                options={[
-                                                    { value: '', label: 'Sin especificar' },
-                                                    ...industries.map(ind => ({ value: ind.name, label: ind.name }))
-                                                ]}
+                                                options={(() => {
+                                                    const list = [
+                                                        { value: '', label: 'Sin especificar', icon: '🏢' },
+                                                        ...industries.map(ind => ({ value: ind.name, label: ind.name, icon: '🏢' }))
+                                                    ];
+                                                    if (selectedLead.industry && !list.some(o => o.value === selectedLead.industry || (typeof o.label === 'string' && o.label.toLowerCase() === selectedLead.industry?.toLowerCase()))) {
+                                                        list.push({
+                                                            value: selectedLead.industry,
+                                                            label: selectedLead.industry,
+                                                            icon: '🏢'
+                                                        });
+                                                    }
+                                                    return list;
+                                                })()}
                                                 placeholder="Sin especificar"
+                                                searchable={true}
                                             />
                                         </div>
                                     </div>
@@ -1157,6 +1203,16 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         isOpen={isManageModalOpen}
                         onClose={() => setIsManageModalOpen(false)}
                         onProductsChanged={loadProducts}
+                    />
+                    <ManageLeadSourcesModal
+                        isOpen={isManageSourcesOpen}
+                        onClose={() => setIsManageSourcesOpen(false)}
+                        onSourcesChanged={reloadSources}
+                    />
+                    <ManageIndustriesModal
+                        isOpen={isManageIndustriesOpen}
+                        onClose={() => setIsManageIndustriesOpen(false)}
+                        onIndustriesChanged={onIndustriesChanged}
                     />
 
                     {/* Modal de Advertencia: No hay cotizaciones para el contrato */}

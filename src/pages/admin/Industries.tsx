@@ -17,16 +17,22 @@ export default function Industries({ defaultTab = 'industries' }: IndustriesProp
     const { profile } = useAuth();
     const location = useLocation();
 
-    // Determinar tab inicial por prop o query param ?tab=sources
-    const initialTab = useMemo(() => {
+    // Determinar tab inicial por prop o query param ?tab=sources o por la ruta actual
+    const resolveTab = (): 'industries' | 'sources' => {
+        if (location.pathname.includes('lead-sources')) return 'sources';
         const params = new URLSearchParams(location.search);
         const queryTab = params.get('tab');
         if (queryTab === 'sources' || queryTab === 'origenes') return 'sources';
         if (queryTab === 'industries' || queryTab === 'rubros') return 'industries';
         return defaultTab;
-    }, [location.search, defaultTab]);
+    };
 
-    const [activeTab, setActiveTab] = useState<'industries' | 'sources'>(initialTab);
+    const [activeTab, setActiveTab] = useState<'industries' | 'sources'>(resolveTab);
+
+    // Sincronizar automáticamente cuando cambie la ruta entre /industries y /lead-sources
+    useEffect(() => {
+        setActiveTab(resolveTab());
+    }, [location.pathname, location.search, defaultTab]);
 
     // ── Estado Rubros / Industrias ──
     const [industries, setIndustries] = useState<Industry[]>([]);

@@ -2081,6 +2081,7 @@ export default function Leads() {
                 navigate={navigate}
                 storageService={storageService}
                 industries={industries}
+                onIndustriesChanged={loadIndustries}
                 handleFileDownload={handleFileDownload}
                 handleFileDelete={handleFileDelete}
                 handleFileUpload={handleFileUpload}

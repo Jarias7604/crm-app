@@ -241,8 +241,8 @@ function App() {
                     <Route path="/items" element={<Navigate to="/catalogo" replace />} />
                     <Route path="/financial-rules" element={<FinancialRules />} />
                     <Route path="/loss-reasons" element={<LossReasons />} />
-                    <Route path="/industries" element={<Industries defaultTab="industries" />} />
-                    <Route path="/lead-sources" element={<Industries defaultTab="sources" />} />
+                    <Route path="/industries" element={<Industries key="industries" defaultTab="industries" />} />
+                    <Route path="/lead-sources" element={<Industries key="sources" defaultTab="sources" />} />
                     <Route path="/admin/pipeline" element={<PipelineConfig />} />
                     <Route path="/admin/call-bot" element={<CallBot />} />
                   </Route>
