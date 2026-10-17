@@ -372,60 +372,60 @@ export default function CotizacionDetalle() {
             {/* Action Bar - Immersive, Edge-to-Edge, Zero Gaps */}
             <div className="sticky top-0 z-40 bg-white border-b border-gray-200 w-full transition-all overflow-hidden shadow-sm">
                 <div className="h-16 sm:h-20 px-4 sm:px-12 flex justify-between items-center w-full">
-                    <div className="flex items-center gap-2 sm:gap-6">
+                    <div className="flex items-center gap-2 sm:gap-4">
                         <Button
                             variant="ghost"
                             onClick={() => navigate('/cotizaciones')}
-                            className="text-gray-400 hover:text-gray-900 group flex items-center gap-1 sm:gap-2 px-0 hover:bg-transparent"
+                            className="h-9 sm:h-10 px-2.5 sm:px-3 text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all group"
                         >
-                            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                            <span className="text-sm font-bold uppercase tracking-widest hidden sm:inline">Volver</span>
+                            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform text-slate-500" />
+                            <span className="hidden sm:inline">Volver</span>
                         </Button>
 
-                        <div className="h-8 w-px bg-gray-100 hidden sm:block"></div>
+                        <div className="h-6 w-px bg-slate-200 hidden sm:block"></div>
 
                         <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] leading-none mb-1">ID Propuesta</span>
+                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Propuesta</span>
                             <div className="flex items-center gap-1.5">
-                                <span className="text-sm sm:text-base font-black text-slate-900 leading-none">#{cotizacion.id.slice(0, 8).toUpperCase()}</span>
-                                <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[9px] font-black text-blue-600 uppercase tracking-tighter">Oficial</span>
+                                <span className="text-xs sm:text-sm font-black text-slate-900 leading-none">#{cotizacion.id.slice(0, 8).toUpperCase()}</span>
+                                <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[9px] font-bold text-blue-600 uppercase tracking-tight">Oficial</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-4">
+                    <div className="flex items-center gap-2 sm:gap-2.5">
                         <Button
                             variant="default"
                             onClick={handleDownloadPDF}
                             disabled={isGeneratingPDF}
                             className={`
-                                h-10 sm:h-12 px-3 sm:px-8 rounded-xl transition-all duration-300
-                                bg-[#4449AA] hover:bg-[#383d8f] text-white shadow-lg shadow-[#4449AA]/20
-                                font-black text-[11px] uppercase tracking-widest
+                                h-9 sm:h-10 px-3.5 sm:px-4 rounded-xl transition-all duration-200
+                                bg-[#4449AA] hover:bg-[#383d8f] text-white shadow-sm hover:shadow
+                                font-semibold text-xs tracking-normal flex items-center gap-2
                             `}
                         >
                             {isGeneratingPDF ? (
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <>
+                                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     <span className="hidden sm:inline">Generando...</span>
-                                </div>
+                                </>
                             ) : (
-                                <div className="flex items-center gap-2">
-                                    <Download className="w-4 h-4" />
+                                <>
+                                    <Download className="w-3.5 h-3.5" />
                                     <span className="hidden sm:inline">Descargar PDF</span>
-                                </div>
+                                </>
                             )}
                         </Button>
 
                         <Button
                             variant="default"
                             onClick={() => setShowShareModal(true)}
-                            className="h-10 sm:h-12 px-3 sm:px-5 bg-white border border-gray-200 text-slate-800 hover:bg-gray-50 hover:border-[#4449AA]/30 font-bold text-[11px] uppercase tracking-widest rounded-xl shadow-sm flex items-center gap-2 transition-all"
+                            className="h-9 sm:h-10 px-3 sm:px-3.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all"
                         >
-                            <Share2 className="w-4 h-4 text-[#4449AA]" />
+                            <Share2 className="w-3.5 h-3.5 text-[#4449AA]" />
                             <span className="hidden sm:inline">Compartir</span>
                             {((cotizacion as any).viewed_count || 0) > 0 && (
-                                <span className="flex items-center gap-0.5 bg-indigo-50 text-[#4449AA] text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                                <span className="flex items-center gap-0.5 bg-indigo-50 text-[#4449AA] text-[9px] font-bold px-1.5 py-0.5 rounded-full">
                                     <Eye className="w-2.5 h-2.5" />
                                     {(cotizacion as any).viewed_count}
                                 </span>
@@ -436,12 +436,12 @@ export default function CotizacionDetalle() {
                         <Button
                             variant="default"
                             onClick={() => setShowContractEditor(true)}
-                            className="h-10 sm:h-12 px-3 sm:px-5 bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-400 font-bold text-[11px] uppercase tracking-widest rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+                            className="h-9 sm:h-10 px-3 sm:px-3.5 bg-white border border-indigo-200 hover:border-indigo-300 text-indigo-700 hover:bg-indigo-50/70 font-semibold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
                         >
-                            <FileText className="w-4 h-4 text-indigo-600" />
+                            <FileText className="w-3.5 h-3.5 text-indigo-600" />
                             <span className="hidden sm:inline">{contract ? 'Contrato' : 'Crear Contrato'}</span>
                             {contract && (
-                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
                                     contract.status === 'firmado' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                                 }`}>
                                     {contract.status === 'firmado' ? 'Firmado' : 'Emitido'}
@@ -455,16 +455,16 @@ export default function CotizacionDetalle() {
                                 variant="default"
                                 onClick={handleAceptarPropuesta}
                                 disabled={isAccepting}
-                                className="h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-lg shadow-emerald-600/20 hidden md:flex items-center gap-2"
+                                className="h-9 sm:h-10 px-3.5 sm:px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm hidden md:flex items-center gap-1.5 transition-all"
                             >
                                 {isAccepting ? (
                                     <>
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                         <span>Procesando...</span>
                                     </>
                                 ) : (
                                     <>
-                                        <CheckCircle2 className="w-4 h-4" />
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
                                         <span>Aceptar</span>
                                     </>
                                 )}
@@ -472,13 +472,13 @@ export default function CotizacionDetalle() {
                         ) : (
                             <>
                                 {/* Mobile: compact circle icon only */}
-                                <div className="md:hidden w-10 h-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center border border-green-200 flex-shrink-0">
-                                    <CheckCircle2 className="w-5 h-5" />
+                                <div className="md:hidden w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200 flex-shrink-0">
+                                    <CheckCircle2 className="w-4 h-4" />
                                 </div>
                                 {/* Desktop: full badge with text */}
-                                <div className="hidden md:flex h-12 px-6 items-center gap-2 bg-green-50 text-green-600 font-black text-[11px] uppercase tracking-widest rounded-xl border border-green-200">
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    Aceptada
+                                <div className="hidden md:flex h-9 sm:h-10 px-3 sm:px-3.5 items-center gap-1.5 bg-emerald-50 text-emerald-700 font-semibold text-xs rounded-xl border border-emerald-200/80">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Aceptada</span>
                                 </div>
                             </>
                         )}
@@ -488,9 +488,9 @@ export default function CotizacionDetalle() {
                                 <Button
                                     variant="default"
                                     onClick={() => navigate(`/facturas/${convertedInvoice.id}`)}
-                                    className="h-12 px-6 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-lg shadow-blue-500/20 flex items-center gap-2"
+                                    className="h-9 sm:h-10 px-3.5 sm:px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all"
                                 >
-                                    <Receipt className="w-4 h-4" />
+                                    <Receipt className="w-3.5 h-3.5" />
                                     <span>Ver Factura ({convertedInvoice.numero_factura})</span>
                                 </Button>
                             ) : (
@@ -498,16 +498,16 @@ export default function CotizacionDetalle() {
                                     variant="default"
                                     onClick={handleConvertToInvoice}
                                     disabled={isConverting}
-                                    className="h-12 px-6 bg-[#3b82f6] hover:bg-[#2563eb] text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-lg shadow-blue-500/20 flex items-center gap-2"
+                                    className="h-9 sm:h-10 px-3.5 sm:px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm flex items-center gap-1.5 transition-all"
                                 >
                                     {isConverting ? (
                                         <>
-                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                             <span>Convirtiendo...</span>
                                         </>
                                     ) : (
                                         <>
-                                            <Receipt className="w-4 h-4" />
+                                            <Receipt className="w-3.5 h-3.5" />
                                             <span>Convertir a Factura</span>
                                         </>
                                     )}
@@ -515,15 +515,16 @@ export default function CotizacionDetalle() {
                             )
                         )}
 
-                        <div className="h-8 w-px bg-gray-100 hidden md:block mx-1"></div>
+                        <div className="h-6 w-px bg-slate-200 hidden md:block mx-0.5"></div>
 
                         {/* Delete: hidden on mobile to prevent overflow */}
                         <Button
                             variant="ghost"
                             onClick={handleDelete}
-                            className="hidden md:flex h-12 w-12 p-0 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                            className="hidden md:flex h-9 sm:h-10 w-9 sm:w-10 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors items-center justify-center"
+                            title="Eliminar propuesta"
                         >
-                            <Trash2 className="w-5 h-5" />
+                            <Trash2 className="w-4 h-4" />
                         </Button>
                     </div>
                 </div>

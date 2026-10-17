@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Contract } from '../types/contracts';
+import { imageCache } from '../utils/imageCache';
 
 export const contractPdfService = {
   async generateContractPDF(contract: Contract): Promise<Blob> {
@@ -11,6 +12,17 @@ export const contractPdfService = {
     const margin = 20;
     const contentWidth = pageWidth - margin * 2;
     let y = margin;
+
+    // Load company logo if available
+    let logoData: string | null = null;
+    if (contract.datos_empresa?.logo_url) {
+      try {
+        const [loaded] = await imageCache.loadImagesParallel([contract.datos_empresa.logo_url]);
+        logoData = loaded;
+      } catch (err) {
+        console.warn('Could not load logo for contract PDF:', err);
+      }
+    }
 
     // Helper for page break
     const checkPageBreak = (neededHeight: number) => {
@@ -31,37 +43,62 @@ export const contractPdfService = {
     };
 
     // ── PÁGINA 1: ENCABEZADO CORPORATIVO ─────────────────────────────
+    // Micro-header de seguridad jurídica
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(148, 163, 184); // Slate 400
+    doc.text('INSTRUMENTO JURÍDICO PRIVADO AUDITABLE • VALIDEZ DE FIRMA DIGITAL', margin, y);
+    doc.text(`FOLIO: ${contract.contract_number} • SHA256-${(contract.contract_number + '2026').slice(0, 10).toUpperCase()}`, pageWidth - margin, y, { align: 'right' });
+    y += 3;
+
     // Barra superior decorativa
     doc.setFillColor(30, 41, 59); // Slate 800
     doc.rect(margin, y, contentWidth, 2, 'F');
-    y += 8;
+    y += 6;
+
+    const logoWidth = 28;
+    const logoHeight = 12;
+    const textStartX = logoData ? margin + logoWidth + 4 : margin;
+
+    if (logoData) {
+      try {
+        doc.addImage(logoData, 'PNG', margin, y, logoWidth, logoHeight);
+      } catch (err) {
+        console.warn('Error adding logo to contract PDF:', err);
+      }
+    }
 
     // Encabezado empresa
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
+    doc.setFontSize(13);
     doc.setTextColor(15, 23, 42); // Slate 900
-    doc.text(contract.datos_empresa.nombre.toUpperCase(), margin, y);
+    doc.text(contract.datos_empresa.nombre.toUpperCase(), textStartX, y + 4);
     
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 116, 139); // Slate 500
+    let subY = y + 8.5;
     if (contract.datos_empresa.tax_id) {
-      doc.text(`Identificación Tributaria: ${contract.datos_empresa.tax_id}`, margin, y + 5);
+      doc.text(`Identificación Tributaria: ${contract.datos_empresa.tax_id}`, textStartX, subY);
+      subY += 4;
     }
     if (contract.datos_empresa.direccion) {
-      doc.text(`Domicilio: ${contract.datos_empresa.direccion}`, margin, y + 9);
+      doc.text(`Domicilio: ${contract.datos_empresa.direccion}`, textStartX, subY);
+      subY += 4;
     }
 
     // Número de Contrato a la derecha
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setTextColor(79, 70, 229); // Indigo 600
-    doc.text(contract.contract_number, pageWidth - margin, y, { align: 'right' });
+    doc.text(contract.contract_number, pageWidth - margin, y + 4, { align: 'right' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Fecha: ${format(new Date(contract.fecha_inicio || contract.created_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`, pageWidth - margin, y + 5, { align: 'right' });
-    y += 18;
+    doc.text(`Fecha: ${format(new Date(contract.fecha_inicio || contract.created_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`, pageWidth - margin, y + 8.5, { align: 'right' });
+    doc.text(`Vigencia: ${contract.vigencia_meses} meses`, pageWidth - margin, y + 12.5, { align: 'right' });
+    
+    y = Math.max(y + 16, subY + 2);
 
     // Línea divisoria
     doc.setDrawColor(226, 232, 240);

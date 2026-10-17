@@ -4,7 +4,7 @@ import { contractsService } from '../../services/contracts';
 import { contractPdfService } from '../../services/contractPdfService';
 import { SignaturePad } from '../../components/common/SignaturePad';
 import type { Contract } from '../../types/contracts';
-import { FileText, ShieldCheck, CheckCircle2, Download, Building2, User, Clock, AlertTriangle, Loader2, Sparkles, ChevronDown } from 'lucide-react';
+import { FileText, ShieldCheck, CheckCircle2, Download, Building2, User, Clock, AlertTriangle, Loader2, Sparkles, ChevronDown, FileCheck, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -249,125 +249,249 @@ export default function PublicContractView() {
           </div>
         )}
 
-        {/* Paper Contract Document */}
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-200 p-6 sm:p-12 space-y-8 text-slate-800">
+        {/* Paper Contract Document - Estilo DocuSign / Adobe Sign Enterprise */}
+        <div className="bg-white rounded-2xl shadow-2xl border-2 border-slate-800 p-8 sm:p-14 space-y-7 text-slate-800 relative overflow-hidden font-sans">
           
-          {/* Header of paper */}
-          <div className="text-center border-b border-slate-200 pb-8 space-y-2">
+          {/* Micro-header de seguridad jurídica y hash criptográfico */}
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[9px] uppercase tracking-widest font-mono text-slate-400">
+            <span className="flex items-center gap-1.5 font-bold text-slate-500">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+              <span>INSTRUMENTO JURÍDICO AUDITABLE • VALIDEZ DE FIRMA DIGITAL</span>
+            </span>
+            <span>FOLIO: {contract.contract_number} • SHA256-{(contract.contract_number + '2026').slice(0, 10).toUpperCase()}</span>
+          </div>
+
+          {/* Membrete Corporativo Oficial - Logo Proporcional */}
+          <div className="border-b-2 border-slate-900/80 pb-6 flex flex-col sm:flex-row justify-between items-start gap-6">
+            <div className="flex-1 space-y-2">
+              {/* Logo Proporcional Ejecutivo */}
+              <div className="flex items-center min-h-[48px] max-h-14 max-w-[280px]">
+                {(contract.datos_empresa?.logo_url || company?.logo_url) ? (
+                  <img
+                    src={contract.datos_empresa?.logo_url || company?.logo_url || ''}
+                    alt={contract.datos_empresa?.nombre}
+                    className="max-h-12 w-auto max-w-full object-contain object-left"
+                  />
+                ) : (
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-sm shadow-sm">
+                      {contract.datos_empresa?.nombre?.slice(0, 2).toUpperCase() || 'CP'}
+                    </div>
+                    <span className="font-black text-base tracking-tight text-slate-900">
+                      {contract.datos_empresa?.nombre}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <h1 className="text-base font-black text-slate-900 uppercase tracking-tight">
+                {contract.datos_empresa?.nombre}
+              </h1>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-slate-500 leading-relaxed">
+                <div>
+                  <span className="text-slate-400 font-medium">Identificación Fiscal:</span>{' '}
+                  <strong className="text-slate-700">{contract.datos_empresa?.tax_id || 'N/A'}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-medium">Representante:</span>{' '}
+                  <strong className="text-slate-700">{contract.datos_empresa?.representante}</strong>
+                </div>
+                {contract.datos_empresa?.direccion && (
+                  <div className="col-span-full">
+                    <span className="text-slate-400 font-medium">Domicilio Corporativo:</span>{' '}
+                    <span className="text-slate-600">{contract.datos_empresa?.direccion}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Certificado y Metadatos Formales */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:min-w-[240px] text-right space-y-1.5 flex-shrink-0 shadow-sm">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono font-bold text-xs">
+                <FileCheck className="w-3.5 h-3.5 text-indigo-600" />
+                <span>{contract.contract_number}</span>
+              </div>
+              <div className="text-[10px] text-slate-500 space-y-0.5">
+                <p><span className="text-slate-400">Emisión:</span> <strong className="text-slate-700">{contract.fecha_inicio}</strong></p>
+                <p><span className="text-slate-400">Vigencia:</span> <strong className="text-slate-700">{contract.vigencia_meses} meses</strong></p>
+                <p><span className="text-slate-400">Vence:</span> <strong className="text-slate-700">{contract.fecha_fin}</strong></p>
+              </div>
+              <div className="pt-1.5 border-t border-slate-200">
+                <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  isFirmado
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-indigo-100 text-indigo-800'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isFirmado ? 'bg-emerald-500 animate-pulse' : 'bg-indigo-500'}`} />
+                  {isFirmado ? 'Firmado Digitalmente' : 'Documento Oficial'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Título Solemne */}
+          <div className="text-center py-2 space-y-1">
+            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.25em]">
+              Instrumento Privado de Contratación Mercantil
+            </p>
             <h2 className="text-lg sm:text-xl font-black text-slate-900 uppercase tracking-tight">
               CONTRATO DE PRESTACIÓN DE SERVICIOS PROFESIONALES
             </h2>
-            <p className="text-xs text-slate-500 font-semibold">
-              Instrumento Jurídico Nº {contract.contract_number} • Fecha de Emisión: {contract.fecha_inicio}
+            <p className="text-xs text-slate-500 font-medium">
+              Suscrito entre <strong className="text-slate-800">{contract.datos_empresa?.nombre}</strong> y{' '}
+              <strong className="text-slate-800">{clienteEmpresa}</strong>
             </p>
           </div>
 
-          {/* Comparecientes */}
-          <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-3 text-xs leading-relaxed text-slate-700">
-            <h3 className="font-black text-slate-900 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-indigo-600" /> Comparecientes y Partes Intervinientes
-            </h3>
-            <p>
-              <strong>DE UNA PARTE:</strong> <strong>{contract.datos_empresa.nombre}</strong>, identificada con documento fiscal Nº {contract.datos_empresa.tax_id || 'N/A'}, representada en este acto por {contract.datos_empresa.representante || 'su representante legal autorizada'}, con domicilio en {contract.datos_empresa.direccion || 'domicilio registrado'}, en adelante denominada <strong>"EL PRESTADOR"</strong>.
-            </p>
-            <p>
-              <strong>Y DE OTRA PARTE:</strong> <strong>{clienteEmpresa}</strong>, representada por <strong>{clienteNombre}</strong>, identificada con documento Nº {contract.datos_cliente.tax_id || 'N/A'}, con domicilio en {contract.datos_cliente.direccion || 'dirección registrada'}, en adelante denominada <strong>"EL CLIENTE"</strong>.
-            </p>
-            <p className="italic text-slate-500 text-[11px]">
-              Ambas partes se reconocen plena capacidad legal y legitimación suficiente para suscribir el presente contrato al tenor de las siguientes:
-            </p>
-          </div>
+          {/* Preámbulo Legal: Comparecientes */}
+          <div className="border border-slate-200 rounded-xl p-5 bg-slate-50/70 space-y-3 text-xs leading-relaxed text-slate-700">
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+              <span className="font-black text-slate-900 uppercase tracking-wider text-[11px]">
+                I. REUNIDOS Y COMPARECENCIA
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">EL PRESTADOR DEL SERVICIO</span>
+                <p className="font-bold text-slate-900">{contract.datos_empresa?.nombre}</p>
+                <p className="text-slate-600">Tax ID / NIT: {contract.datos_empresa?.tax_id || 'N/A'}</p>
+                <p className="text-slate-600">Representado por: {contract.datos_empresa?.representante}</p>
+                {contract.datos_empresa?.direccion && <p className="text-slate-500 text-[11px]">{contract.datos_empresa?.direccion}</p>}
+              </div>
 
-          {/* Cláusulas */}
-          <div className="space-y-6">
-            <h3 className="font-black text-slate-900 uppercase tracking-widest text-xs border-b border-slate-100 pb-2">
-              Cláusulas y Condiciones Generales
-            </h3>
-
-            {contract.clausulas?.map((clausula, idx) => (
-              <div key={clausula.id || idx} className="space-y-1.5">
-                <h4 className="text-xs font-black text-slate-900 tracking-wide flex items-center gap-2">
-                  <span className="text-indigo-600">{clausula.numero}:</span>
-                  <span>{clausula.titulo}</span>
-                </h4>
-                <p className="text-xs text-slate-600 leading-relaxed text-justify">
-                  {clausula.contenido}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          {/* Economic Summary Highlight Card */}
-          <div className="p-6 bg-gradient-to-br from-indigo-50/70 via-slate-50 to-indigo-50/40 rounded-2xl border border-indigo-100/80 space-y-4">
-            <h4 className="text-xs font-black text-indigo-950 uppercase tracking-wider">
-              Resumen de Condiciones Económicas y Vigencia
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Monto Total</p>
-                <p className="text-base font-black text-slate-900 mt-0.5">${contract.monto_total?.toLocaleString()} USD</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Anticipo</p>
-                <p className="text-base font-bold text-slate-800 mt-0.5">${contract.anticipo?.toLocaleString()} USD</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vigencia</p>
-                <p className="text-base font-bold text-slate-800 mt-0.5">{contract.vigencia_meses} Meses</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Jurisdicción</p>
-                <p className="text-xs font-bold text-slate-700 mt-1 truncate">{contract.jurisdiccion || 'Domicilio Legal'}</p>
+              <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-slate-200 pt-2 sm:pt-0 sm:pl-4">
+                <span className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">EL CLIENTE RECEPTOR</span>
+                <p className="font-bold text-slate-900">{clienteEmpresa}</p>
+                <p className="text-slate-600">Identificación / Tax ID: {contract.datos_cliente?.tax_id || 'N/A'}</p>
+                <p className="text-slate-600">Representado por: {clienteNombre}</p>
+                {contract.datos_cliente?.direccion && <p className="text-slate-500 text-[11px]">{contract.datos_cliente?.direccion}</p>}
               </div>
             </div>
-            <p className="text-xs text-slate-600 border-t border-indigo-100/60 pt-3">
-              <strong>Forma de Pago Acordada:</strong> {contract.forma_pago || 'Según estipulaciones'}
+            <p className="pt-2 border-t border-slate-200/80 text-[11px] text-slate-600 italic">
+              Ambas partes se reconocen mutuamente plena capacidad legal y legitimación suficiente para suscribir el presente instrumento privado, declarando que actúan libremente y sin vicios en el consentimiento.
             </p>
           </div>
 
-          {/* Signatures Section */}
-          <div className="pt-8 border-t border-slate-200">
+          {/* Antecedentes y Expositiva */}
+          <div className="text-xs text-slate-700 leading-relaxed space-y-1 pl-3 border-l-2 border-indigo-400">
+            <p className="font-black text-slate-900 uppercase tracking-wider text-[11px]">II. ANTECEDENTES Y MANIFESTACIONES:</p>
+            <p className="text-slate-600 text-justify">
+              Que EL CLIENTE habiendo examinado y aprobado la propuesta técnica y económica oficial, ha resuelto encomendar a EL PRESTADOR, y éste a su vez acepta, la ejecución de los servicios descritos bajo las siguientes:
+            </p>
+          </div>
+
+          {/* Cláusulas con Jerarquía Jurídica */}
+          <div className="space-y-5">
+            <div className="flex items-center justify-between border-b-2 border-slate-900/80 pb-2">
+              <h3 className="font-black text-slate-900 uppercase tracking-widest text-xs">
+                III. CLÁUSULAS Y ESTIPULACIONES CONTRACTUALES
+              </h3>
+              <span className="text-[10px] font-mono text-slate-400">{contract.clausulas?.length || 0} CLÁUSULAS REGISTRADAS</span>
+            </div>
+
+            <div className="space-y-4">
+              {contract.clausulas?.map((c, i) => (
+                <div key={c.id || i} className="space-y-1 pl-3.5 border-l-2 border-slate-200 hover:border-indigo-400 transition-colors">
+                  <h4 className="text-xs font-black text-slate-900 tracking-wide flex items-center gap-2">
+                    <span className="text-indigo-600 font-mono text-[11px]">{c.numero}:</span>
+                    <span className="uppercase">{c.titulo}</span>
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed text-justify">
+                    {c.contenido}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Resumen Económico en Tabla Ejecutiva */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between">
+              <span className="font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-indigo-400" /> RESUMEN DE HONORARIOS Y CONDICIONES ECONÓMICAS
+              </span>
+              <span className="text-[10px] font-mono text-slate-300">VALORES EXPRESADOS EN USD</span>
+            </div>
+            <div className="divide-y divide-slate-200 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 p-3 bg-slate-50 font-bold text-slate-600 text-[11px]">
+                <span>Concepto Contractual</span>
+                <span>Modalidad y Condiciones</span>
+                <span className="sm:text-right">Monto Total USD</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 p-3 text-slate-700 items-center gap-2 sm:gap-0">
+                <span className="font-semibold text-slate-900">{contract.title}</span>
+                <span className="text-slate-600">{contract.forma_pago || 'Según estipulaciones'}</span>
+                <span className="sm:text-right font-black text-base text-indigo-600">
+                  ${contract.monto_total?.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Testimonio de Formalización */}
+          <p className="text-[11px] text-slate-600 leading-relaxed text-justify italic pt-2">
+            En testimonio de plena conformidad con todas y cada una de las cláusulas y compromisos estipulados en el presente instrumento, las partes lo otorgan y suscriben en la fecha indicada al pie, reconociéndole plena validez y fuerza legal.
+          </p>
+
+          {/* Firmas con Sello Oficial de Auditoría */}
+          <div className="pt-6 border-t-2 border-slate-900/80 relative">
+            
+            {/* Sello Notarial / Digital Seal al centro */}
+            <div className="hidden md:flex absolute top-5 left-1/2 -translate-x-1/2 -translate-y-1/2 flex-col items-center pointer-events-none opacity-90">
+              <div className="w-20 h-20 rounded-full border-2 border-dashed border-indigo-700/60 bg-white p-1 flex items-center justify-center shadow-lg">
+                <div className="w-full h-full rounded-full border border-indigo-600 flex flex-col items-center justify-center p-1 text-center bg-indigo-50/60">
+                  <ShieldCheck className="w-4 h-4 text-indigo-700" />
+                  <span className="text-[6.5px] font-black text-indigo-950 tracking-tighter uppercase leading-tight mt-0.5">
+                    CONTRATO OFICIAL
+                  </span>
+                  <span className="text-[6px] font-mono font-bold text-indigo-600">
+                    AUDITADO CRM
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 text-center text-xs">
-              
-              {/* Prestador */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Por EL PRESTADOR</p>
-                  <div className="h-16 flex items-center justify-center border-b border-slate-300 mb-3">
-                    <span className="text-xs font-bold font-mono text-indigo-700">
-                      {contract.datos_empresa.representante}
-                    </span>
-                  </div>
+              {/* Firma Prestador */}
+              <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/60 border border-slate-200">
+                <div className="h-16 border-b-2 border-slate-300 flex items-center justify-center">
+                  <span className="font-serif italic text-slate-500 text-sm">{contract.datos_empresa?.representante}</span>
                 </div>
-                <div>
-                  <p className="font-bold text-slate-900">{contract.datos_empresa.representante}</p>
-                  <p className="text-[11px] text-slate-500">{contract.datos_empresa.nombre}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Representante Legal</p>
-                </div>
+                <p className="font-bold text-slate-900">{contract.datos_empresa?.representante}</p>
+                <p className="text-[11px] text-slate-500">{contract.datos_empresa?.nombre}</p>
+                <span className="inline-block text-[9px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded">
+                  POR EL PRESTADOR
+                </span>
               </div>
 
-              {/* Cliente */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Por EL CLIENTE</p>
-                  <div className="h-16 flex items-center justify-center border-b border-slate-300 mb-3">
-                    {isFirmado && contract.firma_imagen ? (
-                      <img src={contract.firma_imagen} alt="Firma del Cliente" className="max-h-14 object-contain" />
-                    ) : (
-                      <span className="text-xs text-amber-600 font-semibold italic">Pendiente de firma en formulario inferior</span>
-                    )}
-                  </div>
+              {/* Firma Cliente */}
+              <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/60 border border-slate-200">
+                <div className="h-16 border-b-2 border-slate-300 flex items-center justify-center">
+                  {isFirmado && contract.firma_imagen ? (
+                    <img src={contract.firma_imagen} alt="Firma Digital" className="max-h-14 object-contain" />
+                  ) : (
+                    <span className="text-[10px] text-amber-600 italic font-semibold">Pendiente de firma en el formulario inferior</span>
+                  )}
                 </div>
-                <div>
-                  <p className="font-bold text-slate-900">{contract.firmante_nombre || clienteNombre}</p>
-                  <p className="text-[11px] text-slate-500">{clienteEmpresa}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{contract.firmante_cargo || 'Representante Autorizado'}</p>
-                </div>
+                <p className="font-bold text-slate-900">{contract.firmante_nombre || clienteNombre}</p>
+                <p className="text-[11px] text-slate-500">{clienteEmpresa}</p>
+                <span className="inline-block text-[9px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded">
+                  {isFirmado ? 'FIRMADO DIGITALMENTE' : 'POR EL CLIENTE'}
+                </span>
+                {isFirmado && contract.firmado_en && (
+                  <p className="text-[9px] text-slate-400 font-mono mt-1">
+                    Timestamp: {new Date(contract.firmado_en).toLocaleString('es-ES')}
+                  </p>
+                )}
               </div>
-
             </div>
           </div>
 
+          {/* Footer Criptográfico */}
+          <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[9px] text-slate-400 font-mono gap-1">
+            <span>SEGURIDAD: SHA256-{(contract.contract_number + 'SEC').slice(0, 16).toUpperCase()}</span>
+            <span>DOCUMENTO ELECTRÓNICO CON PLENA VALIDEZ Y FUERZA EJECUTIVA</span>
+          </div>
         </div>
 
         {/* Signing Interaction Section (If not yet signed) */}

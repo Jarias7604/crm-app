@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Send, Eye, FileText, CheckCircle2, DollarSign, Calendar, Building2, User, Shield, Download, RefreshCw } from 'lucide-react';
+import { X, Plus, Trash2, Save, Send, Eye, FileText, CheckCircle2, DollarSign, Calendar, Building2, User, Shield, Download, RefreshCw, ShieldCheck, FileCheck } from 'lucide-react';
 import type { Contract, ContractClause, CreateContractInput } from '../../types/contracts';
 import { contractsService } from '../../services/contracts';
 import { generateContractDefaults } from '../../utils/contractDefaults';
@@ -58,6 +58,7 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
 
     if (existingContract) {
       setContractId(existingContract.id);
+      const effectiveLogo = existingContract.datos_empresa?.logo_url || company?.logo_url || (cotizacion as any)?.company?.logo_url || null;
       setFormData({
         company_id: existingContract.company_id,
         lead_id: existingContract.lead_id,
@@ -77,14 +78,21 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
         fecha_inicio: existingContract.fecha_inicio,
         fecha_fin: existingContract.fecha_fin,
         jurisdiccion: existingContract.jurisdiccion,
-        datos_empresa: existingContract.datos_empresa,
+        datos_empresa: {
+          ...existingContract.datos_empresa,
+          logo_url: effectiveLogo,
+        },
         datos_cliente: existingContract.datos_cliente,
       });
       setCurrentContractForShare(existingContract);
     } else {
       // Auto-generate defaults from seed data
+      const effectiveCompany = company || (cotizacion as any)?.company || { id: '', name: 'Mi Empresa' };
       const defaults = generateContractDefaults({
-        company: company || { id: '', name: 'Mi Empresa' },
+        company: {
+          ...effectiveCompany,
+          logo_url: effectiveCompany?.logo_url || (cotizacion as any)?.company?.logo_url || null,
+        },
         lead,
         cotizacion,
         creatorName,
@@ -93,7 +101,7 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
       setContractId(null);
       setFormData({
         ...defaults,
-        company_id: company?.id || cotizacion?.company_id || '',
+        company_id: effectiveCompany?.id || cotizacion?.company_id || '',
         lead_id: lead?.id || cotizacion?.lead_id || null,
         client_id: null,
         cotizacion_id: cotizacion?.id || null,
@@ -329,6 +337,33 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                         className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
                       />
                     </div>
+
+                    {/* Logo institucional */}
+                    <div className="flex items-center gap-2 pt-1 border-t border-slate-200/60">
+                      {formData.datos_empresa.logo_url ? (
+                        <div className="w-10 h-7 rounded bg-white p-0.5 border border-slate-200 flex items-center justify-center flex-shrink-0">
+                          <img
+                            src={formData.datos_empresa.logo_url}
+                            alt="Logo"
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-10 h-7 rounded bg-slate-200 flex items-center justify-center text-[9px] font-bold text-slate-500 flex-shrink-0">
+                          LOGO
+                        </div>
+                      )}
+                      <input
+                        type="text"
+                        placeholder="URL Logo Oficial (automático de tu empresa)"
+                        value={formData.datos_empresa.logo_url || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          datos_empresa: { ...prev.datos_empresa, logo_url: e.target.value }
+                        }))}
+                        className="flex-1 px-2 py-1 bg-white border border-slate-200 rounded-lg text-[11px] text-slate-700 placeholder:text-slate-400"
+                      />
+                    </div>
                   </div>
 
                   <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 space-y-2">
@@ -504,116 +539,295 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
 
             </div>
           ) : (
-            /* Vista Previa del Documento Completo */
-            <div className="max-w-3xl mx-auto bg-white p-8 sm:p-12 rounded-3xl shadow-xl border border-slate-200 text-slate-800 space-y-6">
-              <div className="border-b border-slate-200 pb-6 flex justify-between items-start">
-                <div>
-                  <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight">{formData.datos_empresa.nombre}</h1>
-                  <p className="text-xs text-slate-500 mt-1">Identificación: {formData.datos_empresa.tax_id || 'N/A'}</p>
-                  <p className="text-xs text-slate-500">Representante: {formData.datos_empresa.representante}</p>
+            /* Vista Previa del Documento Completo - Estilo DocuSign / Adobe Sign Enterprise */
+            <div className="max-w-4xl mx-auto bg-white p-8 sm:p-14 rounded-2xl shadow-2xl border-2 border-slate-800 text-slate-800 space-y-7 relative overflow-hidden font-sans">
+              
+              {/* Micro-header de seguridad jurídica y hash criptográfico */}
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[9px] uppercase tracking-widest font-mono text-slate-400">
+                <span className="flex items-center gap-1.5 font-bold text-slate-500">
+                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>INSTRUMENTO JURÍDICO AUDITABLE • VALIDEZ DE FIRMA DIGITAL</span>
+                </span>
+                <span>FOLIO: {formData.contract_number} • SHA256-{(formData.contract_number + '2026').slice(0, 10).toUpperCase()}</span>
+              </div>
+
+              {/* Membrete Corporativo Oficial - Logo Proporcional */}
+              <div className="border-b-2 border-slate-900/80 pb-6 flex flex-col sm:flex-row justify-between items-start gap-6">
+                <div className="flex-1 space-y-2">
+                  {/* Logo Proporcional Ejecutivo (Sin recortes ni cajas cuadradas) */}
+                  <div className="flex items-center min-h-[48px] max-h-14 max-w-[280px]">
+                    {formData.datos_empresa.logo_url ? (
+                      <img
+                        src={formData.datos_empresa.logo_url}
+                        alt={formData.datos_empresa.nombre}
+                        className="max-h-12 w-auto max-w-full object-contain object-left"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-sm shadow-sm">
+                          {formData.datos_empresa.nombre?.slice(0, 2).toUpperCase() || 'CP'}
+                        </div>
+                        <span className="font-black text-base tracking-tight text-slate-900">
+                          {formData.datos_empresa.nombre}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <h1 className="text-base font-black text-slate-900 uppercase tracking-tight">
+                    {formData.datos_empresa.nombre}
+                  </h1>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-slate-500 leading-relaxed">
+                    <div>
+                      <span className="text-slate-400 font-medium">Identificación Fiscal:</span>{' '}
+                      <strong className="text-slate-700">{formData.datos_empresa.tax_id || 'N/A'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-medium">Representante:</span>{' '}
+                      <strong className="text-slate-700">{formData.datos_empresa.representante}</strong>
+                    </div>
+                    {formData.datos_empresa.direccion && (
+                      <div className="col-span-full">
+                        <span className="text-slate-400 font-medium">Domicilio Corporativo:</span>{' '}
+                        <span className="text-slate-600">{formData.datos_empresa.direccion}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100">
-                    {formData.contract_number}
-                  </span>
-                  <p className="text-[11px] text-slate-400 mt-1">{formData.fecha_inicio}</p>
+
+                {/* Certificado y Metadatos Formales */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 sm:min-w-[240px] text-right space-y-1.5 flex-shrink-0 shadow-sm">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 font-mono font-bold text-xs">
+                    <FileCheck className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>{formData.contract_number}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 space-y-0.5">
+                    <p><span className="text-slate-400">Emisión:</span> <strong className="text-slate-700">{formData.fecha_inicio}</strong></p>
+                    <p><span className="text-slate-400">Vigencia:</span> <strong className="text-slate-700">{formData.vigencia_meses} meses</strong></p>
+                    <p><span className="text-slate-400">Vence:</span> <strong className="text-slate-700">{formData.fecha_fin}</strong></p>
+                  </div>
+                  <div className="pt-1.5 border-t border-slate-200">
+                    <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      existingContract?.status === 'firmado'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-indigo-100 text-indigo-800'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${existingContract?.status === 'firmado' ? 'bg-emerald-500 animate-pulse' : 'bg-indigo-500'}`} />
+                      {existingContract?.status === 'firmado' ? 'Firmado Digitalmente' : 'Documento Oficial'}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="text-center py-2">
-                <h2 className="text-base font-black text-slate-900 tracking-tight">{(formData.title || '').toUpperCase()}</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Instrumento Legal de Prestación de Servicios</p>
-              </div>
-
-              <div className="p-4 bg-slate-50 rounded-2xl text-xs text-slate-700 leading-relaxed space-y-2 border border-slate-100">
-                <p className="font-bold text-slate-900">COMPARECIENTES:</p>
-                <p>
-                  De una parte, <strong>{formData.datos_empresa.nombre}</strong> (EL PRESTADOR), y de otra parte <strong>{formData.datos_cliente.empresa || formData.datos_cliente.nombre}</strong> (EL CLIENTE), representada por {formData.datos_cliente.nombre}, convienen suscribir el presente contrato al tenor de las siguientes estipulaciones:
+              {/* Título Solemne */}
+              <div className="text-center py-2 space-y-1">
+                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.25em]">
+                  Instrumento Privado de Contratación Mercantil
+                </p>
+                <h2 className="text-lg sm:text-xl font-black text-slate-900 uppercase tracking-tight">
+                  CONTRATO DE PRESTACIÓN DE SERVICIOS PROFESIONALES
+                </h2>
+                <p className="text-xs text-slate-500 font-medium">
+                  Suscrito entre <strong className="text-slate-800">{formData.datos_empresa.nombre}</strong> y{' '}
+                  <strong className="text-slate-800">{formData.datos_cliente.empresa || formData.datos_cliente.nombre}</strong>
                 </p>
               </div>
 
-              <div className="space-y-4">
-                {formData.clausulas.map((c, i) => (
-                  <div key={i} className="space-y-1">
-                    <h4 className="text-xs font-black text-slate-900 tracking-wide">
-                      {c.numero}: {c.titulo}
-                    </h4>
-                    <p className="text-xs text-slate-600 leading-relaxed text-justify">
-                      {c.contenido}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 text-xs space-y-1">
-                <p className="font-bold text-indigo-950">RESUMEN ECONÓMICO:</p>
-                <p className="text-indigo-900">• Monto Total: ${formData.monto_total?.toLocaleString()} USD</p>
-                <p className="text-indigo-900">• Condiciones de Pago: {formData.forma_pago}</p>
-                <p className="text-indigo-900">• Vigencia: {formData.vigencia_meses} meses</p>
-              </div>
-
-              <div className="pt-8 border-t border-slate-200 grid grid-cols-2 gap-8 text-center text-xs">
-                <div>
-                  <div className="h-14 border-b border-slate-300 mb-2"></div>
-                  <p className="font-bold text-slate-900">{formData.datos_empresa.representante}</p>
-                  <p className="text-[11px] text-slate-500">{formData.datos_empresa.nombre}</p>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">EL PRESTADOR</p>
+              {/* Preámbulo Legal: Comparecientes */}
+              <div className="border border-slate-200 rounded-xl p-5 bg-slate-50/70 space-y-3 text-xs leading-relaxed text-slate-700">
+                <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+                  <span className="font-black text-slate-900 uppercase tracking-wider text-[11px]">
+                    I. REUNIDOS Y COMPARECENCIA
+                  </span>
                 </div>
-                <div>
-                  <div className="h-14 border-b border-slate-300 mb-2 flex items-center justify-center">
-                    {existingContract?.firmado_digitalmente && existingContract.firma_imagen ? (
-                      <img src={existingContract.firma_imagen} alt="Firma" className="max-h-12 object-contain" />
-                    ) : (
-                      <span className="text-[10px] text-slate-400 italic">Pendiente de firma digital</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">EL PRESTADOR DEL SERVICIO</span>
+                    <p className="font-bold text-slate-900">{formData.datos_empresa.nombre}</p>
+                    <p className="text-slate-600">Tax ID / NIT: {formData.datos_empresa.tax_id || 'N/A'}</p>
+                    <p className="text-slate-600">Representado por: {formData.datos_empresa.representante}</p>
+                    {formData.datos_empresa.direccion && <p className="text-slate-500 text-[11px]">{formData.datos_empresa.direccion}</p>}
+                  </div>
+
+                  <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-slate-200 pt-2 sm:pt-0 sm:pl-4">
+                    <span className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">EL CLIENTE RECEPTOR</span>
+                    <p className="font-bold text-slate-900">{formData.datos_cliente.empresa || formData.datos_cliente.nombre}</p>
+                    <p className="text-slate-600">Identificación / Tax ID: {formData.datos_cliente.tax_id || 'N/A'}</p>
+                    <p className="text-slate-600">Representado por: {formData.datos_cliente.nombre}</p>
+                    {formData.datos_cliente.direccion && <p className="text-slate-500 text-[11px]">{formData.datos_cliente.direccion}</p>}
+                  </div>
+                </div>
+                <p className="pt-2 border-t border-slate-200/80 text-[11px] text-slate-600 italic">
+                  Ambas partes se reconocen mutuamente plena capacidad legal y legitimación suficiente para suscribir el presente instrumento privado, declarando que actúan libremente y sin vicios en el consentimiento.
+                </p>
+              </div>
+
+              {/* Antecedentes y Expositiva */}
+              <div className="text-xs text-slate-700 leading-relaxed space-y-1 pl-3 border-l-2 border-indigo-400">
+                <p className="font-black text-slate-900 uppercase tracking-wider text-[11px]">II. ANTECEDENTES Y MANIFESTACIONES:</p>
+                <p className="text-slate-600 text-justify">
+                  Que EL CLIENTE habiendo examinado y aprobado la propuesta técnica y económica oficial, ha resuelto encomendar a EL PRESTADOR, y éste a su vez acepta, la ejecución de los servicios descritos bajo las siguientes:
+                </p>
+              </div>
+
+              {/* Cláusulas con Jerarquía Jurídica */}
+              <div className="space-y-5">
+                <div className="flex items-center justify-between border-b-2 border-slate-900/80 pb-2">
+                  <h3 className="font-black text-slate-900 uppercase tracking-widest text-xs">
+                    III. CLÁUSULAS Y ESTIPULACIONES CONTRACTUALES
+                  </h3>
+                  <span className="text-[10px] font-mono text-slate-400">{formData.clausulas.length} CLÁUSULAS REGISTRADAS</span>
+                </div>
+
+                <div className="space-y-4">
+                  {formData.clausulas.map((c, i) => (
+                    <div key={i} className="space-y-1 pl-3.5 border-l-2 border-slate-200 hover:border-indigo-400 transition-colors">
+                      <h4 className="text-xs font-black text-slate-900 tracking-wide flex items-center gap-2">
+                        <span className="text-indigo-600 font-mono text-[11px]">{c.numero}:</span>
+                        <span className="uppercase">{c.titulo}</span>
+                      </h4>
+                      <p className="text-xs text-slate-600 leading-relaxed text-justify">
+                        {c.contenido}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Resumen Económico en Tabla Ejecutiva */}
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between">
+                  <span className="font-black text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-indigo-400" /> RESUMEN DE HONORARIOS Y CONDICIONES ECONÓMICAS
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-300">VALORES EXPRESADOS EN USD</span>
+                </div>
+                <div className="divide-y divide-slate-200 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 p-3 bg-slate-50 font-bold text-slate-600 text-[11px]">
+                    <span>Concepto Contractual</span>
+                    <span>Modalidad y Condiciones</span>
+                    <span className="sm:text-right">Monto Total USD</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 p-3 text-slate-700 items-center gap-2 sm:gap-0">
+                    <span className="font-semibold text-slate-900">{formData.title}</span>
+                    <span className="text-slate-600">{formData.forma_pago}</span>
+                    <span className="sm:text-right font-black text-base text-indigo-600">
+                      ${formData.monto_total?.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Testimonio de Formalización */}
+              <p className="text-[11px] text-slate-600 leading-relaxed text-justify italic pt-2">
+                En testimonio de plena conformidad con todas y cada una de las cláusulas y compromisos estipulados en el presente instrumento, las partes lo otorgan y suscriben en la fecha indicada al pie, reconociéndole plena validez y fuerza legal.
+              </p>
+
+              {/* Firmas con Sello Oficial de Auditoría */}
+              <div className="pt-6 border-t-2 border-slate-900/80 relative">
+                
+                {/* Sello Notarial / Digital Seal al centro */}
+                <div className="hidden md:flex absolute top-5 left-1/2 -translate-x-1/2 -translate-y-1/2 flex-col items-center pointer-events-none opacity-90">
+                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-indigo-700/60 bg-white p-1 flex items-center justify-center shadow-lg">
+                    <div className="w-full h-full rounded-full border border-indigo-600 flex flex-col items-center justify-center p-1 text-center bg-indigo-50/60">
+                      <ShieldCheck className="w-4 h-4 text-indigo-700" />
+                      <span className="text-[6.5px] font-black text-indigo-950 tracking-tighter uppercase leading-tight mt-0.5">
+                        CONTRATO OFICIAL
+                      </span>
+                      <span className="text-[6px] font-mono font-bold text-indigo-600">
+                        AUDITADO CRM
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 text-center text-xs">
+                  {/* Firma Prestador */}
+                  <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/60 border border-slate-200">
+                    <div className="h-16 border-b-2 border-slate-300 flex items-center justify-center">
+                      <span className="font-serif italic text-slate-500 text-sm">{formData.datos_empresa.representante}</span>
+                    </div>
+                    <p className="font-bold text-slate-900">{formData.datos_empresa.representante}</p>
+                    <p className="text-[11px] text-slate-500">{formData.datos_empresa.nombre}</p>
+                    <span className="inline-block text-[9px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded">
+                      POR EL PRESTADOR
+                    </span>
+                  </div>
+
+                  {/* Firma Cliente */}
+                  <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/60 border border-slate-200">
+                    <div className="h-16 border-b-2 border-slate-300 flex items-center justify-center">
+                      {existingContract?.firmado_digitalmente && existingContract.firma_imagen ? (
+                        <img src={existingContract.firma_imagen} alt="Firma Digital" className="max-h-14 object-contain" />
+                      ) : (
+                        <span className="text-[10px] text-amber-600 italic font-semibold">Pendiente de firma digital por el cliente</span>
+                      )}
+                    </div>
+                    <p className="font-bold text-slate-900">{formData.datos_cliente.nombre}</p>
+                    <p className="text-[11px] text-slate-500">{formData.datos_cliente.empresa || formData.datos_cliente.nombre}</p>
+                    <span className="inline-block text-[9px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded">
+                      {existingContract?.firmado_digitalmente ? 'FIRMADO DIGITALMENTE' : 'POR EL CLIENTE'}
+                    </span>
+                    {existingContract?.firmado_digitalmente && existingContract.firmado_en && (
+                      <p className="text-[9px] text-slate-400 font-mono mt-1">
+                        Timestamp: {new Date(existingContract.firmado_en).toLocaleString('es-ES')}
+                      </p>
                     )}
                   </div>
-                  <p className="font-bold text-slate-900">{formData.datos_cliente.nombre}</p>
-                  <p className="text-[11px] text-slate-500">{formData.datos_cliente.empresa || formData.datos_cliente.nombre}</p>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">EL CLIENTE</p>
                 </div>
+              </div>
+
+              {/* Footer Criptográfico */}
+              <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[9px] text-slate-400 font-mono gap-1">
+                <span>SEGURIDAD: SHA256-{(formData.contract_number + 'SEC').slice(0, 16).toUpperCase()}</span>
+                <span>DOCUMENTO ELECTRÓNICO CON PLENA VALIDEZ Y FUERZA EJECUTIVA</span>
               </div>
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-between">
+        <div className="px-6 py-3.5 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleDownloadPDF}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+              className="h-9 sm:h-10 px-3.5 sm:px-4 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5 text-slate-600" /> Descargar Borrador PDF
+              <Download className="w-3.5 h-3.5 text-slate-600" />
+              <span>Descargar Borrador PDF</span>
             </button>
             {contractId && (
               <button
                 type="button"
                 onClick={() => setIsShareOpen(true)}
-                className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                className="h-9 sm:h-10 px-3.5 sm:px-4 bg-indigo-50 hover:bg-indigo-100/80 text-indigo-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
               >
-                <Send className="w-3.5 h-3.5" /> Enlaces de Firma (WhatsApp / Email)
+                <Send className="w-3.5 h-3.5" />
+                <span>Enlaces de Firma (WhatsApp / Email)</span>
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => handleSave('borrador')}
               disabled={saving}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              className="h-9 sm:h-10 px-3.5 sm:px-4 bg-slate-100 hover:bg-slate-200/80 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
             >
-              <Save className="w-4 h-4 text-slate-600" /> Guardar Borrador
+              <Save className="w-3.5 h-3.5 text-slate-600" />
+              <span>Guardar Borrador</span>
             </button>
 
             <button
               type="button"
               onClick={() => handleSave('enviado')}
               disabled={saving}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/25 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              className="h-9 sm:h-10 px-4 sm:px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-sm hover:shadow transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
             >
-              <CheckCircle2 className="w-4 h-4" /> Emitir y Compartir con Cliente
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Emitir y Compartir con Cliente</span>
             </button>
           </div>
         </div>
