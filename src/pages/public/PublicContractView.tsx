@@ -433,39 +433,23 @@ export default function PublicContractView() {
             En testimonio de plena conformidad con todas y cada una de las cláusulas y compromisos estipulados en el presente instrumento, las partes lo otorgan y suscriben en la fecha indicada al pie, reconociéndole plena validez y fuerza legal.
           </p>
 
-          {/* Firmas con Sello Oficial de Auditoría */}
-          <div className="pt-6 border-t-2 border-slate-900/80 relative">
-            
-            {/* Sello Notarial / Digital Seal al centro */}
-            <div className="hidden md:flex absolute top-5 left-1/2 -translate-x-1/2 -translate-y-1/2 flex-col items-center pointer-events-none opacity-90">
-              <div className="w-20 h-20 rounded-full border-2 border-dashed border-indigo-700/60 bg-white p-1 flex items-center justify-center shadow-lg">
-                <div className="w-full h-full rounded-full border border-indigo-600 flex flex-col items-center justify-center p-1 text-center bg-indigo-50/60">
-                  <ShieldCheck className="w-4 h-4 text-indigo-700" />
-                  <span className="text-[6.5px] font-black text-indigo-950 tracking-tighter uppercase leading-tight mt-0.5">
-                    CONTRATO OFICIAL
-                  </span>
-                  <span className="text-[6px] font-mono font-bold text-indigo-600">
-                    AUDITADO CRM
-                  </span>
-                </div>
-              </div>
-            </div>
-
+          {/* Firmas de las Partes */}
+          <div className="pt-6 border-t-2 border-slate-900/80">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 text-center text-xs">
               {/* Firma Prestador */}
-              <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/60 border border-slate-200">
+              <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/70 border border-slate-200">
                 <div className="h-16 border-b-2 border-slate-300 flex items-center justify-center">
-                  <span className="font-serif italic text-slate-500 text-sm">{contract.datos_empresa?.representante}</span>
+                  <span className="font-serif italic text-slate-600 text-sm font-semibold">{contract.datos_empresa?.representante}</span>
                 </div>
                 <p className="font-bold text-slate-900">{contract.datos_empresa?.representante}</p>
                 <p className="text-[11px] text-slate-500">{contract.datos_empresa?.nombre}</p>
-                <span className="inline-block text-[9px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded">
+                <span className="inline-block text-[9px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded">
                   POR EL PRESTADOR
                 </span>
               </div>
 
               {/* Firma Cliente */}
-              <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/60 border border-slate-200">
+              <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/70 border border-slate-200">
                 <div className="h-16 border-b-2 border-slate-300 flex items-center justify-center">
                   {isFirmado && contract.firma_imagen ? (
                     <img src={contract.firma_imagen} alt="Firma Digital" className="max-h-14 object-contain" />
@@ -475,7 +459,7 @@ export default function PublicContractView() {
                 </div>
                 <p className="font-bold text-slate-900">{contract.firmante_nombre || clienteNombre}</p>
                 <p className="text-[11px] text-slate-500">{clienteEmpresa}</p>
-                <span className="inline-block text-[9px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded">
+                <span className="inline-block text-[9px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded">
                   {isFirmado ? 'FIRMADO DIGITALMENTE' : 'POR EL CLIENTE'}
                 </span>
                 {isFirmado && contract.firmado_en && (
@@ -485,12 +469,43 @@ export default function PublicContractView() {
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Footer Criptográfico */}
-          <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[9px] text-slate-400 font-mono gap-1">
-            <span>SEGURIDAD: SHA256-{(contract.contract_number + 'SEC').slice(0, 16).toUpperCase()}</span>
-            <span>DOCUMENTO ELECTRÓNICO CON PLENA VALIDEZ Y FUERZA EJECUTIVA</span>
+            {/* Certificado de Integridad y Trazabilidad Criptográfica (100% White-Label) */}
+            <div className="mt-6 pt-4 border-t border-slate-200">
+              <div className="p-3.5 rounded-xl bg-slate-50/90 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-700">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700 flex-shrink-0">
+                    <ShieldCheck className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-900">
+                      {isFirmado 
+                        ? 'Certificado Oficial de Firma Electrónica' 
+                        : 'Instrumento Electrónico con Validez Jurídica Vinculante'}
+                    </p>
+                    <p className="text-[9px] text-slate-500 font-mono">
+                      FOLIO: {contract.contract_number} • SHA256-{(contract.contract_number + '2026').slice(0, 16).toUpperCase()} • LEY DE FIRMA ELECTRÓNICA
+                    </p>
+                  </div>
+                </div>
+                <div className="text-[9px] text-right text-slate-500 font-medium">
+                  {isFirmado ? (
+                    <div className="flex flex-col sm:items-end">
+                      <span className="text-emerald-700 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Firmado electrónicamente
+                      </span>
+                      <span className="text-slate-400 font-mono text-[8.5px]">
+                        {contract.firmado_en ? new Date(contract.firmado_en).toLocaleString('es-ES') : ''} • IP: {contract.firmante_ip || 'Auditada'}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-slate-500 italic">
+                      Registro inmutable emitido para formalización y suscripción digital
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

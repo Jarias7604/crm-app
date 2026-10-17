@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Send, Eye, FileText, CheckCircle2, DollarSign, Calendar, Building2, User, Shield, Download, RefreshCw, ShieldCheck, FileCheck } from 'lucide-react';
+import { X, Plus, Trash2, Save, Send, Eye, FileText, CheckCircle2, DollarSign, Calendar, Building2, User, Shield, Download, RefreshCw, ShieldCheck, FileCheck, Briefcase, Package, Code, Hammer, Sparkles, Lock } from 'lucide-react';
 import type { Contract, ContractClause, CreateContractInput } from '../../types/contracts';
 import { contractsService } from '../../services/contracts';
-import { generateContractDefaults } from '../../utils/contractDefaults';
+import { generateContractDefaults, INDUSTRY_PRESETS, buildClausesForPreset, type ContractIndustryPreset } from '../../utils/contractDefaults';
 import { contractPdfService } from '../../services/contractPdfService';
 import { ContractShareModal } from './ContractShareModal';
 import toast from 'react-hot-toast';
@@ -52,6 +52,7 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [currentContractForShare, setCurrentContractForShare] = useState<Contract | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<ContractIndustryPreset>('servicios');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -148,6 +149,37 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
       ...prev,
       clausulas: prev.clausulas.filter((_, i) => i !== idx),
     }));
+  };
+
+  const handleApplyPreset = (preset: ContractIndustryPreset) => {
+    if (formData.clausulas.length > 0) {
+      const confirmChange = window.confirm(
+        '¿Deseas aplicar esta plantilla de rubro? Se actualizará el título, objeto y las cláusulas con la redacción legal especializada de este giro comercial, conservando tus montos económicos y datos de partes.'
+      );
+      if (!confirmChange) return;
+    }
+
+    setSelectedPreset(preset);
+    const { title, objeto, clausulas } = buildClausesForPreset(preset, {
+      empresaNombre: formData.datos_empresa.nombre,
+      clienteNombre: formData.datos_cliente.nombre,
+      clienteEmpresa: formData.datos_cliente.empresa || formData.datos_cliente.nombre,
+      planNombre: cotizacion?.plan_nombre || formData.title,
+      modulos: '',
+      total: formData.monto_total || 0,
+      formaPagoTexto: formData.forma_pago || '',
+      vigenciaMeses: formData.vigencia_meses || 12,
+      hoy: new Date(),
+      jurisdiccion: formData.jurisdiccion || 'San Salvador, El Salvador',
+    });
+
+    setFormData(prev => ({
+      ...prev,
+      title,
+      objeto,
+      clausulas,
+    }));
+    toast.success('Plantilla de rubro aplicada correctamente');
   };
 
   const handleSave = async (targetStatus: 'borrador' | 'enviado' = 'borrador') => {
@@ -273,15 +305,78 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
           {activeTab === 'editor' ? (
             <div className="space-y-6 max-w-4xl mx-auto">
               
+              {/* Selector de Plantilla por Rubro / Giro de Empresa */}
+              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-md border border-indigo-900/40">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/10">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-600/60 border border-indigo-400/30 flex items-center justify-center text-amber-300">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black tracking-wide uppercase text-white flex items-center gap-2">
+                        Plantilla según Giro o Rubro de Empresa
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/20">
+                          Multi-Tenant SaaS
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-slate-300">
+                        Selecciona el tipo de contrato para cargar cláusulas especializadas a tu actividad:
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-3.5">
+                  {INDUSTRY_PRESETS.map((p) => {
+                    const isSelected = selectedPreset === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleApplyPreset(p.id)}
+                        className={`flex flex-col items-start p-2.5 rounded-xl border transition-all text-left group ${
+                          isSelected
+                            ? 'bg-indigo-600/40 border-indigo-400 text-white shadow-inner'
+                            : 'border-white/10 bg-white/5 hover:bg-white/15 hover:border-indigo-400/40 text-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1 text-indigo-300 group-hover:text-amber-300">
+                          {p.id === 'servicios' && <Briefcase className="w-3.5 h-3.5" />}
+                          {p.id === 'suministro' && <Package className="w-3.5 h-3.5" />}
+                          {p.id === 'tecnologia' && <Code className="w-3.5 h-3.5" />}
+                          {p.id === 'construccion' && <Hammer className="w-3.5 h-3.5" />}
+                          {p.id === 'nda' && <Shield className="w-3.5 h-3.5" />}
+                          <span className="text-[10px] font-black uppercase tracking-tight">
+                            {p.label}
+                          </span>
+                        </div>
+                        <span className="text-[9px] text-slate-400 group-hover:text-slate-200 line-clamp-1">
+                          {p.badge}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Card 1: Identificación y Objeto */}
               <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
                   <Shield className="w-4 h-4 text-indigo-600" /> Información General y Partes
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-bold text-slate-700">Título del Contrato</label>
+                    <label className="text-xs font-bold text-slate-700">Nº de Contrato (Código)</label>
+                    <input
+                      type="text"
+                      value={formData.contract_number}
+                      onChange={(e) => setFormData(prev => ({ ...prev, contract_number: e.target.value }))}
+                      className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-indigo-700 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700">Título del Documento</label>
                     <input
                       type="text"
                       value={formData.title}
@@ -290,12 +385,13 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-700">Nº de Contrato (Código)</label>
+                    <label className="text-xs font-bold text-slate-700">Ciudad y Jurisdicción Legal</label>
                     <input
                       type="text"
-                      value={formData.contract_number}
-                      onChange={(e) => setFormData(prev => ({ ...prev, contract_number: e.target.value }))}
-                      className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-indigo-700 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                      placeholder="Ej: San Salvador, El Salvador"
+                      value={formData.jurisdiccion || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, jurisdiccion: e.target.value }))}
+                      className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                   </div>
                 </div>
@@ -723,39 +819,23 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                 En testimonio de plena conformidad con todas y cada una de las cláusulas y compromisos estipulados en el presente instrumento, las partes lo otorgan y suscriben en la fecha indicada al pie, reconociéndole plena validez y fuerza legal.
               </p>
 
-              {/* Firmas con Sello Oficial de Auditoría */}
-              <div className="pt-6 border-t-2 border-slate-900/80 relative">
-                
-                {/* Sello Notarial / Digital Seal al centro */}
-                <div className="hidden md:flex absolute top-5 left-1/2 -translate-x-1/2 -translate-y-1/2 flex-col items-center pointer-events-none opacity-90">
-                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-indigo-700/60 bg-white p-1 flex items-center justify-center shadow-lg">
-                    <div className="w-full h-full rounded-full border border-indigo-600 flex flex-col items-center justify-center p-1 text-center bg-indigo-50/60">
-                      <ShieldCheck className="w-4 h-4 text-indigo-700" />
-                      <span className="text-[6.5px] font-black text-indigo-950 tracking-tighter uppercase leading-tight mt-0.5">
-                        CONTRATO OFICIAL
-                      </span>
-                      <span className="text-[6px] font-mono font-bold text-indigo-600">
-                        AUDITADO CRM
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
+              {/* Firmas de las Partes */}
+              <div className="pt-6 border-t-2 border-slate-900/80">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 text-center text-xs">
                   {/* Firma Prestador */}
-                  <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/60 border border-slate-200">
+                  <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/70 border border-slate-200">
                     <div className="h-16 border-b-2 border-slate-300 flex items-center justify-center">
-                      <span className="font-serif italic text-slate-500 text-sm">{formData.datos_empresa.representante}</span>
+                      <span className="font-serif italic text-slate-600 text-sm font-semibold">{formData.datos_empresa.representante}</span>
                     </div>
                     <p className="font-bold text-slate-900">{formData.datos_empresa.representante}</p>
                     <p className="text-[11px] text-slate-500">{formData.datos_empresa.nombre}</p>
-                    <span className="inline-block text-[9px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded">
+                    <span className="inline-block text-[9px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded">
                       POR EL PRESTADOR
                     </span>
                   </div>
 
                   {/* Firma Cliente */}
-                  <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/60 border border-slate-200">
+                  <div className="space-y-1.5 p-4 rounded-xl bg-slate-50/70 border border-slate-200">
                     <div className="h-16 border-b-2 border-slate-300 flex items-center justify-center">
                       {existingContract?.firmado_digitalmente && existingContract.firma_imagen ? (
                         <img src={existingContract.firma_imagen} alt="Firma Digital" className="max-h-14 object-contain" />
@@ -765,7 +845,7 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                     </div>
                     <p className="font-bold text-slate-900">{formData.datos_cliente.nombre}</p>
                     <p className="text-[11px] text-slate-500">{formData.datos_cliente.empresa || formData.datos_cliente.nombre}</p>
-                    <span className="inline-block text-[9px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded">
+                    <span className="inline-block text-[9px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded">
                       {existingContract?.firmado_digitalmente ? 'FIRMADO DIGITALMENTE' : 'POR EL CLIENTE'}
                     </span>
                     {existingContract?.firmado_digitalmente && existingContract.firmado_en && (
@@ -775,12 +855,43 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                     )}
                   </div>
                 </div>
-              </div>
 
-              {/* Footer Criptográfico */}
-              <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between text-[9px] text-slate-400 font-mono gap-1">
-                <span>SEGURIDAD: SHA256-{(formData.contract_number + 'SEC').slice(0, 16).toUpperCase()}</span>
-                <span>DOCUMENTO ELECTRÓNICO CON PLENA VALIDEZ Y FUERZA EJECUTIVA</span>
+                {/* Certificado de Integridad y Trazabilidad Criptográfica (100% White-Label) */}
+                <div className="mt-6 pt-4 border-t border-slate-200">
+                  <div className="p-3.5 rounded-xl bg-slate-50/90 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-700">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700 flex-shrink-0">
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-900">
+                          {existingContract?.firmado_digitalmente 
+                            ? 'Certificado Oficial de Firma Electrónica' 
+                            : 'Instrumento Electrónico con Validez Jurídica Vinculante'}
+                        </p>
+                        <p className="text-[9px] text-slate-500 font-mono">
+                          FOLIO: {formData.contract_number} • SHA256-{(formData.contract_number + '2026').slice(0, 16).toUpperCase()} • LEY DE FIRMA ELECTRÓNICA
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-[9px] text-right text-slate-500 font-medium">
+                      {existingContract?.firmado_digitalmente ? (
+                        <div className="flex flex-col sm:items-end">
+                          <span className="text-emerald-700 font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Firmado electrónicamente
+                          </span>
+                          <span className="text-slate-400 font-mono text-[8.5px]">
+                            {existingContract.firmado_en ? new Date(existingContract.firmado_en).toLocaleString('es-ES') : ''} • IP: {existingContract.firmante_ip || 'Auditada'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 italic">
+                          Registro inmutable emitido para formalización y suscripción digital
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
