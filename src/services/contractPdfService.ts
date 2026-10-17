@@ -43,14 +43,6 @@ export const contractPdfService = {
     };
 
     // ── PÁGINA 1: ENCABEZADO CORPORATIVO ─────────────────────────────
-    // Micro-header de seguridad jurídica
-    doc.setFontSize(6.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(148, 163, 184); // Slate 400
-    doc.text('INSTRUMENTO JURÍDICO PRIVADO AUDITABLE • VALIDEZ DE FIRMA DIGITAL', margin, y);
-    doc.text(`FOLIO: ${contract.contract_number} • SHA256-${(contract.contract_number + '2026').slice(0, 10).toUpperCase()}`, pageWidth - margin, y, { align: 'right' });
-    y += 3;
-
     // Barra superior decorativa
     doc.setFillColor(30, 41, 59); // Slate 800
     doc.rect(margin, y, contentWidth, 2, 'F');

@@ -552,15 +552,6 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
             /* Vista Previa del Documento Completo - Estilo DocuSign / Adobe Sign Enterprise */
             <div className="max-w-4xl mx-auto bg-white p-8 sm:p-14 rounded-2xl shadow-2xl border-2 border-slate-800 text-slate-800 space-y-7 relative overflow-hidden font-sans">
               
-              {/* Micro-header de seguridad jurídica y hash criptográfico */}
-              <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-[9px] uppercase tracking-widest font-mono text-slate-400">
-                <span className="flex items-center gap-1.5 font-bold text-slate-500">
-                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>INSTRUMENTO JURÍDICO AUDITABLE • VALIDEZ DE FIRMA DIGITAL</span>
-                </span>
-                <span>FOLIO: {formData.contract_number} • SHA256-{(formData.contract_number + '2026').slice(0, 10).toUpperCase()}</span>
-              </div>
-
               {/* Membrete Corporativo Oficial - Logo Proporcional */}
               <div className="border-b-2 border-slate-900/80 pb-6 flex flex-col sm:flex-row justify-between items-start gap-6">
                 <div className="flex-1 space-y-2">
@@ -770,42 +761,13 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                   </div>
                 </div>
 
-                {/* Certificado de Integridad y Trazabilidad Criptográfica (100% White-Label) */}
-                <div className="mt-6 pt-4 border-t border-slate-200">
-                  <div className="p-3.5 rounded-xl bg-slate-50/90 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-700">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700 flex-shrink-0">
-                        <ShieldCheck className="w-4 h-4" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-900">
-                          {existingContract?.firmado_digitalmente 
-                            ? 'Certificado Oficial de Firma Electrónica' 
-                            : 'Instrumento Electrónico con Validez Jurídica Vinculante'}
-                        </p>
-                        <p className="text-[9px] text-slate-500 font-mono">
-                          FOLIO: {formData.contract_number} • SHA256-{(formData.contract_number + '2026').slice(0, 16).toUpperCase()} • LEY DE FIRMA ELECTRÓNICA
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-[9px] text-right text-slate-500 font-medium">
-                      {existingContract?.firmado_digitalmente ? (
-                        <div className="flex flex-col sm:items-end">
-                          <span className="text-emerald-700 font-bold flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Firmado electrónicamente
-                          </span>
-                          <span className="text-slate-400 font-mono text-[8.5px]">
-                            {existingContract.firmado_en ? new Date(existingContract.firmado_en).toLocaleString('es-ES') : ''} • IP: {existingContract.firmante_ip || 'Auditada'}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-slate-500 italic">
-                          Registro inmutable emitido para formalización y suscripción digital
-                        </span>
-                      )}
-                    </div>
+                {/* Trazabilidad Legal Discreta (Estándar HubSpot / DocuSign - Solo cuando está firmado) */}
+                {existingContract?.firmado_digitalmente && (
+                  <div className="mt-8 pt-3 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-400 font-mono gap-1">
+                    <span>Doc. Ref: {formData.contract_number} • Hash SHA-256: {(formData.contract_number + 'SEC2026').slice(0, 16).toUpperCase()}</span>
+                    <span>Firmado electrónicamente el {existingContract.firmado_en ? new Date(existingContract.firmado_en).toLocaleString('es-ES') : ''} • IP: {existingContract.firmante_ip || 'Auditada'}</span>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
