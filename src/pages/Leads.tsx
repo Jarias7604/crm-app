@@ -180,9 +180,14 @@ export default function Leads() {
             const saved = localStorage.getItem('lead_visible_columns');
             if (saved) {
                 const parsed: string[] = JSON.parse(saved);
-                // Auto-surface newly added default columns for returning users
-                const missing = defaultCols.filter(c => !parsed.includes(c));
-                return missing.length > 0 ? [...parsed, ...missing] : parsed;
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    // Filter to only columns that actually exist in ALL_COLUMNS, and guarantee 'name' is included
+                    const validIds = new Set(ALL_COLUMNS.map(c => c.id));
+                    const sanitized = parsed.filter(c => validIds.has(c));
+                    if (sanitized.length > 0) {
+                        return sanitized.includes('name') ? sanitized : ['name', ...sanitized];
+                    }
+                }
             }
         } catch {}
         return defaultCols;
@@ -1752,15 +1757,27 @@ export default function Leads() {
                                 {showColumnModal && (
                                     <div className="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[999] overflow-hidden">
                                         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 bg-gray-50/60">
-                                            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Columnas visibles</h3>
-                                            <button
-                                                onClick={() => {
-                                                    const all = ALL_COLUMNS.map(c => c.id);
-                                                    setVisibleColumns(all);
-                                                    localStorage.setItem('lead_visible_columns', JSON.stringify(all));
-                                                }}
-                                                className="text-[9px] font-black text-indigo-400 hover:text-indigo-600 transition-colors"
-                                            >Todas</button>
+                                            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Columnas</h3>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'industry', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at', 'interested_product_id'];
+                                                        setVisibleColumns(defaultCols);
+                                                        localStorage.setItem('lead_visible_columns', JSON.stringify(defaultCols));
+                                                    }}
+                                                    className="text-[9px] font-bold text-gray-400 hover:text-gray-600 transition-colors"
+                                                    title="Restablecer a columnas por defecto"
+                                                >Defecto</button>
+                                                <span className="text-gray-200">|</span>
+                                                <button
+                                                    onClick={() => {
+                                                        const all = ALL_COLUMNS.map(c => c.id);
+                                                        setVisibleColumns(all);
+                                                        localStorage.setItem('lead_visible_columns', JSON.stringify(all));
+                                                    }}
+                                                    className="text-[9px] font-black text-indigo-500 hover:text-indigo-700 transition-colors"
+                                                >Todas</button>
+                                            </div>
                                         </div>
                                         <div className="py-1">
                                             {ALL_COLUMNS.map(col => {

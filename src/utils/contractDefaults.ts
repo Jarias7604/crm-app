@@ -80,11 +80,6 @@ export function generateContractDefaults(seed: ContractSeedData): {
   const valorCuota = cuotas > 0 ? Math.round((remanente / cuotas) * 100) / 100 : 0;
   const totalStr = total.toLocaleString('en-US', { minimumFractionDigits: 2 });
 
-  // Módulos o alcance complementario
-  const modulos = Array.isArray(cotizacion?.modulos_adicionales)
-    ? cotizacion.modulos_adicionales.map((m: any) => typeof m === 'string' ? m : m.nombre).join(', ')
-    : '';
-
   const datos_empresa: ContractCompanyData = {
     nombre: empresaNombre,
     tax_id: company.tax_id || '',
@@ -118,22 +113,72 @@ export function generateContractDefaults(seed: ContractSeedData): {
     formaPagoTexto += ` Se otorga un periodo de gracia promocional de ${mesesGracia} mes(es) sin cobro (Go-Live diferido), programándose el primer cobro efectivo para el día ${primerCobroTexto}.`;
   }
 
+  // DTEs / DTs volume
+  const volumenDtes = Number(cotizacion?.volumen_dtes || 0);
+
+  // Módulos o alcance complementario
+  const modulosList: string[] = [];
+  if (Array.isArray(cotizacion?.modulos_adicionales)) {
+    cotizacion.modulos_adicionales.forEach((m: any) => {
+      const nombre = typeof m === 'string' ? m : m.nombre;
+      const precio = typeof m === 'object' ? (m.pago_unico || m.costo_anual || m.costo_mensual) : null;
+      if (nombre) {
+        modulosList.push(precio ? `${nombre} ($${Number(precio).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD)` : nombre);
+      }
+    });
+  }
+
+  // Servicios complementarios de la cotización
+  const serviciosExtra: string[] = [];
+  if (cotizacion?.servicio_whatsapp) {
+    serviciosExtra.push(`Módulo WhatsApp Business API${cotizacion.costo_whatsapp ? ` ($${Number(cotizacion.costo_whatsapp).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD)` : ''}`);
+  }
+  if (cotizacion?.servicio_personalizacion) {
+    serviciosExtra.push(`Personalización y Adecuación de Software${cotizacion.costo_personalizacion ? ` ($${Number(cotizacion.costo_personalizacion).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD)` : ''}`);
+  }
+  if (cotizacion?.incluir_implementacion && cotizacion.costo_implementacion > 0) {
+    serviciosExtra.push(`Servicio de Implementación e Inducción Inicial ($${Number(cotizacion.costo_implementacion).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD)`);
+  }
+
+  const modulos = modulosList.join(', ');
+
   const jurisdiccion = datos_empresa.ciudad_pais || 'San Salvador, El Salvador';
   const fechaInicioTexto = format(hoy, "d 'de' MMMM 'de' yyyy", { locale: es });
   const fechaFinTexto = format(fechaFin, "d 'de' MMMM 'de' yyyy", { locale: es });
 
-  const objetoTexto = `Prestación de servicios, suministro y/o licenciamiento correspondientes a "${planNombre}"${
-    modulos ? ` con alcance en: ${modulos}` : ''
-  }, conforme a las especificaciones acordadas en la propuesta comercial oficial.`;
+  let objetoTexto = `Prestación de servicios, suministro y/o licenciamiento correspondientes a "${planNombre}"`;
+  if (volumenDtes > 0) {
+    objetoTexto += ` con capacidad operativa de hasta ${volumenDtes.toLocaleString('es-SV')} transacciones diarias / DTEs`;
+  }
+  if (modulos) {
+    objetoTexto += ` y alcance en módulos: ${modulos}`;
+  }
+  objetoTexto += `, conforme a las especificaciones convenidas en la propuesta comercial oficial.`;
+
+  // Construcción detallada de Cláusula Primera con ítems y catálogo
+  let contenidoPrimera = `EL PRESTADOR se compromete y obliga a prestar a favor de EL CLIENTE los servicios profesionales, técnicos o de licenciamiento correspondientes a "${planNombre}".`;
+  const itemsAlcance: string[] = [];
+  if (volumenDtes > 0) {
+    itemsAlcance.push(`Capacidad Operativa y Transaccional: Hasta ${volumenDtes.toLocaleString('es-SV')} transacciones diarias / documentos tributarios electrónicos (DTEs) mensuales incluidos.`);
+  }
+  if (modulosList.length > 0) {
+    itemsAlcance.push(`Módulos Adicionales y Funcionalidades: ${modulosList.join(', ')}.`);
+  }
+  if (serviciosExtra.length > 0) {
+    itemsAlcance.push(`Servicios Complementarios e Integraciones: ${serviciosExtra.join(', ')}.`);
+  }
+
+  if (itemsAlcance.length > 0) {
+    contenidoPrimera += `\n\nAlcance detallado de los entregables y especificaciones técnicas convenidas:\n${itemsAlcance.map(item => `• ${item}`).join('\n')}`;
+  }
+  contenidoPrimera += `\n\nTodos los trabajos se desarrollarán bajo rigurosos estándares profesionales y de estricta conformidad con las especificaciones acordadas en la propuesta comercial de referencia.`;
 
   const clausulas: ContractClause[] = [
     {
       id: 'c1',
       numero: 'PRIMERA',
       titulo: 'OBJETO Y ALCANCE DE LOS SERVICIOS',
-      contenido: `EL PRESTADOR se compromete y obliga a prestar a favor de EL CLIENTE los servicios profesionales, técnicos o de suministro correspondientes a "${planNombre}"${
-        modulos ? `, integrando los siguientes alcances: ${modulos}` : ''
-      }. Todos los trabajos se realizarán bajo rigurosos estándares profesionales y de estricta conformidad con las especificaciones acordadas.`,
+      contenido: contenidoPrimera,
       es_personalizada: false,
     },
     {

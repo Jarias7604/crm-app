@@ -15,6 +15,8 @@ import type { Lead, FollowUp, LeadStatus, LeadPriority } from '../../types';
 import { type CallActivity } from '../../services/callActivity';
 import { contractsService } from '../../services/contracts';
 import type { Contract } from '../../types/contracts';
+import { cotizacionesService } from '../../services/cotizaciones';
+import type { Cotizacion } from '../../types/cotizaciones';
 import { ContractEditorModal } from '../contracts/ContractEditorModal';
 import { ContractShareModal } from '../contracts/ContractShareModal';
 import { contractPdfService } from '../../services/contractPdfService';
@@ -113,6 +115,36 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const [isContractShareOpen, setIsContractShareOpen] = useState(false);
     const [companyInfo, setCompanyInfo] = useState<any>(null);
 
+    // Cotizaciones del Lead y Restricción de Contratos sin Cotización
+    const [leadCotizaciones, setLeadCotizaciones] = useState<Cotizacion[]>([]);
+    const [selectedCotizacionForContract, setSelectedCotizacionForContract] = useState<Cotizacion | null>(null);
+    const [isQuotePickerOpen, setIsQuotePickerOpen] = useState(false);
+    const [isNoQuoteWarningOpen, setIsNoQuoteWarningOpen] = useState(false);
+
+    const handleInitiateContractCreation = () => {
+        if (leadCotizaciones.length === 0) {
+            setIsNoQuoteWarningOpen(true);
+            return;
+        }
+
+        if (leadCotizaciones.length === 1) {
+            setSelectedCotizacionForContract(leadCotizaciones[0]);
+            setSelectedContractForEdit(null);
+            setIsContractEditorOpen(true);
+            return;
+        }
+
+        // Multiple quotes -> open quote selector modal
+        setIsQuotePickerOpen(true);
+    };
+
+    const handleSelectQuoteForContract = (cot: Cotizacion) => {
+        setSelectedCotizacionForContract(cot);
+        setIsQuotePickerOpen(false);
+        setSelectedContractForEdit(null);
+        setIsContractEditorOpen(true);
+    };
+
     const getWhatsAppLink = (phone: string) => {
         if (!phone) return '';
         let cleanPhone = phone.replace(/\D/g, '');
@@ -149,16 +181,18 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
         if (!lead) return;
         setIsLoadingDetails(true);
         try {
-            const [followUpsData, messagesData, activitiesData, contractsData] = await Promise.all([
+            const [followUpsData, messagesData, activitiesData, contractsData, cotizacionesData] = await Promise.all([
                 leadsService.getFollowUps(lead.id),
                 leadsService.getLeadMessages(lead.id),
                 callActivityService.getLeadCalls(lead.id),
                 contractsService.getByLead(lead.id).catch(() => []),
+                cotizacionesService.getCotizacionesByLead(lead.id).catch(() => []),
             ]);
             setFollowUps(followUpsData || []);
             setMessages(messagesData || []);
             setCallActivities(activitiesData || []);
             setLeadContracts(contractsData || []);
+            setLeadCotizaciones(cotizacionesData || []);
 
             // Cargar info de empresa si no está
             if (lead.company_id) {
@@ -592,6 +626,98 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 )}
                             </div>
 
+                            {/* ── Propuestas y Cotizaciones del Lead ── */}
+                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-4">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="w-4 h-4 text-emerald-600" />
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            Cotizaciones & Propuestas ({leadCotizaciones.length})
+                                        </h4>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            navigate('/cotizaciones/nueva-pro', { state: { lead: selectedLead } });
+                                        }}
+                                        className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs border border-emerald-200/70"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" /> Nueva Cotización
+                                    </button>
+                                </div>
+
+                                {leadCotizaciones.length > 0 ? (
+                                    <div className="space-y-2.5">
+                                        {leadCotizaciones.map((cot) => {
+                                            const total = cot.total_anual || cot.total_mensual || 0;
+                                            return (
+                                                <div
+                                                    key={cot.id}
+                                                    className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-emerald-200 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                                                >
+                                                    <div className="space-y-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-mono font-bold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-100">
+                                                                COT-{cot.id.slice(0, 6).toUpperCase()}
+                                                            </span>
+                                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                                                cot.estado === 'aceptada'
+                                                                    ? 'bg-emerald-100 text-emerald-800'
+                                                                    : cot.estado === 'enviada'
+                                                                    ? 'bg-blue-100 text-blue-800'
+                                                                    : 'bg-amber-100 text-amber-800'
+                                                            }`}>
+                                                                {cot.estado === 'aceptada' ? '✅ Aceptada' : cot.estado === 'enviada' ? '📤 Enviada' : '📝 Borrador'}
+                                                            </span>
+                                                            {cot.volumen_dtes ? (
+                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                                                                    {cot.volumen_dtes.toLocaleString()} DTs
+                                                                </span>
+                                                            ) : null}
+                                                        </div>
+                                                        <p className="text-xs font-bold text-slate-800 truncate">{cot.plan_nombre || 'Propuesta Comercial'}</p>
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Monto: <strong className="text-emerald-700">${total.toLocaleString()} USD</strong>
+                                                            {cot.created_at && ` • ${format(new Date(cot.created_at), 'dd MMM yyyy', { locale: es })}`}
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        <a
+                                                            href={`/cotizaciones/${cot.id}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="px-2.5 py-1 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg text-[11px] font-bold border border-slate-200 transition-colors flex items-center gap-1"
+                                                        >
+                                                            <ExternalLink className="w-3 h-3" /> Ver
+                                                        </a>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleSelectQuoteForContract(cot)}
+                                                            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1 cursor-pointer"
+                                                            title="Formalizar esta cotización en un contrato oficial"
+                                                        >
+                                                            <ShieldCheck className="w-3 h-3" /> Crear Contrato
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="p-3.5 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center space-y-1.5">
+                                        <p className="text-xs text-slate-500 font-medium">Este prospecto aún no tiene cotizaciones generadas.</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedLead } })}
+                                            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-1 underline cursor-pointer"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" /> Cotizar con Cotizador Pro
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* ── Contratos de Servicios Profesionales ── */}
                             <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-4">
                                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -600,10 +726,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     </h4>
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            setSelectedContractForEdit(null);
-                                            setIsContractEditorOpen(true);
-                                        }}
+                                        onClick={handleInitiateContractCreation}
                                         className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
                                     >
                                         <Plus className="w-3.5 h-3.5" /> Nuevo Contrato
@@ -1036,6 +1159,125 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         onProductsChanged={loadProducts}
                     />
 
+                    {/* Modal de Advertencia: No hay cotizaciones para el contrato */}
+                    {isNoQuoteWarningOpen && (
+                        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                            <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+                                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mx-auto">
+                                    <ShieldCheck className="w-6 h-6" />
+                                </div>
+                                <div className="text-center space-y-1.5">
+                                    <h3 className="text-base font-black text-slate-900">Cotización Previa Requerida</h3>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        Siguiendo el flujo comercial de la empresa, todo contrato debe derivar de una cotización oficial para garantizar la consistencia de precios, paquetes de DTs y condiciones aprobadas.
+                                    </p>
+                                </div>
+                                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-600 flex items-center gap-2.5">
+                                    <span className="text-lg">💡</span>
+                                    <span>Genera primero la cotización formal con el Cotizador Pro para este prospecto.</span>
+                                </div>
+                                <div className="flex items-center gap-2 pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsNoQuoteWarningOpen(false)}
+                                        className="flex-1 py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                        Entendido
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsNoQuoteWarningOpen(false);
+                                            navigate('/cotizaciones/nueva-pro', { state: { lead: selectedLead } });
+                                        }}
+                                        className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                                    >
+                                        <Plus className="w-4 h-4" /> Crear Cotización
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Modal Selector de Cotización Base para Contrato */}
+                    {isQuotePickerOpen && (
+                        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+                            <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[85vh] flex flex-col">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                    <div>
+                                        <h3 className="text-sm font-black text-slate-900">Seleccionar Cotización Base</h3>
+                                        <p className="text-xs text-slate-500">¿Sobre cuál propuesta deseas generar el contrato?</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsQuotePickerOpen(false)}
+                                        className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                                    {leadCotizaciones.map((cot) => {
+                                        const total = cot.total_anual || cot.total_mensual || 0;
+                                        return (
+                                            <div
+                                                key={cot.id}
+                                                onClick={() => handleSelectQuoteForContract(cot)}
+                                                className="p-3.5 rounded-2xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/40 transition-all cursor-pointer group flex items-center justify-between gap-3"
+                                            >
+                                                <div className="space-y-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-mono font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-100">
+                                                            COT-{cot.id.slice(0, 6).toUpperCase()}
+                                                        </span>
+                                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                                            cot.estado === 'aceptada'
+                                                                ? 'bg-emerald-100 text-emerald-800'
+                                                                : cot.estado === 'enviada'
+                                                                ? 'bg-blue-100 text-blue-800'
+                                                                : 'bg-amber-100 text-amber-800'
+                                                        }`}>
+                                                            {cot.estado}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs font-black text-slate-800 group-hover:text-indigo-900 truncate">
+                                                        {cot.plan_nombre || 'Servicios Profesionales'}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-500">
+                                                        Monto: <strong className="text-emerald-700">${total.toLocaleString()} USD</strong>
+                                                        {cot.volumen_dtes ? ` • ${cot.volumen_dtes.toLocaleString()} DTs` : ''}
+                                                    </p>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleSelectQuoteForContract(cot);
+                                                    }}
+                                                    className="px-3 py-1.5 bg-indigo-600 group-hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shrink-0 transition-all shadow-xs"
+                                                >
+                                                    Seleccionar ➔
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="pt-2 border-t border-slate-100 flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsQuotePickerOpen(false)}
+                                        className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
+                                    >
+                                        Cancelar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Contract Modals */}
                     {isContractEditorOpen && (
                         <ContractEditorModal
@@ -1043,8 +1285,10 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             onClose={() => {
                                 setIsContractEditorOpen(false);
                                 setSelectedContractForEdit(null);
+                                setSelectedCotizacionForContract(null);
                             }}
                             existingContract={selectedContractForEdit}
+                            cotizacion={selectedCotizacionForContract}
                             lead={selectedLead}
                             company={companyInfo || { id: selectedLead.company_id, name: 'Mi Empresa' }}
                             creatorName={profile?.full_name}

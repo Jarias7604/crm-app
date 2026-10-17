@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Send, Eye, FileText, CheckCircle2, DollarSign, Calendar, Building2, User, Shield, Download, RefreshCw, ShieldCheck, FileCheck } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Plus, Trash2, Save, Send, Eye, FileText, CheckCircle2, DollarSign, Calendar, Building2, User, Shield, Download, RefreshCw, ShieldCheck, FileCheck, Package, Search, Tag, Filter } from 'lucide-react';
 import type { Contract, ContractClause, CreateContractInput } from '../../types/contracts';
 import { contractsService } from '../../services/contracts';
 import { generateContractDefaults } from '../../utils/contractDefaults';
 import { contractPdfService } from '../../services/contractPdfService';
 import { ContractShareModal } from './ContractShareModal';
+import { pricingService } from '../../services/pricing';
+import type { PricingItem } from '../../types/pricing';
 import toast from 'react-hot-toast';
 
 import { calculateContractDates, getContractExpirationInfo, formatContractDate } from '../../utils/contractReminders';
@@ -67,6 +69,65 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [currentContractForShare, setCurrentContractForShare] = useState<Contract | null>(null);
+
+  // Catálogo corporativo integrado
+  const [catalogItems, setCatalogItems] = useState<PricingItem[]>([]);
+  const [isCatalogSelectorOpen, setIsCatalogSelectorOpen] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogTypeFilter, setCatalogTypeFilter] = useState<'all' | 'plan' | 'modulo' | 'servicio' | 'implementacion'>('all');
+  const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setIsLoadingCatalog(true);
+    pricingService.getAllPricingItems(false)
+      .then(items => setCatalogItems(items || []))
+      .catch(err => {
+        console.warn('Error loading catalog items for contract:', err);
+      })
+      .finally(() => setIsLoadingCatalog(false));
+  }, [isOpen]);
+
+  const filteredCatalogItems = useMemo(() => {
+    return catalogItems.filter(item => {
+      const matchType = catalogTypeFilter === 'all' || item.tipo === catalogTypeFilter;
+      const q = catalogSearch.toLowerCase().trim();
+      const matchSearch = !q ||
+        item.nombre.toLowerCase().includes(q) ||
+        (item.descripcion && item.descripcion.toLowerCase().includes(q)) ||
+        (item.tipo && item.tipo.toLowerCase().includes(q));
+      return matchType && matchSearch;
+    });
+  }, [catalogItems, catalogTypeFilter, catalogSearch]);
+
+  const handleAddCatalogItemToContract = (item: PricingItem) => {
+    const price = item.precio_anual || item.precio_mensual || item.costo_unico || 0;
+    const dteInfo = item.min_dtes ? ` (Capacidad: hasta ${item.min_dtes.toLocaleString()} DTEs/DTs)` : '';
+    const itemLine = `• ${item.nombre} [${item.tipo.toUpperCase()}]${dteInfo}: ${item.descripcion || 'Servicio oficial del catálogo corporativo'} ($${price.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD).`;
+
+    setFormData(prev => {
+      const newClausulas = [...prev.clausulas];
+      const c1Index = newClausulas.findIndex(c => c.numero === 'PRIMERA' || c.id === 'c1');
+      if (c1Index !== -1) {
+        newClausulas[c1Index] = {
+          ...newClausulas[c1Index],
+          contenido: `${newClausulas[c1Index].contenido.trim()}\n${itemLine}`,
+        };
+      }
+
+      const nextObjeto = prev.objeto ? `${prev.objeto}, ${item.nombre}` : item.nombre;
+      const nextMonto = prev.monto_total + price;
+
+      return {
+        ...prev,
+        clausulas: newClausulas,
+        objeto: nextObjeto,
+        monto_total: nextMonto,
+      };
+    });
+
+    toast.success(`"${item.nombre}" insertado en Cláusula Primera (+ $${price.toLocaleString()} USD)`);
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -273,9 +334,17 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/10 text-indigo-200 border border-white/10">
                   {formData.contract_number}
                 </span>
+                {cotizacion && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Cotización Vinculada
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400">
                 Cliente: <strong className="text-slate-200">{formData.datos_cliente.empresa || formData.datos_cliente.nombre}</strong>
+                {cotizacion?.plan_nombre && (
+                  <span className="ml-2 text-slate-400">• Plan Base: <strong className="text-indigo-300">{cotizacion.plan_nombre}</strong></span>
+                )}
               </p>
             </div>
           </div>
@@ -688,14 +757,138 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
                   <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                     <FileText className="w-4 h-4 text-indigo-600" /> Cláusulas del Contrato ({formData.clausulas.length})
                   </h3>
-                  <button
-                    type="button"
-                    onClick={handleAddClause}
-                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Agregar Cláusula Extra
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsCatalogSelectorOpen(prev => !prev)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer ${
+                        isCatalogSelectorOpen
+                          ? 'bg-emerald-600 text-white shadow-emerald-200'
+                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      }`}
+                      title="Explorar e incorporar ítems del catálogo de precios o paquetes de DTs a la Cláusula Primera"
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                      <span>Catálogo & DTs</span>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black ${isCatalogSelectorOpen ? 'bg-white/20 text-white' : 'bg-emerald-200/70 text-emerald-900'}`}>
+                        {catalogItems.length}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddClause}
+                      className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Agregar Cláusula Extra
+                    </button>
+                  </div>
                 </div>
+
+                {/* Panel de Inserción Rápida desde el Catálogo Corporativo */}
+                {isCatalogSelectorOpen && (
+                  <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-200 shadow-sm space-y-3 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4 text-emerald-700" />
+                        <h4 className="text-xs font-black text-emerald-950 uppercase tracking-wide">
+                          Catálogo de Precios, Módulos y DTs
+                        </h4>
+                        <span className="text-[10px] text-emerald-700 font-medium hidden sm:inline">
+                          (Haz clic en <strong>Insertar</strong> para trasladar ítems a la Cláusula Primera)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsCatalogSelectorOpen(false)}
+                        className="text-xs text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
+                      >
+                        ✕ Cerrar
+                      </button>
+                    </div>
+
+                    {/* Filtros y Buscador con Lupa */}
+                    <div className="flex flex-col sm:flex-row items-center gap-2.5">
+                      <div className="relative flex-1 w-full">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={catalogSearch}
+                          onChange={(e) => setCatalogSearch(e.target.value)}
+                          placeholder="Buscar por nombre, código o descripción de servicio..."
+                          className="w-full pl-9 pr-3 py-1.5 bg-white border border-emerald-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-500 outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                        {(['all', 'plan', 'modulo', 'servicio', 'implementacion'] as const).map(t => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setCatalogTypeFilter(t)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-all whitespace-nowrap cursor-pointer ${
+                              catalogTypeFilter === t
+                                ? 'bg-emerald-700 text-white shadow-xs'
+                                : 'bg-white text-emerald-900 border border-emerald-200 hover:bg-emerald-100/50'
+                            }`}
+                          >
+                            {t === 'all' ? 'Todos' : t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Grid de ítems del catálogo */}
+                    <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                      {isLoadingCatalog ? (
+                        <div className="py-6 text-center text-xs text-emerald-700 font-semibold">
+                          Cargando catálogo oficial de productos...
+                        </div>
+                      ) : filteredCatalogItems.length > 0 ? (
+                        filteredCatalogItems.map(item => {
+                          const price = item.precio_anual || item.precio_mensual || item.costo_unico || 0;
+                          return (
+                            <div
+                              key={item.id}
+                              className="p-3 bg-white rounded-xl border border-emerald-100 hover:border-emerald-300 shadow-2xs flex items-center justify-between gap-3 transition-all"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-black text-slate-800 truncate">{item.nombre}</span>
+                                  <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                                    {item.tipo}
+                                  </span>
+                                  {item.min_dtes ? (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                                      {item.min_dtes.toLocaleString()} DTs
+                                    </span>
+                                  ) : null}
+                                </div>
+                                {item.descripcion && (
+                                  <p className="text-[10px] text-slate-500 line-clamp-1 mt-0.5">{item.descripcion}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <span className="text-xs font-black text-slate-900">
+                                  ${price.toLocaleString()} USD
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddCatalogItemToContract(item)}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg shadow-xs transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Plus className="w-3 h-3" /> Insertar
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-6 text-slate-400 text-xs font-medium">
+                          No se encontraron servicios o DTs en el catálogo con los filtros aplicados.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   {formData.clausulas.map((clausula, idx) => (

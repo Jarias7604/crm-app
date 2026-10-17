@@ -145,6 +145,13 @@ export const leadSourcesService = {
     },
 
     /**
+     * Toggle active state of a source
+     */
+    async toggleActive(id: string, currentStatus: boolean): Promise<LeadSource> {
+        return this.updateSource(id, { is_active: !currentStatus });
+    },
+
+    /**
      * Delete a non-system source
      */
     async deleteSource(id: string): Promise<void> {
