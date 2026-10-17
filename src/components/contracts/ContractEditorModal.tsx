@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Send, Eye, FileText, CheckCircle2, DollarSign, Calendar, Building2, User, Shield, Download, RefreshCw, ShieldCheck, FileCheck, Briefcase, Package, Code, Hammer, Sparkles, Lock } from 'lucide-react';
+import { X, Plus, Trash2, Save, Send, Eye, FileText, CheckCircle2, DollarSign, Calendar, Building2, User, Shield, Download, RefreshCw, ShieldCheck, FileCheck } from 'lucide-react';
 import type { Contract, ContractClause, CreateContractInput } from '../../types/contracts';
 import { contractsService } from '../../services/contracts';
-import { generateContractDefaults, INDUSTRY_PRESETS, buildClausesForPreset, type ContractIndustryPreset } from '../../utils/contractDefaults';
+import { generateContractDefaults } from '../../utils/contractDefaults';
 import { contractPdfService } from '../../services/contractPdfService';
 import { ContractShareModal } from './ContractShareModal';
 import toast from 'react-hot-toast';
@@ -52,7 +52,6 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [currentContractForShare, setCurrentContractForShare] = useState<Contract | null>(null);
-  const [selectedPreset, setSelectedPreset] = useState<ContractIndustryPreset>('servicios');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -149,37 +148,6 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
       ...prev,
       clausulas: prev.clausulas.filter((_, i) => i !== idx),
     }));
-  };
-
-  const handleApplyPreset = (preset: ContractIndustryPreset) => {
-    if (formData.clausulas.length > 0) {
-      const confirmChange = window.confirm(
-        '¿Deseas aplicar esta plantilla de rubro? Se actualizará el título, objeto y las cláusulas con la redacción legal especializada de este giro comercial, conservando tus montos económicos y datos de partes.'
-      );
-      if (!confirmChange) return;
-    }
-
-    setSelectedPreset(preset);
-    const { title, objeto, clausulas } = buildClausesForPreset(preset, {
-      empresaNombre: formData.datos_empresa.nombre,
-      clienteNombre: formData.datos_cliente.nombre,
-      clienteEmpresa: formData.datos_cliente.empresa || formData.datos_cliente.nombre,
-      planNombre: cotizacion?.plan_nombre || formData.title,
-      modulos: '',
-      total: formData.monto_total || 0,
-      formaPagoTexto: formData.forma_pago || '',
-      vigenciaMeses: formData.vigencia_meses || 12,
-      hoy: new Date(),
-      jurisdiccion: formData.jurisdiccion || 'San Salvador, El Salvador',
-    });
-
-    setFormData(prev => ({
-      ...prev,
-      title,
-      objeto,
-      clausulas,
-    }));
-    toast.success('Plantilla de rubro aplicada correctamente');
   };
 
   const handleSave = async (targetStatus: 'borrador' | 'enviado' = 'borrador') => {
@@ -305,60 +273,6 @@ export const ContractEditorModal: React.FC<ContractEditorModalProps> = ({
           {activeTab === 'editor' ? (
             <div className="space-y-6 max-w-4xl mx-auto">
               
-              {/* Selector de Plantilla por Rubro / Giro de Empresa */}
-              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white shadow-md border border-indigo-900/40">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-white/10">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-600/60 border border-indigo-400/30 flex items-center justify-center text-amber-300">
-                      <Sparkles className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black tracking-wide uppercase text-white flex items-center gap-2">
-                        Plantilla según Giro o Rubro de Empresa
-                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/20">
-                          Multi-Tenant SaaS
-                        </span>
-                      </h4>
-                      <p className="text-[11px] text-slate-300">
-                        Selecciona el tipo de contrato para cargar cláusulas especializadas a tu actividad:
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-3.5">
-                  {INDUSTRY_PRESETS.map((p) => {
-                    const isSelected = selectedPreset === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => handleApplyPreset(p.id)}
-                        className={`flex flex-col items-start p-2.5 rounded-xl border transition-all text-left group ${
-                          isSelected
-                            ? 'bg-indigo-600/40 border-indigo-400 text-white shadow-inner'
-                            : 'border-white/10 bg-white/5 hover:bg-white/15 hover:border-indigo-400/40 text-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5 mb-1 text-indigo-300 group-hover:text-amber-300">
-                          {p.id === 'servicios' && <Briefcase className="w-3.5 h-3.5" />}
-                          {p.id === 'suministro' && <Package className="w-3.5 h-3.5" />}
-                          {p.id === 'tecnologia' && <Code className="w-3.5 h-3.5" />}
-                          {p.id === 'construccion' && <Hammer className="w-3.5 h-3.5" />}
-                          {p.id === 'nda' && <Shield className="w-3.5 h-3.5" />}
-                          <span className="text-[10px] font-black uppercase tracking-tight">
-                            {p.label}
-                          </span>
-                        </div>
-                        <span className="text-[9px] text-slate-400 group-hover:text-slate-200 line-clamp-1">
-                          {p.badge}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* Card 1: Identificación y Objeto */}
               <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-4">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
