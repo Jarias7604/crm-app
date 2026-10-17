@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall, Sparkles, Brain, Target, Globe } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall, Sparkles, Brain, Target, Globe, Radio } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -196,7 +196,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         subItems?: { name: string; href: string; icon: any; badge?: number }[];
     }
     const isCallBotEnabled = import.meta.env.VITE_SHOW_CALL_BOT === 'true';
-    const configPaths = ['/company/billing', '/company/branding', '/company/integrations', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/admin/call-bot'];
+    const configPaths = ['/company/billing', '/company/branding', '/company/integrations', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/lead-sources', '/admin/call-bot'];
     const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings', '/marketing/cockpit', '/marketing/engine-config', '/marketing/predictions'];
     const socialPaths = ['/marketing/social', '/marketing/flyers', '/company/social-accounts'];
     const teamPaths = ['/company/team', '/company/teams', '/company/performance'];
@@ -549,6 +549,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         { name: t('sidebar.financialManagement'), href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
         { name: t('sidebar.lossReasons'), href: '/loss-reasons', icon: XCircle, current: location.pathname === '/loss-reasons', permissionKey: 'loss_reasons' },
         { name: t('sidebar.industries'), href: '/industries', icon: Building2, current: location.pathname === '/industries', permissionKey: 'loss_reasons' },
+        { name: 'Orígenes de Leads', href: '/lead-sources', icon: Radio, current: location.pathname === '/lead-sources', permissionKey: 'loss_reasons' },
         { name: t('sidebar.callBotAi'), href: '/admin/call-bot', icon: PhoneCall, current: location.pathname === '/admin/call-bot', permissionKey: 'pipeline.admin', proOnly: true },
     ];
 

@@ -56,6 +56,9 @@ export interface Contract {
   vigencia_meses: number;
   fecha_inicio: string;
   fecha_fin: string | null;
+  meses_gracia?: number | null;
+  fecha_primer_cobro?: string | null;
+  notas?: string | null;
   jurisdiccion: string;
 
   datos_empresa: ContractCompanyData;
@@ -94,6 +97,9 @@ export interface CreateContractInput {
   vigencia_meses?: number;
   fecha_inicio?: string;
   fecha_fin?: string | null;
+  meses_gracia?: number | null;
+  fecha_primer_cobro?: string | null;
+  notas?: string | null;
   jurisdiccion?: string;
   datos_empresa: ContractCompanyData;
   datos_cliente: ContractClientData;

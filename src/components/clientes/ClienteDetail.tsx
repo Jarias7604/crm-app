@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone, UserCircle2, DollarSign, ClipboardList, Trash2, AlertTriangle, ShieldCheck, FileText, Download, ExternalLink, Plus } from 'lucide-react';
+import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone, UserCircle2, DollarSign, ClipboardList, Trash2, AlertTriangle, ShieldCheck, FileText, Download, ExternalLink, Plus, Pencil, Sparkles, Clock, Gift, Package, Layers } from 'lucide-react';
 import type { Client, ClientPipelineStage, ClientDocument, ClientStageDocumentType } from '../../types/clients';
 import { clientsService, pipelineStagesService } from '../../services/clients';
 import { contractsService } from '../../services/contracts';
 import type { Contract } from '../../types/contracts';
+import { cotizacionesService } from '../../services/cotizaciones';
+import type { Cotizacion } from '../../types/cotizaciones';
 import { ContractEditorModal } from '../contracts/ContractEditorModal';
 import { ContractShareModal } from '../contracts/ContractShareModal';
 import { contractPdfService } from '../../services/contractPdfService';
@@ -13,6 +15,7 @@ import { auditLogService } from '../../services/auditLog';
 import PagosPanel from './PagosPanel';
 import { usePermissions } from '../../hooks/usePermissions';
 import { supabase } from '../../services/supabase';
+import { getContractExpirationInfo, formatContractDate } from '../../utils/contractReminders';
 import toast from 'react-hot-toast';
 
 interface TeamMember { id: string; full_name: string | null; email: string; }
@@ -37,8 +40,9 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [savingAssign, setSavingAssign] = useState(false);
   const [reverting, setReverting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'pipeline' | 'pagos' | 'contratos'>('pipeline');
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'servicios' | 'pagos' | 'contratos'>('pipeline');
   const [contracts, setContracts] = useState<Contract[]>([]);
+  const [clientQuotes, setClientQuotes] = useState<Cotizacion[]>([]);
   const [selectedContractForEdit, setSelectedContractForEdit] = useState<Contract | null>(null);
   const [isContractEditorOpen, setIsContractEditorOpen] = useState(false);
   const [contractForShare, setContractForShare] = useState<Contract | null>(null);
@@ -48,6 +52,10 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Estados rápidos para formalización Go-Live
+  const [goLiveVigencia, setGoLiveVigencia] = useState(12);
+  const [goLiveGracia, setGoLiveGracia] = useState(0);
 
   const load = useCallback(async () => {
     if (!clientId) return;
@@ -63,10 +71,11 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
       const idx = s.findIndex(st => st.id === c?.etapa_actual_id);
       setActiveStageIdx(idx >= 0 ? idx : 0);
 
-      // Cargar contratos del cliente/lead
+      // Cargar contratos y cotizaciones del cliente/lead
       if (c) {
         if (c.lead_id) {
           contractsService.getByLead(c.lead_id).then(cts => setContracts(cts || [])).catch(() => {});
+          cotizacionesService.getCotizacionesByLead(c.lead_id).then(qs => setClientQuotes(qs || [])).catch(() => {});
         } else {
           contractsService.getByClient(c.id).then(cts => setContracts(cts || [])).catch(() => {});
         }
@@ -380,11 +389,11 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
           </div>
         )}
 
-        {/* Tabs: Pipeline / Pagos */}
-        <div className="flex border-b border-gray-100">
+        {/* Tabs: Pipeline / Servicios / Pagos / Contratos */}
+        <div className="flex border-b border-gray-100 overflow-x-auto">
           <button
             onClick={() => setActiveTab('pipeline')}
-            className={`flex items-center gap-1.5 px-5 py-3 text-xs font-black transition-all border-b-2 ${
+            className={`flex items-center gap-1.5 px-4 py-3 text-xs font-black transition-all border-b-2 whitespace-nowrap cursor-pointer ${
               activeTab === 'pipeline'
                 ? 'border-[#4449AA] text-[#4449AA]'
                 : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -394,8 +403,19 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
             Pipeline
           </button>
           <button
+            onClick={() => setActiveTab('servicios')}
+            className={`flex items-center gap-1.5 px-4 py-3 text-xs font-black transition-all border-b-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'servicios'
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            Servicios ({contracts.length})
+          </button>
+          <button
             onClick={() => setActiveTab('pagos')}
-            className={`flex items-center gap-1.5 px-5 py-3 text-xs font-black transition-all border-b-2 ${
+            className={`flex items-center gap-1.5 px-4 py-3 text-xs font-black transition-all border-b-2 whitespace-nowrap cursor-pointer ${
               activeTab === 'pagos'
                 ? 'border-emerald-500 text-emerald-600'
                 : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -406,7 +426,7 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
           </button>
           <button
             onClick={() => setActiveTab('contratos')}
-            className={`flex items-center gap-1.5 px-5 py-3 text-xs font-black transition-all border-b-2 ${
+            className={`flex items-center gap-1.5 px-4 py-3 text-xs font-black transition-all border-b-2 whitespace-nowrap cursor-pointer ${
               activeTab === 'contratos'
                 ? 'border-indigo-600 text-indigo-600'
                 : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -416,6 +436,213 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
             Contratos ({contracts.length})
           </button>
         </div>
+
+        {/* Servicios Tab — Historial y Consolidado de Productos/Planes Contratados */}
+        {activeTab === 'servicios' && client && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            {/* KPI Header Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Servicios Activos</p>
+                <p className="text-xl font-black text-slate-900 mt-0.5">{contracts.length}</p>
+                <p className="text-[10px] text-slate-500 font-medium mt-0.5">Planes y suscripciones</p>
+              </div>
+
+              <div className="p-3.5 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">Valor Contratado</p>
+                <p className="text-xl font-black text-indigo-950 mt-0.5">
+                  ${contracts.reduce((acc, c) => acc + (c.monto_total || 0), 0).toLocaleString()} USD
+                </p>
+                <p className="text-[10px] text-indigo-600 font-medium mt-0.5">Monto global acordado</p>
+              </div>
+
+              <div className="p-3.5 bg-emerald-50/50 rounded-2xl border border-emerald-100">
+                <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Cuota / Recurrente</p>
+                <p className="text-xl font-black text-emerald-950 mt-0.5">
+                  ${contracts.reduce((acc, c) => acc + (c.valor_cuota || 0), 0).toLocaleString()} USD
+                </p>
+                <p className="text-[10px] text-emerald-600 font-medium mt-0.5">Facturación periódica</p>
+              </div>
+
+              <div className="p-3.5 bg-purple-50/50 rounded-2xl border border-purple-100">
+                <p className="text-[10px] font-black text-purple-700 uppercase tracking-widest">Capacidad DTs</p>
+                <p className="text-xl font-black text-purple-950 mt-0.5">
+                  {(() => {
+                    const totalDtes = clientQuotes.reduce((acc, q) => acc + (q.volumen_dtes || 0), 0);
+                    return totalDtes > 0 ? `${totalDtes.toLocaleString()} DTs` : 'Incluida';
+                  })()}
+                </p>
+                <p className="text-[10px] text-purple-600 font-medium mt-0.5">Volumen transaccional</p>
+              </div>
+            </div>
+
+            {/* List of Contracted Services */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                <div>
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                    Historial de Servicios & Planes Contratados
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    Registro trazable de entregables, licenciamiento SaaS y paquetes operativos
+                  </p>
+                </div>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedContractForEdit(null);
+                      setIsContractEditorOpen(true);
+                    }}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Formalizar Servicio
+                  </button>
+                )}
+              </div>
+
+              {contracts.length > 0 ? (
+                contracts.map((c) => {
+                  const expInfo = getContractExpirationInfo(c.fecha_fin);
+                  return (
+                    <div
+                      key={c.id}
+                      className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm hover:border-indigo-300 transition-all space-y-3"
+                    >
+                      {/* Top Row: Title, Contract Number & Badges */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                            <Package className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-slate-900">{c.title}</span>
+                              <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                                {c.contract_number}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              ID: {c.id.slice(0, 8)} • Vigencia de {c.vigencia_meses} meses
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`px-2.5 py-0.5 text-[10px] font-black uppercase rounded-full border ${expInfo.colorClass.badge}`}>
+                            {expInfo.label}
+                          </span>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            c.status === 'firmado'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : c.status === 'enviado'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {c.status === 'firmado' ? '✅ Firmado' : c.status === 'enviado' ? '📤 Enviado' : '📝 Borrador'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Middle: Scope / Objeto del Servicio */}
+                      {c.objeto && (
+                        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100 text-xs text-slate-700 leading-relaxed">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                            Alcance y Objeto del Servicio:
+                          </p>
+                          <p className="line-clamp-2">{c.objeto}</p>
+                        </div>
+                      )}
+
+                      {/* Bottom Grid: Fechas, Gracia y Condiciones Económicas */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 text-xs">
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Inicio (Go-Live)</span>
+                          <span className="font-black text-slate-800">{formatContractDate(c.fecha_inicio)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Vencimiento</span>
+                          <span className="font-black text-slate-800">{formatContractDate(c.fecha_fin)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Periodo de Gracia</span>
+                          <span className="font-black text-amber-700">
+                            {(c.meses_gracia ?? 0) > 0 ? `${c.meses_gracia} mes(es) gratis` : 'Sin gracia'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">Inversión Total</span>
+                          <span className="font-black text-emerald-700">${c.monto_total?.toLocaleString()} USD</span>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                        <a
+                          href={`/contrato/${c.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 text-[11px]"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" /> Ver Contrato Oficial
+                        </a>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                await contractPdfService.downloadContractPDF(c);
+                                toast.success('PDF descargado');
+                              } catch {
+                                toast.error('Error al generar PDF');
+                              }
+                            }}
+                            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            title="Descargar PDF"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                          {canManage && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedContractForEdit(c);
+                                setIsContractEditorOpen(true);
+                              }}
+                              className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg font-bold text-[11px] border border-slate-200 cursor-pointer"
+                            >
+                              Editar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-10 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200 space-y-2">
+                  <Package className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-xs font-semibold text-slate-600">No hay servicios o planes formalizados aún.</p>
+                  <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                    Cuando el cliente pasa por la etapa final de Go-Live o formaliza un contrato, los productos contratados se consolidan en este historial.
+                  </p>
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedContractForEdit(null);
+                        setIsContractEditorOpen(true);
+                      }}
+                      className="mt-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Formalizar Servicio Ahora
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Contratos Tab */}
         {activeTab === 'contratos' && client && (
@@ -655,6 +882,230 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
                     </div>
                   </div>
 
+                  {/* 🚀 Bloque de Formalización & Arranque Go-Live */}
+                  {(() => {
+                    const isGoLiveStage = selectedStage.es_final || activeStageIdx === sorted.length - 1 || selectedStage.nombre?.toLowerCase().includes('live');
+                    if (!isGoLiveStage) return null;
+
+                    const clientContract = contracts.length > 0 ? contracts[0] : null;
+
+                    return (
+                      <div className="bg-gradient-to-br from-indigo-50/90 via-white to-blue-50/70 rounded-2xl p-4 border border-indigo-200/80 shadow-xs space-y-3">
+                        <div className="flex items-center justify-between border-b border-indigo-100 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                              <ShieldCheck className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                                Formalización & Arranque Go-Live
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-100 text-indigo-800">Etapa Clave</span>
+                              </h4>
+                              <p className="text-[10px] text-slate-500 font-medium">
+                                Vigencia de servicio, fecha inicio y recordatorios de vencimiento
+                              </p>
+                            </div>
+                          </div>
+
+                          {canManage && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedContractForEdit(clientContract || null);
+                                setIsContractEditorOpen(true);
+                              }}
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                            >
+                              {clientContract ? (
+                                <>
+                                  <Pencil className="w-3.5 h-3.5" /> Editar Contrato
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="w-3.5 h-3.5" /> + Generar Contrato Go-Live
+                                </>
+                              )}
+                            </button>
+                          )}
+                        </div>
+
+                        {clientContract ? (
+                          <div className="space-y-3">
+                            <div className="p-3.5 bg-white rounded-xl border border-indigo-100 shadow-2xs space-y-2.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                                    {clientContract.contract_number}
+                                  </span>
+                                  <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                    clientContract.status === 'firmado'
+                                      ? 'bg-emerald-100 text-emerald-800'
+                                      : clientContract.status === 'enviado'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {clientContract.status === 'firmado' ? '✅ Firmado' : clientContract.status === 'enviado' ? '📤 Enviado' : '📝 Borrador'}
+                                  </span>
+                                </div>
+
+                                {/* Recordatorio de Vencimiento Badge */}
+                                {(() => {
+                                  const exp = getContractExpirationInfo(clientContract.fecha_fin);
+                                  return (
+                                    <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${exp.colorClass.badge}`}>
+                                      {exp.label}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+
+                              <p className="text-xs font-bold text-slate-800">{clientContract.title}</p>
+
+                              {/* Grid de 4 Fechas Clave */}
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 text-[11px]">
+                                <div className="bg-slate-50 p-2 rounded-lg">
+                                  <span className="text-[9px] font-bold uppercase text-slate-400 block">Inicio Go-Live</span>
+                                  <span className="font-bold text-slate-800">{formatContractDate(clientContract.fecha_inicio)}</span>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded-lg">
+                                  <span className="text-[9px] font-bold uppercase text-slate-400 block">Vigencia</span>
+                                  <span className="font-bold text-slate-800">{clientContract.vigencia_meses} meses</span>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded-lg">
+                                  <span className="text-[9px] font-bold uppercase text-slate-400 block">Vencimiento</span>
+                                  <span className="font-bold text-slate-800">{formatContractDate(clientContract.fecha_fin)}</span>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded-lg">
+                                  <span className="text-[9px] font-bold uppercase text-slate-400 block">1er Cobro</span>
+                                  <span className="font-bold text-emerald-700">
+                                    {formatContractDate(clientContract.fecha_primer_cobro || clientContract.fecha_inicio)}
+                                  </span>
+                                  {(clientContract.meses_gracia ?? 0) > 0 && (
+                                    <span className="text-[9px] text-amber-600 font-bold block">({clientContract.meses_gracia}m gratis)</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {clientContract.notas && (
+                                <p className="text-[10px] text-slate-500 italic bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                  📌 Acuerdos Go-Live: {clientContract.notas}
+                                </p>
+                              )}
+
+                              {/* Acciones de Contrato */}
+                              <div className="flex items-center justify-between pt-1 text-xs">
+                                <a
+                                  href={`/contrato/${clientContract.id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 text-[11px]"
+                                >
+                                  <ExternalLink className="w-3 h-3" /> Ver Enlace Público
+                                </a>
+
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setContractForShare(clientContract);
+                                      setIsContractShareOpen(true);
+                                    }}
+                                    className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Compartir enlace / WhatsApp"
+                                  >
+                                    <Send className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        await contractPdfService.downloadContractPDF(clientContract);
+                                        toast.success('PDF descargado');
+                                      } catch {
+                                        toast.error('Error al generar PDF');
+                                      }
+                                    }}
+                                    className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                    title="Descargar PDF"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-3">
+                            <div className="flex items-start gap-2.5">
+                              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <div className="space-y-1">
+                                <p className="text-xs font-bold text-amber-900">
+                                  Formalización de Contrato Go-Live Requerida
+                                </p>
+                                <p className="text-[11px] text-amber-700 leading-relaxed">
+                                  Formaliza el contrato para definir la fecha de arranque, vigencia y meses gratis antes de promover a Cliente Activo.
+                                </p>
+                              </div>
+                            </div>
+
+                            {canManage && (
+                              <div className="bg-white p-3 rounded-lg border border-amber-100 space-y-2.5">
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                  <div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Vigencia</span>
+                                    <div className="flex gap-1">
+                                      {[3, 6, 12, 24].map(v => (
+                                        <button
+                                          key={v}
+                                          type="button"
+                                          onClick={() => setGoLiveVigencia(v)}
+                                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                                            goLiveVigencia === v ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                          }`}
+                                        >
+                                          {v}m
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Meses gratis (Gracia)</span>
+                                    <div className="flex gap-1">
+                                      {[0, 1, 2, 3].map(g => (
+                                        <button
+                                          key={g}
+                                          type="button"
+                                          onClick={() => setGoLiveGracia(g)}
+                                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                                            goLiveGracia === g ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                          }`}
+                                        >
+                                          {g === 0 ? '0' : `${g}m`}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedContractForEdit(null);
+                                    setIsContractEditorOpen(true);
+                                  }}
+                                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+                                >
+                                  <Sparkles className="w-3.5 h-3.5" /> Generar Contrato Go-Live ({goLiveVigencia} meses{goLiveGracia > 0 ? `, ${goLiveGracia}m gratis` : ''})
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   <StageDocumentUpload
                     stage={stageWithTypes}
                     client={client}
@@ -671,33 +1122,45 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
 
         {/* Footer: advance button */}
         {!loading && client && !client.es_activo && canManage && (
-          <div className="p-4 border-t border-gray-100 flex gap-2">
-            {!isFirstStage && (
-              <button
-                onClick={handleRevertStage}
-                disabled={reverting || advancing}
-                title="Regresar a etapa anterior"
-                className="flex items-center justify-center px-4 py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-bold transition-all disabled:opacity-50 border border-red-100/50"
-              >
-                {reverting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Regresar etapa'}
-              </button>
+          <div className="p-4 border-t border-gray-100 flex flex-col gap-2">
+            {isLastStage && !contracts.some(c => c.status === 'firmado') && (
+              <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200/80 rounded-xl text-[11px] text-amber-800">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                <span>
+                  {contracts.length === 0
+                    ? 'Recomendación Go-Live: Genera el contrato formal antes de promover a Cliente Activo.'
+                    : 'Recomendación Go-Live: El contrato aún no está firmado por el cliente.'}
+                </span>
+              </div>
             )}
-            <button
-              onClick={handleAdvanceStage}
-              disabled={advancing || reverting}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${
-                isLastStage
-                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
-                  : 'bg-[#4449AA] hover:bg-[#3338a0] text-white'
-              } disabled:opacity-60`}
-            >
-              {advancing
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : isLastStage
-                ? '🎉 Promover a Cliente Activo'
-                : <>Completar etapa y avanzar <ChevronRight className="w-4 h-4" /></>
-              }
-            </button>
+            <div className="flex gap-2">
+              {!isFirstStage && (
+                <button
+                  onClick={handleRevertStage}
+                  disabled={reverting || advancing}
+                  title="Regresar a etapa anterior"
+                  className="flex items-center justify-center px-4 py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-bold transition-all disabled:opacity-50 border border-red-100/50"
+                >
+                  {reverting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Regresar etapa'}
+                </button>
+              )}
+              <button
+                onClick={handleAdvanceStage}
+                disabled={advancing || reverting}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${
+                  isLastStage
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                    : 'bg-[#4449AA] hover:bg-[#3338a0] text-white'
+                } disabled:opacity-60`}
+              >
+                {advancing
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : isLastStage
+                  ? '🎉 Promover a Cliente Activo'
+                  : <>Completar etapa y avanzar <ChevronRight className="w-4 h-4" /></>
+                }
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -712,8 +1175,11 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
           }}
           existingContract={selectedContractForEdit}
           lead={client.lead_id ? { id: client.lead_id, name: client.nombre, company_name: (client as any).company_name_lead || client.nombre, email: client.email, phone: client.telefono } : null}
+          client={client}
           company={companyData || { id: client.company_id, name: 'Mi Empresa' }}
           creatorName={currentUser?.user_metadata?.full_name || currentUser?.email}
+          initialVigenciaMeses={goLiveVigencia}
+          initialMesesGracia={goLiveGracia}
           onSaved={(saved) => {
             setContracts(prev => {
               const exists = prev.some(c => c.id === saved.id);
