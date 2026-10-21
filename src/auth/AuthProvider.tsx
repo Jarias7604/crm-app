@@ -90,7 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (cachedRaw) {
             try {
                 const cachedProfile = JSON.parse(cachedRaw);
-                if (cachedProfile?.id) {
+                // 🛑 Si el perfil guardado en caché estaba pausado o inactivo, eliminarlo de inmediato
+                if (cachedProfile?.is_active === false || cachedProfile?.status === 'inactive') {
+                    sessionStorage.removeItem('crm_cached_profile_v1');
+                    localStorage.removeItem('crm_cached_profile_v1');
+                } else if (cachedProfile?.id) {
                     setProfile(cachedProfile);
                 }
             } catch {
@@ -196,12 +200,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
     }, [profile?.id, (profile as any)?.custom_role_id]);
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // REALTIME USER STATUS WATCHER (KILL-SWITCH)
+    // Si un administrador pausa o desactiva este usuario en Team mientras está
+    // usando la aplicación, se detecta el cambio en tiempo real (< 100ms) y se expulsa
+    // inmediatamente cerrando la sesión y limpiando la caché.
+    // ─────────────────────────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!user?.id) return;
+
+        const channel = supabase
+            .channel(`user-profile-status:${user.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles',
+                    filter: `id=eq.${user.id}`,
+                },
+                async (payload) => {
+                    const newRow = payload.new as any;
+                    const isSuper = newRow?.role === 'super_admin' || newRow?.is_platform_owner === true;
+                    if (newRow && !isSuper && (newRow.is_active === false || newRow.status === 'inactive')) {
+                        console.warn('⛔ [AuthProvider] Kill-switch activado: usuario pausado por el administrador.');
+                        queryClient.clear();
+                        sessionStorage.removeItem('crm_cached_profile_v1');
+                        localStorage.removeItem('crm_cached_profile_v1');
+                        setProfile(null);
+                        setSession(null);
+                        setUser(null);
+                        await supabase.auth.signOut();
+                        window.location.href = '/login?paused=true';
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [user?.id]);
+
     const fetchProfile = async (userId: string, _userEmail?: string) => {
         try {
             // 1. FETCH PROFILE (using maybeSingle to gracefully handle brand new registrations without profile rows)
             let { data, error } = await supabase
                 .from('profiles')
-                .select('id, email, role, company_id, full_name, phone, status, created_at, custom_role_id, permissions, is_platform_owner')
+                .select('id, email, role, company_id, full_name, phone, status, is_active, created_at, custom_role_id, permissions, is_platform_owner')
                 .eq('id', userId)
                 .maybeSingle();
 
@@ -237,7 +283,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         // Re-fetch profile so company_id and permissions are populated
                         const { data: updatedProfile } = await supabase
                             .from('profiles')
-                            .select('id, email, role, company_id, full_name, phone, status, created_at, custom_role_id, permissions, is_platform_owner')
+                            .select('id, email, role, company_id, full_name, phone, status, is_active, created_at, custom_role_id, permissions, is_platform_owner')
                             .eq('id', userId)
                             .maybeSingle();
 
@@ -273,6 +319,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (!data) {
                 console.warn('[AuthProvider] No profile could be loaded or created for user:', userId);
                 setLoading(false);
+                return;
+            }
+
+            // 🛑 CHECK DE SEGURIDAD CRÍTICO: Cuenta pausada o inactiva
+            // Si el colaborador está pausado (is_active === false o status === 'inactive'),
+            // se le expulsa inmediatamente para proteger la seguridad de la empresa.
+            const isSuperUser = data?.role === 'super_admin' || data?.is_platform_owner === true;
+            if (!isSuperUser && (data.is_active === false || data.status === 'inactive')) {
+                console.warn('[AuthProvider] ⛔ Cuenta pausada o inactiva detectada. Expulsando usuario:', userId);
+                queryClient.clear();
+                sessionStorage.removeItem('crm_cached_profile_v1');
+                localStorage.removeItem('crm_cached_profile_v1');
+                setProfile(null);
+                setSession(null);
+                setUser(null);
+                await supabase.auth.signOut();
+                setLoading(false);
+                if (window.location.pathname !== '/login') {
+                    window.location.href = '/login?paused=true';
+                }
                 return;
             }
 
@@ -520,8 +586,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             }
             setProfile(finalProfile);
-            // ⚡ Cache active profile for instant optimistic hydration on reload
-            if (finalProfile && !finalProfile.full_name?.startsWith('Simulación:')) {
+            // ⚡ Cache active profile for instant optimistic hydration on reload (only if active)
+            if (finalProfile && !finalProfile.full_name?.startsWith('Simulación:') && finalProfile.is_active !== false && finalProfile.status !== 'inactive') {
                 sessionStorage.setItem('crm_cached_profile_v1', JSON.stringify(finalProfile));
             }
         } catch (err) {
@@ -536,11 +602,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // This ensures the next user who logs in starts with a clean slate
         queryClient.clear();
         sessionStorage.removeItem('crm_cached_profile_v1');
+        localStorage.removeItem('crm_cached_profile_v1');
         prevUserIdRef.current = null;
         localStorage.removeItem('simulated_role');
         localStorage.removeItem('simulated_company_id');
         setSimulatedRole(null);
         setSimulatedCompanyId(null);
+        setProfile(null);
+        setSession(null);
+        setUser(null);
         await supabase.auth.signOut();
     };
 

@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../services/supabase';
+import { queryClient } from '../lib/queryClient';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Eye, EyeOff, KeyRound, Mail } from 'lucide-react';
@@ -66,6 +67,45 @@ export default function Login() {
     const [error, setError] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+
+    // 🛑 Detectar si el usuario fue redirigido tras ser expulsado por cuenta inactiva o pausada
+    useEffect(() => {
+        if (searchParams.get('paused') === 'true') {
+            setError('⛔ Tu cuenta se encuentra pausada o desactivada por un administrador. Comunícate con la administración de tu empresa.');
+        }
+    }, [searchParams]);
+
+    // 🛑 CHECK DE SEGURIDAD CRÍTICO: Verificar si la cuenta está activa en la base de datos
+    const checkUserActiveStatus = async (userId: string): Promise<boolean> => {
+        try {
+            const { data: profileCheck, error: pErr } = await supabase
+                .from('profiles')
+                .select('id, is_active, status, role, is_platform_owner')
+                .eq('id', userId)
+                .maybeSingle();
+
+            if (pErr) {
+                console.error('[Login] Error verificando estado de perfil:', pErr);
+                return true;
+            }
+
+            const isSuper = profileCheck?.role === 'super_admin' || profileCheck?.is_platform_owner === true;
+            if (profileCheck && !isSuper && (profileCheck.is_active === false || profileCheck.status === 'inactive')) {
+                console.warn('[Login] ⛔ Intento de acceso bloqueado: cuenta pausada/inactiva para usuario:', userId);
+                await supabase.auth.signOut();
+                queryClient.clear();
+                sessionStorage.removeItem('crm_cached_profile_v1');
+                localStorage.removeItem('crm_cached_profile_v1');
+                setError('⛔ Tu cuenta se encuentra pausada o desactivada por un administrador. Comunícate con la administración de tu empresa.');
+                return false;
+            }
+            return true;
+        } catch (err) {
+            console.error('[Login] Excepción al verificar estado de usuario:', err);
+            return true;
+        }
+    };
 
     const handlePasswordLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -81,7 +121,15 @@ export default function Login() {
             if (error) {
                 setError(translateAuthError(error.message));
                 setLoading(false);
-            } else if (data?.session) {
+                return;
+            }
+
+            if (data?.session?.user) {
+                const isActive = await checkUserActiveStatus(data.session.user.id);
+                if (!isActive) {
+                    setLoading(false);
+                    return;
+                }
                 navigate('/dashboard', { replace: true });
             } else {
                 navigate('/dashboard', { replace: true });
@@ -137,7 +185,15 @@ export default function Login() {
             if (error) {
                 setError(translateAuthError(error.message));
                 setLoading(false);
-            } else if (data?.session) {
+                return;
+            }
+
+            if (data?.session?.user) {
+                const isActive = await checkUserActiveStatus(data.session.user.id);
+                if (!isActive) {
+                    setLoading(false);
+                    return;
+                }
                 navigate('/dashboard', { replace: true });
             } else {
                 navigate('/dashboard', { replace: true });

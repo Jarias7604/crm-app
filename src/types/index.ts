@@ -10,6 +10,7 @@ export interface CustomRole {
     created_at: string;
 }
 export type CompanyStatus = 'active' | 'trial' | 'suspended';
+export type UserProfileStatus = 'active' | 'inactive' | 'suspended' | 'trial';
 export type LicenseStatus = 'active' | 'trial' | 'suspended' | 'expired' | 'manual_hold';
 export type LeadStatus =
     | 'Prospecto'
@@ -33,7 +34,7 @@ export interface Profile {
     company_id: string;
     full_name: string | null;
     phone: string | null;
-    status: CompanyStatus;
+    status: UserProfileStatus;
     is_active?: boolean;
     avatar_url?: string | null;
     website?: string | null;

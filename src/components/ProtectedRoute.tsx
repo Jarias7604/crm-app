@@ -60,6 +60,12 @@ export default function ProtectedRoute() {
         return <Navigate to="/login" replace />;
     }
 
+    // 🛑 SEGURIDAD CRÍTICA: Bloquear colaboradores pausados o inactivos
+    const isSuperUser = profile?.role === 'super_admin' || (profile as any)?.is_platform_owner;
+    if (profile && !isSuperUser && (profile.is_active === false || profile.status === 'inactive')) {
+        return <Navigate to="/login?paused=true" replace />;
+    }
+
     if (trialExpired) {
         return <Navigate to="/trial-expired" replace />;
     }
