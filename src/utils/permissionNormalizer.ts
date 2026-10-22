@@ -42,6 +42,11 @@ export const MODULE_LICENSE_MAP: Record<string, string> = {
     tickets:         'tickets',
     chat:            'chat',
     calendar:        'calendar',
+    calendario:      'calendar',
+    followups:       'leads',
+    followup:        'leads',
+    seguimientos:    'leads',
+    seguimiento:     'leads',
     pricing:         'pricing',
     paquetes:        'paquetes',
     items:           'items',
@@ -103,6 +108,10 @@ export function isPermissionAllowedByCompanyLicense(
     }
 
     // 4. Granular prefix checks for legacy or compound naming conventions
+    if ((lowerKey.startsWith('followups') || lowerKey.startsWith('seguimiento')) &&
+        (companyLicense.includes('leads') || companyLicense.includes('calendar') || companyLicense.includes('clientes'))) return true;
+    if ((lowerKey.startsWith('calendar') || lowerKey.startsWith('calendario')) &&
+        (companyLicense.includes('calendar') || companyLicense.includes('leads'))) return true;
     if (lowerKey.startsWith('cotizaciones.') && companyLicense.includes('quotes')) return true;
     if (lowerKey.startsWith('quotes.') && companyLicense.includes('quotes')) return true;
     if (lowerKey.startsWith('clientes.') && companyLicense.includes('leads')) return true;

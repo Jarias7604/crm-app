@@ -830,11 +830,19 @@ export const leadsService = {
         const { data: { user } } = await supabase.auth.getUser();
 
         // Resolve company_id — required by RLS CHECK (company_id = get_auth_company_id()).
-        // If not explicitly passed, fetch the active/simulated company ID so the INSERT
-        // is never rejected by RLS and the record is visible in calendar queries.
+        // If not explicitly passed, fetch active/simulated company ID or from the lead.
         let companyId = followUp.company_id;
         if (!companyId) {
             companyId = (await this.getActiveCompanyId()) || undefined;
+        }
+
+        if (!companyId && followUp.lead_id) {
+            const { data: leadRow } = await supabase
+                .from('leads')
+                .select('company_id')
+                .eq('id', followUp.lead_id)
+                .single();
+            if (leadRow?.company_id) companyId = leadRow.company_id;
         }
 
         const { data, error } = await supabase
@@ -852,44 +860,55 @@ export const leadsService = {
         if (error) throw error;
 
         // Auto-complete previous PAST follow-ups for this lead
-        // Do not auto-complete FUTURE meetings/calls (e.g. scheduled for next week)
+        // Wrapped in try/catch so secondary updates never block follow-up creation if RLS differs
         if (followUp.lead_id) {
             const nowIso = new Date().toISOString();
-            await supabase
-                .from('follow_ups')
-                .update({
-                    completed: true,
-                    completed_at: nowIso,
-                    completed_by: user?.id
-                })
-                .eq('lead_id', followUp.lead_id)
-                .eq('completed', false)
-                .lte('date', nowIso)
-                .neq('id', data.id);
+            try {
+                await supabase
+                    .from('follow_ups')
+                    .update({
+                        completed: true,
+                        completed_at: nowIso,
+                        completed_by: user?.id
+                    })
+                    .eq('lead_id', followUp.lead_id)
+                    .eq('completed', false)
+                    .lte('date', nowIso)
+                    .neq('id', data.id);
+            } catch (prevErr) {
+                console.warn('Non-fatal: could not auto-complete previous follow-ups:', prevErr);
+            }
 
             // Update lead with the new follow up date and assignee
-            await supabase
-                .from('leads')
-                .update({
-                    next_followup_date: followUp.date,
-                    next_followup_assignee: assignedTo || null,
-                    // ── CRITICAL: update last_follow_up_at so Pipeline Intelligence metrics are accurate ──
-                    last_follow_up_at: new Date().toISOString(),
-                })
-                .eq('id', followUp.lead_id);
-
-            // Also set first_follow_up_at if this is the very first follow-up for this lead
-            const { data: leadData } = await supabase
-                .from('leads')
-                .select('first_follow_up_at')
-                .eq('id', followUp.lead_id)
-                .single();
-
-            if (!leadData?.first_follow_up_at) {
+            try {
                 await supabase
                     .from('leads')
-                    .update({ first_follow_up_at: new Date().toISOString() })
+                    .update({
+                        next_followup_date: followUp.date,
+                        next_followup_assignee: assignedTo || null,
+                        last_follow_up_at: new Date().toISOString(),
+                    })
                     .eq('id', followUp.lead_id);
+            } catch (leadUpdErr) {
+                console.warn('Non-fatal: could not update lead next_followup_date:', leadUpdErr);
+            }
+
+            // Also set first_follow_up_at if this is the very first follow-up for this lead
+            try {
+                const { data: leadData } = await supabase
+                    .from('leads')
+                    .select('first_follow_up_at')
+                    .eq('id', followUp.lead_id)
+                    .single();
+
+                if (!leadData?.first_follow_up_at) {
+                    await supabase
+                        .from('leads')
+                        .update({ first_follow_up_at: new Date().toISOString() })
+                        .eq('id', followUp.lead_id);
+                }
+            } catch (firstErr) {
+                console.warn('Non-fatal: could not set first_follow_up_at on lead:', firstErr);
             }
         }
 

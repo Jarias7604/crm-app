@@ -228,9 +228,13 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                 await leadsService.updateLead(lead.id, { status: newStatus as any });
             }
 
-            // Increment contact_count atomically
-            const { data: currentLead } = await supabase.from('leads').select('contact_count').eq('id', lead.id).single();
-            await supabase.from('leads').update({ contact_count: ((currentLead?.contact_count as number) || 0) + 1 }).eq('id', lead.id);
+            // Increment contact_count atomically (non-fatal if blocked)
+            try {
+                const { data: currentLead } = await supabase.from('leads').select('contact_count').eq('id', lead.id).single();
+                await supabase.from('leads').update({ contact_count: ((currentLead?.contact_count as number) || 0) + 1 }).eq('id', lead.id);
+            } catch (cntErr) {
+                console.warn('Non-fatal: could not increment contact_count:', cntErr);
+            }
 
             // 2. If user wants a follow-up, create it independently
             if (wantsFollowUp && followUpDate) {
@@ -240,6 +244,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
 
                 await leadsService.createFollowUp({
                     lead_id: lead.id,
+                    company_id: companyId || lead.company_id,
                     date: followUpDateTime,
                     notes: followUpNote.trim() || `Seguimiento: ${ACTION_TYPE_CONFIG[actionType].label}`,
                     action_type: followUpActionType,

@@ -18,8 +18,9 @@ import { supabase } from '../services/supabase';
 import { companyCalendarsService } from '../services/companyCalendars';
 import { useAuth } from '../auth/AuthProvider';
 import { useTimezone } from '../hooks/useTimezone';
-import { formatTimeInZone, utcToLocalDate, getHourAndMinuteInZone, DEFAULT_TIMEZONE } from '../utils/timezone';
+import { formatTimeInZone, utcToLocalDate, getHourAndMinuteInZone, DEFAULT_TIMEZONE, localToUtcISO } from '../utils/timezone';
 import GoogleMeetScheduler from '../components/GoogleMeetScheduler';
+import NewFollowUpModal from '../components/NewFollowUpModal';
 import toast from 'react-hot-toast';
 
 type CalendarEvent = Awaited<ReturnType<typeof leadsService.getCalendarFollowUps>>[number];
@@ -111,6 +112,41 @@ export default function Calendar() {
     const companyTimezone = rawTimezone || DEFAULT_TIMEZONE;
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
 
+    // Permissions to view all team calendar events and use team collaborator filter
+    const canViewAllCalendar = useMemo(() => {
+        if (isAdmin) return true;
+        const p = profile?.permissions as Record<string, any> | undefined;
+        if (!p) return false;
+        return (
+            p['calendar_view_team'] === true ||
+            p['CALENDAR_VIEW_TEAM'] === true ||
+            p['followups_view_all'] === true ||
+            p['FOLLOWUPS_VIEW_ALL'] === true ||
+            p['calendar_view_all'] === true ||
+            p['CALENDAR_VIEW_ALL'] === true ||
+            p['followups_schedule'] === true ||
+            p['FOLLOWUPS_SCHEDULE'] === true ||
+            p['calendar'] === true
+        );
+    }, [isAdmin, profile?.permissions]);
+
+    const canDeleteFollowUp = useMemo(() => {
+        if (isAdmin) return true;
+        const p = profile?.permissions as Record<string, any> | undefined;
+        return p?.['followups_delete'] === true || p?.['FOLLOWUPS_DELETE'] === true;
+    }, [isAdmin, profile?.permissions]);
+
+    const canAssignOthers = useMemo(() => {
+        if (isAdmin) return true;
+        const p = profile?.permissions as Record<string, any> | undefined;
+        return (
+            p?.['followups_assign'] === true ||
+            p?.['FOLLOWUPS_ASSIGN'] === true ||
+            p?.['followups_schedule'] === true ||
+            p?.['FOLLOWUPS_SCHEDULE'] === true
+        );
+    }, [isAdmin, profile?.permissions]);
+
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
@@ -130,7 +166,11 @@ export default function Calendar() {
     const [showMeetScheduler, setShowMeetScheduler] = useState(false);
     const [meetSchedulerDate, setMeetSchedulerDate] = useState<Date | undefined>(undefined);
 
-    // Responsable filter — admin only, ver perspectiva de un agente en el calendario
+    // New Follow-up modal
+    const [showNewFollowUpModal, setShowNewFollowUpModal] = useState(false);
+    const [newFollowUpDate, setNewFollowUpDate] = useState<Date | undefined>(undefined);
+
+    // Responsable filter — admins o roles con permiso de ver calendario de equipo
     const [calendarCollabProfiles, setCalendarCollabProfiles] = useState<{ id: string; full_name: string; role: string; avatar_url?: string | null }[]>([]);
     const [selectedCalendarCollabId, setSelectedCalendarCollabId] = useState<string | undefined>(undefined);
     const [selectedCalendarCollabName, setSelectedCalendarCollabName] = useState<string | null>(null);
@@ -188,9 +228,9 @@ export default function Calendar() {
         return () => { supabase.removeChannel(channel); };
     }, [queryClient]);
 
-    // Cargar perfiles para filtro de responsable (solo admins)
+    // Cargar perfiles para filtro de responsable (admins o roles con acceso a calendario de equipo)
     useEffect(() => {
-        if (!isAdmin || !profile?.company_id) return;
+        if (!canViewAllCalendar || !profile?.company_id) return;
         const simId = localStorage.getItem('simulated_company_id');
         const companyId = simId || profile.company_id;
         supabase
@@ -200,7 +240,7 @@ export default function Calendar() {
             .eq('is_active', true)
             .order('full_name')
             .then(({ data }) => { if (data) setCalendarCollabProfiles(data); });
-    }, [isAdmin, profile?.company_id, profile?.role]);
+    }, [canViewAllCalendar, profile?.company_id, profile?.role]);
 
     // Click-outside para cerrar dropdown de responsable
     useEffect(() => {
@@ -288,7 +328,7 @@ export default function Calendar() {
     // Outlook integration is not yet implemented — return empty array
     const mockOutlookEvents = useMemo(() => [], []);
 
-    // Role-based filtering: collaborators ven solo los suyos; admins pueden filtrar
+    // Role-based filtering: admins y roles con permisos de equipo ven todos o filtran; agentes ven los suyos
     const filteredEvents = useMemo(() => {
         let baseEvents = calendarEvents.filter(ev => {
             if (ev.action_type === 'meeting') {
@@ -297,12 +337,12 @@ export default function Calendar() {
             return showCrmEvents;
         });
         let events = [...baseEvents, ...mockGoogleEvents];
-        if (isAdmin) {
+        if (canViewAllCalendar) {
             if (selectedCalendarCollabId) return events.filter(ev => ev.assigned_to === selectedCalendarCollabId);
             return events;
         }
         return events.filter(ev => ev.assigned_to === profile?.id);
-    }, [calendarEvents, showCrmEvents, mockGoogleEvents, isAdmin, profile?.id, selectedCalendarCollabId]);
+    }, [calendarEvents, showCrmEvents, mockGoogleEvents, canViewAllCalendar, profile?.id, selectedCalendarCollabId]);
 
     const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
     const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -447,8 +487,8 @@ export default function Calendar() {
                         <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                 </div>
-                {/* Responsable filter — solo admins */}
-                {isAdmin && (
+                {/* Responsable filter — admins y colaboradores con permisos de seguimiento/calendario */}
+                {canViewAllCalendar && (
                     <div className="relative" ref={calendarCollabRef}>
                         <button
                             onClick={() => setIsCalendarCollabOpen(!isCalendarCollabOpen)}
@@ -544,7 +584,10 @@ export default function Calendar() {
                     <span className="xl:hidden">Reunión</span>
                 </button>
                 <button
-                    onClick={() => navigate('/leads')}
+                    onClick={() => {
+                        setNewFollowUpDate(selectedDate || new Date());
+                        setShowNewFollowUpModal(true);
+                    }}
                     className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-200 transition-all ml-1 shrink-0"
                 >
                     <Plus className="w-3.5 h-3.5" />
@@ -597,7 +640,10 @@ export default function Calendar() {
                     </>
                 )}
                 <button
-                    onClick={() => navigate('/leads')}
+                    onClick={() => {
+                        setNewFollowUpDate(selectedDate || new Date());
+                        setShowNewFollowUpModal(true);
+                    }}
                     className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-200"
                 >
                     <Plus className="w-4 h-4 text-white" />
@@ -1691,12 +1737,14 @@ export default function Calendar() {
                             >
                                 {selectedCrmEvent.completed ? '↩️ Marcar Pendiente' : '✅ Completar'}
                             </button>
-                            <button
-                                onClick={() => handleDeleteFollowUp(selectedCrmEvent.id)}
-                                className="flex-1 py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-rose-200/50"
-                            >
-                                🗑️ Eliminar
-                            </button>
+                            {canDeleteFollowUp && (
+                                <button
+                                    onClick={() => handleDeleteFollowUp(selectedCrmEvent.id)}
+                                    className="flex-1 py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-rose-200/50"
+                                >
+                                    🗑️ Eliminar
+                                </button>
+                            )}
                         </div>
 
                     </div>
@@ -1912,12 +1960,24 @@ export default function Calendar() {
                             </div>
 
                             {/* Footer */}
-                            <div className="p-4 border-t border-slate-100 bg-white flex items-center justify-end shrink-0">
+                            <div className="p-4 border-t border-slate-100 bg-white flex items-center justify-between shrink-0">
+                                <button
+                                    onClick={() => {
+                                        const targetDate = dayDetailDate || new Date();
+                                        setDayDetailDate(null);
+                                        setNewFollowUpDate(targetDate);
+                                        setShowNewFollowUpModal(true);
+                                    }}
+                                    className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-200 transition-all"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Agendar para este día
+                                </button>
                                 <button
                                     onClick={() => { setDayDetailDate(null); navigate('/leads', { state: { leadIds, fromCalendar: true } }); }}
-                                    className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-200 transition-all"
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-200 transition-all"
                                 >
-                                    Ver {dayEvents.length} en Tabla de Leads
+                                    Ver {dayEvents.length} en Tabla
                                     <ExternalLink className="w-4 h-4" />
                                 </button>
                             </div>
@@ -1925,6 +1985,20 @@ export default function Calendar() {
                     </div>
                 );
             })()}
+
+            {/* New FollowUp Modal */}
+            <NewFollowUpModal
+                isOpen={showNewFollowUpModal}
+                onClose={() => setShowNewFollowUpModal(false)}
+                onSuccess={() => {
+                    queryClient.invalidateQueries({ queryKey: ['calendar-follow-ups'] });
+                }}
+                initialDate={newFollowUpDate || selectedDate || new Date()}
+                companyTimezone={companyTimezone}
+                teamMembers={calendarCollabProfiles}
+                canAssignOthers={canAssignOthers}
+                currentUserId={profile?.id}
+            />
         </div>
     );
 }
