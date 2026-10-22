@@ -100,8 +100,14 @@ const TIME_SLOTS = (() => {
 // Format date for display in Spanish
 const formatDateES = (dateStr: string) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr + 'T12:00:00');
-    return date.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    try {
+        const cleanStr = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`;
+        const date = new Date(cleanStr);
+        if (isNaN(date.getTime())) return dateStr;
+        return date.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    } catch {
+        return dateStr;
+    }
 };
 
 const todayISO = new Date().toISOString().split('T')[0];
@@ -478,7 +484,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                                     <option value="">Sin asignar</option>
                                     {teamMembers.map(m => (
                                         <option key={m.id} value={m.id}>
-                                            {m.full_name || m.email.split('@')[0]}
+                                            {m.full_name || (typeof m.email === 'string' ? m.email.split('@')[0] : 'Usuario')}
                                         </option>
                                     ))}
                                 </select>

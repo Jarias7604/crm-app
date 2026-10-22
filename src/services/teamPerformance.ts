@@ -465,7 +465,7 @@ export const teamPerformanceService = {
 
                 return {
                     user_id: p.id,
-                    full_name: p.full_name || p.email.split('@')[0],
+                    full_name: p.full_name || (typeof p.email === 'string' ? p.email.split('@')[0] : 'Usuario'),
                     email: p.email,
                     avatar_url: p.avatar_url,
                     role: p.role,

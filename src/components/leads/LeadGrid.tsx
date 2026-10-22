@@ -141,7 +141,7 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
                                                         )}
                                                         <div>
                                                             <p className="text-xs font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Responsable</p>
-                                                            <p className="text-sm font-bold text-gray-700 truncate">{owner?.full_name || owner?.email.split('@')[0]}</p>
+                                                            <p className="text-sm font-bold text-gray-700 truncate">{owner?.full_name || (typeof owner?.email === 'string' ? owner.email.split('@')[0] : 'Asignado')}</p>
                                                         </div>
                                                     </div>
                                                 );
@@ -160,7 +160,7 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
                                                         )}
                                                         <div>
                                                             <p className="text-xs font-black text-blue-400 uppercase tracking-widest leading-none mb-0.5">Asignado a</p>
-                                                            <p className="text-sm font-bold text-gray-700 truncate">{assignee?.full_name || assignee?.email.split('@')[0]}</p>
+                                                            <p className="text-sm font-bold text-gray-700 truncate">{assignee?.full_name || (typeof assignee?.email === 'string' ? assignee.email.split('@')[0] : 'Asignado')}</p>
                                                         </div>
                                                     </div>
                                                 );

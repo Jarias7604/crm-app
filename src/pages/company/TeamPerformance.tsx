@@ -3361,7 +3361,7 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
         const actualConnected = summary.calls_connected;
         const deviation = actual - goalUpToDate;
         const percent = goalUpToDate > 0 ? (actual / goalUpToDate) * 100 : 0;
-        const userName = user.full_name || user.email.split('@')[0];
+        const userName = user.full_name || (typeof user.email === 'string' ? user.email.split('@')[0] : 'Usuario');
         const avatarUrl = user.avatar_url;
         
         return {

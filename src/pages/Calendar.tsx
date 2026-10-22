@@ -1833,7 +1833,7 @@ export default function Calendar() {
                                                 </div>
                                                 <div className="flex flex-col min-w-0">
                                                     <span className="text-xs font-bold text-slate-800 truncate">
-                                                        {att.displayName || att.email.split('@')[0]}
+                                                        {att.displayName || (typeof att.email === 'string' ? att.email.split('@')[0] : 'Invitado')}
                                                     </span>
                                                     <span className="text-[10px] font-medium text-slate-400 truncate">
                                                         {att.email}

@@ -285,7 +285,7 @@ export default function Teams() {
                                             {team.leader && (
                                                 <span className="flex items-center gap-1 text-[10px] font-bold text-amber-600">
                                                     <Crown className="w-3 h-3" />
-                                                    {team.leader.full_name || team.leader.email.split('@')[0]}
+                                                    {team.leader.full_name || (typeof team.leader.email === 'string' ? team.leader.email.split('@')[0] : 'Líder')}
                                                 </span>
                                             )}
                                         </div>

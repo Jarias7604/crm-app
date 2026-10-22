@@ -277,7 +277,7 @@ export function CustomDatePicker({
                 <div className="flex items-center gap-3 overflow-hidden">
                     <CalendarIcon className={`w-4 h-4 flex-shrink-0 ${iconClasses[variant]}`} />
                     <span className={`truncate ${textClasses[variant]}`}>
-                        {activeDate ? format(activeDate, displayFormat, { locale: es }) : placeholder}
+                        {activeDate ? (() => { try { return format(activeDate, displayFormat, { locale: es }); } catch { return format(activeDate, 'dd/MM/yyyy'); } })() : placeholder}
                     </span>
                 </div>
                 {activeDate && (

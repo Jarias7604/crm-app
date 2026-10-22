@@ -163,13 +163,17 @@ export default function Leads() {
 
     // Column order persistence
     const [columnOrder, setColumnOrder] = useState<string[]>(() => {
-        const saved = localStorage.getItem('lead_column_order');
         const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'industry', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at', 'interested_product_id'];
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            const newCols = defaultCols.filter(c => !parsed.includes(c));
-            return newCols.length > 0 ? [...parsed.slice(0, 1), ...newCols, ...parsed.slice(1)] : parsed;
-        }
+        try {
+            const saved = localStorage.getItem('lead_column_order');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    const newCols = defaultCols.filter(c => !parsed.includes(c));
+                    return newCols.length > 0 ? [...parsed.slice(0, 1), ...newCols, ...parsed.slice(1)] : parsed;
+                }
+            }
+        } catch {}
         return defaultCols;
     });
 

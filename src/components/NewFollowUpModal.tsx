@@ -318,7 +318,7 @@ export default function NewFollowUpModal({
                             <option value="">Sin asignar / Empresa</option>
                             {teamMembers.map(m => (
                                 <option key={m.id} value={m.id}>
-                                    {m.full_name} ({m.role})
+                                    {m.full_name || 'Usuario'} {m.role ? `(${m.role})` : ''}
                                 </option>
                             ))}
                         </select>

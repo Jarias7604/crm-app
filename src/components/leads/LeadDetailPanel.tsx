@@ -565,7 +565,13 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 onChange={(val) => handleUpdateLead({ assigned_to: val || null })}
                                                 options={[
                                                     { value: '', label: 'Sin asignar' },
-                                                    ...teamMembers.map(m => ({ value: m.id, label: m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email }))
+                                                    ...teamMembers.map(m => {
+                                                        const emailPrefix = typeof m.email === 'string' && m.email.includes('@') ? m.email.split('@')[0] : (m.email || '');
+                                                        const label = m.full_name 
+                                                            ? (emailPrefix ? `${m.full_name} (${emailPrefix})` : m.full_name)
+                                                            : (m.email || 'Miembro');
+                                                        return { value: m.id, label };
+                                                    })
                                                 ]}
                                                 placeholder="Sin asignar"
                                             />
@@ -1044,7 +1050,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
 
                                             // Assignee
                                             const assignee = isFollowUp
-                                                ? (item.assigned_profile?.full_name || item.assigned_profile?.email?.split('@')[0] || item.profiles?.full_name || item.profiles?.email?.split('@')[0] || null)
+                                                ? (item.assigned_profile?.full_name || (typeof item.assigned_profile?.email === 'string' ? item.assigned_profile.email.split('@')[0] : null) || item.profiles?.full_name || (typeof item.profiles?.email === 'string' ? item.profiles.email.split('@')[0] : null) || null)
                                                 : null;
 
                                             return (

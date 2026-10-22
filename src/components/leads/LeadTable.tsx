@@ -464,7 +464,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                                     )}
                                                                                 </div>
                                                                                 <span className="text-[11px] font-bold text-slate-600 truncate max-w-[80px]">
-                                                                                    {owner?.full_name?.split(' ')[0] || owner?.email.split('@')[0]}
+                                                                                    {owner?.full_name?.split(' ')[0] || (typeof owner?.email === 'string' ? owner.email.split('@')[0] : 'Asignado')}
                                                                                 </span>
                                                                             </div>
                                                                         );
