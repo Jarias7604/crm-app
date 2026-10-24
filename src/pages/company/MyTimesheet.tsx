@@ -51,7 +51,7 @@ export default function MyTimesheet() {
   const [overtimeEndTime, setOvertimeEndTime] = useState<string>('21:00');
 
   // Dropdown options
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string; description?: string; status?: string }[]>([]);
   const [tickets, setTickets] = useState<{ 
     id: string; 
     title: string; 
@@ -76,21 +76,21 @@ export default function MyTimesheet() {
     if (!activeCompanyId || !profile?.id) return;
     setLoading(true);
     try {
-      // 1. Cargar proyectos de la empresa
+      // 1. Cargar proyectos de la empresa con descripción y estado
       const { data: projData } = await supabase
         .from('crm_projects')
-        .select('id, name')
+        .select('id, name, description, status')
         .eq('company_id', activeCompanyId)
         .order('name');
       if (projData) setProjects(projData);
 
-      // 2. Cargar tickets
+      // 2. Cargar tickets con prioridad, estado y cliente
       const { data: tickData } = await supabase
         .from('tickets')
         .select('id, title, status, priority, lead_name')
         .eq('company_id', activeCompanyId)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
       if (tickData) setTickets(tickData);
 
       // 3. Cargar historial del usuario
@@ -839,7 +839,7 @@ export default function MyTimesheet() {
               </div>
             )}
 
-            {/* SELECTORES MODERNOS BUSCABLES (Comboboxes que reemplazan el select viejo) */}
+            {/* SELECTORES MODERNOS BUSCABLES (Comboboxes amplios y legibles) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               {/* Proyecto Buscable */}
               <SearchableSelect
@@ -847,13 +847,20 @@ export default function MyTimesheet() {
                 icon={FolderGit2}
                 disabled={isFormDisabled}
                 placeholder="Seleccionar proyecto..."
-                searchPlaceholder="Buscar proyecto por nombre..."
-                noneOptionLabel="(Opcional) Trabajo General"
+                searchPlaceholder="Buscar proyecto por nombre o descripción..."
+                noneOptionLabel="(Opcional) Trabajo General / Sin Proyecto"
                 value={projectId}
                 onChange={setProjectId}
-                options={projects.map(p => ({
+                align="left"
+                popoverWidthClass="w-full min-w-[320px] sm:min-w-[460px] md:min-w-[520px]"
+                options={projects.map((p) => ({
                   id: p.id,
                   title: p.name,
+                  subtitle: p.description ? p.description : undefined,
+                  badge: p.status === 'active' ? '🟢 En Curso' : p.status === 'completed' ? '🏁 Concluido' : undefined,
+                  badgeColor: p.status === 'active' 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    : 'bg-slate-100 text-slate-600 border-slate-200',
                 }))}
               />
 
@@ -862,18 +869,41 @@ export default function MyTimesheet() {
                 label="Ticket de Soporte"
                 icon={Ticket}
                 disabled={isFormDisabled}
-                placeholder="Vincular ticket..."
-                searchPlaceholder="Buscar ticket por título o cliente..."
+                placeholder="Vincular ticket de soporte..."
+                searchPlaceholder="Buscar por título, cliente, prioridad o estado..."
                 noneOptionLabel="(Opcional) Sin ticket asignado"
                 value={ticketId}
                 onChange={setTicketId}
-                options={tickets.map(t => ({
-                  id: t.id,
-                  title: t.title,
-                  subtitle: t.lead_name ? `Cliente: ${t.lead_name}` : undefined,
-                  badge: t.priority || t.status,
-                  badgeColor: t.priority === 'urgent' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600',
-                }))}
+                align="right"
+                popoverWidthClass="w-full min-w-[320px] sm:min-w-[480px] md:min-w-[560px]"
+                options={tickets.map((t) => {
+                  const priorityMap: Record<string, { label: string; color: string }> = {
+                    urgent: { label: '🔴 Urgente', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+                    high: { label: '🟠 Alta', color: 'bg-amber-50 text-amber-800 border-amber-200' },
+                    medium: { label: '🔵 Media', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+                    low: { label: '⚪ Baja', color: 'bg-slate-100 text-slate-600 border-slate-200' },
+                  };
+                  const statusMap: Record<string, { label: string; color: string }> = {
+                    new: { label: 'Nuevo', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+                    open: { label: 'Abierto', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                    pending: { label: 'En Espera', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+                    resolved: { label: 'Resuelto', color: 'bg-slate-100 text-slate-600 border-slate-200' },
+                    closed: { label: 'Cerrado', color: 'bg-slate-100 text-slate-500 border-slate-200' },
+                  };
+
+                  const p = t.priority ? priorityMap[t.priority] : undefined;
+                  const s = t.status ? statusMap[t.status] : undefined;
+
+                  return {
+                    id: t.id,
+                    title: t.title,
+                    subtitle: t.lead_name ? `🏢 Cliente: ${t.lead_name}` : undefined,
+                    badge: p?.label || s?.label,
+                    badgeColor: p?.color || s?.color || 'bg-slate-100 text-slate-600 border-slate-200',
+                    secondaryBadge: p && s ? s.label : undefined,
+                    secondaryBadgeColor: s?.color,
+                  };
+                })}
               />
             </div>
 
