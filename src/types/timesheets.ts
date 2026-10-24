@@ -11,6 +11,8 @@ export interface TimesheetEntry {
   regular_hours: number;
   overtime_hours: number;
   overtime_reason?: string | null;
+  overtime_start_time?: string | null;
+  overtime_end_time?: string | null;
   work_summary: string;
   project_id?: string | null;
   project_name?: string | null;
@@ -29,7 +31,8 @@ export interface TimesheetEntry {
 
 export type PayrollCountry = 'SV' | 'US' | 'OTHER';
 export type PaymentFrequency = 'semanal' | 'quincenal' | 'mensual' | 'por_hora';
-export type ContractType = 'hourly' | 'salary' | 'contractor_1099' | 'services_sv';
+export type ContractType = 'hourly' | 'salary' | 'contractor_1099' | 'services_sv' | 'services';
+export type CommissionMode = 'manual' | 'percentage_sales' | 'fixed_per_deal';
 
 export interface CustomDeductionRule {
   id: string;
@@ -46,10 +49,14 @@ export interface PayrollMemberConfig {
   user_name?: string;
   user_email?: string;
   user_avatar?: string | null;
+  employee_code?: string;
+  hire_date?: string;
   payment_frequency: PaymentFrequency;
   contract_type: ContractType;
   hourly_rate: number;
   base_salary: number;
+  expected_weekly_hours: number; // Ej. 44 horas semanales estándar o 40 horas
+  applies_overtime: boolean; // Si aplica pago extraordinario por horas extras
   overtime_multiplier: number;
   country: PayrollCountry;
   apply_isss: boolean;
@@ -59,6 +66,9 @@ export interface PayrollMemberConfig {
   renta_percentage?: number;
   isss_percentage?: number;
   afp_percentage?: number;
+  commission_mode?: CommissionMode;
+  commission_rate?: number;
+  bonus_kpi_default?: number;
   custom_deductions: CustomDeductionRule[];
   created_at?: string;
   updated_at?: string;
@@ -69,15 +79,28 @@ export interface PayrollCalculationItem {
   user_name: string;
   user_email: string;
   user_avatar?: string | null;
+  employee_code?: string;
+  hire_date?: string;
   country: PayrollCountry;
   contract_type: ContractType;
+  payment_frequency: PaymentFrequency;
   hourly_rate: number;
-  regular_hours: number;
+  effective_hourly_rate: number; // Tarifa por hora real/calculada (Sueldo pactado / horas período)
+  expected_period_hours: number; // Horas que debía cumplir en el período (ej: 176h mes o 88h quincena)
+  regular_hours: number; // Horas ordinarias efectivamente reportadas y aprobadas
+  hours_deficit: number; // Horas que le faltaron para completar la jornada pactada (si < expected)
+  hours_deficit_deduction: number; // Monto descontado por horas no trabajadas
   overtime_hours: number;
-  regular_pay: number;
+  applies_overtime: boolean;
+  regular_pay: number; // Salario ordinario devengado efectivo
   overtime_pay: number;
-  base_salary_part: number;
-  gross_pay: number;
+  base_salary: number; // Sueldo base pactado del período
+  base_salary_part: number; // Sueldo base pactado del período (alias para compatibilidad)
+  kpi_bonus: number; // Bono por cumplimiento de KPIs
+  commission_amount: number; // Comisiones por metas / ventas
+  commission_notes?: string;
+  overtime_schedule_details?: string; // Ej: "17:00 a 21:00"
+  gross_pay: number; // Total haberes devengados (salario regular + horas extras + bonos + comisiones)
   isss: number;
   afp: number;
   renta: number;

@@ -26,7 +26,7 @@ interface CustomDatePickerProps {
     onChange: (date: string) => void;
     placeholder?: string;
     className?: string;
-    variant?: 'light' | 'dark' | 'transparent';
+    variant?: 'light' | 'dark' | 'transparent' | 'white';
     minDate?: string;
     forceOpenUp?: boolean;
     forceOpenDown?: boolean;
@@ -253,19 +253,22 @@ export function CustomDatePicker({
     const triggerClasses = {
         dark: "bg-white/10 border-white/20 text-white hover:bg-white/20",
         light: "bg-indigo-50/50 border-indigo-100 text-indigo-700 hover:bg-indigo-100/50",
-        transparent: "bg-transparent border-transparent text-gray-700 hover:bg-gray-50"
+        transparent: "bg-transparent border-transparent text-gray-700 hover:bg-gray-50",
+        white: "h-11 py-0 px-3.5 bg-white border-slate-200 text-slate-800 hover:border-slate-300 shadow-2xs text-xs"
     };
 
     const iconClasses = {
         dark: "text-white opacity-60",
         light: "text-indigo-500",
-        transparent: "text-gray-400"
+        transparent: "text-gray-400",
+        white: "text-slate-400"
     };
 
     const textClasses = {
         dark: activeDate ? "text-white" : "text-white/40",
         light: activeDate ? "text-indigo-700" : "text-indigo-300",
-        transparent: activeDate ? "text-gray-700" : "text-gray-400"
+        transparent: activeDate ? "text-gray-700" : "text-gray-400",
+        white: activeDate ? "text-slate-800 font-semibold" : "text-slate-400 font-normal"
     };
 
     return (

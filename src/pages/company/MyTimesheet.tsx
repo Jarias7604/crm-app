@@ -46,6 +46,10 @@ export default function MyTimesheet() {
   const [projectId, setProjectId] = useState<string>('');
   const [ticketId, setTicketId] = useState<string>('');
 
+  // Horario de Horas Extras
+  const [overtimeStartTime, setOvertimeStartTime] = useState<string>('17:00');
+  const [overtimeEndTime, setOvertimeEndTime] = useState<string>('21:00');
+
   // Dropdown options
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [tickets, setTickets] = useState<{ 
@@ -175,6 +179,8 @@ export default function MyTimesheet() {
       setRegularHours(selectedDayEntry.regular_hours);
       setOvertimeHours(selectedDayEntry.overtime_hours);
       setOvertimeReason(selectedDayEntry.overtime_reason || '');
+      setOvertimeStartTime(selectedDayEntry.overtime_start_time || '17:00');
+      setOvertimeEndTime(selectedDayEntry.overtime_end_time || '21:00');
       setWorkSummary(selectedDayEntry.work_summary || '');
       setProjectId(selectedDayEntry.project_id || '');
       setTicketId(selectedDayEntry.ticket_id || '');
@@ -183,6 +189,8 @@ export default function MyTimesheet() {
       setRegularHours(8);
       setOvertimeHours(0);
       setOvertimeReason('');
+      setOvertimeStartTime('17:00');
+      setOvertimeEndTime('21:00');
       setWorkSummary('');
       setProjectId('');
       setTicketId('');
@@ -256,9 +264,15 @@ export default function MyTimesheet() {
       return;
     }
 
-    if (overtimeHours > 0 && (!overtimeReason.trim() || overtimeReason.trim().length < 4)) {
-      toast.error('Es obligatorio justificar el motivo del tiempo extra.');
-      return;
+    if (overtimeHours > 0) {
+      if (!overtimeReason.trim() || overtimeReason.trim().length < 4) {
+        toast.error('Es obligatorio justificar el motivo del tiempo extra.');
+        return;
+      }
+      if (!overtimeStartTime || !overtimeEndTime) {
+        toast.error('Por favor especifica de qué hora a qué hora se laboró el tiempo extra.');
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -269,6 +283,8 @@ export default function MyTimesheet() {
       regularHours: Number(regularHours),
       overtimeHours: Number(overtimeHours),
       overtimeReason: overtimeHours > 0 ? overtimeReason : undefined,
+      overtimeStartTime: overtimeHours > 0 ? overtimeStartTime : undefined,
+      overtimeEndTime: overtimeHours > 0 ? overtimeEndTime : undefined,
       workSummary,
       projectId: projectId || null,
       ticketId: ticketId || null,
@@ -283,7 +299,7 @@ export default function MyTimesheet() {
       } else if (selectedDayEntry?.status === 'rejected') {
         toast.success('Reporte corregido y reenviado para revisión del supervisor.');
       } else if (overtimeHours > 0) {
-        toast.success('Jornada enviada. Las horas extras quedaron pendientes de aprobación.');
+        toast.success(`Jornada enviada. Horas extras (${overtimeStartTime} a ${overtimeEndTime}) en revisión.`);
       } else {
         toast.success('Jornada registrada y enviada correctamente.');
       }
@@ -758,25 +774,68 @@ export default function MyTimesheet() {
               </div>
             </div>
 
-            {/* Justificación de Horas Extras (Aparece automáticamente si hay overtime) */}
+            {/* Justificación y Horario de Horas Extras (Aparece automáticamente si hay overtime) */}
             {overtimeHours > 0 && (
-              <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3 space-y-2 animate-fadeIn">
-                <div className="flex items-center gap-1.5 text-amber-900 text-xs font-bold">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  ¿Por qué se requirió tiempo extra hoy? (Obligatorio)
+              <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 space-y-3 animate-fadeIn">
+                <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
+                  <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-700" />
+                    Horario Laborado Adicional
+                  </span>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded-full">
+                    Requerimiento Contable
+                  </span>
                 </div>
-                <textarea
-                  rows={2}
-                  disabled={isFormDisabled}
-                  placeholder="Ej: Despliegue de versión en servidor de cliente fuera de horario, atención de emergencia técnica..."
-                  value={overtimeReason}
-                  onChange={(e) => setOvertimeReason(e.target.value)}
-                  required
-                  className="w-full p-2 bg-white border border-amber-300 rounded-lg text-xs text-slate-800 focus:outline-none placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100"
-                />
-                <p className="text-[10px] text-amber-800 leading-snug">
-                  📌 El supervisor revisará esta justificación en la bandeja de Nómina antes de aprobar el pago con recargo de ley.
-                </p>
+
+                {/* De qué hora a qué hora */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-amber-900 uppercase mb-1">
+                      Desde (Hora Inicio)
+                    </label>
+                    <input
+                      type="time"
+                      disabled={isFormDisabled}
+                      value={overtimeStartTime}
+                      onChange={(e) => setOvertimeStartTime(e.target.value)}
+                      required
+                      className="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-amber-900 uppercase mb-1">
+                      Hasta (Hora Fin)
+                    </label>
+                    <input
+                      type="time"
+                      disabled={isFormDisabled}
+                      value={overtimeEndTime}
+                      onChange={(e) => setOvertimeEndTime(e.target.value)}
+                      required
+                      className="w-full px-2.5 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 text-amber-900 text-xs font-bold">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    ¿Por qué se requirió tiempo extra hoy? (Obligatorio)
+                  </div>
+                  <textarea
+                    rows={2}
+                    disabled={isFormDisabled}
+                    placeholder="Ej: Despliegue de versión en servidor de cliente fuera de horario, atención de emergencia técnica..."
+                    value={overtimeReason}
+                    onChange={(e) => setOvertimeReason(e.target.value)}
+                    required
+                    className="w-full p-2 bg-white border border-amber-300 rounded-lg text-xs text-slate-800 focus:outline-none placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  />
+                  <p className="text-[10px] text-amber-800 leading-snug">
+                    📌 Horario registrado: <strong>{overtimeStartTime} a {overtimeEndTime}</strong>. El supervisor lo revisará en la bandeja de Nómina antes de autorizar el pago con recargo de ley.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -961,6 +1020,11 @@ export default function MyTimesheet() {
                           <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
                             <Sparkles className="w-3 h-3 text-amber-500" />
                             +{entry.overtime_hours}h Extra
+                            {(entry.overtime_start_time && entry.overtime_end_time) && (
+                              <span className="text-[10px] text-amber-700 font-semibold ml-1">
+                                ({entry.overtime_start_time} a {entry.overtime_end_time})
+                              </span>
+                            )}
                           </span>
                         )}
                       </div>

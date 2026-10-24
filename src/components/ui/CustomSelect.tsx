@@ -4,6 +4,7 @@ import { ChevronDown, Check, Search, X } from 'lucide-react';
 export interface SelectOption {
     value: string;
     label: string | React.ReactNode;
+    shortLabel?: string;
     icon?: React.ReactNode | string;
     color?: string;
 }
@@ -84,17 +85,17 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                     e.preventDefault();
                     setIsOpen(!isOpen);
                 }}
-                className={buttonClassName || `w-full flex items-center justify-between bg-white border ${isOpen ? 'border-indigo-300 ring-4 ring-indigo-50/50' : 'border-gray-200 hover:border-gray-300'} shadow-sm rounded-xl px-3 py-2.5 text-left transition-all outline-none cursor-pointer`}
+                className={buttonClassName || `w-full h-11 flex items-center justify-between bg-white border ${isOpen ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-slate-300'} shadow-2xs rounded-xl px-3.5 text-left transition-all outline-none cursor-pointer`}
             >
-                <span className="flex items-center gap-2 text-sm font-bold text-gray-700 truncate">
+                <span className="flex items-center gap-2 text-xs font-semibold text-slate-800 truncate">
                     {selectedOption?.icon && <span className="flex-shrink-0 text-base leading-none">{selectedOption.icon}</span>}
-                    <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
+                    <span className="truncate">{selectedOption ? (selectedOption.shortLabel || selectedOption.label) : placeholder}</span>
                 </span>
-                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isOpen && (
-                <div className="absolute z-50 mt-1.5 w-full bg-white rounded-2xl shadow-[0_12px_36px_rgb(0,0,0,0.15)] border border-gray-200 overflow-hidden py-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute z-50 mt-1.5 w-full min-w-[280px] sm:min-w-[320px] max-w-[420px] bg-white rounded-2xl shadow-[0_12px_36px_rgb(0,0,0,0.15)] border border-slate-200 overflow-hidden py-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
                     {/* Buscador con lupa */}
                     {isSearchEnabled && (
                         <div className="p-2 border-b border-gray-100 bg-slate-50/70">
@@ -113,9 +114,9 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                                     <button
                                         type="button"
                                         onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSearchTerm('');
-                                            searchInputRef.current?.focus();
+                                             e.stopPropagation();
+                                             setSearchTerm('');
+                                             searchInputRef.current?.focus();
                                         }}
                                         className="absolute right-2 p-0.5 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-600 cursor-pointer"
                                     >
@@ -144,13 +145,13 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                                             setIsOpen(false);
                                             setSearchTerm('');
                                         }}
-                                        className={`w-full flex items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-indigo-50/60 active:bg-indigo-100/70 cursor-pointer
-                                            ${isSelected ? 'bg-indigo-50 text-indigo-700 font-black' : 'text-gray-700 font-bold'}
+                                        className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left text-xs transition-colors hover:bg-indigo-50/60 active:bg-indigo-100/70 cursor-pointer
+                                            ${isSelected ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-700 font-medium'}
                                         `}
                                     >
-                                        <span className={`flex items-center gap-2 truncate ${option.color || ''}`}>
+                                        <span className={`flex items-center gap-2.5 ${option.color || ''}`}>
                                             {option.icon && <span className="flex-shrink-0 text-base leading-none">{option.icon}</span>}
-                                            <span className="truncate">{option.label}</span>
+                                            <span className="whitespace-normal leading-snug">{option.label}</span>
                                         </span>
                                         {isSelected && <Check className="w-4 h-4 text-indigo-600 flex-shrink-0 ml-2" />}
                                     </button>
