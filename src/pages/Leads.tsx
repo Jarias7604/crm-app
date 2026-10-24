@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { LeadTable } from '../components/leads/LeadTable';
 import { LeadGrid } from '../components/leads/LeadGrid';
@@ -25,7 +25,6 @@ import { csvHelper } from '../utils/csvHelper';
 import { storageService } from '../services/storage';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
-import { useMemo } from 'react';
 import { CreateLeadFullscreen } from '../components/CreateLeadFullscreen';
 import { QuickActionLogger } from '../components/QuickCallLogger';
 import { LeadKanban } from '../components/LeadKanban';
@@ -52,9 +51,14 @@ export default function Leads() {
     const { profile, simulatedCompanyId } = useAuth();
     const activeCompanyId = simulatedCompanyId || profile?.company_id || '';
     const { hasPermission } = usePermissions();
-    const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const isEffectiveAdmin = profile?.role === 'super_admin' || (!profile?.custom_role_id && profile?.role === 'company_admin');
+    const isAdmin = isEffectiveAdmin;
     // Direct check — bypasses usePermissions inheritance (where 'leads' base would grant 'leads_view_all')
-    const canViewAllLeads = isAdmin || (profile?.permissions?.['leads_view_all'] === true);
+    const canViewAllLeads = useMemo(() => {
+        if (isEffectiveAdmin) return true;
+        const p = profile?.permissions as Record<string, any> | undefined;
+        return p?.['leads_view_all'] === true || p?.['LEADS_VIEW_ALL'] === true;
+    }, [isEffectiveAdmin, profile?.permissions]);
     const { timezone: rawTimezone } = useTimezone(profile?.company_id);
     const { tableRef: leadsTableRef, wrapperRef: leadsWrapperRef } = useAriasTables();
     const queryClient = useQueryClient();

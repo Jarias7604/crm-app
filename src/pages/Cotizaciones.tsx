@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FileText, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, ArrowUpDown, GripVertical, Search, BadgeDollarSign, TrendingUp, Calendar, ChevronDown, X, Building2 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -15,8 +15,21 @@ import { useWorkspaceHierarchy } from '../hooks/useWorkspaceHierarchy';
 
 export default function Cotizaciones() {
     const { profile } = useAuth();
-    const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
-    const canViewAllQuotes = isAdmin || (profile?.permissions?.['quotes_view_all'] === true);
+    const isEffectiveAdmin = profile?.role === 'super_admin' || (!profile?.custom_role_id && profile?.role === 'company_admin');
+    const isAdmin = isEffectiveAdmin;
+    const canViewAllQuotes = useMemo(() => {
+        if (isEffectiveAdmin) return true;
+        const p = profile?.permissions as Record<string, any> | undefined;
+        if (!p) return false;
+        return (
+            p['quotes_view_all'] === true ||
+            p['QUOTES_VIEW_ALL'] === true ||
+            p['quotes_view_team'] === true ||
+            p['QUOTES_VIEW_TEAM'] === true ||
+            p['cotizaciones_view_all'] === true ||
+            p['COTIZACIONES_VIEW_ALL'] === true
+        );
+    }, [isEffectiveAdmin, profile?.permissions]);
     const navigate = useNavigate();
 
     // 🏢 Hierarchical Data Roll-up (HubSpot / Salesforce style)
@@ -144,9 +157,12 @@ export default function Cotizaciones() {
             setLoading(true);
             const queryCompanyIds = targetCompanyIds.length > 0 ? targetCompanyIds : profile!.company_id;
             let data = await cotizacionesService.getCotizaciones(queryCompanyIds);
-            // 🔒 Role-based visibility: collaborators only see their own quotes
+            // 🔒 Role-based visibility: collaborators only see their own quotes or quotes belonging to their assigned leads
             if (!canViewAllQuotes && profile?.id) {
-                data = data.filter((cot: any) => cot.created_by === profile.id);
+                data = data.filter((cot: any) => 
+                    cot.created_by === profile.id || 
+                    (cot.lead && cot.lead.assigned_to === profile.id)
+                );
             }
             setCotizaciones(data);
         } catch (error: any) {

@@ -45,7 +45,7 @@ class CotizacionesService {
             .from('cotizaciones')
             .select(`
                 *,
-                lead:leads(id, name, email),
+                lead:leads(id, name, email, assigned_to),
                 creator:profiles!created_by(full_name, email, avatar_url)
             `);
 

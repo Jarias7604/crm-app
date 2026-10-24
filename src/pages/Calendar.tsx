@@ -110,42 +110,38 @@ export default function Calendar() {
     const { profile } = useAuth();
     const { timezone: rawTimezone } = useTimezone(profile?.company_id);
     const companyTimezone = rawTimezone || DEFAULT_TIMEZONE;
-    const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const isEffectiveAdmin = profile?.role === 'super_admin' || (!profile?.custom_role_id && profile?.role === 'company_admin');
+    const isAdmin = isEffectiveAdmin;
 
     // Permissions to view all team calendar events and use team collaborator filter
     const canViewAllCalendar = useMemo(() => {
-        if (isAdmin) return true;
+        if (isEffectiveAdmin) return true;
         const p = profile?.permissions as Record<string, any> | undefined;
         if (!p) return false;
         return (
             p['calendar_view_team'] === true ||
             p['CALENDAR_VIEW_TEAM'] === true ||
-            p['followups_view_all'] === true ||
-            p['FOLLOWUPS_VIEW_ALL'] === true ||
             p['calendar_view_all'] === true ||
             p['CALENDAR_VIEW_ALL'] === true ||
-            p['followups_schedule'] === true ||
-            p['FOLLOWUPS_SCHEDULE'] === true ||
-            p['calendar'] === true
+            p['followups_view_all'] === true ||
+            p['FOLLOWUPS_VIEW_ALL'] === true
         );
-    }, [isAdmin, profile?.permissions]);
+    }, [isEffectiveAdmin, profile?.permissions]);
 
     const canDeleteFollowUp = useMemo(() => {
-        if (isAdmin) return true;
+        if (isEffectiveAdmin) return true;
         const p = profile?.permissions as Record<string, any> | undefined;
         return p?.['followups_delete'] === true || p?.['FOLLOWUPS_DELETE'] === true;
-    }, [isAdmin, profile?.permissions]);
+    }, [isEffectiveAdmin, profile?.permissions]);
 
     const canAssignOthers = useMemo(() => {
-        if (isAdmin) return true;
+        if (isEffectiveAdmin) return true;
         const p = profile?.permissions as Record<string, any> | undefined;
         return (
             p?.['followups_assign'] === true ||
-            p?.['FOLLOWUPS_ASSIGN'] === true ||
-            p?.['followups_schedule'] === true ||
-            p?.['FOLLOWUPS_SCHEDULE'] === true
+            p?.['FOLLOWUPS_ASSIGN'] === true
         );
-    }, [isAdmin, profile?.permissions]);
+    }, [isEffectiveAdmin, profile?.permissions]);
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -194,22 +190,30 @@ export default function Calendar() {
     const nextMonthStart = useMemo(() => startOfMonth(addMonths(currentDate, 1)).toISOString(), [currentDate]);
     const nextMonthEnd   = useMemo(() => endOfMonth(addMonths(currentDate, 1)).toISOString(),   [currentDate]);
 
+    // When collaborator cannot view team calendar, strictly lock queries to their own profile id
+    const effectiveCalendarAssigneeId = canViewAllCalendar ? selectedCalendarCollabId : profile?.id;
+
     // Query principal — full data con JOINs, ventana = mes actual
     const { data: calendarEventsData, isLoading: loading } = useQuery({
-        queryKey: ['calendar-follow-ups', windowStart, windowEnd, selectedCalendarCollabId],
-        queryFn: () => leadsService.getCalendarFollowUps(windowStart, windowEnd, selectedCalendarCollabId),
+        queryKey: ['calendar-follow-ups', windowStart, windowEnd, effectiveCalendarAssigneeId],
+        queryFn: () => leadsService.getCalendarFollowUps(windowStart, windowEnd, effectiveCalendarAssigneeId),
         staleTime: 1 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
         placeholderData: (previousData) => previousData,
     });
-    const calendarEvents = calendarEventsData ?? [];
+    // In-memory security guard: ensure non-admin collaborators without team calendar permission never see others' follow-ups
+    const calendarEvents = useMemo(() => {
+        const events = calendarEventsData ?? [];
+        if (canViewAllCalendar) return events;
+        return events.filter(ev => ev.assigned_to === profile?.id);
+    }, [calendarEventsData, canViewAllCalendar, profile?.id]);
 
     // Prefetch silencioso de meses adyacentes — navegación sin spinner
     useEffect(() => {
         const prefetch = (start: string, end: string) =>
             queryClient.prefetchQuery({
-                queryKey: ['calendar-follow-ups', start, end, selectedCalendarCollabId],
-                queryFn: () => leadsService.getCalendarFollowUps(start, end, selectedCalendarCollabId),
+                queryKey: ['calendar-follow-ups', start, end, effectiveCalendarAssigneeId],
+                queryFn: () => leadsService.getCalendarFollowUps(start, end, effectiveCalendarAssigneeId),
                 staleTime: 5 * 60 * 1000,
             });
         const timer = setTimeout(() => {
@@ -217,7 +221,7 @@ export default function Calendar() {
             prefetch(nextMonthStart, nextMonthEnd);
         }, 1000);
         return () => clearTimeout(timer);
-    }, [currentDate, queryClient, prevMonthStart, prevMonthEnd, nextMonthStart, nextMonthEnd, selectedCalendarCollabId]);
+    }, [currentDate, queryClient, prevMonthStart, prevMonthEnd, nextMonthStart, nextMonthEnd, effectiveCalendarAssigneeId]);
 
     // Realtime: invalidar cache cuando cambia un follow-up
     useEffect(() => {
