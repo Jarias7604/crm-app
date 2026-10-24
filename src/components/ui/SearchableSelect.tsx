@@ -103,7 +103,7 @@ export default function SearchableSelect({
           {selectedOption ? (
             <div className="min-w-0 flex-1 py-0.5">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="font-bold text-slate-800 text-xs truncate max-w-[200px] sm:max-w-[240px]">
+                <span className="font-bold text-slate-800 text-xs truncate" title={selectedOption.title}>
                   {selectedOption.title}
                 </span>
                 {selectedOption.badge && (
