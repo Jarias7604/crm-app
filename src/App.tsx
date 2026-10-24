@@ -90,6 +90,8 @@ const TrialExpired      = lazy(() => import('./pages/public/TrialExpired'));
 const Workspaces        = lazy(() => import('./pages/company/Workspaces'));
 const Facturas          = lazy(() => import('./pages/Facturas'));
 const FacturaDetalle    = lazy(() => import('./pages/FacturaDetalle'));
+const MyTimesheet       = lazy(() => import('./pages/company/MyTimesheet'));
+const PayrollManager    = lazy(() => import('./pages/company/PayrollManager'));
 
 
 // ─── Skeleton Screen (técnica Netflix) ───────────────────────────────────────
@@ -223,10 +225,12 @@ function App() {
                   <Route path="/cotizaciones/:id" element={<CotizacionDetalle />} />
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/calendar/booking" element={<BookingSettings />} />
+                  <Route path="/mi-jornada" element={<MyTimesheet />} />
 
                   {/* Company & Config Routes (Admin only) */}
                   <Route element={<RoleProtectedRoute allowedRoles={['super_admin', 'company_admin']} />}>
                     <Route path="/company/team" element={<Team />} />
+                    <Route path="/company/payroll" element={<PayrollManager />} />
                     <Route path="/company/permissions" element={<Permissions />} />
                     <Route path="/company/branding" element={<Branding />} />
                     <Route path="/company/billing" element={<Billing />} />

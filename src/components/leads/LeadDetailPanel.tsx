@@ -23,6 +23,7 @@ import { ContractEditorModal } from '../contracts/ContractEditorModal';
 import { ContractShareModal } from '../contracts/ContractShareModal';
 import { contractPdfService } from '../../services/contractPdfService';
 import { QuickActionLogger } from '../QuickCallLogger';
+import { SectionErrorBoundary } from '../ui/SectionErrorBoundary';
 import toast from 'react-hot-toast';
 
 import { Input } from '../ui/Input';
@@ -385,22 +386,24 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         Registrar Nueva Acción
                                     </button>
                                 ) : (
-                                    <QuickActionLogger
-                                        lead={selectedLead}
-                                        companyId={localStorage.getItem('simulated_company_id') || profile?.company_id || ''}
-                                        teamMembers={teamMembers}
-                                        callStartedAt={callStartedAt ?? undefined}
-                                        onCallLogged={async (statusChanged, newStatus) => {
-                                            if (statusChanged && newStatus) {
-                                                await handleUpdateLead({ status: newStatus });
-                                            }
-                                            loadFollowUps(selectedLead.id);
-                                        }}
-                                        onClose={() => {
-                                            setIsCallLoggerOpen(false);
-                                            setCallStartedAt(null); // reset mobile call start
-                                        }}
-                                    />
+                                    <SectionErrorBoundary fallbackTitle="Error al mostrar el registrador de acciones">
+                                        <QuickActionLogger
+                                            lead={selectedLead}
+                                            companyId={localStorage.getItem('simulated_company_id') || profile?.company_id || ''}
+                                            teamMembers={Array.isArray(teamMembers) ? teamMembers : []}
+                                            callStartedAt={callStartedAt ?? undefined}
+                                            onCallLogged={async (statusChanged, newStatus) => {
+                                                if (statusChanged && newStatus) {
+                                                    await handleUpdateLead({ status: newStatus });
+                                                }
+                                                loadFollowUps(selectedLead.id);
+                                            }}
+                                            onClose={() => {
+                                                setIsCallLoggerOpen(false);
+                                                setCallStartedAt(null); // reset mobile call start
+                                            }}
+                                        />
+                                    </SectionErrorBoundary>
                                 )}
                             </div>
 

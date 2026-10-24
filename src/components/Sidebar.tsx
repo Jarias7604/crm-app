@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall, Sparkles, Brain, Target, Globe, Radio } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall, Sparkles, Brain, Target, Globe, Radio, Clock, Calculator } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -443,6 +443,13 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: t('sidebar.projects'), href: '/proyectos', icon: Layers, current: location.pathname.startsWith('/proyectos') });
     }
 
+    navigation.push({
+        name: 'Mi Jornada',
+        href: '/mi-jornada',
+        icon: Clock,
+        current: location.pathname === '/mi-jornada'
+    });
+
     if (canAccess('quotes') || profile?.role === 'super_admin') {
         navigation.push({ name: t('sidebar.quotes'), href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
     }
@@ -579,11 +586,12 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             name: t('sidebar.team'),
             href: '/company/team',
             icon: Users,
-            current: location.pathname.startsWith('/company/team') || location.pathname.startsWith('/company/teams') || location.pathname.startsWith('/company/performance'),
+            current: location.pathname.startsWith('/company/team') || location.pathname.startsWith('/company/teams') || location.pathname.startsWith('/company/performance') || location.pathname.startsWith('/company/payroll'),
             subItems: [
                 { name: t('sidebar.members'), href: '/company/team', icon: UserCircle },
                 { name: t('sidebar.structure'), href: '/company/teams', icon: Network },
                 { name: t('sidebar.performance'), href: '/company/performance', icon: BarChart3 },
+                { name: 'Overtime & Planilla', href: '/company/payroll', icon: Calculator },
             ]
         });
         navigation.push({ name: t('sidebar.permissions'), href: '/company/permissions', icon: ShieldCheck, current: location.pathname.startsWith('/company/permissions') });

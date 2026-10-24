@@ -5,7 +5,6 @@ import { callActivityService, ACTION_TYPE_CONFIG, CALL_OUTCOME_CONFIG, type Call
 import { leadsService } from '../services/leads';
 import { supabase } from '../services/supabase';
 import type { Lead, LeadStatus, FollowUpActionType } from '../types';
-import { CustomDatePicker } from './ui/CustomDatePicker';
 import toast from 'react-hot-toast';
 import { useTimezone } from '../hooks/useTimezone';
 import { localToUtcISO, DEFAULT_TIMEZONE } from '../utils/timezone';
@@ -127,31 +126,38 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
 
     // ── Quality Score: live calculation based on form state ──────────────────
     const calcQualityScore = () => {
-        let score = 0;
-        const effectiveOutcome = specialOutcome ? 'connected' : outcome;
-        const sessionSecs = (Date.now() - openedAtRef.current) / 1000;
+        try {
+            let score = 0;
+            const effectiveOutcome = specialOutcome ? 'connected' : outcome;
+            const sessionSecs = (Date.now() - (openedAtRef.current || Date.now())) / 1000;
 
-        // +20  Connected or special outcome (real conversation/action)
-        if (effectiveOutcome === 'connected') score += 20;
+            // +20  Connected or special outcome (real conversation/action)
+            if (effectiveOutcome === 'connected') score += 20;
 
-        // +10  Notes written (> 15 chars)
-        if (notes.trim().length > 15) score += 10;
-        // +5   Bonus: detailed notes (> 60 chars)
-        if (notes.trim().length > 60) score += 5;
+            // +10  Notes written (> 15 chars)
+            if (notes && notes.trim().length > 15) score += 10;
+            // +5   Bonus: detailed notes (> 60 chars)
+            if (notes && notes.trim().length > 60) score += 5;
 
-        // +20  Follow-up scheduled
-        if (wantsFollowUp && followUpDate) score += 20;
+            // +20  Follow-up scheduled
+            if (wantsFollowUp && followUpDate) score += 20;
 
-        // +15  Real session time > 90 seconds (conversation actually happened)
-        if (sessionSecs > 90) score += 15;
+            // +15  Real session time > 90 seconds (conversation actually happened)
+            if (sessionSecs > 90) score += 15;
 
-        // +30  Timely response: registered within 2h of scheduled follow-up
-        if (lead.next_followup_date) {
-            const diffH = Math.abs(Date.now() - new Date(lead.next_followup_date).getTime()) / 3_600_000;
-            if (diffH < 2) score += 30;
+            // +30  Timely response: registered within 2h of scheduled follow-up
+            if (lead?.next_followup_date) {
+                const targetTime = new Date(lead.next_followup_date).getTime();
+                if (!isNaN(targetTime)) {
+                    const diffH = Math.abs(Date.now() - targetTime) / 3_600_000;
+                    if (diffH < 2) score += 30;
+                }
+            }
+
+            return Math.min(Math.max(score, 0), 100);
+        } catch {
+            return 50;
         }
-
-        return Math.min(score, 100);
     };
 
     // Company timezone for correct UTC storage (fallback to El Salvador if not yet loaded)
@@ -188,17 +194,29 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
 
     // Default follow-up date to tomorrow
     const getDefaultDate = () => {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return tomorrow.toISOString().split('T')[0];
+        try {
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            return tomorrow.toISOString().split('T')[0];
+        } catch {
+            return '';
+        }
     };
 
     // Toggle follow-up scheduling
-    const handleFollowUpToggle = () => {
-        const next = !wantsFollowUp;
-        setWantsFollowUp(next);
-        if (next && !followUpDate) {
-            setFollowUpDate(getDefaultDate());
+    const handleFollowUpToggle = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        try {
+            const next = !wantsFollowUp;
+            setWantsFollowUp(next);
+            if (next && !followUpDate) {
+                setFollowUpDate(getDefaultDate());
+            }
+        } catch (err) {
+            console.error('Error toggling follow-up:', err);
         }
     };
 
@@ -421,8 +439,9 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
             <div className="mb-4">
                 <div className="flex items-center gap-3">
                     <button
+                        type="button"
                         onClick={handleFollowUpToggle}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${wantsFollowUp ? 'bg-purple-600' : 'bg-gray-200'
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${wantsFollowUp ? 'bg-purple-600' : 'bg-gray-200'
                             }`}
                     >
                         <span
@@ -450,13 +469,12 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                         <div className="grid grid-cols-2 gap-2 mb-3">
                             <div>
                                 <label className="block text-[8px] font-bold text-purple-500 uppercase mb-1 ml-1">Fecha</label>
-                                <CustomDatePicker
+                                <input
+                                    type="date"
                                     value={followUpDate}
-                                    onChange={(date) => setFollowUpDate(date)}
-                                    placeholder="Seleccionar fecha"
-                                    variant="light"
-                                    minDate={todayISO}
-                                    forceOpenUp
+                                    min={todayISO}
+                                    onChange={(e) => setFollowUpDate(e.target.value)}
+                                    className="w-full bg-white border border-purple-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none cursor-pointer"
                                 />
                             </div>
                             <div>
@@ -464,7 +482,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                                 <select
                                     value={followUpTime}
                                     onChange={(e) => setFollowUpTime(e.target.value)}
-                                    className="w-full bg-white border border-purple-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none appearance-none cursor-pointer"
+                                    className="w-full bg-white border border-purple-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none appearance-none cursor-pointer"
                                 >
                                     {TIME_SLOTS.map(slot => (
                                         <option key={slot.value} value={slot.value}>{slot.label}</option>
@@ -473,7 +491,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                             </div>
                         </div>
                         {/* Assignee Selector */}
-                        {teamMembers.length > 0 && (
+                        {Array.isArray(teamMembers) && teamMembers.length > 0 && (
                             <div className="mb-3">
                                 <label className="block text-[8px] font-bold text-purple-500 uppercase mb-1 ml-1">Ejecutivo Asignado</label>
                                 <select
@@ -482,11 +500,15 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                                     className="w-full bg-white border border-purple-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none appearance-none cursor-pointer"
                                 >
                                     <option value="">Sin asignar</option>
-                                    {teamMembers.map(m => (
-                                        <option key={m.id} value={m.id}>
-                                            {m.full_name || (typeof m.email === 'string' ? m.email.split('@')[0] : 'Usuario')}
-                                        </option>
-                                    ))}
+                                    {teamMembers.filter(Boolean).map(m => {
+                                        const emailPrefix = typeof m?.email === 'string' && m.email.includes('@') ? m.email.split('@')[0] : '';
+                                        const label = m?.full_name || emailPrefix || 'Usuario';
+                                        return (
+                                            <option key={m?.id || String(Math.random())} value={m?.id || ''}>
+                                                {label}
+                                            </option>
+                                        );
+                                    })}
                                 </select>
                             </div>
                         )}
