@@ -171,6 +171,7 @@ export const timesheetsService = {
     projectId?: string | null;
     taskId?: string | null;
     ticketId?: string | null;
+    isAdmin?: boolean;
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
       // Si overtime > 0, es obligatorio justificar
@@ -178,6 +179,55 @@ export const timesheetsService = {
         return { success: false, error: 'Es obligatorio justificar el motivo de las horas extras.' };
       }
 
+      // 1. Verificar si ya existe registro para ese colaborador en esa fecha
+      const { data: existing } = await supabase
+        .from('team_timesheets')
+        .select('id, status')
+        .eq('company_id', payload.companyId)
+        .eq('user_id', payload.userId)
+        .eq('work_date', payload.workDate)
+        .maybeSingle();
+
+      if (existing) {
+        // Reglas de inmutabilidad estricta
+        if ((existing.status === 'approved' || existing.status === 'paid') && !payload.isAdmin) {
+          return {
+            success: false,
+            error: 'Esta jornada ya fue aprobada para nómina y está bloqueada contra modificaciones. Solo un administrador puede alterarla.'
+          };
+        }
+
+        if (existing.status === 'submitted' && !payload.isAdmin) {
+          return {
+            success: false,
+            error: 'Esta jornada ya fue enviada y está en cola de revisión. Una vez enviada no puede modificarse por el colaborador a menos que un administrador lo autorice.'
+          };
+        }
+
+        // Si es rechazado o si es administrador, permitir actualización
+        const { data: updated, error: updateErr } = await supabase
+          .from('team_timesheets')
+          .update({
+            regular_hours: payload.regularHours,
+            overtime_hours: payload.overtimeHours,
+            overtime_reason: payload.overtimeReason || null,
+            work_summary: payload.workSummary,
+            project_id: payload.projectId || null,
+            task_id: payload.taskId || null,
+            ticket_id: payload.ticketId || null,
+            status: existing.status === 'approved' ? (payload.isAdmin ? 'approved' : 'submitted') : 'submitted',
+            rejection_reason: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+
+        if (updateErr) throw updateErr;
+        return { success: true, data: updated };
+      }
+
+      // Registro nuevo
       const { data, error } = await supabase
         .from('team_timesheets')
         .insert([{
@@ -233,6 +283,26 @@ export const timesheetsService = {
           reviewed_by: reviewerId,
           reviewed_at: new Date().toISOString(),
           rejection_reason: reason || 'Horas extras no autorizadas',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  },
+
+  async unlockTimesheetForEmployee(id: string, reviewerId: string, note?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('team_timesheets')
+        .update({
+          status: 'rejected',
+          reviewed_by: reviewerId,
+          reviewed_at: new Date().toISOString(),
+          rejection_reason: note || 'Habilitado por el administrador para que el colaborador realice correcciones.',
           updated_at: new Date().toISOString(),
         })
         .eq('id', id);

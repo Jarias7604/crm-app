@@ -19,6 +19,7 @@ interface SearchableSelectProps {
   value: string;
   onChange: (value: string) => void;
   noneOptionLabel?: string;
+  disabled?: boolean;
 }
 
 export default function SearchableSelect({
@@ -30,7 +31,8 @@ export default function SearchableSelect({
   options,
   value,
   onChange,
-  noneOptionLabel = '(Opcional) Ninguno / General'
+  noneOptionLabel = '(Opcional) Ninguno / General',
+  disabled = false,
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -78,9 +80,14 @@ export default function SearchableSelect({
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/80 border rounded-xl text-left text-xs transition flex items-center justify-between gap-2 shadow-2xs ${
-          isOpen ? 'border-indigo-500 ring-2 ring-indigo-500/10 bg-white' : 'border-slate-200'
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full px-3 py-2 border rounded-xl text-left text-xs transition flex items-center justify-between gap-2 shadow-2xs ${
+          disabled
+            ? 'opacity-60 cursor-not-allowed bg-slate-100 border-slate-200 text-slate-500'
+            : isOpen
+            ? 'border-indigo-500 ring-2 ring-indigo-500/10 bg-white cursor-pointer'
+            : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200 cursor-pointer'
         }`}
       >
         <div className="flex items-center gap-2 truncate flex-1 min-w-0">
@@ -101,13 +108,13 @@ export default function SearchableSelect({
         </div>
 
         <div className="flex items-center gap-1 shrink-0 text-slate-400">
-          {value && (
+          {value && !disabled && (
             <span
               onClick={(e) => {
                 e.stopPropagation();
                 onChange('');
               }}
-              className="p-0.5 hover:text-slate-600 rounded transition"
+              className="p-0.5 hover:text-slate-600 rounded transition cursor-pointer"
               title="Borrar selección"
             >
               <X className="w-3.5 h-3.5" />

@@ -8,7 +8,7 @@ import {
   Clock, Calendar, AlertCircle, CheckCircle2, XCircle, 
   Send, Plus, Layers, Ticket, ChevronLeft, ChevronRight, History, 
   Sparkles, FileText, Check, AlertTriangle, ArrowRight, Zap, RefreshCw,
-  FolderGit2
+  FolderGit2, Lock, Unlock, ShieldCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -30,6 +30,8 @@ function getMonday(d: Date): Date {
 export default function MyTimesheet() {
   const { profile, simulatedCompanyId } = useAuth();
   const activeCompanyId = simulatedCompanyId || profile?.company_id;
+  const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+  const [adminOverrideUnlocked, setAdminOverrideUnlocked] = useState<boolean>(false);
 
   // Selected Date & Reference Week
   const todayStr = useMemo(() => formatDateISO(new Date()), []);
@@ -148,6 +150,25 @@ export default function MyTimesheet() {
     return entries.find(e => e.work_date === selectedDate);
   }, [entries, selectedDate]);
 
+  // Reset del override administrativo cuando cambia la fecha seleccionada
+  useEffect(() => {
+    setAdminOverrideUnlocked(false);
+  }, [selectedDate]);
+
+  // Reglas de inmutabilidad estricta:
+  // - 'submitted': el empleado lo envió. En cola de revisión, NO puede cambiarlo.
+  // - 'approved': aprobado por supervisor/nómina. Bloqueo total permanente.
+  // - 'paid': liquidado en nómina contable. Bloqueo total permanente.
+  // - 'rejected': devuelto por supervisor con observación. El empleado SÍ puede corregir y reenviar.
+  // - Sin registro / borrador: totalmente editable.
+  const isLockedStatus = useMemo(() => {
+    if (!selectedDayEntry) return false;
+    return ['submitted', 'approved', 'paid'].includes(selectedDayEntry.status);
+  }, [selectedDayEntry]);
+
+  // El formulario está bloqueado si el registro tiene estado protegido Y (el usuario no es admin O el admin no ha activado el override explícito)
+  const isFormDisabled = isLockedStatus && (!isAdmin || !adminOverrideUnlocked);
+
   // Cuando cambia el día seleccionado, sincronizamos el formulario
   useEffect(() => {
     if (selectedDayEntry) {
@@ -167,6 +188,29 @@ export default function MyTimesheet() {
       setTicketId('');
     }
   }, [selectedDate, selectedDayEntry]);
+
+  // Acción de Administrador: Devolver al empleado para que lo edite
+  const handleAdminUnlockForEmployee = async () => {
+    if (!selectedDayEntry || !profile?.id) return;
+    const confirmUnlock = window.confirm(
+      '¿Deseas devolver este registro al colaborador para que pueda editar sus horas y entregables desde su cuenta?'
+    );
+    if (!confirmUnlock) return;
+
+    const res = await timesheetsService.unlockTimesheetForEmployee(
+      selectedDayEntry.id,
+      profile.id,
+      'Habilitado por el administrador para que el colaborador realice correcciones.'
+    );
+
+    if (res.success) {
+      toast.success('Registro devuelto al colaborador con permisos de edición habilitados.');
+      setAdminOverrideUnlocked(false);
+      await fetchHistory();
+    } else {
+      toast.error('Error al desbloquear: ' + res.error);
+    }
+  };
 
   // Resumen de Horas de la Semana
   const weekStats = useMemo(() => {
@@ -202,6 +246,11 @@ export default function MyTimesheet() {
       return;
     }
 
+    if (isFormDisabled) {
+      toast.error('Este registro está bloqueado contra modificaciones.');
+      return;
+    }
+
     if (!workSummary.trim()) {
       toast.error('Por favor detalla qué actividades realizaste.');
       return;
@@ -215,7 +264,7 @@ export default function MyTimesheet() {
     setSubmitting(true);
     const res = await timesheetsService.submitTimesheet({
       companyId: activeCompanyId,
-      userId: profile.id,
+      userId: selectedDayEntry?.user_id || profile.id,
       workDate: selectedDate,
       regularHours: Number(regularHours),
       overtimeHours: Number(overtimeHours),
@@ -223,15 +272,21 @@ export default function MyTimesheet() {
       workSummary,
       projectId: projectId || null,
       ticketId: ticketId || null,
+      isAdmin: Boolean(isAdmin && adminOverrideUnlocked),
     });
     setSubmitting(false);
 
     if (res.success) {
-      toast.success(
-        overtimeHours > 0 
-          ? 'Jornada enviada. Las horas extras quedaron pendientes de aprobación.' 
-          : 'Jornada registrada correctamente.'
-      );
+      if (isAdmin && adminOverrideUnlocked) {
+        toast.success('Cambios guardados con autorización de administrador.');
+        setAdminOverrideUnlocked(false);
+      } else if (selectedDayEntry?.status === 'rejected') {
+        toast.success('Reporte corregido y reenviado para revisión del supervisor.');
+      } else if (overtimeHours > 0) {
+        toast.success('Jornada enviada. Las horas extras quedaron pendientes de aprobación.');
+      } else {
+        toast.success('Jornada registrada y enviada correctamente.');
+      }
       await fetchHistory();
     } else {
       toast.error(res.error || 'No se pudo guardar la jornada');
@@ -242,26 +297,26 @@ export default function MyTimesheet() {
     switch (status) {
       case 'approved':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Aprobado
           </span>
         );
       case 'rejected':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-            <XCircle className="w-3 h-3 text-rose-600" /> Rechazado
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+            <XCircle className="w-3 h-3 text-rose-600" /> Corrección Requerida
           </span>
         );
       case 'paid':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
             <Check className="w-3 h-3 text-purple-600" /> Liquidado
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-            <Clock className="w-3 h-3 text-amber-600" /> Pendiente
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+            <Clock className="w-3 h-3 text-amber-600" /> Enviado (En Revisión)
           </span>
         );
     }
@@ -363,7 +418,13 @@ export default function MyTimesheet() {
               <span className="w-2 h-2 rounded-full bg-emerald-500" /> Aprobado
             </span>
             <span className="flex items-center gap-1 font-medium">
-              <span className="w-2 h-2 rounded-full bg-amber-400" /> Pendiente
+              <span className="w-2 h-2 rounded-full bg-amber-400" /> Enviado
+            </span>
+            <span className="flex items-center gap-1 font-medium">
+              <span className="w-2 h-2 rounded-full bg-rose-500" /> Corrección
+            </span>
+            <span className="flex items-center gap-1 font-medium text-slate-400">
+              <Lock className="w-3 h-3 text-slate-400" /> Bloqueado
             </span>
           </div>
         </div>
@@ -375,6 +436,7 @@ export default function MyTimesheet() {
             const isSelected = dateStr === selectedDate;
             const entry = entries.find(e => e.work_date === dateStr);
             const hasOvertime = entry && entry.overtime_hours > 0;
+            const isEntryLocked = entry && ['submitted', 'approved', 'paid'].includes(entry.status);
 
             return (
               <button
@@ -416,10 +478,15 @@ export default function MyTimesheet() {
                 <div className="w-full">
                   {entry ? (
                     <div className="flex items-center justify-between gap-1 w-full">
-                      <span className="text-[11px] font-bold text-slate-800">
+                      <span className="text-[11px] font-bold text-slate-800 flex items-center gap-1">
+                        {isEntryLocked && (
+                          <span title="Registro Bloqueado">
+                            <Lock className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                          </span>
+                        )}
                         {entry.regular_hours}h
                         {hasOvertime && (
-                          <span className="text-amber-700 font-bold ml-1">+{entry.overtime_hours}h</span>
+                          <span className="text-amber-700 font-bold ml-0.5">+{entry.overtime_hours}h</span>
                         )}
                       </span>
                       <span className={`w-2 h-2 rounded-full shrink-0 ${
@@ -454,7 +521,13 @@ export default function MyTimesheet() {
                 {formattedSelectedDate}
               </div>
               <h2 className="text-sm font-bold text-slate-900 mt-0.5">
-                {selectedDayEntry ? 'Actualizar Reporte del Día' : 'Nuevo Registro de Jornada'}
+                {selectedDayEntry?.status === 'approved' || selectedDayEntry?.status === 'paid'
+                  ? 'Reporte Aprobado para Nómina'
+                  : selectedDayEntry?.status === 'submitted'
+                  ? 'Reporte Enviado (En Revisión)'
+                  : selectedDayEntry?.status === 'rejected'
+                  ? 'Reporte Devuelto para Corrección'
+                  : 'Nuevo Registro de Jornada'}
               </h2>
             </div>
 
@@ -464,6 +537,146 @@ export default function MyTimesheet() {
               </div>
             )}
           </div>
+
+          {/* ── BANNERS INFORMATIVOS DE ESTADO Y SEGURIDAD ── */}
+
+          {/* BANNER 1: Aprobado o Liquidado (Bloqueo Total Legal) */}
+          {(selectedDayEntry?.status === 'approved' || selectedDayEntry?.status === 'paid') && !adminOverrideUnlocked && (
+            <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-xl p-3.5 flex items-start gap-3 animate-fadeIn">
+              <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg shrink-0 mt-0.5">
+                <Lock className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-900">
+                    Jornada Aprobada para Nómina (Registro Sellado)
+                  </span>
+                  <span className="text-[10px] font-bold uppercase bg-emerald-200/80 text-emerald-800 px-2 py-0.5 rounded-full">
+                    Inmutable
+                  </span>
+                </div>
+                <p className="text-emerald-800 text-[11px] mt-1 leading-relaxed">
+                  Este registro fue validado y cerrado contablemente. Para cumplir con normativas laborales y trazabilidad legal, no puede ser modificado por el colaborador.
+                </p>
+                {!isAdmin && (
+                  <p className="text-[10px] text-emerald-700 mt-1.5 font-medium italic">
+                    🔒 Si requieres un ajuste extraordinario, solicita a un administrador que habilite la edición.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* BANNER 2: Enviado (Bloqueado mientras está en cola de revisión) */}
+          {selectedDayEntry?.status === 'submitted' && !adminOverrideUnlocked && (
+            <div className="bg-amber-50/90 border border-amber-200/90 rounded-xl p-3.5 flex items-start gap-3 animate-fadeIn">
+              <div className="p-2 bg-amber-100 text-amber-700 rounded-lg shrink-0 mt-0.5">
+                <Lock className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-900">
+                    Jornada Enviada (En Cola de Revisión)
+                  </span>
+                  <span className="text-[10px] font-bold uppercase bg-amber-200/80 text-amber-800 px-2 py-0.5 rounded-full">
+                    Bloqueado
+                  </span>
+                </div>
+                <p className="text-amber-800 text-[11px] mt-1 leading-relaxed">
+                  Has enviado este reporte de jornada. Para asegurar la transparencia, no se permite su edición mientras el supervisor evalúa las horas trabajadas.
+                </p>
+                {!isAdmin && (
+                  <p className="text-[10px] text-amber-700 mt-1.5 font-medium italic">
+                    🔒 Si necesitas realizar cambios, solicita a tu supervisor que devuelva el registro para corrección.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* BANNER 3: Rechazado / Devuelto para Corrección */}
+          {selectedDayEntry?.status === 'rejected' && (
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 flex items-start gap-3 animate-fadeIn">
+              <div className="p-2 bg-rose-100 text-rose-700 rounded-lg shrink-0 mt-0.5">
+                <AlertCircle className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-rose-900">
+                    Jornada Devuelta para Corrección
+                  </span>
+                  <span className="text-[10px] font-bold uppercase bg-rose-200 text-rose-800 px-2 py-0.5 rounded-full">
+                    Edición Habilitada
+                  </span>
+                </div>
+                <p className="text-rose-800 text-[11px] mt-1 leading-snug">
+                  <strong>Observación del supervisor:</strong> "{selectedDayEntry.rejection_reason || 'Por favor revisar entregables o justificación de tiempo extra'}"
+                </p>
+                <p className="text-[10px] text-rose-700 mt-1.5 font-medium">
+                  ✏️ Los campos han sido habilitados para que corrijas la información y reenvíes tu jornada.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* BANNER 4: Panel Administrativo de Control y Desbloqueo */}
+          {isAdmin && isLockedStatus && (
+            <div className="bg-slate-900 text-white rounded-xl p-3.5 space-y-2.5 shadow-md animate-fadeIn">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300">
+                  <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                  Control de Administrador / Supervisor
+                </div>
+                <span className="text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 px-2 py-0.5 rounded">
+                  {profile?.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-300 leading-snug">
+                Este reporte está bloqueado para el colaborador. Como administrador tienes privilegios para habilitar la modificación directa o devolverlo:
+              </p>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setAdminOverrideUnlocked(!adminOverrideUnlocked)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    adminOverrideUnlocked
+                      ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-sm'
+                      : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                  }`}
+                >
+                  {adminOverrideUnlocked ? (
+                    <>
+                      <Lock className="w-3.5 h-3.5" />
+                      Volver a Bloquear
+                    </>
+                  ) : (
+                    <>
+                      <Unlock className="w-3.5 h-3.5" />
+                      Habilitar Modificación Directa
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleAdminUnlockForEmployee}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
+                  title="Devolver al colaborador para que lo edite y reenvíe"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                  Permitir que el Empleado lo Edite
+                </button>
+              </div>
+
+              {adminOverrideUnlocked && (
+                <div className="text-[11px] text-amber-200 bg-amber-950/50 p-2 rounded-lg border border-amber-500/30 font-medium">
+                  ⚠️ <strong>Modo Edición Administrativa Activo:</strong> Puedes modificar las horas, entregables y asignación. Al guardar, quedará registrado con autorización de administrador.
+                </div>
+              )}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Presets Rápidos de Horas */}
@@ -475,8 +688,11 @@ export default function MyTimesheet() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  disabled={isFormDisabled}
                   onClick={() => setRegularHours(8)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
+                    isFormDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                  } ${
                     regularHours === 8
                       ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-2xs'
                       : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -486,8 +702,11 @@ export default function MyTimesheet() {
                 </button>
                 <button
                   type="button"
+                  disabled={isFormDisabled}
                   onClick={() => setRegularHours(4)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition border ${
+                    isFormDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                  } ${
                     regularHours === 4
                       ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-2xs'
                       : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
@@ -502,10 +721,11 @@ export default function MyTimesheet() {
                     step="0.5"
                     min="0"
                     max="24"
+                    disabled={isFormDisabled}
                     value={regularHours}
                     onChange={(e) => setRegularHours(Math.max(0, Number(e.target.value)))}
                     required
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 text-right pr-7 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 text-right pr-7 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100"
                   />
                   <span className="absolute right-2 top-1.5 text-xs text-slate-400 font-bold">h</span>
                 </div>
@@ -528,10 +748,11 @@ export default function MyTimesheet() {
                   step="0.5"
                   min="0"
                   max="16"
+                  disabled={isFormDisabled}
                   placeholder="0"
                   value={overtimeHours || ''}
                   onChange={(e) => setOvertimeHours(Math.max(0, Number(e.target.value)))}
-                  className="w-full px-3 py-2 bg-amber-50/40 border border-amber-200 rounded-xl text-xs font-bold text-amber-950 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 pr-8"
+                  className="w-full px-3 py-2 bg-amber-50/40 border border-amber-200 rounded-xl text-xs font-bold text-amber-950 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 pr-8 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100"
                 />
                 <span className="absolute right-3 top-2 text-xs text-amber-600 font-bold">hrs</span>
               </div>
@@ -546,11 +767,12 @@ export default function MyTimesheet() {
                 </div>
                 <textarea
                   rows={2}
+                  disabled={isFormDisabled}
                   placeholder="Ej: Despliegue de versión en servidor de cliente fuera de horario, atención de emergencia técnica..."
                   value={overtimeReason}
                   onChange={(e) => setOvertimeReason(e.target.value)}
                   required
-                  className="w-full p-2 bg-white border border-amber-300 rounded-lg text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
+                  className="w-full p-2 bg-white border border-amber-300 rounded-lg text-xs text-slate-800 focus:outline-none placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100"
                 />
                 <p className="text-[10px] text-amber-800 leading-snug">
                   📌 El supervisor revisará esta justificación en la bandeja de Nómina antes de aprobar el pago con recargo de ley.
@@ -564,6 +786,7 @@ export default function MyTimesheet() {
               <SearchableSelect
                 label="Proyecto"
                 icon={FolderGit2}
+                disabled={isFormDisabled}
                 placeholder="Seleccionar proyecto..."
                 searchPlaceholder="Buscar proyecto por nombre..."
                 noneOptionLabel="(Opcional) Trabajo General"
@@ -579,6 +802,7 @@ export default function MyTimesheet() {
               <SearchableSelect
                 label="Ticket de Soporte"
                 icon={Ticket}
+                disabled={isFormDisabled}
                 placeholder="Vincular ticket..."
                 searchPlaceholder="Buscar ticket por título o cliente..."
                 noneOptionLabel="(Opcional) Sin ticket asignado"
@@ -601,23 +825,53 @@ export default function MyTimesheet() {
               </label>
               <textarea
                 rows={3}
+                disabled={isFormDisabled}
                 placeholder="Describe brevemente tus avances técnicos, llamadas o tareas concluidas hoy..."
                 value={workSummary}
                 onChange={(e) => setWorkSummary(e.target.value)}
                 required
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100"
               />
             </div>
 
-            {/* Botón de Envío */}
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-500/20 flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
-            >
-              <Send className="w-3.5 h-3.5" />
-              {submitting ? 'Guardando...' : selectedDayEntry ? 'Actualizar Reporte del Día' : 'Enviar Reporte de Jornada'}
-            </button>
+            {/* Botón de Envío o Indicador de Bloqueo */}
+            {isFormDisabled ? (
+              <div className="w-full py-2.5 px-4 bg-slate-100 border border-slate-200 text-slate-400 font-bold rounded-xl text-xs flex items-center justify-center gap-2 select-none cursor-not-allowed shadow-2xs">
+                <Lock className="w-3.5 h-3.5 text-slate-400" />
+                {selectedDayEntry?.status === 'approved' || selectedDayEntry?.status === 'paid'
+                  ? 'Jornada Aprobada — Registro Bloqueado'
+                  : 'Jornada Enviada — Edición Bloqueada en Revisión'}
+              </div>
+            ) : (
+              <button
+                type="submit"
+                disabled={submitting}
+                className={`w-full py-2.5 px-4 font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer text-white ${
+                  adminOverrideUnlocked
+                    ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20'
+                    : selectedDayEntry?.status === 'rejected'
+                    ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/20'
+                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20'
+                }`}
+              >
+                {adminOverrideUnlocked ? (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    {submitting ? 'Guardando...' : 'Guardar Modificación como Administrador'}
+                  </>
+                ) : selectedDayEntry?.status === 'rejected' ? (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    {submitting ? 'Enviando...' : 'Corregir y Reenviar Reporte'}
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    {submitting ? 'Guardando...' : selectedDayEntry ? 'Actualizar Reporte del Día' : 'Enviar Reporte de Jornada'}
+                  </>
+                )}
+              </button>
+            )}
           </form>
         </div>
 
