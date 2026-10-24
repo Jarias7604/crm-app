@@ -389,7 +389,7 @@ export const timesheetsService = {
       let totalNet = 0;
 
       const items: PayrollCalculationItem[] = (teamMembers || []).map(member => {
-        const cfg = configMap.get(member.id) || {
+        const cfg: PayrollMemberConfig = configMap.get(member.id) || {
           company_id: params.companyId,
           user_id: member.id,
           payment_frequency: 'quincenal',
@@ -401,6 +401,10 @@ export const timesheetsService = {
           apply_isss: true,
           apply_afp: true,
           apply_renta: true,
+          renta_mode: 'percentage',
+          renta_percentage: 10.0,
+          isss_percentage: 3.0,
+          afp_percentage: 7.25,
           custom_deductions: [],
         };
 
