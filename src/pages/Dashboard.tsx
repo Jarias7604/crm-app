@@ -516,7 +516,7 @@ export default function Dashboard() {
                 setIsLoadingUncontacted(true);
                 let uncontactedQ = supabase
                     .from('leads')
-                    .select('id, name, company_name, created_at, value, source, status, contact_count, last_follow_up_at, assigned_to')
+                    .select('id, name, company_name, created_at, value, source, status, contact_count, last_follow_up_at, assigned_to, interested_product_id')
                     .eq('company_id', profile.company_id)
                     .eq('status', 'Prospecto')
                     .or('contact_count.is.null,contact_count.eq.0')
@@ -1528,9 +1528,9 @@ export default function Dashboard() {
                         <div
                             key={item.name}
                             onClick={item.onClick}
-                            className={`group relative rounded-[20px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)] group-hover/cards:scale-[0.97] group-hover/cards:opacity-60 hover:!scale-[1.03] hover:!opacity-100 hover:!-translate-y-2 hover:shadow-[0_20px_50px_rgb(0,0,0,0.12)] hover:z-50 cursor-pointer ${activeCardFilter === item.name ? 'z-[101]' : 'z-10'} bg-white border-slate-200/70 overflow-hidden`}
+                            className={`group relative rounded-[20px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)] group-hover/cards:scale-[0.97] group-hover/cards:opacity-60 hover:!scale-[1.03] hover:!opacity-100 hover:!-translate-y-2 hover:shadow-[0_20px_50px_rgb(0,0,0,0.12)] hover:z-50 cursor-pointer ${activeCardFilter === item.name ? 'z-[150] !scale-100 !transform-none shadow-[0_20px_50px_rgb(0,0,0,0.12)]' : 'z-10'} bg-white border-slate-200/70`}
                         >
-                            <div className="absolute inset-0 pointer-events-none">
+                            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-[20px]">
                                 <div className={`absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full blur-3xl opacity-0 group-hover:opacity-60 transition-opacity duration-700 ${item.color.replace('text-', 'bg-')}`}></div>
                                 <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-slate-50/50 to-transparent"></div>
                             </div>
@@ -1549,7 +1549,7 @@ export default function Dashboard() {
                                                 activeCardFilter === item.name 
                                                     ? 'bg-indigo-600 text-white shadow-md' 
                                                     : (item.name === t('dashboard.crm.uncontactedLeads', { defaultValue: 'Sin Contactar' }) || item.name === 'Sin Contactar' || item.name === 'Leads Sin Contactar') && selectedProductFilter.length > 0
-                                                        ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-300'
+                                                        ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-300'
                                                         : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
                                             }`}
                                             title={(item.name === t('dashboard.crm.uncontactedLeads', { defaultValue: 'Sin Contactar' }) || item.name === 'Sin Contactar' || item.name === 'Leads Sin Contactar') ? 'Filtrar por Tipo de Lead / Producto' : 'Filtro de período'}
@@ -1560,103 +1560,87 @@ export default function Dashboard() {
                                             (item.name === t('dashboard.crm.uncontactedLeads', { defaultValue: 'Sin Contactar' }) || item.name === 'Sin Contactar' || item.name === 'Leads Sin Contactar') ? (
                                                 <div 
                                                     onClick={(e) => e.stopPropagation()} 
-                                                    className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 p-3 animate-in fade-in slide-in-from-top-2"
+                                                    className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 z-[999] py-2 animate-in fade-in slide-in-from-top-2 max-h-80 overflow-y-auto"
                                                 >
-                                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <Package className="w-3.5 h-3.5 text-rose-600" />
-                                                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-800">Filtrar por Producto</span>
-                                                        </div>
-                                                        {selectedProductFilter.length > 0 && (
-                                                            <button 
-                                                                onClick={() => setSelectedProductFilter([])}
-                                                                className="text-[10px] font-bold text-rose-600 hover:text-rose-800 transition-colors"
-                                                            >
-                                                                Restablecer
-                                                            </button>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
-                                                        {/* Todos los productos */}
-                                                        <button
-                                                            onClick={() => setSelectedProductFilter([])}
-                                                            className={`w-full text-left px-3 py-2 rounded-xl text-[11px] transition-colors flex items-center justify-between ${selectedProductFilter.length === 0 ? 'bg-rose-50 text-rose-700 font-black' : 'text-slate-600 font-bold hover:bg-slate-50'}`}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selectedProductFilter.length === 0 ? 'bg-rose-600 border-rose-600 text-white' : 'border-slate-300 bg-white'}`}>
-                                                                    {selectedProductFilter.length === 0 && <Check className="w-3 h-3 stroke-[3]" />}
-                                                                </div>
-                                                                <span>Todos los productos</span>
+                                                    {/* Todos los productos */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedProductFilter([]);
+                                                        }}
+                                                        className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors flex items-center justify-between ${selectedProductFilter.length === 0 ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selectedProductFilter.length === 0 ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 bg-white'}`}>
+                                                                {selectedProductFilter.length === 0 && <Check className="w-3 h-3 stroke-[3]" />}
                                                             </div>
-                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${selectedProductFilter.length === 0 ? 'bg-rose-200/80 text-rose-800' : 'bg-slate-100 text-slate-500'}`}>
-                                                                {uncontactedLeads.length}
-                                                            </span>
-                                                        </button>
+                                                            <span>Todos los productos</span>
+                                                        </div>
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${selectedProductFilter.length === 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                            {uncontactedLeads.length}
+                                                        </span>
+                                                    </button>
 
-                                                        <div className="border-t border-slate-100 my-1.5" />
+                                                    <div className="border-t border-gray-100 my-1" />
 
-                                                        {/* Cada producto */}
-                                                        {availableProducts.map(prod => {
-                                                            const isChecked = selectedProductFilter.includes(prod.id);
-                                                            const count = uncontactedByProduct[prod.id] || 0;
-                                                            return (
-                                                                <button
-                                                                    key={prod.id}
-                                                                    onClick={() => {
-                                                                        setSelectedProductFilter(prev => {
-                                                                            if (prev.includes(prod.id)) {
-                                                                                return prev.filter(id => id !== prod.id);
-                                                                            } else {
-                                                                                return [...prev, prod.id];
-                                                                            }
-                                                                        });
-                                                                    }}
-                                                                    className={`w-full text-left px-3 py-2 rounded-xl text-[11px] transition-colors flex items-center justify-between ${isChecked ? 'bg-rose-50/80 text-rose-700 font-black' : 'text-slate-600 font-bold hover:bg-slate-50'}`}
-                                                                >
-                                                                    <div className="flex items-center gap-2 min-w-0">
-                                                                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked ? 'bg-rose-600 border-rose-600 text-white' : 'border-slate-300 bg-white'}`}>
-                                                                            {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                                                                        </div>
-                                                                        <span className="truncate">{prod.name}</span>
-                                                                    </div>
-                                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${count > 0 ? (isChecked ? 'bg-rose-200 text-rose-800' : 'bg-rose-100 text-rose-600') : 'bg-slate-100 text-slate-400'}`}>
-                                                                        {count}
-                                                                    </span>
-                                                                </button>
-                                                            );
-                                                        })}
-
-                                                        {/* Leads sin producto asignado si existen */}
-                                                        {(uncontactedByProduct['none'] || 0) > 0 && (
+                                                    {/* Cada producto */}
+                                                    {availableProducts.map(prod => {
+                                                        const isChecked = selectedProductFilter.includes(prod.id);
+                                                        const count = uncontactedByProduct[prod.id] || 0;
+                                                        return (
                                                             <button
-                                                                onClick={() => {
+                                                                key={prod.id}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
                                                                     setSelectedProductFilter(prev => {
-                                                                        if (prev.includes('none')) {
-                                                                            return prev.filter(id => id !== 'none');
+                                                                        if (prev.includes(prod.id)) {
+                                                                            return prev.filter(id => id !== prod.id);
                                                                         } else {
-                                                                            return [...prev, 'none'];
+                                                                            return [...prev, prod.id];
                                                                         }
                                                                     });
                                                                 }}
-                                                                className={`w-full text-left px-3 py-2 rounded-xl text-[11px] transition-colors flex items-center justify-between ${selectedProductFilter.includes('none') ? 'bg-rose-50/80 text-rose-700 font-black' : 'text-slate-600 font-bold hover:bg-slate-50'}`}
+                                                                className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors flex items-center justify-between ${isChecked ? 'bg-indigo-50/80 text-indigo-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
                                                             >
                                                                 <div className="flex items-center gap-2 min-w-0">
-                                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${selectedProductFilter.includes('none') ? 'bg-rose-600 border-rose-600 text-white' : 'border-slate-300 bg-white'}`}>
-                                                                        {selectedProductFilter.includes('none') && <Check className="w-3 h-3 stroke-[3]" />}
+                                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 bg-white'}`}>
+                                                                        {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                                                                     </div>
-                                                                    <span className="truncate italic text-slate-500">Sin producto asignado</span>
+                                                                    <span className="truncate">{prod.name}</span>
                                                                 </div>
-                                                                <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-slate-100 text-slate-600">
-                                                                    {uncontactedByProduct['none']}
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${isChecked ? 'bg-indigo-100 text-indigo-700' : count > 0 ? 'bg-gray-100 text-gray-700' : 'bg-gray-50 text-gray-300'}`}>
+                                                                    {count}
                                                                 </span>
                                                             </button>
-                                                        )}
-                                                    </div>
+                                                        );
+                                                    })}
 
-                                                    <div className="pt-2 mt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center font-medium">
-                                                        Mostrando {displayedUncontactedCount} de {uncontactedLeads.length} leads
-                                                    </div>
+                                                    {/* Leads sin producto asignado si existen */}
+                                                    {(uncontactedByProduct['none'] || 0) > 0 && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedProductFilter(prev => {
+                                                                    if (prev.includes('none')) {
+                                                                        return prev.filter(id => id !== 'none');
+                                                                    } else {
+                                                                        return [...prev, 'none'];
+                                                                    }
+                                                                });
+                                                            }}
+                                                            className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors flex items-center justify-between ${selectedProductFilter.includes('none') ? 'bg-indigo-50/80 text-indigo-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+                                                        >
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${selectedProductFilter.includes('none') ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 bg-white'}`}>
+                                                                    {selectedProductFilter.includes('none') && <Check className="w-3 h-3 stroke-[3]" />}
+                                                                </div>
+                                                                <span className="truncate italic text-gray-500">Sin producto</span>
+                            </div>
+                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0 ${selectedProductFilter.includes('none') ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                                {uncontactedByProduct['none']}
+                                                            </span>
+                                                        </button>
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-100 z-50 py-2 animate-in fade-in slide-in-from-top-2">
