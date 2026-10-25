@@ -238,7 +238,22 @@ export default function Dashboard() {
     const [isLoadingUncontacted, setIsLoadingUncontacted] = useState(true);
     const [uncontactedCount, setUncontactedCount] = useState<number>(0);
     const [availableProducts, setAvailableProducts] = useState<{ id: string; name: string; is_active?: boolean }[]>([]);
-    const [selectedProductFilter, setSelectedProductFilter] = useState<string[]>([]);
+    const [selectedProductFilter, setSelectedProductFilter] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('dashboard_uncontacted_product_filter');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('dashboard_uncontacted_product_filter', JSON.stringify(selectedProductFilter));
+        } catch (e) {
+            // ignore
+        }
+    }, [selectedProductFilter]);
 
     // States for AI Cognitive Capsule
     const [selectedAiLead, setSelectedAiLead] = useState<{ id: string; name: string } | null>(null);
@@ -1503,6 +1518,7 @@ export default function Dashboard() {
                             state: { 
                                 assignedFilter: dashboardAssignedTo || 'all', 
                                 uncontactedOnly: true, 
+                                leadIds: filteredUncontactedLeads.map(l => l.id),
                                 status: 'Prospecto', 
                                 pipelineView: 'all',
                                 startDate: dateRange.startDate,
@@ -1810,6 +1826,7 @@ export default function Dashboard() {
                                                         state: { 
                                                             assignedFilter: dashboardAssignedTo || 'all',
                                                             uncontactedOnly: true,
+                                                            leadIds: filteredUncontactedLeads.map(l => l.id),
                                                             status: 'Prospecto',
                                                             pipelineView: 'all',
                                                             startDate: dateRange.startDate,

@@ -1474,7 +1474,7 @@ export default function Leads() {
                         </div>
                     </div>
                     <button
-                        onClick={() => { setUncontactedOnly(false); setPipelineFilter(null); setProductFilter('all'); }}
+                        onClick={() => { setUncontactedOnly(false); setPipelineFilter(null); setProductFilter('all'); setFilteredLeadIds(null); }}
                         className="flex items-center gap-1 bg-white hover:bg-rose-100 text-rose-700 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-xl transition-all border border-rose-200 shadow-xs cursor-pointer"
                     >
                         <X className="w-3 h-3" />
