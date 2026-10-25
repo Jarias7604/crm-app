@@ -118,6 +118,7 @@
             "last30Days": "Last 30 Days",
             "totalPipeline": "Total Pipeline",
             "totalLeads": "Total Leads",
+            "uncontactedLeads": "Uncontacted Leads",
             "wonDeals": "Won Deals",
             "conversionRate": "Conversion Rate",
             "funnelTitle": "Sales Funnel",

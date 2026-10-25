@@ -18,7 +18,7 @@ import type { Lead, LeadStatus, LeadPriority, FollowUp, LossReason, Industry, Le
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search, Target, Calendar, Settings2, SlidersHorizontal, ArrowLeft } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search, Target, Calendar, Settings2, SlidersHorizontal, ArrowLeft, PhoneOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -305,6 +305,7 @@ export default function Leads() {
     const [endDateFilter, setEndDateFilter] = useState<string | null>(null);
     const [minContactCountFilter, setMinContactCountFilter] = useState<number | null>(null);
     const [pipelineFilter, setPipelineFilter] = useState<PipelineFilter>(null);
+    const [uncontactedOnly, setUncontactedOnly] = useState<boolean>(false);
     const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
     // ── Pipeline Segments — 'active' | 'pool' | 'all' ─────────────────────────
     // 'active' = hide Llamada fría + En Nutrición (default for agents)
@@ -385,6 +386,15 @@ export default function Leads() {
                 }
                 if (state.minContactCount) {
                     setMinContactCountFilter(state.minContactCount);
+                }
+                if (state.uncontactedOnly !== undefined) {
+                    setUncontactedOnly(state.uncontactedOnly);
+                }
+                if (state.pipelineFilter) {
+                    setPipelineFilter(state.pipelineFilter);
+                }
+                if (state.pipelineView) {
+                    setPipelineView(state.pipelineView);
                 }
                 if (state.openCreateModal) {
                     const openReq = typeof state.openCreateModal === 'number' ? state.openCreateModal : 1;
@@ -670,12 +680,18 @@ export default function Leads() {
                 if ((lead.industry || '') !== industryFilter) return false;
             }
 
+            // Filter by uncontacted only (0 contacts and no follow up recorded)
+            if (uncontactedOnly) {
+                const hasBeenContacted = ((lead.contact_count || 0) > 0) || !!lead.last_follow_up_at;
+                if (hasBeenContacted) return false;
+            }
+
             return true;
         });
 
         // Apply pipeline intelligence filter on top of standard filters
         return applyPipelineFilter(base, pipelineFilter, profile?.company_id);
-    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, industryFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, pipelineFilter, pipelineView]);
+    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, industryFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, uncontactedOnly, pipelineFilter, pipelineView]);
 
     // Leads that have passed ALL filters EXCEPT the pipeline chip filter.
     // Used so chip counters respect the active date/status/priority filters.
@@ -1426,6 +1442,25 @@ export default function Leads() {
                 industries={industries}
                 workspaceProps={{ workspaces, canRollup, selectedWorkspace, setSelectedWorkspace }}
             />
+            {/* ── Uncontacted Filter Banner ──────────────────────────── */}
+            {uncontactedOnly && (
+                <div className="flex items-center justify-between bg-rose-50 border border-rose-200/80 rounded-2xl px-4 py-2.5 shadow-sm animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                        <PhoneOff className="w-4 h-4 text-rose-600 shrink-0" />
+                        <div>
+                            <span className="text-xs font-black text-rose-800">Filtrando: Leads Sin Contactar</span>
+                            <span className="text-[11px] text-rose-600 font-medium ml-2 hidden sm:inline">Mostrando prospectos activos que aún no han recibido llamadas ni seguimientos</span>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => { setUncontactedOnly(false); setPipelineFilter(null); }}
+                        className="flex items-center gap-1 bg-white hover:bg-rose-100 text-rose-700 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-xl transition-all border border-rose-200 shadow-xs cursor-pointer"
+                    >
+                        <X className="w-3 h-3" />
+                        Quitar filtro
+                    </button>
+                </div>
+            )}
             {/* ── Pipeline Segment Toggle Banner ─────────────────────────────────── */}
             {statusFilter === 'all' && !filteredLeadId && !filteredLeadIds && (
                 <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-2xl px-3 py-2 shadow-sm">

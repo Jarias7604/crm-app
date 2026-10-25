@@ -87,9 +87,10 @@ function filterLeads(leads: Lead[], filter: PipelineFilter, s: PipelineSettings)
   const atRisk = Array.isArray(s.atRiskStatuses) ? s.atRiskStatuses : [];
 
   switch (filter) {
-    // 🔴 Leads sin contacto en X días (usa último seguimiento o fecha de creación)
+    // 🔴 Leads sin contacto aún (0 intentos/seguimientos registrados) o sin seguimiento en X días
     case 'never_contacted':
       return active.filter(l => {
+        if (!l.last_follow_up_at && (!l.contact_count || l.contact_count === 0)) return true;
         const ref = l.last_follow_up_at ?? l.created_at;
         return daysSince(ref) >= s.neverContactedDays;
       });

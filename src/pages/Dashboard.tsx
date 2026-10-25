@@ -234,6 +234,9 @@ export default function Dashboard() {
     const [unassignedLeads, setUnassignedLeads] = useState<any[]>([]);
     const [isLoadingUnassigned, setIsLoadingUnassigned] = useState(true);
     const [isUnassignedModalOpen, setIsUnassignedModalOpen] = useState(false);
+    const [uncontactedLeads, setUncontactedLeads] = useState<any[]>([]);
+    const [isLoadingUncontacted, setIsLoadingUncontacted] = useState(true);
+    const [uncontactedCount, setUncontactedCount] = useState<number>(0);
 
     // States for AI Cognitive Capsule
     const [selectedAiLead, setSelectedAiLead] = useState<{ id: string; name: string } | null>(null);
@@ -468,6 +471,38 @@ export default function Dashboard() {
                         setIsLoadingUnassigned(false);
                     });
             }
+
+            // Fetch uncontacted leads (active leads that have not been contacted yet)
+            if (profile?.company_id) {
+                setIsLoadingUncontacted(true);
+                let uncontactedQ = supabase
+                    .from('leads')
+                    .select('id, name, company_name, created_at, value, source, status, contact_count, last_follow_up_at, assigned_to')
+                    .eq('company_id', profile.company_id)
+                    .not('status', 'in', '("Cerrado","Cliente","Perdido","Erróneo")')
+                    .is('last_follow_up_at', null);
+
+                if (dashboardAssignedTo) {
+                    if (Array.isArray(dashboardAssignedTo)) {
+                        uncontactedQ = uncontactedQ.in('assigned_to', dashboardAssignedTo);
+                    } else {
+                        uncontactedQ = uncontactedQ.eq('assigned_to', dashboardAssignedTo);
+                    }
+                }
+
+                uncontactedQ.order('created_at', { ascending: false })
+                    .then(({ data, error }) => {
+                        if (error) {
+                            logger.error('Error fetching uncontacted leads', error);
+                        } else {
+                            const filtered = (data || []).filter(l => !l.contact_count || l.contact_count === 0);
+                            setUncontactedLeads(filtered);
+                            setUncontactedCount(filtered.length);
+                        }
+                        setIsLoadingUncontacted(false);
+                    });
+            }
+
 
             // Set stats - fall back totalWonAmount if 0 (e.g. when closing_amount is not set or RPC schema is older)
             const adjustedStats = { ...dashboardData.stats };
@@ -1341,7 +1376,7 @@ export default function Dashboard() {
             </div>
 
             {/* KPI Cards - Global Standard */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 group/cards">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 group/cards">
                 {[
                     {
                         name: t('dashboard.crm.wonDeals'),
@@ -1387,6 +1422,25 @@ export default function Dashboard() {
                         trendColor: stats.totalLeadsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
                         onClick: () => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  startDate: dateRange.startDate, endDate: dateRange.endDate } }),
                         tooltip: 'Total de prospectos registrados en el período seleccionado. Incluye todos los estados: nuevos, en proceso, cerrados y perdidos.'
+                    },
+                    {
+                        name: t('dashboard.crm.uncontactedLeads', { defaultValue: 'Sin Contactar' }),
+                        value: uncontactedCount,
+                        icon: PhoneOff,
+                        color: 'text-rose-600',
+                        bg: 'bg-rose-50/50',
+                        trend: uncontactedCount > 0 ? `${uncontactedCount} pendientes` : 'Al día',
+                        trendColor: uncontactedCount > 0 ? 'text-rose-600' : 'text-emerald-500',
+                        onClick: () => navigate('/leads', { 
+                            state: { 
+                                assignedFilter: dashboardAssignedTo || 'all', 
+                                pipelineFilter: 'never_contacted', 
+                                uncontactedOnly: true, 
+                                status: 'all', 
+                                pipelineView: 'all' 
+                            } 
+                        }),
+                        tooltip: 'Prospectos activos que aún no han recibido ningún intento de contacto o llamada. ¡Atiéndelos de inmediato para no perder la venta!'
                     },
                     {
                         name: 'Descartes & Errores',
@@ -1556,6 +1610,31 @@ export default function Dashboard() {
                                                 </div>
                                             </div>
                                         </div>
+                                    ) : (item.name === t('dashboard.crm.uncontactedLeads', { defaultValue: 'Sin Contactar' }) || item.name === 'Sin Contactar' || item.name === 'Leads Sin Contactar') ? (
+                                        <div className="space-y-2 mt-1">
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-5xl xl:text-6xl font-black tracking-tight text-rose-600 drop-shadow-sm leading-none">{item.value}</span>
+                                                <span className="text-[11px] font-black text-rose-400 uppercase tracking-wider">leads</span>
+                                            </div>
+                                            <div 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate('/leads', { 
+                                                        state: { 
+                                                            assignedFilter: dashboardAssignedTo || 'all',
+                                                            pipelineFilter: 'never_contacted',
+                                                            uncontactedOnly: true,
+                                                            status: 'all',
+                                                            pipelineView: 'all'
+                                                        } 
+                                                    });
+                                                }}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-all shadow-md shadow-rose-200 group/badge"
+                                            >
+                                                <PhoneOff className="w-3.5 h-3.5 group-hover/badge:-translate-x-0.5 transition-transform" />
+                                                <span className="text-[9px] uppercase tracking-wider font-extrabold">Por Contactar</span>
+                                            </div>
+                                        </div>
                                     ) : (
                                         <div className="flex items-baseline gap-2">
                                             <span className="text-4xl font-black tracking-[-0.04em] text-slate-900">{item.value}</span>
@@ -1660,6 +1739,16 @@ export default function Dashboard() {
                     const potentialUnlock = biggestStuck ? biggestStuck.value * avgTicket : 0;
 
                     const focusItems = [
+                        uncontactedCount > 0 && {
+                            icon: PhoneOff,
+                            color: 'text-rose-600',
+                            bg: 'bg-rose-50',
+                            label: 'Sin Contactar',
+                            value: `${uncontactedCount} Prospecto${uncontactedCount > 1 ? 's' : ''}`,
+                            sub: 'Esperando primer contacto o llamada',
+                            action: 'uncontacted_filter',
+                            tooltip: 'Leads activos que ingresaron al CRM pero ningún asesor ha contactado aún. ¡Llámalos de inmediato para maximizar la conversión!',
+                        },
                         biggestStuck && {
                             icon: Flame,
                             color: 'text-rose-500',
@@ -1717,7 +1806,21 @@ export default function Dashboard() {
                                     {focusItems.map((item, i) => (
                                         <div
                                             key={i}
-                                            onClick={() => item.action && navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: item.action, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                            onClick={() => {
+                                                if (item.action === 'uncontacted_filter') {
+                                                    navigate('/leads', { 
+                                                        state: { 
+                                                            assignedFilter: dashboardAssignedTo || 'all', 
+                                                            pipelineFilter: 'never_contacted', 
+                                                            uncontactedOnly: true, 
+                                                            status: 'all', 
+                                                            pipelineView: 'all' 
+                                                        } 
+                                                    });
+                                                } else if (item.action) {
+                                                    navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: item.action, startDate: dateRange.startDate, endDate: dateRange.endDate } });
+                                                }
+                                            }}
                                             className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50/60 hover:bg-slate-100/80 cursor-pointer transition-all group/item border border-slate-100/80"
                                         >
                                             <div className={`w-8 h-8 rounded-xl ${item.bg} flex items-center justify-center shrink-0 mt-0.5`}>
