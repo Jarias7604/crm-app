@@ -938,11 +938,23 @@ export default function PayrollManager() {
                         </td>
 
                         {/* Base Pactada */}
-                        <td className="py-2.5 px-3 text-right text-slate-600 font-medium">
+                        <td className="py-2.5 px-3 text-right font-medium">
                           {isFixed ? (
-                            `$${item.base_salary_part.toFixed(2)}`
+                            <div>
+                              <span className="text-slate-800 font-bold block">${item.base_salary_part.toFixed(2)}</span>
+                              {item.payment_frequency === 'mensual' && item.expected_period_hours < 176 && item.base_salary_part > 0 && (
+                                <span className="text-[9px] text-slate-400 font-normal block" title="50% de su salario mensual correspondiente a esta quincena">
+                                  quincenal (${(item.base_salary_part * 2).toFixed(0)}/mes)
+                                </span>
+                              )}
+                              {item.payment_frequency === 'quincenal' && item.expected_period_hours > 88 && item.base_salary_part > 0 && (
+                                <span className="text-[9px] text-slate-400 font-normal block" title="Total mensual correspondiente a 2 quincenas">
+                                  mensual (${(item.base_salary_part / 2).toFixed(0)}/quincena)
+                                </span>
+                              )}
+                            </div>
                           ) : (
-                            `$${item.hourly_rate.toFixed(2)}/h`
+                            <span className="text-slate-600">${item.hourly_rate.toFixed(2)}/h</span>
                           )}
                         </td>
 
