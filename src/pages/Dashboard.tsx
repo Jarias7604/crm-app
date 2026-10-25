@@ -440,6 +440,7 @@ export default function Dashboard() {
     const isViewingOwnData = !dashboardAssignedTo || dashboardAssignedTo === profile?.id;
     const canViewActiveFinancials = canViewFinancials || isViewingOwnData;
     const averageTicket = stats.wonDeals > 0 ? Math.round((stats.totalWonAmount || stats.totalWonPotential || 0) / stats.wonDeals) : 0;
+    const finalUncontactedCount = Math.max(uncontactedCount, funnelData.find(d => d.key === 'Prospecto')?.value || 0);
 
     // Use optimized dashboard hook (replaces 5 queries with 1)
     const { data: dashboardData, isLoading: isDashboardLoading, error: dashboardError, refetch } = useDashboardStats(
@@ -1425,12 +1426,12 @@ export default function Dashboard() {
                     },
                     {
                         name: t('dashboard.crm.uncontactedLeads', { defaultValue: 'Sin Contactar' }),
-                        value: uncontactedCount,
+                        value: finalUncontactedCount,
                         icon: PhoneOff,
                         color: 'text-rose-600',
                         bg: 'bg-rose-50/50',
-                        trend: uncontactedCount > 0 ? `${uncontactedCount} pendientes` : 'Al día',
-                        trendColor: uncontactedCount > 0 ? 'text-rose-600' : 'text-emerald-500',
+                        trend: finalUncontactedCount > 0 ? `${finalUncontactedCount} pendientes` : 'Al día',
+                        trendColor: finalUncontactedCount > 0 ? 'text-rose-600' : 'text-emerald-500',
                         onClick: () => navigate('/leads', { 
                             state: { 
                                 assignedFilter: dashboardAssignedTo || 'all', 
@@ -1738,18 +1739,21 @@ export default function Dashboard() {
                     const avgTicket = stats.wonDeals > 0 ? Math.round((stats.totalWonAmount || stats.totalWonPotential || 0) / stats.wonDeals) : 0;
                     const potentialUnlock = biggestStuck ? biggestStuck.value * avgTicket : 0;
 
+                    const prospectoVolume = funnelData.find(d => d.key === 'Prospecto')?.value || 0;
+                    const finalUncontactedCount = Math.max(uncontactedCount, prospectoVolume);
+
                     const focusItems = [
-                        uncontactedCount > 0 && {
+                        finalUncontactedCount > 0 && {
                             icon: PhoneOff,
                             color: 'text-rose-600',
                             bg: 'bg-rose-50',
-                            label: 'Sin Contactar',
-                            value: `${uncontactedCount} Prospecto${uncontactedCount > 1 ? 's' : ''}`,
+                            label: 'Leads Sin Contactar',
+                            value: `${finalUncontactedCount} Prospecto${finalUncontactedCount > 1 ? 's' : ''}`,
                             sub: 'Esperando primer contacto o llamada',
                             action: 'uncontacted_filter',
                             tooltip: 'Leads activos que ingresaron al CRM pero ningún asesor ha contactado aún. ¡Llámalos de inmediato para maximizar la conversión!',
                         },
-                        biggestStuck && {
+                        biggestStuck && biggestStuck.key !== 'Prospecto' && {
                             icon: Flame,
                             color: 'text-rose-500',
                             bg: 'bg-rose-50',
