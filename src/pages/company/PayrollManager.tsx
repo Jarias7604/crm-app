@@ -446,6 +446,23 @@ export default function PayrollManager() {
     });
   }, [payrollSummary.items, searchTerm, countryFilter, onlyWithHours]);
 
+  // Totales reactivos y exactos calculados directamente sobre la lista mostrada en pantalla
+  const totals = useMemo(() => {
+    let gross = 0;
+    let deds = 0;
+    let net = 0;
+    for (const item of filteredItems) {
+      gross += item.gross_pay;
+      deds += item.isss + item.afp + item.renta + item.other_deductions;
+      net += item.net_pay;
+    }
+    return {
+      gross: +gross.toFixed(2),
+      deductions: +deds.toFixed(2),
+      net: +net.toFixed(2),
+    };
+  }, [filteredItems]);
+
   // Filtro de solicitudes en Bandeja de Aprobaciones
   const filteredApprovals = useMemo(() => {
     if (approvalsFilter === 'overtime') {
@@ -677,7 +694,7 @@ export default function PayrollManager() {
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
           <p className="text-2xl font-bold text-emerald-700 tracking-tight mt-1">
-            ${payrollSummary.totalNet.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${totals.net.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <span className="text-[10px] text-slate-400 mt-0.5 block font-medium">
             Monto líquido disponible para pago
@@ -690,7 +707,7 @@ export default function PayrollManager() {
             Total Bruto Devengado
           </span>
           <p className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
-            ${payrollSummary.totalGross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${totals.gross.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <span className="text-[10px] text-slate-400 mt-0.5 block font-medium">
             Salario base + Overtime aprobado
@@ -703,7 +720,7 @@ export default function PayrollManager() {
             Retenciones Fiscales
           </span>
           <p className="text-2xl font-bold text-rose-600 tracking-tight mt-1">
-            -${payrollSummary.totalDeductions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            -${totals.deductions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <span className="text-[10px] text-slate-400 mt-0.5 block font-medium">
             Renta directa, ISSS, AFP y deducciones
@@ -854,7 +871,7 @@ export default function PayrollManager() {
                   <th className="py-2.5 px-4">Colaborador</th>
                   <th className="py-2.5 px-3">Modalidad</th>
                   <th className="py-2.5 px-3 text-center">Jornada (Horas)</th>
-                  <th className="py-2.5 px-3 text-right">Base Pactada</th>
+                  <th className="py-2.5 px-3 text-right" title="Sueldo base contratado y monto correspondiente al corte">Sueldo Base</th>
                   <th className="py-2.5 px-3 text-right">Salario Devengado</th>
                   <th className="py-2.5 px-3 text-center">Overtime</th>
                   <th className="py-2.5 px-3 text-right">Bonos KPI</th>
@@ -925,9 +942,13 @@ export default function PayrollManager() {
                             <span className="font-bold text-slate-800">
                               {item.regular_hours}h <span className="text-slate-400 font-normal">/ {item.expected_period_hours}h</span>
                             </span>
-                            {item.hours_deficit > 0 ? (
+                            {item.regular_hours > 0 && item.hours_deficit > 0 ? (
                               <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1 rounded border border-amber-200 mt-0.5">
                                 -{item.hours_deficit}h falta
+                              </span>
+                            ) : item.regular_hours === 0 ? (
+                              <span className="text-[9px] text-slate-400 font-normal mt-0.5">
+                                Sin horas
                               </span>
                             ) : item.regular_hours >= item.expected_period_hours && item.expected_period_hours > 0 ? (
                               <span className="text-[9px] font-bold text-emerald-700 mt-0.5">
@@ -937,24 +958,34 @@ export default function PayrollManager() {
                           </div>
                         </td>
 
-                        {/* Base Pactada */}
+                        {/* Sueldo Base */}
                         <td className="py-2.5 px-3 text-right font-medium">
                           {isFixed ? (
                             <div>
-                              <span className="text-slate-800 font-bold block">${item.base_salary_part.toFixed(2)}</span>
-                              {item.payment_frequency === 'mensual' && item.expected_period_hours < 176 && item.base_salary_part > 0 && (
-                                <span className="text-[9px] text-slate-400 font-normal block" title="50% de su salario mensual correspondiente a esta quincena">
-                                  quincenal (${(item.base_salary_part * 2).toFixed(0)}/mes)
+                              <span className="text-slate-900 font-bold block">${item.base_salary_part.toFixed(2)}</span>
+                              {item.payment_frequency === 'mensual' && item.expected_period_hours < 176 && item.base_salary_part > 0 ? (
+                                <span className="text-[9px] text-slate-500 font-normal block" title={`Sueldo mensual pactado: $${(item.base_salary_part * 2).toFixed(0)}. Aplica 50% en corte quincenal`}>
+                                  Corte quincenal <span className="text-slate-400">(${(item.base_salary_part * 2).toFixed(0)}/mes)</span>
                                 </span>
-                              )}
-                              {item.payment_frequency === 'quincenal' && item.expected_period_hours > 88 && item.base_salary_part > 0 && (
-                                <span className="text-[9px] text-slate-400 font-normal block" title="Total mensual correspondiente a 2 quincenas">
-                                  mensual (${(item.base_salary_part / 2).toFixed(0)}/quincena)
+                              ) : item.payment_frequency === 'quincenal' && item.expected_period_hours > 88 && item.base_salary_part > 0 ? (
+                                <span className="text-[9px] text-slate-500 font-normal block" title="Total de 2 quincenas en el mes">
+                                  Mes completo <span className="text-slate-400">(${(item.base_salary_part / 2).toFixed(0)}/quincena)</span>
+                                </span>
+                              ) : item.base_salary_part > 0 ? (
+                                <span className="text-[9px] text-slate-400 font-normal block capitalize">
+                                  {item.payment_frequency}
+                                </span>
+                              ) : (
+                                <span className="text-[9px] text-amber-600 font-medium block" title="Falta configurar salario en Ficha Técnica">
+                                  Sin configurar
                                 </span>
                               )}
                             </div>
                           ) : (
-                            <span className="text-slate-600">${item.hourly_rate.toFixed(2)}/h</span>
+                            <div>
+                              <span className="text-slate-900 font-bold block">${item.hourly_rate.toFixed(2)}/h</span>
+                              <span className="text-[9px] text-slate-400 font-normal block">Por horas</span>
+                            </div>
                           )}
                         </td>
 
