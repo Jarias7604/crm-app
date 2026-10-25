@@ -440,7 +440,7 @@ export default function Dashboard() {
     const isViewingOwnData = !dashboardAssignedTo || dashboardAssignedTo === profile?.id;
     const canViewActiveFinancials = canViewFinancials || isViewingOwnData;
     const averageTicket = stats.wonDeals > 0 ? Math.round((stats.totalWonAmount || stats.totalWonPotential || 0) / stats.wonDeals) : 0;
-    const finalUncontactedCount = Math.max(uncontactedCount, funnelData.find(d => d.key === 'Prospecto')?.value || 0);
+    const finalUncontactedCount = uncontactedCount;
 
     // Use optimized dashboard hook (replaces 5 queries with 1)
     const { data: dashboardData, isLoading: isDashboardLoading, error: dashboardError, refetch } = useDashboardStats(
@@ -480,7 +480,8 @@ export default function Dashboard() {
                     .from('leads')
                     .select('id, name, company_name, created_at, value, source, status, contact_count, last_follow_up_at, assigned_to')
                     .eq('company_id', profile.company_id)
-                    .not('status', 'in', '("Cerrado","Cliente","Perdido","Erróneo")')
+                    .eq('status', 'Prospecto')
+                    .or('contact_count.is.null,contact_count.eq.0')
                     .is('last_follow_up_at', null);
 
                 if (dashboardAssignedTo) {
@@ -491,15 +492,41 @@ export default function Dashboard() {
                     }
                 }
 
+                if (dateRange.startDate) {
+                    uncontactedQ = uncontactedQ.gte('created_at', dateRange.startDate);
+                }
+                if (dateRange.endDate) {
+                    uncontactedQ = uncontactedQ.lte('created_at', dateRange.endDate);
+                }
+
                 uncontactedQ.order('created_at', { ascending: false })
-                    .then(({ data, error }) => {
+                    .then(async ({ data, error }) => {
                         if (error) {
                             logger.error('Error fetching uncontacted leads', error);
-                        } else {
-                            const filtered = (data || []).filter(l => !l.contact_count || l.contact_count === 0);
-                            setUncontactedLeads(filtered);
-                            setUncontactedCount(filtered.length);
+                            setIsLoadingUncontacted(false);
+                            return;
                         }
+                        const candidates = data || [];
+                        if (candidates.length === 0) {
+                            setUncontactedLeads([]);
+                            setUncontactedCount(0);
+                            setIsLoadingUncontacted(false);
+                            return;
+                        }
+
+                        // Cross-reference follow_ups table to ensure leads with registered calls/notes are excluded
+                        const candidateIds = candidates.map(l => l.id);
+                        const { data: fuData } = await supabase
+                            .from('follow_ups')
+                            .select('lead_id')
+                            .eq('company_id', profile.company_id)
+                            .in('lead_id', candidateIds);
+
+                        const contactedIds = new Set((fuData || []).map(f => f.lead_id));
+                        const strictlyUncontacted = candidates.filter(l => !contactedIds.has(l.id));
+
+                        setUncontactedLeads(strictlyUncontacted);
+                        setUncontactedCount(strictlyUncontacted.length);
                         setIsLoadingUncontacted(false);
                     });
             }
@@ -680,7 +707,7 @@ export default function Dashboard() {
                     })));
                 });
         }
-    }, [dashboardData, dashboardAssignedTo]);
+    }, [dashboardData, dashboardAssignedTo, dateRange.startDate, dateRange.endDate]);
 
     // ── Recovery Intelligence — fetch re-engaged leads stats ─────────────────
     useEffect(() => {
@@ -1435,10 +1462,11 @@ export default function Dashboard() {
                         onClick: () => navigate('/leads', { 
                             state: { 
                                 assignedFilter: dashboardAssignedTo || 'all', 
-                                pipelineFilter: 'never_contacted', 
                                 uncontactedOnly: true, 
-                                status: 'all', 
-                                pipelineView: 'all' 
+                                status: 'Prospecto', 
+                                pipelineView: 'all',
+                                startDate: dateRange.startDate,
+                                endDate: dateRange.endDate
                             } 
                         }),
                         tooltip: 'Prospectos activos que aún no han recibido ningún intento de contacto o llamada. ¡Atiéndelos de inmediato para no perder la venta!'
@@ -1623,14 +1651,15 @@ export default function Dashboard() {
                                                     navigate('/leads', { 
                                                         state: { 
                                                             assignedFilter: dashboardAssignedTo || 'all',
-                                                            pipelineFilter: 'never_contacted',
                                                             uncontactedOnly: true,
-                                                            status: 'all',
-                                                            pipelineView: 'all'
+                                                            status: 'Prospecto',
+                                                            pipelineView: 'all',
+                                                            startDate: dateRange.startDate,
+                                                            endDate: dateRange.endDate
                                                         } 
                                                     });
                                                 }}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-all shadow-md shadow-rose-200 group/badge"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold transition-all shadow-md shadow-rose-200 group/badge cursor-pointer"
                                             >
                                                 <PhoneOff className="w-3.5 h-3.5 group-hover/badge:-translate-x-0.5 transition-transform" />
                                                 <span className="text-[9px] uppercase tracking-wider font-extrabold">Por Contactar</span>
@@ -1740,7 +1769,7 @@ export default function Dashboard() {
                     const potentialUnlock = biggestStuck ? biggestStuck.value * avgTicket : 0;
 
                     const prospectoVolume = funnelData.find(d => d.key === 'Prospecto')?.value || 0;
-                    const finalUncontactedCount = Math.max(uncontactedCount, prospectoVolume);
+                    const finalUncontactedCount = uncontactedCount;
 
                     const focusItems = [
                         finalUncontactedCount > 0 && {
@@ -1815,10 +1844,11 @@ export default function Dashboard() {
                                                     navigate('/leads', { 
                                                         state: { 
                                                             assignedFilter: dashboardAssignedTo || 'all', 
-                                                            pipelineFilter: 'never_contacted', 
                                                             uncontactedOnly: true, 
-                                                            status: 'all', 
-                                                            pipelineView: 'all' 
+                                                            status: 'Prospecto', 
+                                                            pipelineView: 'all',
+                                                            startDate: dateRange.startDate,
+                                                            endDate: dateRange.endDate
                                                         } 
                                                     });
                                                 } else if (item.action) {

@@ -682,6 +682,7 @@ export default function Leads() {
 
             // Filter by uncontacted only (0 contacts and no follow up recorded)
             if (uncontactedOnly) {
+                if (lead.status !== 'Prospecto') return false;
                 const hasBeenContacted = ((lead.contact_count || 0) > 0) || !!lead.last_follow_up_at;
                 if (hasBeenContacted) return false;
             }
