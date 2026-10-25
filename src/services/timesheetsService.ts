@@ -619,34 +619,78 @@ export const timesheetsService = {
 
         const hours = hoursMap.get(member.id) || { regApproved: 0, otApproved: 0, otPending: 0 };
         
-        // ── A. Determinación de Horas Pactadas del Período ──
-        // Semanal: 1 semana (ej. 44h)
-        // Quincenal: 2 semanas (ej. 88h)
-        // Mensual: 4 semanas (ej. 176h estándar contable)
+        // ── A. Determinación de Horas Pactadas y Base del Período ──
+        // Detectar si el rango seleccionado es Quincena (~14-16 días), Mes Completo (~28-31 días) o Semana (~7 días)
+        const dStart = new Date(params.startDate + 'T00:00:00');
+        const dEnd = new Date(params.endDate + 'T00:00:00');
+        const diffDays = Math.max(1, Math.round((dEnd.getTime() - dStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+        const isRoughlyMonth = diffDays >= 25 && diffDays <= 32;
+        const isRoughlyQuincena = diffDays >= 12 && diffDays <= 18;
+        const isRoughlyWeek = diffDays >= 5 && diffDays <= 9;
+
         const weeklyHrs = Number(cfg.expected_weekly_hours || 44.0);
+        const rawBaseSalary = +(Number(cfg.base_salary || 0)).toFixed(2);
+
         let expectedPeriodHours = 0;
-        if (cfg.payment_frequency === 'mensual') {
-          expectedPeriodHours = +(weeklyHrs * 4).toFixed(1); // 44 * 4 = 176.0h
-        } else if (cfg.payment_frequency === 'quincenal') {
-          expectedPeriodHours = +(weeklyHrs * 2).toFixed(1); // 44 * 2 = 88.0h
-        } else if (cfg.payment_frequency === 'semanal') {
-          expectedPeriodHours = +(weeklyHrs).toFixed(1); // 44.0h
-        } else {
+        let baseSalaryPeriod = rawBaseSalary;
+
+        if (isRoughlyMonth) {
+          // El corte seleccionado es un mes completo (~176h)
+          expectedPeriodHours = +(weeklyHrs * 4).toFixed(1);
+          if (cfg.payment_frequency === 'quincenal') {
+            baseSalaryPeriod = +(rawBaseSalary * 2).toFixed(2);
+          } else if (cfg.payment_frequency === 'semanal') {
+            baseSalaryPeriod = +(rawBaseSalary * 4).toFixed(2);
+          } else {
+            baseSalaryPeriod = rawBaseSalary;
+          }
+        } else if (isRoughlyQuincena) {
+          // El corte seleccionado es una quincena (~88h)
           expectedPeriodHours = +(weeklyHrs * 2).toFixed(1);
+          if (cfg.payment_frequency === 'mensual') {
+            baseSalaryPeriod = +(rawBaseSalary / 2).toFixed(2);
+          } else if (cfg.payment_frequency === 'semanal') {
+            baseSalaryPeriod = +(rawBaseSalary * 2).toFixed(2);
+          } else {
+            baseSalaryPeriod = rawBaseSalary;
+          }
+        } else if (isRoughlyWeek) {
+          // El corte seleccionado es una semana (~44h)
+          expectedPeriodHours = +(weeklyHrs).toFixed(1);
+          if (cfg.payment_frequency === 'mensual') {
+            baseSalaryPeriod = +(rawBaseSalary / 4).toFixed(2);
+          } else if (cfg.payment_frequency === 'quincenal') {
+            baseSalaryPeriod = +(rawBaseSalary / 2).toFixed(2);
+          } else {
+            baseSalaryPeriod = rawBaseSalary;
+          }
+        } else {
+          // Rango personalizado de N días: prorrateo semanal exacto
+          const weeksRatio = diffDays / 7;
+          expectedPeriodHours = +(weeklyHrs * weeksRatio).toFixed(1);
+          if (cfg.payment_frequency === 'mensual') {
+            baseSalaryPeriod = +(rawBaseSalary * (weeksRatio / 4)).toFixed(2);
+          } else if (cfg.payment_frequency === 'quincenal') {
+            baseSalaryPeriod = +(rawBaseSalary * (weeksRatio / 2)).toFixed(2);
+          } else if (cfg.payment_frequency === 'semanal') {
+            baseSalaryPeriod = +(rawBaseSalary * weeksRatio).toFixed(2);
+          } else {
+            baseSalaryPeriod = rawBaseSalary;
+          }
         }
 
-        const baseSalaryPactado = +(Number(cfg.base_salary || 0)).toFixed(2);
         const regularHoursWorked = +(hours.regApproved).toFixed(1);
 
         // ── B. Tarifa por Hora Efectiva (Cálculo Contable Transparente) ──
         // Si tiene Salario Fijo o Servicios Profesionales con monto mensual:
-        // Tarifa Hora = Sueldo Pactado / Horas Esperadas del Período (ej: $800 / 176h = $4.5455/h)
+        // Tarifa Hora = Sueldo Pactado del Período / Horas Esperadas del Período (ej: $400 / 88h = $4.5455/h)
         let effectiveHourlyRate = 0;
         const isFixedSalaryOrServices = ['salary', 'services_sv', 'services'].includes(cfg.contract_type);
 
         if (isFixedSalaryOrServices) {
-          if (expectedPeriodHours > 0 && baseSalaryPactado > 0) {
-            effectiveHourlyRate = +(baseSalaryPactado / expectedPeriodHours).toFixed(4);
+          if (expectedPeriodHours > 0 && baseSalaryPeriod > 0) {
+            effectiveHourlyRate = +(baseSalaryPeriod / expectedPeriodHours).toFixed(4);
           } else {
             effectiveHourlyRate = Number(cfg.hourly_rate || 0);
           }
@@ -661,10 +705,10 @@ export const timesheetsService = {
         let hoursDeficitDeduction = 0;
 
         if (isFixedSalaryOrServices) {
-          if (baseSalaryPactado > 0) {
+          if (baseSalaryPeriod > 0) {
             if (regularHoursWorked >= expectedPeriodHours) {
-              // Cumplió completamente su jornada: se paga su sueldo base íntegro pactado
-              regularPay = baseSalaryPactado;
+              // Cumplió completamente su jornada: se paga su sueldo base íntegro pactado del período
+              regularPay = baseSalaryPeriod;
               hoursDeficit = 0;
               hoursDeficitDeduction = 0;
             } else {
@@ -672,12 +716,12 @@ export const timesheetsService = {
               hoursDeficit = +(expectedPeriodHours - regularHoursWorked).toFixed(1);
               if (regularHoursWorked === 0) {
                 // Si no laboró ninguna hora, el descuento es el salario base pactado íntegro y devengado es $0.00
-                hoursDeficitDeduction = baseSalaryPactado;
+                hoursDeficitDeduction = baseSalaryPeriod;
                 regularPay = 0;
               } else {
                 hoursDeficitDeduction = +(hoursDeficit * effectiveHourlyRate).toFixed(2);
-                hoursDeficitDeduction = Math.min(hoursDeficitDeduction, baseSalaryPactado);
-                regularPay = Math.max(0, +(baseSalaryPactado - hoursDeficitDeduction).toFixed(2));
+                hoursDeficitDeduction = Math.min(hoursDeficitDeduction, baseSalaryPeriod);
+                regularPay = Math.max(0, +(baseSalaryPeriod - hoursDeficitDeduction).toFixed(2));
               }
             }
           } else {
@@ -736,7 +780,7 @@ export const timesheetsService = {
 
         if (cfg.country === 'SV') {
           const isProf = cfg.contract_type === 'services_sv' || cfg.contract_type === 'services';
-          const isQuincenal = cfg.payment_frequency === 'quincenal';
+          const isQuincenal = !isRoughlyMonth;
           const svDeds = calculateElSalvadorDeductions(
             grossPay, 
             isQuincenal, 
@@ -795,8 +839,8 @@ export const timesheetsService = {
           applies_overtime: appliesOvertime,
           regular_pay: regularPay,
           overtime_pay: overtimePay,
-          base_salary: baseSalaryPactado,
-          base_salary_part: baseSalaryPactado,
+          base_salary: baseSalaryPeriod,
+          base_salary_part: baseSalaryPeriod,
           kpi_bonus: kpiBonus,
           commission_amount: commissionAmount,
           commission_notes: commissionNotes,

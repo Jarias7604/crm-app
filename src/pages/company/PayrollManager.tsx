@@ -160,36 +160,62 @@ export default function PayrollManager() {
     }
   };
 
-  // ── Navegación rápida de quincenas (ADP / QuickBooks style) ────
+  // ── Navegación rápida y presets de corte (ADP / QuickBooks style) ────
+
+  const handleSelectPreset = (preset: 'q1' | 'q2' | 'month') => {
+    const ref = new Date(startDate + 'T00:00:00');
+    const year = ref.getFullYear();
+    const month = ref.getMonth();
+    if (preset === 'q1') {
+      setStartDate(new Date(year, month, 1).toISOString().split('T')[0]);
+      setEndDate(new Date(year, month, 15).toISOString().split('T')[0]);
+    } else if (preset === 'q2') {
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      setStartDate(new Date(year, month, 16).toISOString().split('T')[0]);
+      setEndDate(new Date(year, month, lastDay).toISOString().split('T')[0]);
+    } else if (preset === 'month') {
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      setStartDate(new Date(year, month, 1).toISOString().split('T')[0]);
+      setEndDate(new Date(year, month, lastDay).toISOString().split('T')[0]);
+    }
+  };
 
   const handleNavigatePeriod = (direction: 'prev' | 'next') => {
     const curStart = new Date(startDate + 'T00:00:00');
+    const curEnd = new Date(endDate + 'T00:00:00');
+    const diffDays = Math.round((curEnd.getTime() - curStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const isFullMonth = diffDays >= 25;
+
     let nextStart: Date;
     let nextEnd: Date;
 
-    if (direction === 'prev') {
-      if (curStart.getDate() > 15) {
-        // Pasar a la 1a quincena del mismo mes
-        nextStart = new Date(curStart.getFullYear(), curStart.getMonth(), 1);
-        nextEnd = new Date(curStart.getFullYear(), curStart.getMonth(), 15);
-      } else {
-        // Pasar a la 2a quincena del mes anterior
-        const prevMonth = curStart.getMonth() - 1;
-        const year = curStart.getFullYear();
-        const lastDayPrev = new Date(year, prevMonth + 1, 0).getDate();
-        nextStart = new Date(year, prevMonth, 16);
-        nextEnd = new Date(year, prevMonth, lastDayPrev);
-      }
+    if (isFullMonth) {
+      const monthOffset = direction === 'next' ? 1 : -1;
+      const targetMonth = new Date(curStart.getFullYear(), curStart.getMonth() + monthOffset, 1);
+      const lastDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate();
+      nextStart = targetMonth;
+      nextEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), lastDay);
     } else {
-      if (curStart.getDate() <= 15) {
-        // Pasar a la 2a quincena del mismo mes
-        const lastDay = new Date(curStart.getFullYear(), curStart.getMonth() + 1, 0).getDate();
-        nextStart = new Date(curStart.getFullYear(), curStart.getMonth(), 16);
-        nextEnd = new Date(curStart.getFullYear(), curStart.getMonth(), lastDay);
+      if (direction === 'prev') {
+        if (curStart.getDate() > 15) {
+          nextStart = new Date(curStart.getFullYear(), curStart.getMonth(), 1);
+          nextEnd = new Date(curStart.getFullYear(), curStart.getMonth(), 15);
+        } else {
+          const prevMonth = curStart.getMonth() - 1;
+          const year = curStart.getFullYear();
+          const lastDayPrev = new Date(year, prevMonth + 1, 0).getDate();
+          nextStart = new Date(year, prevMonth, 16);
+          nextEnd = new Date(year, prevMonth, lastDayPrev);
+        }
       } else {
-        // Pasar a la 1a quincena del mes siguiente
-        nextStart = new Date(curStart.getFullYear(), curStart.getMonth() + 1, 1);
-        nextEnd = new Date(curStart.getFullYear(), curStart.getMonth() + 1, 15);
+        if (curStart.getDate() <= 15) {
+          const lastDay = new Date(curStart.getFullYear(), curStart.getMonth() + 1, 0).getDate();
+          nextStart = new Date(curStart.getFullYear(), curStart.getMonth(), 16);
+          nextEnd = new Date(curStart.getFullYear(), curStart.getMonth(), lastDay);
+        } else {
+          nextStart = new Date(curStart.getFullYear(), curStart.getMonth() + 1, 1);
+          nextEnd = new Date(curStart.getFullYear(), curStart.getMonth() + 1, 15);
+        }
       }
     }
 
@@ -443,6 +469,21 @@ export default function PayrollManager() {
     }
   }, [startDate, endDate]);
 
+  // Preset activo (1ª Quincena, 2ª Quincena, Mes Completo)
+  const activePreset = useMemo<'q1' | 'q2' | 'month' | 'custom'>(() => {
+    try {
+      const d1 = new Date(startDate + 'T00:00:00');
+      const d2 = new Date(endDate + 'T00:00:00');
+      const lastDay = new Date(d1.getFullYear(), d1.getMonth() + 1, 0).getDate();
+      if (d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth()) {
+        if (d1.getDate() === 1 && d2.getDate() === 15) return 'q1';
+        if (d1.getDate() === 16 && d2.getDate() === lastDay) return 'q2';
+        if (d1.getDate() === 1 && d2.getDate() === lastDay) return 'month';
+      }
+    } catch { /* silent */ }
+    return 'custom';
+  }, [startDate, endDate]);
+
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-5 animate-fadeIn font-sans text-slate-800">
       
@@ -530,10 +571,47 @@ export default function PayrollManager() {
           <button
             onClick={() => handleNavigatePeriod('next')}
             className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition border border-slate-200/60"
-            title="Quincena siguiente"
+            title="Período siguiente"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
+
+          {/* Presets Rápidos: 1ª Quincena, 2ª Quincena, Mes Completo */}
+          <div className="hidden sm:inline-flex bg-slate-100 p-0.5 rounded-lg text-xs font-semibold ml-1">
+            <button
+              type="button"
+              onClick={() => handleSelectPreset('q1')}
+              className={`px-2.5 py-1 rounded-md transition cursor-pointer text-[11px] ${
+                activePreset === 'q1'
+                  ? 'bg-white text-indigo-700 font-bold shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              1ª Quincena
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectPreset('q2')}
+              className={`px-2.5 py-1 rounded-md transition cursor-pointer text-[11px] ${
+                activePreset === 'q2'
+                  ? 'bg-white text-indigo-700 font-bold shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              2ª Quincena
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectPreset('month')}
+              className={`px-2.5 py-1 rounded-md transition cursor-pointer text-[11px] ${
+                activePreset === 'month'
+                  ? 'bg-white text-indigo-700 font-bold shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Mes Completo
+            </button>
+          </div>
 
           {/* Fechas personalizadas con CustomDatePicker moderno */}
           <div className="hidden lg:flex items-center gap-2 ml-3 pl-3 border-l border-slate-200 text-xs text-slate-500">
@@ -695,24 +773,77 @@ export default function PayrollManager() {
 
               <button
                 onClick={() => {
-                // Export simple CSV
-                const headers = ['Colaborador,Email,Pais,Modalidad,Horas_Reg,Horas_Ext,Bruto,ISSS,AFP,Renta,Neto\n'];
-                const rows = filteredItems.map(i => 
-                  `"${i.user_name}","${i.user_email}","${i.country}","${i.contract_type}",${i.regular_hours},${i.overtime_hours},${i.gross_pay},${i.isss},${i.afp},${i.renta},${i.net_pay}`
-                ).join('\n');
-                const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Nomina_${startDate}_al_${endDate}.csv`;
-                a.click();
-                toast.success('Reporte CSV descargado');
-              }}
-              className="text-xs font-semibold text-slate-600 hover:text-indigo-600 flex items-center gap-1.5 transition"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Exportar CSV
-            </button>
+                  // Exportación CSV Completa y Profesional con BOM UTF-8 para Excel
+                  const headers = [
+                    'Codigo_Empleado',
+                    'Colaborador',
+                    'Email',
+                    'Pais',
+                    'Modalidad',
+                    'Frecuencia_Pago',
+                    'Horas_Pactadas',
+                    'Horas_Trabajadas',
+                    'Horas_Faltantes',
+                    'Horas_Extras',
+                    'Base_Pactada_Periodo',
+                    'Salario_Devengado',
+                    'Pago_Horas_Extras',
+                    'Bonos_KPI',
+                    'Comisiones',
+                    'Total_Haberes_Bruto',
+                    'ISSS',
+                    'AFP',
+                    'Renta',
+                    'Otras_Deducciones',
+                    'Total_Deducciones',
+                    'Neto_a_Pagar'
+                  ].join(',');
+
+                  const rows = filteredItems.map(i => {
+                    const totalDeds = (i.isss + i.afp + i.renta + i.other_deductions).toFixed(2);
+                    const cleanName = `"${(i.user_name || '').replace(/"/g, '""')}"`;
+                    const cleanEmail = `"${(i.user_email || '').replace(/"/g, '""')}"`;
+                    return [
+                      `"${i.employee_code || ''}"`,
+                      cleanName,
+                      cleanEmail,
+                      `"${i.country}"`,
+                      `"${i.contract_type}"`,
+                      `"${i.payment_frequency}"`,
+                      i.expected_period_hours,
+                      i.regular_hours,
+                      i.hours_deficit,
+                      i.overtime_hours,
+                      i.base_salary_part,
+                      i.regular_pay,
+                      i.overtime_pay,
+                      i.kpi_bonus,
+                      i.commission_amount,
+                      i.gross_pay,
+                      i.isss,
+                      i.afp,
+                      i.renta,
+                      i.other_deductions,
+                      totalDeds,
+                      i.net_pay
+                    ].join(',');
+                  }).join('\n');
+
+                  const csvContent = '\uFEFF' + headers + '\n' + rows;
+                  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `Nomina_${startDate}_al_${endDate}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success('Reporte contable CSV detallado descargado');
+                }}
+                className="text-xs font-semibold text-slate-600 hover:text-indigo-600 flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Exportar CSV
+              </button>
           </div>
         </div>
 

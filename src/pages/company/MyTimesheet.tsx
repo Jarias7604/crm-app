@@ -200,8 +200,13 @@ export default function MyTimesheet() {
     return ['submitted', 'approved', 'paid'].includes(selectedDayEntry.status);
   }, [selectedDayEntry]);
 
-  // El formulario está bloqueado si el registro tiene estado protegido Y (el usuario no es admin O el admin no ha activado el override explícito)
-  const isFormDisabled = isLockedStatus && (!isAdmin || !adminOverrideUnlocked);
+  // Bloqueo preventivo de fechas futuras (no se permite reportar trabajo anticipado)
+  const isFutureDate = selectedDate > todayStr;
+
+  // El formulario está bloqueado si:
+  // 1. El registro tiene estado protegido Y (no es admin O el admin no ha activado el override)
+  // 2. O la fecha seleccionada es futura y el usuario no es admin
+  const isFormDisabled = (isLockedStatus && (!isAdmin || !adminOverrideUnlocked)) || (isFutureDate && !isAdmin);
 
   // Cuando cambia el día seleccionado, sincronizamos el formulario
   useEffect(() => {
@@ -286,6 +291,11 @@ export default function MyTimesheet() {
 
     if (isFormDisabled) {
       toast.error('Este registro está bloqueado contra modificaciones.');
+      return;
+    }
+
+    if (selectedDate > todayStr && !isAdmin) {
+      toast.error('No es posible registrar jornadas de trabajo en fechas futuras.');
       return;
     }
 
@@ -543,6 +553,10 @@ export default function MyTimesheet() {
                           : 'bg-amber-400'
                       }`} />
                     </div>
+                  ) : dateStr > todayStr ? (
+                    <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-slate-400" /> Próximo
+                    </span>
                   ) : (
                     <span className="text-[10px] text-slate-400 font-semibold block">
                       Sin registrar
@@ -665,7 +679,29 @@ export default function MyTimesheet() {
             </div>
           )}
 
-          {/* BANNER 4: Panel Administrativo de Control y Desbloqueo */}
+          {/* BANNER 4: Fecha Futura (Bloqueo Preventivo) */}
+          {isFutureDate && !isAdmin && !selectedDayEntry && (
+            <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-3.5 flex items-start gap-3 animate-fadeIn">
+              <div className="p-2 bg-slate-100 text-slate-500 rounded-lg shrink-0 mt-0.5">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800">
+                    Fecha Futura — Registro Inhabilitado
+                  </span>
+                  <span className="text-[10px] font-bold uppercase bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">
+                    Bloqueado
+                  </span>
+                </div>
+                <p className="text-slate-600 text-[11px] mt-1 leading-relaxed">
+                  No es posible registrar jornadas de trabajo de forma anticipada. Podrás ingresar tus horas y actividades una vez transcurra este día laboral.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* BANNER 5: Panel Administrativo de Control y Desbloqueo */}
           {isAdmin && isLockedStatus && (
             <div className="bg-slate-900 text-white rounded-xl p-3.5 space-y-2.5 shadow-md animate-fadeIn">
               <div className="flex items-center justify-between">
