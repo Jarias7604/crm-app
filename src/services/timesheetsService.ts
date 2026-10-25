@@ -661,22 +661,35 @@ export const timesheetsService = {
         let hoursDeficitDeduction = 0;
 
         if (isFixedSalaryOrServices) {
-          if (regularHoursWorked >= expectedPeriodHours) {
-            // Cumplió completamente su jornada: se paga su sueldo base íntegro pactado (¡NUNCA se multiplica sueldo base * horas!)
-            regularPay = baseSalaryPactado;
+          if (baseSalaryPactado > 0) {
+            if (regularHoursWorked >= expectedPeriodHours) {
+              // Cumplió completamente su jornada: se paga su sueldo base íntegro pactado
+              regularPay = baseSalaryPactado;
+              hoursDeficit = 0;
+              hoursDeficitDeduction = 0;
+            } else {
+              // Trabajó menos de las horas pactadas
+              hoursDeficit = +(expectedPeriodHours - regularHoursWorked).toFixed(1);
+              if (regularHoursWorked === 0) {
+                // Si no laboró ninguna hora, el descuento es el salario base pactado íntegro y devengado es $0.00
+                hoursDeficitDeduction = baseSalaryPactado;
+                regularPay = 0;
+              } else {
+                hoursDeficitDeduction = +(hoursDeficit * effectiveHourlyRate).toFixed(2);
+                hoursDeficitDeduction = Math.min(hoursDeficitDeduction, baseSalaryPactado);
+                regularPay = Math.max(0, +(baseSalaryPactado - hoursDeficitDeduction).toFixed(2));
+              }
+            }
+          } else {
+            // Contrato sin salario base pactado ($0.00): se devenga por horas efectivamente trabajadas
+            regularPay = +(regularHoursWorked * effectiveHourlyRate).toFixed(2);
             hoursDeficit = 0;
             hoursDeficitDeduction = 0;
-          } else {
-            // Trabajó menos de las horas pactadas (ej. 140h de 176h -> 36h de falta)
-            hoursDeficit = +(expectedPeriodHours - regularHoursWorked).toFixed(1);
-            hoursDeficitDeduction = +(hoursDeficit * effectiveHourlyRate).toFixed(2);
-            // Salario prorrateado exacto: (140 / 176) * 800 = $636.36
-            regularPay = Math.max(0, +(baseSalaryPactado - hoursDeficitDeduction).toFixed(2));
           }
         } else {
           // Contrato por horas estricto
           regularPay = +(regularHoursWorked * effectiveHourlyRate).toFixed(2);
-          hoursDeficit = regularHoursWorked < expectedPeriodHours ? +(expectedPeriodHours - regularHoursWorked).toFixed(1) : 0;
+          hoursDeficit = 0;
           hoursDeficitDeduction = 0;
         }
 

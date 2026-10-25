@@ -1393,7 +1393,7 @@ export default function PayrollManager() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 text-[11px]">
-                          {['salary', 'services_sv', 'services'].includes(selectedPayStub.contract_type) ? (
+                          {['salary', 'services_sv', 'services'].includes(selectedPayStub.contract_type) && selectedPayStub.base_salary_part > 0 ? (
                             selectedPayStub.hours_deficit > 0 ? (
                               <>
                                 <tr>
