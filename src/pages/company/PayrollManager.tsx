@@ -34,6 +34,7 @@ export default function PayrollManager() {
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [countryFilter, setCountryFilter] = useState<'ALL' | PayrollCountry>('ALL');
+  const [onlyWithHours, setOnlyWithHours] = useState<boolean>(false);
 
   // Period Date Range (ADP / QuickBooks Quincenal standard)
   const today = new Date();
@@ -414,9 +415,10 @@ export default function PayrollManager() {
       const matchSearch = item.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           item.user_email.toLowerCase().includes(searchTerm.toLowerCase());
       const matchCountry = countryFilter === 'ALL' || item.country === countryFilter;
-      return matchSearch && matchCountry;
+      const matchHours = onlyWithHours ? (item.regular_hours > 0 || item.overtime_hours > 0) : true;
+      return matchSearch && matchCountry && matchHours;
     });
-  }, [payrollSummary.items, searchTerm, countryFilter]);
+  }, [payrollSummary.items, searchTerm, countryFilter, onlyWithHours]);
 
   // Filtro de solicitudes en Bandeja de Aprobaciones
   const filteredApprovals = useMemo(() => {
@@ -663,9 +665,36 @@ export default function PayrollManager() {
                 {filteredItems.length} colaboradores
               </span>
             </div>
-            
-            <button
-              onClick={() => {
+
+            <div className="flex items-center gap-2">
+              {/* Filtro: Todos vs Solo con Horas Trabajadas */}
+              <div className="inline-flex bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setOnlyWithHours(false)}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                    !onlyWithHours
+                      ? 'bg-white text-indigo-700 font-bold shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Todos ({payrollSummary.items.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOnlyWithHours(true)}
+                  className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                    onlyWithHours
+                      ? 'bg-white text-indigo-700 font-bold shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Solo con Horas ({payrollSummary.items.filter(i => i.regular_hours > 0 || i.overtime_hours > 0).length})
+                </button>
+              </div>
+
+              <button
+                onClick={() => {
                 // Export simple CSV
                 const headers = ['Colaborador,Email,Pais,Modalidad,Horas_Reg,Horas_Ext,Bruto,ISSS,AFP,Renta,Neto\n'];
                 const rows = filteredItems.map(i => 
@@ -685,8 +714,9 @@ export default function PayrollManager() {
               Exportar CSV
             </button>
           </div>
+        </div>
 
-          <div className="overflow-x-auto">
+        <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200/80 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
                 <tr>
@@ -789,7 +819,7 @@ export default function PayrollManager() {
                         <td className="py-2.5 px-3 text-right font-medium text-slate-900">
                           <div>
                             <span className="font-bold">${item.regular_pay.toFixed(2)}</span>
-                            {item.hours_deficit_deduction > 0 && (
+                            {item.hours_deficit_deduction > 0 && item.regular_hours > 0 && (
                               <span className="block text-[9px] text-rose-600 font-medium" title="Descuento por horas faltantes">
                                 (-${item.hours_deficit_deduction.toFixed(2)})
                               </span>
