@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, SlidersHorizontal, ChevronDown, CheckCircle, Filter, Calendar, X, User, ArrowLeft, Building2 } from 'lucide-react';
+import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, SlidersHorizontal, ChevronDown, CheckCircle, Filter, Calendar, X, User, ArrowLeft, Building2, Check } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { CustomDatePicker } from '../ui/CustomDatePicker';
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '../../types';
@@ -48,8 +48,8 @@ interface LeadToolbarProps {
     setCompletedLeadIds: (v: string[] | null) => void;
     calendarDateLabel: string | null;
     setCalendarDateLabel: (v: string | null) => void;
-    productFilter: string | 'all';
-    setProductFilter: (v: string | 'all') => void;
+    productFilter: string | 'all' | string[];
+    setProductFilter: (v: string | 'all' | string[]) => void;
     products: LeadProduct[];
     industryFilter: string | 'all';
     setIndustryFilter: (v: string | 'all') => void;
@@ -302,41 +302,74 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     );
 
 
-    const ProductDropdown = () => (
-        <div className="relative" ref={productFilterRef}>
-            <button
-                onClick={() => setIsProductFilterOpen(!isProductFilterOpen)}
-                className={`flex items-center gap-2 bg-white border px-3 py-2 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all shadow-sm h-9 min-w-[140px] justify-between ${productFilter !== 'all' ? 'border-indigo-300 text-indigo-600 bg-indigo-50/30' : 'border-gray-200 text-gray-600'}`}
-            >
-                <div className="flex items-center gap-1.5">
-                    <Filter className="h-3.5 w-3.5 opacity-60" />
-                    <span className="truncate max-w-[110px]">{productFilter === 'all' ? 'Producto' : products.find(p => p.id === productFilter)?.name || 'Producto'}</span>
-                </div>
-                <ChevronDown className={`h-3.5 w-3.5 opacity-40 transition-transform duration-300 ${isProductFilterOpen ? 'rotate-180' : ''}`} />
-            </button>
+    const ProductDropdown = () => {
+        const isAll = productFilter === 'all' || (Array.isArray(productFilter) && productFilter.length === 0);
+        const selectedLabel = isAll
+            ? 'Producto'
+            : Array.isArray(productFilter)
+                ? (productFilter.length === 1 ? (products.find(p => p.id === productFilter[0])?.name || '1 producto') : `${productFilter.length} productos`)
+                : (products.find(p => p.id === productFilter)?.name || 'Producto');
 
-            {isProductFilterOpen && (
-                <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 py-2 animate-in fade-in slide-in-from-top-2">
-                    <button
-                        onClick={() => { setProductFilter('all'); setIsProductFilterOpen(false); }}
-                        className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors ${productFilter === 'all' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}
-                    >
-                        Todos los productos
-                    </button>
-                    <div className="border-t border-gray-100 my-1" />
-                    {products.map(prod => (
+        return (
+            <div className="relative" ref={productFilterRef}>
+                <button
+                    onClick={() => setIsProductFilterOpen(!isProductFilterOpen)}
+                    className={`flex items-center gap-2 bg-white border px-3 py-2 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all shadow-sm h-9 min-w-[140px] justify-between ${!isAll ? 'border-indigo-300 text-indigo-600 bg-indigo-50/30' : 'border-gray-200 text-gray-600'}`}
+                >
+                    <div className="flex items-center gap-1.5">
+                        <Filter className="h-3.5 w-3.5 opacity-60" />
+                        <span className="truncate max-w-[110px]">{selectedLabel}</span>
+                    </div>
+                    <ChevronDown className={`h-3.5 w-3.5 opacity-40 transition-transform duration-300 ${isProductFilterOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isProductFilterOpen && (
+                    <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 py-2 animate-in fade-in slide-in-from-top-2">
                         <button
-                            key={prod.id}
-                            onClick={() => { setProductFilter(prod.id); setIsProductFilterOpen(false); }}
-                            className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors ${productFilter === prod.id ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                            onClick={() => { setProductFilter('all'); setIsProductFilterOpen(false); }}
+                            className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors flex items-center justify-between ${isAll ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}
                         >
-                            {prod.name}
+                            <div className="flex items-center gap-2">
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isAll ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 bg-white'}`}>
+                                    {isAll && <Check className="w-3 h-3 stroke-[3]" />}
+                                </div>
+                                <span>Todos los productos</span>
+                            </div>
                         </button>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
+                        <div className="border-t border-gray-100 my-1" />
+                        {products.map(prod => {
+                            const isChecked = Array.isArray(productFilter) ? productFilter.includes(prod.id) : productFilter === prod.id;
+                            return (
+                                <button
+                                    key={prod.id}
+                                    onClick={() => {
+                                        if (productFilter === 'all') {
+                                            setProductFilter([prod.id]);
+                                        } else if (Array.isArray(productFilter)) {
+                                            const next = productFilter.includes(prod.id)
+                                                ? productFilter.filter(p => p !== prod.id)
+                                                : [...productFilter, prod.id];
+                                            setProductFilter(next.length === 0 ? 'all' : next);
+                                        } else {
+                                            setProductFilter(productFilter === prod.id ? 'all' : [productFilter, prod.id]);
+                                        }
+                                    }}
+                                    className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors flex items-center justify-between ${isChecked ? 'bg-indigo-50/80 text-indigo-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 bg-white'}`}>
+                                            {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                                        </div>
+                                        <span>{prod.name}</span>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     const IndustryDropdown = () => (
         <div className="relative" ref={industryFilterRef}>

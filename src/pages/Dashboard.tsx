@@ -4,7 +4,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Line, LabelList
 } from 'recharts';
-import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout, CreditCard, Brain, Sparkles, MessageSquare, Crosshair, Flame, Zap, HelpCircle, UserMinus, RefreshCw } from 'lucide-react';
+import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout, CreditCard, Brain, Sparkles, MessageSquare, Crosshair, Flame, Zap, HelpCircle, UserMinus, RefreshCw, Package, Check, X } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { supabase } from '../services/supabase';
 import { useEffect, useState, useRef, useMemo } from 'react';
@@ -237,6 +237,8 @@ export default function Dashboard() {
     const [uncontactedLeads, setUncontactedLeads] = useState<any[]>([]);
     const [isLoadingUncontacted, setIsLoadingUncontacted] = useState(true);
     const [uncontactedCount, setUncontactedCount] = useState<number>(0);
+    const [availableProducts, setAvailableProducts] = useState<{ id: string; name: string; is_active?: boolean }[]>([]);
+    const [selectedProductFilter, setSelectedProductFilter] = useState<string[]>([]);
 
     // States for AI Cognitive Capsule
     const [selectedAiLead, setSelectedAiLead] = useState<{ id: string; name: string } | null>(null);
@@ -300,6 +302,42 @@ export default function Dashboard() {
                 });
         }
     }, [profile?.company_id, refreshKey]);
+
+    // Cargar productos de la empresa para filtrado dinámico
+    useEffect(() => {
+        if (profile?.company_id) {
+            supabase
+                .from('lead_products')
+                .select('id, name, is_active')
+                .eq('company_id', profile.company_id)
+                .eq('is_active', true)
+                .order('name', { ascending: true })
+                .then(({ data }) => {
+                    if (data) setAvailableProducts(data);
+                });
+        }
+    }, [profile?.company_id]);
+
+    // Conteo de prospectos sin contactar por cada producto
+    const uncontactedByProduct = useMemo(() => {
+        const counts: Record<string, number> = {};
+        uncontactedLeads.forEach(l => {
+            const key = l.interested_product_id || 'none';
+            counts[key] = (counts[key] || 0) + 1;
+        });
+        return counts;
+    }, [uncontactedLeads]);
+
+    // Filtrar prospectos sin contactar por los productos seleccionados (multi-select)
+    const filteredUncontactedLeads = useMemo(() => {
+        if (selectedProductFilter.length === 0) return uncontactedLeads;
+        return uncontactedLeads.filter(l => {
+            const key = l.interested_product_id || 'none';
+            return selectedProductFilter.includes(key);
+        });
+    }, [uncontactedLeads, selectedProductFilter]);
+
+    const displayedUncontactedCount = filteredUncontactedLeads.length;
 
     const navigate = useNavigate();
 
@@ -440,7 +478,7 @@ export default function Dashboard() {
     const isViewingOwnData = !dashboardAssignedTo || dashboardAssignedTo === profile?.id;
     const canViewActiveFinancials = canViewFinancials || isViewingOwnData;
     const averageTicket = stats.wonDeals > 0 ? Math.round((stats.totalWonAmount || stats.totalWonPotential || 0) / stats.wonDeals) : 0;
-    const finalUncontactedCount = uncontactedCount;
+    const finalUncontactedCount = displayedUncontactedCount;
 
     // Use optimized dashboard hook (replaces 5 queries with 1)
     const { data: dashboardData, isLoading: isDashboardLoading, error: dashboardError, refetch } = useDashboardStats(
@@ -1453,12 +1491,14 @@ export default function Dashboard() {
                     },
                     {
                         name: t('dashboard.crm.uncontactedLeads', { defaultValue: 'Sin Contactar' }),
-                        value: finalUncontactedCount,
+                        value: displayedUncontactedCount,
                         icon: PhoneOff,
                         color: 'text-rose-600',
                         bg: 'bg-rose-50/50',
-                        trend: finalUncontactedCount > 0 ? `${finalUncontactedCount} pendientes` : 'Al día',
-                        trendColor: finalUncontactedCount > 0 ? 'text-rose-600' : 'text-emerald-500',
+                        trend: selectedProductFilter.length > 0 
+                            ? `${displayedUncontactedCount} en ${selectedProductFilter.length === 1 ? (selectedProductFilter[0] === 'none' ? 'Sin producto' : availableProducts.find(p => p.id === selectedProductFilter[0])?.name || '1 producto') : `${selectedProductFilter.length} productos`}`
+                            : (displayedUncontactedCount > 0 ? `${displayedUncontactedCount} pendientes` : 'Al día'),
+                        trendColor: displayedUncontactedCount > 0 ? 'text-rose-600' : 'text-emerald-500',
                         onClick: () => navigate('/leads', { 
                             state: { 
                                 assignedFilter: dashboardAssignedTo || 'all', 
@@ -1466,7 +1506,8 @@ export default function Dashboard() {
                                 status: 'Prospecto', 
                                 pipelineView: 'all',
                                 startDate: dateRange.startDate,
-                                endDate: dateRange.endDate
+                                endDate: dateRange.endDate,
+                                productFilter: selectedProductFilter.length === 0 ? 'all' : (selectedProductFilter.length === 1 ? selectedProductFilter[0] : selectedProductFilter)
                             } 
                         }),
                         tooltip: 'Prospectos activos que aún no han recibido ningún intento de contacto o llamada. ¡Atiéndelos de inmediato para no perder la venta!'
@@ -1504,30 +1545,140 @@ export default function Dashboard() {
                                                 e.stopPropagation();
                                                 setActiveCardFilter(activeCardFilter === item.name ? null : item.name);
                                             }}
-                                            className={`p-1.5 rounded-lg transition-all ${activeCardFilter === item.name ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${
+                                                activeCardFilter === item.name 
+                                                    ? 'bg-indigo-600 text-white shadow-md' 
+                                                    : (item.name === t('dashboard.crm.uncontactedLeads', { defaultValue: 'Sin Contactar' }) || item.name === 'Sin Contactar' || item.name === 'Leads Sin Contactar') && selectedProductFilter.length > 0
+                                                        ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-300'
+                                                        : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                                            }`}
+                                            title={(item.name === t('dashboard.crm.uncontactedLeads', { defaultValue: 'Sin Contactar' }) || item.name === 'Sin Contactar' || item.name === 'Leads Sin Contactar') ? 'Filtrar por Tipo de Lead / Producto' : 'Filtro de período'}
                                         >
                                             <Settings className="w-3.5 h-3.5" />
                                         </button>
                                         {activeCardFilter === item.name && (
-                                            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-100 z-50 py-2 animate-in fade-in slide-in-from-top-2">
-                                                {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
-                                                    <button
-                                                        key={key}
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setSelectedDateRange(key);
-                                                            setActiveCardFilter(null);
-                                                        }}
-                                                        className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-slate-50'}`}
-                                                    >
-                                                        <span className="flex items-center gap-2">
-                                                            {option.label}
-                                                            <span className="text-[9px] opacity-50 font-medium">{getDateRangeLabelDisplay(key)}</span>
-                                                        </span>
-                                                        {selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                            (item.name === t('dashboard.crm.uncontactedLeads', { defaultValue: 'Sin Contactar' }) || item.name === 'Sin Contactar' || item.name === 'Leads Sin Contactar') ? (
+                                                <div 
+                                                    onClick={(e) => e.stopPropagation()} 
+                                                    className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 p-3 animate-in fade-in slide-in-from-top-2"
+                                                >
+                                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Package className="w-3.5 h-3.5 text-rose-600" />
+                                                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-800">Filtrar por Producto</span>
+                                                        </div>
+                                                        {selectedProductFilter.length > 0 && (
+                                                            <button 
+                                                                onClick={() => setSelectedProductFilter([])}
+                                                                className="text-[10px] font-bold text-rose-600 hover:text-rose-800 transition-colors"
+                                                            >
+                                                                Restablecer
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
+                                                        {/* Todos los productos */}
+                                                        <button
+                                                            onClick={() => setSelectedProductFilter([])}
+                                                            className={`w-full text-left px-3 py-2 rounded-xl text-[11px] transition-colors flex items-center justify-between ${selectedProductFilter.length === 0 ? 'bg-rose-50 text-rose-700 font-black' : 'text-slate-600 font-bold hover:bg-slate-50'}`}
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${selectedProductFilter.length === 0 ? 'bg-rose-600 border-rose-600 text-white' : 'border-slate-300 bg-white'}`}>
+                                                                    {selectedProductFilter.length === 0 && <Check className="w-3 h-3 stroke-[3]" />}
+                                                                </div>
+                                                                <span>Todos los productos</span>
+                                                            </div>
+                                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${selectedProductFilter.length === 0 ? 'bg-rose-200/80 text-rose-800' : 'bg-slate-100 text-slate-500'}`}>
+                                                                {uncontactedLeads.length}
+                                                            </span>
+                                                        </button>
+
+                                                        <div className="border-t border-slate-100 my-1.5" />
+
+                                                        {/* Cada producto */}
+                                                        {availableProducts.map(prod => {
+                                                            const isChecked = selectedProductFilter.includes(prod.id);
+                                                            const count = uncontactedByProduct[prod.id] || 0;
+                                                            return (
+                                                                <button
+                                                                    key={prod.id}
+                                                                    onClick={() => {
+                                                                        setSelectedProductFilter(prev => {
+                                                                            if (prev.includes(prod.id)) {
+                                                                                return prev.filter(id => id !== prod.id);
+                                                                            } else {
+                                                                                return [...prev, prod.id];
+                                                                            }
+                                                                        });
+                                                                    }}
+                                                                    className={`w-full text-left px-3 py-2 rounded-xl text-[11px] transition-colors flex items-center justify-between ${isChecked ? 'bg-rose-50/80 text-rose-700 font-black' : 'text-slate-600 font-bold hover:bg-slate-50'}`}
+                                                                >
+                                                                    <div className="flex items-center gap-2 min-w-0">
+                                                                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${isChecked ? 'bg-rose-600 border-rose-600 text-white' : 'border-slate-300 bg-white'}`}>
+                                                                            {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                                                                        </div>
+                                                                        <span className="truncate">{prod.name}</span>
+                                                                    </div>
+                                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${count > 0 ? (isChecked ? 'bg-rose-200 text-rose-800' : 'bg-rose-100 text-rose-600') : 'bg-slate-100 text-slate-400'}`}>
+                                                                        {count}
+                                                                    </span>
+                                                                </button>
+                                                            );
+                                                        })}
+
+                                                        {/* Leads sin producto asignado si existen */}
+                                                        {(uncontactedByProduct['none'] || 0) > 0 && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedProductFilter(prev => {
+                                                                        if (prev.includes('none')) {
+                                                                            return prev.filter(id => id !== 'none');
+                                                                        } else {
+                                                                            return [...prev, 'none'];
+                                                                        }
+                                                                    });
+                                                                }}
+                                                                className={`w-full text-left px-3 py-2 rounded-xl text-[11px] transition-colors flex items-center justify-between ${selectedProductFilter.includes('none') ? 'bg-rose-50/80 text-rose-700 font-black' : 'text-slate-600 font-bold hover:bg-slate-50'}`}
+                                                            >
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${selectedProductFilter.includes('none') ? 'bg-rose-600 border-rose-600 text-white' : 'border-slate-300 bg-white'}`}>
+                                                                        {selectedProductFilter.includes('none') && <Check className="w-3 h-3 stroke-[3]" />}
+                                                                    </div>
+                                                                    <span className="truncate italic text-slate-500">Sin producto asignado</span>
+                                                                </div>
+                                                                <span className="text-[10px] px-2 py-0.5 rounded-full font-black bg-slate-100 text-slate-600">
+                                                                    {uncontactedByProduct['none']}
+                                                                </span>
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="pt-2 mt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center font-medium">
+                                                        Mostrando {displayedUncontactedCount} de {uncontactedLeads.length} leads
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-100 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                                                    {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                                        <button
+                                                            key={key}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedDateRange(key);
+                                                                setActiveCardFilter(null);
+                                                            }}
+                                                            className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-slate-50'}`}
+                                                        >
+                                                            <span className="flex items-center gap-2">
+                                                                {option.label}
+                                                                <span className="text-[9px] opacity-50 font-medium">{getDateRangeLabelDisplay(key)}</span>
+                                                            </span>
+                                                            {selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )
                                         )}
                                     </div>
                                 </div>
@@ -1645,6 +1796,29 @@ export default function Dashboard() {
                                                 <span className="text-5xl xl:text-6xl font-black tracking-tight text-rose-600 drop-shadow-sm leading-none">{item.value}</span>
                                                 <span className="text-[11px] font-black text-rose-400 uppercase tracking-wider">leads</span>
                                             </div>
+
+                                            {/* Badge visible del filtro de producto activo */}
+                                            {selectedProductFilter.length > 0 && (
+                                                <div className="flex flex-wrap items-center gap-1">
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-100/90 border border-rose-200 text-rose-800 text-[10px] font-black tracking-wide">
+                                                        <Package className="w-3 h-3 text-rose-600 shrink-0" />
+                                                        <span className="truncate max-w-[140px]">
+                                                            {selectedProductFilter.map(id => id === 'none' ? 'Sin producto' : availableProducts.find(p => p.id === id)?.name || id).join(', ')}
+                                                        </span>
+                                                        <span
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedProductFilter([]);
+                                                            }}
+                                                            className="hover:bg-rose-200 rounded p-0.5 ml-0.5 cursor-pointer text-rose-700"
+                                                            title="Ver todos los productos"
+                                                        >
+                                                            ×
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            )}
+
                                             <div 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -1655,7 +1829,8 @@ export default function Dashboard() {
                                                             status: 'Prospecto',
                                                             pipelineView: 'all',
                                                             startDate: dateRange.startDate,
-                                                            endDate: dateRange.endDate
+                                                            endDate: dateRange.endDate,
+                                                            productFilter: selectedProductFilter.length === 0 ? 'all' : (selectedProductFilter.length === 1 ? selectedProductFilter[0] : selectedProductFilter)
                                                         } 
                                                     });
                                                 }}
@@ -1848,7 +2023,8 @@ export default function Dashboard() {
                                                             status: 'Prospecto', 
                                                             pipelineView: 'all',
                                                             startDate: dateRange.startDate,
-                                                            endDate: dateRange.endDate
+                                                            endDate: dateRange.endDate,
+                                                            productFilter: selectedProductFilter.length === 0 ? 'all' : (selectedProductFilter.length === 1 ? selectedProductFilter[0] : selectedProductFilter)
                                                         } 
                                                     });
                                                 } else if (item.action) {

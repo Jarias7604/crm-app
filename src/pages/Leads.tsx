@@ -291,7 +291,7 @@ export default function Leads() {
     const [sourceFilter, setSourceFilter] = useState<string | 'all' | string[]>('all');
     const [lossReasonFilter, setLossReasonFilter] = useState<string | 'all' | string[]>('all');
     const [lostAtStageFilter, setLostAtStageFilter] = useState<string | 'all' | string[]>('all');
-    const [productFilter, setProductFilter] = useState<string | 'all'>('all');
+    const [productFilter, setProductFilter] = useState<string | 'all' | string[]>('all');
     const [products, setProducts] = useState<LeadProduct[]>([]);
     const [industryFilter, setIndustryFilter] = useState<string | 'all'>('all');
     const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
@@ -386,6 +386,9 @@ export default function Leads() {
                 }
                 if (state.minContactCount) {
                     setMinContactCountFilter(state.minContactCount);
+                }
+                if (state.productFilter !== undefined) {
+                    setProductFilter(state.productFilter);
                 }
                 if (state.uncontactedOnly !== undefined) {
                     setUncontactedOnly(state.uncontactedOnly);
@@ -672,7 +675,17 @@ export default function Leads() {
 
             // Filter by product of interest
             if (productFilter !== 'all') {
-                if (lead.interested_product_id !== productFilter) return false;
+                if (Array.isArray(productFilter)) {
+                    const hasProduct = lead.interested_product_id && productFilter.includes(lead.interested_product_id);
+                    const matchesNone = productFilter.includes('none') && !lead.interested_product_id;
+                    if (!hasProduct && !matchesNone) return false;
+                } else {
+                    if (productFilter === 'none') {
+                        if (lead.interested_product_id) return false;
+                    } else if (lead.interested_product_id !== productFilter) {
+                        return false;
+                    }
+                }
             }
 
             // Filter by rubro / industria (stored as the industry name)
@@ -1450,11 +1463,18 @@ export default function Leads() {
                         <PhoneOff className="w-4 h-4 text-rose-600 shrink-0" />
                         <div>
                             <span className="text-xs font-black text-rose-800">Filtrando: Leads Sin Contactar</span>
+                            {productFilter !== 'all' && (
+                                <span className="ml-2 text-[11px] font-bold text-rose-700 bg-rose-100/90 border border-rose-200 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
+                                    📦 {Array.isArray(productFilter)
+                                        ? productFilter.map(id => id === 'none' ? 'Sin producto' : products.find(p => p.id === id)?.name || id).join(', ')
+                                        : (productFilter === 'none' ? 'Sin producto' : products.find(p => p.id === productFilter)?.name || productFilter)}
+                                </span>
+                            )}
                             <span className="text-[11px] text-rose-600 font-medium ml-2 hidden sm:inline">Mostrando prospectos activos que aún no han recibido llamadas ni seguimientos</span>
                         </div>
                     </div>
                     <button
-                        onClick={() => { setUncontactedOnly(false); setPipelineFilter(null); }}
+                        onClick={() => { setUncontactedOnly(false); setPipelineFilter(null); setProductFilter('all'); }}
                         className="flex items-center gap-1 bg-white hover:bg-rose-100 text-rose-700 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-xl transition-all border border-rose-200 shadow-xs cursor-pointer"
                     >
                         <X className="w-3 h-3" />
