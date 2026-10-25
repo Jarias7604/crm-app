@@ -85,6 +85,11 @@ export default function PayrollManager() {
   const [deletingTimesheet, setDeletingTimesheet] = useState<boolean>(false);
   const [approvalsFilter, setApprovalsFilter] = useState<'all' | 'overtime'>('all');
 
+  // Detalle de Jornadas Individuales por Colaborador (Modal de Auditoría y Eliminación)
+  const [inspectingMember, setInspectingMember] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [memberDailyTimesheets, setMemberDailyTimesheets] = useState<TimesheetEntry[]>([]);
+  const [loadingMemberDaily, setLoadingMemberDaily] = useState<boolean>(false);
+
   // Config Member Edit Modal (Ficha Técnica de Empleado)
   const [editingConfig, setEditingConfig] = useState<PayrollMemberConfig | null>(null);
   const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
@@ -244,6 +249,9 @@ export default function PayrollManager() {
         setDeleteModalOpen(false);
         setSelectedEntryToDelete(null);
         await loadAllData();
+        if (inspectingMember) {
+          await refreshMemberDays(inspectingMember.id);
+        }
       } else {
         toast.error('Error al eliminar registro: ' + (res.error || 'No se pudo eliminar de la base de datos'));
       }
@@ -251,6 +259,39 @@ export default function PayrollManager() {
       toast.error('Error inesperado: ' + err.message);
     } finally {
       setDeletingTimesheet(false);
+    }
+  };
+
+  const handleOpenMemberDays = async (item: PayrollCalculationItem) => {
+    setInspectingMember({ id: item.user_id, name: item.user_name, email: item.user_email });
+    setLoadingMemberDaily(true);
+    try {
+      const data = await timesheetsService.getTimesheets({
+        companyId: activeCompanyId!,
+        userId: item.user_id,
+        startDate,
+        endDate,
+      });
+      setMemberDailyTimesheets(data);
+    } catch (err) {
+      console.error('Error fetching member days:', err);
+    } finally {
+      setLoadingMemberDaily(false);
+    }
+  };
+
+  const refreshMemberDays = async (userId: string) => {
+    if (!activeCompanyId) return;
+    try {
+      const data = await timesheetsService.getTimesheets({
+        companyId: activeCompanyId,
+        userId,
+        startDate,
+        endDate,
+      });
+      setMemberDailyTimesheets(data);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -828,6 +869,15 @@ export default function PayrollManager() {
                         {/* Acciones */}
                         <td className="py-2.5 px-3 text-center">
                           <div className="flex items-center justify-center gap-1">
+                            <button
+                              id={`btn-days-${item.user_id}`}
+                              aria-label="Ver y gestionar jornadas de este colaborador"
+                              onClick={() => handleOpenMemberDays(item)}
+                              className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition cursor-pointer"
+                              title="Ver desglose de días laborados y eliminar registros"
+                            >
+                              <Clock className="w-4 h-4" />
+                            </button>
                             <button
                               id={`btn-adjust-${item.user_id}`}
                               aria-label="Ajustar bonos y comisiones"
@@ -2649,7 +2699,124 @@ export default function PayrollManager() {
         </div>
       )}
 
-      {/* ── 10. MODAL DE CONFIRMACIÓN DE ELIMINACIÓN DE REGISTRO (ADMIN) ── */}
+      {/* ── 11. MODAL DETALLE DE JORNADAS Y ELIMINACIÓN DE REGISTROS POR COLABORADOR ── */}
+      {inspectingMember && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 border border-slate-200 animate-scaleUp max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-base">
+                  {inspectingMember.name.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Jornadas Registradas: {inspectingMember.name}</h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Período: {periodLabel} • {inspectingMember.email}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInspectingMember(null)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center font-bold text-sm transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 custom-scrollbar">
+              {loadingMemberDaily ? (
+                <div className="py-12 text-center text-slate-400 text-xs space-y-2">
+                  <Clock className="w-6 h-6 animate-spin mx-auto text-indigo-500" />
+                  <p>Cargando jornadas del período...</p>
+                </div>
+              ) : memberDailyTimesheets.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 space-y-2 border border-dashed border-slate-200 rounded-xl">
+                  <FileText className="w-8 h-8 text-slate-300 mx-auto" />
+                  <p className="text-xs font-bold text-slate-700">Sin jornadas registradas</p>
+                  <p className="text-[11px] text-slate-400">
+                    Este colaborador no ha registrado horas en el período {periodLabel}.
+                  </p>
+                </div>
+              ) : (
+                memberDailyTimesheets.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition shadow-2xs space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-900">
+                          📅 {new Date(entry.work_date + 'T00:00:00').toLocaleDateString('es-ES', {
+                            weekday: 'short',
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </span>
+                        <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                          {entry.regular_hours}h reg.
+                        </span>
+                        {entry.overtime_hours > 0 && (
+                          <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                            +{entry.overtime_hours}h extra
+                          </span>
+                        )}
+                        <span className={`text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-md border ${
+                          entry.status === 'approved'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : entry.status === 'rejected'
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        }`}>
+                          {entry.status === 'approved' ? 'Aprobado' : entry.status === 'rejected' ? 'Rechazado' : 'En Revisión'}
+                        </span>
+                      </div>
+
+                      {/* Botón de Eliminación Directa de la Jornada */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDelete(entry)}
+                        title="Eliminar permanentemente este día (Admin)"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Eliminar Día</span>
+                      </button>
+                    </div>
+
+                    {entry.work_summary && (
+                      <p className="text-xs text-slate-700 leading-snug">
+                        <strong>Entregables:</strong> {entry.work_summary}
+                      </p>
+                    )}
+
+                    {entry.overtime_hours > 0 && entry.overtime_reason && (
+                      <div className="bg-amber-50/70 border border-amber-200/70 rounded-lg p-2 text-[11px] text-amber-900">
+                        <strong>Motivo overtime:</strong> <em>"{entry.overtime_reason}"</em>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between shrink-0">
+              <span className="text-xs text-slate-500">
+                Total días registrados: <strong>{memberDailyTimesheets.length}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setInspectingMember(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 12. MODAL DE CONFIRMACIÓN DE ELIMINACIÓN DE REGISTRO (ADMIN) ── */}
       {deleteModalOpen && selectedEntryToDelete && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-rose-100 animate-scaleUp">
