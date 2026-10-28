@@ -14,6 +14,7 @@ interface OperationalSpeedControlProps {
     companyId: string;
     startDate?: string;
     endDate?: string;
+    dateRangeLabel?: string;
     assignedTo?: string | string[];
     canViewFinancials: boolean;
     uncontactedLeads: any[];
@@ -130,6 +131,7 @@ export function OperationalSpeedControl({
     companyId,
     startDate,
     endDate,
+    dateRangeLabel,
     assignedTo,
     canViewFinancials,
     uncontactedLeads = [],
@@ -161,8 +163,15 @@ export function OperationalSpeedControl({
         setIsSlaTargetDropdownOpen(false);
     };
 
-    // ── Alcance temporal: 'all_time' (Histórico integral completo) vs 'period' (Filtro del Dashboard) ──
-    const [timeScope, setTimeScope] = useState<'all_time' | 'period'>('all_time');
+    // ── Alcance temporal: 'period' (Sincronizado con el filtro de fecha del Dashboard) vs 'all_time' ──
+    const [timeScope, setTimeScope] = useState<'period' | 'all_time'>('period');
+
+    // Sincronizar automáticamente con el Dashboard cuando el usuario cambia el selector de fechas
+    useEffect(() => {
+        if (startDate || endDate || dateRangeLabel) {
+            setTimeScope('period');
+        }
+    }, [startDate, endDate, dateRangeLabel]);
 
     // ── Modo de visualización: 'all' (Integral Retroactivo) vs 'queue' (Cola Pendiente) vs 'attended' (Solo Atendidos) ──
     const [viewMode, setViewMode] = useState<'all' | 'queue' | 'attended'>('all');
@@ -363,8 +372,23 @@ export function OperationalSpeedControl({
         uncontactedLeads.forEach(l => { 
             if (l?.id && l.status !== 'Cliente' && !map.has(l.id)) map.set(l.id, l); 
         });
-        return Array.from(map.values());
-    }, [rawLeads, uncontactedLeads]);
+        let list = Array.from(map.values());
+
+        // Si estamos en modo período, aseguramos con precisión matemática que TODOS los prospectos
+        // caigan dentro de startDate y endDate
+        if (timeScope === 'period') {
+            if (startDate) {
+                const startMs = new Date(startDate).getTime();
+                list = list.filter(l => new Date(l.created_at).getTime() >= startMs);
+            }
+            if (endDate) {
+                const endMs = new Date(endDate).getTime();
+                list = list.filter(l => new Date(l.created_at).getTime() <= endMs);
+            }
+        }
+
+        return list;
+    }, [rawLeads, uncontactedLeads, timeScope, startDate, endDate]);
 
     // ── Conteo de Prospectos por Producto en este conjunto ───────────────────────
     const leadsCountByProduct = useMemo(() => {
@@ -552,7 +576,9 @@ export function OperationalSpeedControl({
                 assignedFilter: assignedTo || 'all',
                 leadIds: leadIds,
                 pipelineView: 'all',
-                productFilter: effectiveProductFilter.length === 0 ? 'all' : (effectiveProductFilter.length === 1 ? effectiveProductFilter[0] : effectiveProductFilter)
+                productFilter: effectiveProductFilter.length === 0 ? 'all' : (effectiveProductFilter.length === 1 ? effectiveProductFilter[0] : effectiveProductFilter),
+                startDate: timeScope === 'period' ? startDate : undefined,
+                endDate: timeScope === 'period' ? endDate : undefined
             }
         });
     };
@@ -774,9 +800,9 @@ export function OperationalSpeedControl({
                     <span className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">
                         Control de Velocidad & Eficiencia de Contacto
                     </span>
-                    <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                        <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
-                        {timeScope === 'all_time' ? 'Histórico Integral Completo' : 'Período Filtrado'} · {analysis.allAnalyzedCount} Leads
+                    <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200/70 px-2 py-0.5 rounded-full flex items-center gap-1.5 shadow-sm">
+                        <Calendar className="w-3 h-3 text-indigo-600" />
+                        <span>{timeScope === 'period' ? (dateRangeLabel || 'Período del Dashboard') : 'Histórico Integral Completo'} · {analysis.allAnalyzedCount} Leads</span>
                     </span>
 
                     {/* Botón de Ayuda General: ¿Cómo se calculan los datos? */}
@@ -823,31 +849,31 @@ export function OperationalSpeedControl({
                         {activeDropdown === 'header' && renderProductDropdownMenu()}
                     </div>
 
-                    {/* Selector de Alcance Temporal (All-Time vs Período) */}
+                    {/* Selector de Alcance Temporal (Período del Dashboard vs All-Time) */}
                     <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shadow-inner">
                         <button
+                            onClick={() => setTimeScope('period')}
+                            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                                timeScope === 'period'
+                                    ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/60'
+                                    : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                            title={`Sincronizado con el filtro de fecha del Dashboard: ${dateRangeLabel || 'Período Actual'}`}
+                        >
+                            <Calendar className="w-3 h-3 text-indigo-600" />
+                            <span>{timeScope === 'period' && dateRangeLabel ? dateRangeLabel : (dateRangeLabel ? `Dashboard: ${dateRangeLabel}` : 'Período Actual')}</span>
+                        </button>
+                        <button
                             onClick={() => setTimeScope('all_time')}
-                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
                                 timeScope === 'all_time'
                                     ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/60'
                                     : 'text-slate-500 hover:text-slate-800'
                             }`}
                             title="Analiza la velocidad retroactiva de todos los prospectos registrados en la historia del CRM"
                         >
-                            <Globe className="w-3 h-3 text-indigo-600" />
+                            <Globe className="w-3 h-3 text-slate-500" />
                             <span>Todo el Histórico</span>
-                        </button>
-                        <button
-                            onClick={() => setTimeScope('period')}
-                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
-                                timeScope === 'period'
-                                    ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/60'
-                                    : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                            title="Limita el análisis a los prospectos del rango de fechas seleccionado en el Dashboard"
-                        >
-                            <Calendar className="w-3 h-3 text-slate-600" />
-                            <span>Período Actual</span>
                         </button>
                     </div>
 
@@ -936,7 +962,7 @@ export function OperationalSpeedControl({
                                             ? 'Demora / Respuesta sobre todo el flujo' 
                                             : viewMode === 'queue' 
                                                 ? 'Tiempo de espera en cola activa' 
-                                                : 'Velocidad histórica de asesores'}
+                                                : 'Velocidad histórica de asesores'} · <span className="text-slate-600 font-bold">{timeScope === 'period' ? (dateRangeLabel || 'Período') : 'Todo el Histórico'}</span>
                                     </p>
                                 </div>
                             </div>
@@ -1206,7 +1232,9 @@ export function OperationalSpeedControl({
                                             position="bottom"
                                         />
                                     </h3>
-                                    <p className="text-[10px] text-slate-400 font-medium">Distribución por tramo operativo</p>
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                        Distribución por tramo operativo · <span className="text-slate-600 font-bold">{timeScope === 'period' ? (dateRangeLabel || 'Período') : 'Todo el Histórico'}</span>
+                                    </p>
                                 </div>
                             </div>
 
@@ -1378,7 +1406,9 @@ export function OperationalSpeedControl({
                                             position="bottom"
                                         />
                                     </h3>
-                                    <p className="text-[10px] text-slate-400 font-medium">Fuga financiera & CAC</p>
+                                    <p className="text-[10px] text-slate-400 font-medium">
+                                        Fuga financiera & CAC · <span className="text-slate-600 font-bold">{timeScope === 'period' ? (dateRangeLabel || 'Período') : 'Todo el Histórico'}</span>
+                                    </p>
                                 </div>
                             </div>
 

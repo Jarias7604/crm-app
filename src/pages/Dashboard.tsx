@@ -2195,6 +2195,13 @@ export default function Dashboard() {
                         companyId={profile.company_id}
                         startDate={dateRange.startDate}
                         endDate={dateRange.endDate}
+                        dateRangeLabel={
+                            isCustomRange && customStartDate && customEndDate
+                                ? `${customStartDate} → ${customEndDate}`
+                                : selectedDateRange === 'all'
+                                    ? 'Todo el tiempo'
+                                    : `${DATE_RANGE_OPTIONS[selectedDateRange]?.label || 'Este mes'} ${getDateRangeLabelDisplay(selectedDateRange)}`
+                        }
                         assignedTo={dashboardAssignedTo}
                         canViewFinancials={canViewActiveFinancials}
                         uncontactedLeads={uncontactedLeads}
