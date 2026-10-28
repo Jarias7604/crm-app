@@ -268,19 +268,80 @@ export const pagosService = {
     return { url: data.publicUrl, path: filePath };
   },
 
-  /** Resumen financiero agregado para KPI cards */
+  /** Resumen financiero agregado para KPI cards y control de liquidez */
   async getResumen(companyId: string): Promise<{
     ventaTotal: number;
     totalCobrado: number;
     totalPendiente: number;
     cotizacionesActivas: number;
+    cashInmediatoCobrado: number;
+    mrrRecurrenteActivo: number;
+    cuotasPendientesTotal: number;
+    contratosCredito: number;
+    contratosContado: number;
+    promedioCuotas: number;
   }> {
     const panorama = await pagosService.getPanorama(companyId);
+
+    // Obtener desglose de tipos de pagos reales recibidos (anticipos vs cuotas)
+    const { data: pagos } = await supabase
+      .from('pagos')
+      .select('tipo, monto')
+      .eq('company_id', companyId);
+
+    let cashInmediatoCobrado = 0;
+    let cuotasCobradas = 0;
+
+    (pagos || []).forEach(p => {
+      const monto = Number(p.monto) || 0;
+      if (p.tipo === 'anticipo' || p.tipo === 'otro') {
+        cashInmediatoCobrado += monto;
+      } else {
+        cuotasCobradas += monto;
+      }
+    });
+
+    let mrrRecurrenteActivo = 0;
+    let contratosCredito = 0;
+    let contratosContado = 0;
+    let sumaPlazos = 0;
+
+    panorama.forEach(p => {
+      const cuotas = p.total_cuotas || (p.plazo_meses || 1);
+      const isCredito = (p.tipo_pago && (p.tipo_pago === 'credito' || p.tipo_pago === 'mensual' || p.tipo_pago === 'cuotas')) || cuotas > 1;
+
+      if (isCredito) {
+        contratosCredito++;
+        sumaPlazos += cuotas;
+        // Si tiene saldo pendiente o cuotas por cobrar, suma al MRR mensual activo
+        if (p.total_pendiente > 0 && cuotas > 0) {
+          mrrRecurrenteActivo += Number(p.valor_por_cuota || (p.venta_total / cuotas));
+        }
+      } else {
+        contratosContado++;
+      }
+    });
+
+    // Si no había desglose explícito de pagos (o tabla pagos está vacía), estimar con anticipos acordados
+    if (cashInmediatoCobrado === 0 && cuotasCobradas === 0) {
+      cashInmediatoCobrado = panorama.reduce((s, p) => s + (p.total_cuotas && p.total_cuotas > 1 ? Number(p.anticipo_acordado || 0) : Number(p.total_cobrado || 0)), 0);
+    }
+
+    const ventaTotal = panorama.reduce((s, p) => s + (p.venta_total || 0), 0);
+    const totalCobrado = panorama.reduce((s, p) => s + (p.total_cobrado || 0), 0);
+    const totalPendiente = panorama.reduce((s, p) => s + (p.total_pendiente || 0), 0);
+
     return {
-      ventaTotal: panorama.reduce((s, p) => s + (p.venta_total || 0), 0),
-      totalCobrado: panorama.reduce((s, p) => s + (p.total_cobrado || 0), 0),
-      totalPendiente: panorama.reduce((s, p) => s + (p.total_pendiente || 0), 0),
+      ventaTotal,
+      totalCobrado,
+      totalPendiente,
       cotizacionesActivas: panorama.length,
+      cashInmediatoCobrado,
+      mrrRecurrenteActivo: Math.round(mrrRecurrenteActivo),
+      cuotasPendientesTotal: totalPendiente,
+      contratosCredito,
+      contratosContado,
+      promedioCuotas: contratosCredito > 0 ? Math.round(sumaPlazos / contratosCredito) : 1,
     };
   },
 };

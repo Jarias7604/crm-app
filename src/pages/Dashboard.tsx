@@ -228,6 +228,12 @@ export default function Dashboard() {
         totalCobrado: number;
         totalPendiente: number;
         cotizacionesActivas: number;
+        cashInmediatoCobrado?: number;
+        mrrRecurrenteActivo?: number;
+        cuotasPendientesTotal?: number;
+        contratosCredito?: number;
+        contratosContado?: number;
+        promedioCuotas?: number;
     } | null>(null);
     const [isFinanceLoading, setIsFinanceLoading] = useState(true);
 
@@ -484,15 +490,24 @@ export default function Dashboard() {
 
 
     // 🔒 Role-based dashboard: collaborators without dashboard_view_company only see their own stats
-    const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const isSuperAdmin = profile?.role === 'super_admin';
+    const isCompanyAdmin = profile?.role === 'company_admin';
+    const isAdmin = isSuperAdmin || isCompanyAdmin;
     const canViewCompanyDashboard = isAdmin || (profile?.permissions?.['dashboard_view_company'] === true);
-    const canViewFinancials = isAdmin || (profile?.permissions?.['view_financials'] === true);
+    
+    // 🔒 Regla estricta de confidencialidad financiera:
+    // Solo Super Admin tiene acceso total siempre, y Company Admin si tiene el permiso habilitado.
+    // Colaboradores y vendedores NO tienen acceso a las métricas financieras de la empresa.
+    const canViewFinancials = isSuperAdmin || (isCompanyAdmin && profile?.permissions?.['view_financials'] !== false) || (profile?.permissions?.['view_financials'] === true);
+    
     // Admin: puede ver perspectiva de un colaborador específico; Agent: siempre ve lo suyo
     const dashboardAssignedTo = canViewCompanyDashboard
         ? (selectedCollabIds.length === 0 ? undefined : selectedCollabIds.length === 1 ? selectedCollabIds[0] : selectedCollabIds)
         : profile?.id;
     const isViewingOwnData = !dashboardAssignedTo || dashboardAssignedTo === profile?.id;
-    const canViewActiveFinancials = canViewFinancials || isViewingOwnData;
+    
+    // Métricas financieras globales reservadas estrictamente a usuarios autorizados
+    const canViewActiveFinancials = canViewFinancials;
     const averageTicket = stats.wonDeals > 0 ? Math.round((stats.totalWonAmount || stats.totalWonPotential || 0) / stats.wonDeals) : 0;
     const finalUncontactedCount = displayedUncontactedCount;
 
@@ -2606,30 +2621,52 @@ export default function Dashboard() {
                         ) : isFinanceLoading ? (
                             <div className="h-full flex items-center justify-center py-10 opacity-30 text-[9px] font-black uppercase tracking-widest animate-pulse">Cargando datos...</div>
                         ) : financeResumen ? (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/50 hover:bg-emerald-50 transition-colors">
-                                        <p className="text-[9px] font-black text-emerald-700 uppercase tracking-wider mb-1">💰 Pagado (Income)</p>
-                                        <p className="text-xl font-black text-emerald-600 font-mono">${(financeResumen.totalCobrado || 0).toLocaleString()}</p>
-                                        <p className="text-[8px] text-slate-400 font-bold">Ingresos cobrados</p>
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-2.5">
+                                    <div className="bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-100/50 hover:bg-emerald-50 transition-colors">
+                                        <p className="text-[9px] font-black text-emerald-700 uppercase tracking-wider mb-0.5">💰 Cobrado (Income)</p>
+                                        <p className="text-lg font-black text-emerald-600 font-mono">${(financeResumen.totalCobrado || 0).toLocaleString()}</p>
+                                        <p className="text-[8px] text-slate-400 font-bold">Ingresos en banco</p>
                                     </div>
-                                    <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100/50 hover:bg-amber-50 transition-colors">
-                                        <p className="text-[9px] font-black text-amber-700 uppercase tracking-wider mb-1">⏳ Pendiente (CxC)</p>
-                                        <p className="text-xl font-black text-amber-600 font-mono">${(financeResumen.totalPendiente || 0).toLocaleString()}</p>
-                                        <p className="text-[8px] text-slate-400 font-bold">Cuentas por cobrar</p>
+                                    <div className="bg-amber-50/50 p-2.5 rounded-xl border border-amber-100/50 hover:bg-amber-50 transition-colors">
+                                        <p className="text-[9px] font-black text-amber-700 uppercase tracking-wider mb-0.5">⏳ Por Cobrar (CxC)</p>
+                                        <p className="text-lg font-black text-amber-600 font-mono">${(financeResumen.totalPendiente || 0).toLocaleString()}</p>
+                                        <p className="text-[8px] text-slate-400 font-bold">Diferido en cuotas</p>
                                     </div>
                                 </div>
 
-                                <div className="space-y-1.5 pt-2 border-t border-slate-50">
-                                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider">
+                                {/* Desglose Operativo: Capitalización vs Recurrencias (MRR) y Términos */}
+                                <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/60 space-y-1.5">
+                                    <div className="flex items-center justify-between text-[10px]">
+                                        <span className="font-extrabold text-slate-600">💵 Capitalización (Upfront):</span>
+                                        <span className="font-mono font-black text-emerald-700">
+                                            ${(financeResumen.cashInmediatoCobrado || 0).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[10px]">
+                                        <span className="font-extrabold text-slate-600">🔄 Recurrencia Mensual (MRR):</span>
+                                        <span className="font-mono font-black text-indigo-600">
+                                            ~${(financeResumen.mrrRecurrenteActivo || 0).toLocaleString()} / mes
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[8.5px] pt-1 border-t border-slate-200/60 text-slate-500 font-bold">
+                                        <span>Términos acordados:</span>
+                                        <span className="text-slate-700">
+                                            {financeResumen.contratosCredito || 0} crédito ({financeResumen.promedioCuotas || 0}m prom.) · {financeResumen.contratosContado || 0} contado
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1 pt-1 border-t border-slate-50">
+                                    <div className="flex justify-between items-center text-[9.5px] font-black uppercase tracking-wider">
                                         <span className="text-slate-400">Progreso de Recaudo</span>
-                                        <span className="text-emerald-600 font-mono text-[11px] font-bold">
+                                        <span className="text-emerald-600 font-mono text-[10.5px] font-bold">
                                             {financeResumen.ventaTotal > 0 
                                                 ? `${Math.round((financeResumen.totalCobrado / financeResumen.ventaTotal) * 100)}%` 
                                                 : '0%'}
                                         </span>
                                     </div>
-                                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
                                         <div 
                                             className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-1000" 
                                             style={{ 
@@ -2639,7 +2676,7 @@ export default function Dashboard() {
                                             }} 
                                         />
                                     </div>
-                                    <div className="flex justify-between text-[9px] text-slate-400 font-bold">
+                                    <div className="flex justify-between text-[8.5px] text-slate-400 font-bold">
                                         <span>Total: ${(financeResumen.ventaTotal || 0).toLocaleString()}</span>
                                         <span>{financeResumen.cotizacionesActivas} contratos con pagos</span>
                                     </div>
