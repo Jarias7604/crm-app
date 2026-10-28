@@ -27,6 +27,7 @@ import { ManagerLivePulse } from '../components/ManagerLivePulse';
 import { WeeklyLeaderboard } from '../components/WeeklyLeaderboard';
 import { PanoramaFinancieroWidget } from '../components/financiero/PanoramaFinancieroWidget';
 import { pagosService } from '../services/pagos';
+import { OperationalSpeedControl } from '../components/dashboard/OperationalSpeedControl';
 import toast from 'react-hot-toast';
 
 
@@ -531,7 +532,7 @@ export default function Dashboard() {
                 setIsLoadingUncontacted(true);
                 let uncontactedQ = supabase
                     .from('leads')
-                    .select('id, name, company_name, created_at, value, source, status, contact_count, last_follow_up_at, assigned_to, interested_product_id')
+                    .select('id, name, company_name, created_at, value, source, status, contact_count, last_follow_up_at, assigned_to, interested_product_id, priority')
                     .eq('company_id', profile.company_id)
                     .eq('status', 'Prospecto')
                     .or('contact_count.is.null,contact_count.eq.0')
@@ -2187,6 +2188,20 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
+
+                {/* ── Centro de Control Operativo & SLA (Speed-to-Lead, Radar de Envejecimiento, Capital en Riesgo) ── */}
+                {profile?.company_id && (
+                    <OperationalSpeedControl
+                        companyId={profile.company_id}
+                        startDate={dateRange.startDate}
+                        endDate={dateRange.endDate}
+                        assignedTo={dashboardAssignedTo}
+                        canViewFinancials={canViewActiveFinancials}
+                        uncontactedLeads={uncontactedLeads}
+                        averageTicket={averageTicket}
+                        isLoading={isLoadingUncontacted}
+                    />
+                )}
 
                 {/* Row 1.5: Sales Trend + Lead Alert KPIs */}
                 {(() => {
