@@ -18,7 +18,8 @@ import type { Lead, LeadStatus, LeadPriority, FollowUp, LossReason, Industry, Le
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search, Target, Calendar, Settings2, SlidersHorizontal, ArrowLeft, PhoneOff } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search, Target, Calendar, Settings2, SlidersHorizontal, ArrowLeft, PhoneOff, CreditCard, RefreshCw, Zap, Receipt, Sparkles, Check } from 'lucide-react';
+import { planPagoService } from '../services/pagos';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -335,6 +336,11 @@ export default function Leads() {
     const [isWonModalOpen, setIsWonModalOpen] = useState(false);
     const [wonData, setWonData] = useState({
         won_date: format(new Date(), 'yyyy-MM-dd'),
+        closing_amount: 0,
+        tipo_cobro: 'contado' as 'contado' | 'credito' | 'mensual',
+        anticipo: 0,
+        plazo_meses: 12,
+        notas_pago: '',
     });
     const [pendingWonStatus, setPendingWonStatus] = useState<LeadStatus | null>(null);
     const [isCallLoggerOpen, setIsCallLoggerOpen] = useState(false);
@@ -1166,7 +1172,15 @@ export default function Leads() {
             const existingDate = selectedLead.internal_won_date
                 ? format(new Date(selectedLead.internal_won_date.substring(0, 10) + 'T12:00:00'), 'yyyy-MM-dd')
                 : format(new Date(), 'yyyy-MM-dd');
-            setWonData({ won_date: existingDate });
+            const initialAmount = Number(selectedLead.closing_amount) || Number(selectedLead.value) || 0;
+            setWonData({
+                won_date: existingDate,
+                closing_amount: initialAmount,
+                tipo_cobro: 'contado',
+                anticipo: initialAmount,
+                plazo_meses: 12,
+                notas_pago: '',
+            });
             setIsWonModalOpen(true);
             return;
         }
@@ -1355,14 +1369,161 @@ export default function Leads() {
         if (!selectedLead || !pendingWonStatus) return;
 
         try {
+            const finalClosingAmount = Math.max(0, Number(wonData.closing_amount) || 0);
+            const finalAnticipo = wonData.tipo_cobro === 'contado'
+                ? finalClosingAmount
+                : Math.min(Math.max(0, Number(wonData.anticipo) || 0), finalClosingAmount);
+            const finalPlazo = wonData.tipo_cobro === 'credito'
+                ? Math.max(1, Number(wonData.plazo_meses) || 12)
+                : (wonData.tipo_cobro === 'mensual' ? 12 : 1);
+
+            // 1. Actualizar el Lead con el monto real de cierre y fecha oficial
             await leadsService.updateLead(selectedLead.id, {
                 status: pendingWonStatus,
+                closing_amount: finalClosingAmount,
                 internal_won_date: new Date(`${wonData.won_date}T12:00:00`).toISOString()
             });
 
+            // 2. Automatización Contable & Financiera (Single Source of Truth para Dashboard y Finanzas)
+            const companyId = selectedLead.company_id || activeCompanyId;
+            if (companyId) {
+                try {
+                    // Verificar si ya existe una cotización asociada a este lead
+                    const { data: existingCots } = await supabase
+                        .from('cotizaciones')
+                        .select('id, estado')
+                        .eq('lead_id', selectedLead.id)
+                        .order('created_at', { ascending: false });
+
+                    let activeCotId: string | null = null;
+                    const paymentDesc = wonData.notas_pago || (
+                        wonData.tipo_cobro === 'contado'
+                            ? 'Pago de Contado (100% Upfront)'
+                            : wonData.tipo_cobro === 'mensual'
+                            ? `Suscripción Mensual de $${finalClosingAmount.toLocaleString()}/mes`
+                            : `Anticipo $${finalAnticipo.toLocaleString()} + ${finalPlazo} cuotas de ~$${Math.round((finalClosingAmount - finalAnticipo) / finalPlazo).toLocaleString()}/mes`
+                    );
+
+                    if (existingCots && existingCots.length > 0) {
+                        activeCotId = existingCots[0].id;
+                        await supabase
+                            .from('cotizaciones')
+                            .update({
+                                estado: 'aceptada',
+                                total_anual: finalClosingAmount,
+                                tipo_pago: wonData.tipo_cobro,
+                                monto_anticipo: finalAnticipo,
+                                cuotas: finalPlazo,
+                                plazo_meses: finalPlazo,
+                                descripcion_pago: paymentDesc
+                            })
+                            .eq('id', activeCotId);
+                    } else {
+                        // Crear automáticamente la cotización ganada
+                        const { data: newCot } = await supabase
+                            .from('cotizaciones')
+                            .insert({
+                                company_id: companyId,
+                                lead_id: selectedLead.id,
+                                nombre_cliente: selectedLead.name,
+                                empresa_cliente: selectedLead.company_name || null,
+                                email_cliente: selectedLead.email || null,
+                                telefono_cliente: selectedLead.phone || null,
+                                plan_nombre: 'Acuerdo Comercial',
+                                volumen_dtes: 0,
+                                costo_plan_anual: finalClosingAmount,
+                                costo_plan_mensual: wonData.tipo_cobro === 'credito' && finalPlazo > 0
+                                    ? Math.round((finalClosingAmount - finalAnticipo) / finalPlazo)
+                                    : (wonData.tipo_cobro === 'mensual' ? finalClosingAmount : 0),
+                                costo_implementacion: 0,
+                                incluir_implementacion: false,
+                                modulos_adicionales: [],
+                                servicio_whatsapp: false,
+                                costo_whatsapp: 0,
+                                servicio_personalizacion: false,
+                                costo_personalizacion: 0,
+                                subtotal_anual: finalClosingAmount,
+                                subtotal_mensual: 0,
+                                descuento_porcentaje: 0,
+                                descuento_monto: 0,
+                                iva_porcentaje: 0,
+                                iva_monto: 0,
+                                total_anual: finalClosingAmount,
+                                total_mensual: 0,
+                                estado: 'aceptada',
+                                tipo_pago: wonData.tipo_cobro,
+                                plazo_meses: finalPlazo,
+                                cuotas: finalPlazo,
+                                monto_anticipo: finalAnticipo,
+                                descripcion_pago: paymentDesc,
+                                created_by: profile?.id
+                            })
+                            .select('id')
+                            .single();
+
+                        if (newCot) activeCotId = newCot.id;
+                    }
+
+                    // 3. Registrar el pago inicial recibido hoy en la tabla 'pagos'
+                    if (activeCotId && finalAnticipo > 0) {
+                        const { data: existingPagos } = await supabase
+                            .from('pagos')
+                            .select('id')
+                            .eq('cotizacion_id', activeCotId)
+                            .limit(1);
+
+                        if (!existingPagos || existingPagos.length === 0) {
+                            await supabase
+                                .from('pagos')
+                                .insert({
+                                    company_id: companyId,
+                                    cotizacion_id: activeCotId,
+                                    lead_id: selectedLead.id,
+                                    monto: finalAnticipo,
+                                    fecha_pago: wonData.won_date,
+                                    tipo: wonData.tipo_cobro === 'contado' ? 'otro' : 'anticipo',
+                                    metodo_pago: 'transferencia',
+                                    notas: wonData.tipo_cobro === 'contado' ? 'Pago de contado al cierre' : 'Prima / Anticipo pactado al cierre',
+                                    registrado_por: profile?.id
+                                });
+                        }
+                    }
+
+                    // 4. Si es financiado en cuotas con saldo pendiente, generar tabla de amortización
+                    if (wonData.tipo_cobro === 'credito' && (finalClosingAmount - finalAnticipo) > 0) {
+                        const { data: existingPlanes } = await supabase
+                            .from('planes_pago')
+                            .select('id')
+                            .eq('lead_id', selectedLead.id)
+                            .limit(1);
+
+                        if (!existingPlanes || existingPlanes.length === 0) {
+                            await planPagoService.generarPlanAmortizacion({
+                                lead_id: selectedLead.id,
+                                cotizacion_id: activeCotId,
+                                monto_total: finalClosingAmount,
+                                monto_anticipo: finalAnticipo,
+                                saldo_a_financiar: finalClosingAmount - finalAnticipo,
+                                plazo_meses: finalPlazo,
+                                tasa_interes_anual: 0,
+                                sistema_amortizacion: 'flat',
+                                fecha_inicio: wonData.won_date,
+                            });
+                        }
+                    }
+                } catch (finErr) {
+                    console.warn('[handleConfirmWon] Error sincronizando finanzas secundarias:', finErr);
+                }
+            }
+
             // Create history entry for traceability
             const statusLabel = STATUS_CONFIG[pendingWonStatus]?.label || pendingWonStatus;
-            const traceabilityNote = `¡TRATO GANADO! Marcado como ${statusLabel} con fecha de cierre ${wonData.won_date}.`;
+            const termsSummary = wonData.tipo_cobro === 'contado'
+                ? `Contado ($${finalClosingAmount.toLocaleString()})`
+                : wonData.tipo_cobro === 'mensual'
+                ? `Suscripción ($${finalClosingAmount.toLocaleString()}/mes)`
+                : `Anticipo $${finalAnticipo.toLocaleString()} + ${finalPlazo} cuotas de ~$${Math.round((finalClosingAmount - finalAnticipo) / finalPlazo).toLocaleString()}/mes`;
+            const traceabilityNote = `¡TRATO GANADO! Marcado como ${statusLabel} el ${wonData.won_date}. Venta: $${finalClosingAmount.toLocaleString()} [${termsSummary}].`;
 
             await leadsService.createFollowUp({
                 lead_id: selectedLead.id,
@@ -1375,7 +1536,7 @@ export default function Leads() {
             setPendingWonStatus(null);
             loadLeads();
             loadFollowUps(selectedLead.id); // Refresh history view
-            toast.success('¡Felicitaciones! Trato cerrado con éxito.');
+            toast.success('¡Felicitaciones! Trato cerrado y registrado en Finanzas.');
         } catch (error: any) {
             logger.error('Failed to mark as won', error, { action: 'handleConfirmWon', leadId: selectedLead.id });
             toast.error(`Error: ${error.message}`);
@@ -2064,7 +2225,15 @@ export default function Leads() {
                             if (newStatus === 'Cerrado' || newStatus === 'Cliente') {
                                 setSelectedLead(lead);
                                 setPendingWonStatus(newStatus);
-                                setWonData({ won_date: format(new Date(), 'yyyy-MM-dd') });
+                                const amount = Number(lead.closing_amount) || Number(lead.value) || 0;
+                                setWonData({
+                                    won_date: format(new Date(), 'yyyy-MM-dd'),
+                                    closing_amount: amount,
+                                    tipo_cobro: 'contado',
+                                    anticipo: amount,
+                                    plazo_meses: 12,
+                                    notas_pago: '',
+                                });
                                 setIsWonModalOpen(true);
                                 return;
                             }
@@ -2162,88 +2331,351 @@ export default function Leads() {
             />
 
             {/* Won Modal */}
-            {
-                isWonModalOpen && selectedLead && (
-                    <div className="fixed inset-0 z-[10000] overflow-y-auto">
-                        <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-                            <div className="fixed inset-0 transition-opacity bg-black/50" onClick={() => setIsWonModalOpen(false)} />
-                            <div className="inline-block align-bottom bg-white rounded-3xl text-left shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10">
-                                <div className={`bg-gradient-to-br ${pendingWonStatus === 'Cerrado' ? 'from-indigo-50 to-purple-50 border-purple-100' : 'from-indigo-50 to-green-50 border-green-100'} px-6 py-5 border-b`}>
+            {/* Won Modal — HubSpot-Grade Financial Agreement */}
+            {isWonModalOpen && selectedLead && (
+                <div className="fixed inset-0 z-[10000] overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity bg-black/50 backdrop-blur-xs" onClick={() => setIsWonModalOpen(false)} />
+                        <div className="inline-block align-bottom bg-white rounded-3xl text-left shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full relative z-10 overflow-hidden border border-slate-100">
+                            
+                            {/* Header Celebratorio */}
+                            <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 px-6 py-5 text-white relative">
+                                <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-12 h-12 ${pendingWonStatus === 'Cerrado' ? 'bg-purple-600' : 'bg-indigo-600'} rounded-2xl flex items-center justify-center shadow-lg transition-colors`}>
+                                        <div className="w-12 h-12 bg-white/15 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-inner border border-white/20">
                                             <Target className="w-6 h-6 text-white" />
                                         </div>
                                         <div>
-                                            <h3 className="text-xl font-black text-gray-900">{pendingWonStatus === 'Cerrado' ? '¡Trato Cerrado!' : '¡Trato Ganado!'}</h3>
-                                            <p className="text-sm font-medium text-gray-500 mt-0.5">Registra la fecha de cierre oficial</p>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-xl font-black tracking-tight">¡Cierre de Venta Exitoso!</h3>
+                                                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-white/20 text-white">
+                                                    SaaS Ready
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-emerald-100 font-medium mt-0.5">
+                                                Registra los términos comerciales para automatizar caja y proyecciones
+                                            </p>
                                         </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => setIsWonModalOpen(false)}
+                                        className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="bg-white px-6 py-6 space-y-5 max-h-[78vh] overflow-y-auto">
+                                
+                                {/* Lead / Cliente Header */}
+                                <div className="bg-slate-50 border border-slate-200/70 rounded-2xl p-4 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Prospecto / Empresa</p>
+                                        <p className="text-base font-black text-slate-900 leading-snug">{selectedLead.name}</p>
+                                        {selectedLead.company_name && (
+                                            <p className="text-xs font-semibold text-slate-500 mt-0.5">{selectedLead.company_name}</p>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Selector de Estado Final */}
+                                    <div className="flex bg-slate-200/80 p-1 rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => setPendingWonStatus('Cerrado')}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                                                pendingWonStatus === 'Cerrado'
+                                                    ? 'bg-purple-600 text-white shadow-sm'
+                                                    : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            Cerrado
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPendingWonStatus('Cliente')}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                                                pendingWonStatus === 'Cliente'
+                                                    ? 'bg-emerald-600 text-white shadow-sm'
+                                                    : 'text-slate-600 hover:text-slate-900'
+                                            }`}
+                                        >
+                                            Cliente
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="bg-white px-6 py-6 space-y-5">
-                                    <div className={`${pendingWonStatus === 'Cerrado' ? 'bg-purple-50 border-purple-100' : 'bg-green-50 border-green-100'} border rounded-xl p-4 transition-colors`}>
-                                        <p className={`text-xs font-bold ${pendingWonStatus === 'Cerrado' ? 'text-purple-700' : 'text-green-700'} uppercase tracking-wider mb-1`}>Cliente / Proyecto</p>
-                                        <p className="text-lg font-black text-gray-900">{selectedLead.name}</p>
-                                        {selectedLead.company_name && <p className="text-sm font-medium text-gray-500">{selectedLead.company_name}</p>}
-                                        <div className="mt-4 pt-4 border-t border-black/5 flex flex-col gap-2">
-                                            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Estado Final:</p>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => setPendingWonStatus('Cerrado')}
-                                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all border ${pendingWonStatus === 'Cerrado'
-                                                        ? 'bg-purple-600 text-white border-purple-600 shadow-md'
-                                                        : 'bg-white text-purple-600 border-purple-100 hover:bg-purple-50'
-                                                        }`}
-                                                >
-                                                    {STATUS_CONFIG['Cerrado'].icon} Cerrado
-                                                </button>
-                                                <button
-                                                    onClick={() => setPendingWonStatus('Cliente')}
-                                                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all border ${pendingWonStatus === 'Cliente'
-                                                        ? 'bg-green-600 text-white border-green-600 shadow-md'
-                                                        : 'bg-white text-green-600 border-green-100 hover:bg-green-50'
-                                                        }`}
-                                                >
-                                                    {STATUS_CONFIG['Cliente'].icon} Cliente
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-black text-gray-700 uppercase tracking-wider block">
-                                            Fecha de Cierre <span className="text-indigo-500">*</span>
+                                {/* Fecha de Cierre & Monto Total */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
+                                            Fecha Oficial de Cierre <span className="text-indigo-500">*</span>
                                         </label>
                                         <CustomDatePicker
                                             value={wonData.won_date}
                                             onChange={(date) => setWonData({ ...wonData, won_date: date })}
                                             variant="light"
                                         />
-                                        <p className="text-[10px] text-gray-400 font-medium italic">
-                                            Esta fecha se utilizará para tus reportes de ventas y desempeño.
-                                        </p>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
+                                            Monto Total de la Venta ($) <span className="text-emerald-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-black">
+                                                $
+                                            </div>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="any"
+                                                value={wonData.closing_amount === 0 ? '' : wonData.closing_amount}
+                                                onChange={(e) => {
+                                                    const val = parseFloat(e.target.value) || 0;
+                                                    setWonData(prev => ({
+                                                        ...prev,
+                                                        closing_amount: val,
+                                                        anticipo: prev.tipo_cobro === 'contado' ? val : prev.anticipo
+                                                    }));
+                                                }}
+                                                placeholder="0.00"
+                                                className="w-full pl-7 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-black text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="bg-gray-50 px-6 py-4 flex gap-3 justify-end border-t border-gray-100">
-                                    <button
-                                        onClick={() => {
-                                            setIsWonModalOpen(false);
-                                            setPendingWonStatus(null);
-                                        }}
-                                        className="px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider text-gray-600 hover:bg-gray-100 transition-all"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        onClick={handleConfirmWon}
-                                        className="px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 transition-all shadow-lg hover:shadow-xl"
-                                    >
-                                        Guardar y Cerrar
-                                    </button>
+
+                                {/* Modalidad de Cobro / Términos de Pago (3 Modelos de Negocio Universales) */}
+                                <div className="space-y-2 pt-2 border-t border-slate-100">
+                                    <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
+                                        Términos de Pago / Modelo de Cobro
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setWonData(prev => ({
+                                                ...prev,
+                                                tipo_cobro: 'contado',
+                                                anticipo: prev.closing_amount,
+                                                plazo_meses: 1
+                                            }))}
+                                            className={`p-3 rounded-xl border text-left transition-all ${
+                                                wonData.tipo_cobro === 'contado'
+                                                    ? 'border-emerald-500 bg-emerald-50/80 shadow-sm ring-1 ring-emerald-500'
+                                                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-1.5 text-xs font-black text-emerald-800">
+                                                <CreditCard className="w-3.5 h-3.5 text-emerald-600" /> Contado
+                                            </div>
+                                            <p className="text-[9.5px] text-slate-500 font-medium mt-1 leading-tight">
+                                                100% pago único hoy
+                                            </p>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setWonData(prev => ({
+                                                ...prev,
+                                                tipo_cobro: 'credito',
+                                                anticipo: prev.anticipo === prev.closing_amount ? Math.round(prev.closing_amount * 0.2) : prev.anticipo,
+                                                plazo_meses: prev.plazo_meses > 1 ? prev.plazo_meses : 12
+                                            }))}
+                                            className={`p-3 rounded-xl border text-left transition-all ${
+                                                wonData.tipo_cobro === 'credito'
+                                                    ? 'border-indigo-500 bg-indigo-50/80 shadow-sm ring-1 ring-indigo-500'
+                                                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-1.5 text-xs font-black text-indigo-800">
+                                                <Clock className="w-3.5 h-3.5 text-indigo-600" /> Prima + Cuotas
+                                            </div>
+                                            <p className="text-[9.5px] text-slate-500 font-medium mt-1 leading-tight">
+                                                Anticipo + saldo financiado
+                                            </p>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setWonData(prev => ({
+                                                ...prev,
+                                                tipo_cobro: 'mensual',
+                                                anticipo: 0,
+                                                plazo_meses: 12
+                                            }))}
+                                            className={`p-3 rounded-xl border text-left transition-all ${
+                                                wonData.tipo_cobro === 'mensual'
+                                                    ? 'border-purple-500 bg-purple-50/80 shadow-sm ring-1 ring-purple-500'
+                                                    : 'border-slate-200 bg-white hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-1.5 text-xs font-black text-purple-800">
+                                                <RefreshCw className="w-3.5 h-3.5 text-purple-600" /> Suscripción
+                                            </div>
+                                            <p className="text-[9.5px] text-slate-500 font-medium mt-1 leading-tight">
+                                                Recurrencia mensual SaaS
+                                            </p>
+                                        </button>
+                                    </div>
                                 </div>
+
+                                {/* Opciones Dinámicas según la modalidad */}
+                                {wonData.tipo_cobro === 'credito' && (
+                                    <div className="bg-indigo-50/60 border border-indigo-100/80 rounded-2xl p-4 space-y-4 animate-in fade-in duration-200">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            {/* Prima / Anticipo */}
+                                            <div className="space-y-1.5">
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-[10.5px] font-black text-indigo-900 uppercase tracking-wider block">
+                                                        Prima / Anticipo Hoy ($)
+                                                    </label>
+                                                    <span className="text-[9px] font-bold text-indigo-600">
+                                                        {wonData.closing_amount > 0 ? `${Math.round(((wonData.anticipo || 0) / wonData.closing_amount) * 100)}%` : '0%'}
+                                                    </span>
+                                                </div>
+                                                <div className="relative">
+                                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-black">
+                                                        $
+                                                    </div>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max={wonData.closing_amount}
+                                                        step="any"
+                                                        value={wonData.anticipo === 0 ? '' : wonData.anticipo}
+                                                        onChange={(e) => setWonData(prev => ({ ...prev, anticipo: parseFloat(e.target.value) || 0 }))}
+                                                        placeholder="0.00"
+                                                        className="w-full pl-7 pr-3 py-2 bg-white border border-indigo-200 rounded-xl text-xs font-black text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                                    />
+                                                </div>
+                                                {/* Botones de porcentaje rápido */}
+                                                <div className="flex gap-1.5 pt-1">
+                                                    {[0, 0.1, 0.2, 0.3, 0.5].map(pct => (
+                                                        <button
+                                                            key={pct}
+                                                            type="button"
+                                                            onClick={() => setWonData(prev => ({
+                                                                ...prev,
+                                                                anticipo: Math.round(prev.closing_amount * pct)
+                                                            }))}
+                                                            className="px-2 py-0.5 rounded-md bg-white border border-indigo-200/80 hover:bg-indigo-100/70 text-[9px] font-black text-indigo-700 transition-colors"
+                                                        >
+                                                            {pct === 0 ? '$0' : `${pct * 100}%`}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Plazo en Meses */}
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10.5px] font-black text-indigo-900 uppercase tracking-wider block">
+                                                    Plazo de Financiamiento
+                                                </label>
+                                                <div className="flex gap-1">
+                                                    {[3, 6, 12, 18, 24].map(meses => (
+                                                        <button
+                                                            key={meses}
+                                                            type="button"
+                                                            onClick={() => setWonData(prev => ({ ...prev, plazo_meses: meses }))}
+                                                            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all border ${
+                                                                wonData.plazo_meses === meses
+                                                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                                                    : 'bg-white text-indigo-900 border-indigo-200/70 hover:bg-indigo-100/50'
+                                                            }`}
+                                                        >
+                                                            {meses}m
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <p className="text-[9px] text-indigo-600 font-medium pt-1">
+                                                    Financiamiento a {wonData.plazo_meses} cuotas mensuales
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Smart Real-time Financial Breakdown Card */}
+                                <div className="bg-slate-900 text-white rounded-2xl p-4 space-y-2.5 shadow-md">
+                                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                            <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Proyección Contable Inmediata
+                                        </span>
+                                        <span className="text-[10px] font-mono font-bold text-slate-300">
+                                            Total: ${(wonData.closing_amount || 0).toLocaleString()}
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-2 pt-1 text-center">
+                                        <div className="bg-white/5 p-2 rounded-xl border border-white/10">
+                                            <p className="text-[8.5px] font-extrabold text-emerald-400 uppercase tracking-wider">
+                                                💵 Entra Hoy (Caja)
+                                            </p>
+                                            <p className="text-sm font-black font-mono text-emerald-300 mt-0.5">
+                                                ${(wonData.tipo_cobro === 'contado' 
+                                                    ? wonData.closing_amount 
+                                                    : (wonData.anticipo || 0)
+                                                ).toLocaleString()}
+                                            </p>
+                                            <p className="text-[7.5px] text-slate-400 font-medium">Capitalización</p>
+                                        </div>
+
+                                        <div className="bg-white/5 p-2 rounded-xl border border-white/10">
+                                            <p className="text-[8.5px] font-extrabold text-indigo-400 uppercase tracking-wider">
+                                                🔄 MRR Recurrente
+                                            </p>
+                                            <p className="text-sm font-black font-mono text-indigo-300 mt-0.5">
+                                                ${(wonData.tipo_cobro === 'credito' && wonData.plazo_meses > 0
+                                                    ? Math.round(Math.max(0, wonData.closing_amount - (wonData.anticipo || 0)) / wonData.plazo_meses)
+                                                    : (wonData.tipo_cobro === 'mensual' ? wonData.closing_amount : 0)
+                                                ).toLocaleString()}<span className="text-[9px] font-normal text-slate-400">/m</span>
+                                            </p>
+                                            <p className="text-[7.5px] text-slate-400 font-medium">
+                                                {wonData.tipo_cobro === 'credito' ? `${wonData.plazo_meses} meses` : wonData.tipo_cobro === 'mensual' ? 'Mensual' : 'N/A'}
+                                            </p>
+                                        </div>
+
+                                        <div className="bg-white/5 p-2 rounded-xl border border-white/10">
+                                            <p className="text-[8.5px] font-extrabold text-amber-400 uppercase tracking-wider">
+                                                ⏳ Por Cobrar (CxC)
+                                            </p>
+                                            <p className="text-sm font-black font-mono text-amber-300 mt-0.5">
+                                                ${(wonData.tipo_cobro === 'contado' 
+                                                    ? 0 
+                                                    : Math.max(0, wonData.closing_amount - (wonData.anticipo || 0))
+                                                ).toLocaleString()}
+                                            </p>
+                                            <p className="text-[7.5px] text-slate-400 font-medium">Saldo pendiente</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footer Buttons */}
+                            <div className="bg-slate-50 px-6 py-4 flex gap-3 justify-end border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsWonModalOpen(false);
+                                        setPendingWonStatus(null);
+                                    }}
+                                    className="px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider text-slate-600 hover:bg-slate-200/70 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmWon}
+                                    className="px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:opacity-95 text-white transition-all shadow-md shadow-emerald-500/20 flex items-center gap-2"
+                                >
+                                    <Check className="w-4 h-4" /> Guardar y Cerrar
+                                </button>
                             </div>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
             {/* Loss Modal */}
             {isLossModalOpen && selectedLead && (
