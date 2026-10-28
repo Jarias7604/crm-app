@@ -334,10 +334,10 @@ class CotizadorService {
                     tipo: esHibrido
                         ? 'Implementación'
                         : (item.tipo === 'modulo' ? 'Módulo' : (item.tipo === 'equipo' ? 'Equipo' : (item.tipo === 'partes' ? 'Partes' : 'Servicio'))),
-                    nombre: esHibrido ? `${item.nombre} (Setup Inicial)` : item.nombre,
+                    nombre: esHibrido ? 'Implementación' : item.nombre,
                     precio_anual: item.pago_unico,
                     precio_mensual: 0,
-                    descripcion: esHibrido ? 'Costo inicial de configuración e inducción (Pago único)' : (item.descripcion || 'Pago único'),
+                    descripcion: esHibrido ? 'Configuración inicial, capacitación (Pago único)' : (item.descripcion || 'Pago único'),
                     cantidad: item.cantidad_default,
                     precio_unitario: item.precio_unitario,
                     unidad: item.unidad
@@ -351,7 +351,7 @@ class CotizadorService {
                 desglose.push({
                     es_pago_unico: false,
                     tipo: item.tipo === 'modulo' ? 'Módulo' : 'Servicio',
-                    nombre: esHibrido ? `${item.nombre} (Recurrente)` : item.nombre,
+                    nombre: item.nombre,
                     precio_anual: precio,
                     precio_mensual: precio / 12,
                     descripcion: item.descripcion || `${cantidad_dtes.toLocaleString()} DTEs × $${item.precio_por_dte}`
@@ -362,10 +362,10 @@ class CotizadorService {
                 desglose.push({
                     es_pago_unico: false,
                     tipo: item.tipo === 'modulo' ? 'Módulo' : (item.tipo === 'plan' ? 'Plan' : 'Suscripción'),
-                    nombre: esHibrido ? `${item.nombre} (Suscripción)` : item.nombre,
+                    nombre: item.nombre,
                     precio_anual: precio,
                     precio_mensual: item.precio_mensual || precio / 12,
-                    descripcion: item.descripcion || 'Recurrente'
+                    descripcion: item.descripcion || (item.precio_anual > 0 ? 'Suscripción anual' : 'Suscripción mensual')
                 });
             }
         });

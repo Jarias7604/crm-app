@@ -342,8 +342,8 @@ export const pdfService = {
                 
                 if (pagoUnicoMonto > 0 && costoAnual > 0) {
                     // Ítem Híbrido: desglosar suscripción recurrente y setup inicial de forma transparente
-                    drawRow(`${m.nombre} (Suscripción)`, costoAnual, false, m.descripcion);
-                    drawRow(`${m.nombre} (Setup Inicial)`, pagoUnicoMonto, true, 'Configuración y setup inicial (Pago único)');
+                    drawRow(m.nombre, costoAnual, false, m.descripcion);
+                    drawRow('Implementación', pagoUnicoMonto, true, 'Configuración inicial, capacitación (Pago único)');
                 } else if (pagoUnicoMonto > 0) {
                     drawRow(m.nombre, pagoUnicoMonto, true, m.descripcion);
                 } else {

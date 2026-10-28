@@ -459,7 +459,7 @@ export default function CotizadorPro() {
 
             return {
                 ...item,
-                pago_unico: isHibrido ? item.pago_unico : (esPagoUnico ? calculatedTotal : 0),
+                pago_unico: isHibrido ? (implementationOverride !== null && !formData.paquete_id ? implementationOverride : item.pago_unico) : (esPagoUnico ? calculatedTotal : 0),
                 precio_anual: isHibrido ? calculatedTotal : (esPagoUnico ? 0 : calculatedTotal),
                 precio_mensual: isHibrido ? (item.precio_mensual || calculatedTotal / 12) : (esPagoUnico ? item.precio_mensual : calculatedTotal / 12),
                 precio_por_dte: 0,
