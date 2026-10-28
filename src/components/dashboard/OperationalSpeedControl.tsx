@@ -6,7 +6,7 @@ import {
     CheckCircle2, PhoneCall, Sparkles, Timer, History,
     BarChart3, Layers, Globe, Calendar, Filter,
     Package, Settings, Check, ChevronDown, X, Calculator,
-    Info, BookOpen, ShieldCheck
+    Info, BookOpen, ShieldCheck, Sliders, Target
 } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 
@@ -141,6 +141,26 @@ export function OperationalSpeedControl({
 }: OperationalSpeedControlProps) {
     const navigate = useNavigate();
 
+    // ── Meta KPI de Tiempo de Contacto (Default: 24 horas = 1440 min) ───────────
+    const [slaTargetMinutes, setSlaTargetMinutes] = useState<number>(() => {
+        try {
+            const saved = localStorage.getItem('dashboard_sla_target_minutes');
+            return saved ? parseInt(saved) : 1440; // 24 horas por defecto
+        } catch {
+            return 1440;
+        }
+    });
+
+    const [isSlaTargetDropdownOpen, setIsSlaTargetDropdownOpen] = useState(false);
+
+    const handleSlaTargetChange = (minutes: number) => {
+        setSlaTargetMinutes(minutes);
+        try {
+            localStorage.setItem('dashboard_sla_target_minutes', minutes.toString());
+        } catch (e) {}
+        setIsSlaTargetDropdownOpen(false);
+    };
+
     // ── Alcance temporal: 'all_time' (Histórico integral completo) vs 'period' (Filtro del Dashboard) ──
     const [timeScope, setTimeScope] = useState<'all_time' | 'period'>('all_time');
 
@@ -191,7 +211,7 @@ export function OperationalSpeedControl({
         } catch (e) {}
     };
 
-    // ── Dropdown Popover de Productos ─────────────────────────────────────────
+    // ── Dropdowns de Productos y Meta SLA ───────────────────────────────────────
     const [activeDropdown, setActiveDropdown] = useState<'header' | 'speed' | 'radar' | 'risk' | null>(null);
 
     useEffect(() => {
@@ -200,14 +220,15 @@ export function OperationalSpeedControl({
             if (!target.closest('.product-dropdown-container')) {
                 setActiveDropdown(null);
             }
+            if (!target.closest('.sla-target-dropdown-container')) {
+                setIsSlaTargetDropdownOpen(false);
+            }
         };
-        if (activeDropdown) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
+        document.addEventListener('mousedown', handleClickOutside);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [activeDropdown]);
+    }, []);
 
     // ── Modal de Lógica y Fórmulas ────────────────────────────────────────────
     const [isLogicModalOpen, setIsLogicModalOpen] = useState(false);
@@ -398,7 +419,7 @@ export function OperationalSpeedControl({
                     lead,
                     type: 'contacted',
                     elapsedMinutes,
-                    withinSla: elapsedMinutes <= 15
+                    withinSla: elapsedMinutes <= slaTargetMinutes
                 };
                 allAnalyzed.push(item);
                 attendedOnly.push(item);
@@ -409,7 +430,7 @@ export function OperationalSpeedControl({
                     lead,
                     type: 'pending',
                     elapsedMinutes,
-                    withinSla: elapsedMinutes <= 15
+                    withinSla: elapsedMinutes <= slaTargetMinutes
                 };
                 allAnalyzed.push(item);
                 pendingOnly.push(item);
@@ -422,17 +443,23 @@ export function OperationalSpeedControl({
         if (viewMode === 'attended') activeDataset = attendedOnly;
 
         // Distribución en los 4 Tramos del Radar de Envejecimiento
-        const fresh: AnalyzedLead[] = [];      // < 15 min (Ventana Óptima / Meta SLA)
+        const fresh: AnalyzedLead[] = [];      // < 15 min (Ventana Óptima)
         const warm: AnalyzedLead[] = [];       // 15m - 2h (Atención en Turno)
-        const atRisk: AnalyzedLead[] = [];     // 2h - 12h (Atención Tardía / En Riesgo)
-        const critical: AnalyzedLead[] = [];   // > 12h o > 24h (Demora Crítica / Abandono)
+        const atRisk: AnalyzedLead[] = [];     // 2h - 12h (Atención Tardía)
+        const critical: AnalyzedLead[] = [];   // > 12h o > 24h (Demora Crítica)
+
+        const withinSlaItems: AnalyzedLead[] = [];
+        const exceededSlaItems: AnalyzedLead[] = [];
 
         let totalMinutes = 0;
-        let withinSlaCount = 0;
 
         activeDataset.forEach(item => {
             totalMinutes += item.elapsedMinutes;
-            if (item.withinSla) withinSlaCount++;
+            if (item.withinSla) {
+                withinSlaItems.push(item);
+            } else {
+                exceededSlaItems.push(item);
+            }
 
             if (item.elapsedMinutes <= 15) {
                 fresh.push(item);
@@ -447,8 +474,9 @@ export function OperationalSpeedControl({
 
         const totalCount = activeDataset.length;
         const avgMinutes = totalCount > 0 ? Math.round(totalMinutes / totalCount) : 0;
+        const withinSlaCount = withinSlaItems.length;
+        const exceededSlaCount = exceededSlaItems.length;
         const slaComplianceRate = totalCount > 0 ? Math.round((withinSlaCount / totalCount) * 100) : 0;
-        const exceededSlaCount = totalCount - withinSlaCount;
 
         // Prospectos en riesgo financiero: ÚNICAMENTE prospectos activos (no cerrados, no clientes, no descartados)
         const highRiskItems = [...atRisk, ...critical].filter(item => 
@@ -467,6 +495,8 @@ export function OperationalSpeedControl({
             withinSlaCount,
             exceededSlaCount,
             slaComplianceRate,
+            withinSlaLeadIds: withinSlaItems.map(i => i.lead.id),
+            exceededSlaLeadIds: exceededSlaItems.map(i => i.lead.id),
             fresh: { items: fresh, count: fresh.length, pct: totalCount > 0 ? Math.round((fresh.length / totalCount) * 100) : 0 },
             warm: { items: warm, count: warm.length, pct: totalCount > 0 ? Math.round((warm.length / totalCount) * 100) : 0 },
             atRisk: { items: atRisk, count: atRisk.length, pct: totalCount > 0 ? Math.round((atRisk.length / totalCount) * 100) : 0 },
@@ -474,7 +504,7 @@ export function OperationalSpeedControl({
             highRiskLeads,
             allAnalyzedCount: allAnalyzed.length
         };
-    }, [filteredEffectiveLeads, followUpMap, viewMode]);
+    }, [filteredEffectiveLeads, followUpMap, viewMode, slaTargetMinutes]);
 
     // ── 3. Métricas Financieras y Capital en Riesgo (CFO / CEO) ────────────────
     const financialStats = useMemo(() => {
@@ -535,6 +565,70 @@ export function OperationalSpeedControl({
             return effectiveProducts.find(p => p.id === id)?.name || id;
         }).join(', ');
     }, [effectiveProductFilter, effectiveProducts]);
+
+    // ── Opciones Disponibles para la Meta SLA KPI ─────────────────────────────
+    const SLA_OPTIONS = [
+        { label: '15 Minutos (Ventana de Oro)', minutes: 15, tag: 'Inmediato' },
+        { label: '1 Hora (Atención Rápida)', minutes: 60, tag: 'Rápido' },
+        { label: '2 Horas (Mismo Turno)', minutes: 120, tag: 'Turno' },
+        { label: '4 Horas (Media Jornada)', minutes: 240, tag: 'Medio Día' },
+        { label: '12 Horas (Mismo Día)', minutes: 720, tag: 'Día' },
+        { label: '24 Horas (1 Día Hábil)', minutes: 1440, tag: 'Estándar', isRecommended: true },
+        { label: '48 Horas (2 Días Hábiles)', minutes: 2880, tag: 'Flexible' },
+    ];
+
+    // ── Menú Desplegable de Configuración de Meta SLA ─────────────────────────
+    const renderSlaTargetDropdown = () => (
+        <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-[9999] py-2 animate-in fade-in zoom-in-95"
+        >
+            <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <Target className="w-3.5 h-3.5 text-indigo-600" />
+                    Configurar Meta SLA (KPI)
+                </span>
+                <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                    Admin
+                </span>
+            </div>
+
+            <div className="p-2 space-y-1">
+                {SLA_OPTIONS.map(opt => {
+                    const isSelected = slaTargetMinutes === opt.minutes;
+                    return (
+                        <button
+                            key={opt.minutes}
+                            onClick={() => handleSlaTargetChange(opt.minutes)}
+                            className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-between ${
+                                isSelected ? 'bg-indigo-600 text-white font-bold shadow-sm' : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                                    isSelected ? 'border-white bg-white text-indigo-600' : 'border-slate-300'
+                                }`}>
+                                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />}
+                                </div>
+                                <span>{opt.label}</span>
+                            </div>
+                            {opt.isRecommended && (
+                                <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
+                                    isSelected ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                    Recomendado
+                                </span>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+            
+            <div className="px-3 py-2 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-500 leading-snug">
+                💡 Los administradores pueden cambiar este umbral en cualquier momento para medir el cumplimiento real de su equipo.
+            </div>
+        </div>
+    );
 
     // ── Componente Reutilizable: Menú Desplegable de Selección de Productos ────
     const renderProductDropdownMenu = () => (
@@ -826,12 +920,12 @@ export function OperationalSpeedControl({
                                         Speed-to-Lead (SLA)
                                         <InfoTip 
                                             title="Lógica Speed-to-Lead (SLA)"
-                                            text="Mide el tiempo real entre la llegada del prospecto al CRM y su primer contacto. Si el lead sigue sin atender, se calcula su tiempo de espera actual acumulado."
-                                            formula="Promedio = Σ(Tiempo de contacto o espera) ÷ Total de Leads"
+                                            text={`Mide el tiempo real entre la llegada del prospecto y su primer contacto. Evalúa si el equipo está cumpliendo la meta definida por el admin (${formatDuration(slaTargetMinutes)}).`}
+                                            formula="Promedio = Σ(Tiempo de contacto o espera) ÷ Total Leads"
                                             bullets={[
+                                                `Meta Actual: ≤ ${formatDuration(slaTargetMinutes)} (Configurable con el botón 'Meta SLA').`,
                                                 'Leads atendidos: primer contacto (llamada o seguimiento) menos fecha de creación.',
                                                 'Leads sin atender: tiempo transcurrido desde su llegada hasta este momento.',
-                                                'Meta Óptima: < 15 minutos (Ventana de Oro con 7x mayor conversión).',
                                                 'Excluye Clientes ya ganados (cumplieron su meta comercial).'
                                             ]}
                                             position="bottom"
@@ -847,40 +941,90 @@ export function OperationalSpeedControl({
                                 </div>
                             </div>
                             
-                            <div className="flex items-center gap-1 relative product-dropdown-container">
-                                <span className="bg-indigo-50 text-indigo-600 border border-indigo-100/80 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
-                                    Meta &lt; 15m
-                                </span>
+                            {/* Grupo Superior Derecho: Selector de Meta SLA + Gear de Producto EXACTO como Sin Contactar */}
+                            <div className="flex items-center gap-1.5">
+                                
+                                {/* 🎯 Selector de Meta SLA (ej. 24h, 15m, etc.) */}
+                                <div className="relative sla-target-dropdown-container">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsSlaTargetDropdownOpen(prev => !prev);
+                                        }}
+                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-[9px] font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer"
+                                        title="Haz clic para cambiar la meta de tiempo de contacto (ej. 24h, 15m)"
+                                    >
+                                        <Target className="w-3 h-3 text-indigo-600" />
+                                        <span>Meta &lt; {formatDuration(slaTargetMinutes)}</span>
+                                        <ChevronDown className="w-2.5 h-2.5 text-indigo-500" />
+                                    </button>
+                                    {isSlaTargetDropdownOpen && renderSlaTargetDropdown()}
+                                </div>
 
-                                {/* Botón de engranaje para filtrar producto en esta tarjeta */}
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveDropdown(activeDropdown === 'speed' ? null : 'speed');
-                                    }}
-                                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                                        effectiveProductFilter.length > 0 
-                                            ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-200' 
-                                            : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'
-                                    }`}
-                                    title="Filtrar por Tipo de Producto"
-                                >
-                                    <Settings className="w-3.5 h-3.5" />
-                                </button>
-                                {activeDropdown === 'speed' && renderProductDropdownMenu()}
+                                {/* ⚙️ Gear de Producto (Diseño EXACTO idéntico al card Sin Contactar) */}
+                                <div className="relative product-dropdown-container">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveDropdown(activeDropdown === 'speed' ? null : 'speed');
+                                        }}
+                                        className={`p-2 rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center ${
+                                            effectiveProductFilter.length > 0 
+                                                ? 'bg-rose-600 text-white ring-2 ring-rose-300 shadow-rose-200' 
+                                                : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
+                                        }`}
+                                        title="Filtrar por Tipo de Producto (ERP, Sin Producto, etc.)"
+                                    >
+                                        <Settings className="w-4 h-4 stroke-[2.5]" />
+                                    </button>
+                                    {activeDropdown === 'speed' && renderProductDropdownMenu()}
+                                </div>
                             </div>
                         </div>
 
                         {/* Pill del producto activo */}
                         {renderActiveProductPill()}
 
-                        {/* Métrica Principal */}
-                        <div className="mt-2 mb-4">
+                        {/* ── COMPARATIVA VISUAL: REALIDAD VS KPI META ── */}
+                        {analysis.totalCount > 0 && (
+                            <div className={`p-3 rounded-2xl border transition-all mb-3 ${
+                                analysis.avgMinutes <= slaTargetMinutes
+                                    ? 'bg-emerald-50/90 border-emerald-200 text-emerald-900 shadow-sm'
+                                    : 'bg-rose-50/90 border-rose-200 text-rose-900 shadow-sm'
+                            }`}>
+                                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider mb-1">
+                                    <span className="flex items-center gap-1.5">
+                                        {analysis.avgMinutes <= slaTargetMinutes ? (
+                                            <>
+                                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                                <span className="text-emerald-700">DENTRO DE LA META</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 animate-pulse" />
+                                                <span className="text-rose-700">TENEMOS QUE MEJORAR</span>
+                                            </>
+                                        )}
+                                    </span>
+                                    <span className="font-mono text-[9px] px-2 py-0.5 rounded-full bg-white/90 font-bold border border-black/5 shadow-2xs">
+                                        Meta: ≤ {formatDuration(slaTargetMinutes)}
+                                    </span>
+                                </div>
+                                <p className="text-[11px] font-bold leading-tight">
+                                    {analysis.avgMinutes <= slaTargetMinutes 
+                                        ? `Excelente: la demora promedio (${formatDuration(analysis.avgMinutes)}) cumple el objetivo de ${formatDuration(slaTargetMinutes)}.`
+                                        : `Alerta operativa: la demora promedio (${formatDuration(analysis.avgMinutes)}) supera la meta de ${formatDuration(slaTargetMinutes)} por ${formatDuration(analysis.avgMinutes - slaTargetMinutes)}.`}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Métrica Principal: Demora Promedio */}
+                        <div className="mt-1 mb-3">
                             {analysis.totalCount > 0 ? (
                                 <>
                                     <div className="flex items-baseline gap-2">
                                         <span className={`text-3xl xl:text-4xl font-black tracking-tight ${
-                                            analysis.slaComplianceRate >= 70 ? 'text-slate-900' : analysis.slaComplianceRate >= 30 ? 'text-amber-600' : 'text-rose-600'
+                                            analysis.avgMinutes <= slaTargetMinutes ? 'text-slate-900' : 'text-rose-600'
                                         }`}>
                                             {formatDuration(analysis.avgMinutes)}
                                         </span>
@@ -891,33 +1035,16 @@ export function OperationalSpeedControl({
                                                 text="Suma de minutos transcurridos de todos los prospectos analizados dividido entre el total de prospectos en este filtro."
                                                 formula="Demora Promedio = (Σ Minutos transcurridos) ÷ Total Leads"
                                                 bullets={[
-                                                    `< 15m: Velocidad Óptima (Verde)`,
-                                                    `15m - 2h: Atención en Turno (Ámbar)`,
-                                                    `> 2h: Demora Crítica con riesgo de fuga (Rojo)`
+                                                    `Meta configurada: ≤ ${formatDuration(slaTargetMinutes)}`,
+                                                    `Verde: Dentro de la meta`,
+                                                    `Rojo: Excede la meta`
                                                 ]}
                                                 position="top"
                                             />
                                         </span>
                                     </div>
 
-                                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                                        {analysis.avgMinutes <= 15 ? (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-lg">
-                                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                                Velocidad Óptima (&lt; 15m)
-                                            </span>
-                                        ) : analysis.avgMinutes <= 120 ? (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-lg">
-                                                <Timer className="w-3 h-3 text-amber-600" />
-                                                Atención en Turno (&lt; 2h)
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-200/60 px-2 py-0.5 rounded-lg">
-                                                <AlertTriangle className="w-3 h-3 text-rose-600" />
-                                                Demora Crítica (&gt; 2h)
-                                            </span>
-                                        )}
-
+                                    <div className="mt-1 flex flex-wrap items-center gap-2">
                                         <span className="text-[9px] font-bold text-slate-400">
                                             ({analysis.totalCount} leads analizados)
                                         </span>
@@ -931,19 +1058,74 @@ export function OperationalSpeedControl({
                             )}
                         </div>
 
+                        {/* ── AUDITORÍA 1-CLIC: CUÁLES ESTÁN DENTRO DE LA META Y CUÁLES NO ── */}
+                        <div className="grid grid-cols-2 gap-2 my-3">
+                            {/* Leads Dentro de Meta */}
+                            <div 
+                                onClick={() => handleNavigateWithLeads(analysis.withinSlaLeadIds)}
+                                className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 hover:bg-emerald-100 hover:border-emerald-300 transition-all cursor-pointer group/within shadow-xs"
+                                title="Clic para ver la lista de prospectos que CUMPLIERON la meta"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                        En Meta
+                                    </span>
+                                    <ArrowRight className="w-3 h-3 text-emerald-500 group-hover/within:translate-x-0.5 transition-transform" />
+                                </div>
+                                <div className="flex items-baseline gap-1.5 mt-0.5">
+                                    <span className="text-xl font-black text-emerald-800 font-mono">
+                                        {analysis.withinSlaCount}
+                                    </span>
+                                    <span className="text-[10px] font-black text-emerald-600">
+                                        ({analysis.slaComplianceRate}%)
+                                    </span>
+                                </div>
+                                <p className="text-[8.5px] text-emerald-700 font-semibold mt-0.5 truncate">
+                                    ≤ {formatDuration(slaTargetMinutes)}
+                                </p>
+                            </div>
+
+                            {/* Leads Fuera de Meta */}
+                            <div 
+                                onClick={() => handleNavigateWithLeads(analysis.exceededSlaLeadIds)}
+                                className="p-2.5 rounded-xl bg-rose-50/70 border border-rose-200/80 hover:bg-rose-100 hover:border-rose-300 transition-all cursor-pointer group/exceed shadow-xs"
+                                title="Clic para ver la lista de prospectos que INCUMPLIERON la meta para atacarlos"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-black text-rose-800 uppercase tracking-wider flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3 text-rose-600" />
+                                        Fuera Meta
+                                    </span>
+                                    <ArrowRight className="w-3 h-3 text-rose-500 group-hover/exceed:translate-x-0.5 transition-transform" />
+                                </div>
+                                <div className="flex items-baseline gap-1.5 mt-0.5">
+                                    <span className="text-xl font-black text-rose-800 font-mono">
+                                        {analysis.exceededSlaCount}
+                                    </span>
+                                    <span className="text-[10px] font-black text-rose-600">
+                                        ({100 - analysis.slaComplianceRate}%)
+                                    </span>
+                                </div>
+                                <p className="text-[8.5px] text-rose-700 font-semibold mt-0.5 truncate">
+                                    &gt; {formatDuration(slaTargetMinutes)} (Atacar)
+                                </p>
+                            </div>
+                        </div>
+
                         {/* Cumplimiento SLA Barra */}
                         <div className="space-y-1.5 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
                             <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider">
                                 <span className="text-slate-500 flex items-center gap-1">
-                                    Cumplimiento SLA (&lt; 15m)
+                                    Cumplimiento SLA (&lt; {formatDuration(slaTargetMinutes)})
                                     <InfoTip
                                         title="Cumplimiento de Meta SLA"
-                                        text="Porcentaje de prospectos que recibieron su primer intento de contacto o atención antes de los primeros 15 minutos."
-                                        formula="(Leads con tiempo ≤ 15 min ÷ Total Leads) × 100"
+                                        text={`Porcentaje de prospectos contactados o atendidos dentro del objetivo de ${formatDuration(slaTargetMinutes)}.`}
+                                        formula={`(Leads con tiempo ≤ ${formatDuration(slaTargetMinutes)} ÷ Total Leads) × 100`}
                                         bullets={[
                                             '≥ 70%: Nivel de excelencia comercial.',
-                                            '30% - 69%: Desfase operativo recuperable.',
-                                            '< 30%: Cuello de botella crítico en guardia de ventas.'
+                                            '40% - 69%: Riesgo operativo moderado.',
+                                            '< 40%: Cuello de botella crítico en guardia de ventas.'
                                         ]}
                                         position="top"
                                     />
@@ -951,7 +1133,7 @@ export function OperationalSpeedControl({
                                 <span className={
                                     analysis.slaComplianceRate >= 70 
                                         ? 'text-emerald-600 font-black' 
-                                        : analysis.slaComplianceRate >= 30 
+                                        : analysis.slaComplianceRate >= 40 
                                             ? 'text-amber-600 font-black' 
                                             : 'text-rose-600 font-black'
                                 }>
@@ -962,14 +1144,14 @@ export function OperationalSpeedControl({
                             <div className="h-2 w-full bg-slate-200/70 rounded-full overflow-hidden">
                                 <div 
                                     className={`h-full rounded-full transition-all duration-1000 ${
-                                        analysis.slaComplianceRate >= 70 ? 'bg-emerald-500' : analysis.slaComplianceRate >= 30 ? 'bg-amber-500' : 'bg-rose-500'
+                                        analysis.slaComplianceRate >= 70 ? 'bg-emerald-500' : analysis.slaComplianceRate >= 40 ? 'bg-amber-500' : 'bg-rose-500'
                                     }`}
                                     style={{ width: `${Math.max(5, analysis.slaComplianceRate)}%` }}
                                 />
                             </div>
 
                             <p className="text-[9px] text-slate-400 font-medium">
-                                {analysis.withinSlaCount} de {analysis.totalCount} prospectos contactados o atendidos dentro de los primeros 15 min.
+                                {analysis.withinSlaCount} de {analysis.totalCount} prospectos contactados o atendidos dentro de las {formatDuration(slaTargetMinutes)}.
                             </p>
                         </div>
                     </div>
@@ -978,16 +1160,16 @@ export function OperationalSpeedControl({
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                         {analysis.exceededSlaCount > 0 ? (
                             <div 
-                                onClick={() => handleNavigateWithLeads(financialStats.leadsInRiskIds)}
+                                onClick={() => handleNavigateWithLeads(analysis.exceededSlaLeadIds)}
                                 className="flex items-center gap-1.5 text-[10px] font-black text-rose-600 hover:text-rose-700 cursor-pointer group/link"
                             >
                                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                                <span>{analysis.exceededSlaCount} prospectos fuera de SLA</span>
+                                <span>{analysis.exceededSlaCount} fuera de meta</span>
                                 <ArrowRight className="w-3 h-3 group-hover/link:translate-x-0.5 transition-transform" />
                             </div>
                         ) : (
                             <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> Flujo 100% al día en SLA
+                                <CheckCircle2 className="w-3 h-3" /> Flujo 100% al día en meta
                             </span>
                         )}
                         
@@ -1028,27 +1210,29 @@ export function OperationalSpeedControl({
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-1 relative product-dropdown-container">
-                                <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
+                            <div className="flex items-center gap-1.5">
+                                <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider">
                                     {analysis.totalCount} evaluados
                                 </span>
 
-                                {/* Botón de engranaje para filtrar producto en esta tarjeta */}
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveDropdown(activeDropdown === 'radar' ? null : 'radar');
-                                    }}
-                                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                                        effectiveProductFilter.length > 0 
-                                            ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-200' 
-                                            : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'
-                                    }`}
-                                    title="Filtrar por Tipo de Producto"
-                                >
-                                    <Settings className="w-3.5 h-3.5" />
-                                </button>
-                                {activeDropdown === 'radar' && renderProductDropdownMenu()}
+                                {/* ⚙️ Gear de Producto (Diseño EXACTO idéntico al card Sin Contactar) */}
+                                <div className="relative product-dropdown-container">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveDropdown(activeDropdown === 'radar' ? null : 'radar');
+                                        }}
+                                        className={`p-2 rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center ${
+                                            effectiveProductFilter.length > 0 
+                                                ? 'bg-rose-600 text-white ring-2 ring-rose-300 shadow-rose-200' 
+                                                : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
+                                        }`}
+                                        title="Filtrar por Tipo de Producto (ERP, Sin Producto, etc.)"
+                                    >
+                                        <Settings className="w-4 h-4 stroke-[2.5]" />
+                                    </button>
+                                    {activeDropdown === 'radar' && renderProductDropdownMenu()}
+                                </div>
                             </div>
                         </div>
 
@@ -1198,27 +1382,29 @@ export function OperationalSpeedControl({
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-1 relative product-dropdown-container">
-                                <span className="bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
+                            <div className="flex items-center gap-1.5">
+                                <span className="bg-rose-50 text-rose-700 border border-rose-100 px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider">
                                     CFO Radar
                                 </span>
 
-                                {/* Botón de engranaje para filtrar producto en esta tarjeta */}
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveDropdown(activeDropdown === 'risk' ? null : 'risk');
-                                    }}
-                                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                                        effectiveProductFilter.length > 0 
-                                            ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-200' 
-                                            : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'
-                                    }`}
-                                    title="Filtrar por Tipo de Producto"
-                                >
-                                    <Settings className="w-3.5 h-3.5" />
-                                </button>
-                                {activeDropdown === 'risk' && renderProductDropdownMenu()}
+                                {/* ⚙️ Gear de Producto (Diseño EXACTO idéntico al card Sin Contactar) */}
+                                <div className="relative product-dropdown-container">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveDropdown(activeDropdown === 'risk' ? null : 'risk');
+                                        }}
+                                        className={`p-2 rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center ${
+                                            effectiveProductFilter.length > 0 
+                                                ? 'bg-rose-600 text-white ring-2 ring-rose-300 shadow-rose-200' 
+                                                : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-200'
+                                        }`}
+                                        title="Filtrar por Tipo de Producto (ERP, Sin Producto, etc.)"
+                                    >
+                                        <Settings className="w-4 h-4 stroke-[2.5]" />
+                                    </button>
+                                    {activeDropdown === 'risk' && renderProductDropdownMenu()}
+                                </div>
                             </div>
                         </div>
 
@@ -1385,7 +1571,7 @@ export function OperationalSpeedControl({
                             <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
                                 <div className="flex items-center gap-2 text-indigo-900 font-black text-xs uppercase tracking-wide mb-1.5">
                                     <Zap className="w-4 h-4 text-indigo-600" />
-                                    <span>1. Speed-to-Lead y Cumplimiento SLA (&lt; 15 min)</span>
+                                    <span>1. Speed-to-Lead y Meta KPI Personalizable</span>
                                 </div>
                                 <p className="text-xs text-slate-700 leading-relaxed">
                                     Mide el tiempo transcurrido desde la llegada del prospecto al CRM hasta su <strong>primer contacto real registrado</strong> (llamadas en <code className="text-indigo-700 font-mono">call_activities</code> o seguimientos en <code className="text-indigo-700 font-mono">follow_ups</code>).
@@ -1393,12 +1579,12 @@ export function OperationalSpeedControl({
                                 
                                 <div className="mt-2.5 bg-white p-3 rounded-xl border border-indigo-200/80 font-mono text-xs text-indigo-950 space-y-1">
                                     <div><strong>Fórmula Demora Promedio:</strong> Σ(Minutos transcurridos de cada lead) ÷ Total Leads</div>
-                                    <div><strong>Fórmula Cumplimiento SLA:</strong> (Leads atendidos o en espera ≤ 15 min ÷ Total Leads) × 100</div>
+                                    <div><strong>Fórmula Cumplimiento Meta:</strong> (Leads con tiempo ≤ Meta ÷ Total Leads) × 100</div>
                                 </div>
 
                                 <div className="mt-2.5 text-[11px] text-slate-600 space-y-1">
+                                    <p>• <strong>Meta Personalizable por el Admin:</strong> Puedes definir si tu objetivo es contactar en 15m, 1h, 2h, 4h, 12h o <strong>24 horas</strong>.</p>
                                     <p>• <strong>Prospectos en cola (pendientes):</strong> Se evalúa su tiempo de espera acumulado hasta el momento actual.</p>
-                                    <p>• <strong>Meta &lt; 15m:</strong> Los estudios de conversión demuestran que contactar en los primeros 15 minutos multiplica por 7 la tasa de cierre.</p>
                                 </div>
                             </div>
 
