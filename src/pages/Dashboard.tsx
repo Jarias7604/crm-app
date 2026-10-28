@@ -490,7 +490,7 @@ export default function Dashboard() {
 
 
     // 🔒 Role-based dashboard: collaborators without dashboard_view_company only see their own stats
-    const isSuperAdmin = profile?.role === 'super_admin';
+    const isSuperAdmin = profile?.role === 'super_admin' || (profile as any)?.is_platform_owner;
     const isCompanyAdmin = profile?.role === 'company_admin';
     const isAdmin = isSuperAdmin || isCompanyAdmin;
     const canViewCompanyDashboard = isAdmin || (profile?.permissions?.['dashboard_view_company'] === true);
