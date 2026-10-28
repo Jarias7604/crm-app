@@ -1,10 +1,12 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     Zap, Clock, Flame, AlertTriangle, ShieldAlert, 
     ArrowRight, DollarSign, Users, HelpCircle, 
     CheckCircle2, PhoneCall, Sparkles, Timer, History,
-    BarChart3, Layers, Globe, Calendar, Filter
+    BarChart3, Layers, Globe, Calendar, Filter,
+    Package, Settings, Check, ChevronDown, X, Calculator,
+    Info, BookOpen, ShieldCheck
 } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 
@@ -17,18 +19,112 @@ interface OperationalSpeedControlProps {
     uncontactedLeads: any[];
     averageTicket?: number;
     isLoading?: boolean;
+    availableProducts?: { id: string; name: string; is_active?: boolean }[];
+    selectedProductFilter?: string[];
+    onProductFilterChange?: (products: string[]) => void;
 }
 
-/** InfoTip reusable para tooltips explicativos ejecutivos */
-const InfoTip = ({ text }: { text: string }) => (
-    <div className="relative group/tip inline-flex items-center" onClick={(e) => e.stopPropagation()}>
-        <HelpCircle className="w-3 h-3 text-slate-300 hover:text-indigo-500 cursor-help transition-colors shrink-0" />
-        <div className="pointer-events-none absolute z-[9999] w-64 bg-slate-900 text-white rounded-xl p-3 text-[10px] font-medium leading-relaxed shadow-2xl opacity-0 group-hover/tip:opacity-100 transition-opacity duration-200 bottom-full left-1/2 -translate-x-1/2 mb-2">
-            {text}
-            <div className="absolute w-2 h-2 bg-slate-900 rotate-45 -bottom-1 left-1/2 -translate-x-1/2" />
+/** InfoTip reusable con diseño ejecutivo y soporte de fórmulas y viñetas */
+const InfoTip = ({ 
+    title,
+    text, 
+    formula,
+    bullets,
+    position = 'top' 
+}: { 
+    title?: string;
+    text: string; 
+    formula?: string;
+    bullets?: string[];
+    position?: 'top' | 'bottom' | 'left' | 'right';
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const tipRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleOutside = (e: MouseEvent) => {
+            if (tipRef.current && !tipRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleOutside);
+        return () => document.removeEventListener('mousedown', handleOutside);
+    }, [isOpen]);
+
+    return (
+        <div 
+            ref={tipRef}
+            className="relative inline-flex items-center" 
+            onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(prev => !prev);
+            }}
+            onMouseEnter={() => setIsOpen(true)}
+            onMouseLeave={() => setIsOpen(false)}
+        >
+            <button
+                type="button"
+                className="w-4 h-4 rounded-full flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 cursor-help transition-all focus:outline-none"
+                title="Ver explicación de la lógica de cálculo"
+            >
+                <HelpCircle className="w-3.5 h-3.5" />
+            </button>
+
+            {isOpen && (
+                <div 
+                    onClick={(e) => e.stopPropagation()}
+                    className={`absolute z-[9999] w-72 sm:w-80 bg-slate-900 text-white rounded-2xl p-3.5 text-[11px] leading-relaxed shadow-2xl border border-slate-700/80 animate-in fade-in zoom-in-95 duration-150 ${
+                        position === 'bottom'
+                            ? 'top-full left-1/2 -translate-x-1/2 mt-2'
+                            : position === 'left'
+                                ? 'right-full top-1/2 -translate-y-1/2 mr-2'
+                                : position === 'right'
+                                    ? 'left-full top-1/2 -translate-y-1/2 ml-2'
+                                    : 'bottom-full left-1/2 -translate-x-1/2 mb-2'
+                    }`}
+                >
+                    {title && (
+                        <div className="flex items-center gap-1.5 font-black text-indigo-300 text-xs mb-1.5 pb-1 border-b border-slate-800">
+                            <Calculator className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <span>{title}</span>
+                        </div>
+                    )}
+                    
+                    <p className="text-slate-300 font-medium text-[10.5px] leading-normal">{text}</p>
+                    
+                    {formula && (
+                        <div className="mt-2 p-2 rounded-xl bg-slate-800/90 border border-slate-700 font-mono text-[9.5px] text-amber-300 tracking-tight">
+                            <span className="text-slate-400 text-[8px] uppercase tracking-wider block font-sans font-bold mb-0.5">📐 Fórmula:</span>
+                            {formula}
+                        </div>
+                    )}
+
+                    {bullets && bullets.length > 0 && (
+                        <ul className="mt-2 space-y-1 text-[10px] text-slate-300 border-t border-slate-800/80 pt-1.5">
+                            {bullets.map((b, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5">
+                                    <span className="text-indigo-400 font-bold">•</span>
+                                    <span>{b}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+
+                    <div className={`absolute w-2.5 h-2.5 bg-slate-900 border-slate-700/80 rotate-45 ${
+                        position === 'bottom'
+                            ? '-top-1.5 left-1/2 -translate-x-1/2 border-t border-l'
+                            : position === 'left'
+                                ? '-right-1.5 top-1/2 -translate-y-1/2 border-t border-r'
+                                : position === 'right'
+                                    ? '-left-1.5 top-1/2 -translate-y-1/2 border-b border-l'
+                                    : '-bottom-1.5 left-1/2 -translate-x-1/2 border-b border-r'
+                    }`} />
+                </div>
+            )}
         </div>
-    </div>
-);
+    );
+};
 
 export function OperationalSpeedControl({
     companyId,
@@ -38,7 +134,10 @@ export function OperationalSpeedControl({
     canViewFinancials,
     uncontactedLeads = [],
     averageTicket = 0,
-    isLoading = false
+    isLoading = false,
+    availableProducts = [],
+    selectedProductFilter: selectedProductFilterProp,
+    onProductFilterChange
 }: OperationalSpeedControlProps) {
     const navigate = useNavigate();
 
@@ -48,6 +147,74 @@ export function OperationalSpeedControl({
     // ── Modo de visualización: 'all' (Integral Retroactivo) vs 'queue' (Cola Pendiente) vs 'attended' (Solo Atendidos) ──
     const [viewMode, setViewMode] = useState<'all' | 'queue' | 'attended'>('all');
 
+    // ── Estado del Filtro de Productos (Sincronizado con Dashboard y con LocalStorage) ──
+    const [internalProductFilter, setInternalProductFilter] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('dashboard_uncontacted_product_filter');
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
+
+    const effectiveProductFilter = selectedProductFilterProp !== undefined 
+        ? selectedProductFilterProp 
+        : internalProductFilter;
+
+    const handleProductFilterToggle = (productId: string) => {
+        let newFilter: string[];
+        if (effectiveProductFilter.includes(productId)) {
+            newFilter = effectiveProductFilter.filter(id => id !== productId);
+        } else {
+            newFilter = [...effectiveProductFilter, productId];
+        }
+
+        if (onProductFilterChange) {
+            onProductFilterChange(newFilter);
+        } else {
+            setInternalProductFilter(newFilter);
+        }
+
+        try {
+            localStorage.setItem('dashboard_uncontacted_product_filter', JSON.stringify(newFilter));
+        } catch (e) {}
+    };
+
+    const handleProductFilterClear = () => {
+        if (onProductFilterChange) {
+            onProductFilterChange([]);
+        } else {
+            setInternalProductFilter([]);
+        }
+        try {
+            localStorage.setItem('dashboard_uncontacted_product_filter', JSON.stringify([]));
+        } catch (e) {}
+    };
+
+    // ── Dropdown Popover de Productos ─────────────────────────────────────────
+    const [activeDropdown, setActiveDropdown] = useState<'header' | 'speed' | 'radar' | 'risk' | null>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Element;
+            if (!target.closest('.product-dropdown-container')) {
+                setActiveDropdown(null);
+            }
+        };
+        if (activeDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [activeDropdown]);
+
+    // ── Modal de Lógica y Fórmulas ────────────────────────────────────────────
+    const [isLogicModalOpen, setIsLogicModalOpen] = useState(false);
+
+    // ── Fallback de Productos cargados directamente desde la base de datos ──
+    const [dbProducts, setDbProducts] = useState<{ id: string; name: string; is_active?: boolean }[]>([]);
+
     // ── Datos Reales de la Base de Datos ───────────────────────────────────────
     const [rawLeads, setRawLeads] = useState<any[]>([]);
     const [followUpMap, setFollowUpMap] = useState<Map<string, number>>(new Map());
@@ -55,6 +222,24 @@ export function OperationalSpeedControl({
 
     // ── Respetar modo simulación multi-inquilino ─────────────────────────────
     const effectiveCompanyId = (typeof window !== 'undefined' ? localStorage.getItem('simulated_company_id') : null) || companyId;
+
+    // Cargar productos de la empresa si no fueron provistos como props
+    useEffect(() => {
+        if (!effectiveCompanyId) return;
+        if (availableProducts && availableProducts.length > 0) return;
+
+        supabase
+            .from('lead_products')
+            .select('id, name, is_active')
+            .eq('company_id', effectiveCompanyId)
+            .eq('is_active', true)
+            .order('name', { ascending: true })
+            .then(({ data }) => {
+                if (data) setDbProducts(data);
+            });
+    }, [effectiveCompanyId, availableProducts]);
+
+    const effectiveProducts = (availableProducts && availableProducts.length > 0) ? availableProducts : dbProducts;
 
     useEffect(() => {
         if (!effectiveCompanyId) return;
@@ -64,11 +249,12 @@ export function OperationalSpeedControl({
 
         const fetchOperationalData = async () => {
             try {
-                // 1. Consultar prospectos con columnas 100% estándar de la base de datos
+                // 1. Consultar prospectos con columnas estándar de la base de datos
                 // 🛑 EXCLUIR CLIENTES: Los clientes ya cumplieron su objetivo comercial, no son prospectos en seguimiento
+                // 📦 INCLUIR interested_product_id para filtrar dinámicamente por tipo de producto
                 let qLeads = supabase
                     .from('leads')
-                    .select('id, name, company_name, created_at, last_follow_up_at, status, value, priority, contact_count, assigned_to')
+                    .select('id, name, company_name, created_at, last_follow_up_at, status, value, priority, contact_count, assigned_to, interested_product_id')
                     .eq('company_id', effectiveCompanyId)
                     .neq('status', 'Cliente');
 
@@ -159,7 +345,28 @@ export function OperationalSpeedControl({
         return Array.from(map.values());
     }, [rawLeads, uncontactedLeads]);
 
-    // ── Motor Analítico Retroactivo: Evalúa el 100% de los Prospectos ─────────
+    // ── Conteo de Prospectos por Producto en este conjunto ───────────────────────
+    const leadsCountByProduct = useMemo(() => {
+        const counts: Record<string, number> = {};
+        effectiveLeads.forEach(l => {
+            const key = l.interested_product_id || 'none';
+            counts[key] = (counts[key] || 0) + 1;
+        });
+        return counts;
+    }, [effectiveLeads]);
+
+    // ── Filtrado dinámico por Producto Seleccionado ─────────────────────────────
+    const filteredEffectiveLeads = useMemo(() => {
+        if (!effectiveProductFilter || effectiveProductFilter.length === 0) {
+            return effectiveLeads;
+        }
+        return effectiveLeads.filter(lead => {
+            const key = lead.interested_product_id || 'none';
+            return effectiveProductFilter.includes(key);
+        });
+    }, [effectiveLeads, effectiveProductFilter]);
+
+    // ── Motor Analítico Retroactivo: Evalúa el 100% de los Prospectos Filtrados ──
     const analysis = useMemo(() => {
         const now = Date.now();
 
@@ -175,7 +382,7 @@ export function OperationalSpeedControl({
         const attendedOnly: AnalyzedLead[] = [];
         const pendingOnly: AnalyzedLead[] = [];
 
-        effectiveLeads.forEach(lead => {
+        filteredEffectiveLeads.forEach(lead => {
             const baseTime = new Date(lead.assigned_at || lead.created_at).getTime();
             const fuTime = followUpMap.get(lead.id);
             const firstContactIso = lead.first_follow_up_at || (fuTime ? new Date(fuTime).toISOString() : null) || lead.last_follow_up_at || lead.internal_won_date;
@@ -202,7 +409,7 @@ export function OperationalSpeedControl({
                     lead,
                     type: 'pending',
                     elapsedMinutes,
-                    withinSla: elapsedMinutes <= 15 // si fue creado hace menos de 15m sigue dentro de ventana
+                    withinSla: elapsedMinutes <= 15
                 };
                 allAnalyzed.push(item);
                 pendingOnly.push(item);
@@ -267,7 +474,7 @@ export function OperationalSpeedControl({
             highRiskLeads,
             allAnalyzedCount: allAnalyzed.length
         };
-    }, [effectiveLeads, followUpMap, viewMode]);
+    }, [filteredEffectiveLeads, followUpMap, viewMode]);
 
     // ── 3. Métricas Financieras y Capital en Riesgo (CFO / CEO) ────────────────
     const financialStats = useMemo(() => {
@@ -314,14 +521,159 @@ export function OperationalSpeedControl({
             state: {
                 assignedFilter: assignedTo || 'all',
                 leadIds: leadIds,
-                pipelineView: 'all'
+                pipelineView: 'all',
+                productFilter: effectiveProductFilter.length === 0 ? 'all' : (effectiveProductFilter.length === 1 ? effectiveProductFilter[0] : effectiveProductFilter)
             }
         });
     };
 
+    // ── Texto de Etiqueta de Productos Activos ────────────────────────────────
+    const activeProductLabels = useMemo(() => {
+        if (effectiveProductFilter.length === 0) return 'Todos los productos';
+        return effectiveProductFilter.map(id => {
+            if (id === 'none') return 'Sin producto';
+            return effectiveProducts.find(p => p.id === id)?.name || id;
+        }).join(', ');
+    }, [effectiveProductFilter, effectiveProducts]);
+
+    // ── Componente Reutilizable: Menú Desplegable de Selección de Productos ────
+    const renderProductDropdownMenu = () => (
+        <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-[9999] py-2 animate-in fade-in zoom-in-95 max-h-80 overflow-y-auto"
+        >
+            <div className="px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-indigo-600" />
+                    Filtrar por Producto
+                </span>
+                {effectiveProductFilter.length > 0 && (
+                    <button
+                        onClick={handleProductFilterClear}
+                        className="text-[9px] font-bold text-rose-600 hover:text-rose-800 transition-colors"
+                    >
+                        Limpiar ({effectiveProductFilter.length})
+                    </button>
+                )}
+            </div>
+
+            {/* Opción 1: Todos los productos */}
+            <button
+                onClick={(e) => {
+                    e.stopPropagation();
+                    handleProductFilterClear();
+                    setActiveDropdown(null);
+                }}
+                className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors flex items-center justify-between ${
+                    effectiveProductFilter.length === 0 ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:bg-slate-50'
+                }`}
+            >
+                <div className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                        effectiveProductFilter.length === 0 ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 bg-white'
+                    }`}>
+                        {effectiveProductFilter.length === 0 && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                    <span className="font-bold">Todos los productos</span>
+                </div>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                    effectiveProductFilter.length === 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'
+                }`}>
+                    {effectiveLeads.length}
+                </span>
+            </button>
+
+            <div className="border-t border-slate-100 my-1" />
+
+            {/* Opción 2: Cada producto disponible */}
+            {effectiveProducts.map(prod => {
+                const isChecked = effectiveProductFilter.includes(prod.id);
+                const count = leadsCountByProduct[prod.id] || 0;
+                return (
+                    <button
+                        key={prod.id}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleProductFilterToggle(prod.id);
+                        }}
+                        className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors flex items-center justify-between ${
+                            isChecked ? 'bg-indigo-50/80 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                        }`}
+                    >
+                        <div className="flex items-center gap-2 min-w-0">
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
+                                isChecked ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 bg-white'
+                            }`}>
+                                {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                            <span className="truncate">{prod.name}</span>
+                        </div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
+                            isChecked ? 'bg-indigo-100 text-indigo-700' : count > 0 ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-300'
+                        }`}>
+                            {count}
+                        </span>
+                    </button>
+                );
+            })}
+
+            {/* Opción 3: Leads sin producto asignado */}
+            {(leadsCountByProduct['none'] || 0) > 0 && (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        handleProductFilterToggle('none');
+                    }}
+                    className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors flex items-center justify-between ${
+                        effectiveProductFilter.includes('none') ? 'bg-indigo-50/80 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                >
+                    <div className="flex items-center gap-2 min-w-0">
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
+                            effectiveProductFilter.includes('none') ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 bg-white'
+                        }`}>
+                            {effectiveProductFilter.includes('none') && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                        <span className="truncate italic text-slate-500 font-medium">Sin producto</span>
+                    </div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black shrink-0 ${
+                        effectiveProductFilter.includes('none') ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                        {leadsCountByProduct['none']}
+                    </span>
+                </button>
+            )}
+        </div>
+    );
+
+    // ── Pill Badge de Producto Activo Reutilizable en Tarjetas ─────────────────
+    const renderActiveProductPill = () => {
+        if (effectiveProductFilter.length === 0) return null;
+        return (
+            <div className="flex flex-wrap items-center gap-1 mb-2.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-50 border border-rose-200/90 text-rose-800 text-[10px] font-black tracking-wide shadow-sm animate-in fade-in">
+                    <Package className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    <span className="truncate max-w-[170px]" title={activeProductLabels}>
+                        {activeProductLabels}
+                    </span>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleProductFilterClear();
+                        }}
+                        className="hover:bg-rose-200 rounded p-0.5 ml-0.5 cursor-pointer text-rose-700 transition-colors"
+                        title="Ver todos los productos"
+                    >
+                        ✕
+                    </button>
+                </span>
+            </div>
+        );
+    };
+
     return (
         <div className="lg:col-span-12 relative z-0">
-            {/* Header del bloque ejecutivo con selectores Retroactivos */}
+            {/* Header del bloque ejecutivo con selectores Retroactivos y Filtro de Producto */}
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 mb-3 px-1">
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
@@ -332,10 +684,51 @@ export function OperationalSpeedControl({
                         <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
                         {timeScope === 'all_time' ? 'Histórico Integral Completo' : 'Período Filtrado'} · {analysis.allAnalyzedCount} Leads
                     </span>
+
+                    {/* Botón de Ayuda General: ¿Cómo se calculan los datos? */}
+                    <button
+                        onClick={() => setIsLogicModalOpen(true)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-50/90 hover:bg-indigo-100 text-indigo-700 font-extrabold text-[9px] uppercase tracking-wider transition-all border border-indigo-200/80 shadow-sm cursor-pointer ml-1"
+                        title="Ver detalle completo de las fórmulas y reglas de cálculo del sistema"
+                    >
+                        <HelpCircle className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Lógica de Cálculo</span>
+                    </button>
                 </div>
 
-                {/* Controles de Vista y Alcance */}
+                {/* Controles de Vista, Alcance y Filtro de Productos */}
                 <div className="flex flex-wrap items-center gap-2">
+
+                    {/* 📦 Selector de Productos (Estilo idéntico a card Sin Contactar) */}
+                    <div className="relative product-dropdown-container">
+                        <button
+                            onClick={() => setActiveDropdown(activeDropdown === 'header' ? null : 'header')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border shadow-sm cursor-pointer ${
+                                effectiveProductFilter.length > 0
+                                    ? 'bg-rose-50 text-rose-700 border-rose-300 ring-2 ring-rose-200'
+                                    : 'bg-white text-slate-600 border-slate-200/80 hover:bg-slate-50'
+                            }`}
+                            title="Filtrar métricas de velocidad por tipo de producto"
+                        >
+                            <Package className={`w-3.5 h-3.5 ${effectiveProductFilter.length > 0 ? 'text-rose-600' : 'text-slate-500'}`} />
+                            <span className="max-w-[130px] truncate">
+                                {effectiveProductFilter.length === 0 
+                                    ? 'Todos los Productos' 
+                                    : effectiveProductFilter.length === 1 
+                                        ? (effectiveProductFilter[0] === 'none' ? 'Sin producto' : effectiveProducts.find(p => p.id === effectiveProductFilter[0])?.name || '1 producto')
+                                        : `${effectiveProductFilter.length} productos`}
+                            </span>
+                            <span className={`text-[8px] px-1.5 py-0.2 rounded-full font-black ${
+                                effectiveProductFilter.length > 0 ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                                {analysis.allAnalyzedCount}
+                            </span>
+                            <ChevronDown className="w-3 h-3 text-slate-400" />
+                        </button>
+
+                        {activeDropdown === 'header' && renderProductDropdownMenu()}
+                    </div>
+
                     {/* Selector de Alcance Temporal (All-Time vs Período) */}
                     <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shadow-inner">
                         <button
@@ -429,9 +822,20 @@ export function OperationalSpeedControl({
                                     <Zap className="w-4 h-4 fill-white" />
                                 </div>
                                 <div>
-                                    <h3 className="text-[11px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                                    <h3 className="text-[11px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                                         Speed-to-Lead (SLA)
-                                        <InfoTip text="Mide el tiempo real entre la llegada del prospecto al CRM y su primer contacto. Evalúa de forma retroactiva el cumplimiento de la meta de contacto en menos de 15 minutos." />
+                                        <InfoTip 
+                                            title="Lógica Speed-to-Lead (SLA)"
+                                            text="Mide el tiempo real entre la llegada del prospecto al CRM y su primer contacto. Si el lead sigue sin atender, se calcula su tiempo de espera actual acumulado."
+                                            formula="Promedio = Σ(Tiempo de contacto o espera) ÷ Total de Leads"
+                                            bullets={[
+                                                'Leads atendidos: primer contacto (llamada o seguimiento) menos fecha de creación.',
+                                                'Leads sin atender: tiempo transcurrido desde su llegada hasta este momento.',
+                                                'Meta Óptima: < 15 minutos (Ventana de Oro con 7x mayor conversión).',
+                                                'Excluye Clientes ya ganados (cumplieron su meta comercial).'
+                                            ]}
+                                            position="bottom"
+                                        />
                                     </h3>
                                     <p className="text-[10px] text-slate-400 font-medium">
                                         {viewMode === 'all' 
@@ -442,10 +846,33 @@ export function OperationalSpeedControl({
                                     </p>
                                 </div>
                             </div>
-                            <span className="bg-indigo-50 text-indigo-600 border border-indigo-100/80 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
-                                Meta &lt; 15m
-                            </span>
+                            
+                            <div className="flex items-center gap-1 relative product-dropdown-container">
+                                <span className="bg-indigo-50 text-indigo-600 border border-indigo-100/80 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
+                                    Meta &lt; 15m
+                                </span>
+
+                                {/* Botón de engranaje para filtrar producto en esta tarjeta */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDropdown(activeDropdown === 'speed' ? null : 'speed');
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                                        effectiveProductFilter.length > 0 
+                                            ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-200' 
+                                            : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'
+                                    }`}
+                                    title="Filtrar por Tipo de Producto"
+                                >
+                                    <Settings className="w-3.5 h-3.5" />
+                                </button>
+                                {activeDropdown === 'speed' && renderProductDropdownMenu()}
+                            </div>
                         </div>
+
+                        {/* Pill del producto activo */}
+                        {renderActiveProductPill()}
 
                         {/* Métrica Principal */}
                         <div className="mt-2 mb-4">
@@ -457,8 +884,19 @@ export function OperationalSpeedControl({
                                         }`}>
                                             {formatDuration(analysis.avgMinutes)}
                                         </span>
-                                        <span className="text-[11px] font-bold text-slate-400">
+                                        <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
                                             {viewMode === 'attended' ? 'respuesta promedio' : 'demora / espera prom.'}
+                                            <InfoTip
+                                                title="Cálculo de Demora Promedio"
+                                                text="Suma de minutos transcurridos de todos los prospectos analizados dividido entre el total de prospectos en este filtro."
+                                                formula="Demora Promedio = (Σ Minutos transcurridos) ÷ Total Leads"
+                                                bullets={[
+                                                    `< 15m: Velocidad Óptima (Verde)`,
+                                                    `15m - 2h: Atención en Turno (Ámbar)`,
+                                                    `> 2h: Demora Crítica con riesgo de fuga (Rojo)`
+                                                ]}
+                                                position="top"
+                                            />
                                         </span>
                                     </div>
 
@@ -488,7 +926,7 @@ export function OperationalSpeedControl({
                             ) : (
                                 <div className="py-2">
                                     <p className="text-base font-black text-slate-500">Sin datos en este filtro</p>
-                                    <p className="text-[10px] text-slate-400 mt-0.5">Selecciona "Todo el Histórico" para ver la trayectoria global.</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">Selecciona "Todos los productos" o "Todo el Histórico" para ver la trayectoria global.</p>
                                 </div>
                             )}
                         </div>
@@ -496,8 +934,19 @@ export function OperationalSpeedControl({
                         {/* Cumplimiento SLA Barra */}
                         <div className="space-y-1.5 bg-slate-50/80 p-3 rounded-xl border border-slate-100">
                             <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider">
-                                <span className="text-slate-500">
+                                <span className="text-slate-500 flex items-center gap-1">
                                     Cumplimiento SLA (&lt; 15m)
+                                    <InfoTip
+                                        title="Cumplimiento de Meta SLA"
+                                        text="Porcentaje de prospectos que recibieron su primer intento de contacto o atención antes de los primeros 15 minutos."
+                                        formula="(Leads con tiempo ≤ 15 min ÷ Total Leads) × 100"
+                                        bullets={[
+                                            '≥ 70%: Nivel de excelencia comercial.',
+                                            '30% - 69%: Desfase operativo recuperable.',
+                                            '< 30%: Cuello de botella crítico en guardia de ventas.'
+                                        ]}
+                                        position="top"
+                                    />
                                 </span>
                                 <span className={
                                     analysis.slaComplianceRate >= 70 
@@ -525,7 +974,7 @@ export function OperationalSpeedControl({
                         </div>
                     </div>
 
-                    {/* Footer con Alerta Viva */}
+                    {/* Footer con Alerta Viva y Estado de Producto */}
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                         {analysis.exceededSlaCount > 0 ? (
                             <div 
@@ -541,8 +990,11 @@ export function OperationalSpeedControl({
                                 <CheckCircle2 className="w-3 h-3" /> Flujo 100% al día en SLA
                             </span>
                         )}
+                        
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                            Retroactivo
+                            {effectiveProductFilter.length > 0 
+                                ? `• ${analysis.totalCount} EN ${effectiveProductFilter.length === 1 ? (effectiveProductFilter[0] === 'none' ? 'Sin producto' : effectiveProducts.find(p => p.id === effectiveProductFilter[0])?.name || '1 PROD.') : `${effectiveProductFilter.length} PROD.`}` 
+                                : (timeScope === 'all_time' ? 'Histórico Global' : 'Período')}
                         </span>
                     </div>
                 </div>
@@ -556,17 +1008,52 @@ export function OperationalSpeedControl({
                                     <Clock className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <h3 className="text-[11px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                                    <h3 className="text-[11px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                                         Radar de Envejecimiento
-                                        <InfoTip text="Clasifica todos los prospectos del CRM según el tiempo que tardaron en ser contactados o el tiempo que llevan esperando. Permite atacar inmediatamente cuellos de botella." />
+                                        <InfoTip 
+                                            title="Lógica de Tramos de Envejecimiento"
+                                            text="Clasifica el 100% de los prospectos evaluados según su tiempo de respuesta histórico o su tiempo de espera actual."
+                                            formula="Tramo = Intervalo de tiempo transcurrido desde la creación del lead"
+                                            bullets={[
+                                                '< 15 min: Ventana de Oro. Receptividad máxima inmediata.',
+                                                '15m - 2h: Atención en turno. Lead aún caliente.',
+                                                '2h - 12h: Demora tardía. Alto riesgo de que consulte competidores.',
+                                                '> 24h: Demora crítica. Leads con más de 1 día de atraso.',
+                                                'Haz clic en cualquier tramo para ver y atacar esos leads.'
+                                            ]}
+                                            position="bottom"
+                                        />
                                     </h3>
                                     <p className="text-[10px] text-slate-400 font-medium">Distribución por tramo operativo</p>
                                 </div>
                             </div>
-                            <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
-                                {analysis.totalCount} evaluados
-                            </span>
+
+                            <div className="flex items-center gap-1 relative product-dropdown-container">
+                                <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
+                                    {analysis.totalCount} evaluados
+                                </span>
+
+                                {/* Botón de engranaje para filtrar producto en esta tarjeta */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDropdown(activeDropdown === 'radar' ? null : 'radar');
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                                        effectiveProductFilter.length > 0 
+                                            ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-200' 
+                                            : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'
+                                    }`}
+                                    title="Filtrar por Tipo de Producto"
+                                >
+                                    <Settings className="w-3.5 h-3.5" />
+                                </button>
+                                {activeDropdown === 'radar' && renderProductDropdownMenu()}
+                            </div>
                         </div>
+
+                        {/* Pill del producto activo */}
+                        {renderActiveProductPill()}
 
                         {/* Lista de 4 Tramos con Clic Directo */}
                         <div className="space-y-2 mt-2">
@@ -574,6 +1061,7 @@ export function OperationalSpeedControl({
                             <div 
                                 onClick={() => handleNavigateWithLeads(analysis.fresh.items.map(i => i.lead.id))}
                                 className="group/item flex items-center justify-between p-2 rounded-xl hover:bg-emerald-50/70 border border-transparent hover:border-emerald-100 transition-all cursor-pointer"
+                                title="Ver prospectos en la ventana óptima"
                             >
                                 <div className="flex items-center gap-2 min-w-0">
                                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shrink-0" />
@@ -598,6 +1086,7 @@ export function OperationalSpeedControl({
                             <div 
                                 onClick={() => handleNavigateWithLeads(analysis.warm.items.map(i => i.lead.id))}
                                 className="group/item flex items-center justify-between p-2 rounded-xl hover:bg-amber-50/70 border border-transparent hover:border-amber-100 transition-all cursor-pointer"
+                                title="Ver prospectos atendidos en turno"
                             >
                                 <div className="flex items-center gap-2 min-w-0">
                                     <div className="w-2.5 h-2.5 rounded-full bg-amber-400 shadow-sm shrink-0" />
@@ -622,6 +1111,7 @@ export function OperationalSpeedControl({
                             <div 
                                 onClick={() => handleNavigateWithLeads(analysis.atRisk.items.map(i => i.lead.id))}
                                 className="group/item flex items-center justify-between p-2 rounded-xl hover:bg-orange-50/70 border border-transparent hover:border-orange-100 transition-all cursor-pointer"
+                                title="Ver prospectos con atención tardía"
                             >
                                 <div className="flex items-center gap-2 min-w-0">
                                     <div className="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-sm shrink-0" />
@@ -646,6 +1136,7 @@ export function OperationalSpeedControl({
                             <div 
                                 onClick={() => handleNavigateWithLeads(analysis.critical.items.map(i => i.lead.id))}
                                 className="group/item flex items-center justify-between p-2 rounded-xl hover:bg-rose-50/70 border border-transparent hover:border-rose-100 transition-all cursor-pointer"
+                                title="Ver prospectos con demora crítica"
                             >
                                 <div className="flex items-center gap-2 min-w-0">
                                     <div className="w-2.5 h-2.5 rounded-full bg-rose-600 shadow-sm shrink-0" />
@@ -670,7 +1161,9 @@ export function OperationalSpeedControl({
 
                     <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
                         <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                            {timeScope === 'all_time' ? 'Histórico Global' : 'Filtro Actual'}
+                            {effectiveProductFilter.length > 0 
+                                ? `• ${analysis.totalCount} EN ${effectiveProductFilter.length === 1 ? (effectiveProductFilter[0] === 'none' ? 'Sin producto' : effectiveProducts.find(p => p.id === effectiveProductFilter[0])?.name || '1 PROD.') : `${effectiveProductFilter.length} PROD.`}` 
+                                : (timeScope === 'all_time' ? 'Histórico Global' : 'Filtro Actual')}
                         </span>
                         <span className="text-[9px] font-extrabold text-indigo-600">
                             Filtro 1-Clic
@@ -678,7 +1171,7 @@ export function OperationalSpeedControl({
                     </div>
                 </div>
 
-                {/* ── TARJETA 3: Capital en Riesgo & Fuga Comercial ── */}
+                {/* ── TARJETA 3: Capital en Riesgo & Fuga Comercial (CFO Radar) ── */}
                 <div className="bg-white p-5 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/70 flex flex-col justify-between group hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500 relative">
                     <div>
                         <div className="flex justify-between items-start mb-3">
@@ -687,24 +1180,65 @@ export function OperationalSpeedControl({
                                     <ShieldAlert className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <h3 className="text-[11px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1">
+                                    <h3 className="text-[11px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                                         Capital en Riesgo
-                                        <InfoTip text="Impacto económico retroactivo de los prospectos que se demoraron en contactar o están sin atender. Calcula el pipeline comprometido según el valor del prospecto o el ticket promedio de ventas de la empresa." />
+                                        <InfoTip 
+                                            title="Lógica de Capital en Riesgo (CFO)"
+                                            text="Calcula la pérdida potencial y fuga publicitaria de prospectos activos con demora superior a 2 horas."
+                                            formula="Pipeline = Σ Valor real | Pauta = Leads demorados × $15 CAC"
+                                            bullets={[
+                                                '🔒 REGLA ESTRICTA: Excluye clientes ya ganados (como tratos cerrados) y leads descartados/erróneos.',
+                                                'Pipeline: Suma el valor cotizado real en CRM (o proyecta con el ticket promedio).',
+                                                'Pauta en Riesgo: Dinero publicitario (Meta/Google Ads) en peligro de desperdicio.'
+                                            ]}
+                                            position="bottom"
+                                        />
                                     </h3>
                                     <p className="text-[10px] text-slate-400 font-medium">Fuga financiera & CAC</p>
                                 </div>
                             </div>
-                            <span className="bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
-                                CFO Radar
-                            </span>
+
+                            <div className="flex items-center gap-1 relative product-dropdown-container">
+                                <span className="bg-rose-50 text-rose-700 border border-rose-100 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
+                                    CFO Radar
+                                </span>
+
+                                {/* Botón de engranaje para filtrar producto en esta tarjeta */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDropdown(activeDropdown === 'risk' ? null : 'risk');
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                                        effectiveProductFilter.length > 0 
+                                            ? 'bg-rose-600 text-white shadow-md ring-2 ring-rose-200' 
+                                            : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'
+                                    }`}
+                                    title="Filtrar por Tipo de Producto"
+                                >
+                                    <Settings className="w-3.5 h-3.5" />
+                                </button>
+                                {activeDropdown === 'risk' && renderProductDropdownMenu()}
+                            </div>
                         </div>
+
+                        {/* Pill del producto activo */}
+                        {renderActiveProductPill()}
 
                         {/* Métricas Financieras Clave con Ticket Promedio Real */}
                         <div className="grid grid-cols-2 gap-2 mt-2">
                             <div className="bg-rose-50/60 p-2.5 rounded-xl border border-rose-100/60">
-                                <p className="text-[9px] font-black text-rose-700 uppercase tracking-wider mb-0.5">
-                                    Pipeline en Peligro
-                                </p>
+                                <div className="flex items-center justify-between mb-0.5">
+                                    <p className="text-[9px] font-black text-rose-700 uppercase tracking-wider">
+                                        Pipeline en Peligro
+                                    </p>
+                                    <InfoTip
+                                        title="Cálculo del Pipeline en Peligro"
+                                        text="Suma del valor cotizado en CRM de todos los prospectos activos demorados (> 2 horas). Si el valor no está configurado, proyecta multiplicando por el Ticket Promedio."
+                                        formula="Σ(Valor del Lead en BD) o (Leads demorados × Ticket Promedio)"
+                                        position="top"
+                                    />
+                                </div>
                                 <p className="text-xl font-black text-rose-700 font-mono">
                                     {canViewFinancials 
                                         ? (financialStats.realPipelineInRisk > 0 
@@ -724,9 +1258,17 @@ export function OperationalSpeedControl({
                             </div>
 
                             <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                                <p className="text-[9px] font-black text-slate-600 uppercase tracking-wider mb-0.5">
-                                    Pauta en Riesgo
-                                </p>
+                                <div className="flex items-center justify-between mb-0.5">
+                                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-wider">
+                                        Pauta en Riesgo
+                                    </p>
+                                    <InfoTip
+                                        title="Cálculo de Pauta en Riesgo (CAC)"
+                                        text="Representa la inversión publicitaria en Meta Ads o Google Ads que se está perdiendo al no contactar al lead rápidamente."
+                                        formula="Pauta en Riesgo = Leads activos demorados (> 2h) × $15 CAC"
+                                        position="top"
+                                    />
+                                </div>
                                 <p className="text-xl font-black text-slate-800 font-mono">
                                     {canViewFinancials 
                                         ? `~$${financialStats.adSpendAtRisk.toLocaleString()}` 
@@ -744,6 +1286,11 @@ export function OperationalSpeedControl({
                                 <div className="flex items-center justify-between">
                                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1">
                                         🚨 Mayor Urgencia de Contacto
+                                        <InfoTip
+                                            title="Priorización de Urgencia"
+                                            text="Muestra los prospectos activos demorados con mayor valor económico y mayor tiempo acumulado sin respuesta para atacarlos primero."
+                                            position="top"
+                                        />
                                     </span>
                                     <span className="text-[8px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">
                                         Acción Inmediata
@@ -779,7 +1326,7 @@ export function OperationalSpeedControl({
                             onClick={() => handleNavigateWithLeads(
                                 financialStats.leadsInRiskIds.length > 0 
                                     ? financialStats.leadsInRiskIds 
-                                    : effectiveLeads.filter(l => l.status !== 'Cliente' && l.status !== 'Cerrado' && l.status !== 'Perdido' && l.status !== 'Erróneo').map(l => l.id)
+                                    : filteredEffectiveLeads.filter(l => l.status !== 'Cliente' && l.status !== 'Cerrado' && l.status !== 'Perdido' && l.status !== 'Erróneo').map(l => l.id)
                             )}
                             disabled={financialStats.leadsInRiskCount === 0}
                             className={`w-full py-2.5 text-white text-[10px] font-black rounded-xl transition-all shadow-md flex items-center justify-center gap-2 uppercase tracking-wider ${
@@ -796,6 +1343,130 @@ export function OperationalSpeedControl({
                 </div>
 
             </div>
+
+            {/* ── MODAL EXPLICATIVO DE LÓGICA Y FÓRMULAS MATEMÁTICAS ────────────────── */}
+            {isLogicModalOpen && (
+                <div 
+                    className="fixed inset-0 z-[99999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
+                    onClick={() => setIsLogicModalOpen(false)}
+                >
+                    <div 
+                        className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200/90 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header del Modal */}
+                        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-200">
+                                    <Calculator className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h2 className="text-base font-black text-slate-900 leading-tight">
+                                        Lógica y Fórmulas de Cálculo
+                                    </h2>
+                                    <p className="text-xs text-slate-500 font-medium">
+                                        Metodología ejecutiva y reglas de negocio del Centro de Control
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setIsLogicModalOpen(false)}
+                                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Contenido en 3 Bloques Didácticos */}
+                        <div className="mt-5 space-y-4">
+
+                            {/* Bloque 1: Speed-to-Lead */}
+                            <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+                                <div className="flex items-center gap-2 text-indigo-900 font-black text-xs uppercase tracking-wide mb-1.5">
+                                    <Zap className="w-4 h-4 text-indigo-600" />
+                                    <span>1. Speed-to-Lead y Cumplimiento SLA (&lt; 15 min)</span>
+                                </div>
+                                <p className="text-xs text-slate-700 leading-relaxed">
+                                    Mide el tiempo transcurrido desde la llegada del prospecto al CRM hasta su <strong>primer contacto real registrado</strong> (llamadas en <code className="text-indigo-700 font-mono">call_activities</code> o seguimientos en <code className="text-indigo-700 font-mono">follow_ups</code>).
+                                </p>
+                                
+                                <div className="mt-2.5 bg-white p-3 rounded-xl border border-indigo-200/80 font-mono text-xs text-indigo-950 space-y-1">
+                                    <div><strong>Fórmula Demora Promedio:</strong> Σ(Minutos transcurridos de cada lead) ÷ Total Leads</div>
+                                    <div><strong>Fórmula Cumplimiento SLA:</strong> (Leads atendidos o en espera ≤ 15 min ÷ Total Leads) × 100</div>
+                                </div>
+
+                                <div className="mt-2.5 text-[11px] text-slate-600 space-y-1">
+                                    <p>• <strong>Prospectos en cola (pendientes):</strong> Se evalúa su tiempo de espera acumulado hasta el momento actual.</p>
+                                    <p>• <strong>Meta &lt; 15m:</strong> Los estudios de conversión demuestran que contactar en los primeros 15 minutos multiplica por 7 la tasa de cierre.</p>
+                                </div>
+                            </div>
+
+                            {/* Bloque 2: Radar de Envejecimiento */}
+                            <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-100">
+                                <div className="flex items-center gap-2 text-amber-900 font-black text-xs uppercase tracking-wide mb-1.5">
+                                    <Clock className="w-4 h-4 text-amber-600" />
+                                    <span>2. Radar de Envejecimiento Operativo</span>
+                                </div>
+                                <p className="text-xs text-slate-700 leading-relaxed">
+                                    Segmenta los prospectos en 4 ventanas de tiempo para identificar cuellos de botella inmediatos:
+                                </p>
+
+                                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                    <div className="bg-white p-2.5 rounded-xl border border-amber-200/80">
+                                        <p className="font-bold text-emerald-700">&lt; 15 min · Ventana Óptima</p>
+                                        <p className="text-[10.5px] text-slate-500 mt-0.5">Leads recién llegados o atendidos de inmediato. Máxima receptividad.</p>
+                                    </div>
+                                    <div className="bg-white p-2.5 rounded-xl border border-amber-200/80">
+                                        <p className="font-bold text-amber-700">15m - 2h · Atención en Turno</p>
+                                        <p className="text-[10.5px] text-slate-500 mt-0.5">Atendidos en el mismo turno de guardia antes de que se enfríen.</p>
+                                    </div>
+                                    <div className="bg-white p-2.5 rounded-xl border border-amber-200/80">
+                                        <p className="font-bold text-orange-700">2h - 12h · Atención Tardía</p>
+                                        <p className="text-[10.5px] text-slate-500 mt-0.5">Demora mayor a 2 horas. Riesgo de que cotice con competidores.</p>
+                                    </div>
+                                    <div className="bg-white p-2.5 rounded-xl border border-amber-200/80">
+                                        <p className="font-bold text-rose-700">&gt; 24h · Demora Crítica</p>
+                                        <p className="text-[10.5px] text-slate-500 mt-0.5">Más de 1 día sin respuesta. Requiere reenganche urgente.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Bloque 3: Capital en Riesgo */}
+                            <div className="bg-rose-50/50 p-4 rounded-2xl border border-rose-100">
+                                <div className="flex items-center gap-2 text-rose-900 font-black text-xs uppercase tracking-wide mb-1.5">
+                                    <ShieldAlert className="w-4 h-4 text-rose-600" />
+                                    <span>3. Capital en Riesgo y Fuga de Pauta (CFO Radar)</span>
+                                </div>
+                                <p className="text-xs text-slate-700 leading-relaxed">
+                                    Cuantifica el impacto financiero directo que produce la demora en la atención:
+                                </p>
+
+                                <div className="mt-2.5 bg-white p-3 rounded-xl border border-rose-200/80 font-mono text-xs text-rose-950 space-y-1">
+                                    <div><strong>Pipeline en Peligro:</strong> Σ(Valor de leads activos demorados &gt; 2h)</div>
+                                    <div><strong>Pauta en Riesgo:</strong> Leads activos demorados &gt; 2h × ~$15 CAC</div>
+                                </div>
+
+                                <div className="mt-2.5 text-[11px] text-slate-600 space-y-1">
+                                    <p>• <strong>Exclusión Estricta de Clientes:</strong> Los prospectos que ya compraron y cerraron la venta (estado <code className="text-rose-700 font-bold">Cliente</code>) están <strong>100% excluidos</strong> de esta métrica, pues ya lograron el objetivo comercial.</p>
+                                    <p>• <strong>Ticket Promedio:</strong> Si un lead no tiene valor cotizado asignado, se proyecta con el ticket promedio histórico (${averageTicket > 0 ? averageTicket : 250}).</p>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {/* Botón de Cierre */}
+                        <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+                            <button
+                                onClick={() => setIsLogicModalOpen(false)}
+                                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition-all shadow-md shadow-indigo-200"
+                            >
+                                Entendido, Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

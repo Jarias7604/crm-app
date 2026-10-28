@@ -2200,6 +2200,9 @@ export default function Dashboard() {
                         uncontactedLeads={uncontactedLeads}
                         averageTicket={averageTicket}
                         isLoading={isLoadingUncontacted}
+                        availableProducts={availableProducts}
+                        selectedProductFilter={selectedProductFilter}
+                        onProductFilterChange={setSelectedProductFilter}
                     />
                 )}
 
