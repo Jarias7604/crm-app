@@ -65,10 +65,12 @@ export function OperationalSpeedControl({
         const fetchOperationalData = async () => {
             try {
                 // 1. Consultar prospectos con columnas 100% estándar de la base de datos
+                // 🛑 EXCLUIR CLIENTES: Los clientes ya cumplieron su objetivo comercial, no son prospectos en seguimiento
                 let qLeads = supabase
                     .from('leads')
                     .select('id, name, company_name, created_at, last_follow_up_at, status, value, priority, contact_count, assigned_to')
-                    .eq('company_id', effectiveCompanyId);
+                    .eq('company_id', effectiveCompanyId)
+                    .neq('status', 'Cliente');
 
                 // Aplicar rango de fechas solo si el usuario seleccionó 'period'
                 if (timeScope === 'period') {
@@ -102,7 +104,7 @@ export function OperationalSpeedControl({
                     console.warn('[OperationalSpeedControl] leads query error:', leadsRes.error);
                 }
 
-                const leadsData = leadsRes.data || [];
+                const leadsData = (leadsRes.data || []).filter(l => l.status !== 'Cliente');
                 setRawLeads(leadsData);
 
                 // Mapear timestamp exacto del primer contacto registrado por cada lead
@@ -145,10 +147,15 @@ export function OperationalSpeedControl({
     };
 
     // ── Conjunto de Prospectos Efectivos (Combina base de datos + prospectos de cola) ──
+    // Excluye estrictamente a clientes ya convertidos
     const effectiveLeads = useMemo(() => {
         const map = new Map<string, any>();
-        rawLeads.forEach(l => { if (l?.id) map.set(l.id, l); });
-        uncontactedLeads.forEach(l => { if (l?.id && !map.has(l.id)) map.set(l.id, l); });
+        rawLeads.forEach(l => { 
+            if (l?.id && l.status !== 'Cliente') map.set(l.id, l); 
+        });
+        uncontactedLeads.forEach(l => { 
+            if (l?.id && l.status !== 'Cliente' && !map.has(l.id)) map.set(l.id, l); 
+        });
         return Array.from(map.values());
     }, [rawLeads, uncontactedLeads]);
 
@@ -173,6 +180,7 @@ export function OperationalSpeedControl({
             const fuTime = followUpMap.get(lead.id);
             const firstContactIso = lead.first_follow_up_at || (fuTime ? new Date(fuTime).toISOString() : null) || lead.last_follow_up_at || lead.internal_won_date;
             const hasContacts = (lead.contact_count && lead.contact_count > 0) || fuTime !== undefined || !!lead.first_follow_up_at;
+            const isTerminal = lead.status === 'Cliente' || lead.status === 'Cerrado' || lead.status === 'Perdido' || lead.status === 'Erróneo';
             const movedPastProspect = lead.status !== 'Prospecto' && lead.status !== 'Erróneo';
 
             if (firstContactIso || hasContacts || movedPastProspect) {
@@ -187,8 +195,8 @@ export function OperationalSpeedControl({
                 };
                 allAnalyzed.push(item);
                 attendedOnly.push(item);
-            } else {
-                // Lead en espera sin atender
+            } else if (!isTerminal) {
+                // Solo prospectos ACTIVOS abiertos en espera (NUNCA cerrados, perdidos ni clientes)
                 const elapsedMinutes = Math.max(1, Math.round((now - baseTime) / 60000));
                 const item: AnalyzedLead = {
                     lead,
@@ -235,8 +243,13 @@ export function OperationalSpeedControl({
         const slaComplianceRate = totalCount > 0 ? Math.round((withinSlaCount / totalCount) * 100) : 0;
         const exceededSlaCount = totalCount - withinSlaCount;
 
-        // Prospectos en riesgo financiero (los que superaron 2h o están críticos)
-        const highRiskItems = [...atRisk, ...critical];
+        // Prospectos en riesgo financiero: ÚNICAMENTE prospectos activos (no cerrados, no clientes, no descartados)
+        const highRiskItems = [...atRisk, ...critical].filter(item => 
+            item.lead.status !== 'Cliente' && 
+            item.lead.status !== 'Cerrado' && 
+            item.lead.status !== 'Perdido' && 
+            item.lead.status !== 'Erróneo'
+        );
         const highRiskLeads = highRiskItems.map(i => i.lead);
 
         return {
@@ -254,11 +267,17 @@ export function OperationalSpeedControl({
             highRiskLeads,
             allAnalyzedCount: allAnalyzed.length
         };
-    }, [rawLeads, followUpMap, viewMode]);
+    }, [effectiveLeads, followUpMap, viewMode]);
 
     // ── 3. Métricas Financieras y Capital en Riesgo (CFO / CEO) ────────────────
     const financialStats = useMemo(() => {
-        const leadsInRisk = analysis.highRiskLeads;
+        // 🔒 CAPITAL EN RIESGO: Únicamente prospectos ACTIVOS que no se han cerrado ni descartado
+        const leadsInRisk = analysis.highRiskLeads.filter(lead => 
+            lead.status !== 'Cliente' && 
+            lead.status !== 'Cerrado' && 
+            lead.status !== 'Perdido' && 
+            lead.status !== 'Erróneo'
+        );
 
         // Pipeline real configurado explícitamente en BD
         const realPipelineInRisk = leadsInRisk.reduce((acc, lead) => acc + (Number(lead.value) || 0), 0);
@@ -270,7 +289,7 @@ export function OperationalSpeedControl({
         // Pauta publicitaria CAC en riesgo (~$15 por lead)
         const adSpendAtRisk = leadsInRisk.length * 15;
 
-        // Prospectos de mayor urgencia (con mayor tiempo acumulado o valor)
+        // Prospectos de mayor urgencia (SOLO ACTIVOS)
         const topTargets = [...leadsInRisk].sort((a, b) => {
             const valDiff = (Number(b.value) || 0) - (Number(a.value) || 0);
             if (valDiff !== 0) return valDiff;
@@ -760,17 +779,17 @@ export function OperationalSpeedControl({
                             onClick={() => handleNavigateWithLeads(
                                 financialStats.leadsInRiskIds.length > 0 
                                     ? financialStats.leadsInRiskIds 
-                                    : rawLeads.map(l => l.id)
+                                    : effectiveLeads.filter(l => l.status !== 'Cliente' && l.status !== 'Cerrado' && l.status !== 'Perdido' && l.status !== 'Erróneo').map(l => l.id)
                             )}
-                            disabled={rawLeads.length === 0}
+                            disabled={financialStats.leadsInRiskCount === 0}
                             className={`w-full py-2.5 text-white text-[10px] font-black rounded-xl transition-all shadow-md flex items-center justify-center gap-2 uppercase tracking-wider ${
-                                rawLeads.length > 0 
+                                financialStats.leadsInRiskCount > 0 
                                     ? 'bg-gradient-to-r from-rose-500 via-red-600 to-indigo-600 hover:opacity-95 shadow-rose-500/20 cursor-pointer' 
                                     : 'bg-slate-300 cursor-not-allowed opacity-60'
                             }`}
                         >
                             <PhoneCall className="w-3.5 h-3.5" />
-                            <span>Atacar {financialStats.leadsInRiskCount > 0 ? `${financialStats.leadsInRiskCount} Leads en Riesgo` : 'Leads'} Ahora</span>
+                            <span>Atacar {financialStats.leadsInRiskCount > 0 ? `${financialStats.leadsInRiskCount} Leads en Riesgo` : 'Sin Leads en Riesgo'} Ahora</span>
                             <ArrowRight className="w-3.5 h-3.5" />
                         </button>
                     </div>
