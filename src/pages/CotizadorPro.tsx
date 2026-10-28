@@ -459,7 +459,11 @@ export default function CotizadorPro() {
 
             return {
                 ...item,
-                pago_unico: isHibrido ? (implementationOverride !== null && !formData.paquete_id ? implementationOverride : item.pago_unico) : (esPagoUnico ? calculatedTotal : 0),
+                pago_unico: isHibrido
+                    ? (formData.incluir_implementacion
+                        ? (implementationOverride !== null && !formData.paquete_id ? implementationOverride : item.pago_unico)
+                        : 0)
+                    : (esPagoUnico ? calculatedTotal : 0),
                 precio_anual: isHibrido ? calculatedTotal : (esPagoUnico ? 0 : calculatedTotal),
                 precio_mensual: isHibrido ? (item.precio_mensual || calculatedTotal / 12) : (esPagoUnico ? item.precio_mensual : calculatedTotal / 12),
                 precio_por_dte: 0,
@@ -641,6 +645,12 @@ export default function CotizadorPro() {
 
                 const esPagoUnico = !hasRecurring && ((item.pago_unico || 0) > 0 || isPhysical || tracksStock || item.modelo_precio === 'por_unidad');
 
+                const setupVal = isHibrido
+                    ? (formData.incluir_implementacion
+                        ? (implementationOverride !== null && !formData.paquete_id ? implementationOverride : item.pago_unico)
+                        : 0)
+                    : (esPagoUnico ? costoCalculado : 0);
+
                 return {
                     id: item.id,
                     nombre: item.nombre,
@@ -648,14 +658,19 @@ export default function CotizadorPro() {
                     descripcion: item.descripcion || '',
                     cantidad: needsQty ? qty : 1,
                     precio_unitario: baseUnit,
-                    total: isHibrido ? (item.pago_unico + costoCalculado) : costoCalculado,
+                    total: isHibrido ? (setupVal + costoCalculado) : costoCalculado,
                     unidad: getBaseUnit(item.unidad || item.metadata?.unidad_medida, item.tipo),
-                    // Si es híbrido, guardar setup en pago_unico y suscripción en costo_anual
-                    pago_unico: isHibrido ? item.pago_unico : (esPagoUnico ? costoCalculado : 0),
+                    // Si es híbrido, guardar setup en pago_unico (o 0 si se excluyó la implementación) y suscripción en costo_anual
+                    pago_unico: setupVal,
                     costo_anual: isHibrido ? costoCalculado : (esPagoUnico ? 0 : costoCalculado),
                     costo_mensual: item.precio_mensual || (isHibrido ? (costoCalculado / 12) : 0)
                 };
             });
+
+            // Buscar costo de implementación híbrida si aplica
+            const costoImpHibridosGen = itemsSeleccionados
+                .filter(i => (i.pago_unico || 0) > 0 && ((i.precio_anual || 0) > 0 || (i.precio_mensual || 0) > 0))
+                .reduce((s, it) => s + (it.pago_unico || 0), 0);
 
             // Preparar datos para guardar (formato correcto)
             const cotizacionData = {
@@ -671,8 +686,10 @@ export default function CotizadorPro() {
                 plan_nombre: paqueteSeleccionado?.paquete || 'Cotización Personalizada',
                 costo_plan_anual: paqueteSeleccionado ? (paqueteOverride ?? paqueteSeleccionado.costo_paquete_anual) : 0,
                 costo_plan_mensual: paqueteSeleccionado?.costo_paquete_mensual ?? 0,
-                costo_implementacion: paqueteSeleccionado && formData.incluir_implementacion
-                    ? (implementationOverride ?? paqueteSeleccionado.costo_implementacion)
+                costo_implementacion: formData.incluir_implementacion
+                    ? (paqueteSeleccionado
+                        ? (implementationOverride ?? paqueteSeleccionado.costo_implementacion)
+                        : (implementationOverride ?? costoImpHibridosGen))
                     : 0,
                 modulos_adicionales: todosLosItems,
                 servicio_whatsapp: whatsappSeleccionado,
@@ -1479,7 +1496,20 @@ export default function CotizadorPro() {
 
                     {pasoActual === 3 && (() => {
                         const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id);
-                        const costoImp = paqueteSeleccionado?.costo_implementacion || 0;
+                        const costoImpPaquete = paqueteSeleccionado?.costo_implementacion || 0;
+                        const hybridItemsSel = [
+                            ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
+                            ...servicios.filter(s => formData.servicios_ids.includes(s.id))
+                        ].filter(item => {
+                            const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
+                            const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
+                            const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
+                            const hasSetup = (item.pago_unico || 0) > 0;
+                            return hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
+                        });
+                        const costoImpHibridos = hybridItemsSel.reduce((sum, item) => sum + (item.pago_unico || 0), 0);
+                        const costoImp = costoImpPaquete + costoImpHibridos;
+
                         return costoImp > 0 ? (
                             <div className="mt-4 flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl">
                                 <div>
@@ -2111,7 +2141,20 @@ export default function CotizadorPro() {
                                     <div className="space-y-1 text-sm">
                                         {(() => {
                                             const paqSel = paquetes.find(p => p.id === formData.paquete_id);
-                                            const costoImp = paqSel?.costo_implementacion || 0;
+                                            const costoImpPaquete = paqSel?.costo_implementacion || 0;
+                                            const hybridItemsSel = [
+                                                ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
+                                                ...servicios.filter(s => formData.servicios_ids.includes(s.id))
+                                            ].filter(item => {
+                                                const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
+                                                const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
+                                                const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
+                                                const hasSetup = (item.pago_unico || 0) > 0;
+                                                return hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
+                                            });
+                                            const costoImpHibridos = hybridItemsSel.reduce((sum, item) => sum + (item.pago_unico || 0), 0);
+                                            const costoImp = costoImpPaquete + costoImpHibridos;
+
                                             if (costoImp === 0) return null;
                                             return (
                                                 <div className="flex justify-between items-center bg-amber-50 p-2 rounded-lg border border-amber-200 mb-2">

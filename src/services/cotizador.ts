@@ -327,7 +327,8 @@ class CotizadorService {
             const esHibrido = tienePagoUnico && (tieneRecurrentePorDTE || tieneRecurrenteFijo);
 
             // 3.1 Componente de Pago Único (Setup fee, hardware, servicio puntual)
-            if (tienePagoUnico) {
+            const incluirEstePagoUnico = esHibrido ? config.incluir_implementacion : true;
+            if (tienePagoUnico && incluirEstePagoUnico) {
                 subtotal_pagos_unicos += item.pago_unico;
                 desglose.push({
                     es_pago_unico: true,
