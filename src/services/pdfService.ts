@@ -339,9 +339,16 @@ export const pdfService = {
             modulos.forEach((m: any) => {
                 const pagoUnicoMonto = Number(m.pago_unico) || 0;
                 const costoAnual = Number(m.costo_anual) || Number(m.costo) || 0;
-                const isOneTime = pagoUnicoMonto > 0;                   // ← NO CAMBIAR esta lógica
-                const currentCosto = isOneTime ? pagoUnicoMonto : costoAnual; // ← NI esta
-                drawRow(m.nombre, currentCosto, isOneTime, m.descripcion);
+                
+                if (pagoUnicoMonto > 0 && costoAnual > 0) {
+                    // Ítem Híbrido: desglosar suscripción recurrente y setup inicial de forma transparente
+                    drawRow(`${m.nombre} (Suscripción)`, costoAnual, false, m.descripcion);
+                    drawRow(`${m.nombre} (Setup Inicial)`, pagoUnicoMonto, true, 'Configuración y setup inicial (Pago único)');
+                } else if (pagoUnicoMonto > 0) {
+                    drawRow(m.nombre, pagoUnicoMonto, true, m.descripcion);
+                } else {
+                    drawRow(m.nombre, costoAnual, false, m.descripcion);
+                }
             });
             // ─────────────────────────────────────────────────────────────────
 

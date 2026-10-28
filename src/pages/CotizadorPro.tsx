@@ -265,7 +265,7 @@ export default function CotizadorPro() {
             // aparecen en el wizard aunque cotizador_items tenga items del mismo tipo.
             const existingIds = new Set(itemsData.map((i: CotizadorItem) => i.id));
             const extraItems: CotizadorItem[] = pricingItemsData
-                .filter((p: any) => p.activo && !existingIds.has(p.id) && p.tipo !== 'plan')
+                .filter((p: any) => p.activo && !existingIds.has(p.id) && (p.tipo !== 'plan' || !paqData.some((paq: any) => (paq.paquete || '').trim().toLowerCase() === (p.nombre || '').trim().toLowerCase())))
                 .map((p: any): CotizadorItem => {
                     const meta = p.metadata || {};
                     const isPhysical = p.tipo === 'equipo' || p.tipo === 'partes' || p.tipo === 'repuestos';
@@ -436,6 +436,10 @@ export default function CotizadorPro() {
             const needsQty = item.modelo_precio === 'por_unidad' || item.modelo_precio === 'por_hora' || tracksStock;
             const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
 
+            const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
+            const hasSetup = (item.pago_unico || 0) > 0;
+            const isHibrido = hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
+
             const baseUnit = item.precio_por_dte > 0
                 ? item.precio_por_dte
                 : (item.precio_mensual > 0
@@ -446,16 +450,18 @@ export default function CotizadorPro() {
                 ? (formData.volumen_dtes * item.precio_por_dte)
                 : needsQty
                     ? baseUnit * qty
-                    : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual);
+                    : (isHibrido
+                        ? (item.precio_anual || (item.precio_mensual * 12))
+                        : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual));
 
             const calculatedTotal = overrides[item.id] !== undefined ? overrides[item.id] : defaultPrice;
-            const esPagoUnico = (item.pago_unico || 0) > 0 || isPhysical || tracksStock || item.modelo_precio === 'por_unidad';
+            const esPagoUnico = !hasRecurring && ((item.pago_unico || 0) > 0 || isPhysical || tracksStock || item.modelo_precio === 'por_unidad');
 
             return {
                 ...item,
-                pago_unico: esPagoUnico ? calculatedTotal : 0,
-                precio_anual: esPagoUnico ? 0 : calculatedTotal,
-                precio_mensual: esPagoUnico ? item.precio_mensual : calculatedTotal / 12,
+                pago_unico: isHibrido ? item.pago_unico : (esPagoUnico ? calculatedTotal : 0),
+                precio_anual: isHibrido ? calculatedTotal : (esPagoUnico ? 0 : calculatedTotal),
+                precio_mensual: isHibrido ? (item.precio_mensual || calculatedTotal / 12) : (esPagoUnico ? item.precio_mensual : calculatedTotal / 12),
                 precio_por_dte: 0,
                 cantidad_default: qty,
                 precio_unitario: baseUnit,
@@ -616,6 +622,10 @@ export default function CotizadorPro() {
                 const needsQty = item.modelo_precio === 'por_unidad' || item.modelo_precio === 'por_hora' || tracksStock;
                 const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
 
+                const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
+                const hasSetup = (item.pago_unico || 0) > 0;
+                const isHibrido = hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
+
                 const baseUnit = item.precio_por_dte > 0
                     ? item.precio_por_dte
                     : (item.precio_mensual > 0
@@ -627,9 +637,9 @@ export default function CotizadorPro() {
                     ? manualPrice
                     : (item.precio_por_dte > 0
                         ? formData.volumen_dtes * item.precio_por_dte
-                        : (needsQty ? baseUnit * qty : (item.pago_unico || item.precio_anual)));
+                        : (needsQty ? baseUnit * qty : (isHibrido ? (item.precio_anual || item.precio_mensual * 12) : (item.pago_unico || item.precio_anual))));
 
-                const esPagoUnico = (item.pago_unico || 0) > 0 || isPhysical || tracksStock || item.modelo_precio === 'por_unidad';
+                const esPagoUnico = !hasRecurring && ((item.pago_unico || 0) > 0 || isPhysical || tracksStock || item.modelo_precio === 'por_unidad');
 
                 return {
                     id: item.id,
@@ -638,12 +648,12 @@ export default function CotizadorPro() {
                     descripcion: item.descripcion || '',
                     cantidad: needsQty ? qty : 1,
                     precio_unitario: baseUnit,
-                    total: costoCalculado,
+                    total: isHibrido ? (item.pago_unico + costoCalculado) : costoCalculado,
                     unidad: getBaseUnit(item.unidad || item.metadata?.unidad_medida, item.tipo),
-                    // Si es pago único, guardarlo en pago_unico; si no, en costo_anual
-                    pago_unico: esPagoUnico ? costoCalculado : 0,
-                    costo_anual: esPagoUnico ? 0 : costoCalculado,
-                    costo_mensual: item.precio_mensual || 0
+                    // Si es híbrido, guardar setup en pago_unico y suscripción en costo_anual
+                    pago_unico: isHibrido ? item.pago_unico : (esPagoUnico ? costoCalculado : 0),
+                    costo_anual: isHibrido ? costoCalculado : (esPagoUnico ? 0 : costoCalculado),
+                    costo_mensual: item.precio_mensual || (isHibrido ? (costoCalculado / 12) : 0)
                 };
             });
 
@@ -1030,7 +1040,10 @@ export default function CotizadorPro() {
                             const toggle = isModulo ? () => toggleModulo(item.id) : () => toggleServicio(item.id);
                             const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
                             const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
-                            const modelo = (item as any).modelo_precio || (tracksStock || isPhysical ? 'por_unidad' : (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual'));
+                            const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
+                            const hasSetup = (item.pago_unico || 0) > 0;
+                            const isHibrido = hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
+                            const modelo = (item as any).modelo_precio || (tracksStock || isPhysical ? 'por_unidad' : (isHibrido ? 'suscripcion_anual' : (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual')));
                             const meta = MODELO_LABELS[modelo] || MODELO_LABELS.precio_fijo;
                             const needsQty = modelo === 'por_hora' || modelo === 'por_unidad' || tracksStock;
                             const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
@@ -1045,7 +1058,7 @@ export default function CotizadorPro() {
                                 ? (formData.volumen_dtes * item.precio_por_dte)
                                 : needsQty
                                     ? baseUnitPrice * qty
-                                    : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual);
+                                    : (isHibrido ? (item.precio_anual || item.precio_mensual * 12) : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual));
                             const currentPrice = overrides[item.id] ?? defaultPrice;
 
                             return (
@@ -1102,7 +1115,17 @@ export default function CotizadorPro() {
                                     ) : (
                                         <div className="mt-auto pt-3 border-t border-gray-100 flex items-end justify-between">
                                             <div>
-                                                <p className="text-[10px] text-gray-400">{needsQty ? `por ${unitLabel}` : item.pago_unico > 0 ? 'Pago único' : item.precio_por_dte > 0 ? 'Por volumen' : '/año'}</p>
+                                                <p className="text-[10px] text-gray-400">
+                                                    {needsQty
+                                                        ? `por ${unitLabel}`
+                                                        : isHibrido
+                                                            ? `${item.precio_anual > 0 ? '/año' : '/mes'} + $${item.pago_unico.toLocaleString()} setup`
+                                                            : item.pago_unico > 0
+                                                                ? 'Pago único'
+                                                                : item.precio_por_dte > 0
+                                                                    ? 'Por volumen'
+                                                                    : '/año'}
+                                                </p>
                                             </div>
                                             <p className={`text-base font-black ${isSelected ? 'text-[#4449AA]' : 'text-gray-700'}`}>${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                                         </div>
@@ -1142,7 +1165,10 @@ export default function CotizadorPro() {
                             const toggle = isModulo ? () => toggleModulo(item.id) : () => toggleServicio(item.id);
                             const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
                             const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
-                            const modelo = (item as any).modelo_precio || (tracksStock || isPhysical ? 'por_unidad' : (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual'));
+                            const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
+                            const hasSetup = (item.pago_unico || 0) > 0;
+                            const isHibrido = hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
+                            const modelo = (item as any).modelo_precio || (tracksStock || isPhysical ? 'por_unidad' : (isHibrido ? 'suscripcion_anual' : (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual')));
                             const meta = MODELO_LABELS[modelo] || MODELO_LABELS.precio_fijo;
                             const needsQty = modelo === 'por_hora' || modelo === 'por_unidad' || tracksStock;
                             const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
@@ -1157,7 +1183,7 @@ export default function CotizadorPro() {
                                 ? (formData.volumen_dtes * item.precio_por_dte)
                                 : needsQty
                                     ? baseUnitPrice * qty
-                                    : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual);
+                                    : (isHibrido ? (item.precio_anual || item.precio_mensual * 12) : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual));
                             const currentPrice = overrides[item.id] ?? defaultPrice;
 
                             const isExpanded = expandedItems.has(item.id);
@@ -1235,13 +1261,23 @@ export default function CotizadorPro() {
                                                         <span className="text-xs text-gray-400 font-bold">$</span>
                                                         <input type="number" className="w-24 text-right font-bold text-[#4449AA] border border-[#4449AA]/30 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-[#4449AA]/30 outline-none text-sm"
                                                             value={overrides[item.id] ?? defaultPrice} onChange={e => setOverrides({ ...overrides, [item.id]: Number(e.target.value) })} />
-                                                        <span className="text-[10px] text-gray-400 font-bold">{item.pago_unico > 0 ? 'único' : item.precio_por_dte > 0 ? '/vol' : '/año'}</span>
+                                                        <span className="text-[10px] text-gray-400 font-bold">{isHibrido ? '/año' : (item.pago_unico > 0 ? 'único' : item.precio_por_dte > 0 ? '/vol' : '/año')}</span>
                                                     </div>
                                                 ) : (
                                                     <div className="text-right">
                                                         <p className={`text-sm font-black ${isSelected ? 'text-[#4449AA]' : 'text-gray-700'}`}>${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                                                         {item.precio_por_dte > 0 && !overrides[item.id] && <p className="text-[10px] text-gray-400">{formData.volumen_dtes} × ${item.precio_por_dte}</p>}
-                                                        <p className="text-[10px] text-gray-400">{needsQty ? `por ${unitLabel}` : item.pago_unico > 0 ? 'Pago único' : item.precio_por_dte > 0 ? 'Por volumen' : '/año'}</p>
+                                                        <p className="text-[10px] text-gray-400">
+                                                            {needsQty
+                                                                ? `por ${unitLabel}`
+                                                                : isHibrido
+                                                                    ? `${item.precio_anual > 0 ? '/año' : '/mes'} + $${item.pago_unico.toLocaleString()} setup`
+                                                                    : item.pago_unico > 0
+                                                                        ? 'Pago único'
+                                                                        : item.precio_por_dte > 0
+                                                                            ? 'Por volumen'
+                                                                            : '/año'}
+                                                        </p>
                                                     </div>
                                                 )}
                                             </div>
@@ -1257,9 +1293,9 @@ export default function CotizadorPro() {
                                         <div className={`px-5 py-4 border-t ${isSelected ? 'bg-[#4449AA]/5 border-[#4449AA]/20' : 'bg-gray-50 border-gray-100'}`}>
                                             <p className="text-sm text-gray-600 leading-relaxed">{item.descripcion}</p>
                                             <div className="flex gap-2 mt-3 flex-wrap">
-                                                {item.pago_unico > 0 && <span className="text-xs bg-purple-50 text-purple-700 font-bold px-2 py-1 rounded-lg">💳 Pago único: ${item.pago_unico.toLocaleString()}</span>}
+                                                {item.pago_unico > 0 && <span className="text-xs bg-purple-50 text-purple-700 font-bold px-2 py-1 rounded-lg">💳 {isHibrido ? 'Setup inicial' : 'Pago único'}: ${item.pago_unico.toLocaleString()}</span>}
                                                 {item.precio_mensual > 0 && <span className="text-xs bg-blue-50 text-blue-700 font-bold px-2 py-1 rounded-lg">🔁 Mensual: ${item.precio_mensual.toLocaleString()}</span>}
-                                                {item.precio_anual > 0 && item.pago_unico === 0 && <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded-lg">📅 Anual: ${item.precio_anual.toLocaleString()}</span>}
+                                                {item.precio_anual > 0 && <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded-lg">📅 Anual: ${item.precio_anual.toLocaleString()}</span>}
                                             </div>
                                         </div>
                                     )}
@@ -1277,17 +1313,20 @@ export default function CotizadorPro() {
                             plan: 'Plan', modulo: 'Módulos', servicio: 'Servicios',
                             implementacion: 'Implementación', equipo: 'Equipos', partes: 'Partes', repuestos: 'Repuestos', otros: 'Otros',
                         };
+                        const hasPlanPaquetes = paquetes.length > 0;
+                        const hasPlanItems = (gruposServicios['plan']?.length || 0) > 0;
                         const categoriasBase = [
-                            ...(paquetes.length > 0 ? ['plan'] : []),
+                            ...(hasPlanPaquetes || hasPlanItems ? ['plan'] : []),
                             ...(modulos.length > 0 ? ['modulo'] : []),
-                            ...Object.keys(gruposServicios)
+                            ...Object.keys(gruposServicios).filter(t => t !== 'plan')
                         ];
                         const categoriasOrdenadas = chipOrder.length > 0
                             ? chipOrder.filter(c => categoriasBase.includes(c)).concat(categoriasBase.filter(c => !chipOrder.includes(c)))
                             : categoriasBase;
                         const conteo: Record<string, number> = {
-                            plan: paquetes.length, modulo: modulos.length,
-                            ...Object.fromEntries(Object.entries(gruposServicios).map(([t, it]) => [t, it.length]))
+                            plan: paquetes.length + (gruposServicios['plan']?.length || 0),
+                            modulo: modulos.length,
+                            ...Object.fromEntries(Object.entries(gruposServicios).filter(([t]) => t !== 'plan').map(([t, it]) => [t, it.length]))
                         };
                         const totalItems = paquetes.length + modulos.length + servicios.length;
 
@@ -1392,13 +1431,22 @@ export default function CotizadorPro() {
                                     </div>
                                 ) : (
                                     <>
-                                        {/* Plan (paquetes) */}
+                                        {/* Plan (paquetes ERP) */}
                                         {paquetes.length > 0 && (filtroStep3 === 'todos' || filtroStep3 === 'plan') && (
                                             <div>
-                                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1 mb-2">Plan</h3>
+                                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1 mb-2">Planes ERP</h3>
                                                 {viewMode === 'card'
                                                     ? <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{paquetes.map(p => renderPaqueteCard(p))}</div>
                                                     : <div className="space-y-2">{paquetes.map(p => renderPaqueteRow(p))}</div>}
+                                            </div>
+                                        )}
+                                        {/* Planes individuales / catálogo (ej. Conta Multiempresa u otros planes) */}
+                                        {(gruposServicios['plan']?.length || 0) > 0 && (filtroStep3 === 'todos' || filtroStep3 === 'plan') && (
+                                            <div>
+                                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1 mb-2">Planes de Suscripción</h3>
+                                                {viewMode === 'card'
+                                                    ? <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{gruposServicios['plan'].map(s => renderItemCard(s, false))}</div>
+                                                    : <div className="space-y-2">{gruposServicios['plan'].map(s => renderItemRow(s, false))}</div>}
                                             </div>
                                         )}
                                         {/* Módulos */}
@@ -1410,12 +1458,12 @@ export default function CotizadorPro() {
                                                     : <div className="space-y-2">{modulos.map(m => renderItemRow(m, true))}</div>}
                                             </div>
                                         )}
-                                        {/* Grupos dinámicos */}
-                                        {Object.entries(gruposServicios).map(([tipo, items]) =>
+                                        {/* Grupos dinámicos (excluyendo 'plan' para no duplicar) */}
+                                        {Object.entries(gruposServicios).filter(([tipo]) => tipo !== 'plan').map(([tipo, items]) =>
                                             (filtroStep3 === 'todos' || filtroStep3 === tipo) && (
                                                 <div key={tipo}>
                                                     <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1 mb-2">
-                                                        {TIPO_LABELS[tipo] || tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+                                                        {TIPO_LABELS[tipo] || tipo.charAt(0).toUpperCase() + tipo.slice(1).replace(/_/g, ' ')}
                                                     </h3>
                                                     {viewMode === 'card'
                                                         ? <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{items.map(s => renderItemCard(s, false))}</div>

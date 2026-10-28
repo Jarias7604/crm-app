@@ -194,10 +194,11 @@ export const calculateQuoteFinancialsV2 = (
         const costoAnual = Number(mod.costo_anual) || Number(mod.costo) || 0;
 
         if (pagoUnico > 0) {
-            // Servicio con pago único → Va al Pago Inicial
+            // Servicio o Setup inicial con pago único → Va al Pago Inicial
             costoServiciosUnicos += pagoUnico;
-        } else if (costoAnual > 0) {
-            // Módulo/servicio recurrente → Va al Pago Recurrente
+        }
+        if (costoAnual > 0) {
+            // Módulo, servicio o plan recurrente → Va al Pago Recurrente (Licencia Anual)
             costoModulosRecurrentes += costoAnual;
         }
     });

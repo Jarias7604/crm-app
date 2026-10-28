@@ -319,39 +319,50 @@ class CotizadorService {
                 : 'Plan base de servicios'
         });
 
-        // 3. ITEMS (separar únicos de recurrentes)
+        // 3. ITEMS (separar únicos de recurrentes, soportando ítems híbridos con setup fee + suscripción)
         items.forEach(item => {
-            if (item.pago_unico > 0) {
+            const tienePagoUnico = (item.pago_unico || 0) > 0;
+            const tieneRecurrentePorDTE = (item.precio_por_dte || 0) > 0;
+            const tieneRecurrenteFijo = (item.precio_anual || 0) > 0 || (item.precio_mensual || 0) > 0;
+            const esHibrido = tienePagoUnico && (tieneRecurrentePorDTE || tieneRecurrenteFijo);
+
+            // 3.1 Componente de Pago Único (Setup fee, hardware, servicio puntual)
+            if (tienePagoUnico) {
                 subtotal_pagos_unicos += item.pago_unico;
                 desglose.push({
                     es_pago_unico: true,
-                    tipo: item.tipo === 'modulo' ? 'Módulo' : (item.tipo === 'equipo' ? 'Equipo' : (item.tipo === 'partes' ? 'Partes' : 'Servicio')),
-                    nombre: item.nombre,
+                    tipo: esHibrido
+                        ? 'Implementación'
+                        : (item.tipo === 'modulo' ? 'Módulo' : (item.tipo === 'equipo' ? 'Equipo' : (item.tipo === 'partes' ? 'Partes' : 'Servicio'))),
+                    nombre: esHibrido ? `${item.nombre} (Setup Inicial)` : item.nombre,
                     precio_anual: item.pago_unico,
                     precio_mensual: 0,
-                    descripcion: item.descripcion || 'Pago único',
+                    descripcion: esHibrido ? 'Costo inicial de configuración e inducción (Pago único)' : (item.descripcion || 'Pago único'),
                     cantidad: item.cantidad_default,
                     precio_unitario: item.precio_unitario,
                     unidad: item.unidad
                 });
-            } else if (item.precio_por_dte > 0) {
+            }
+
+            // 3.2 Componente Recurrente (Suscripción anual/mensual o por DTE)
+            if (tieneRecurrentePorDTE) {
                 const precio = cantidad_dtes * item.precio_por_dte;
                 subtotal_recurrente_base += precio;
                 desglose.push({
                     es_pago_unico: false,
                     tipo: item.tipo === 'modulo' ? 'Módulo' : 'Servicio',
-                    nombre: item.nombre,
+                    nombre: esHibrido ? `${item.nombre} (Recurrente)` : item.nombre,
                     precio_anual: precio,
                     precio_mensual: precio / 12,
                     descripcion: item.descripcion || `${cantidad_dtes.toLocaleString()} DTEs × $${item.precio_por_dte}`
                 });
-            } else {
+            } else if (tieneRecurrenteFijo) {
                 const precio = item.precio_anual || (item.precio_mensual * 12);
                 subtotal_recurrente_base += precio;
                 desglose.push({
                     es_pago_unico: false,
-                    tipo: item.tipo === 'modulo' ? 'Módulo' : 'Servicio',
-                    nombre: item.nombre,
+                    tipo: item.tipo === 'modulo' ? 'Módulo' : (item.tipo === 'plan' ? 'Plan' : 'Suscripción'),
+                    nombre: esHibrido ? `${item.nombre} (Suscripción)` : item.nombre,
                     precio_anual: precio,
                     precio_mensual: item.precio_mensual || precio / 12,
                     descripcion: item.descripcion || 'Recurrente'

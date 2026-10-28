@@ -568,8 +568,11 @@ export default function PublicQuoteView() {
                         )}
 
                         {(cotizacion.modulos_adicionales || []).map((mod: any, idx: number) => {
-                            const esPagoUnico = (Number(mod.pago_unico) || 0) > 0;
-                            const monto = esPagoUnico ? Number(mod.pago_unico) : (Number(mod.costo_anual || mod.costo) || 0);
+                            const pagoUnicoVal = Number(mod.pago_unico) || 0;
+                            const recurrenteVal = Number(mod.costo_anual || mod.costo) || 0;
+                            const esHibrido = pagoUnicoVal > 0 && recurrenteVal > 0;
+                            const esPagoUnico = pagoUnicoVal > 0 && !esHibrido;
+                            const monto = esHibrido ? (pagoUnicoVal + recurrenteVal) : (esPagoUnico ? pagoUnicoVal : recurrenteVal);
                             return (
                                 <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-start justify-between group active:scale-[0.98] transition-all text-xs">
                                     <div className="flex items-start gap-4">
@@ -588,14 +591,28 @@ export default function PublicQuoteView() {
                                             {mod.descripcion && (
                                                 <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">{mod.descripcion}</p>
                                             )}
-                                            {esPagoUnico ? (
+                                            {esHibrido ? (
+                                                <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                                                    <span className="text-[8px] font-black bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full w-fit">
+                                                        PLAN (${recurrenteVal.toLocaleString()}/año)
+                                                    </span>
+                                                    <span className="text-[8px] font-black bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full w-fit">
+                                                        + SETUP (${pagoUnicoVal.toLocaleString()} ÚNICO)
+                                                    </span>
+                                                </div>
+                                            ) : esPagoUnico ? (
                                                 <span className="inline-block mt-1 text-[8px] font-black bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full w-fit">PAGO ÚNICO</span>
                                             ) : (
                                                 <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tighter">MÓDULO ADICIONAL</p>
                                             )}
                                         </div>
                                     </div>
-                                    <span className="text-lg font-black text-slate-900 tracking-tight flex-shrink-0">${monto.toLocaleString()}</span>
+                                    <div className="text-right flex-shrink-0">
+                                        <span className="text-lg font-black text-slate-900 tracking-tight">${monto.toLocaleString()}</span>
+                                        {esHibrido && (
+                                            <p className="text-[9px] text-slate-400 font-medium">${recurrenteVal.toLocaleString()}/año + ${pagoUnicoVal.toLocaleString()} setup</p>
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}
@@ -690,22 +707,22 @@ export default function PublicQuoteView() {
                                             )}
                                             {/* Módulos adicionales recurrentes — uno por línea */}
                                             {plan.show_breakdown !== false && (cotizacion.modulos_adicionales || [])
-                                                .filter((mod: any) => !(Number(mod.pago_unico) > 0) && (Number(mod.costo_anual || mod.costo) > 0))
+                                                .filter((mod: any) => Number(mod.costo_anual || mod.costo) > 0)
                                                 .map((mod: any, modIdx: number) => (
                                                     <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
-                                                        <span className="truncate">{mod.nombre}</span>
+                                                        <span className="truncate">{mod.nombre} {Number(mod.pago_unico) > 0 ? '(Suscripción)' : ''}</span>
                                                         <span className="font-bold text-slate-700 ml-2 flex-shrink-0">
                                                             ${Number(mod.costo_anual || mod.costo || 0).toLocaleString()}
                                                         </span>
                                                     </div>
                                                 ))
                                             }
-                                            {/* Servicios de pago único (si es solo servicio/proyecto) */}
-                                            {isServiceOnly && plan.show_breakdown !== false && (cotizacion.modulos_adicionales || [])
-                                                .filter((mod: any) => Number(mod.pago_unico) > 0)
+                                            {/* Servicios o setup fees de pago único */}
+                                            {plan.show_breakdown !== false && (cotizacion.modulos_adicionales || [])
+                                                .filter((mod: any) => Number(mod.pago_unico) > 0 && (isServiceOnly || Number(mod.costo_anual || mod.costo) > 0))
                                                 .map((mod: any, modIdx: number) => (
                                                     <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
-                                                        <span className="truncate">{mod.nombre}</span>
+                                                        <span className="truncate">{mod.nombre} {Number(mod.costo_anual || mod.costo) > 0 ? '(Setup)' : ''}</span>
                                                         <span className="font-bold text-slate-700 ml-2 flex-shrink-0">
                                                             ${Number(mod.pago_unico).toLocaleString()}
                                                         </span>

@@ -705,8 +705,11 @@ export default function CotizacionDetalle() {
                                     )}
                                     {/* Módulos adicionales */}
                                     {(Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [])?.map((mod: any, idx: number) => {
-                                        const esPagoUnico = (Number(mod.pago_unico) || 0) > 0;
-                                        const monto = esPagoUnico ? Number(mod.pago_unico) : (Number(mod.costo_anual || mod.costo) || 0);
+                                        const pagoUnicoVal = Number(mod.pago_unico) || 0;
+                                        const recurrenteVal = Number(mod.costo_anual || mod.costo) || 0;
+                                        const esHibrido = pagoUnicoVal > 0 && recurrenteVal > 0;
+                                        const esPagoUnico = pagoUnicoVal > 0 && !esHibrido;
+                                        const monto = esHibrido ? (pagoUnicoVal + recurrenteVal) : (esPagoUnico ? pagoUnicoVal : recurrenteVal);
                                         return (
                                             <div key={idx} className="flex items-start gap-3 sm:gap-4 px-3 sm:px-6 py-4 sm:py-5 hover:bg-slate-50/50 transition-colors">
                                                 <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl ${esPagoUnico ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-purple-50 border-purple-100 text-purple-600'} border flex items-center justify-center flex-shrink-0 mt-0.5`}>
@@ -720,17 +723,28 @@ export default function CotizacionDetalle() {
                                                                 {mod.cantidad} {formatUnitLabel(mod.unidad, Number(mod.cantidad), mod.tipo)} × ${Number(mod.precio_unitario || (monto / Number(mod.cantidad))).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                                             </span>
                                                         )}
-                                                        {esPagoUnico && (
+                                                        {esHibrido ? (
+                                                            <span className="bg-indigo-100 text-indigo-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter flex-shrink-0">
+                                                                PLAN (${recurrenteVal.toLocaleString()}/año) + SETUP (${pagoUnicoVal.toLocaleString()} ÚNICO)
+                                                            </span>
+                                                        ) : esPagoUnico ? (
                                                             <span className="bg-orange-100 text-orange-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter flex-shrink-0">PAGO ÚNICO</span>
+                                                        ) : (
+                                                            <span className="bg-purple-100 text-purple-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter flex-shrink-0">MÓDULO ADICIONAL</span>
                                                         )}
                                                     </div>
                                                     {mod.descripcion && (
                                                         <p className="text-xs text-slate-500 leading-relaxed">{mod.descripcion}</p>
                                                     )}
                                                 </div>
-                                                <span className="font-black text-slate-900 text-sm sm:text-lg tabular-nums flex-shrink-0 pt-0.5 pl-2">
-                                                    ${monto.toLocaleString()}
-                                                </span>
+                                                <div className="text-right flex-shrink-0 pt-0.5 pl-2">
+                                                    <span className="font-black text-slate-900 text-sm sm:text-lg tabular-nums">
+                                                        ${monto.toLocaleString()}
+                                                    </span>
+                                                    {esHibrido && (
+                                                        <p className="text-[10px] text-slate-400 font-medium">${recurrenteVal.toLocaleString()}/año + ${pagoUnicoVal.toLocaleString()} setup</p>
+                                                    )}
+                                                </div>
                                             </div>
                                         );
                                     })}
