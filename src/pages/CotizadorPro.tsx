@@ -613,14 +613,16 @@ export default function CotizadorPro() {
             );
 
             // Preparar modulos y servicios generales para modulos_adicionales con desglose completo
-            const todosLosItems = [
+            const rawSelectedItems = [
                 ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
                 ...servicios.filter(s =>
                     formData.servicios_ids.includes(s.id) &&
                     !s.nombre.toLowerCase().includes('whatsapp') &&
                     !s.nombre.toLowerCase().includes('personaliz')
                 )
-            ].map(item => {
+            ];
+
+            const todosLosItems = rawSelectedItems.map(item => {
                 const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
                 const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
                 const needsQty = item.modelo_precio === 'por_unidad' || item.modelo_precio === 'por_hora' || tracksStock;
@@ -668,7 +670,7 @@ export default function CotizadorPro() {
             });
 
             // Buscar costo de implementación híbrida si aplica
-            const costoImpHibridosGen = itemsSeleccionados
+            const costoImpHibridosGen = rawSelectedItems
                 .filter(i => (i.pago_unico || 0) > 0 && ((i.precio_anual || 0) > 0 || (i.precio_mensual || 0) > 0))
                 .reduce((s, it) => s + (it.pago_unico || 0), 0);
 
