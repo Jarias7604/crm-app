@@ -440,39 +440,39 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
         {/* Servicios Tab — Historial y Consolidado de Productos/Planes Contratados */}
         {activeTab === 'servicios' && client && (
           <div className="flex-1 overflow-y-auto p-5 space-y-5">
-            {/* KPI Header Bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/70">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Servicios Activos</p>
-                <p className="text-xl font-black text-slate-900 mt-0.5">{contracts.length}</p>
-                <p className="text-[10px] text-slate-500 font-medium mt-0.5">Planes y suscripciones</p>
+            {/* Minimalist Executive KPI Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50/70 p-2 rounded-xl border border-slate-200/60">
+              <div className="bg-white p-2.5 rounded-lg border border-slate-200/50 shadow-2xs">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Servicios</span>
+                <p className="text-sm font-black text-slate-900 font-mono mt-0.5">{contracts.length}</p>
+                <span className="text-[8.5px] text-slate-400 block truncate">Planes activos</span>
               </div>
 
-              <div className="p-3.5 bg-indigo-50/50 rounded-2xl border border-indigo-100">
-                <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest">Valor Contratado</p>
-                <p className="text-xl font-black text-indigo-950 mt-0.5">
-                  ${contracts.reduce((acc, c) => acc + (c.monto_total || 0), 0).toLocaleString()} USD
+              <div className="bg-white p-2.5 rounded-lg border border-slate-200/50 shadow-2xs">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Valor Contratado</span>
+                <p className="text-sm font-black text-slate-900 font-mono mt-0.5">
+                  ${contracts.reduce((acc, c) => acc + (c.monto_total || 0), 0).toLocaleString()}
                 </p>
-                <p className="text-[10px] text-indigo-600 font-medium mt-0.5">Monto global acordado</p>
+                <span className="text-[8.5px] text-slate-400 block truncate">Total acordado</span>
               </div>
 
-              <div className="p-3.5 bg-emerald-50/50 rounded-2xl border border-emerald-100">
-                <p className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Cuota / Recurrente</p>
-                <p className="text-xl font-black text-emerald-950 mt-0.5">
-                  ${contracts.reduce((acc, c) => acc + (c.valor_cuota || 0), 0).toLocaleString()} USD
+              <div className="bg-white p-2.5 rounded-lg border border-slate-200/50 shadow-2xs">
+                <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider block">Recurrente</span>
+                <p className="text-sm font-black text-emerald-700 font-mono mt-0.5">
+                  ${contracts.reduce((acc, c) => acc + (c.valor_cuota || 0), 0).toLocaleString()}<span className="text-[9px] font-normal text-slate-400">/m</span>
                 </p>
-                <p className="text-[10px] text-emerald-600 font-medium mt-0.5">Facturación periódica</p>
+                <span className="text-[8.5px] text-emerald-600/80 block truncate">Facturación periódica</span>
               </div>
 
-              <div className="p-3.5 bg-purple-50/50 rounded-2xl border border-purple-100">
-                <p className="text-[10px] font-black text-purple-700 uppercase tracking-widest">Capacidad DTs</p>
-                <p className="text-xl font-black text-purple-950 mt-0.5">
+              <div className="bg-white p-2.5 rounded-lg border border-slate-200/50 shadow-2xs">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Capacidad</span>
+                <p className="text-sm font-black text-slate-900 font-mono mt-0.5 truncate">
                   {(() => {
                     const totalDtes = clientQuotes.reduce((acc, q) => acc + (q.volumen_dtes || 0), 0);
                     return totalDtes > 0 ? `${totalDtes.toLocaleString()} DTs` : 'Incluida';
                   })()}
                 </p>
-                <p className="text-[10px] text-purple-600 font-medium mt-0.5">Volumen transaccional</p>
+                <span className="text-[8.5px] text-slate-400 block truncate">Volumen DTs</span>
               </div>
             </div>
 
@@ -882,7 +882,7 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
                     </div>
                   </div>
 
-                  {/* 🚀 Bloque de Formalización & Arranque Go-Live */}
+                  {/* 🚀 Bloque Minimalista de Formalización Go-Live */}
                   {(() => {
                     const isGoLiveStage = selectedStage.es_final || activeStageIdx === sorted.length - 1 || selectedStage.nombre?.toLowerCase().includes('live');
                     if (!isGoLiveStage) return null;
@@ -890,177 +890,150 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
                     const clientContract = contracts.length > 0 ? contracts[0] : null;
 
                     return (
-                      <div className="bg-gradient-to-br from-indigo-50/90 via-white to-blue-50/70 rounded-2xl p-4 border border-indigo-200/80 shadow-xs space-y-3">
-                        <div className="flex items-center justify-between border-b border-indigo-100 pb-2.5">
+                      <div className="bg-slate-50/70 rounded-xl p-3 border border-slate-200/70 space-y-2.5">
+                        <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-                              <ShieldCheck className="w-4 h-4" />
+                            <div className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                              <ShieldCheck className="w-3.5 h-3.5" />
                             </div>
-                            <div>
-                              <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                                Formalización & Arranque Go-Live
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-100 text-indigo-800">Etapa Clave</span>
+                            <div className="flex items-center gap-1.5">
+                              <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wider">
+                                Formalización Go-Live
                               </h4>
-                              <p className="text-[10px] text-slate-500 font-medium">
-                                Vigencia de servicio, fecha inicio y recordatorios de vencimiento
-                              </p>
+                              <span className={`px-1.5 py-0.2 rounded text-[8.5px] font-black uppercase tracking-wider border ${
+                                clientContract 
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60' 
+                                  : 'bg-amber-50 text-amber-700 border-amber-200/60'
+                              }`}>
+                                {clientContract ? 'Formalizado' : 'Requerido'}
+                              </span>
                             </div>
                           </div>
 
-                          {canManage && (
+                          {clientContract && canManage && (
                             <button
                               type="button"
                               onClick={() => {
-                                setSelectedContractForEdit(clientContract || null);
+                                setSelectedContractForEdit(clientContract);
                                 setIsContractEditorOpen(true);
                               }}
-                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                              className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
                             >
-                              {clientContract ? (
-                                <>
-                                  <Pencil className="w-3.5 h-3.5" /> Editar Contrato
-                                </>
-                              ) : (
-                                <>
-                                  <Plus className="w-3.5 h-3.5" /> + Generar Contrato Go-Live
-                                </>
-                              )}
+                              <Pencil className="w-3 h-3" /> Editar
                             </button>
                           )}
                         </div>
 
                         {clientContract ? (
-                          <div className="space-y-3">
-                            <div className="p-3.5 bg-white rounded-xl border border-indigo-100 shadow-2xs space-y-2.5">
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                                    {clientContract.contract_number}
-                                  </span>
-                                  <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                                    clientContract.status === 'firmado'
-                                      ? 'bg-emerald-100 text-emerald-800'
-                                      : clientContract.status === 'enviado'
-                                      ? 'bg-blue-100 text-blue-800'
-                                      : 'bg-amber-100 text-amber-800'
-                                  }`}>
-                                    {clientContract.status === 'firmado' ? '✅ Firmado' : clientContract.status === 'enviado' ? '📤 Enviado' : '📝 Borrador'}
-                                  </span>
-                                </div>
-
-                                {/* Recordatorio de Vencimiento Badge */}
+                          <div className="p-2.5 bg-white rounded-lg border border-slate-200/60 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                {clientContract.contract_number}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                  clientContract.status === 'firmado'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : clientContract.status === 'enviado'
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                  {clientContract.status === 'firmado' ? '✅ Firmado' : clientContract.status === 'enviado' ? '📤 Enviado' : '📝 Borrador'}
+                                </span>
                                 {(() => {
                                   const exp = getContractExpirationInfo(clientContract.fecha_fin);
                                   return (
-                                    <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${exp.colorClass.badge}`}>
+                                    <span className={`text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full border ${exp.colorClass.badge}`}>
                                       {exp.label}
                                     </span>
                                   );
                                 })()}
                               </div>
+                            </div>
 
-                              <p className="text-xs font-bold text-slate-800">{clientContract.title}</p>
+                            <p className="text-xs font-bold text-slate-800 truncate">{clientContract.title}</p>
 
-                              {/* Grid de 4 Fechas Clave */}
-                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-100 text-[11px]">
-                                <div className="bg-slate-50 p-2 rounded-lg">
-                                  <span className="text-[9px] font-bold uppercase text-slate-400 block">Inicio Go-Live</span>
-                                  <span className="font-bold text-slate-800">{formatContractDate(clientContract.fecha_inicio)}</span>
-                                </div>
-                                <div className="bg-slate-50 p-2 rounded-lg">
-                                  <span className="text-[9px] font-bold uppercase text-slate-400 block">Vigencia</span>
-                                  <span className="font-bold text-slate-800">{clientContract.vigencia_meses} meses</span>
-                                </div>
-                                <div className="bg-slate-50 p-2 rounded-lg">
-                                  <span className="text-[9px] font-bold uppercase text-slate-400 block">Vencimiento</span>
-                                  <span className="font-bold text-slate-800">{formatContractDate(clientContract.fecha_fin)}</span>
-                                </div>
-                                <div className="bg-slate-50 p-2 rounded-lg">
-                                  <span className="text-[9px] font-bold uppercase text-slate-400 block">1er Cobro</span>
-                                  <span className="font-bold text-emerald-700">
-                                    {formatContractDate(clientContract.fecha_primer_cobro || clientContract.fecha_inicio)}
-                                  </span>
-                                  {(clientContract.meses_gracia ?? 0) > 0 && (
-                                    <span className="text-[9px] text-amber-600 font-bold block">({clientContract.meses_gracia}m gratis)</span>
-                                  )}
-                                </div>
+                            <div className="grid grid-cols-4 gap-1.5 pt-1.5 border-t border-slate-100 text-[10px]">
+                              <div>
+                                <span className="text-[8.5px] text-slate-400 block">Inicio</span>
+                                <span className="font-bold text-slate-700">{formatContractDate(clientContract.fecha_inicio)}</span>
                               </div>
+                              <div>
+                                <span className="text-[8.5px] text-slate-400 block">Vigencia</span>
+                                <span className="font-bold text-slate-700">{clientContract.vigencia_meses}m</span>
+                              </div>
+                              <div>
+                                <span className="text-[8.5px] text-slate-400 block">Vencimiento</span>
+                                <span className="font-bold text-slate-700">{formatContractDate(clientContract.fecha_fin)}</span>
+                              </div>
+                              <div>
+                                <span className="text-[8.5px] text-slate-400 block">1er Cobro</span>
+                                <span className="font-bold text-emerald-700">{formatContractDate(clientContract.fecha_primer_cobro || clientContract.fecha_inicio)}</span>
+                                {(clientContract.meses_gracia ?? 0) > 0 && (
+                                  <span className="text-[8px] text-amber-600 font-bold block">({clientContract.meses_gracia}m gratis)</span>
+                                )}
+                              </div>
+                            </div>
 
-                              {clientContract.notas && (
-                                <p className="text-[10px] text-slate-500 italic bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                  📌 Acuerdos Go-Live: {clientContract.notas}
-                                </p>
-                              )}
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[10px]">
+                              <a
+                                href={`/contrato/${clientContract.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 text-[10px]"
+                              >
+                                <ExternalLink className="w-3 h-3" /> Ver enlace público
+                              </a>
 
-                              {/* Acciones de Contrato */}
-                              <div className="flex items-center justify-between pt-1 text-xs">
-                                <a
-                                  href={`/contrato/${clientContract.id}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 text-[11px]"
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setContractForShare(clientContract);
+                                    setIsContractShareOpen(true);
+                                  }}
+                                  className="p-1 text-slate-500 hover:text-indigo-600 rounded transition-colors"
+                                  title="Compartir enlace / WhatsApp"
                                 >
-                                  <ExternalLink className="w-3 h-3" /> Ver Enlace Público
-                                </a>
-
-                                <div className="flex items-center gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setContractForShare(clientContract);
-                                      setIsContractShareOpen(true);
-                                    }}
-                                    className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                                    title="Compartir enlace / WhatsApp"
-                                  >
-                                    <Send className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      try {
-                                        await contractPdfService.downloadContractPDF(clientContract);
-                                        toast.success('PDF descargado');
-                                      } catch {
-                                        toast.error('Error al generar PDF');
-                                      }
-                                    }}
-                                    className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                                    title="Descargar PDF"
-                                  >
-                                    <Download className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
+                                  <Send className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    try {
+                                      await contractPdfService.downloadContractPDF(clientContract);
+                                      toast.success('PDF descargado');
+                                    } catch {
+                                      toast.error('Error al generar PDF');
+                                    }
+                                  }}
+                                  className="p-1 text-slate-500 hover:text-slate-800 rounded transition-colors"
+                                  title="Descargar PDF"
+                                >
+                                  <Download className="w-3 h-3" />
+                                </button>
                               </div>
                             </div>
                           </div>
                         ) : (
-                          <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-3">
-                            <div className="flex items-start gap-2.5">
-                              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                              <div className="space-y-1">
-                                <p className="text-xs font-bold text-amber-900">
-                                  Formalización de Contrato Go-Live Requerida
-                                </p>
-                                <p className="text-[11px] text-amber-700 leading-relaxed">
-                                  Formaliza el contrato para definir la fecha de arranque, vigencia y meses gratis antes de promover a Cliente Activo.
-                                </p>
-                              </div>
-                            </div>
+                          <div className="p-3 bg-white rounded-lg border border-slate-200/70 space-y-2.5">
+                            <p className="text-[11px] text-slate-500 font-medium">
+                              Configura los acuerdos de arranque antes de promover a Cliente Activo:
+                            </p>
 
                             {canManage && (
-                              <div className="bg-white p-3 rounded-lg border border-amber-100 space-y-2.5">
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <div className="space-y-2.5">
+                                <div className="grid grid-cols-2 gap-2 text-xs">
                                   <div>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Vigencia</span>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Vigencia</span>
                                     <div className="flex gap-1">
                                       {[3, 6, 12, 24].map(v => (
                                         <button
                                           key={v}
                                           type="button"
                                           onClick={() => setGoLiveVigencia(v)}
-                                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                                            goLiveVigencia === v ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                          className={`flex-1 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                                            goLiveVigencia === v ? 'bg-indigo-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                           }`}
                                         >
                                           {v}m
@@ -1070,15 +1043,15 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
                                   </div>
 
                                   <div>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Meses gratis (Gracia)</span>
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase block mb-1">Meses Gracia</span>
                                     <div className="flex gap-1">
                                       {[0, 1, 2, 3].map(g => (
                                         <button
                                           key={g}
                                           type="button"
                                           onClick={() => setGoLiveGracia(g)}
-                                          className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                                            goLiveGracia === g ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                          className={`flex-1 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                                            goLiveGracia === g ? 'bg-amber-500 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                           }`}
                                         >
                                           {g === 0 ? '0' : `${g}m`}
@@ -1094,9 +1067,9 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
                                     setSelectedContractForEdit(null);
                                     setIsContractEditorOpen(true);
                                   }}
-                                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
+                                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer active:scale-98"
                                 >
-                                  <Sparkles className="w-3.5 h-3.5" /> Generar Contrato Go-Live ({goLiveVigencia} meses{goLiveGracia > 0 ? `, ${goLiveGracia}m gratis` : ''})
+                                  <Sparkles className="w-3.5 h-3.5" /> Generar Contrato ({goLiveVigencia} meses{goLiveGracia > 0 ? `, ${goLiveGracia}m gratis` : ''})
                                 </button>
                               </div>
                             )}
@@ -1122,14 +1095,14 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
 
         {/* Footer: advance button */}
         {!loading && client && !client.es_activo && canManage && (
-          <div className="p-4 border-t border-gray-100 flex flex-col gap-2">
+          <div className="p-3 border-t border-slate-100 flex flex-col gap-2 bg-slate-50/30">
             {isLastStage && !contracts.some(c => c.status === 'firmado') && (
-              <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200/80 rounded-xl text-[11px] text-amber-800">
+              <div className="flex items-center gap-2 p-2 bg-amber-50/70 border border-amber-200/60 rounded-lg text-[10px] text-amber-800 font-medium">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
                 <span>
                   {contracts.length === 0
-                    ? 'Recomendación Go-Live: Genera el contrato formal antes de promover a Cliente Activo.'
-                    : 'Recomendación Go-Live: El contrato aún no está firmado por el cliente.'}
+                    ? 'Recomendación: Formaliza el contrato antes de promover a Cliente Activo.'
+                    : 'Aviso: El contrato aún no ha sido marcado como firmado.'}
                 </span>
               </div>
             )}
@@ -1139,25 +1112,25 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
                   onClick={handleRevertStage}
                   disabled={reverting || advancing}
                   title="Regresar a etapa anterior"
-                  className="flex items-center justify-center px-4 py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-bold transition-all disabled:opacity-50 border border-red-100/50"
+                  className="flex items-center justify-center px-3.5 py-2.5 bg-white text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-xl text-xs font-bold transition-all disabled:opacity-50 border border-slate-200 cursor-pointer"
                 >
-                  {reverting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Regresar etapa'}
+                  {reverting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Regresar etapa'}
                 </button>
               )}
               <button
                 onClick={handleAdvanceStage}
                 disabled={advancing || reverting}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-black transition-all shadow-xs cursor-pointer active:scale-98 ${
                   isLastStage
-                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white'
                     : 'bg-[#4449AA] hover:bg-[#3338a0] text-white'
                 } disabled:opacity-60`}
               >
                 {advancing
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   : isLastStage
                   ? '🎉 Promover a Cliente Activo'
-                  : <>Completar etapa y avanzar <ChevronRight className="w-4 h-4" /></>
+                  : <>Completar etapa y avanzar <ChevronRight className="w-3.5 h-3.5" /></>
                 }
               </button>
             </div>
