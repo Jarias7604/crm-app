@@ -241,8 +241,10 @@ export const pdfService = {
             doc.setFontSize(7);
             doc.text('PLAN SELECCIONADO', sX + 32.5, sY - 3, { align: 'center' });
             doc.setTextColor(79, 70, 229);
-            doc.setFontSize(14);
-            doc.text((cotizacion.plan_nombre || 'PLAN').toUpperCase(), sX + 32.5, sY + 5, { align: 'center' });
+            const planHeaderTitle = (cotizacion.plan_nombre || 'PLAN').toUpperCase();
+            const planFontSize = planHeaderTitle.length > 20 ? 8.5 : (planHeaderTitle.length > 14 ? 10.5 : 13);
+            doc.setFontSize(planFontSize);
+            doc.text(planHeaderTitle, sX + 32.5, sY + 5, { align: 'center' });
             doc.setTextColor(100, 116, 139);
             doc.setFontSize(6);
             // Solo mostrar DTEs/año si el tenant usa volumen DTE (facturación electrónica)
@@ -307,12 +309,15 @@ export const pdfService = {
             };
 
             // Main Items
-            drawRow(`Licencia Anual ${cotizacion.plan_nombre}`, cotizacion.costo_plan_anual || 0, false, planDescription);
-            if (cotizacion.incluir_implementacion && Number(cotizacion.costo_implementacion) > 0) {
-                drawRow('Implementación y Configuración', cotizacion.costo_implementacion || 0, true);
+            if (Number(cotizacion.costo_plan_anual) > 0) {
+                const planLabel = cotizacion.plan_nombre ? ` ${cotizacion.plan_nombre}` : '';
+                drawRow(`Licencia Anual${planLabel}`, Number(cotizacion.costo_plan_anual), false, planDescription);
             }
-            if (cotizacion.servicio_whatsapp) {
-                drawRow('Comunicación WhatsApp', cotizacion.costo_whatsapp || 0);
+            if (cotizacion.incluir_implementacion && Number(cotizacion.costo_implementacion) > 0) {
+                drawRow('Implementación y Configuración', Number(cotizacion.costo_implementacion), true);
+            }
+            if (cotizacion.servicio_whatsapp && Number(cotizacion.costo_whatsapp) > 0) {
+                drawRow('Comunicación WhatsApp', Number(cotizacion.costo_whatsapp));
             }
             // ⚠️  BLOQUE CRÍTICO — NO MODIFICAR SIN LEER ESTO ⚠️
             // ─────────────────────────────────────────────────────────────────
@@ -456,8 +461,9 @@ export const pdfService = {
                 const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
 
                 // Calcular número de líneas que se van a dibujar
+                const licenciaBase = Number(cotizacion.costo_plan_anual) || 0;
                 let numLineasInicial = (implementacionBase > 0 ? 1 : 0) + serviciosUnicos.length + (descuentoImplementacionMonto > 0 ? 1 : 0) + 1; // +1 para IVA
-                let numLineasRecurrente = 1 + serviciosRec.length + (costoWhatsApp > 0 ? 1 : 0) + (financials.recargoFinanciamiento > 0 ? 1 : 0) + (descuentoManualMonto > 0 ? 1 : 0) + 1 + 1; // Licencia + módulos + WhatsApp + Financiamiento + Descuento + IVA + Total Plan
+                let numLineasRecurrente = (licenciaBase > 0 ? 1 : 0) + serviciosRec.length + (costoWhatsApp > 0 ? 1 : 0) + (financials.recargoFinanciamiento > 0 ? 1 : 0) + (descuentoManualMonto > 0 ? 1 : 0) + 1 + 1; // Licencia + módulos + WhatsApp + Financiamiento + Descuento + IVA + Total Plan
 
                 const numLineas = isRecurrent ? numLineasRecurrente : numLineasInicial;
                 const lineHeight = 4;
@@ -548,9 +554,12 @@ export const pdfService = {
                     let lineY = y + 18;
 
                     // Licencia
-                    doc.text(`Licencia ${cotizacion.plan_nombre}`, x + 7, lineY);
-                    doc.text(`$${licenciaBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
-                    lineY += lineHeight;
+                    if (licenciaBase > 0) {
+                        const planLabel = cotizacion.plan_nombre ? ` ${cotizacion.plan_nombre}` : '';
+                        doc.text(`Licencia${planLabel}`, x + 7, lineY);
+                        doc.text(`$${licenciaBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+                        lineY += lineHeight;
+                    }
 
                     // Módulos recurrentes
                     serviciosRec.forEach((serv: any) => {
@@ -742,13 +751,15 @@ export const pdfService = {
                     doc.setFontSize(6);
 
                     // Licencia base
-                    doc.setTextColor(100, 116, 139);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text('Licencia ' + (cotizacion.plan_nombre || ''), colX + 5, lineY);
-                    doc.setTextColor(51, 65, 85);
-                    doc.setFont('helvetica', 'bold');
-                    doc.text(`$${licenciaBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
-                    lineY += lineH;
+                    if (licenciaBase > 0) {
+                        doc.setTextColor(100, 116, 139);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text('Licencia ' + (cotizacion.plan_nombre || ''), colX + 5, lineY);
+                        doc.setTextColor(51, 65, 85);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`$${licenciaBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
+                        lineY += lineH;
+                    }
 
                     // Módulos recurrentes adicionales
                     const _planModulosRec = parseModules(cotizacion.modulos_adicionales)
