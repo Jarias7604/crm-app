@@ -6,12 +6,14 @@ import React, { useState, useEffect } from 'react';
 import {
     Award, ShieldAlert, CheckCircle2, TrendingUp, Users, Calendar,
     ExternalLink, Sparkles, Flame, ChevronRight, FileText, Target,
-    Filter, X, Copy, Check, BarChart2, AlertTriangle, Layers, ArrowRight
+    Filter, X, Copy, Check, BarChart2, AlertTriangle, Layers, ArrowRight,
+    Lightbulb
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { salesAuditService } from '../../services/salesAuditService';
 import type { SalesCallAudit, RubricCriterionScore } from '../../types/salesExcellence';
 import { OFFICIAL_ARIAS_RUBRIC } from '../../types/salesExcellence';
+import { RealCoachingOpportunitiesModal } from '../company/RealCoachingOpportunitiesModal';
 
 interface SalesExcellenceAuditsSectionProps {
     companyId: string;
@@ -62,6 +64,8 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
     const [selectedRep, setSelectedRep] = useState<string | null>(null);
     const [activeCoachingTab, setActiveCoachingTab] = useState<'aggregate' | 'single'>('aggregate');
     const [copiedPlan, setCopiedPlan] = useState(false);
+    const [isCoachingModalOpen, setIsCoachingModalOpen] = useState(false);
+    const [coachingModalDemoId, setCoachingModalDemoId] = useState<string | undefined>(undefined);
 
     // Resuelve la foto de perfil oficial o avatar ejecutivo de alta resolución
     const getExecutiveAvatar = (repKey: string, displayName: string): string => {
@@ -652,16 +656,30 @@ ${activeDiagnostic.actionRequired}
                                 </button>
                             </div>
 
-                            {activeCoachingTab === 'aggregate' && activeDiagnostic && (
+                            <div className="flex items-center gap-2">
                                 <button
-                                    onClick={handleCopyCoachingReport}
-                                    className="px-2.5 py-1 text-[11px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-all flex items-center gap-1 cursor-pointer border border-indigo-100"
-                                    title="Copiar informe para sesión de coaching 1:1"
+                                    onClick={() => {
+                                        setCoachingModalDemoId(undefined);
+                                        setIsCoachingModalOpen(true);
+                                    }}
+                                    className="px-3 py-1.5 text-xs font-black text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer border border-amber-300 shadow-xs"
+                                    title="Ver momentos reales de Google Meet y las preguntas que debió hacer el asesor"
                                 >
-                                    {copiedPlan ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                                    {copiedPlan ? 'Copiado' : 'Copiar Plan 1:1'}
+                                    <Lightbulb className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                                    <span>💡 Ver Preguntas que Debió Hacer</span>
                                 </button>
-                            )}
+
+                                {activeCoachingTab === 'aggregate' && activeDiagnostic && (
+                                    <button
+                                        onClick={handleCopyCoachingReport}
+                                        className="px-2.5 py-1 text-[11px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-all flex items-center gap-1 cursor-pointer border border-indigo-100"
+                                        title="Copiar informe para sesión de coaching 1:1"
+                                    >
+                                        {copiedPlan ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                        {copiedPlan ? 'Copiado' : 'Copiar Plan 1:1'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* PESTAÑA 1: DIAGNÓSTICO GLOBAL CONSOLIDADO (El resumen de todas las 7 o 25 demos) */}
@@ -847,12 +865,36 @@ ${activeDiagnostic.actionRequired}
                                             {selectedAudit.coaching_summary.immediate_action}
                                         </p>
                                     </div>
+
+                                    <div className="pt-2">
+                                        <button
+                                            onClick={() => {
+                                                setCoachingModalDemoId(selectedAudit.id);
+                                                setIsCoachingModalOpen(true);
+                                            }}
+                                            className="w-full py-2.5 px-4 text-xs font-black text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                                        >
+                                            <Lightbulb className="w-4 h-4 text-amber-600" />
+                                            <span>Ver Oportunidades & Preguntas para esta Demo</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
                     </div>
                 </div>
             )}
+
+            {/* Modal de Oportunidades Reales & Preguntas Clave (Coach de Ventas ARIAS) */}
+            <RealCoachingOpportunitiesModal
+                isOpen={isCoachingModalOpen}
+                onClose={() => setIsCoachingModalOpen(false)}
+                repName={selectedRep || (selectedAudit?.sales_rep_name || 'Diana Morales')}
+                repAvatar={getExecutiveAvatar(selectedRep || 'Diana Morales', selectedRep || 'Diana Morales')}
+                totalDemos={activeDiagnostic?.totalDemos || 7}
+                avgScore={activeDiagnostic?.avgScore || 36}
+                initialDemoId={coachingModalDemoId}
+            />
         </div>
     );
 };
