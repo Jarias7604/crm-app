@@ -135,11 +135,14 @@ export const RealCoachingOpportunitiesModal: React.FC<RealCoachingOpportunitiesM
                     </div>
                 </div>
 
-                {/* ─── SELECTOR HORIZONTAL DE CASOS REALES DE LLAMADAS ─── */}
-                <div className="px-6 py-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center gap-2 overflow-x-auto text-xs">
-                    <span className="font-bold text-slate-400 text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-1">
-                        <Building2 className="w-3.5 h-3.5 text-indigo-500" />
-                        Reunión:
+                {/* ─── SELECTOR HORIZONTAL DE CLIENTES REALES AUDITADOS (0 DUPLICADOS) ─── */}
+                <div 
+                    className="px-6 py-2 bg-slate-50 border-b border-slate-200/80 flex items-center gap-2 overflow-x-auto text-xs select-none"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                    <span className="font-bold text-slate-400 text-[10px] uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
+                        <Target className="w-3.5 h-3.5 text-indigo-500" />
+                        Cliente:
                     </span>
                     {repOpportunities.map((opp, idx) => {
                         const isCurrent = idx === activeCaseIndex;
@@ -150,18 +153,21 @@ export const RealCoachingOpportunitiesModal: React.FC<RealCoachingOpportunitiesM
                                     setActiveCaseIndex(idx);
                                     setActiveInteractiveStep(1); // Reiniciar al paso 1
                                 }}
-                                className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                                className={`px-2.5 py-1.5 rounded-xl font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 text-xs ${
                                     isCurrent
                                         ? 'bg-slate-900 text-white shadow-xs'
                                         : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100 hover:text-slate-900'
                                 }`}
+                                title={`${opp.clientName} (${opp.clientCompanyType})`}
                             >
-                                <span className="w-4 h-4 rounded-full bg-indigo-500/20 text-indigo-400 text-[10px] font-black flex items-center justify-center">
+                                <span className={`w-4 h-4 rounded-full text-[10px] font-black flex items-center justify-center ${
+                                    isCurrent ? 'bg-indigo-500 text-white' : 'bg-indigo-50 text-indigo-600'
+                                }`}>
                                     {idx + 1}
                                 </span>
-                                <span>{opp.clientName}</span>
-                                <span className="text-[10px] font-semibold text-slate-400">
-                                    ({opp.minuteTimestamp})
+                                <span className="truncate max-w-[130px]">{opp.clientName}</span>
+                                <span className={`text-[10px] font-medium ${isCurrent ? 'text-slate-300' : 'text-slate-400'}`}>
+                                    {opp.minuteTimestamp}
                                 </span>
                             </button>
                         );

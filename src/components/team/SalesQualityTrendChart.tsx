@@ -29,12 +29,12 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
         { date: 'Oct 06', label: 'Oct 6', scoreTeam: 27, scoreDiana: 25, scorePatricia: 31, demos: 1, client: 'Transportes Express', milestone: 'Patricia M. · Módulo contratos' },
         { date: 'Oct 09', label: 'Oct 9', scoreTeam: 27, scoreDiana: 27, scorePatricia: 27, demos: 1, client: 'Kervin Roque', milestone: 'Patricia M. · Empresa de servicios' },
         { date: 'Oct 12', label: 'Oct 12', scoreTeam: 31, scoreDiana: 32, scorePatricia: 29, demos: 1, client: 'Comercializadora del Valle', milestone: 'Diana M. · Reportería y costos' },
-        { date: 'Oct 15', label: 'Oct 15', scoreTeam: 34, scoreDiana: 34, scorePatricia: 29, demos: 2, client: 'Luis Escobar', milestone: 'Grecia SDR / Diana AE · POS 8 días' },
+        { date: 'Oct 15', label: 'Oct 15', scoreTeam: 34, scoreDiana: 34, scorePatricia: 29, demos: 1, client: 'Luis Escobar', milestone: 'Grecia SDR / Diana AE · POS 8 días' },
         { date: 'Oct 18', label: 'Oct 18', scoreTeam: 36, scoreDiana: 37, scorePatricia: 32, demos: 1, client: 'Supermercados La Canasta', milestone: 'Diana M. · Diagnóstico de caja' },
         { date: 'Oct 21', label: 'Oct 21', scoreTeam: 37, scoreDiana: 38, scorePatricia: 34, demos: 1, client: 'Agropecuaria El Roble', milestone: 'Diana M. · Adopción de agenda' },
         { date: 'Oct 25', label: 'Oct 25', scoreTeam: 41, scoreDiana: 42, scorePatricia: 36, demos: 1, client: 'Distribuidora San José', milestone: 'Diana M. · Manejo de objeciones' },
-        { date: 'Oct 28', label: 'Oct 28', scoreTeam: 45, scoreDiana: 45, scorePatricia: 37, demos: 2, client: 'Finca Miramar', milestone: 'Diana M. · Pico de calidad (45 pts)' },
-        { date: 'Oct 30', label: 'Oct 30', scoreTeam: 45, scoreDiana: 45, scorePatricia: 37, demos: 1, client: 'Cierre del Mes', milestone: 'Consolidación de rúbrica' }
+        { date: 'Oct 28', label: 'Oct 28', scoreTeam: 45, scoreDiana: 45, scorePatricia: 37, demos: 1, client: 'Finca Miramar', milestone: 'Diana M. · Pico de calidad (45 pts)' },
+        { date: 'Oct 30', label: 'Oct 30', scoreTeam: 45, scoreDiana: 45, scorePatricia: 37, demos: 0, client: 'Cierre del Mes', milestone: 'Consolidación de rúbrica' }
     ];
 
     const chartData = useMemo(() => {
