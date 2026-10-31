@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode, Box, ShieldCheck, ExternalLink } from 'lucide-react';
+import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode, Box, ShieldCheck, ExternalLink, Flame, Sparkles } from 'lucide-react';
+import { LiveDemoHUDModal } from './LiveDemoHUDModal';
+import { GeminiAuditModal } from './GeminiAuditModal';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { leadProductsService } from '../../services/leadProducts';
@@ -126,6 +128,10 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const [selectedCotizacionForContract, setSelectedCotizacionForContract] = useState<Cotizacion | null>(null);
     const [isQuotePickerOpen, setIsQuotePickerOpen] = useState(false);
     const [isNoQuoteWarningOpen, setIsNoQuoteWarningOpen] = useState(false);
+
+    // ARIAS Sales Excellence & Gemini HUD
+    const [isDemoHUDOpen, setIsDemoHUDOpen] = useState(false);
+    const [isGeminiAuditOpen, setIsGeminiAuditOpen] = useState(false);
 
     const handleInitiateContractCreation = () => {
         if (leadCotizaciones.length === 0) {
@@ -369,6 +375,52 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         className="flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-700 rounded-xl font-bold text-[11px] hover:bg-[#25D366] hover:text-white hover:border-[#25D366] transition-all border border-slate-200 shadow-sm group"
                                     >
                                         <Smartphone className="w-4 h-4 text-[#25D366] group-hover:text-white" /> WhatsApp
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* ARIAS Sales Excellence & Gemini HUD Card */}
+                            <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-900 rounded-2xl p-5 border border-indigo-500/30 shadow-md space-y-3 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none -mr-6 -mt-6"></div>
+                                <div className="flex items-center justify-between border-b border-indigo-500/20 pb-3 relative z-10">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                                            <Flame className="w-3.5 h-3.5 text-amber-400" />
+                                        </div>
+                                        <span className="text-[11px] font-black uppercase text-white tracking-wider">
+                                            Arias Sales Excellence
+                                        </span>
+                                    </div>
+                                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                        Método Oficial
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2.5 relative z-10">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsDemoHUDOpen(true)}
+                                        className="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-indigo-500/30 hover:border-indigo-400 transition-all text-left group cursor-pointer"
+                                    >
+                                        <div className="flex items-center gap-1.5 text-indigo-300 font-black text-[11px] mb-1">
+                                            <span>🎯 Guion Demo HUD</span>
+                                        </div>
+                                        <span className="text-[10px] text-slate-400 leading-tight">
+                                            7 preguntas obligatorias y objeciones en vivo
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsGeminiAuditOpen(true)}
+                                        className="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-indigo-500/30 hover:border-violet-400 transition-all text-left group cursor-pointer"
+                                    >
+                                        <div className="flex items-center gap-1.5 text-violet-300 font-black text-[11px] mb-1">
+                                            <span>⚡ Auditar Gemini</span>
+                                        </div>
+                                        <span className="text-[10px] text-slate-400 leading-tight">
+                                            Evalúa notas de Google Meet (100 pts)
+                                        </span>
                                     </button>
                                 </div>
                             </div>
@@ -1377,6 +1429,27 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             }}
                         />
                     )}
+
+                    {/* Live Demo HUD Modal */}
+                    <LiveDemoHUDModal
+                        isOpen={isDemoHUDOpen}
+                        onClose={() => setIsDemoHUDOpen(false)}
+                        leadName={selectedLead.name}
+                        leadCompany={selectedLead.company_name}
+                        onApplyFindings={async (notes) => {
+                            const currentNotes = selectedLead.next_action_notes ? `${selectedLead.next_action_notes}\n\n` : '';
+                            await handleUpdateLead({ next_action_notes: `${currentNotes}${notes}` });
+                        }}
+                    />
+
+                    {/* Gemini Audit Modal */}
+                    <GeminiAuditModal
+                        isOpen={isGeminiAuditOpen}
+                        onClose={() => setIsGeminiAuditOpen(false)}
+                        lead={selectedLead}
+                        profile={profile}
+                        onLeadUpdated={handleUpdateLead}
+                    />
                 </div>
             );
 };

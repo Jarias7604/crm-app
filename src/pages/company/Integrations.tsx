@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import {
   Calendar, Webhook, Key, CheckCircle, ExternalLink, Plus, Trash2,
-  AlertCircle, ChevronRight, Globe, Copy, RefreshCw, X, Check, Mail, Monitor
+  AlertCircle, ChevronRight, Globe, Copy, RefreshCw, X, Check, Mail, Monitor, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
 import SharedCalendarsManager from '../../components/company/SharedCalendarsManager';
+import { GeminiDriveManager } from '../../components/company/GeminiDriveManager';
 
 const WEBHOOK_EVENTS = [
   { key: 'lead.created', label: 'Lead Creado', desc: 'Se dispara cuando se crea un nuevo lead' },
@@ -24,7 +25,7 @@ interface WebhookForm {
   events: string[];
 }
 
-type TabType = 'calendar' | 'webhooks' | 'api';
+type TabType = 'calendar' | 'gemini_drive' | 'webhooks' | 'api';
 
 export default function Integrations() {
   const { profile } = useAuth();
@@ -184,12 +185,18 @@ export default function Integrations() {
           </div>
         </div>
 
-        <div className="flex p-1 bg-gray-100 rounded-2xl relative z-10">
+        <div className="flex p-1 bg-gray-100 rounded-2xl relative z-10 flex-wrap gap-1">
           <button
             onClick={() => setTab('calendar')}
             className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${tab === 'calendar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
           >
             <Calendar className="w-3.5 h-3.5" /> Calendar
+          </button>
+          <button
+            onClick={() => setTab('gemini_drive')}
+            className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${tab === 'gemini_drive' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Gemini & Google Drive
           </button>
           <button
             onClick={() => setTab('webhooks')}
@@ -315,6 +322,14 @@ export default function Integrations() {
           )}
 
         </div>
+      )}
+
+      {/* ── TAB: Gemini & Google Drive ────────────────────────────────────── */}
+      {tab === 'gemini_drive' && (
+        <GeminiDriveManager
+          companyId={profile?.company_id || ''}
+          isAdmin={profile?.role === 'company_admin' || profile?.role === 'super_admin'}
+        />
       )}
 
       {/* ── TAB: Webhooks ──────────────────────────────────────────────────── */}

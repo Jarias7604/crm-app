@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { ActivityDashboard } from '../../components/ActivityDashboard';
 import { AIPerformanceChat } from '../../components/AIPerformanceChat';
+import { SalesExcellenceAuditsSection } from '../../components/team/SalesExcellenceAuditsSection';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
 import {
@@ -172,7 +173,7 @@ export default function TeamPerformancePage() {
     const [teamPerformance, setTeamPerformance] = useState<TeamPerformance[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'users' | 'teams' | 'charts' | 'forecast' | 'calls'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'teams' | 'charts' | 'forecast' | 'calls' | 'audits'>('users');
     const [filters, setFilters] = useState<PerformanceFilters>({ period: 'all' });
 
     // Conversion rate calculation mode
@@ -524,6 +525,7 @@ export default function TeamPerformancePage() {
                         { key: 'users' as const, icon: Users, label: 'Por Persona' },
                         { key: 'teams' as const, icon: BarChart3, label: 'Por Equipo' },
                         { key: 'calls' as const, icon: PhoneCall, label: '📊 Actividad' },
+                        { key: 'audits' as const, icon: Award, label: '🎯 Auditoría Gemini' },
                         { key: 'charts' as const, icon: TrendingUp, label: 'Gráficas' },
                         { key: 'forecast' as const, icon: Target, label: '📊 Forecast' },
                     ] as const).map((tab) => (
@@ -580,6 +582,12 @@ export default function TeamPerformancePage() {
                     getUserGoal={getUserGoal}
                     conversionMode={conversionMode}
                     customConversionRate={customConversionRate}
+                />
+            ) : activeTab === 'audits' ? (
+                <SalesExcellenceAuditsSection
+                    companyId={profile?.company_id || ''}
+                    profileNames={profileNames}
+                    profileAvatars={profileAvatars}
                 />
             ) : activeTab === 'forecast' ? (
                 <ForecastSection companyId={profile?.company_id || ''} isAdmin={isAdmin} />
