@@ -390,21 +390,40 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                         </span>
                     </div>
 
-                    {/* Input Palabra Clave Obligatoria (DEMO) */}
+                    {/* Input Palabra Clave Obligatoria (DEMO / DEMO 1) */}
                     <div className="space-y-1.5 md:col-span-1">
-                        <label className="block font-bold text-slate-700">
-                            Palabra Clave Obligatoria en el Título:
-                        </label>
+                        <div className="flex items-center justify-between">
+                            <label className="font-bold text-slate-700">
+                                Palabra Clave Obligatoria:
+                            </label>
+                            <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-full">
+                                100% Dinámico
+                            </span>
+                        </div>
                         <input
                             type="text"
                             value={requiredKeyword}
                             onChange={(e) => setRequiredKeyword(e.target.value)}
-                            placeholder="DEMO, Demo"
-                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs focus:outline-none focus:border-indigo-500 focus:bg-white"
+                            placeholder="ej: DEMO 1, DEMO ERP, DEMO"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs focus:outline-none focus:border-indigo-500 focus:bg-white font-mono font-bold"
                         />
-                        <span className="text-[10px] text-slate-400">
-                            Solo procesará reuniones que incluyan estas palabras (separadas por coma).
-                        </span>
+                        <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                            <span className="text-[10px] text-slate-400">Atajos:</span>
+                            {['DEMO', 'DEMO 1', 'DEMO ERP', 'DISCOVERY'].map(k => (
+                                <button
+                                    key={k}
+                                    type="button"
+                                    onClick={() => setRequiredKeyword(k)}
+                                    className={`text-[10px] px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                                        requiredKeyword.toLowerCase().trim() === k.toLowerCase()
+                                            ? 'bg-indigo-600 text-white shadow-xs'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    {k}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     {/* Input Patrón de Búsqueda */}
@@ -480,15 +499,19 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                     </label>
                 </div>
 
-                {/* Explicación de Carpeta en Google Drive */}
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 flex items-start gap-3">
+                {/* Explicación de Carpeta en Google Drive & Solución a Google */}
+                <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 text-xs text-slate-700 flex items-start gap-3">
                     <Database className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
                     <div>
-                        <strong className="text-slate-800 font-bold">¿Cómo garantizar que solo se procesen Demos comerciales?</strong>
-                        <p className="mt-0.5 text-slate-500 leading-relaxed text-[11px]">
-                            • <strong>Opción 1 (Por Título):</strong> Asegúrate de que tu equipo siempre use la palabra <strong>«Demo»</strong> en el título de la invitación de Google Calendar / Google Meet (ej: <em>«DEMO ERP - Cliente X»</em>). El filtro activo arriba descartará automáticamente cualquier otra reunión (como "Revisión bancos" o "Cobranzas").
+                        <strong className="text-indigo-950 font-bold">
+                            💡 Solución a la limitación de Google Workspace (Sin mover archivos a mano):
+                        </strong>
+                        <p className="mt-1 text-slate-600 leading-relaxed text-[11px]">
+                            Google Meet con Gemini <strong>no</strong> tiene automatización nativa para mover notas a carpetas; siempre las deposita dispersas en la raíz o en Actividad. Por eso este CRM resuelve el problema de raíz mediante <strong>Palabras Clave Dinámicas</strong>:
                             <br />
-                            • <strong>Opción 2 (Por Carpeta Dedicada):</strong> Si prefieres ordenar por carpetas, crea una carpeta en tu Google Drive (ej: <em>«Demos de Ventas»</em>), comparte esa carpeta con tus vendedoras y pega el enlace de la carpeta (<code>https://drive.google.com/drive/folders/...</code>) en el primer campo.
+                            • Si hoy tu equipo nombra las llamadas como <strong className="text-indigo-700 font-mono">DEMO</strong> o <strong className="text-indigo-700 font-mono">DEMO 1</strong>, solo escribes esa palabra clave arriba y el CRM absorberá <strong>únicamente</strong> esas reuniones, descartando reuniones internas, operativas o de contabilidad.
+                            <br />
+                            • Cada empresa administradora en el SaaS puede definir su propia palabra clave o enlace de Drive sin afectar a las demás.
                         </p>
                     </div>
                 </div>
