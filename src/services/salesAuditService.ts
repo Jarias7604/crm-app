@@ -24,16 +24,16 @@ export const salesAuditService = {
      * Analiza el texto de las notas generadas por Gemini (Google Meet)
      * y califica cada uno de los 9 criterios de la Rúbrica Oficial de 100 Puntos.
      */
-    async auditGeminiNotes(
+    evaluateNotesSync(
         notes: string,
         leadName: string,
         repName: string
-    ): Promise<{
+    ): {
         totalScore: number;
         rubricScores: RubricCriterionScore[];
         coachingSummary: AuditCoachingSummary;
         extractedData: ExtractedLeadData;
-    }> {
+    } {
         const lower = notes.toLowerCase();
 
         // ── 1. Preparación y agenda (10 pts)
@@ -327,6 +327,19 @@ export const salesAuditService = {
         };
     },
 
+    async auditGeminiNotes(
+        notes: string,
+        leadName: string,
+        repName: string
+    ): Promise<{
+        totalScore: number;
+        rubricScores: RubricCriterionScore[];
+        coachingSummary: AuditCoachingSummary;
+        extractedData: ExtractedLeadData;
+    }> {
+        return Promise.resolve(this.evaluateNotesSync(notes, leadName, repName));
+    },
+
     /**
      * Guarda la auditoría en Supabase o en cache local
      */
@@ -417,7 +430,8 @@ export const salesAuditService = {
                 .order('created_at', { ascending: false })
                 .limit(100);
 
-            const audits: SalesCallAudit[] = (!error && data && data.length > 0) ? data : this.getAllLocalAudits(companyId);
+            const localAudits = this.getAllLocalAudits(companyId);
+            const audits: SalesCallAudit[] = (!error && data && data.length >= localAudits.length) ? data : localAudits;
 
             if (audits.length === 0) {
                 return { totalAudits: 0, avgScore: 0, repAverages: {}, latestAudits: [] };
@@ -447,7 +461,13 @@ export const salesAuditService = {
                 latestAudits: audits.slice(0, 10)
             };
         } catch {
-            return { totalAudits: 0, avgScore: 0, repAverages: {}, latestAudits: [] };
+            const fallbackAudits = this.getAllLocalAudits(companyId);
+            return {
+                totalAudits: fallbackAudits.length,
+                avgScore: fallbackAudits.length ? Math.round(fallbackAudits.reduce((acc, a) => acc + a.total_score, 0) / fallbackAudits.length) : 0,
+                repAverages: {},
+                latestAudits: fallbackAudits.slice(0, 10)
+            };
         }
     },
 
@@ -484,12 +504,122 @@ export const salesAuditService = {
         return [];
     },
 
+    getCertifiedDemosAudits(companyId: string): SalesCallAudit[] {
+        const rawDemos = [
+            {
+                id: 'audit_finca_1859',
+                lead_id: 'lead_finca_miramar_1859',
+                sales_rep_name: 'Diana Morales',
+                created_at: '2026-10-27T18:59:00Z',
+                google_doc_url: 'https://drive.google.com/drive/activity',
+                clientName: 'Finca Miramar',
+                meeting_notes_raw: 'Demostración de catálogo, cotizaciones dinámicas y facturación electrónica para múltiples sucursales agrícolas.'
+            },
+            {
+                id: 'audit_finca_1723',
+                lead_id: 'lead_finca_miramar_1723',
+                sales_rep_name: 'Diana Morales',
+                created_at: '2026-10-27T17:23:00Z',
+                google_doc_url: 'https://drive.google.com/drive/activity',
+                clientName: 'Finca Miramar',
+                meeting_notes_raw: 'Revisión técnica de flujo de pedidos, módulos de nómina e integración contable.'
+            },
+            {
+                id: 'audit_finca_1712',
+                lead_id: 'lead_finca_miramar_1712',
+                sales_rep_name: 'Diana Morales',
+                created_at: '2026-10-27T17:12:00Z',
+                google_doc_url: 'https://drive.google.com/drive/activity',
+                clientName: 'Finca Miramar',
+                meeting_notes_raw: 'Configuración inicial de catálogo y validación de permisos de usuario para gerencia.'
+            },
+            {
+                id: 'audit_finca_1701',
+                lead_id: 'lead_finca_miramar_1701',
+                sales_rep_name: 'Diana Morales',
+                created_at: '2026-10-27T17:01:00Z',
+                google_doc_url: 'https://drive.google.com/drive/activity',
+                clientName: 'Finca Miramar',
+                meeting_notes_raw: 'Apertura de sesión, presentación de agenda y diagnóstico de dolor operativo en inventarios.'
+            },
+            {
+                id: 'audit_luis_escobar',
+                lead_id: 'lead_luis_escobar',
+                sales_rep_name: 'Grecia Vásquez',
+                created_at: '2026-10-27T15:00:00Z',
+                google_doc_url: 'https://docs.google.com/document/d/10gpzd_2sI2VPGxBOvcVNrFYR_0Ey9gevRE8ixtKhkKU/edit',
+                clientName: 'Luis Escobar',
+                meeting_notes_raw: 'Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
+            },
+            {
+                id: 'audit_arias_0957',
+                lead_id: 'lead_arias_general_0957',
+                sales_rep_name: 'Diana Morales',
+                created_at: '2026-10-27T09:57:00Z',
+                google_doc_url: 'https://drive.google.com/drive/activity',
+                clientName: 'Demo Arias ERP (Lead General)',
+                meeting_notes_raw: 'Presentación completa de funcionalidades core de ERP, reportería financiera y control de compras.'
+            },
+            {
+                id: 'audit_kervin_roque',
+                lead_id: 'lead_kervin_roque',
+                sales_rep_name: 'Patricia Martínez',
+                created_at: '2026-10-26T14:39:00Z',
+                google_doc_url: 'https://drive.google.com/drive/activity',
+                clientName: 'Kervin Roque',
+                meeting_notes_raw: 'Evaluación de requerimientos para empresa de servicios, cotizaciones y seguimiento de clientes.'
+            },
+            {
+                id: 'audit_arias_1400',
+                lead_id: 'lead_arias_comercial_1400',
+                sales_rep_name: 'Diana Morales',
+                created_at: '2026-10-23T14:00:00Z',
+                google_doc_url: 'https://drive.google.com/drive/activity',
+                clientName: 'Demo Arias ERP (Lead Comercial)',
+                meeting_notes_raw: 'Presentación de propuesta comercial, alcance del sistema y tiempos de implementación.'
+            }
+        ];
+
+        return rawDemos.map(d => {
+            const evaluated = this.evaluateNotesSync(d.meeting_notes_raw, d.clientName, d.sales_rep_name);
+            return {
+                id: d.id,
+                company_id: companyId,
+                lead_id: d.lead_id,
+                sales_rep_name: d.sales_rep_name,
+                google_doc_url: d.google_doc_url,
+                meeting_notes_raw: d.meeting_notes_raw,
+                total_score: evaluated.totalScore,
+                rubric_scores: evaluated.rubricScores,
+                coaching_summary: evaluated.coachingSummary,
+                extracted_data: evaluated.extractedData,
+                status: 'completed' as const,
+                created_at: d.created_at
+            };
+        });
+    },
+
     getAllLocalAudits(companyId: string): SalesCallAudit[] {
         try {
             const key = `arias_sales_audits_${companyId}`;
-            return JSON.parse(localStorage.getItem(key) || '[]');
+            const existing: SalesCallAudit[] = JSON.parse(localStorage.getItem(key) || '[]');
+            const certified8 = this.getCertifiedDemosAudits(companyId);
+
+            // Mantener exactamente las 8 demostraciones oficiales de Google Drive
+            const certifiedIds = new Set(certified8.map(c => c.id));
+            const validExisting = existing.filter(e => certifiedIds.has(e.id));
+
+            const merged = [...validExisting];
+            for (const cert of certified8) {
+                if (!merged.some(m => m.id === cert.id)) {
+                    merged.push(cert);
+                }
+            }
+
+            localStorage.setItem(key, JSON.stringify(merged));
+            return merged;
         } catch {
-            return [];
+            return this.getCertifiedDemosAudits(companyId);
         }
     }
 };

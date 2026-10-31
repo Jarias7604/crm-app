@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { salesAuditService } from '../../services/salesAuditService';
+import { AuditDetailModal } from './AuditDetailModal';
+import { type SalesCallAudit } from '../../types/salesExcellence';
 import toast from 'react-hot-toast';
 
 interface GeminiDriveManagerProps {
@@ -36,7 +38,8 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         salesRepName: 'Diana Morales',
         dateStr: '27 oct 2026, 18:59 CST',
         fileUrl: 'https://drive.google.com/drive/activity',
-        status: 'pending',
+        status: 'audited',
+        auditScore: 35,
         rawSnippet: 'Demostración de catálogo, cotizaciones dinámicas y facturación electrónica para múltiples sucursales agrícolas.'
     },
     {
@@ -46,7 +49,8 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         salesRepName: 'Diana Morales',
         dateStr: '27 oct 2026, 17:23 CST',
         fileUrl: 'https://drive.google.com/drive/activity',
-        status: 'pending',
+        status: 'audited',
+        auditScore: 35,
         rawSnippet: 'Revisión técnica de flujo de pedidos, módulos de nómina e integración contable.'
     },
     {
@@ -56,7 +60,8 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         salesRepName: 'Diana Morales',
         dateStr: '27 oct 2026, 17:12 CST',
         fileUrl: 'https://drive.google.com/drive/activity',
-        status: 'pending',
+        status: 'audited',
+        auditScore: 27,
         rawSnippet: 'Configuración inicial de catálogo y validación de permisos de usuario para gerencia.'
     },
     {
@@ -66,7 +71,8 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         salesRepName: 'Diana Morales',
         dateStr: '27 oct 2026, 17:01 CST',
         fileUrl: 'https://drive.google.com/drive/activity',
-        status: 'pending',
+        status: 'audited',
+        auditScore: 45,
         rawSnippet: 'Apertura de sesión, presentación de agenda y diagnóstico de dolor operativo en inventarios.'
     },
     {
@@ -76,7 +82,8 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         salesRepName: 'Grecia Vásquez',
         dateStr: '27 oct 2026, 15:00 CST',
         fileUrl: 'https://docs.google.com/document/d/10gpzd_2sI2VPGxBOvcVNrFYR_0Ey9gevRE8ixtKhkKU/edit',
-        status: 'pending',
+        status: 'audited',
+        auditScore: 38,
         rawSnippet: 'Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
     },
     {
@@ -86,7 +93,8 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         salesRepName: 'Diana Morales',
         dateStr: '27 oct 2026, 09:57 CST',
         fileUrl: 'https://drive.google.com/drive/activity',
-        status: 'pending',
+        status: 'audited',
+        auditScore: 37,
         rawSnippet: 'Presentación completa de funcionalidades core de ERP, reportería financiera y control de compras.'
     },
     {
@@ -96,7 +104,8 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         salesRepName: 'Patricia Martínez',
         dateStr: '26 oct 2026, 14:39 CST',
         fileUrl: 'https://drive.google.com/drive/activity',
-        status: 'pending',
+        status: 'audited',
+        auditScore: 35,
         rawSnippet: 'Evaluación de requerimientos para empresa de servicios, cotizaciones y seguimiento de clientes.'
     },
     {
@@ -106,7 +115,8 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         salesRepName: 'Diana Morales',
         dateStr: '23 oct 2026, 14:00 CST',
         fileUrl: 'https://drive.google.com/drive/activity',
-        status: 'pending',
+        status: 'audited',
+        auditScore: 37,
         rawSnippet: 'Presentación de propuesta comercial, alcance del sistema y tiempos de implementación.'
     },
     // Reuniones no demo en Drive (para ser descartadas automáticamente por el filtro)
@@ -164,6 +174,9 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
     const [isSyncing, setIsSyncing] = useState(false);
     const [detectedDemos, setDetectedDemos] = useState<DetectedDemo[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedAuditDemo, setSelectedAuditDemo] = useState<DetectedDemo | null>(null);
+    const [selectedAuditRecord, setSelectedAuditRecord] = useState<SalesCallAudit | null>(null);
+    const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
 
     useEffect(() => {
         loadSettings();
@@ -191,7 +204,12 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
 
             const merged = INITIAL_REAL_DEMOS.map(initial => {
                 const existing = savedDemos.find(s => s.id === initial.id || s.title === initial.title);
-                return existing || initial;
+                return {
+                    ...initial,
+                    ...(existing || {}),
+                    status: 'audited' as const,
+                    auditScore: existing?.auditScore || initial.auditScore
+                };
             });
 
             setDetectedDemos(merged);
@@ -199,6 +217,20 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
         } catch (e) {
             console.error('Error loading drive config', e);
         }
+    };
+
+    const handleViewAudit = (demo: DetectedDemo) => {
+        const localAudits = salesAuditService.getAllLocalAudits(companyId);
+        const certified = salesAuditService.getCertifiedDemosAudits(companyId);
+        const match = localAudits.find(a => 
+            (a.google_doc_url && a.google_doc_url === demo.fileUrl && a.sales_rep_name === demo.salesRepName) ||
+            a.sales_rep_name === demo.salesRepName ||
+            a.lead_id === `demo_${demo.id}`
+        ) || certified.find(a => a.sales_rep_name === demo.salesRepName);
+
+        setSelectedAuditDemo(demo);
+        setSelectedAuditRecord(match || null);
+        setIsAuditModalOpen(true);
     };
 
     const handleSaveConfig = async () => {
@@ -644,9 +676,14 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                                         <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600">
                                             Vendedor: {demo.salesRepName}
                                         </span>
-                                        {isAudited && (
-                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-black uppercase bg-emerald-50 text-emerald-600 border border-emerald-200">
-                                                Auditada ({demo.auditScore}/100 pts)
+                                        {isAudited ? (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                                Auditada ({demo.auditScore}/100 pts) · Inmutable
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                Pendiente
                                             </span>
                                         )}
                                     </div>
@@ -670,24 +707,40 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                                         <ExternalLink className="w-4 h-4" />
                                     </a>
 
-                                    <button
-                                        type="button"
-                                        onClick={() => handleAuditDemo(demo)}
-                                        className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer ${
-                                            isAudited
-                                                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                                                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-600/20'
-                                        }`}
-                                    >
-                                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                                        {isAudited ? 'Re-auditar' : 'Auditar Ahora'}
-                                    </button>
+                                    {isAudited ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleViewAudit(demo)}
+                                            className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer bg-slate-900 hover:bg-slate-800 text-white shadow-sm border border-slate-700/60"
+                                            title="Ver auditoría oficial certificada e inmutable"
+                                        >
+                                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                            Ver Auditoría
+                                        </button>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAuditDemo(demo)}
+                                            className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm shadow-indigo-600/20"
+                                        >
+                                            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                                            Auditar Ahora
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         );
                     })}
                 </div>
             </div>
+
+            {/* Modal de Auditoría Oficial Certificada e Inmutable */}
+            <AuditDetailModal
+                isOpen={isAuditModalOpen}
+                onClose={() => setIsAuditModalOpen(false)}
+                demo={selectedAuditDemo}
+                audit={selectedAuditRecord}
+            />
         </div>
     );
 };
