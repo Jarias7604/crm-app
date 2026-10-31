@@ -84,9 +84,11 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
 export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyId, isAdmin }) => {
     const [driveActivityUrl, setDriveActivityUrl] = useState('https://drive.google.com/drive/activity');
     const [searchPattern, setSearchPattern] = useState('*Notas de Gemini*, *Notes by Gemini*');
+    const [requiredKeyword, setRequiredKeyword] = useState('DEMO, Demo');
+    const [onlyDemosFilter, setOnlyDemosFilter] = useState(true);
     const [autoAuditOnDetect, setAutoAuditOnDetect] = useState(true);
     const [autoMatchLead, setAutoMatchLead] = useState(true);
-    const [autoCreateLead, setAutoCreateLead] = useState(false);
+    const [autoCreateLead, setAutoCreateLead] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [detectedDemos, setDetectedDemos] = useState<DetectedDemo[]>([]);
@@ -105,9 +107,11 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                 const parsed = JSON.parse(savedRaw);
                 setDriveActivityUrl(parsed.driveActivityUrl || 'https://drive.google.com/drive/activity');
                 setSearchPattern(parsed.searchPattern || '*Notas de Gemini*, *Notes by Gemini*');
+                setRequiredKeyword(parsed.requiredKeyword || 'DEMO, Demo');
+                setOnlyDemosFilter(parsed.onlyDemosFilter ?? true);
                 setAutoAuditOnDetect(parsed.autoAuditOnDetect ?? true);
                 setAutoMatchLead(parsed.autoMatchLead ?? true);
-                setAutoCreateLead(parsed.autoCreateLead ?? false);
+                setAutoCreateLead(parsed.autoCreateLead ?? true);
             }
 
             // Load detected demos state
@@ -128,6 +132,8 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
         const payload = {
             driveActivityUrl,
             searchPattern,
+            requiredKeyword,
+            onlyDemosFilter,
             autoAuditOnDetect,
             autoMatchLead,
             autoCreateLead,
@@ -156,12 +162,109 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
         }
     };
 
+    const executeAuditForDemo = async (demo: DetectedDemo): Promise<number> => {
+        // 1. Run NLP audit
+        const result = await salesAuditService.auditGeminiNotes(
+            demo.rawSnippet,
+            demo.clientName,
+            demo.salesRepName
+        );
+
+        // 2. Resolve salesperson profile ID
+        let evaluatedUserId: string | null = null;
+        try {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .eq('company_id', companyId)
+                .ilike('full_name', `%${demo.salesRepName}%`)
+                .limit(1);
+
+            if (profiles && profiles.length > 0) {
+                evaluatedUserId = profiles[0].id;
+            }
+        } catch {}
+
+        // 3. Search or create lead in this company
+        let targetLeadId: string | null = null;
+        try {
+            if (autoMatchLead) {
+                const { data: leads } = await supabase
+                    .from('leads')
+                    .select('id, name')
+                    .eq('company_id', companyId)
+                    .ilike('name', `%${demo.clientName}%`)
+                    .limit(1);
+
+                if (leads && leads.length > 0) {
+                    targetLeadId = leads[0].id;
+                    await supabase.from('leads').update({
+                        next_action_notes: `[Auto-Auditoría Gemini] Puntuación: ${result.totalScore}/100. ${result.coachingSummary.immediate_action}`,
+                        assigned_to: evaluatedUserId || undefined
+                    }).eq('id', targetLeadId);
+                }
+            }
+
+            if (!targetLeadId && autoCreateLead) {
+                const { data: newLead } = await supabase.from('leads').insert({
+                    company_id: companyId,
+                    name: demo.clientName,
+                    status: 'Lead calificado',
+                    source: 'Demo Google Meet (Gemini)',
+                    assigned_to: evaluatedUserId,
+                    next_action_notes: `[Auto-Auditoría Gemini] Puntuación: ${result.totalScore}/100. ${result.coachingSummary.immediate_action}`
+                }).select().single();
+
+                if (newLead) targetLeadId = newLead.id;
+            }
+        } catch (e) {
+            console.warn('Lead query or creation error in audit', e);
+        }
+
+        // Guaranteed fallback id so audit is never lost
+        const finalLeadId = targetLeadId || `demo_${demo.id}`;
+
+        // 4. Save audit record
+        await salesAuditService.saveAudit({
+            company_id: companyId,
+            lead_id: finalLeadId,
+            evaluated_user_id: evaluatedUserId,
+            sales_rep_name: demo.salesRepName,
+            google_doc_url: demo.fileUrl,
+            meeting_notes_raw: demo.rawSnippet,
+            total_score: result.totalScore,
+            rubric_scores: result.rubricScores,
+            coaching_summary: result.coachingSummary,
+            extracted_data: result.extractedData,
+            status: 'completed'
+        });
+
+        return result.totalScore;
+    };
+
     const handleSyncNow = async () => {
         setIsSyncing(true);
         try {
-            // Simula el barrido de la API de Google Drive
-            await new Promise(r => setTimeout(r, 1200));
-            toast.success('Bandeja de Google Drive sincronizada: 5 demostraciones detectadas');
+            // Simula el barrido de Google Drive API
+            await new Promise(r => setTimeout(r, 1000));
+
+            let currentList = [...detectedDemos];
+            if (autoAuditOnDetect) {
+                const updated: DetectedDemo[] = [];
+                for (const demo of currentList) {
+                    if (demo.status === 'pending') {
+                        const score = await executeAuditForDemo(demo);
+                        updated.push({ ...demo, status: 'audited' as const, auditScore: score });
+                    } else {
+                        updated.push(demo);
+                    }
+                }
+                setDetectedDemos(updated);
+                localStorage.setItem(`gemini_drive_demos_${companyId}`, JSON.stringify(updated));
+                toast.success('Bandeja sincronizada y llamadas auditadas con éxito');
+            } else {
+                toast.success('Bandeja de Google Drive sincronizada: 5 demostraciones detectadas');
+            }
         } catch {
             toast.error('Error al sincronizar con Google Drive');
         } finally {
@@ -172,74 +275,41 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
     const handleAuditDemo = async (demo: DetectedDemo) => {
         toast.loading(`Auditando "${demo.clientName}" contra la Rúbrica ARIAS...`, { id: 'audit_toast' });
         try {
-            // 1. Run audit
-            const result = await salesAuditService.auditGeminiNotes(
-                demo.rawSnippet,
-                demo.clientName,
-                demo.salesRepName
-            );
+            const score = await executeAuditForDemo(demo);
 
-            // 2. Search if lead exists in this company
-            const { data: leads } = await supabase
-                .from('leads')
-                .select('id, name')
-                .eq('company_id', companyId)
-                .ilike('name', `%${demo.clientName}%`)
-                .limit(1);
-
-            let targetLeadId: string | null = null;
-
-            if (leads && leads.length > 0) {
-                targetLeadId = leads[0].id;
-                // Update lead next action
-                await supabase.from('leads').update({
-                    next_action_notes: `[Auto-Auditoría Gemini] Puntuación: ${result.totalScore}/100. ${result.coachingSummary.immediate_action}`
-                }).eq('id', targetLeadId);
-            } else if (autoCreateLead) {
-                // Create lead if not exists
-                const { data: newLead } = await supabase.from('leads').insert({
-                    company_id: companyId,
-                    name: demo.clientName,
-                    status: 'Lead calificado',
-                    source: 'Demo Google Meet',
-                    next_action_notes: `[Auto-Auditoría Gemini] Puntuación: ${result.totalScore}/100. ${result.coachingSummary.immediate_action}`
-                }).select().single();
-                if (newLead) targetLeadId = newLead.id;
-            }
-
-            // 3. Save audit record
-            if (targetLeadId) {
-                await salesAuditService.saveAudit({
-                    company_id: companyId,
-                    lead_id: targetLeadId,
-                    google_doc_url: demo.fileUrl,
-                    meeting_notes_raw: demo.rawSnippet,
-                    total_score: result.totalScore,
-                    rubric_scores: result.rubricScores,
-                    coaching_summary: result.coachingSummary,
-                    extracted_data: result.extractedData,
-                    status: 'completed'
-                });
-            }
-
-            // 4. Update demo status in list
+            // Update demo status in UI list
             const updated = detectedDemos.map(d =>
-                d.id === demo.id ? { ...d, status: 'audited' as const, auditScore: result.totalScore } : d
+                d.id === demo.id ? { ...d, status: 'audited' as const, auditScore: score } : d
             );
             setDetectedDemos(updated);
             localStorage.setItem(`gemini_drive_demos_${companyId}`, JSON.stringify(updated));
 
-            toast.success(`¡Demostración de ${demo.clientName} auditada! (${result.totalScore}/100 pts)`, { id: 'audit_toast' });
+            toast.success(`¡Demostración de ${demo.clientName} auditada! (${score}/100 pts)`, { id: 'audit_toast' });
         } catch (e) {
             console.error('Error auditing demo', e);
             toast.error('Ocurrió un error al procesar la auditoría', { id: 'audit_toast' });
         }
     };
 
-    const filteredDemos = detectedDemos.filter(d =>
-        d.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        d.salesRepName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredDemos = detectedDemos.filter(d => {
+        // 1. Filtro estricto de solo DEMOS
+        if (onlyDemosFilter) {
+            const titleLower = d.title.toLowerCase();
+            const keywords = requiredKeyword.toLowerCase().split(',').map(k => k.trim()).filter(Boolean);
+            const matches = keywords.some(k => titleLower.includes(k));
+            if (!matches) return false;
+        }
+
+        // 2. Buscador por texto
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            return d.clientName.toLowerCase().includes(term) ||
+                d.salesRepName.toLowerCase().includes(term) ||
+                d.title.toLowerCase().includes(term);
+        }
+
+        return true;
+    });
 
     return (
         <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
@@ -302,28 +372,45 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
                     {/* Input Carpeta / URL */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 md:col-span-1">
                         <label className="block font-bold text-slate-700">
-                            Enlace o Ubicación de Google Drive (Activity):
+                            Enlace de Google Drive (Actividad o Carpeta):
                         </label>
                         <input
                             type="url"
                             value={driveActivityUrl}
                             onChange={(e) => setDriveActivityUrl(e.target.value)}
-                            placeholder="https://drive.google.com/drive/activity"
+                            placeholder="https://drive.google.com/drive/activity o /folders/..."
                             className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs focus:outline-none focus:border-indigo-500 focus:bg-white"
                         />
                         <span className="text-[10px] text-slate-400">
-                            Usa <code className="text-indigo-600 font-bold">drive.google.com/drive/activity</code> para leer todos los archivos compartidos por tus ejecutivos.
+                            Puedes usar <code className="text-indigo-600 font-bold">drive.google.com/drive/activity</code> o el link de una carpeta exclusiva.
+                        </span>
+                    </div>
+
+                    {/* Input Palabra Clave Obligatoria (DEMO) */}
+                    <div className="space-y-1.5 md:col-span-1">
+                        <label className="block font-bold text-slate-700">
+                            Palabra Clave Obligatoria en el Título:
+                        </label>
+                        <input
+                            type="text"
+                            value={requiredKeyword}
+                            onChange={(e) => setRequiredKeyword(e.target.value)}
+                            placeholder="DEMO, Demo"
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs focus:outline-none focus:border-indigo-500 focus:bg-white"
+                        />
+                        <span className="text-[10px] text-slate-400">
+                            Solo procesará reuniones que incluyan estas palabras (separadas por coma).
                         </span>
                     </div>
 
                     {/* Input Patrón de Búsqueda */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 md:col-span-1">
                         <label className="block font-bold text-slate-700">
-                            Patrón de Archivos de Gemini a Detectar:
+                            Patrón de Archivos de Gemini:
                         </label>
                         <input
                             type="text"
@@ -333,13 +420,26 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                             className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs focus:outline-none focus:border-indigo-500 focus:bg-white"
                         />
                         <span className="text-[10px] text-slate-400">
-                            Filtra automáticamente los documentos de notas generados por Google Meet.
+                            Filtra los documentos de notas generados por Google Meet.
                         </span>
                     </div>
                 </div>
 
                 {/* Toggles de Automatización */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                    <label className="p-4 rounded-2xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 transition-all cursor-pointer flex items-start gap-3">
+                        <input
+                            type="checkbox"
+                            checked={onlyDemosFilter}
+                            onChange={(e) => setOnlyDemosFilter(e.target.checked)}
+                            className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                        />
+                        <div>
+                            <span className="block text-xs font-black text-indigo-950">Filtrar Solo "DEMO"</span>
+                            <span className="block text-[11px] text-slate-600 mt-0.5">Ignora reuniones internas, soporte o cobranzas.</span>
+                        </div>
+                    </label>
+
                     <label className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer flex items-start gap-3">
                         <input
                             type="checkbox"
@@ -361,8 +461,8 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                             className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                         />
                         <div>
-                            <span className="block text-xs font-bold text-slate-800">Emparejar Lead por Nombre</span>
-                            <span className="block text-[11px] text-slate-500 mt-0.5">Buscar "Luis Escobar" en tu base de datos y asociarle la demo.</span>
+                            <span className="block text-xs font-bold text-slate-800">Emparejar Lead</span>
+                            <span className="block text-[11px] text-slate-500 mt-0.5">Buscar "Luis Escobar" en tu base de datos.</span>
                         </div>
                     </label>
 
@@ -374,10 +474,23 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                             className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4"
                         />
                         <div>
-                            <span className="block text-xs font-bold text-slate-800">Auto-Crear Lead Nuevo</span>
-                            <span className="block text-[11px] text-slate-500 mt-0.5">Si el cliente de la demo no estaba registrado en el CRM.</span>
+                            <span className="block text-xs font-bold text-slate-800">Auto-Crear Lead</span>
+                            <span className="block text-[11px] text-slate-500 mt-0.5">Si el cliente aún no estaba en el CRM.</span>
                         </div>
                     </label>
+                </div>
+
+                {/* Explicación de Carpeta en Google Drive */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 flex items-start gap-3">
+                    <Database className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                    <div>
+                        <strong className="text-slate-800 font-bold">¿Cómo garantizar que solo se procesen Demos comerciales?</strong>
+                        <p className="mt-0.5 text-slate-500 leading-relaxed text-[11px]">
+                            • <strong>Opción 1 (Por Título):</strong> Asegúrate de que tu equipo siempre use la palabra <strong>«Demo»</strong> en el título de la invitación de Google Calendar / Google Meet (ej: <em>«DEMO ERP - Cliente X»</em>). El filtro activo arriba descartará automáticamente cualquier otra reunión (como "Revisión bancos" o "Cobranzas").
+                            <br />
+                            • <strong>Opción 2 (Por Carpeta Dedicada):</strong> Si prefieres ordenar por carpetas, crea una carpeta en tu Google Drive (ej: <em>«Demos de Ventas»</em>), comparte esa carpeta con tus vendedoras y pega el enlace de la carpeta (<code>https://drive.google.com/drive/folders/...</code>) en el primer campo.
+                        </p>
+                    </div>
                 </div>
             </div>
 

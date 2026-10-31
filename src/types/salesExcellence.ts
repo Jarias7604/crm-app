@@ -37,6 +37,7 @@ export interface SalesCallAudit {
     company_id: string;
     lead_id: string;
     evaluated_user_id?: string | null;
+    sales_rep_name?: string | null;
     auditor_id?: string | null;
     google_doc_url?: string | null;
     meeting_notes_raw: string;

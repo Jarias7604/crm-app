@@ -331,36 +331,46 @@ export const salesAuditService = {
      * Guarda la auditoría en Supabase o en cache local
      */
     async saveAudit(audit: Omit<SalesCallAudit, 'id' | 'created_at'>): Promise<SalesCallAudit> {
+        let result: SalesCallAudit;
         try {
+            const insertPayload: any = {
+                company_id: audit.company_id,
+                lead_id: audit.lead_id,
+                evaluated_user_id: audit.evaluated_user_id,
+                auditor_id: audit.auditor_id,
+                google_doc_url: audit.google_doc_url,
+                meeting_notes_raw: audit.meeting_notes_raw,
+                total_score: audit.total_score,
+                rubric_scores: audit.rubric_scores,
+                coaching_summary: audit.coaching_summary,
+                extracted_data: audit.extracted_data,
+                status: audit.status || 'completed'
+            };
+
             const { data, error } = await supabase
                 .from('sales_call_audits')
-                .insert({
-                    company_id: audit.company_id,
-                    lead_id: audit.lead_id,
-                    evaluated_user_id: audit.evaluated_user_id,
-                    auditor_id: audit.auditor_id,
-                    google_doc_url: audit.google_doc_url,
-                    meeting_notes_raw: audit.meeting_notes_raw,
-                    total_score: audit.total_score,
-                    rubric_scores: audit.rubric_scores,
-                    coaching_summary: audit.coaching_summary,
-                    extracted_data: audit.extracted_data,
-                    status: audit.status || 'completed'
-                })
+                .insert(insertPayload)
                 .select()
                 .single();
 
             if (error) {
                 // If table doesn't exist yet, save locally to keep user experience seamless
                 console.warn('Could not insert to sales_call_audits table, caching locally', error);
-                return this.saveToLocalCache(audit);
+                result = this.saveToLocalCache(audit);
+            } else {
+                result = data;
+                // Also update local cache for quick offline/realtime stats
+                this.saveToLocalCache(audit);
             }
-
-            return data;
         } catch (err: any) {
             console.warn('Error saving audit, falling back to local storage', err);
-            return this.saveToLocalCache(audit);
+            result = this.saveToLocalCache(audit);
         }
+
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('sales_audit_updated', { detail: result }));
+        }
+        return result;
     },
 
     /**
@@ -407,7 +417,7 @@ export const salesAuditService = {
                 .order('created_at', { ascending: false })
                 .limit(100);
 
-            const audits: SalesCallAudit[] = (!error && data) ? data : this.getAllLocalAudits(companyId);
+            const audits: SalesCallAudit[] = (!error && data && data.length > 0) ? data : this.getAllLocalAudits(companyId);
 
             if (audits.length === 0) {
                 return { totalAudits: 0, avgScore: 0, repAverages: {}, latestAudits: [] };
@@ -418,7 +428,7 @@ export const salesAuditService = {
 
             for (const a of audits) {
                 sumTotal += a.total_score;
-                const repId = a.evaluated_user_id || 'unassigned';
+                const repId = a.evaluated_user_id || a.sales_rep_name || 'unassigned';
                 if (!repAverages[repId]) {
                     repAverages[repId] = { count: 0, totalScore: 0, avgScore: 0, lastScore: a.total_score };
                 }

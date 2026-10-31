@@ -40,6 +40,13 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         if (companyId) {
             loadStats();
         }
+
+        const handleUpdate = () => {
+            loadStats();
+        };
+
+        window.addEventListener('sales_audit_updated', handleUpdate);
+        return () => window.removeEventListener('sales_audit_updated', handleUpdate);
     }, [companyId]);
 
     const loadStats = async () => {
