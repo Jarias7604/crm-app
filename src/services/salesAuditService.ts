@@ -519,77 +519,77 @@ export const salesAuditService = {
     getCertifiedDemosAudits(companyId: string): SalesCallAudit[] {
         const rawDemos = [
             {
-                id: 'audit_finca_1859',
-                lead_id: 'lead_finca_miramar_1859',
+                id: 'audit_finca_miramar',
+                lead_id: 'lead_finca_miramar',
                 sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-27T18:59:00Z',
+                created_at: '2026-10-28T18:30:00Z',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Finca Miramar',
-                meeting_notes_raw: 'Demostración de catálogo, cotizaciones dinámicas y facturación electrónica para múltiples sucursales agrícolas.'
+                meeting_notes_raw: 'Demostración de catálogo, cotizaciones dinámicas y facturación electrónica para múltiples sucursales agrícolas. Pico de calidad comercial con validación de flujos.'
             },
             {
-                id: 'audit_finca_1723',
-                lead_id: 'lead_finca_miramar_1723',
+                id: 'audit_distribuidora_sanjose',
+                lead_id: 'lead_distribuidora_sanjose',
                 sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-27T17:23:00Z',
+                created_at: '2026-10-25T16:15:00Z',
                 google_doc_url: 'https://drive.google.com/drive/activity',
-                clientName: 'Finca Miramar',
-                meeting_notes_raw: 'Revisión técnica de flujo de pedidos, módulos de nómina e integración contable.'
+                clientName: 'Distribuidora San José',
+                meeting_notes_raw: 'Revisión técnica de flujo de pedidos, facturación fiscal y control de inventarios para ferretería mayorista.'
             },
             {
-                id: 'audit_finca_1712',
-                lead_id: 'lead_finca_miramar_1712',
+                id: 'audit_agropecuaria_roble',
+                lead_id: 'lead_agropecuaria_roble',
                 sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-27T17:12:00Z',
+                created_at: '2026-10-21T14:40:00Z',
                 google_doc_url: 'https://drive.google.com/drive/activity',
-                clientName: 'Finca Miramar',
-                meeting_notes_raw: 'Configuración inicial de catálogo y validación de permisos de usuario para gerencia.'
+                clientName: 'Agropecuaria El Roble',
+                meeting_notes_raw: 'Configuración de órdenes de compra, control de almacenes ganaderos y roles de usuario para gerencia.'
             },
             {
-                id: 'audit_finca_1701',
-                lead_id: 'lead_finca_miramar_1701',
+                id: 'audit_supermercados_canasta',
+                lead_id: 'lead_supermercados_canasta',
                 sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-27T17:01:00Z',
+                created_at: '2026-10-18T11:20:00Z',
                 google_doc_url: 'https://drive.google.com/drive/activity',
-                clientName: 'Finca Miramar',
-                meeting_notes_raw: 'Apertura de sesión, presentación de agenda y diagnóstico de dolor operativo en inventarios.'
+                clientName: 'Supermercados La Canasta',
+                meeting_notes_raw: 'Apertura de sesión, presentación de puntos de venta POS y diagnóstico de control de caja para cadena retail.'
             },
             {
                 id: 'audit_luis_escobar',
                 lead_id: 'lead_luis_escobar',
                 sales_rep_name: 'Diana Morales', // AE que condujo y dio la demo
                 sdr_rep_name: 'Grecia Vásquez',  // SDR que coordinó y agendó la demo
-                created_at: '2026-10-27T15:00:00Z',
+                created_at: '2026-10-15T15:00:00Z',
                 google_doc_url: 'https://docs.google.com/document/d/10gpzd_2sI2VPGxBOvcVNrFYR_0Ey9gevRE8ixtKhkKU/edit',
                 clientName: 'Luis Escobar',
                 meeting_notes_raw: 'Demostración presentada por Diana Morales (AE) · Cita agendada por Grecia Vásquez (SDR). Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
             },
             {
-                id: 'audit_arias_0957',
-                lead_id: 'lead_arias_general_0957',
+                id: 'audit_comercializadora_valle',
+                lead_id: 'lead_comercializadora_valle',
                 sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-27T09:57:00Z',
+                created_at: '2026-10-12T10:00:00Z',
                 google_doc_url: 'https://drive.google.com/drive/activity',
-                clientName: 'Demo Arias ERP (Lead General)',
-                meeting_notes_raw: 'Presentación completa de funcionalidades core de ERP, reportería financiera y control de compras.'
+                clientName: 'Comercializadora del Valle',
+                meeting_notes_raw: 'Presentación de reportería financiera ejecutiva, balance de costos y logística para distribución de alimentos.'
             },
             {
                 id: 'audit_kervin_roque',
                 lead_id: 'lead_kervin_roque',
                 sales_rep_name: 'Patricia Martínez',
-                created_at: '2026-10-26T14:39:00Z',
+                created_at: '2026-10-09T14:39:00Z',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Kervin Roque',
                 meeting_notes_raw: 'Evaluación de requerimientos para empresa de servicios, cotizaciones y seguimiento de clientes.'
             },
             {
-                id: 'audit_arias_1400',
-                lead_id: 'lead_arias_comercial_1400',
-                sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-23T14:00:00Z',
+                id: 'audit_transportes_express',
+                lead_id: 'lead_transportes_express',
+                sales_rep_name: 'Patricia Martínez',
+                created_at: '2026-10-06T11:00:00Z',
                 google_doc_url: 'https://drive.google.com/drive/activity',
-                clientName: 'Demo Arias ERP (Lead Comercial)',
-                meeting_notes_raw: 'Presentación de propuesta comercial, alcance del sistema y tiempos de implementación.'
+                clientName: 'Transportes Express',
+                meeting_notes_raw: 'Presentación inicial de módulo de contratos, clientes recurrentes y control de facturas de transporte.'
             }
         ];
 
@@ -599,6 +599,7 @@ export const salesAuditService = {
                 id: d.id,
                 company_id: companyId,
                 lead_id: d.lead_id,
+                clientName: d.clientName,
                 sales_rep_name: d.sales_rep_name,
                 sdr_rep_name: (d as any).sdr_rep_name || null,
                 google_doc_url: d.google_doc_url,

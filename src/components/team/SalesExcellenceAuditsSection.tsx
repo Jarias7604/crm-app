@@ -136,6 +136,21 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         return { color: 'text-rose-600 bg-rose-50 border-rose-200', text: '🔴 Intervención' };
     };
 
+    const resolveClientName = (audit: SalesCallAudit | null | undefined): string => {
+        if (!audit) return 'Demostración';
+        if ((audit as any).clientName) return (audit as any).clientName;
+        const id = (audit.id + ' ' + (audit.lead_id || '')).toLowerCase();
+        if (id.includes('luis_escobar')) return 'Luis Escobar';
+        if (id.includes('finca')) return 'Finca Miramar';
+        if (id.includes('sanjose')) return 'Distribuidora San José';
+        if (id.includes('roble')) return 'Agropecuaria El Roble';
+        if (id.includes('canasta')) return 'Supermercados La Canasta';
+        if (id.includes('valle')) return 'Comercializadora del Valle';
+        if (id.includes('kervin')) return 'Kervin Roque';
+        if (id.includes('transporte')) return 'Transportes Express';
+        return audit.lead_id || 'Cliente Comercial';
+    };
+
     // ─── Motor de Diagnóstico Global Agregado por Persona ────────────────────────
     const calculateRepDiagnostic = (targetRep: string, allAudits: SalesCallAudit[]): RepAggregateDiagnostic | null => {
         const cleanTarget = targetRep.toLowerCase().trim();
@@ -314,53 +329,8 @@ ${activeDiagnostic.actionRequired}
     };
 
     return (
-        <div className="space-y-6">
-            {/* KPI Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-                        <Flame className="w-6 h-6 text-indigo-600" />
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                            Calidad Comercial Media
-                        </p>
-                        <p className="text-2xl font-black text-slate-800 tracking-tight">
-                            {stats.avgScore > 0 ? `${stats.avgScore} / 100` : 'Sin datos'}
-                        </p>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600">
-                        <FileText className="w-6 h-6 text-violet-600" />
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                            Demos Auditadas (Gemini)
-                        </p>
-                        <p className="text-2xl font-black text-slate-800 tracking-tight">
-                            {stats.totalAudits} demos
-                        </p>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
-                        <Target className="w-6 h-6 text-emerald-600" />
-                    </div>
-                    <div>
-                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                            Meta de Coaching Semanal
-                        </p>
-                        <p className="text-2xl font-black text-slate-800 tracking-tight">
-                            5 demos / rep
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Gráfico Interactivo de Evolución de Calidad Comercial en el Tiempo */}
+        <div className="space-y-4">
+            {/* Gráfico Ejecutivo de Evolución Temporal (Estilo Metricool) */}
             <SalesQualityTrendChart
                 audits={stats.latestAudits}
                 selectedRep={selectedRep}
@@ -372,528 +342,479 @@ ${activeDiagnostic.actionRequired}
                 }}
             />
 
-            {/* Ranking por Vendedor con Filtro Interactivo */}
-            <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                    <div>
-                        <h3 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                            <Award className="w-4 h-4 text-indigo-500" />
-                            Scorecard de Calidad Comercial por Ejecutivo (AE)
-                        </h3>
-                        <p className="text-xs text-slate-400">
-                            Haz clic en cualquier persona para filtrar todas sus demos y ver su diagnóstico global consolidado
-                        </p>
+            {/* Scorecard Unificado del Equipo Comercial (Compacto, Ordenado, No Inflado) */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                            Equipo Comercial
+                        </span>
+                        <span className="text-slate-300">/</span>
+                        <h4 className="text-xs font-black text-slate-900">
+                            Scorecard de Desempeño (AE & SDR)
+                        </h4>
                     </div>
 
                     <div className="flex items-center gap-2">
                         {selectedRep && (
                             <button
                                 onClick={() => setSelectedRep(null)}
-                                className="px-3 py-1 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all flex items-center gap-1.5 cursor-pointer"
+                                className="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all flex items-center gap-1 cursor-pointer"
                             >
-                                <X className="w-3.5 h-3.5" />
-                                Ver Todos ({stats.totalAudits})
+                                <X className="w-3 h-3" />
+                                <span>Ver Todos ({stats.totalAudits})</span>
                             </button>
                         )}
-                        <span className="text-xs font-bold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60">
-                            Meta ARIAS: ≥ 85 pts
+                        <span className="text-[11px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60">
+                            Meta: ≥ 85 pts
                         </span>
                     </div>
                 </div>
 
-                {Object.keys(stats.repAverages).length === 0 ? (
-                    <div className="text-center py-10 space-y-2">
-                        <p className="text-xs text-slate-400">Aún no hay demostraciones auditadas para tu equipo.</p>
-                        <p className="text-xs text-indigo-600 font-bold">
-                            Para auditar la primera demo, abre cualquier Lead y haz clic en "⚡ Auditar Gemini".
-                        </p>
-                    </div>
-                ) : (
-                    <div className="divide-y divide-slate-100">
-                        {Object.entries(stats.repAverages).map(([repId, repData]) => {
-                            const matchingAudit = stats.latestAudits.find(a => (a.evaluated_user_id === repId || a.sales_rep_name === repId) && a.sales_rep_name);
-                            const name = profileNames[repId] || matchingAudit?.sales_rep_name || (repId !== 'unassigned' && !repId.includes('-') ? repId : 'Ejecutivo de Ventas');
-                            const avatar = getExecutiveAvatar(repId, name);
-                            const badge = getScoreBadge(repData.avgScore);
-                            const isSelected = selectedRep === name;
+                {/* Filas Compactas de Rendimiento (AEs y SDRs juntos de forma ordenada) */}
+                <div className="divide-y divide-slate-100">
+                    {/* Filas de AEs */}
+                    {Object.entries(stats.repAverages).map(([repId, repData]) => {
+                        const matchingAudit = stats.latestAudits.find(a => (a.evaluated_user_id === repId || a.sales_rep_name === repId) && a.sales_rep_name);
+                        const name = profileNames[repId] || matchingAudit?.sales_rep_name || (repId !== 'unassigned' && !repId.includes('-') ? repId : 'Ejecutivo de Ventas');
+                        const avatar = getExecutiveAvatar(repId, name);
+                        const badge = getScoreBadge(repData.avgScore);
+                        const isSelected = selectedRep === name;
 
-                            return (
-                                <div
-                                    key={repId}
-                                    onClick={() => handleToggleRepFilter(name)}
-                                    className={`py-4 flex items-center justify-between gap-4 px-3 rounded-2xl transition-all cursor-pointer ${
-                                        isSelected
-                                            ? 'bg-indigo-50/80 ring-2 ring-indigo-500 shadow-xs'
-                                            : 'hover:bg-slate-50/80'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="relative">
-                                            <img
-                                                src={avatar}
-                                                alt={name}
-                                                className={`w-11 h-11 rounded-full object-cover border-2 shadow-xs ${
-                                                    isSelected ? 'border-indigo-500' : 'border-slate-200'
-                                                }`}
-                                                onError={(e) => {
-                                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=fff&size=128&bold=true`;
-                                                }}
-                                            />
+                        return (
+                            <div
+                                key={repId}
+                                onClick={() => handleToggleRepFilter(name)}
+                                className={`py-2.5 px-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                                    isSelected
+                                        ? 'bg-indigo-50/90 ring-1 ring-indigo-500 shadow-2xs'
+                                        : 'hover:bg-slate-50'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <img
+                                        src={avatar}
+                                        alt={name}
+                                        className={`w-8 h-8 rounded-lg object-cover border shrink-0 ${
+                                            isSelected ? 'border-indigo-500' : 'border-slate-200'
+                                        }`}
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=fff&size=64&bold=true`;
+                                        }}
+                                    />
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="text-xs font-black text-slate-900 truncate">{name}</span>
+                                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                                AE
+                                            </span>
                                             {isSelected && (
-                                                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white">
-                                                    ✓
-                                                </div>
+                                                <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-indigo-600 text-white">
+                                                    Activo
+                                                </span>
                                             )}
                                         </div>
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <h4 className="text-xs font-black text-slate-800">{name}</h4>
-                                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-600 border border-indigo-100">
-                                                    AE / Demostradora
-                                                </span>
-                                                {isSelected && (
-                                                    <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-600 text-white shadow-2xs">
-                                                        Filtrando activo
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <p className="text-[11px] text-slate-400">
-                                                {repData.count} demo(s) auditada(s) · Última puntuación: {repData.lastScore} pts · <span className="text-indigo-600 font-semibold">Clic para ver reporte 1:1</span>
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-right">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase border ${badge.color}`}>
-                                                    {badge.text}
-                                                </span>
-                                                <span className="text-base font-black text-slate-800">
-                                                    {repData.avgScore} / 100
-                                                </span>
-                                            </div>
-                                            <div className="w-32 bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1 ml-auto">
-                                                <div
-                                                    className={`h-full rounded-full ${repData.avgScore >= 85 ? 'bg-emerald-500' : repData.avgScore >= 70 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                                                    style={{ width: `${Math.min(repData.avgScore, 100)}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                        <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-indigo-600 rotate-90' : 'text-slate-300'}`} />
+                                        <p className="text-[10px] text-slate-400">
+                                            {repData.count} demo(s) · Clic para filtrar
+                                        </p>
                                     </div>
                                 </div>
-                            );
-                        })}
-                    </div>
-                )}
 
-                {/* Sección de Reconocimiento y Métricas SDR (Agendadoras) */}
-                <div className="mt-4 pt-4 border-t border-slate-100">
-                    <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                            <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                            Pipeline de Agendamiento y Prospección (Equipo SDR)
-                        </h4>
-                        <span className="text-[10px] font-bold text-slate-400">
-                            Demos convocadas para el equipo AE
-                        </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div
-                            onClick={() => handleToggleRepFilter('Grecia Vásquez')}
-                            className={`p-3.5 rounded-2xl transition-all cursor-pointer flex items-center justify-between border ${
-                                selectedRep === 'Grecia Vásquez'
-                                    ? 'bg-indigo-50/80 ring-2 ring-indigo-500 border-indigo-300'
-                                    : 'bg-indigo-50/40 border-indigo-100 hover:bg-indigo-50/70'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <img
-                                    src={getExecutiveAvatar('Grecia Vásquez', 'Grecia Vásquez')}
-                                    alt="Grecia Vásquez"
-                                    className="w-10 h-10 rounded-full object-cover border border-white shadow-xs"
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=Grecia+Vasquez&background=6366f1&color=fff&size=128&bold=true`;
-                                    }}
-                                />
-                                <div>
-                                    <div className="flex items-center gap-1.5">
-                                        <h5 className="text-xs font-black text-slate-800">Grecia Vásquez</h5>
-                                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-violet-100 text-violet-700">
-                                            SDR / Agendadora
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <div className="text-right">
+                                        <span className={`px-2 py-0.2 rounded-full text-[9px] font-black uppercase border ${badge.color}`}>
+                                            {badge.text}
                                         </span>
                                     </div>
-                                    <p className="text-[11px] text-slate-500">
-                                        1 demo agendada (Luis Escobar) · Coordinada en Calendar
-                                    </p>
+                                    <span className="text-xs font-black text-slate-800 min-w-[55px] text-right">
+                                        {repData.avgScore} / 100
+                                    </span>
+                                    <ChevronRight className={`w-3.5 h-3.5 ${isSelected ? 'text-indigo-600' : 'text-slate-300'}`} />
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                    100% Asistencia
-                                </span>
-                                <p className="text-[10px] text-slate-400 mt-0.5">Demostrada por Diana</p>
+                        );
+                    })}
+
+                    {/* Fila SDR Grecia Vásquez */}
+                    <div
+                        onClick={() => handleToggleRepFilter('Grecia Vásquez')}
+                        className={`py-2.5 px-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            selectedRep === 'Grecia Vásquez'
+                                ? 'bg-indigo-50/90 ring-1 ring-indigo-500 shadow-2xs'
+                                : 'hover:bg-slate-50'
+                        }`}
+                    >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <img
+                                src={getExecutiveAvatar('Grecia Vásquez', 'Grecia Vásquez')}
+                                alt="Grecia Vásquez"
+                                className="w-8 h-8 rounded-lg object-cover border border-slate-200 shrink-0"
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=Grecia+Vasquez&background=6366f1&color=fff&size=64&bold=true`;
+                                }}
+                            />
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-xs font-black text-slate-900">Grecia Vásquez</span>
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-violet-100 text-violet-700">
+                                        SDR
+                                    </span>
+                                    {selectedRep === 'Grecia Vásquez' && (
+                                        <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-indigo-600 text-white">
+                                            Activo
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-[10px] text-slate-400">
+                                    1 demo agendada (Luis Escobar) · Coordinada en Calendar
+                                </p>
                             </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-[9px] font-black uppercase text-emerald-700 bg-emerald-50 px-2 py-0.2 rounded-full border border-emerald-200">
+                                100% Asistencia
+                            </span>
+                            <span className="text-xs font-bold text-slate-400 min-w-[55px] text-right">
+                                Convocada
+                            </span>
+                            <ChevronRight className={`w-3.5 h-3.5 ${selectedRep === 'Grecia Vásquez' ? 'text-indigo-600' : 'text-slate-300'}`} />
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Banner de Filtro Activo */}
-            {selectedRep && (
-                <div className="p-3.5 rounded-2xl bg-indigo-50/90 border border-indigo-200/80 flex items-center justify-between animate-in fade-in duration-200 shadow-2xs">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-                            <Filter className="w-4 h-4" />
-                        </div>
-                        <div>
-                            <p className="text-xs font-bold text-slate-800">
-                                Filtrando auditorías de: <strong className="text-indigo-700">{selectedRep}</strong>
-                            </p>
-                            <p className="text-[11px] text-slate-500">
-                                Mostrando {displayedAudits.length} demostraciones y su diagnóstico global consolidado
-                            </p>
-                        </div>
-                    </div>
-
-                    <button
-                        onClick={() => setSelectedRep(null)}
-                        className="px-3 py-1.5 rounded-xl bg-white border border-indigo-200 text-xs font-bold text-indigo-700 hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                    >
-                        <X className="w-3.5 h-3.5" />
-                        Quitar Filtro (Ver las {stats.totalAudits} demos)
-                    </button>
-                </div>
-            )}
-
-            {/* Sección de Auditorías y Diagnóstico Consolidado */}
+            {/* ─── WORKSPACE DE AUDITORÍAS & COACHING (Estilo Metricool: Compacto, Ordenado, No Inflado) ─── */}
             {stats.latestAudits.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Columna Izquierda: Lista de Auditorías (Filtrables) */}
-                    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 space-y-3">
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                                <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                                {selectedRep ? `Demos de ${selectedRep}` : 'Últimas Auditorías Registradas'}
-                            </h4>
-                            <span className="text-[11px] font-bold text-slate-400">
-                                {displayedAudits.length} demo(s)
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+                    {/* Barra de Encabezado Superior de la Sección */}
+                    <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50/50">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                                Centro de Grabaciones & Coaching
+                            </span>
+                            <span className="text-slate-300">/</span>
+                            <span className="text-xs font-black text-slate-850">
+                                {selectedRep ? `Auditorías de ${selectedRep}` : `Todas las Demos (${displayedAudits.length})`}
                             </span>
                         </div>
 
-                        <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                            {displayedAudits.map((audit) => {
-                                const isSelected = selectedAudit?.id === audit.id;
-                                const badge = getScoreBadge(audit.total_score);
-                                const clientTitle = audit.id.includes('luis_escobar') 
-                                    ? 'Luis Escobar' 
-                                    : audit.id.includes('kervin_roque') 
-                                    ? 'Kervin Roque' 
-                                    : audit.id.includes('finca') 
-                                    ? 'Finca Miramar' 
-                                    : 'Demo Arias ERP';
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    setCoachingModalDemoId(selectedAudit?.id);
+                                    setIsCoachingModalOpen(true);
+                                }}
+                                className="px-3 py-1.5 text-xs font-black text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300/80 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                title="Ver momentos reales de Google Meet y las preguntas que debió hacer el asesor"
+                            >
+                                <Lightbulb className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                                <span>💡 Simulador de Coaching 1:1</span>
+                            </button>
 
-                                return (
-                                    <div
-                                        key={audit.id}
-                                        onClick={() => {
-                                            setSelectedAudit(audit);
-                                            setActiveCoachingTab('single');
-                                        }}
-                                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                                            isSelected
-                                                ? 'bg-indigo-50/70 border-indigo-300 shadow-xs'
-                                                : 'bg-white border-slate-200/60 hover:border-slate-300 hover:bg-slate-50/50'
-                                        }`}
-                                    >
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs font-black text-slate-800">
-                                                    {clientTitle}
-                                                </span>
-                                                <span className="text-xs font-bold text-slate-500">
-                                                    ({audit.total_score}/100 pts)
-                                                </span>
-                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${badge.color}`}>
-                                                    {badge.text}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
-                                                <span className="font-semibold text-slate-700">Presentó: {audit.sales_rep_name || 'Diana Morales'}</span>
-                                                {audit.sdr_rep_name && (
-                                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                                                        Agendó: {audit.sdr_rep_name} (SDR)
-                                                    </span>
-                                                )}
-                                                <span>·</span>
-                                                <span>{new Date(audit.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                                            </div>
-                                        </div>
-
-                                        <ChevronRight className={`w-4 h-4 shrink-0 ${isSelected ? 'text-indigo-600' : 'text-slate-300'}`} />
-                                    </div>
-                                );
-                            })}
+                            {activeDiagnostic && (
+                                <button
+                                    onClick={handleCopyCoachingReport}
+                                    className="px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                    title="Copiar informe de 1:1 al portapapeles"
+                                >
+                                    {copiedPlan ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                                    <span>{copiedPlan ? '¡Copiado!' : 'Copiar Plan 1:1'}</span>
+                                </button>
+                            )}
                         </div>
                     </div>
 
-                    {/* Columna Derecha: Panel de Diagnóstico (Consolidado 1:1 vs Demo Individual) */}
-                    <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4">
-                        {/* Selector de Pestañas de Diagnóstico */}
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setActiveCoachingTab('aggregate')}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                                        activeCoachingTab === 'aggregate'
-                                            ? 'bg-indigo-600 text-white shadow-xs'
-                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    }`}
-                                >
-                                    <BarChart2 className="w-3.5 h-3.5" />
-                                    {selectedRep ? `Diagnóstico Global (${activeDiagnostic?.totalDemos} demos)` : 'Resumen Global'}
-                                </button>
-
-                                <button
-                                    onClick={() => setActiveCoachingTab('single')}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
-                                        activeCoachingTab === 'single'
-                                            ? 'bg-indigo-600 text-white shadow-xs'
-                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    }`}
-                                >
-                                    <FileText className="w-3.5 h-3.5" />
-                                    Demo Individual
-                                </button>
+                    {/* Layout de 2 Columnas de Alta Densidad (Master-Detail sin scrolls inflados) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+                        {/* ─── COLUMNA IZQUIERDA (Cols 1-7): TABLA COMPACTA DE AUDITORÍAS ─── */}
+                        <div className="lg:col-span-7 p-4 space-y-3">
+                            <div className="flex items-center justify-between text-xs pb-1">
+                                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">
+                                    Historial de Demostraciones Evaluadas
+                                </span>
+                                <span className="text-[11px] text-slate-400">
+                                    Haz clic en una demo para ver su análisis
+                                </span>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => {
-                                        setCoachingModalDemoId(undefined);
-                                        setIsCoachingModalOpen(true);
-                                    }}
-                                    className="px-3 py-1.5 text-xs font-black text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer border border-amber-300 shadow-xs"
-                                    title="Ver momentos reales de Google Meet y las preguntas que debió hacer el asesor"
-                                >
-                                    <Lightbulb className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                                    <span>💡 Ver Preguntas que Debió Hacer</span>
-                                </button>
+                            {/* Tabla Compacta Estilo Metricool con Scroll Contenido */}
+                            <div className="overflow-x-auto overflow-y-auto max-h-[440px] border border-slate-200/80 rounded-xl">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="sticky top-0 z-10">
+                                        <tr className="bg-slate-100/90 text-[10px] font-black uppercase tracking-wider text-slate-600 border-b border-slate-200 backdrop-blur-xs">
+                                            <th className="py-2.5 px-3">Cliente / Reunión</th>
+                                            <th className="py-2.5 px-2">Presentador (AE)</th>
+                                            <th className="py-2.5 px-2">SDR</th>
+                                            <th className="py-2.5 px-2 text-center">Puntaje</th>
+                                            <th className="py-2.5 px-2 text-center">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {displayedAudits.map((audit) => {
+                                            const isSelected = selectedAudit?.id === audit.id;
+                                            const badge = getScoreBadge(audit.total_score);
+                                            const clientTitle = resolveClientName(audit);
+                                            const d = new Date(audit.created_at);
+                                            const dateShort = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+                                            const timeShort = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
-                                {activeCoachingTab === 'aggregate' && activeDiagnostic && (
-                                    <button
-                                        onClick={handleCopyCoachingReport}
-                                        className="px-2.5 py-1 text-[11px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-all flex items-center gap-1 cursor-pointer border border-indigo-100"
-                                        title="Copiar informe para sesión de coaching 1:1"
-                                    >
-                                        {copiedPlan ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                                        {copiedPlan ? 'Copiado' : 'Copiar Plan 1:1'}
-                                    </button>
-                                )}
+                                            return (
+                                                <tr
+                                                    key={audit.id}
+                                                    onClick={() => {
+                                                        setSelectedAudit(audit);
+                                                        setActiveCoachingTab('single');
+                                                    }}
+                                                    className={`transition-colors cursor-pointer ${
+                                                        isSelected
+                                                            ? 'bg-indigo-50/90 font-medium'
+                                                            : 'hover:bg-slate-50/80'
+                                                    }`}
+                                                >
+                                                    {/* Cliente & Fecha */}
+                                                    <td className="py-2.5 px-3">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-bold text-slate-900 truncate max-w-[130px]">
+                                                                {clientTitle}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[10px] text-slate-400">
+                                                            {dateShort} · {timeShort}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* AE */}
+                                                    <td className="py-2.5 px-2">
+                                                        <span className="text-[11px] font-bold text-slate-800">
+                                                            {audit.sales_rep_name || 'Diana Morales'}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* SDR */}
+                                                    <td className="py-2.5 px-2">
+                                                        {audit.sdr_rep_name ? (
+                                                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                                                {audit.sdr_rep_name}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-400">—</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Score */}
+                                                    <td className="py-2.5 px-2 text-center">
+                                                        <span className="font-black text-slate-900 text-xs">
+                                                            {audit.total_score}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400">/100</span>
+                                                    </td>
+
+                                                    {/* Estado */}
+                                                    <td className="py-2.5 px-2 text-center">
+                                                        <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${badge.color}`}>
+                                                            {badge.text}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 
-                        {/* PESTAÑA 1: DIAGNÓSTICO GLOBAL CONSOLIDADO (El resumen de todas las 7 o 25 demos) */}
-                        {activeCoachingTab === 'aggregate' && activeDiagnostic && (
-                            <div className="space-y-4 animate-in fade-in duration-200">
-                                {/* Encabezado del Diagnóstico Consolidado */}
-                                <div className="flex items-center justify-between bg-slate-50/70 p-3.5 rounded-2xl border border-slate-100">
-                                    <div>
-                                        <span className="text-[10px] font-black uppercase text-indigo-500 tracking-wider">
-                                            Radiografía Consolidada de Auditorías
-                                        </span>
-                                        <h4 className="text-sm font-black text-slate-800">
-                                            {activeDiagnostic.repName} · {activeDiagnostic.totalDemos} demostraciones analizadas
-                                        </h4>
-                                    </div>
-                                    <div className="text-right">
-                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${getScoreBadge(activeDiagnostic.avgScore).color}`}>
-                                            Promedio: {activeDiagnostic.avgScore} / 100
-                                        </span>
-                                    </div>
+                        {/* ─── COLUMNA DERECHA (Cols 8-12): INSPECTOR COMPACTO DE COACHING ─── */}
+                        <div className="lg:col-span-5 p-4 space-y-3 bg-slate-50/30 max-h-[480px] overflow-y-auto">
+                            {/* Pestañas del Inspector (Estilo Metricool) */}
+                            <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                                <div className="flex items-center gap-1 text-[11px]">
+                                    <button
+                                        onClick={() => setActiveCoachingTab('aggregate')}
+                                        className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                                            activeCoachingTab === 'aggregate'
+                                                ? 'bg-slate-900 text-white shadow-2xs'
+                                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        Plan 1:1 Global
+                                    </button>
+
+                                    <button
+                                        onClick={() => setActiveCoachingTab('single')}
+                                        className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                                            activeCoachingTab === 'single'
+                                                ? 'bg-slate-900 text-white shadow-2xs'
+                                                : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        Demo Seleccionada
+                                    </button>
                                 </div>
 
-                                {/* Caja Roja: Errores Sistémicos Recurrentes */}
-                                <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-100 space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[11px] font-black uppercase text-rose-800 flex items-center gap-1.5">
-                                            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                                            Brechas Críticas Recurrentes (¿Dónde falla repetidamente?)
-                                        </span>
-                                    </div>
+                                <span className="text-[10px] font-bold text-slate-400">
+                                    {activeCoachingTab === 'aggregate'
+                                        ? `${activeDiagnostic?.totalDemos || 0} demos`
+                                        : resolveClientName(selectedAudit)}
+                                </span>
+                            </div>
 
-                                    {activeDiagnostic.topGaps.length === 0 ? (
-                                        <p className="text-xs text-rose-700">No se detectaron fallas repetitivas en las demos evaluadas.</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {activeDiagnostic.topGaps.map((gap, idx) => (
-                                                <div key={idx} className="bg-white/80 p-2.5 rounded-xl border border-rose-200/60 text-xs space-y-1">
-                                                    <div className="flex items-center justify-between">
-                                                        <strong className="text-slate-900 font-black">{idx + 1}. {gap.name}</strong>
-                                                        <span className="px-2 py-0.2 rounded-full text-[10px] font-black bg-rose-100 text-rose-700">
-                                                            Falló en {gap.failCount} de {activeDiagnostic.totalDemos} demos ({gap.percentage}%)
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-slate-600 text-[11px]">
-                                                        ↳ <span className="font-semibold text-rose-700">Corrección ARIAS:</span> {gap.recommendation}
-                                                    </p>
-                                                </div>
-                                            ))}
+                            {/* VISTA 1: DIAGNÓSTICO 1:1 GLOBAL CONSOLIDADO (Compacto, elegante, no inflado) */}
+                            {activeCoachingTab === 'aggregate' && activeDiagnostic && (
+                                <div className="space-y-3 text-xs">
+                                    {/* Resumen Superior */}
+                                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200/80">
+                                        <div>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                                Foco de Coaching
+                                            </span>
+                                            <strong className="text-slate-900 font-black text-xs">
+                                                {activeDiagnostic.repName}
+                                            </strong>
                                         </div>
-                                    )}
-                                </div>
-
-                                {/* Caja Verde: Fortalezas Demostradas */}
-                                <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 space-y-2">
-                                    <span className="text-[11px] font-black uppercase text-emerald-800 flex items-center gap-1.5">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                        Fortalezas Demostradas (Lo que hace excelente de forma consistente)
-                                    </span>
-
-                                    <div className="space-y-1.5">
-                                        {activeDiagnostic.topStrengths.map((str, idx) => (
-                                            <div key={idx} className="flex items-center justify-between text-xs bg-white/80 p-2 rounded-xl border border-emerald-200/60">
-                                                <span className="text-slate-800 font-bold">✓ {str.name}</span>
-                                                <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                                                    {str.passCount} de {activeDiagnostic.totalDemos} demos ({str.percentage}% éxito)
-                                                </span>
-                                            </div>
-                                        ))}
+                                        <div className="text-right">
+                                            <span className="text-xs font-black text-indigo-700 block">
+                                                {activeDiagnostic.avgScore} / 100 pts
+                                            </span>
+                                            <span className="text-[9px] font-bold text-slate-400">
+                                                Media de {activeDiagnostic.totalDemos} demos
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Caja Púrpura: Roleplay de 7 Minutos */}
-                                <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-1 text-xs">
-                                    <span className="text-[10px] font-black uppercase text-indigo-700 flex items-center gap-1">
-                                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                                        Roleplay Recomendado para el 1:1 Semanal (7 minutos)
-                                    </span>
-                                    <p className="text-slate-800 font-medium">
-                                        {activeDiagnostic.roleplayFocus}
-                                    </p>
-                                </div>
-
-                                {/* Caja Ámbar: Acción Inmediata de Rescate */}
-                                <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-100 space-y-1 text-xs">
-                                    <span className="text-[10px] font-black uppercase text-amber-800 flex items-center gap-1">
-                                        <Target className="w-3.5 h-3.5 text-amber-600" />
-                                        Acción Inmediata Prioritaria
-                                    </span>
-                                    <p className="text-slate-800 font-medium">
-                                        {activeDiagnostic.actionRequired}
-                                    </p>
-                                </div>
-
-                                {/* Desglose Visual de los 9 Criterios Oficiales */}
-                                <div className="space-y-2 pt-2 border-t border-slate-100">
-                                    <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                                        Tasa de Cumplimiento por Criterio Oficial (Rúbrica de 100 pts)
-                                    </span>
+                                    {/* Brechas Críticas (Cards elegantes con borde izquierdo rojo) */}
                                     <div className="space-y-1.5">
-                                        {activeDiagnostic.criteriaStats.map(crit => (
-                                            <div key={crit.id} className="text-xs space-y-0.5">
-                                                <div className="flex items-center justify-between text-[11px]">
-                                                    <span className="text-slate-700 font-semibold truncate max-w-[260px]">{crit.name}</span>
-                                                    <span className={`font-black ${crit.passRate >= 70 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                        {crit.passRate}% ({crit.passCount}/{activeDiagnostic.totalDemos})
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 flex items-center gap-1">
+                                            <AlertTriangle className="w-3 h-3 text-rose-500" />
+                                            Top Brechas Recurrentes
+                                        </span>
+                                        {activeDiagnostic.topGaps.slice(0, 2).map((gap, i) => (
+                                            <div
+                                                key={i}
+                                                className="p-2.5 rounded-xl bg-white border border-slate-200/80 border-l-3 border-l-rose-500 space-y-0.5 shadow-2xs"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-bold text-slate-900 text-[11px]">
+                                                        {i + 1}. {gap.name}
+                                                    </span>
+                                                    <span className="text-[9px] font-black text-rose-700 bg-rose-50 px-1.5 py-0.2 rounded border border-rose-100">
+                                                        {gap.percentage}% error
                                                     </span>
                                                 </div>
-                                                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                                                    <div
-                                                        className={`h-full rounded-full ${crit.passRate >= 70 ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                                                        style={{ width: `${crit.passRate}%` }}
-                                                    />
-                                                </div>
+                                                <p className="text-[10px] text-slate-500 leading-tight">
+                                                    ↳ <strong className="text-slate-700">Corrección:</strong> {gap.recommendation}
+                                                </p>
                                             </div>
                                         ))}
                                     </div>
-                                </div>
-                            </div>
-                        )}
 
-                        {/* PESTAÑA 2: DETALLE DE DEMO INDIVIDUAL */}
-                        {activeCoachingTab === 'single' && selectedAudit && (
-                            <div className="space-y-4 animate-in fade-in duration-200">
-                                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-black uppercase text-indigo-500 tracking-wider">
-                                                Auditoría Individual
+                                    {/* Roleplay de 7 minutos */}
+                                    <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 border-l-3 border-l-indigo-500 space-y-1 shadow-2xs">
+                                        <span className="text-[10px] font-black uppercase text-indigo-700 flex items-center gap-1">
+                                            <Sparkles className="w-3 h-3 text-indigo-500" />
+                                            Roleplay de 7 min para el 1:1
+                                        </span>
+                                        <p className="text-[11px] text-slate-700 leading-tight">
+                                            {activeDiagnostic.roleplayFocus}
+                                        </p>
+                                    </div>
+
+                                    {/* Fortalezas Clave */}
+                                    <div className="p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-100 space-y-1">
+                                        <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
+                                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                            Fortaleza Consistente
+                                        </span>
+                                        <p className="text-[11px] text-slate-700 leading-tight">
+                                            {activeDiagnostic.topStrengths[0]?.name || 'CRM veraz y documentado'} ({activeDiagnostic.topStrengths[0]?.percentage || 100}% éxito).
+                                        </p>
+                                    </div>
+
+                                    {/* Botón Accionador para abrir el simulador */}
+                                    <button
+                                        onClick={() => {
+                                            setCoachingModalDemoId(undefined);
+                                            setIsCoachingModalOpen(true);
+                                        }}
+                                        className="w-full py-2 px-3 text-xs font-bold text-slate-800 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                                    >
+                                        <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                                        <span>Practicar en Simulador Interactivo</span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* VISTA 2: AUDITORÍA DE LA DEMO SELECCIONADA */}
+                            {activeCoachingTab === 'single' && selectedAudit && (
+                                <div className="space-y-3 text-xs">
+                                    <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between">
+                                        <div>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                                Reunión Evaluada
                                             </span>
+                                            <strong className="text-slate-900 font-black text-xs">
+                                                {selectedAudit.sales_rep_name || 'Diana Morales'} · {resolveClientName(selectedAudit)}
+                                            </strong>
                                             {selectedAudit.sdr_rep_name && (
-                                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                                                <span className="text-[10px] text-indigo-600 block">
                                                     Agendada por {selectedAudit.sdr_rep_name} (SDR)
                                                 </span>
                                             )}
                                         </div>
-                                        <h4 className="text-sm font-black text-slate-800">
-                                            {selectedAudit.sales_rep_name || 'Diana Morales'} · {selectedAudit.total_score} / 100 puntos
-                                        </h4>
-                                        {selectedAudit.sdr_rep_name && (
-                                            <p className="text-[11px] text-slate-500 mt-0.5">
-                                                Evaluación técnica de la presentación en Meet conducida por <strong>{selectedAudit.sales_rep_name} (AE)</strong>. Cita generada por <strong>{selectedAudit.sdr_rep_name} (SDR)</strong>.
-                                            </p>
-                                        )}
+                                        <div className="text-right">
+                                            <span className="text-sm font-black text-slate-900 block">
+                                                {selectedAudit.total_score} pts
+                                            </span>
+                                            <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-black uppercase border ${getScoreBadge(selectedAudit.total_score).color}`}>
+                                                {getScoreBadge(selectedAudit.total_score).text}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${getScoreBadge(selectedAudit.total_score).color}`}>
-                                        {getScoreBadge(selectedAudit.total_score).text}
-                                    </span>
-                                </div>
 
-                                <div className="space-y-3 text-xs">
-                                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 space-y-1">
-                                        <span className="text-[10px] font-black uppercase text-emerald-700">
-                                            Fortaleza Observable en esta Demo
+                                    {/* Fortaleza */}
+                                    <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-100 space-y-0.5">
+                                        <span className="text-[9px] font-black uppercase text-emerald-800 block">
+                                            ✓ Fortaleza Demostrada
                                         </span>
-                                        <p className="text-slate-700 font-medium">
+                                        <p className="text-[11px] text-slate-700 leading-tight">
                                             {selectedAudit.coaching_summary.strength}
                                         </p>
                                     </div>
 
-                                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-100 space-y-1">
-                                        <span className="text-[10px] font-black uppercase text-rose-700">
-                                            Falla Crítica Observable en esta Demo
+                                    {/* Falla Crítica */}
+                                    <div className="p-2.5 rounded-xl bg-rose-50/60 border border-rose-100 space-y-0.5">
+                                        <span className="text-[9px] font-black uppercase text-rose-800 block">
+                                            ⚠️ Falla Crítica a Corregir
                                         </span>
-                                        <p className="text-slate-700 font-medium">
+                                        <p className="text-[11px] text-slate-700 leading-tight">
                                             {selectedAudit.coaching_summary.critical_gap}
                                         </p>
                                     </div>
 
-                                    <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-100 space-y-1">
-                                        <span className="text-[10px] font-black uppercase text-indigo-700">
-                                            Roleplay Recomendado (7 minutos)
+                                    {/* Acción Inmediata */}
+                                    <div className="p-2.5 rounded-xl bg-amber-50/60 border border-amber-100 space-y-0.5">
+                                        <span className="text-[9px] font-black uppercase text-amber-800 block">
+                                            ⚡ Acción Inmediata
                                         </span>
-                                        <p className="text-slate-700 font-medium">
-                                            {selectedAudit.coaching_summary.recommended_roleplay}
-                                        </p>
-                                    </div>
-
-                                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 space-y-1">
-                                        <span className="text-[10px] font-black uppercase text-amber-700">
-                                            Acción Inmediata de Rescate
-                                        </span>
-                                        <p className="text-slate-700 font-medium">
+                                        <p className="text-[11px] text-slate-700 leading-tight">
                                             {selectedAudit.coaching_summary.immediate_action}
                                         </p>
                                     </div>
 
-                                    <div className="pt-2">
-                                        <button
-                                            onClick={() => {
-                                                setCoachingModalDemoId(selectedAudit.id);
-                                                setIsCoachingModalOpen(true);
-                                            }}
-                                            className="w-full py-2.5 px-4 text-xs font-black text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-                                        >
-                                            <Lightbulb className="w-4 h-4 text-amber-600" />
-                                            <span>Ver Oportunidades & Preguntas para esta Demo</span>
-                                        </button>
-                                    </div>
+                                    {/* Botón Oportunidades Reales para esta demo */}
+                                    <button
+                                        onClick={() => {
+                                            setCoachingModalDemoId(selectedAudit.id);
+                                            setIsCoachingModalOpen(true);
+                                        }}
+                                        className="w-full py-2 px-3 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300/80 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                                    >
+                                        <Lightbulb className="w-3.5 h-3.5 text-amber-600" />
+                                        <span>Ver Preguntas que Debió Hacer en esta Demo</span>
+                                    </button>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
             )}
