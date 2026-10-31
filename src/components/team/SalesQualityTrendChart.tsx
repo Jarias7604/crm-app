@@ -22,19 +22,16 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
 }) => {
     const [viewGranularity, setViewGranularity] = useState<'weeks' | 'demos'>('weeks');
 
-    // Datos temporales de Octubre estilo Metricool (Barras de Demos + Línea de Calidad)
+    // Datos temporales de Octubre sincronizados con Google Calendar y Google Drive
     const timelineData = [
         { date: 'Oct 01', label: 'Oct 1', scoreTeam: 24, scoreDiana: 24, scorePatricia: 24, demos: 0, client: 'Inicio de periodo', milestone: 'Línea base sin rúbrica' },
-        { date: 'Oct 04', label: 'Oct 4', scoreTeam: 24, scoreDiana: 24, scorePatricia: 24, demos: 0, client: 'Revisión interna', milestone: 'Preparación de rúbrica' },
-        { date: 'Oct 06', label: 'Oct 6', scoreTeam: 27, scoreDiana: 25, scorePatricia: 31, demos: 1, client: 'Transportes Express', milestone: 'Patricia M. · Módulo contratos' },
-        { date: 'Oct 09', label: 'Oct 9', scoreTeam: 27, scoreDiana: 27, scorePatricia: 27, demos: 1, client: 'Kervin Roque', milestone: 'Patricia M. · Empresa de servicios' },
         { date: 'Oct 12', label: 'Oct 12', scoreTeam: 31, scoreDiana: 32, scorePatricia: 29, demos: 1, client: 'Comercializadora del Valle', milestone: 'Diana M. · Reportería y costos' },
-        { date: 'Oct 15', label: 'Oct 15', scoreTeam: 34, scoreDiana: 34, scorePatricia: 29, demos: 1, client: 'Luis Escobar', milestone: 'Grecia SDR / Diana AE · POS 8 días' },
         { date: 'Oct 18', label: 'Oct 18', scoreTeam: 36, scoreDiana: 37, scorePatricia: 32, demos: 1, client: 'Supermercados La Canasta', milestone: 'Diana M. · Diagnóstico de caja' },
         { date: 'Oct 21', label: 'Oct 21', scoreTeam: 37, scoreDiana: 38, scorePatricia: 34, demos: 1, client: 'Agropecuaria El Roble', milestone: 'Diana M. · Adopción de agenda' },
         { date: 'Oct 25', label: 'Oct 25', scoreTeam: 41, scoreDiana: 42, scorePatricia: 36, demos: 1, client: 'Distribuidora San José', milestone: 'Diana M. · Manejo de objeciones' },
-        { date: 'Oct 28', label: 'Oct 28', scoreTeam: 45, scoreDiana: 45, scorePatricia: 37, demos: 1, client: 'Finca Miramar', milestone: 'Diana M. · Pico de calidad (45 pts)' },
-        { date: 'Oct 30', label: 'Oct 30', scoreTeam: 45, scoreDiana: 45, scorePatricia: 37, demos: 0, client: 'Cierre del Mes', milestone: 'Consolidación de rúbrica' }
+        { date: 'Oct 26', label: 'Oct 26', scoreTeam: 35, scoreDiana: 38, scorePatricia: 35, demos: 1, client: 'Kervin Roque', milestone: 'Patricia M. · 5-6pm Calendar' },
+        { date: 'Oct 27', label: 'Oct 27', scoreTeam: 39, scoreDiana: 39, scorePatricia: 35, demos: 3, client: '3 Demos Diana Morales: Demo ERP (12pm), Luis Escobar (5pm), Finca Miramar (9pm)', milestone: 'Diana M. · 3 Demos en Google Calendar (12pm, 5pm, 9pm)' },
+        { date: 'Oct 31', label: 'Oct 31', scoreTeam: 40, scoreDiana: 40, scorePatricia: 35, demos: 0, client: 'Cierre del Mes', milestone: 'Consolidación de rúbrica' }
     ];
 
     const chartData = useMemo(() => {

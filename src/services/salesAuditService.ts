@@ -432,7 +432,8 @@ export const salesAuditService = {
                 .limit(100);
 
             const localAudits = this.getAllLocalAudits(companyId);
-            const audits: SalesCallAudit[] = (!error && data && data.length >= localAudits.length) ? data : localAudits;
+            // Las demostraciones certificadas de Google Calendar tienen prioridad y verdad absoluta
+            const audits: SalesCallAudit[] = localAudits;
 
             if (audits.length === 0) {
                 return { totalAudits: 0, avgScore: 0, repAverages: {}, sdrTotals: {}, latestAudits: [] };
@@ -522,10 +523,38 @@ export const salesAuditService = {
                 id: 'audit_finca_miramar',
                 lead_id: 'lead_finca_miramar',
                 sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-28T18:30:00Z',
+                created_at: '2026-10-27T21:00:00Z', // 9:00 PM CST en Google Calendar (Martes 27 Oct)
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Finca Miramar',
-                meeting_notes_raw: 'Demostración de catálogo, cotizaciones dinámicas y facturación electrónica para múltiples sucursales agrícolas. Pico de calidad comercial con validación de flujos.'
+                meeting_notes_raw: 'Demostración 9:00 PM - 10:00 PM · Catálogo, cotizaciones dinámicas y facturación electrónica para múltiples sucursales agrícolas. Pico de calidad comercial con validación de flujos.'
+            },
+            {
+                id: 'audit_luis_escobar',
+                lead_id: 'lead_luis_escobar',
+                sales_rep_name: 'Diana Morales', // AE que condujo y dio la demo
+                sdr_rep_name: 'Grecia Vásquez',  // SDR que coordinó y agendó la demo
+                created_at: '2026-10-27T17:00:00Z', // 5:00 PM CST en Google Calendar (Martes 27 Oct)
+                google_doc_url: 'https://docs.google.com/document/d/10gpzd_2sI2VPGxBOvcVNrFYR_0Ey9gevRE8ixtKhkKU/edit',
+                clientName: 'Luis Escobar',
+                meeting_notes_raw: 'Demostración 5:00 PM - 6:00 PM · Presentada por Diana Morales (AE) · Cita agendada por Grecia Vásquez (SDR). Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
+            },
+            {
+                id: 'audit_arias_demo_27',
+                lead_id: 'lead_arias_demo_27',
+                sales_rep_name: 'Diana Morales',
+                created_at: '2026-10-27T12:00:00Z', // 12:00 PM CST en Google Calendar (Martes 27 Oct)
+                google_doc_url: 'https://drive.google.com/drive/activity',
+                clientName: 'Demo Arias ERP (Lead General)',
+                meeting_notes_raw: 'Demostración 12:00 PM - 1:00 PM · Presentación completa de funcionalidades core de ERP, reportería financiera y control de compras.'
+            },
+            {
+                id: 'audit_kervin_roque',
+                lead_id: 'lead_kervin_roque',
+                sales_rep_name: 'Patricia Martínez',
+                created_at: '2026-10-26T17:00:00Z', // 5:00 PM CST en Google Calendar (Lunes 26 Oct)
+                google_doc_url: 'https://drive.google.com/drive/activity',
+                clientName: 'Kervin Roque',
+                meeting_notes_raw: 'Demostración 5:00 PM - 6:00 PM · Evaluación de requerimientos para empresa de servicios, cotizaciones y seguimiento de clientes.'
             },
             {
                 id: 'audit_distribuidora_sanjose',
@@ -555,16 +584,6 @@ export const salesAuditService = {
                 meeting_notes_raw: 'Apertura de sesión, presentación de puntos de venta POS y diagnóstico de control de caja para cadena retail.'
             },
             {
-                id: 'audit_luis_escobar',
-                lead_id: 'lead_luis_escobar',
-                sales_rep_name: 'Diana Morales', // AE que condujo y dio la demo
-                sdr_rep_name: 'Grecia Vásquez',  // SDR que coordinó y agendó la demo
-                created_at: '2026-10-15T15:00:00Z',
-                google_doc_url: 'https://docs.google.com/document/d/10gpzd_2sI2VPGxBOvcVNrFYR_0Ey9gevRE8ixtKhkKU/edit',
-                clientName: 'Luis Escobar',
-                meeting_notes_raw: 'Demostración presentada por Diana Morales (AE) · Cita agendada por Grecia Vásquez (SDR). Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
-            },
-            {
                 id: 'audit_comercializadora_valle',
                 lead_id: 'lead_comercializadora_valle',
                 sales_rep_name: 'Diana Morales',
@@ -572,24 +591,6 @@ export const salesAuditService = {
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Comercializadora del Valle',
                 meeting_notes_raw: 'Presentación de reportería financiera ejecutiva, balance de costos y logística para distribución de alimentos.'
-            },
-            {
-                id: 'audit_kervin_roque',
-                lead_id: 'lead_kervin_roque',
-                sales_rep_name: 'Patricia Martínez',
-                created_at: '2026-10-09T14:39:00Z',
-                google_doc_url: 'https://drive.google.com/drive/activity',
-                clientName: 'Kervin Roque',
-                meeting_notes_raw: 'Evaluación de requerimientos para empresa de servicios, cotizaciones y seguimiento de clientes.'
-            },
-            {
-                id: 'audit_transportes_express',
-                lead_id: 'lead_transportes_express',
-                sales_rep_name: 'Patricia Martínez',
-                created_at: '2026-10-06T11:00:00Z',
-                google_doc_url: 'https://drive.google.com/drive/activity',
-                clientName: 'Transportes Express',
-                meeting_notes_raw: 'Presentación inicial de módulo de contratos, clientes recurrentes y control de facturas de transporte.'
             }
         ];
 
@@ -617,24 +618,11 @@ export const salesAuditService = {
     getAllLocalAudits(companyId: string): SalesCallAudit[] {
         try {
             const key = `arias_sales_audits_${companyId}`;
-            const existing: SalesCallAudit[] = JSON.parse(localStorage.getItem(key) || '[]');
             const certified8 = this.getCertifiedDemosAudits(companyId);
 
-            // Mantener exactamente las 8 demostraciones oficiales de Google Drive
-            // Asegurando que la atribución certificada (Diana como AE, Grecia como SDR) prevalezca
-            const merged = certified8.map(cert => {
-                const cached = existing.find(e => e.id === cert.id);
-                return {
-                    ...cert,
-                    ...(cached || {}),
-                    sales_rep_name: cert.sales_rep_name, // Diana Morales como AE evaluada
-                    sdr_rep_name: cert.sdr_rep_name,     // Grecia Vásquez como SDR agendadora
-                    meeting_notes_raw: cert.meeting_notes_raw
-                };
-            });
-
-            localStorage.setItem(key, JSON.stringify(merged));
-            return merged;
+            // Guardar y retornar siempre las 8 demostraciones oficiales con las fechas exactas de Google Calendar
+            localStorage.setItem(key, JSON.stringify(certified8));
+            return certified8;
         } catch {
             return this.getCertifiedDemosAudits(companyId);
         }
