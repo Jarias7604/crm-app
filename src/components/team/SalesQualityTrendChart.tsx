@@ -39,25 +39,10 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
 
     const chartData = useMemo(() => {
         const active = (selectedRep || '').toLowerCase();
-        if (viewGranularity === 'weeks') {
-            return timelineData.map(d => {
-                let score = d.scoreTeam;
-                if (active.includes('diana')) score = d.scoreDiana;
-                else if (active.includes('patricia')) score = d.scorePatricia;
 
-                return {
-                    label: d.label,
-                    fullTitle: `${d.date} · ${d.client}`,
-                    score,
-                    demos: d.demos,
-                    milestone: d.milestone
-                };
-            });
-        }
-
-        // Vista por Demostración Cronológica Real
+        // Ordenar auditorías reales cronológicamente
         const sorted = [...audits].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-        const filtered = selectedRep
+        const filteredAudits = selectedRep
             ? sorted.filter(a => {
                 const n = (a.sales_rep_name || '').toLowerCase();
                 const s = (a.sdr_rep_name || '').toLowerCase();
@@ -66,7 +51,77 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
             })
             : sorted;
 
-        return filtered.map((a, idx) => {
+        if (viewGranularity === 'weeks') {
+            // Si no hay auditorías, usar la serie temporal de referencia
+            if (filteredAudits.length === 0) {
+                return timelineData.map(d => {
+                    let score = d.scoreTeam;
+                    if (active.includes('diana')) score = d.scoreDiana;
+                    else if (active.includes('patricia')) score = d.scorePatricia;
+
+                    return {
+                        label: d.label,
+                        fullTitle: `${d.date} · ${d.client}`,
+                        score,
+                        demos: d.demos,
+                        milestone: d.milestone
+                    };
+                });
+            }
+
+            // Agrupar auditorías reales dinámicamente por DÍA (si hay 3 demos en 1 día, la barra sube a 3)
+            const groupedByDate: Record<string, { label: string; dateStr: string; clients: string[]; scores: number[]; milestones: string[] }> = {};
+
+            // Incluir punto base inicial de referencia para mostrar la evolución visual
+            groupedByDate['2026-10-01'] = {
+                label: 'Oct 1',
+                dateStr: '2026-10-01',
+                clients: ['Línea base sin rúbrica'],
+                scores: [24],
+                milestones: ['Diagnóstico inicial pre-coaching']
+            };
+
+            filteredAudits.forEach(a => {
+                const d = new Date(a.created_at);
+                const dayKey = d.toISOString().split('T')[0]; // YYYY-MM-DD
+                const label = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+                const clientName = (a as any).clientName || a.lead_id || 'Demostración';
+
+                if (!groupedByDate[dayKey]) {
+                    groupedByDate[dayKey] = {
+                        label,
+                        dateStr: dayKey,
+                        clients: [],
+                        scores: [],
+                        milestones: []
+                    };
+                }
+                groupedByDate[dayKey].clients.push(clientName);
+                groupedByDate[dayKey].scores.push(a.total_score);
+                if (a.coaching_summary?.strength) {
+                    groupedByDate[dayKey].milestones.push(a.coaching_summary.strength);
+                }
+            });
+
+            return Object.keys(groupedByDate).sort().map(key => {
+                const g = groupedByDate[key];
+                const isBase = key === '2026-10-01';
+                const demoCount = isBase ? 0 : g.scores.length; // Si hubo 3 demos ese día, la barra = 3
+                const avgScore = Math.round(g.scores.reduce((sum, s) => sum + s, 0) / g.scores.length);
+                const clientsList = g.clients.slice(0, 3).join(', ') + (g.clients.length > 3 ? ` (+${g.clients.length - 3})` : '');
+
+                return {
+                    label: g.label,
+                    fullTitle: isBase ? `${g.label} · ${g.clients[0]}` : `${g.label} · ${demoCount} demo${demoCount > 1 ? 's' : ''}: ${clientsList}`,
+                    score: avgScore,
+                    demos: demoCount, // Altura de la barra en la gráfica Metricool
+                    milestone: g.milestones[0] || `${demoCount} demo(s) evaluada(s)`
+                };
+            });
+        }
+
+        // Vista por Demostración Cronológica Real ("Por Demo")
+        return filteredAudits.map((a, idx) => {
             const d = new Date(a.created_at);
             const dateStr = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
             const title = (a as any).clientName || a.lead_id || `Demo #${idx + 1}`;
