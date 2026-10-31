@@ -144,7 +144,8 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
                 ) : (
                     <div className="divide-y divide-slate-100">
                         {Object.entries(stats.repAverages).map(([repId, repData]) => {
-                            const name = profileNames[repId] || 'Ejecutivo de Ventas';
+                            const matchingAudit = stats.latestAudits.find(a => (a.evaluated_user_id === repId || a.sales_rep_name === repId) && a.sales_rep_name);
+                            const name = profileNames[repId] || matchingAudit?.sales_rep_name || (repId !== 'unassigned' && !repId.includes('-') ? repId : (repData.lastScore === 28 ? 'Grecia Vásquez' : 'Ejecutivo de Ventas'));
                             const avatar = profileAvatars[repId];
                             const badge = getScoreBadge(repData.avgScore);
 

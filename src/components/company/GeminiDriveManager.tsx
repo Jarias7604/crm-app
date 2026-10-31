@@ -30,7 +30,47 @@ interface DetectedDemo {
 // Demos reales detectadas desde Google Drive (Activity / Shared with me)
 const INITIAL_REAL_DEMOS: DetectedDemo[] = [
     {
-        id: 'drive_demo_1',
+        id: 'drive_demo_finca_1859',
+        title: 'Demo Arias ERP - Finca Miramar: 2026/10/27 18:59 CST - Notas de Gemini',
+        clientName: 'Finca Miramar',
+        salesRepName: 'Diana Morales',
+        dateStr: '27 oct 2026, 18:59 CST',
+        fileUrl: 'https://drive.google.com/drive/activity',
+        status: 'pending',
+        rawSnippet: 'Demostración de catálogo, cotizaciones dinámicas y facturación electrónica para múltiples sucursales agrícolas.'
+    },
+    {
+        id: 'drive_demo_finca_1723',
+        title: 'Demo Arias ERP - Finca Miramar: 2026/10/27 17:23 CST - Notas de Gemini',
+        clientName: 'Finca Miramar',
+        salesRepName: 'Diana Morales',
+        dateStr: '27 oct 2026, 17:23 CST',
+        fileUrl: 'https://drive.google.com/drive/activity',
+        status: 'pending',
+        rawSnippet: 'Revisión técnica de flujo de pedidos, módulos de nómina e integración contable.'
+    },
+    {
+        id: 'drive_demo_finca_1712',
+        title: 'Demo Arias ERP - Finca Miramar: 2026/10/27 17:12 CST - Notas de Gemini',
+        clientName: 'Finca Miramar',
+        salesRepName: 'Diana Morales',
+        dateStr: '27 oct 2026, 17:12 CST',
+        fileUrl: 'https://drive.google.com/drive/activity',
+        status: 'pending',
+        rawSnippet: 'Configuración inicial de catálogo y validación de permisos de usuario para gerencia.'
+    },
+    {
+        id: 'drive_demo_finca_1701',
+        title: 'Demo Arias ERP - Finca Miramar: 2026/10/27 17:01 CST - Notas de Gemini',
+        clientName: 'Finca Miramar',
+        salesRepName: 'Diana Morales',
+        dateStr: '27 oct 2026, 17:01 CST',
+        fileUrl: 'https://drive.google.com/drive/activity',
+        status: 'pending',
+        rawSnippet: 'Apertura de sesión, presentación de agenda y diagnóstico de dolor operativo en inventarios.'
+    },
+    {
+        id: 'drive_demo_luis_escobar',
         title: 'DEMO ERP - LUIS ESCOBAR - 2026/10/27 15:00 CST - Notes by Gemini (English)',
         clientName: 'Luis Escobar',
         salesRepName: 'Grecia Vásquez',
@@ -40,18 +80,39 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         rawSnippet: 'Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
     },
     {
-        id: 'drive_demo_2',
-        title: 'Demo Arias ERP - Finca Miramar: 2026/10/27 18:59 CST - Notas de Gemini',
-        clientName: 'Finca Miramar',
+        id: 'drive_demo_arias_0957',
+        title: 'Demo Arias ERP: 2026/10/27 09:57 CST - Notas de Gemini',
+        clientName: 'Demo Arias ERP (Lead General)',
         salesRepName: 'Diana Morales',
-        dateStr: '27 oct 2026, 18:59 CST',
+        dateStr: '27 oct 2026, 09:57 CST',
         fileUrl: 'https://drive.google.com/drive/activity',
         status: 'pending',
-        rawSnippet: 'Presentación de catálogo, cotizaciones dinámicas y facturación electrónica. Interés en módulos de nómina.'
+        rawSnippet: 'Presentación completa de funcionalidades core de ERP, reportería financiera y control de compras.'
     },
     {
-        id: 'drive_demo_3',
-        title: 'Revisión ajustes bancos y cxc - Arroz - 2026/10/28 12:59 CST - Notes by Gemini',
+        id: 'drive_demo_kervin_roque',
+        title: 'Demo ERP Arias - Kervin Roque - 2026/10/26 14:39 CST - Notes by Gemini',
+        clientName: 'Kervin Roque',
+        salesRepName: 'Patricia Martínez',
+        dateStr: '26 oct 2026, 14:39 CST',
+        fileUrl: 'https://drive.google.com/drive/activity',
+        status: 'pending',
+        rawSnippet: 'Evaluación de requerimientos para empresa de servicios, cotizaciones y seguimiento de clientes.'
+    },
+    {
+        id: 'drive_demo_arias_1400',
+        title: 'Demo Arias ERP: 2026/10/23 14:00 CST - Notas de Gemini',
+        clientName: 'Demo Arias ERP (Lead Comercial)',
+        salesRepName: 'Diana Morales',
+        dateStr: '23 oct 2026, 14:00 CST',
+        fileUrl: 'https://drive.google.com/drive/activity',
+        status: 'pending',
+        rawSnippet: 'Presentación de propuesta comercial, alcance del sistema y tiempos de implementación.'
+    },
+    // Reuniones no demo en Drive (para ser descartadas automáticamente por el filtro)
+    {
+        id: 'drive_meeting_arroz',
+        title: 'Revisión ajustes bancos y cxc - Arroz - 2026/10/28 12:59 CST - Notes by Gemini (English)',
         clientName: 'Arroz',
         salesRepName: 'Patricia Martínez',
         dateStr: '28 oct 2026, 12:59 CST',
@@ -60,24 +121,34 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         rawSnippet: 'Revisión de conciliación bancaria y flujo de caja. Validación de requerimientos de reportería.'
     },
     {
-        id: 'drive_demo_4',
-        title: 'Demo Salinera San Jorge: 2026/08/20 10:00 CST - Notas de Gemini',
-        clientName: 'Salinera San Jorge',
-        salesRepName: 'Diana Morales',
-        dateStr: '20 ago 2026, 10:00 CST',
+        id: 'drive_meeting_texa46',
+        title: 'Revisión ajustes Texa46 - 2026/10/28 10:00 CST - Notes by Gemini (Spanish)',
+        clientName: 'Texa46',
+        salesRepName: 'Patricia Martínez',
+        dateStr: '28 oct 2026, 10:00 CST',
         fileUrl: 'https://drive.google.com/drive/activity',
         status: 'pending',
-        rawSnippet: 'Flujo de ventas y despacho. Necesidad de control de inventario en múltiples almacenes.'
+        rawSnippet: 'Revisión de ajustes de sistema de contabilidad interna.'
     },
     {
-        id: 'drive_demo_5',
-        title: 'Reunión revisión cuentas por Cobrar - Funerales Del Cid : 2026/10/29 18:00 CST - Notas de Gemini',
-        clientName: 'Funerales Del Cid',
-        salesRepName: 'Diana Morales',
-        dateStr: '29 oct 2026, 18:00 CST',
+        id: 'drive_meeting_contabilidad',
+        title: 'Revisión modalidad contabilidad - 2026/10/26 10:28 CST - Notes by Gemini',
+        clientName: 'Contabilidad Interna',
+        salesRepName: 'Patricia Martínez',
+        dateStr: '26 oct 2026, 10:28 CST',
         fileUrl: 'https://drive.google.com/drive/activity',
         status: 'pending',
-        rawSnippet: 'Revisión de carteras de clientes y planes de financiamiento mensual. Validación de cobros recurrentes.'
+        rawSnippet: 'Revisión de parámetros de configuración contable.'
+    },
+    {
+        id: 'drive_meeting_seguimiento',
+        title: 'Seguimiento desarrollo ERP Arias - 2026/10/23 08:59 CST - Notes by Gemini (Spanish)',
+        clientName: 'Desarrollo Interno',
+        salesRepName: 'Patricia Martínez',
+        dateStr: '23 oct 2026, 08:59 CST',
+        fileUrl: 'https://drive.google.com/drive/activity',
+        status: 'pending',
+        rawSnippet: 'Revisión de sprint y desarrollo técnico interno.'
     }
 ];
 
@@ -114,14 +185,17 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                 setAutoCreateLead(parsed.autoCreateLead ?? true);
             }
 
-            // Load detected demos state
+            // Load detected demos state and merge with full catalog of Drive files
             const demosRaw = localStorage.getItem(`gemini_drive_demos_${companyId}`);
-            if (demosRaw) {
-                setDetectedDemos(JSON.parse(demosRaw));
-            } else {
-                setDetectedDemos(INITIAL_REAL_DEMOS);
-                localStorage.setItem(`gemini_drive_demos_${companyId}`, JSON.stringify(INITIAL_REAL_DEMOS));
-            }
+            const savedDemos: DetectedDemo[] = demosRaw ? JSON.parse(demosRaw) : [];
+
+            const merged = INITIAL_REAL_DEMOS.map(initial => {
+                const existing = savedDemos.find(s => s.id === initial.id || s.title === initial.title);
+                return existing || initial;
+            });
+
+            setDetectedDemos(merged);
+            localStorage.setItem(`gemini_drive_demos_${companyId}`, JSON.stringify(merged));
         } catch (e) {
             console.error('Error loading drive config', e);
         }
@@ -248,7 +322,14 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
             // Simula el barrido de Google Drive API
             await new Promise(r => setTimeout(r, 1000));
 
-            let currentList = [...detectedDemos];
+            const demosRaw = localStorage.getItem(`gemini_drive_demos_${companyId}`);
+            const savedDemos: DetectedDemo[] = demosRaw ? JSON.parse(demosRaw) : [];
+
+            let currentList = INITIAL_REAL_DEMOS.map(initial => {
+                const existing = savedDemos.find(s => s.id === initial.id || s.title === initial.title);
+                return existing || initial;
+            });
+
             if (autoAuditOnDetect) {
                 const updated: DetectedDemo[] = [];
                 for (const demo of currentList) {
@@ -261,9 +342,13 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                 }
                 setDetectedDemos(updated);
                 localStorage.setItem(`gemini_drive_demos_${companyId}`, JSON.stringify(updated));
-                toast.success('Bandeja sincronizada y llamadas auditadas con éxito');
+                const demoCount = updated.filter(d => d.title.toLowerCase().includes('demo')).length;
+                toast.success(`Google Drive sincronizado: ${demoCount} demostraciones detectadas y auditadas`);
             } else {
-                toast.success('Bandeja de Google Drive sincronizada: 5 demostraciones detectadas');
+                setDetectedDemos(currentList);
+                localStorage.setItem(`gemini_drive_demos_${companyId}`, JSON.stringify(currentList));
+                const demoCount = currentList.filter(d => d.title.toLowerCase().includes('demo')).length;
+                toast.success(`Bandeja de Google Drive sincronizada: ${demoCount} demostraciones detectadas`);
             }
         } catch {
             toast.error('Error al sincronizar con Google Drive');
