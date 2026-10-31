@@ -272,9 +272,36 @@ export default function TeamPerformancePage() {
 
             const names: Record<string, string> = {};
             const avatars: Record<string, string | null> = {};
+
+            // Cargar todos los perfiles de la empresa directamente para asegurar avatares y nombres globales
+            try {
+                const { data: allProfiles } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url')
+                    .eq('company_id', profile.company_id);
+                if (allProfiles) {
+                    allProfiles.forEach((p) => {
+                        if (p.full_name) {
+                            names[p.id] = p.full_name;
+                            if (p.avatar_url) {
+                                avatars[p.id] = p.avatar_url;
+                                avatars[p.full_name] = p.avatar_url;
+                                avatars[p.full_name.toLowerCase().trim()] = p.avatar_url;
+                            }
+                        }
+                    });
+                }
+            } catch (err) {
+                console.warn('Error cargando perfiles globales para avatares:', err);
+            }
+
             userData.forEach((u) => {
                 names[u.user_id] = u.full_name;
                 avatars[u.user_id] = u.avatar_url;
+                if (u.full_name) {
+                    avatars[u.full_name] = u.avatar_url;
+                    avatars[u.full_name.toLowerCase().trim()] = u.avatar_url;
+                }
             });
             setProfileNames(names);
             setProfileAvatars(avatars);

@@ -22,6 +22,7 @@ interface DetectedDemo {
     title: string;
     clientName: string;
     salesRepName: string;
+    sdrName?: string;
     dateStr: string;
     fileUrl: string;
     status: 'pending' | 'audited';
@@ -79,12 +80,13 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         id: 'drive_demo_luis_escobar',
         title: 'DEMO ERP - LUIS ESCOBAR - 2026/10/27 15:00 CST - Notes by Gemini (English)',
         clientName: 'Luis Escobar',
-        salesRepName: 'Grecia Vásquez',
+        salesRepName: 'Diana Morales',
+        sdrName: 'Grecia Vásquez',
         dateStr: '27 oct 2026, 15:00 CST',
         fileUrl: 'https://docs.google.com/document/d/10gpzd_2sI2VPGxBOvcVNrFYR_0Ey9gevRE8ixtKhkKU/edit',
         status: 'audited',
         auditScore: 38,
-        rawSnippet: 'Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
+        rawSnippet: 'Demostración de Arias ERP presentada por Diana Morales (AE) · Cita agendada por Grecia Vásquez (SDR). Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario.'
     },
     {
         id: 'drive_demo_arias_0957',
@@ -207,6 +209,8 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                 return {
                     ...initial,
                     ...(existing || {}),
+                    salesRepName: initial.salesRepName,
+                    sdrName: initial.sdrName,
                     status: 'audited' as const,
                     auditScore: existing?.auditScore || initial.auditScore
                 };
@@ -336,6 +340,7 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
             lead_id: finalLeadId,
             evaluated_user_id: evaluatedUserId,
             sales_rep_name: demo.salesRepName,
+            sdr_rep_name: demo.sdrName,
             google_doc_url: demo.fileUrl,
             meeting_notes_raw: demo.rawSnippet,
             total_score: result.totalScore,
@@ -673,9 +678,14 @@ export const GeminiDriveManager: React.FC<GeminiDriveManagerProps> = ({ companyI
                                         <span className="text-[10px] font-bold text-slate-400">
                                             · {demo.dateStr}
                                         </span>
-                                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-600">
-                                            Vendedor: {demo.salesRepName}
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-700">
+                                            Presentador (AE): {demo.salesRepName}
                                         </span>
+                                        {demo.sdrName && (
+                                            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                                Agendó: {demo.sdrName} (SDR)
+                                            </span>
+                                        )}
                                         {isAudited ? (
                                             <span className="text-[10px] px-2 py-0.5 rounded-full font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                                                 <ShieldCheck className="w-3 h-3 text-emerald-600" />

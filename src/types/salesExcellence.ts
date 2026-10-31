@@ -38,6 +38,7 @@ export interface SalesCallAudit {
     lead_id: string;
     evaluated_user_id?: string | null;
     sales_rep_name?: string | null;
+    sdr_rep_name?: string | null; // Nombre de la SDR / agendadora de la cita
     auditor_id?: string | null;
     google_doc_url?: string | null;
     meeting_notes_raw: string;

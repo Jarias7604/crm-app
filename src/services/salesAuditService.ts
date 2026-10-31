@@ -417,6 +417,7 @@ export const salesAuditService = {
         totalAudits: number;
         avgScore: number;
         repAverages: Record<string, { count: number; avgScore: number; lastScore: number }>;
+        sdrTotals: Record<string, { count: number; lastDemo: string; demos: string[] }>;
         latestAudits: SalesCallAudit[];
     }> {
         try {
@@ -434,10 +435,11 @@ export const salesAuditService = {
             const audits: SalesCallAudit[] = (!error && data && data.length >= localAudits.length) ? data : localAudits;
 
             if (audits.length === 0) {
-                return { totalAudits: 0, avgScore: 0, repAverages: {}, latestAudits: [] };
+                return { totalAudits: 0, avgScore: 0, repAverages: {}, sdrTotals: {}, latestAudits: [] };
             }
 
             const repAverages: Record<string, { count: number; totalScore: number; avgScore: number; lastScore: number }> = {};
+            const sdrTotals: Record<string, { count: number; lastDemo: string; demos: string[] }> = {};
             let sumTotal = 0;
 
             for (const a of audits) {
@@ -448,6 +450,14 @@ export const salesAuditService = {
                 }
                 repAverages[repId].count += 1;
                 repAverages[repId].totalScore += a.total_score;
+
+                if (a.sdr_rep_name) {
+                    if (!sdrTotals[a.sdr_rep_name]) {
+                        sdrTotals[a.sdr_rep_name] = { count: 0, lastDemo: a.lead_id, demos: [] };
+                    }
+                    sdrTotals[a.sdr_rep_name].count += 1;
+                    sdrTotals[a.sdr_rep_name].demos.push(a.lead_id);
+                }
             }
 
             for (const repId in repAverages) {
@@ -458,6 +468,7 @@ export const salesAuditService = {
                 totalAudits: audits.length,
                 avgScore: Math.round(sumTotal / audits.length),
                 repAverages,
+                sdrTotals,
                 latestAudits: audits.slice(0, 10)
             };
         } catch {
@@ -466,6 +477,7 @@ export const salesAuditService = {
                 totalAudits: fallbackAudits.length,
                 avgScore: fallbackAudits.length ? Math.round(fallbackAudits.reduce((acc, a) => acc + a.total_score, 0) / fallbackAudits.length) : 0,
                 repAverages: {},
+                sdrTotals: {},
                 latestAudits: fallbackAudits.slice(0, 10)
             };
         }
@@ -545,11 +557,12 @@ export const salesAuditService = {
             {
                 id: 'audit_luis_escobar',
                 lead_id: 'lead_luis_escobar',
-                sales_rep_name: 'Grecia Vásquez',
+                sales_rep_name: 'Diana Morales', // AE que condujo y dio la demo
+                sdr_rep_name: 'Grecia Vásquez',  // SDR que coordinó y agendó la demo
                 created_at: '2026-10-27T15:00:00Z',
                 google_doc_url: 'https://docs.google.com/document/d/10gpzd_2sI2VPGxBOvcVNrFYR_0Ey9gevRE8ixtKhkKU/edit',
                 clientName: 'Luis Escobar',
-                meeting_notes_raw: 'Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
+                meeting_notes_raw: 'Demostración presentada por Diana Morales (AE) · Cita agendada por Grecia Vásquez (SDR). Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
             },
             {
                 id: 'audit_arias_0957',
@@ -587,6 +600,7 @@ export const salesAuditService = {
                 company_id: companyId,
                 lead_id: d.lead_id,
                 sales_rep_name: d.sales_rep_name,
+                sdr_rep_name: (d as any).sdr_rep_name || null,
                 google_doc_url: d.google_doc_url,
                 meeting_notes_raw: d.meeting_notes_raw,
                 total_score: evaluated.totalScore,
@@ -606,15 +620,17 @@ export const salesAuditService = {
             const certified8 = this.getCertifiedDemosAudits(companyId);
 
             // Mantener exactamente las 8 demostraciones oficiales de Google Drive
-            const certifiedIds = new Set(certified8.map(c => c.id));
-            const validExisting = existing.filter(e => certifiedIds.has(e.id));
-
-            const merged = [...validExisting];
-            for (const cert of certified8) {
-                if (!merged.some(m => m.id === cert.id)) {
-                    merged.push(cert);
-                }
-            }
+            // Asegurando que la atribución certificada (Diana como AE, Grecia como SDR) prevalezca
+            const merged = certified8.map(cert => {
+                const cached = existing.find(e => e.id === cert.id);
+                return {
+                    ...cert,
+                    ...(cached || {}),
+                    sales_rep_name: cert.sales_rep_name, // Diana Morales como AE evaluada
+                    sdr_rep_name: cert.sdr_rep_name,     // Grecia Vásquez como SDR agendadora
+                    meeting_notes_raw: cert.meeting_notes_raw
+                };
+            });
 
             localStorage.setItem(key, JSON.stringify(merged));
             return merged;

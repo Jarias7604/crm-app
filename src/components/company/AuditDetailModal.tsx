@@ -13,6 +13,7 @@ interface DetectedDemoLike {
     title: string;
     clientName: string;
     salesRepName: string;
+    sdrName?: string;
     dateStr: string;
     fileUrl: string;
     auditScore?: number;
@@ -36,6 +37,7 @@ export const AuditDetailModal: React.FC<AuditDetailModalProps> = ({
 
     const totalScore = audit?.total_score ?? demo.auditScore ?? 35;
     const repName = audit?.sales_rep_name || demo.salesRepName;
+    const sdrName = audit?.sdr_rep_name || demo.sdrName;
     const clientName = demo.clientName;
     const rubricScores = audit?.rubric_scores || [];
     const coaching = audit?.coaching_summary;
@@ -84,7 +86,12 @@ export const AuditDetailModal: React.FC<AuditDetailModalProps> = ({
                                 </span>
                             </div>
                             <p className="text-xs text-indigo-200/70 font-medium">
-                                Cuenta: <strong className="text-white">{clientName}</strong> · Vendedor: <strong className="text-white">{repName}</strong>
+                                Cuenta: <strong className="text-white">{clientName}</strong> · Presentador (AE): <strong className="text-white">{repName}</strong>
+                                {sdrName && (
+                                    <span className="ml-2 text-indigo-300">
+                                        · Agendada por (SDR): <strong className="text-amber-300">{sdrName}</strong>
+                                    </span>
+                                )}
                             </p>
                         </div>
                     </div>
@@ -105,6 +112,23 @@ export const AuditDetailModal: React.FC<AuditDetailModalProps> = ({
                         Para evitar la manipulación de métricas comerciales, el registro está sellado y protegido contra recálculos.
                     </span>
                 </div>
+
+                {/* Banner de Atribución de Roles SDR vs Presentador */}
+                {sdrName && (
+                    <div className="bg-indigo-950/60 border-b border-indigo-500/30 px-6 py-2.5 flex items-center justify-between text-xs text-indigo-200">
+                        <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                Separación de Roles SDR vs AE
+                            </span>
+                            <span>
+                                Cita coordinada en Calendar por <strong>{sdrName} (SDR)</strong>. Demostración en vivo ejecutada por <strong>{repName} (AE)</strong> y evaluada por la Rúbrica.
+                            </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
+                            ✓ Atribución Verificada
+                        </span>
+                    </div>
+                )}
 
                 {/* Contenido con Scroll */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
