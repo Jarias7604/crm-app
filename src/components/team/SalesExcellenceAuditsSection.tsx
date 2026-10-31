@@ -14,6 +14,7 @@ import { salesAuditService } from '../../services/salesAuditService';
 import type { SalesCallAudit, RubricCriterionScore } from '../../types/salesExcellence';
 import { OFFICIAL_ARIAS_RUBRIC } from '../../types/salesExcellence';
 import { RealCoachingOpportunitiesModal } from '../company/RealCoachingOpportunitiesModal';
+import { SalesQualityTrendChart } from './SalesQualityTrendChart';
 
 interface SalesExcellenceAuditsSectionProps {
     companyId: string;
@@ -258,8 +259,8 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
     };
 
     // Manejador del click en un ejecutivo para filtrar
-    const handleToggleRepFilter = (name: string) => {
-        if (selectedRep === name) {
+    const handleToggleRepFilter = (name: string | null) => {
+        if (!name || selectedRep === name) {
             setSelectedRep(null);
             setActiveCoachingTab('aggregate');
         } else {
@@ -358,6 +359,18 @@ ${activeDiagnostic.actionRequired}
                     </div>
                 </div>
             </div>
+
+            {/* Gráfico Interactivo de Evolución de Calidad Comercial en el Tiempo */}
+            <SalesQualityTrendChart
+                audits={stats.latestAudits}
+                selectedRep={selectedRep}
+                onSelectRep={handleToggleRepFilter}
+                executiveAvatars={{
+                    'Diana Morales': getExecutiveAvatar('Diana Morales', 'Diana Morales'),
+                    'Grecia Vásquez': getExecutiveAvatar('Grecia Vásquez', 'Grecia Vásquez'),
+                    'Patricia Martínez': getExecutiveAvatar('Patricia Martínez', 'Patricia Martínez')
+                }}
+            />
 
             {/* Ranking por Vendedor con Filtro Interactivo */}
             <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4">
