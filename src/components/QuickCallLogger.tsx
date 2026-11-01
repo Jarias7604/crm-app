@@ -29,6 +29,7 @@ import { useTimezone } from '../hooks/useTimezone';
 import { localToUtcISO, DEFAULT_TIMEZONE } from '../utils/timezone';
 import { CustomSelect } from './ui/CustomSelect';
 import { CustomDatePicker } from './ui/CustomDatePicker';
+import { CustomTimePicker } from './ui/CustomTimePicker';
 import { STATUS_CONFIG } from '../types';
 
 interface QuickActionLoggerProps {
@@ -575,17 +576,10 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
                                         Hora
                                     </label>
-                                    <div className="relative flex items-center">
-                                        <div className="absolute left-3.5 pointer-events-none text-slate-400">
-                                            <Clock className="w-4 h-4" />
-                                        </div>
-                                        <input
-                                            type="time"
-                                            value={followUpTime}
-                                            onChange={(e) => setFollowUpTime(e.target.value)}
-                                            className="w-full h-10 pl-10 pr-3.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all cursor-pointer shadow-2xs"
-                                        />
-                                    </div>
+                                    <CustomTimePicker
+                                        value={followUpTime}
+                                        onChange={setFollowUpTime}
+                                    />
                                 </div>
                             </div>
 
