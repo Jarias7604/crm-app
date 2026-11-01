@@ -1,6 +1,10 @@
 // src/pages/company/SalesTraining.tsx
-// Módulo Oficial de Capacitación Comercial y Academia de Ventas en el CRM SaaS
-// Diseño dinámico, tipografía ejecutiva grande, transiciones fluidas, lightbox HD y multi-tenant white-label
+// Módulo Oficial de Academia & Training en el CRM SaaS
+// Soporta:
+// 1. Gestor CRUD de Presentaciones (Crear, Duplicar, Editar, Eliminar)
+// 2. Reproductor Ejecutivo Cinema Mode (Sin barras feas abajo, Guion de líder 100% ocultable, Drawer de diapositivas)
+// 3. Guía Rápida & Scripts interactiva con botones de copiado
+// 4. Aislamiento estricto multi-tenant (White-Label para empresas que no sean Arias Defense)
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
@@ -27,10 +31,16 @@ import {
     Check,
     ZoomIn,
     Volume2,
-    CheckSquare
+    Plus,
+    Trash2,
+    Edit3,
+    Layers,
+    LayoutGrid,
+    Calendar,
+    ArrowLeft
 } from 'lucide-react';
 
-interface SlideData {
+export interface SlideData {
     num: number;
     category: string;
     title: string;
@@ -45,22 +55,49 @@ interface SlideData {
     speakerNotes: string;
 }
 
+export interface TrainingDeck {
+    id: string;
+    title: string;
+    subtitle: string;
+    category: string;
+    isOfficial?: boolean;
+    slides: SlideData[];
+    createdAt: string;
+    updatedAt: string;
+}
+
 export default function SalesTraining() {
     const { profile } = useAuth();
     const [company, setCompany] = useState<{ id: string; name: string; logo_url?: string } | null>(null);
+    const [activeTab, setActiveTab] = useState<'decks' | 'presentation' | 'handbook'>('presentation');
+    const [activeDeckId, setActiveDeckId] = useState<string>('official-25-slides');
     const [currentSlide, setCurrentSlide] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [showNotes, setShowNotes] = useState(true);
-    const [activeTab, setActiveTab] = useState<'presentation' | 'handbook'>('presentation');
+    const [showNotes, setShowNotes] = useState(false); // Por defecto oculto para que no estorbe abajo
+    const [showSlidesModal, setShowSlidesModal] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [zoomedImage, setZoomedImage] = useState<{ src: string; caption?: string } | null>(null);
     const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
+    
+    // Estados del CRUD de Presentaciones
+    const [decks, setDecks] = useState<TrainingDeck[]>([]);
+    const [showDeckModal, setShowDeckModal] = useState(false);
+    const [editingDeck, setEditingDeck] = useState<TrainingDeck | null>(null);
+    const [deckForm, setDeckForm] = useState({
+        title: '',
+        subtitle: '',
+        category: 'Ventas y Cierre',
+        cloneFromOfficial: true
+    });
+
+    // Estados de Dinamización con IA
     const [showAiModal, setShowAiModal] = useState(false);
     const [isSimulatingAi, setIsSimulatingAi] = useState(false);
     const [simulatedComplete, setSimulatedComplete] = useState(false);
+
     const deckContainerRef = useRef<HTMLDivElement>(null);
 
-    // Cargar datos de la empresa para personalizar o aplicar white-label
+    // Cargar datos de la empresa para white-label
     useEffect(() => {
         if (!profile?.company_id) return;
         supabase
@@ -74,7 +111,6 @@ export default function SalesTraining() {
     }, [profile?.company_id]);
 
     // Validación estricta multi-tenant: solo Arias Defense ve la marca de defensa.
-    // Todos los demás clientes/inquilinos del SaaS ven su propio nombre y logo en modo white-label.
     const isAriasDefense = useMemo(() => {
         const cName = company?.name?.toLowerCase() || '';
         const userEmail = profile?.email?.toLowerCase() || '';
@@ -106,8 +142,8 @@ export default function SalesTraining() {
         };
     }, [isAriasDefense, company]);
 
-    // Slides dinámicas adaptadas con trazabilidad y privacidad de datos
-    const slides: SlideData[] = useMemo(() => {
+    // Slides oficiales del Método de Ventas (25 Slides)
+    const officialSlides: SlideData[] = useMemo(() => {
         const cName = isAriasDefense ? 'ARIAS' : (company?.name || 'nuestro software');
 
         return [
@@ -516,34 +552,199 @@ export default function SalesTraining() {
         ];
     }, [isAriasDefense, tenantBrand, company?.name]);
 
-    const slide = slides[currentSlide];
+    // Clave para guardar en localStorage de forma multi-tenant
+    const storageKey = useMemo(() => {
+        return `crm_training_decks_${profile?.company_id || 'default'}`;
+    }, [profile?.company_id]);
 
-    // Navegación por teclado (Flechas, Espacio, PageUp/Down, Tecla F)
+    // Cargar o inicializar mazos de presentación
+    useEffect(() => {
+        const officialDeck: TrainingDeck = {
+            id: 'official-25-slides',
+            title: isAriasDefense ? 'ARIAS Sales Excellence' : `Método de Ventas · ${tenantBrand.companyName}`,
+            subtitle: 'El nuevo estándar de diagnóstico, demos de alto impacto y disciplina de cierre.',
+            category: 'Metodología Oficial',
+            isOfficial: true,
+            slides: officialSlides,
+            createdAt: '2026-10-31',
+            updatedAt: '2026-10-31'
+        };
+
+        try {
+            const saved = localStorage.getItem(storageKey);
+            if (saved) {
+                const parsed = JSON.parse(saved) as TrainingDeck[];
+                // Siempre mantener el oficial actualizado con los nombres/logos multi-tenant
+                const customDecks = parsed.filter(d => d.id !== 'official-25-slides');
+                setDecks([officialDeck, ...customDecks]);
+            } else {
+                setDecks([officialDeck]);
+                localStorage.setItem(storageKey, JSON.stringify([officialDeck]));
+            }
+        } catch (e) {
+            setDecks([officialDeck]);
+        }
+    }, [storageKey, officialSlides, isAriasDefense, tenantBrand.companyName]);
+
+    // Deck actualmente seleccionado
+    const activeDeck = useMemo(() => {
+        return decks.find(d => d.id === activeDeckId) || decks[0] || {
+            id: 'official-25-slides',
+            title: 'Metodología Oficial',
+            subtitle: '25 Slides',
+            category: 'Oficial',
+            slides: officialSlides,
+            createdAt: '',
+            updatedAt: ''
+        };
+    }, [decks, activeDeckId, officialSlides]);
+
+    const activeSlides = activeDeck.slides && activeDeck.slides.length > 0 ? activeDeck.slides : officialSlides;
+    const slide = activeSlides[currentSlide] || activeSlides[0];
+
+    // Funciones del CRUD de Presentaciones
+    const saveDecksToStorage = (updated: TrainingDeck[]) => {
+        setDecks(updated);
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(updated));
+        } catch (err) {
+            console.error('Error guardando presentaciones:', err);
+        }
+    };
+
+    const handleCreateOrUpdateDeck = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!deckForm.title.trim()) {
+            toast.error('Por favor escribe un título para la presentación');
+            return;
+        }
+
+        const now = new Date().toISOString().split('T')[0];
+
+        if (editingDeck) {
+            // Actualizar presentación existente
+            const updated = decks.map(d => {
+                if (d.id === editingDeck.id) {
+                    return {
+                        ...d,
+                        title: deckForm.title,
+                        subtitle: deckForm.subtitle,
+                        category: deckForm.category,
+                        updatedAt: now
+                    };
+                }
+                return d;
+            });
+            saveDecksToStorage(updated);
+            toast.success('Presentación actualizada con éxito');
+        } else {
+            // Crear nueva presentación
+            const newId = `deck-${Date.now()}`;
+            const initialSlides: SlideData[] = deckForm.cloneFromOfficial
+                ? JSON.parse(JSON.stringify(officialSlides))
+                : [
+                    {
+                        num: 1,
+                        isCover: true,
+                        category: deckForm.category,
+                        title: deckForm.title,
+                        subtitle: deckForm.subtitle || 'Entrenamiento Comercial Especializado',
+                        bullets: [],
+                        speakerNotes: 'Bienvenida al equipo. Objetivos clave de esta sesión.'
+                    }
+                ];
+
+            const newDeck: TrainingDeck = {
+                id: newId,
+                title: deckForm.title,
+                subtitle: deckForm.subtitle,
+                category: deckForm.category,
+                isOfficial: false,
+                slides: initialSlides,
+                createdAt: now,
+                updatedAt: now
+            };
+
+            const updated = [...decks, newDeck];
+            saveDecksToStorage(updated);
+            toast.success('Nueva presentación creada con éxito');
+            setActiveDeckId(newId);
+            setCurrentSlide(0);
+            setActiveTab('presentation');
+        }
+
+        setShowDeckModal(false);
+        setEditingDeck(null);
+        setDeckForm({ title: '', subtitle: '', category: 'Ventas y Cierre', cloneFromOfficial: true });
+    };
+
+    const handleDuplicateDeck = (deck: TrainingDeck) => {
+        const newId = `deck-${Date.now()}`;
+        const now = new Date().toISOString().split('T')[0];
+        const duplicated: TrainingDeck = {
+            ...deck,
+            id: newId,
+            title: `Copia de ${deck.title}`,
+            isOfficial: false,
+            createdAt: now,
+            updatedAt: now,
+            slides: JSON.parse(JSON.stringify(deck.slides))
+        };
+        const updated = [...decks, duplicated];
+        saveDecksToStorage(updated);
+        toast.success(`Presentación "${deck.title}" duplicada con éxito`);
+    };
+
+    const handleDeleteDeck = (id: string, title: string) => {
+        if (id === 'official-25-slides') {
+            toast.error('La presentación oficial del sistema no puede ser eliminada');
+            return;
+        }
+        if (confirm(`¿Estás seguro de que deseas eliminar la presentación "${title}"?`)) {
+            const updated = decks.filter(d => d.id !== id);
+            saveDecksToStorage(updated);
+            if (activeDeckId === id) {
+                setActiveDeckId('official-25-slides');
+                setCurrentSlide(0);
+            }
+            toast.success('Presentación eliminada');
+        }
+    };
+
+    const startPresentation = (deckId: string) => {
+        setActiveDeckId(deckId);
+        setCurrentSlide(0);
+        setShowNotes(false);
+        setActiveTab('presentation');
+    };
+
+    // Navegación por teclado
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (activeTab !== 'presentation') return;
             if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
                 e.preventDefault();
-                setCurrentSlide(prev => Math.min(slides.length - 1, prev + 1));
+                setCurrentSlide(prev => Math.min(activeSlides.length - 1, prev + 1));
             } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
                 e.preventDefault();
                 setCurrentSlide(prev => Math.max(0, prev - 1));
             } else if (e.key === 'f' || e.key === 'F') {
                 toggleFullscreen();
-            } else if (e.key === 'Escape' && zoomedImage) {
-                setZoomedImage(null);
+            } else if (e.key === 'Escape') {
+                if (zoomedImage) setZoomedImage(null);
+                else if (showSlidesModal) setShowSlidesModal(false);
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [slides.length, activeTab, zoomedImage]);
+    }, [activeSlides.length, activeTab, zoomedImage, showSlidesModal]);
 
-    // Auto Play Slideshow (10 segundos por slide)
+    // Auto Play Slideshow
     useEffect(() => {
         if (!isPlaying || activeTab !== 'presentation') return;
         const interval = setInterval(() => {
             setCurrentSlide(prev => {
-                if (prev >= slides.length - 1) {
+                if (prev >= activeSlides.length - 1) {
                     setIsPlaying(false);
                     return prev;
                 }
@@ -551,7 +752,7 @@ export default function SalesTraining() {
             });
         }, 10000);
         return () => clearInterval(interval);
-    }, [isPlaying, activeTab, slides.length]);
+    }, [isPlaying, activeTab, activeSlides.length]);
 
     const toggleFullscreen = () => {
         if (!deckContainerRef.current) return;
@@ -570,397 +771,522 @@ export default function SalesTraining() {
     };
 
     return (
-        <div className="space-y-6">
-            {/* Header del Módulo con Tabs y Controles */}
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm">
-                <div className="flex items-center gap-4">
-                    <div className="p-3.5 bg-gradient-to-br from-rose-500 to-rose-600 text-white rounded-2xl shadow-md shadow-rose-600/20">
-                        <GraduationCap className="w-8 h-8" />
+        <div className="space-y-3 pb-4">
+            {/* Barra Superior Ejecutiva Unificada (Zero Bloat, Máximo Espacio para la Presentación) */}
+            <div className="bg-white border border-gray-200 rounded-2xl px-4 py-2.5 flex items-center justify-between gap-3 shadow-xs">
+                {/* Izquierda: Marca y Selector de Vista */}
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-rose-500 to-rose-600 text-white rounded-xl shadow-xs shrink-0">
+                        <GraduationCap className="w-5 h-5" />
                     </div>
-                    <div>
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
-                                {isAriasDefense ? 'Academia de Ventas · ARIAS Sales Excellence' : `Academia de Ventas · ${tenantBrand.companyName}`}
-                            </h1>
-                            <span className="px-3 py-1 text-xs font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200 rounded-full">
-                                25 Slides Oficiales
-                            </span>
-                        </div>
-                        <p className="text-sm md:text-base text-gray-600 mt-1 font-medium">
-                            Metodología oficial de diagnóstico, manejo de objeciones y disciplina de cierre para el equipo comercial.
-                        </p>
+                    <div className="hidden sm:block">
+                        <span className="font-extrabold text-sm text-gray-900">
+                            {isAriasDefense ? 'ARIAS Sales Excellence' : tenantBrand.companyName}
+                        </span>
                     </div>
-                </div>
 
-                <div className="flex items-center gap-2.5 w-full lg:w-auto justify-end flex-wrap">
-                    <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200 text-xs md:text-sm font-bold">
+                    {/* Selector de Modo */}
+                    <div className="flex items-center bg-gray-100 p-1 rounded-xl text-xs font-bold">
                         <button
                             onClick={() => setActiveTab('presentation')}
-                            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
-                                activeTab === 'presentation' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                                activeTab === 'presentation' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
                             }`}
                         >
-                            <Presentation className="w-4 h-4 text-rose-600" />
-                            Modo Presentación
+                            <Presentation className="w-3.5 h-3.5 text-rose-600" />
+                            <span>Presentación</span>
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('decks')}
+                            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                                activeTab === 'decks' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                        >
+                            <Layers className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Mis Mazos ({decks.length})</span>
                         </button>
                         <button
                             onClick={() => setActiveTab('handbook')}
-                            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
-                                activeTab === 'handbook' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                                activeTab === 'handbook' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'
                             }`}
                         >
-                            <BookOpen className="w-4 h-4 text-blue-600" />
-                            Guía Rápida & Scripts
+                            <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Scripts & Objeciones</span>
                         </button>
                     </div>
+                </div>
+
+                {/* Derecha: Herramientas */}
+                <div className="flex items-center gap-2">
+                    {activeTab === 'presentation' && (
+                        <>
+                            <button
+                                onClick={() => setShowSlidesModal(true)}
+                                className="px-2.5 py-1.5 rounded-xl text-xs font-bold border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 flex items-center gap-1.5 transition-all"
+                                title="Ver todas las diapositivas"
+                            >
+                                <LayoutGrid className="w-3.5 h-3.5" />
+                                <span className="hidden md:inline">Diapositivas ({slide.num}/{activeSlides.length})</span>
+                                <span className="md:hidden">{slide.num}/{activeSlides.length}</span>
+                            </button>
+
+                            <button
+                                onClick={() => setIsPlaying(!isPlaying)}
+                                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                                    isPlaying ? 'bg-amber-50 text-amber-700 border-amber-300 shadow-xs animate-pulse' : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+                                }`}
+                                title={isPlaying ? 'Pausar Reproducción' : 'Auto Play'}
+                            >
+                                {isPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                                <span className="hidden lg:inline">{isPlaying ? 'Pausar' : 'Auto Play'}</span>
+                            </button>
+
+                            <button
+                                onClick={() => setShowNotes(!showNotes)}
+                                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                    showNotes ? 'bg-blue-600 text-white border-blue-600 shadow-xs' : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200'
+                                }`}
+                                title="Guion del Líder / Notas"
+                            >
+                                <Volume2 className="w-3.5 h-3.5" />
+                                <span className="hidden lg:inline">Guion del Líder</span>
+                            </button>
+
+                            <button
+                                onClick={toggleFullscreen}
+                                className="p-1.5 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-700 transition-all shadow-xs"
+                                title="Pantalla Completa"
+                            >
+                                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                            </button>
+                        </>
+                    )}
+
+                    {activeTab === 'decks' && (
+                        <button
+                            onClick={() => {
+                                setEditingDeck(null);
+                                setDeckForm({ title: '', subtitle: '', category: 'Ventas y Cierre', cloneFromOfficial: true });
+                                setShowDeckModal(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition-all shadow-xs active:scale-95"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Nueva Presentación</span>
+                        </button>
+                    )}
 
                     <button
                         onClick={() => setShowAiModal(true)}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-xs md:text-sm font-black transition-all shadow-sm shadow-violet-600/20 active:scale-95"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-xs font-black transition-all shadow-xs"
+                        title="Dinamizar con IA"
                     >
-                        <Sparkles className="w-4 h-4" />
-                        <span className="hidden sm:inline">Dinamizar con IA</span>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">IA</span>
                     </button>
 
                     <a
                         href={tenantBrand.pptxFile}
                         download={tenantBrand.pptxDownloadName}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs md:text-sm font-black transition-all shadow-sm shadow-emerald-600/20 active:scale-95"
+                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all"
+                        title="Descargar PPTX"
                     >
-                        <Download className="w-4 h-4" />
-                        <span className="hidden sm:inline">Descargar PPTX</span>
+                        <Download className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">PPTX</span>
                     </a>
                 </div>
             </div>
 
-            {/* TAB 1: PRESENTACIÓN INTERACTIVA DINÁMICA */}
-            {activeTab === 'presentation' && (
-                <div ref={deckContainerRef} className={`space-y-4 ${isFullscreen ? 'bg-slate-950 p-6 md:p-12 min-h-screen flex flex-col justify-center' : ''}`}>
-                    
-                    {/* Barra de progreso animada interactiva */}
-                    <div className="w-full bg-gray-200/80 h-2 rounded-full overflow-hidden shadow-inner">
-                        <div 
-                            className="h-full bg-gradient-to-r from-rose-500 via-rose-600 to-emerald-500 transition-all duration-500 ease-out"
-                            style={{ width: `${((currentSlide + 1) / slides.length) * 100}%` }}
-                        />
-                    </div>
-
-                    {/* Barra de control superior de la diapositiva */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-6 py-4 rounded-2xl border border-gray-200 shadow-sm">
-                        <div className="flex items-center gap-3">
-                            <span className="font-mono text-xs md:text-sm font-black text-rose-700 bg-rose-50 border border-rose-200 px-3.5 py-1.5 rounded-xl">
-                                Slide {slide.num} de {slides.length}
-                            </span>
-                            <span className="text-xs md:text-sm font-black text-gray-800 hidden sm:inline truncate max-w-xs md:max-w-md">
-                                {slide.title}
-                            </span>
-                            <span className="text-[11px] font-bold text-gray-500 hidden lg:inline">
-                                ({Math.round(((currentSlide + 1) / slides.length) * 100)}% completado)
-                            </span>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            {/* Auto Play Slideshow */}
-                            <button
-                                onClick={() => setIsPlaying(!isPlaying)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border ${
-                                    isPlaying ? 'bg-amber-50 text-amber-700 border-amber-300 shadow-sm animate-pulse' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                                }`}
-                                title={isPlaying ? 'Pausar Reproducción Automática' : 'Iniciar Reproducción Automática (10s por slide)'}
-                            >
-                                {isPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                                <span className="hidden sm:inline">{isPlaying ? 'Pausar' : 'Auto Play'}</span>
-                            </button>
-
-                            {/* Guion del Líder */}
-                            <button
-                                onClick={() => setShowNotes(!showNotes)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                                    showNotes ? 'bg-blue-50 text-blue-700 border-blue-200 font-extrabold' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                                }`}
-                            >
-                                Guion del Líder
-                            </button>
-
-                            {/* Botón Anterior */}
-                            <button
-                                onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
-                                disabled={currentSlide === 0}
-                                className="p-2 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xs"
-                                title="Slide Anterior (Flecha Izquierda)"
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-
-                            {/* Botón Siguiente */}
-                            <button
-                                onClick={() => setCurrentSlide(prev => Math.min(slides.length - 1, prev + 1))}
-                                disabled={currentSlide === slides.length - 1}
-                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs md:text-sm font-black flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md shadow-rose-600/20"
-                                title="Siguiente Slide (Espacio o Flecha Derecha)"
-                            >
-                                <span>Siguiente</span>
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-
-                            {/* Pantalla Completa */}
-                            <button
-                                onClick={toggleFullscreen}
-                                className="p-2 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-700 transition-all shadow-xs"
-                                title="Pantalla Completa (Tecla F)"
-                            >
-                                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                            </button>
+            {/* VISTA 1: CATÁLOGO CRUD DE PRESENTACIONES */}
+            {activeTab === 'decks' && (
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-xl font-black text-gray-900">Catálogo de Presentaciones Comerciales</h2>
+                            <p className="text-xs md:text-sm text-gray-500 font-medium">Selecciona una presentación para entrenar a tu equipo o crea una nueva versión personalizada.</p>
                         </div>
                     </div>
 
-                    {/* Escenario de la Diapositiva (Espacioso, Tipografía Grande y Animado) */}
-                    <div className="w-full min-h-[580px] lg:min-h-[640px] bg-white rounded-3xl border border-gray-200/90 shadow-xl shadow-gray-200/40 p-6 md:p-10 flex flex-col justify-between overflow-hidden relative">
-                        <div key={currentSlide} className="h-full flex flex-col justify-between animate-in fade-in zoom-in-[0.99] duration-300">
-                            {slide.isCover ? (
-                                slide.num === 1 ? (
-                                    <div className="flex flex-col lg:flex-row justify-between items-stretch h-full gap-8 my-auto">
-                                        <div className="flex-1 flex flex-col justify-center py-4">
-                                            <div className="text-xs md:text-sm font-black text-rose-600 tracking-widest uppercase mb-4 flex items-center gap-2">
-                                                <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />
-                                                {slide.category}
-                                            </div>
-                                            {tenantBrand.logoUrl ? (
-                                                <img
-                                                    src={tenantBrand.logoUrl}
-                                                    alt={tenantBrand.companyName}
-                                                    className="h-14 md:h-16 w-auto object-contain self-start mb-6"
-                                                />
-                                            ) : (
-                                                <div className="flex items-center gap-3 mb-6 text-gray-900 font-black text-2xl md:text-3xl">
-                                                    <Building2 className="w-8 h-8 text-rose-600" />
-                                                    {tenantBrand.companyName}
-                                                </div>
-                                            )}
-                                            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-gray-900 leading-[1.08] tracking-tight mb-4">
-                                                Vendemos resultados.<br />
-                                                <span className="text-rose-600">No pantallas.</span>
-                                            </h1>
-                                            <p className="text-base md:text-xl text-gray-600 font-medium mb-8 max-w-xl leading-relaxed">
-                                                {slide.subtitle}
-                                            </p>
-                                            <div className="w-full h-1 bg-gray-900 rounded-full mb-4" />
-                                            <div className="text-xs md:text-sm font-extrabold text-gray-700 tracking-wider flex items-center gap-3 flex-wrap">
-                                                <span className="px-3 py-1 bg-gray-100 rounded-lg border border-gray-200">CASOS REALES</span>
-                                                <span>·</span>
-                                                <span className="px-3 py-1 bg-gray-100 rounded-lg border border-gray-200">PRÁCTICA EN VIVO</span>
-                                                <span>·</span>
-                                                <span className="px-3 py-1 bg-gray-100 rounded-lg border border-gray-200">AUDITORÍA SEMANAL</span>
-                                            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {decks.map(deck => (
+                            <div 
+                                key={deck.id} 
+                                className="bg-white rounded-3xl border border-gray-200/90 hover:border-rose-300 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between overflow-hidden group"
+                            >
+                                <div>
+                                    {/* Miniatura de la Portada */}
+                                    <div 
+                                        onClick={() => startPresentation(deck.id)}
+                                        className="h-44 bg-gradient-to-br from-slate-900 via-slate-800 to-rose-950 p-6 text-white flex flex-col justify-between relative cursor-pointer overflow-hidden"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-md tracking-wider ${
+                                                deck.isOfficial ? 'bg-rose-600 text-white' : 'bg-white/20 text-white backdrop-blur-xs'
+                                            }`}>
+                                                {deck.isOfficial ? 'OFICIAL · SISTEMA' : deck.category || 'PERSONALIZADA'}
+                                            </span>
+                                            <span className="text-xs font-mono font-bold opacity-80">
+                                                {deck.slides.length} Slides
+                                            </span>
                                         </div>
-                                        <div className="w-full lg:w-2/5 bg-gradient-to-br from-rose-600 to-rose-700 rounded-2xl p-8 md:p-10 text-white flex flex-col justify-between shadow-2xl shadow-rose-900/20">
-                                            <div>
-                                                <div className="text-xs font-black tracking-widest uppercase opacity-85 mb-4 flex items-center gap-2">
-                                                    <Sparkles className="w-4 h-4" />
-                                                    OBJETIVO ESTRATÉGICO
-                                                </div>
-                                                <div className="text-2xl md:text-4xl font-black leading-tight">
-                                                    Más decisiones de compra, sin perder confianza ni integridad.
-                                                </div>
-                                            </div>
-                                            <div className="text-sm md:text-base space-y-2 opacity-95 border-t border-rose-500/50 pt-6 font-bold">
-                                                <div className="flex items-center gap-2">
-                                                    <CheckCircle2 className="w-5 h-5 text-rose-200" />
-                                                    Rúbrica Oficial de 100 Puntos
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <CheckCircle2 className="w-5 h-5 text-rose-200" />
-                                                    Auditoría Automática con IA
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <CheckCircle2 className="w-5 h-5 text-rose-200" />
-                                                    Trazabilidad en Vivo de cada Demo
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="h-full flex flex-col justify-between py-2">
+
                                         <div>
-                                            <div className="text-xs md:text-sm font-black text-rose-600 tracking-wider uppercase mb-2">
-                                                {slide.category}
-                                            </div>
-                                            <h2 className="text-3xl md:text-5xl font-black text-gray-900 mb-3 tracking-tight">
-                                                {slide.title}
-                                            </h2>
-                                            <p className="text-base md:text-lg text-gray-600 font-medium mb-6">{slide.subtitle}</p>
-                                        </div>
-
-                                        <div className="space-y-4 my-4">
-                                            {slide.bullets.map((b, idx) => (
-                                                <div key={idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-5 md:p-6 flex items-center gap-5 shadow-xs hover:border-rose-300 hover:shadow-md transition-all">
-                                                    <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white font-mono font-black text-xl flex items-center justify-center shrink-0 shadow-md shadow-rose-600/30">
-                                                        0{idx + 1}
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-base md:text-xl font-extrabold text-gray-900">{b.label}</div>
-                                                        <div className="text-sm md:text-base text-gray-600 mt-1 font-medium">{b.text}</div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        <div className="p-5 bg-emerald-50 border border-emerald-300 rounded-2xl text-center text-sm md:text-base font-black text-emerald-900 shadow-sm">
-                                            «EL PROFESIONAL DE VENTAS NO ESPERA QUE EL CLIENTE COMPRE; LO GUÍA A TOMAR LA MEJOR DECISIÓN FINANCIERA PARA SU NEGOCIO.»
-                                        </div>
-                                    </div>
-                                )
-                            ) : (
-                                <div className="flex flex-col h-full justify-between">
-                                    {/* Cabecera del Slide */}
-                                    <div className="pb-4">
-                                        <div className="text-xs md:text-sm font-black text-rose-600 tracking-widest uppercase mb-1.5 flex items-center gap-2">
-                                            <span className="w-2 h-2 rounded-full bg-rose-600" />
-                                            {slide.category}
-                                        </div>
-                                        <h2 className="text-2xl md:text-4xl lg:text-4xl font-extrabold text-gray-900 tracking-tight leading-tight">
-                                            {slide.title}
-                                        </h2>
-                                        {slide.subtitle && (
-                                            <p className="text-sm md:text-lg text-gray-600 font-medium mt-1 leading-snug">
-                                                {slide.subtitle}
-                                            </p>
-                                        )}
-                                        <div className="w-full h-px bg-gray-200 mt-3" />
-                                    </div>
-
-                                    {/* Contenido en 2 Columnas de Gran Escala */}
-                                    <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch my-2">
-                                        
-                                        {/* Columna Izquierda: Bullets y Citas de Gran Tamaño */}
-                                        <div className="bg-slate-50/70 border border-slate-200/90 rounded-2xl p-5 md:p-6 flex flex-col justify-between overflow-y-auto">
-                                            <div className="space-y-4">
-                                                {slide.badgeText && (
-                                                    <span className={`inline-block px-3.5 py-1 text-xs font-black uppercase tracking-wider rounded-lg border ${
-                                                        slide.badgeColor === 'red' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                                                        slide.badgeColor === 'green' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                                        slide.badgeColor === 'amber' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                                        'bg-blue-50 text-blue-700 border-blue-200'
-                                                    }`}>
-                                                        {slide.badgeText}
-                                                    </span>
-                                                )}
-
-                                                {slide.mainQuote && (
-                                                    <div className="text-base md:text-xl font-extrabold text-gray-900 leading-snug border-l-4 border-rose-600 pl-4 py-2.5 bg-gradient-to-r from-rose-50 to-white rounded-r-xl shadow-xs">
-                                                        {slide.mainQuote}
-                                                    </div>
-                                                )}
-
-                                                <div className="space-y-3">
-                                                    {slide.bullets.map((b, idx) => (
-                                                        <div 
-                                                            key={idx} 
-                                                            className={`p-3.5 md:p-4 rounded-xl border transition-all duration-200 hover:scale-[1.01] hover:shadow-md ${
-                                                                b.isDanger 
-                                                                    ? 'bg-rose-50/70 border-rose-200' 
-                                                                    : b.isSuccess 
-                                                                    ? 'bg-emerald-50/70 border-emerald-200' 
-                                                                    : 'bg-white border-gray-200/90 shadow-xs'
-                                                            }`}
-                                                        >
-                                                            <div className={`text-sm md:text-base font-extrabold flex items-center gap-2 ${
-                                                                b.isDanger ? 'text-rose-700' : b.isSuccess ? 'text-emerald-800' : 'text-gray-900'
-                                                            }`}>
-                                                                {b.isDanger && <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />}
-                                                                {b.isSuccess && <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />}
-                                                                {!b.isDanger && !b.isSuccess && <div className="w-2 h-2 rounded-full bg-rose-600 shrink-0" />}
-                                                                <span>{b.label}</span>
-                                                            </div>
-                                                            <div className="text-xs md:text-sm text-gray-700 leading-relaxed font-medium mt-1 pl-4 whitespace-pre-line">
-                                                                {b.text}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Columna Derecha: Captura de Pantalla Real con Hover Zoom */}
-                                        <div 
-                                            onClick={() => slide.imageSrc && setZoomedImage({ src: slide.imageSrc, caption: slide.imageCaption })}
-                                            className="group relative bg-slate-100/70 hover:bg-slate-100 border-2 border-dashed border-gray-300 hover:border-rose-400 rounded-2xl p-4 flex flex-col items-center justify-center transition-all duration-300 cursor-pointer shadow-inner min-h-[300px] md:min-h-[380px]"
-                                        >
-                                            {slide.imageSrc ? (
-                                                <>
-                                                    <div className="relative w-full h-full flex items-center justify-center overflow-hidden rounded-xl">
-                                                        <img
-                                                            src={slide.imageSrc}
-                                                            alt={slide.imageCaption || 'Captura Real CRM'}
-                                                            className="max-h-[340px] md:max-h-[400px] w-auto object-contain rounded-xl shadow-lg border border-white group-hover:scale-[1.03] transition-transform duration-300"
-                                                        />
-                                                        <div className="absolute inset-0 bg-gray-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white font-black text-xs md:text-sm rounded-xl backdrop-blur-xs">
-                                                            <ZoomIn className="w-5 h-5" />
-                                                            <span>Clic para ampliar captura en HD</span>
-                                                        </div>
-                                                    </div>
-                                                    {slide.imageCaption && (
-                                                        <div className="text-xs md:text-sm font-extrabold text-gray-700 uppercase tracking-wider mt-3 flex items-center gap-1.5">
-                                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                                            {slide.imageCaption}
-                                                        </div>
-                                                    )}
-                                                </>
-                                            ) : (
-                                                <div className="text-center text-gray-400 font-bold text-sm">
-                                                    Visualización Oficial
-                                                </div>
+                                            <h3 className="text-xl font-black leading-snug line-clamp-2 group-hover:text-rose-300 transition-colors">
+                                                {deck.title}
+                                            </h3>
+                                            {deck.subtitle && (
+                                                <p className="text-xs text-gray-300 mt-1 line-clamp-1 opacity-90 font-medium">
+                                                    {deck.subtitle}
+                                                </p>
                                             )}
                                         </div>
+
+                                        <div className="absolute inset-0 bg-rose-600/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                            <span className="px-4 py-2 bg-white text-gray-900 text-xs font-black rounded-xl shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                                                ▶ Abrir Presentación
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Metadatos */}
+                                    <div className="p-5 space-y-3">
+                                        <div className="flex items-center justify-between text-xs text-gray-500 font-medium">
+                                            <span className="flex items-center gap-1.5">
+                                                <Calendar className="w-3.5 h-3.5" />
+                                                Actualizado: {deck.updatedAt || 'Hoy'}
+                                            </span>
+                                            <span className="px-2 py-0.5 bg-gray-100 rounded text-gray-700 font-bold">
+                                                {deck.slides.length} diapositivas
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    </div>
 
-                    {/* Guion del Líder (Speaker Notes) con Tipografía Amplia */}
-                    {showNotes && (
-                        <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-white p-5 rounded-2xl border border-blue-200/90 flex items-start gap-4 shadow-sm animate-in fade-in duration-200">
-                            <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-sm shrink-0">
-                                <Volume2 className="w-5 h-5" />
-                            </div>
-                            <div className="space-y-1">
-                                <div className="text-xs font-black text-blue-900 uppercase tracking-wider flex items-center gap-2">
-                                    <span>Guion del Líder / Notas del Facilitador</span>
-                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px]">OFICIAL</span>
+                                {/* Acciones CRUD */}
+                                <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2">
+                                    <button
+                                        onClick={() => startPresentation(deck.id)}
+                                        className="flex-1 py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-rose-600/20"
+                                    >
+                                        <Play className="w-3.5 h-3.5 fill-current" />
+                                        <span>Presentar</span>
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleDuplicateDeck(deck)}
+                                        className="p-2 hover:bg-white text-gray-600 hover:text-gray-900 border border-transparent hover:border-gray-200 rounded-xl transition-all"
+                                        title="Duplicar presentación"
+                                    >
+                                        <Copy className="w-4 h-4" />
+                                    </button>
+
+                                    {!deck.isOfficial && (
+                                        <>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingDeck(deck);
+                                                    setDeckForm({
+                                                        title: deck.title,
+                                                        subtitle: deck.subtitle || '',
+                                                        category: deck.category || 'Ventas',
+                                                        cloneFromOfficial: false
+                                                    });
+                                                    setShowDeckModal(true);
+                                                }}
+                                                className="p-2 hover:bg-white text-gray-600 hover:text-blue-600 border border-transparent hover:border-gray-200 rounded-xl transition-all"
+                                                title="Editar información"
+                                            >
+                                                <Edit3 className="w-4 h-4" />
+                                            </button>
+
+                                            <button
+                                                onClick={() => handleDeleteDeck(deck.id, deck.title)}
+                                                className="p-2 hover:bg-white text-gray-400 hover:text-rose-600 border border-transparent hover:border-gray-200 rounded-xl transition-all"
+                                                title="Eliminar presentación"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </>
+                                    )}
+
+                                    <a
+                                        href={tenantBrand.pptxFile}
+                                        download={tenantBrand.pptxDownloadName}
+                                        className="p-2 hover:bg-white text-gray-600 hover:text-emerald-600 border border-transparent hover:border-gray-200 rounded-xl transition-all"
+                                        title="Descargar PPTX"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                    </a>
                                 </div>
-                                <p className="text-sm md:text-base text-gray-800 leading-relaxed font-medium italic">
-                                    "{slide.speakerNotes}"
-                                </p>
                             </div>
-                        </div>
-                    )}
-
-                    {/* Tira de Miniaturas Interactiva */}
-                    <div className="flex gap-2 overflow-x-auto pb-2 pt-1 px-1 custom-scrollbar">
-                        {slides.map((s, idx) => (
-                            <button
-                                key={s.num}
-                                onClick={() => setCurrentSlide(idx)}
-                                className={`px-3 py-2 text-xs font-bold rounded-xl shrink-0 border transition-all flex items-center gap-2 ${
-                                    currentSlide === idx
-                                        ? 'bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-600/20 scale-105'
-                                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                                }`}
-                            >
-                                <span className={`w-5 h-5 rounded-md text-[10px] font-black flex items-center justify-center ${
-                                    currentSlide === idx ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                    {s.num}
-                                </span>
-                                <span className="truncate max-w-[130px]">{s.title}</span>
-                            </button>
                         ))}
                     </div>
                 </div>
             )}
 
-            {/* TAB 2: GUÍA RÁPIDA & SCRIPTS (Con botones de copiado y tipografía grande) */}
+            {/* VISTA 2: REPRODUCTOR CINEMA (Zero Bloat, Slide con textos grandes y legibles) */}
+            {activeTab === 'presentation' && (
+                <div 
+                    ref={deckContainerRef} 
+                    className={`relative flex flex-col justify-between bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden ${
+                        isFullscreen ? 'fixed inset-0 z-50 bg-white p-8' : 'h-[calc(100vh-140px)] min-h-[520px] max-h-[760px] p-6 md:p-8'
+                    }`}
+                >
+                    <div key={currentSlide} className="h-full flex flex-col justify-between overflow-hidden animate-in fade-in duration-200">
+                        {slide.isCover ? (
+                            slide.num === 1 ? (
+                                <div className="flex flex-col lg:flex-row justify-between items-stretch h-full gap-8 my-auto">
+                                    <div className="flex-1 flex flex-col justify-center py-2">
+                                        <div className="text-xs md:text-sm font-black text-rose-600 tracking-widest uppercase mb-3 flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />
+                                            {slide.category}
+                                        </div>
+                                        {tenantBrand.logoUrl ? (
+                                            <img
+                                                src={tenantBrand.logoUrl}
+                                                alt={tenantBrand.companyName}
+                                                className="h-12 md:h-14 w-auto object-contain self-start mb-5"
+                                            />
+                                        ) : (
+                                            <div className="flex items-center gap-3 mb-5 text-gray-900 font-black text-2xl md:text-3xl">
+                                                <Building2 className="w-8 h-8 text-rose-600" />
+                                                {tenantBrand.companyName}
+                                            </div>
+                                        )}
+                                        <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-gray-900 leading-[1.05] tracking-tight mb-4">
+                                            Vendemos resultados.<br />
+                                            <span className="text-rose-600">No pantallas.</span>
+                                        </h1>
+                                        <p className="text-lg md:text-xl text-gray-600 font-medium mb-6 max-w-xl leading-relaxed">
+                                            {slide.subtitle}
+                                        </p>
+                                        <div className="w-full h-1 bg-gray-900 rounded-full mb-4" />
+                                        <div className="text-xs md:text-sm font-extrabold text-gray-700 tracking-wider flex items-center gap-3 flex-wrap">
+                                            <span className="px-3 py-1 bg-gray-100 rounded-lg border border-gray-200">CASOS REALES</span>
+                                            <span>·</span>
+                                            <span className="px-3 py-1 bg-gray-100 rounded-lg border border-gray-200">PRÁCTICA EN VIVO</span>
+                                            <span>·</span>
+                                            <span className="px-3 py-1 bg-gray-100 rounded-lg border border-gray-200">AUDITORÍA SEMANAL</span>
+                                        </div>
+                                    </div>
+                                    <div className="w-full lg:w-2/5 bg-gradient-to-br from-rose-600 to-rose-700 rounded-2xl p-6 md:p-8 text-white flex flex-col justify-between shadow-xl shadow-rose-900/20">
+                                        <div>
+                                            <div className="text-xs font-black tracking-widest uppercase opacity-85 mb-3 flex items-center gap-2">
+                                                <Sparkles className="w-4 h-4" />
+                                                OBJETIVO ESTRATÉGICO
+                                            </div>
+                                            <div className="text-2xl md:text-4xl font-black leading-tight">
+                                                Más decisiones de compra, sin perder confianza ni integridad.
+                                            </div>
+                                        </div>
+                                        <div className="text-sm md:text-base space-y-2 opacity-95 border-t border-rose-500/50 pt-5 font-bold">
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 className="w-5 h-5 text-rose-200 shrink-0" />
+                                                <span>Rúbrica Oficial de 100 Puntos</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 className="w-5 h-5 text-rose-200 shrink-0" />
+                                                <span>Auditoría Automática con IA</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 className="w-5 h-5 text-rose-200 shrink-0" />
+                                                <span>Trazabilidad en Vivo de cada Demo</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col justify-between py-2">
+                                    <div>
+                                        <div className="text-xs md:text-sm font-black text-rose-600 tracking-wider uppercase mb-2">
+                                            {slide.category}
+                                        </div>
+                                        <h2 className="text-3xl md:text-5xl font-black text-gray-900 mb-3 tracking-tight">
+                                            {slide.title}
+                                        </h2>
+                                        <p className="text-lg md:text-xl text-gray-600 font-medium mb-6">{slide.subtitle}</p>
+                                    </div>
+
+                                    <div className="space-y-4 my-2">
+                                        {slide.bullets.map((b, idx) => (
+                                            <div key={idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-5 md:p-6 flex items-center gap-5 shadow-xs hover:border-rose-300 hover:shadow-md transition-all">
+                                                <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white font-mono font-black text-xl flex items-center justify-center shrink-0 shadow-md shadow-rose-600/30">
+                                                    0{idx + 1}
+                                                </div>
+                                                <div>
+                                                    <div className="text-lg md:text-xl font-extrabold text-gray-900">{b.label}</div>
+                                                    <div className="text-base text-gray-600 mt-1 font-medium">{b.text}</div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-2xl text-center text-base md:text-lg font-black text-emerald-900 shadow-xs">
+                                        «EL PROFESIONAL DE VENTAS NO ESPERA QUE EL CLIENTE COMPRE; LO GUÍA A TOMAR LA MEJOR DECISIÓN FINANCIERA PARA SU NEGOCIO.»
+                                    </div>
+                                </div>
+                            )
+                        ) : (
+                            <div className="flex flex-col h-full justify-between">
+                                {/* Título Superior del Slide */}
+                                <div className="pb-3 border-b border-gray-100">
+                                    <div className="text-xs md:text-sm font-black text-rose-600 tracking-widest uppercase mb-1 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-rose-600" />
+                                        {slide.category}
+                                    </div>
+                                    <h2 className="text-2xl md:text-3xl lg:text-4xl font-black text-gray-900 tracking-tight leading-tight">
+                                        {slide.title}
+                                    </h2>
+                                    {slide.subtitle && (
+                                        <p className="text-base md:text-lg text-gray-600 font-medium mt-1 leading-snug">
+                                            {slide.subtitle}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Contenido Central: 2 Columnas (Textos a la izquierda, Captura a la derecha) */}
+                                <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch my-3 min-h-0 overflow-hidden">
+                                    <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-5 flex flex-col justify-between overflow-y-auto">
+                                        <div className="space-y-4">
+                                            {slide.badgeText && (
+                                                <span className={`inline-block px-3 py-1 text-xs font-black uppercase tracking-wider rounded-lg border ${
+                                                    slide.badgeColor === 'red' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                                    slide.badgeColor === 'green' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                    slide.badgeColor === 'amber' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                    'bg-blue-50 text-blue-700 border-blue-200'
+                                                }`}>
+                                                    {slide.badgeText}
+                                                </span>
+                                            )}
+
+                                            {slide.mainQuote && (
+                                                <div className="text-lg md:text-xl lg:text-2xl font-black text-gray-900 leading-snug border-l-4 border-rose-600 pl-4 py-2.5 bg-gradient-to-r from-rose-50 to-white rounded-r-xl shadow-xs">
+                                                    {slide.mainQuote}
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-3">
+                                                {slide.bullets.map((b, idx) => (
+                                                    <div 
+                                                        key={idx} 
+                                                        className={`p-3.5 rounded-xl border transition-all duration-200 hover:shadow-md ${
+                                                            b.isDanger 
+                                                                ? 'bg-rose-50/80 border-rose-200' 
+                                                                : b.isSuccess 
+                                                                ? 'bg-emerald-50/80 border-emerald-200' 
+                                                                : 'bg-white border-gray-200 shadow-xs'
+                                                        }`}
+                                                    >
+                                                        <div className={`text-base md:text-lg font-black flex items-center gap-2 ${
+                                                            b.isDanger ? 'text-rose-700' : b.isSuccess ? 'text-emerald-800' : 'text-gray-900'
+                                                        }`}>
+                                                            {b.isDanger && <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />}
+                                                            {b.isSuccess && <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />}
+                                                            {!b.isDanger && !b.isSuccess && <div className="w-2.5 h-2.5 rounded-full bg-rose-600 shrink-0" />}
+                                                            <span>{b.label}</span>
+                                                        </div>
+                                                        <div className="text-sm md:text-base text-gray-700 leading-relaxed font-medium mt-1 pl-4 whitespace-pre-line">
+                                                            {b.text}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div 
+                                        onClick={() => slide.imageSrc && setZoomedImage({ src: slide.imageSrc, caption: slide.imageCaption })}
+                                        className="group relative bg-slate-100/70 hover:bg-slate-100 border border-gray-200 hover:border-rose-400 rounded-2xl p-3 flex flex-col items-center justify-center transition-all duration-300 cursor-pointer shadow-inner overflow-hidden"
+                                    >
+                                        {slide.imageSrc ? (
+                                            <>
+                                                <div className="relative w-full h-full flex items-center justify-center overflow-hidden rounded-xl">
+                                                    <img
+                                                        src={slide.imageSrc}
+                                                        alt={slide.imageCaption || 'Captura Real CRM'}
+                                                        className="max-h-[300px] lg:max-h-[380px] w-auto object-contain rounded-xl shadow-lg border border-white group-hover:scale-[1.02] transition-transform duration-300"
+                                                    />
+                                                    <div className="absolute inset-0 bg-gray-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white font-black text-xs md:text-sm rounded-xl backdrop-blur-xs">
+                                                        <ZoomIn className="w-5 h-5" />
+                                                        <span>Clic para ampliar captura en HD</span>
+                                                    </div>
+                                                </div>
+                                                {slide.imageCaption && (
+                                                    <div className="text-xs font-extrabold text-gray-700 uppercase tracking-wider mt-2 flex items-center gap-1.5">
+                                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                                        {slide.imageCaption}
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <div className="text-center text-gray-400 font-bold text-sm">
+                                                Visualización Oficial
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Guion del Líder Flotante (Solo visible si showNotes es TRUE; 100% oculto si es FALSE) */}
+                    {showNotes && (
+                        <div className="absolute bottom-16 left-6 right-6 z-20 bg-slate-900/95 text-white p-5 rounded-2xl shadow-2xl border border-slate-700 backdrop-blur-md flex items-start justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2 bg-blue-500 text-white rounded-lg shrink-0 shadow-sm">
+                                    <Volume2 className="w-5 h-5" />
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="text-xs font-black uppercase tracking-wider text-blue-300 flex items-center gap-2">
+                                        <span>Guion del Líder / Notas del Facilitador</span>
+                                        <span className="px-2 py-0.5 bg-blue-500/20 text-blue-200 rounded text-[10px]">OFICIAL</span>
+                                    </div>
+                                    <p className="text-sm md:text-base text-slate-100 font-medium italic leading-relaxed">
+                                        "{slide.speakerNotes}"
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowNotes(false)}
+                                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
+                                title="Cerrar guion"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Dock Inferior Limpio (Dentro del contenedor, sin barras extras ni scrollbars) */}
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
+                        <button
+                            onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
+                            disabled={currentSlide === 0}
+                            className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs md:text-sm font-bold flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                            <span>Anterior</span>
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs md:text-sm font-black text-gray-800 bg-gray-50 border border-gray-200 px-3 py-1 rounded-xl">
+                                Slide {slide.num} de {activeSlides.length}
+                            </span>
+                        </div>
+
+                        <button
+                            onClick={() => setCurrentSlide(prev => Math.min(activeSlides.length - 1, prev + 1))}
+                            disabled={currentSlide === activeSlides.length - 1}
+                            className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs md:text-sm font-black flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md shadow-rose-600/20 active:scale-95"
+                        >
+                            <span>Siguiente</span>
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* VISTA 3: GUÍA RÁPIDA & SCRIPTS */}
             {activeTab === 'handbook' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Las 7 Preguntas de Descubrimiento */}
@@ -1065,6 +1391,183 @@ export default function SalesTraining() {
                 </div>
             )}
 
+            {/* MODAL GRID: SELECTOR DE DIAPOSITIVAS (Reemplaza el scrollbar feo) */}
+            {showSlidesModal && (
+                <div 
+                    onClick={() => setShowSlidesModal(false)}
+                    className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+                >
+                    <div 
+                        onClick={e => e.stopPropagation()}
+                        className="bg-white rounded-3xl max-w-4xl w-full max-h-[85vh] p-6 shadow-2xl flex flex-col justify-between overflow-hidden"
+                    >
+                        <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-rose-100 text-rose-700 rounded-xl">
+                                    <LayoutGrid className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-gray-900">Navegador de Diapositivas</h3>
+                                    <p className="text-xs text-gray-500 font-medium">Haz clic en cualquier diapositiva para saltar directamente a ella.</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowSlidesModal(false)}
+                                className="p-2 hover:bg-gray-100 text-gray-500 hover:text-gray-900 rounded-xl transition-all"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto py-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            {activeSlides.map((s, idx) => (
+                                <button
+                                    key={s.num}
+                                    onClick={() => {
+                                        setCurrentSlide(idx);
+                                        setShowSlidesModal(false);
+                                    }}
+                                    className={`p-3 rounded-2xl border text-left flex flex-col justify-between transition-all ${
+                                        currentSlide === idx
+                                            ? 'bg-rose-50 border-rose-500 ring-2 ring-rose-500/30 shadow-md'
+                                            : 'bg-slate-50 border-gray-200 hover:bg-white hover:border-gray-300'
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className={`w-6 h-6 rounded-lg text-xs font-black flex items-center justify-center ${
+                                            currentSlide === idx ? 'bg-rose-600 text-white' : 'bg-gray-200 text-gray-700'
+                                        }`}>
+                                            {s.num}
+                                        </span>
+                                        {s.isCover && (
+                                            <span className="text-[9px] font-black text-rose-600 uppercase">Portada</span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs font-bold text-gray-900 line-clamp-2 leading-snug">
+                                        {s.title}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="pt-3 border-t border-gray-100 flex justify-end">
+                            <button
+                                onClick={() => setShowSlidesModal(false)}
+                                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL CRUD: CREAR / EDITAR PRESENTACIÓN */}
+            {showDeckModal && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl max-w-lg w-full border border-gray-100 shadow-2xl p-6 md:p-8 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-rose-100 text-rose-700 rounded-2xl">
+                                    <Presentation className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-gray-900 text-lg">
+                                        {editingDeck ? 'Editar Presentación' : 'Crear Nueva Presentación'}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 font-bold">
+                                        {tenantBrand.companyName}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowDeckModal(false)}
+                                className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleCreateOrUpdateDeck} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-1">
+                                    Título de la Presentación *
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="Ej: Capacitación Cierre de Demos Q4"
+                                    value={deckForm.title}
+                                    onChange={e => setDeckForm({ ...deckForm, title: e.target.value })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-1">
+                                    Subtítulo / Objetivo
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Ej: Técnicas avanzadas de diagnóstico y manejo de objeciones"
+                                    value={deckForm.subtitle}
+                                    onChange={e => setDeckForm({ ...deckForm, subtitle: e.target.value })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-1">
+                                    Categoría
+                                </label>
+                                <select
+                                    value={deckForm.category}
+                                    onChange={e => setDeckForm({ ...deckForm, category: e.target.value })}
+                                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all"
+                                >
+                                    <option value="Ventas y Cierre">Ventas y Cierre</option>
+                                    <option value="Onboarding de SDRs">Onboarding de SDRs</option>
+                                    <option value="Demostración de Producto">Demostración de Producto</option>
+                                    <option value="Sector Agrícola">Sector Agrícola</option>
+                                    <option value="Sector Servicios">Sector Servicios</option>
+                                    <option value="Personalizada">Personalizada</option>
+                                </select>
+                            </div>
+
+                            {!editingDeck && (
+                                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl">
+                                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-rose-900">
+                                        <input
+                                            type="checkbox"
+                                            checked={deckForm.cloneFromOfficial}
+                                            onChange={e => setDeckForm({ ...deckForm, cloneFromOfficial: e.target.checked })}
+                                            className="rounded text-rose-600 focus:ring-rose-500"
+                                        />
+                                        <span>Copiar las 25 diapositivas de la metodología oficial como base inicial</span>
+                                    </label>
+                                </div>
+                            )}
+
+                            <div className="pt-2 flex items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDeckModal(false)}
+                                    className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black shadow-md shadow-rose-600/20 transition-all active:scale-95"
+                                >
+                                    {editingDeck ? 'Guardar Cambios' : 'Crear Presentación'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {/* Modal Lightbox de Capturas en Alta Definición */}
             {zoomedImage && (
                 <div 
@@ -1096,7 +1599,7 @@ export default function SalesTraining() {
                 </div>
             )}
 
-            {/* Modal de Dinamización con IA (Visión Futura Solicitada por el Usuario) */}
+            {/* Modal de Dinamización con IA */}
             {showAiModal && (
                 <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="bg-white rounded-3xl max-w-lg w-full border border-gray-100 shadow-2xl p-6 md:p-8 space-y-5 animate-in fade-in zoom-in-95 duration-200">
