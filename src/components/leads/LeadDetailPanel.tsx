@@ -268,13 +268,11 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         <div className="flex justify-center pt-3 pb-0 flex-shrink-0 sm:hidden">
                             <div className="w-10 h-1 bg-gray-200 rounded-full" />
                         </div>
-                        {/* Header Premium (Dark Mode Style) */}
-                        <div className="px-6 py-7 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 flex justify-between items-center relative z-30 shadow-md">
-                            {/* Decorative background glow */}
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10"></div>
+                        {/* Header Premium (Modo Claro, Elegante y Minimalista) */}
+                        <div className="px-6 py-6 bg-white border-b border-slate-200/80 flex justify-between items-center relative z-30 shadow-xs">
                             <div className="relative z-10 flex-1">
                                 <div className="flex items-center gap-4 mb-2">
-                                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center text-white shadow-lg ring-4 ring-indigo-500/30">
+                                    <div className="w-12 h-12 bg-indigo-50 border border-indigo-200/80 rounded-2xl flex items-center justify-center text-indigo-600 shadow-xs">
                                         <User className="w-6 h-6" />
                                     </div>
                                     <div className="flex-1">
@@ -282,7 +280,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             type="text"
                                             defaultValue={selectedLead.name}
                                             onBlur={(e) => handleUpdateLead({ name: e.target.value })}
-                                            className="block w-full text-2xl font-black text-white tracking-tight border-none hover:bg-white/5 focus:bg-white/10 focus:ring-2 focus:ring-indigo-400 rounded-lg px-2 py-0.5 -ml-2 transition-all bg-transparent placeholder-slate-400"
+                                            className="block w-full text-2xl font-black text-slate-900 tracking-tight border-none hover:bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded-lg px-2 py-0.5 -ml-2 transition-all bg-transparent placeholder-slate-400"
                                             placeholder="Nombre del Lead"
                                         />
                                         <input
@@ -290,7 +288,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             defaultValue={selectedLead.company_name || ''}
                                             placeholder="Empresa no especificada"
                                             onBlur={(e) => handleUpdateLead({ company_name: e.target.value })}
-                                            className="block w-full text-[14px] font-bold text-indigo-200 border-none hover:bg-white/5 focus:bg-white/10 focus:ring-2 focus:ring-indigo-400 rounded-lg px-2 -ml-2 transition-all bg-transparent placeholder-indigo-300/50"
+                                            className="block w-full text-[14px] font-bold text-slate-500 border-none hover:bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded-lg px-2 -ml-2 transition-all bg-transparent placeholder-slate-400"
                                         />
                                         <div className="ml-1 mt-2 flex items-center gap-2">
                                             <CustomDatePicker
@@ -302,38 +300,38 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                     }
                                                 }}
                                                 variant="light"
-                                                className="w-44 text-sm font-bold bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/30 backdrop-blur-sm transition-all shadow-sm"
+                                                className="w-44 text-sm font-bold bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300 transition-all shadow-xs"
                                             />
                                             <button
                                                 onClick={handleOpenQr}
-                                                className="h-[38px] px-3 bg-white/10 text-white border border-white/20 hover:bg-white/20 hover:border-white/30 rounded-lg transition-all backdrop-blur-sm shadow-sm flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                                                className="h-[38px] px-3 bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 hover:border-slate-300 rounded-lg transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                                                 title="Código QR de WhatsApp"
                                             >
-                                                <QrCode className="w-5 h-5" />
+                                                <QrCode className="w-4 h-4 text-indigo-600" />
                                                 <span className="text-xs font-bold">WhatsApp QR</span>
                                             </button>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap gap-x-3 gap-y-2 mt-4">
-                                    <div className="flex items-center gap-2 group bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50 shadow-sm transition-all hover:bg-slate-700/80 hover:border-slate-600">
-                                        <Phone className="w-3.5 h-3.5 text-indigo-400" />
+                                    <div className="flex items-center gap-2 group bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs transition-all hover:bg-white hover:border-slate-300">
+                                        <Phone className="w-3.5 h-3.5 text-indigo-600" />
                                         <input
                                             type="text"
                                             defaultValue={selectedLead.phone || ''}
                                             placeholder="Añadir teléfono"
                                             onBlur={(e) => handleUpdateLead({ phone: e.target.value })}
-                                            className="text-[13px] text-slate-200 font-bold border-none bg-transparent p-0 focus:ring-0 w-28 placeholder-slate-500"
+                                            className="text-[13px] text-slate-800 font-bold border-none bg-transparent p-0 focus:ring-0 w-28 placeholder-slate-400"
                                         />
                                     </div>
-                                    <div className="flex items-center gap-2 group bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50 shadow-sm transition-all hover:bg-slate-700/80 hover:border-slate-600">
-                                        <Mail className="w-3.5 h-3.5 text-indigo-400" />
+                                    <div className="flex items-center gap-2 group bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 shadow-xs transition-all hover:bg-white hover:border-slate-300">
+                                        <Mail className="w-3.5 h-3.5 text-indigo-600" />
                                         <input
                                             type="text"
                                             defaultValue={selectedLead.email || ''}
                                             placeholder="Añadir email"
                                             onBlur={(e) => handleUpdateLead({ email: e.target.value })}
-                                            className="text-[13px] text-slate-200 font-bold border-none bg-transparent p-0 focus:ring-0 w-44 placeholder-slate-500"
+                                            className="text-[13px] text-slate-800 font-bold border-none bg-transparent p-0 focus:ring-0 w-44 placeholder-slate-400"
                                         />
                                     </div>
                                 </div>
@@ -341,7 +339,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             <div className="flex flex-col items-center gap-3 relative z-10 ml-4 self-start">
                                 <button
                                     onClick={() => setIsDetailOpen(false)}
-                                    className="p-2 bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl transition-all border border-slate-700 shadow-sm active:scale-95"
+                                    className="p-2 bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-all border border-slate-200 shadow-xs active:scale-95"
                                     title="Cerrar panel"
                                 >
                                     <X className="w-5 h-5" />
@@ -412,19 +410,20 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 </div>
                             </div>
 
-                            {/* ARIAS Sales Excellence & Gemini HUD Card */}
-                            <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-900 rounded-2xl p-5 border border-indigo-500/30 shadow-md space-y-3 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none -mr-6 -mt-6"></div>
-                                <div className="flex items-center justify-between border-b border-indigo-500/20 pb-3 relative z-10">
+                            {/* ARIAS Sales Excellence & Gemini HUD Card (Claro, Limpio, Premium) */}
+                            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm space-y-3.5 relative overflow-hidden">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-3 relative z-10">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
-                                            <Flame className="w-3.5 h-3.5 text-amber-400" />
+                                        <div className="w-7 h-7 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-xs">
+                                            <Flame className="w-4 h-4" />
                                         </div>
-                                        <span className="text-[11px] font-black uppercase text-white tracking-wider">
-                                            Arias Sales Excellence
-                                        </span>
+                                        <div>
+                                            <span className="text-[11px] font-black uppercase text-slate-900 tracking-wider">
+                                                Arias Sales Excellence
+                                            </span>
+                                        </div>
                                     </div>
-                                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                    <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                                         Método Oficial
                                     </span>
                                 </div>
@@ -433,12 +432,13 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setIsDemoHUDOpen(true)}
-                                        className="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-indigo-500/30 hover:border-indigo-400 transition-all text-left group cursor-pointer"
+                                        className="flex flex-col items-start p-3.5 rounded-xl bg-slate-50 hover:bg-rose-50/40 border border-slate-200 hover:border-rose-300 transition-all text-left group cursor-pointer shadow-xs"
                                     >
-                                        <div className="flex items-center gap-1.5 text-indigo-300 font-black text-[11px] mb-1">
-                                            <span>🎯 Guion Demo HUD</span>
+                                        <div className="flex items-center gap-1.5 text-rose-700 font-black text-[12px] mb-1">
+                                            <Target className="w-3.5 h-3.5 text-rose-600" />
+                                            <span>Guion Demo HUD</span>
                                         </div>
-                                        <span className="text-[10px] text-slate-400 leading-tight">
+                                        <span className="text-[11px] text-slate-500 leading-snug font-medium">
                                             7 preguntas obligatorias y objeciones en vivo
                                         </span>
                                     </button>
@@ -446,16 +446,17 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setIsGeminiAuditOpen(true)}
-                                        className={`flex flex-col items-start p-3 rounded-xl transition-all text-left group cursor-pointer border ${
+                                        className={`flex flex-col items-start p-3.5 rounded-xl transition-all text-left group cursor-pointer border shadow-xs ${
                                             leadAudit
-                                                ? 'bg-indigo-950/80 hover:bg-indigo-900/80 border-indigo-400/60'
-                                                : 'bg-slate-800/80 hover:bg-slate-800 border border-indigo-500/30 hover:border-violet-400'
+                                                ? 'bg-indigo-50/60 hover:bg-indigo-50 border-indigo-300'
+                                                : 'bg-slate-50 hover:bg-indigo-50/40 border-slate-200 hover:border-indigo-300'
                                         }`}
                                     >
-                                        <div className="flex items-center gap-1.5 text-violet-300 font-black text-[11px] mb-1">
-                                            <span>⚡ Auditar Gemini</span>
+                                        <div className="flex items-center gap-1.5 text-indigo-700 font-black text-[12px] mb-1">
+                                            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                                            <span>Auditar Gemini</span>
                                         </div>
-                                        <span className="text-[10px] text-slate-400 leading-tight">
+                                        <span className="text-[11px] text-slate-500 leading-snug font-medium">
                                             {leadAudit ? 'Revisar rúbrica o re-auditar doc' : 'Evalúa notas de Google Meet (100 pts)'}
                                         </span>
                                     </button>
@@ -463,23 +464,23 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
 
                                 {/* Banner Visual de Estado de Auditoría Vinculado */}
                                 {leadAudit ? (
-                                    <div className="p-2.5 rounded-xl bg-slate-800/90 border border-indigo-500/30 flex items-center justify-between gap-2 relative z-10">
+                                    <div className="p-2.5 rounded-xl bg-indigo-50/50 border border-indigo-200/80 flex items-center justify-between gap-2 relative z-10">
                                         <div className="flex items-center gap-2 min-w-0">
-                                            <span className="text-xs">📊</span>
+                                            <Target className="w-4 h-4 text-indigo-600 shrink-0" />
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="text-[11px] font-black text-white">
+                                                    <span className="text-[11px] font-black text-slate-900">
                                                         Demo Evaluada: {leadAudit.total_score}/100 pts
                                                     </span>
-                                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-black uppercase border ${
-                                                        leadAudit.total_score >= 85 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
-                                                        leadAudit.total_score >= 70 ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
-                                                        'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase border ${
+                                                        leadAudit.total_score >= 85 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                        leadAudit.total_score >= 70 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                        'bg-rose-50 text-rose-700 border-rose-200'
                                                     }`}>
-                                                        {leadAudit.total_score >= 85 ? '🟢 Sólido' : leadAudit.total_score >= 70 ? '🟡 Coaching' : '🔴 Intervención'}
+                                                        {leadAudit.total_score >= 85 ? 'Sólido' : leadAudit.total_score >= 70 ? 'Coaching' : 'Intervención'}
                                                     </span>
                                                 </div>
-                                                <p className="text-[9px] text-slate-400 truncate">
+                                                <p className="text-[10px] text-slate-500 truncate">
                                                     {leadAudit.google_doc_url ? 'Google Doc Vinculado' : 'Notas de Meet registradas'}
                                                 </p>
                                             </div>
@@ -487,18 +488,18 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         <button
                                             type="button"
                                             onClick={() => setIsGeminiAuditOpen(true)}
-                                            className="px-2 py-1 rounded-lg text-[10px] font-black text-indigo-300 hover:text-white bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 transition-all cursor-pointer whitespace-nowrap"
+                                            className="px-2.5 py-1 rounded-lg text-[10px] font-black text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 border border-indigo-200 transition-all cursor-pointer whitespace-nowrap shadow-xs"
                                         >
                                             Ver Rúbrica
                                         </button>
                                     </div>
                                 ) : (
-                                    <div className="px-2.5 py-1.5 rounded-xl bg-slate-800/40 border border-slate-700/50 flex items-center justify-between text-[10px] text-slate-400 relative z-10">
+                                    <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-[11px] text-slate-500 relative z-10">
                                         <span className="flex items-center gap-1.5">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                                             Pega el link de Google Docs o Gemini Meet
                                         </span>
-                                        <span className="text-emerald-400 font-bold">100% Automático</span>
+                                        <span className="text-emerald-700 font-bold">100% Automático</span>
                                     </div>
                                 )}
                             </div>
