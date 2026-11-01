@@ -79,24 +79,24 @@ export const LiveDemoHUDModal: React.FC<LiveDemoHUDModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[10000] flex justify-end bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[10000] flex justify-end bg-black/40 backdrop-blur-xs animate-in fade-in duration-200 overflow-hidden">
             <div className="w-full sm:w-[680px] md:w-[720px] lg:w-[750px] sm:max-w-[85vw] bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full text-slate-800 overflow-hidden">
                 {/* Header Superior Limpio */}
-                <div className="px-6 py-5 bg-white border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shadow-xs">
-                            <Flame className="w-5 h-5" />
+                <div className="px-4 sm:px-6 py-3.5 sm:py-5 bg-white border-b border-slate-100 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shadow-xs shrink-0">
+                            <Flame className="w-4 h-4 sm:w-5 sm:h-5" />
                         </div>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <h3 className="text-base font-black tracking-tight text-slate-900">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                <h3 className="text-sm sm:text-base font-black tracking-tight text-slate-900 truncate">
                                     Modo Demo en Vivo · Método ARIAS
                                 </h3>
-                                <span className="px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+                                <span className="px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full shrink-0">
                                     En llamada
                                 </span>
                             </div>
-                            <p className="text-xs text-slate-500 font-medium mt-0.5">
+                            <p className="text-xs text-slate-500 font-medium mt-0.5 truncate">
                                 Prospecto: <strong className="text-slate-800 font-bold">{leadName}</strong> {leadCompany && `· ${leadCompany}`}
                             </p>
                         </div>
@@ -104,7 +104,7 @@ export const LiveDemoHUDModal: React.FC<LiveDemoHUDModalProps> = ({
 
                     <button
                         onClick={onClose}
-                        className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
+                        className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg sm:rounded-xl transition-all shrink-0 cursor-pointer"
                         title="Cerrar copiloto"
                     >
                         <X className="w-5 h-5" />
@@ -112,14 +112,14 @@ export const LiveDemoHUDModal: React.FC<LiveDemoHUDModalProps> = ({
                 </div>
 
                 {/* Progress bar de preguntas */}
-                <div className="px-6 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                        <span className="text-slate-500 font-bold">Descubrimiento obligatorio:</span>
-                        <span className={`font-black ${answeredCount >= 5 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                            {answeredCount} de {ARIAS_DISCOVERY_QUESTIONS.length} preguntas
+                <div className="px-4 sm:px-6 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-xs gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-slate-500 font-bold truncate">Descubrimiento:</span>
+                        <span className={`font-black shrink-0 ${answeredCount >= 5 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                            {answeredCount} de {ARIAS_DISCOVERY_QUESTIONS.length}
                         </span>
                     </div>
-                    <div className="w-36 bg-slate-200 h-2 rounded-full overflow-hidden">
+                    <div className="w-24 sm:w-36 bg-slate-200 h-2 rounded-full overflow-hidden shrink-0">
                         <div
                             className="h-full bg-gradient-to-r from-rose-500 to-rose-600 transition-all duration-300"
                             style={{ width: `${(answeredCount / ARIAS_DISCOVERY_QUESTIONS.length) * 100}%` }}
@@ -128,44 +128,44 @@ export const LiveDemoHUDModal: React.FC<LiveDemoHUDModalProps> = ({
                 </div>
 
                 {/* Navigation Tabs (Sin emojis, con iconos vectoriales limpios) */}
-                <div className="px-6 pt-2 bg-white border-b border-slate-200 flex gap-2">
+                <div className="px-4 sm:px-6 pt-2 bg-white border-b border-slate-200 flex gap-2 overflow-x-auto no-scrollbar scroll-smooth">
                     <button
                         onClick={() => setActiveTab('questions')}
-                        className={`pb-3 px-3 text-xs font-black tracking-wide transition-all border-b-2 flex items-center gap-1.5 ${
+                        className={`pb-3 px-2.5 sm:px-3 text-xs font-black tracking-wide transition-all border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                             activeTab === 'questions'
                                 ? 'border-rose-600 text-rose-700'
                                 : 'border-transparent text-slate-500 hover:text-slate-900'
                         }`}
                     >
-                        <Target className="w-3.5 h-3.5 text-rose-600" />
+                        <Target className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                         <span>7 Preguntas Obligatorias</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('objections')}
-                        className={`pb-3 px-3 text-xs font-black tracking-wide transition-all border-b-2 flex items-center gap-1.5 ${
+                        className={`pb-3 px-2.5 sm:px-3 text-xs font-black tracking-wide transition-all border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                             activeTab === 'objections'
                                 ? 'border-rose-600 text-rose-700'
                                 : 'border-transparent text-slate-500 hover:text-slate-900'
                         }`}
                     >
-                        <Shield className="w-3.5 h-3.5 text-amber-600" />
+                        <Shield className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                         <span>Respuestas a Objeciones</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('rules')}
-                        className={`pb-3 px-3 text-xs font-black tracking-wide transition-all border-b-2 flex items-center gap-1.5 ${
+                        className={`pb-3 px-2.5 sm:px-3 text-xs font-black tracking-wide transition-all border-b-2 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                             activeTab === 'rules'
                                 ? 'border-rose-600 text-rose-700'
                                 : 'border-transparent text-slate-500 hover:text-slate-900'
                         }`}
                     >
-                        <FileCheck className="w-3.5 h-3.5 text-blue-600" />
+                        <FileCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                         <span>Reglas de Pruebas & Cotización</span>
                     </button>
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden p-3.5 sm:p-6 space-y-4 bg-slate-50/50">
                     {/* Tab 1: 7 Preguntas de Descubrimiento */}
                     {activeTab === 'questions' && (
                         <div className="space-y-3.5">
@@ -365,19 +365,17 @@ export const LiveDemoHUDModal: React.FC<LiveDemoHUDModalProps> = ({
                 </div>
 
                 {/* Footer con Acciones */}
-                <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-between">
+                <div className="px-4 sm:px-6 py-3.5 bg-white border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                     <span className="text-xs text-slate-500 font-medium">
                         {answeredCount} de {ARIAS_DISCOVERY_QUESTIONS.length} preguntas respondidas
                     </span>
-                    <div className="flex items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={handleSaveSessionNotes}
-                            className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm shadow-rose-600/20 flex items-center gap-2 active:scale-95 cursor-pointer"
-                        >
-                            <Copy className="w-3.5 h-3.5" /> Guardar Notas en Lead
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        onClick={handleSaveSessionNotes}
+                        className="w-full sm:w-auto px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm shadow-rose-600/20 flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+                    >
+                        <Copy className="w-3.5 h-3.5" /> Guardar Notas en Lead
+                    </button>
                 </div>
             </div>
         </div>

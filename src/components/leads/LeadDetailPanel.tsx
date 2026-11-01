@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode, Box, ShieldCheck, ExternalLink, Flame, Sparkles } from 'lucide-react';
+import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode, Box, ShieldCheck, ExternalLink, Flame, Sparkles, ChevronLeft } from 'lucide-react';
 import { LiveDemoHUDModal } from './LiveDemoHUDModal';
 import { GeminiAuditModal } from './GeminiAuditModal';
 import { format } from 'date-fns';
@@ -33,6 +33,7 @@ import toast from 'react-hot-toast';
 import { Input } from '../ui/Input';
 import { CustomDatePicker } from '../ui/CustomDatePicker';
 import { CustomSelect } from '../ui/CustomSelect';
+import { EnterpriseCard, EnterpriseCardHeader, EnterpriseCardContent, EnterpriseField } from '../ui/EnterpriseCard';
 
 interface LeadDetailPanelProps {
     isOpen: boolean;
@@ -262,55 +263,51 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const setIsDetailOpen = (val: boolean) => { if (!val) onClose(); };
 
             return (
-                <div className="fixed inset-0 z-[9999] flex justify-end">
+                <div className="fixed inset-0 z-[9999] flex justify-end overflow-hidden">
                     <div className="absolute inset-0 bg-black/40 lead-sheet-backdrop" onClick={() => setIsDetailOpen(false)} />
                     <div className="relative z-10 w-full sm:w-[680px] md:w-[720px] lg:w-[750px] sm:max-w-[85vw] h-full bg-[#F8FAFC] shadow-[-16px_0_48px_rgba(15,23,42,0.12)] flex flex-col overflow-hidden lead-sheet transition-all duration-300 ease-out border-l border-slate-200/80">
-                        {/* Header Enterprise (Limpio, Sobrio, No cansa la vista) */}
-                        <div className="px-6 pt-3.5 pb-4 bg-white border-b border-slate-200 relative z-30 shadow-2xs space-y-3">
-                            {/* Breadcrumb de navegación estilo Enterprise */}
-                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
-                                <span 
-                                    className="text-blue-600 hover:underline cursor-pointer font-semibold"
-                                    onClick={() => setIsDetailOpen(false)}
-                                >
-                                    Prospectos
-                                </span>
-                                <span className="text-slate-300">/</span>
-                                <span className="text-slate-700 font-semibold truncate max-w-[280px]">
-                                    {selectedLead.name || 'Detalle de Lead'}
-                                </span>
-                            </div>
-
-                            {/* Fila 1: Avatar + Nombre + Empresa (Izquierda) y Acciones Rápidas (Derecha) */}
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <div className="w-10 h-10 shrink-0 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-center text-blue-600 shadow-2xs">
-                                        <User className="w-5 h-5" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <input
-                                            type="text"
-                                            defaultValue={selectedLead.name}
-                                            onBlur={(e) => handleUpdateLead({ name: e.target.value })}
-                                            className="block w-full text-lg font-bold text-slate-900 tracking-tight border-none hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-600 rounded-md px-1.5 py-0.5 -ml-1.5 transition-all bg-transparent placeholder-slate-400 truncate"
-                                            placeholder="Nombre del Lead"
-                                        />
-                                        <input
-                                            type="text"
-                                            defaultValue={selectedLead.company_name || ''}
-                                            placeholder="Empresa no especificada"
-                                            onBlur={(e) => handleUpdateLead({ company_name: e.target.value })}
-                                            className="block w-full text-xs font-medium text-slate-500 border-none hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-600 rounded-md px-1.5 -ml-1.5 -mt-0.5 transition-all bg-transparent placeholder-slate-400 truncate"
-                                        />
-                                    </div>
+                        {/* Header Enterprise Compacto & Cómodo (Bajo perfil, máximo espacio vertical para el teclado y datos) */}
+                        <div className="bg-white border-b border-slate-200 relative z-30 px-3.5 sm:px-6 py-2 sm:py-2.5 shadow-2xs space-y-1.5 shrink-0">
+                            {/* Fila 1: Breadcrumb + Acciones Rápidas */}
+                            <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 text-xs text-slate-500 min-w-0">
+                                    <button 
+                                        type="button"
+                                        onClick={() => setIsDetailOpen(false)}
+                                        className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer truncate hover:underline flex items-center gap-0.5"
+                                    >
+                                        <ChevronLeft className="w-3.5 h-3.5" />
+                                        <span>Prospectos</span>
+                                    </button>
+                                    <span className="text-slate-300">/</span>
+                                    <span className="text-slate-700 font-bold truncate max-w-[130px] sm:max-w-[220px]">
+                                        {selectedLead.name || 'Detalle'}
+                                    </span>
                                 </div>
 
-                                {/* Acciones de Cabecera en UNA SOLA LÍNEA HORIZONTAL: Registrar Acción + Basurero + Cerrar */}
-                                <div className="flex items-center gap-2 shrink-0 self-center">
+                                {/* Acciones de Cabecera (Botones claros y cómodos para móvil y desktop) */}
+                                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                                    {/* Botón WhatsApp directo (si tiene teléfono) */}
+                                    {selectedLead.phone && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const link = getWhatsAppLink(selectedLead.phone || '');
+                                                if (link) window.open(link, '_blank');
+                                            }}
+                                            className="h-7 sm:h-7.5 px-2 sm:px-2.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1 font-semibold text-xs transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                            title="Abrir WhatsApp"
+                                        >
+                                            <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                                            <span className="hidden sm:inline">WhatsApp</span>
+                                        </button>
+                                    )}
+
+                                    {/* Botón Registrar Acción */}
                                     <button
                                         type="button"
                                         onClick={() => setIsCallLoggerOpen(!isCallLoggerOpen)}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs tracking-wide transition-all shadow-2xs cursor-pointer active:scale-95 ${
+                                        className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-md font-semibold text-xs tracking-wide transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 ${
                                             isCallLoggerOpen
                                                 ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300'
                                                 : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
@@ -320,18 +317,34 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         <Phone className="w-3.5 h-3.5" />
                                         <span className="hidden sm:inline">{isCallLoggerOpen ? 'Cerrar' : 'Registrar Acción'}</span>
                                     </button>
+
+                                    {/* Botón QR */}
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenQr}
+                                        className="h-7 sm:h-7.5 w-7 sm:w-7.5 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                        title="Código QR WhatsApp"
+                                    >
+                                        <QrCode className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {/* Botón Eliminar Lead (Admin) */}
                                     {isAdmin && (
                                         <button
+                                            type="button"
                                             onClick={() => handleDeleteLead(selectedLead.id, selectedLead.name)}
-                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all border border-slate-200 hover:border-red-200 shadow-2xs active:scale-95 cursor-pointer"
+                                            className="h-7 sm:h-7.5 w-7 sm:w-7.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 border border-slate-200 hover:border-red-200 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
                                             title="Eliminar Lead"
                                         >
-                                            <Trash2 className="w-4 h-4" />
+                                            <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                     )}
+
+                                    {/* Botón Cerrar */}
                                     <button
+                                        type="button"
                                         onClick={() => setIsDetailOpen(false)}
-                                        className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all border border-slate-200 shadow-2xs active:scale-95 cursor-pointer"
+                                        className="h-7 sm:h-7.5 w-7 sm:w-7.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
                                         title="Cerrar panel"
                                     >
                                         <X className="w-4 h-4" />
@@ -339,57 +352,37 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 </div>
                             </div>
 
-                            {/* Fila 2: Teléfono + Email + Fecha + WhatsApp QR — TODO EN UNA SOLA LÍNEA HORIZONTAL */}
-                            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                                <div className="flex items-center gap-2 group bg-slate-50 hover:bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 shadow-2xs transition-all h-[34px]">
-                                    <Phone className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                            {/* Fila 2: Nombre del Lead + Empresa */}
+                            <div className="flex items-center gap-2 pt-0.5 min-w-0">
+                                <div className="w-6 h-6 sm:w-7 sm:h-7 shrink-0 bg-blue-50 border border-blue-200 rounded-md flex items-center justify-center text-blue-600 shadow-2xs">
+                                    <User className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="min-w-0 flex-1 flex items-baseline gap-2">
                                     <input
                                         type="text"
-                                        defaultValue={selectedLead.phone || ''}
-                                        placeholder="Añadir teléfono"
-                                        onBlur={(e) => handleUpdateLead({ phone: e.target.value })}
-                                        className="text-xs text-slate-800 font-semibold border-none bg-transparent p-0 focus:ring-0 w-24 placeholder-slate-400"
+                                        defaultValue={selectedLead.name}
+                                        onBlur={(e) => handleUpdateLead({ name: e.target.value })}
+                                        className="font-bold text-slate-900 text-sm sm:text-base border-none hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-600 rounded px-1 -ml-1 transition-all bg-transparent placeholder-slate-400 truncate flex-1 min-w-[120px]"
+                                        placeholder="Nombre del Lead"
                                     />
-                                </div>
-                                <div className="flex items-center gap-2 group bg-slate-50 hover:bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 shadow-2xs transition-all h-[34px]">
-                                    <Mail className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                                     <input
                                         type="text"
-                                        defaultValue={selectedLead.email || ''}
-                                        placeholder="Añadir email"
-                                        onBlur={(e) => handleUpdateLead({ email: e.target.value })}
-                                        className="text-xs text-slate-800 font-semibold border-none bg-transparent p-0 focus:ring-0 w-36 placeholder-slate-400"
+                                        defaultValue={selectedLead.company_name || ''}
+                                        placeholder="Empresa no especificada"
+                                        onBlur={(e) => handleUpdateLead({ company_name: e.target.value })}
+                                        className="text-xs font-medium text-slate-500 border-none hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-600 rounded px-1 transition-all bg-transparent placeholder-slate-400 truncate hidden sm:block max-w-[200px]"
                                     />
                                 </div>
-                                <CustomDatePicker
-                                    value={selectedLead.created_at || ''}
-                                    onChange={(date) => {
-                                        if (date) {
-                                            const newDate = new Date(`${date}T12:00:00Z`);
-                                            handleUpdateLead({ created_at: newDate.toISOString() });
-                                        }
-                                    }}
-                                    variant="light"
-                                    className="w-36 [&>div]:!py-1 [&>div]:!px-2.5 [&>div]:!h-[34px] [&>div]:!rounded-lg [&>div]:!border-slate-200 [&>div]:!bg-slate-50 hover:[&>div]:!bg-white [&>div]:!shadow-2xs"
-                                />
-                                <button
-                                    onClick={handleOpenQr}
-                                    className="h-[34px] px-2.5 bg-slate-50 text-slate-700 border border-slate-200 hover:bg-white hover:border-slate-300 rounded-lg transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
-                                    title="Código QR de WhatsApp"
-                                >
-                                    <QrCode className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                                    <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">WhatsApp QR</span>
-                                </button>
                             </div>
                         </div>
 
                         {/* Navigation Tabs (Estilo Enterprise Limpio y Organizado — Sin fatiga visual) */}
-                        <div className="bg-white border-b border-slate-200 relative z-20 shrink-0 px-6">
-                            <div className="flex items-center gap-8 text-xs overflow-x-auto no-scrollbar">
+                        <div className="bg-white border-b border-slate-200 relative z-20 shrink-0 px-4 sm:px-6">
+                            <div className="flex items-center gap-4 sm:gap-8 text-xs overflow-x-auto no-scrollbar scroll-smooth">
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab('info')}
-                                    className={`flex items-center gap-2 py-3 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
+                                    className={`flex items-center gap-1.5 py-2 sm:py-2.5 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
                                         activeTab === 'info'
                                             ? 'border-blue-600 text-blue-700'
                                             : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
@@ -402,7 +395,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab('sales')}
-                                    className={`flex items-center gap-2 py-3 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
+                                    className={`flex items-center gap-1.5 py-2 sm:py-2.5 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
                                         activeTab === 'sales'
                                             ? 'border-blue-600 text-blue-700'
                                             : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
@@ -418,7 +411,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab('quotes')}
-                                    className={`flex items-center gap-2 py-3 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
+                                    className={`flex items-center gap-1.5 py-2 sm:py-2.5 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
                                         activeTab === 'quotes'
                                             ? 'border-blue-600 text-blue-700'
                                             : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
@@ -436,7 +429,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab('activity')}
-                                    className={`flex items-center gap-2 py-3 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
+                                    className={`flex items-center gap-1.5 py-2 sm:py-2.5 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
                                         activeTab === 'activity'
                                             ? 'border-blue-600 text-blue-700'
                                             : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
@@ -454,7 +447,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         </div>
 
                         {/* Content Scrollable Container */}
-                        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 sm:p-6 pb-40 space-y-6">
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-3.5 sm:p-6 pb-40 space-y-4 sm:space-y-6">
                             {/* Quick Action Logger Drawer */}
                             {isCallLoggerOpen && (
                                 <div className="bg-white rounded-2xl p-5 border border-indigo-100 shadow-md animate-in fade-in duration-200">
@@ -498,83 +491,36 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
 
                             {/* ── TAB 1: FICHA & NEGOCIO ── */}
                             {activeTab === 'info' && (
-                                <div className="space-y-6 animate-in fade-in duration-200">
-                                    {/* Quick Stats Executive Banner (Compacto, Bajo Perfil y Descansado a la Vista) */}
-                                    <div className="bg-white rounded-lg px-4 py-2.5 border border-slate-200 shadow-2xs grid grid-cols-2 sm:grid-cols-4 gap-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                                        <div className="flex items-center gap-2.5 px-2 py-0.5 min-w-0">
-                                            <div className="w-7 h-7 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
-                                                <DollarSign className="w-3.5 h-3.5" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none">Inversión Potencial</p>
-                                                <p className="text-sm font-bold text-slate-900 tracking-tight truncate leading-tight mt-0.5">${(selectedLead.value || 0).toLocaleString()}</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-2.5 px-2 py-0.5 min-w-0">
-                                            <div className="w-7 h-7 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
-                                                <Target className="w-3.5 h-3.5" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Temperatura</p>
-                                                <div className="leading-none scale-95 origin-left"><PriorityBadge priority={selectedLead.priority || 'medium'} /></div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-2.5 px-2 py-0.5 min-w-0">
-                                            <div className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
-                                                <Activity className="w-3.5 h-3.5" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Estado Lead</p>
-                                                <div className="leading-none scale-95 origin-left"><StatusBadge status={selectedLead.status} /></div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-2.5 px-2 py-0.5 min-w-0">
-                                            <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200">
-                                                <Phone className="w-3.5 h-3.5" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none">Intentos Contacto</p>
-                                                <p className="text-sm font-bold text-slate-900 tracking-tight truncate leading-tight mt-0.5">{selectedLead.contact_count || 0} <span className="text-[10px] font-medium text-slate-400">llamadas</span></p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* 2-Column Responsive Layout for Details */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
+                                    {/* 2-Column Responsive Layout for Details (Al grano, directo al formulario como en Item Master) */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                                         {/* Left Column: Parámetros del Lead */}
-                                        <div className="bg-white rounded-lg border border-slate-200 shadow-2xs">
+                                        <EnterpriseCard>
                                             {/* Sub-header Strip Estructurado (Estilo Enterprise Limpio) */}
-                                            <div className="bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between rounded-t-lg">
-                                                <div className="flex items-center gap-2">
-                                                    <Target className="w-3.5 h-3.5 text-blue-600" />
-                                                    <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
-                                                        Parámetros Comerciales
-                                                    </h4>
-                                                </div>
-                                            </div>
+                                            <EnterpriseCardHeader
+                                                title="Parámetros Comerciales"
+                                                icon={<Target className="w-3.5 h-3.5" />}
+                                            />
 
-                                            <div className="p-4 space-y-4">
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Estado del Embudo</label>
+                                            <EnterpriseCardContent>
+                                                <EnterpriseField label="Estado del Embudo">
                                                     <CustomSelect
                                                         value={selectedLead.status}
                                                         onChange={(val) => handleUpdateLead({ status: val as LeadStatus })}
                                                         options={Object.entries(STATUS_CONFIG).map(([key, config]) => ({ value: key, label: config.label, icon: config.icon }))}
                                                     />
-                                                </div>
+                                                </EnterpriseField>
 
-                                                <div className="space-y-1.5">
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Temperatura / Prioridad</label>
-                                                        {(selectedLead.engagement_score || 0) > 0 && (
+                                                <EnterpriseField
+                                                    label="Temperatura / Prioridad"
+                                                    actionBadge={
+                                                        (selectedLead.engagement_score || 0) > 0 ? (
                                                             <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
                                                                 Engagement: {selectedLead.engagement_score} pts
                                                             </span>
-                                                        )}
-                                                    </div>
+                                                        ) : undefined
+                                                    }
+                                                >
                                                     <CustomSelect
                                                         value={selectedLead.priority || 'medium'}
                                                         onChange={(val) => handleUpdateLead({ priority: val as LeadPriority })}
@@ -585,19 +531,42 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                             { value: 'low', label: 'Baja (Cold)' },
                                                         ]}
                                                     />
+                                                </EnterpriseField>
+
+                                                {/* Inversión Potencial ($) y Cierre Real ($) — Compacto, simple, al grano como en Item Master */}
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <EnterpriseField label="Inversión Potencial">
+                                                        <div className="relative">
+                                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">$</span>
+                                                            <Input
+                                                                type="number"
+                                                                defaultValue={selectedLead.value || 0}
+                                                                onBlur={(e) => handleUpdateLead({ value: Number(e.target.value) })}
+                                                                className="h-8.5 pl-6 rounded-md border-slate-300 bg-white font-bold text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-xs shadow-2xs"
+                                                                placeholder="0"
+                                                            />
+                                                        </div>
+                                                    </EnterpriseField>
+
+                                                    <EnterpriseField label="Cierre Real">
+                                                        <div className="relative">
+                                                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">$</span>
+                                                            <Input
+                                                                type="number"
+                                                                defaultValue={selectedLead.closing_amount || 0}
+                                                                onBlur={(e) => handleUpdateLead({ closing_amount: Number(e.target.value) })}
+                                                                className="h-8.5 pl-6 rounded-md border-slate-300 bg-white font-bold text-emerald-700 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-xs shadow-2xs"
+                                                                placeholder="0"
+                                                            />
+                                                        </div>
+                                                    </EnterpriseField>
                                                 </div>
 
-                                                <div className="space-y-1.5">
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fuente de Origen</label>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setIsManageSourcesOpen(true)}
-                                                            className="text-blue-600 hover:text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
-                                                        >
-                                                            Gestionar
-                                                        </button>
-                                                    </div>
+                                                <EnterpriseField
+                                                    label="Fuente de Origen"
+                                                    actionText="Gestionar"
+                                                    onActionClick={() => setIsManageSourcesOpen(true)}
+                                                >
                                                     <CustomSelect
                                                         value={selectedLead.source || ''}
                                                         onChange={(val) => handleUpdateLead({ source: val || null })}
@@ -614,19 +583,13 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                         placeholder="Sin especificar"
                                                         searchable={true}
                                                     />
-                                                </div>
+                                                </EnterpriseField>
 
-                                                <div className="space-y-1.5">
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Rubro / Industria</label>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setIsManageIndustriesOpen(true)}
-                                                            className="text-blue-600 hover:text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
-                                                        >
-                                                            Gestionar
-                                                        </button>
-                                                    </div>
+                                                <EnterpriseField
+                                                    label="Rubro / Industria"
+                                                    actionText="Gestionar"
+                                                    onActionClick={() => setIsManageIndustriesOpen(true)}
+                                                >
                                                     <CustomSelect
                                                         value={selectedLead.industry || ''}
                                                         onChange={(val) => handleUpdateLead({ industry: val || null })}
@@ -643,19 +606,13 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                         placeholder="Sin especificar"
                                                         searchable={true}
                                                     />
-                                                </div>
+                                                </EnterpriseField>
 
-                                                <div className="space-y-1.5">
-                                                    <div className="flex items-center justify-between">
-                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Producto de Interés</label>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setIsManageModalOpen(true)}
-                                                            className="text-blue-600 hover:text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
-                                                        >
-                                                            Gestionar
-                                                        </button>
-                                                    </div>
+                                                <EnterpriseField
+                                                    label="Producto de Interés"
+                                                    actionText="Gestionar"
+                                                    onActionClick={() => setIsManageModalOpen(true)}
+                                                >
                                                     <CustomSelect
                                                         value={selectedLead.interested_product_id || ''}
                                                         onChange={(val) => handleUpdateLead({ interested_product_id: val || null })}
@@ -665,13 +622,13 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                         ]}
                                                         placeholder="Sin especificar"
                                                     />
-                                                </div>
+                                                </EnterpriseField>
 
                                                 {/* Propietario del Lead (Diseño Plano y Limpio) */}
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                                                        <Shield className="w-3 h-3 text-blue-600" /> Asignado A
-                                                    </label>
+                                                <EnterpriseField
+                                                    label="Asignado A"
+                                                    icon={<Shield className="w-3 h-3 text-blue-600" />}
+                                                >
                                                     <CustomSelect
                                                         value={selectedLead.assigned_to || ''}
                                                         onChange={(val) => handleUpdateLead({ assigned_to: val || null })}
@@ -687,76 +644,113 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                         ]}
                                                         placeholder="Sin asignar"
                                                     />
-                                                </div>
-                                            </div>
-                                        </div>
+                                                </EnterpriseField>
+                                            </EnterpriseCardContent>
+                                        </EnterpriseCard>
 
-                                        {/* Right Column: Operaciones, Finanzas y Canales */}
-                                        <div className="space-y-6">
-                                            {/* Finanzas & Canales de Contacto Rápido */}
-                                            <div className="bg-white rounded-lg border border-slate-200 shadow-2xs">
-                                                {/* Header Strip Proyecciones */}
-                                                <div className="bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between rounded-t-lg">
-                                                    <div className="flex items-center gap-2">
-                                                        <DollarSign className="w-3.5 h-3.5 text-blue-600" />
-                                                        <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
-                                                            Proyecciones Económicas
-                                                        </h4>
-                                                    </div>
-                                                </div>
+                                        {/* Right Column: Contacto Directo & Documentos */}
+                                        <div className="space-y-4 sm:space-y-6">
+                                            {/* Contacto & Canales Directos */}
+                                            <EnterpriseCard>
+                                                <EnterpriseCardHeader
+                                                    title="Contacto & Canales Directos"
+                                                    icon={<Phone className="w-3.5 h-3.5" />}
+                                                />
 
-                                                <div className="p-4 space-y-4">
-                                                    <div className="grid grid-cols-2 gap-3 items-start">
-                                                        <div className="space-y-1.5">
-                                                            <div className="h-5 flex items-center">
-                                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate whitespace-nowrap">
-                                                                    Potencial Estimado
-                                                                </label>
-                                                            </div>
-                                                            <div className="relative">
-                                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">$</div>
-                                                                <Input
-                                                                    type="number"
-                                                                    defaultValue={selectedLead.value || 0}
-                                                                    onBlur={(e) => handleUpdateLead({ value: Number(e.target.value) })}
-                                                                    className="h-9 pl-7 rounded-md border-slate-300 bg-white font-bold text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-xs shadow-2xs"
-                                                                />
-                                                            </div>
+                                                <EnterpriseCardContent>
+                                                    {/* Teléfono */}
+                                                    <EnterpriseField
+                                                        label="Teléfono Principal"
+                                                        actionBadge={
+                                                            selectedLead.phone ? (
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <a
+                                                                        href={`tel:${selectedLead.phone}`}
+                                                                        className="text-[10px] font-bold text-blue-600 hover:underline"
+                                                                    >
+                                                                        Llamar
+                                                                    </a>
+                                                                    <span className="text-slate-300">•</span>
+                                                                    <a
+                                                                        href={getWhatsAppLink(selectedLead.phone)}
+                                                                        target="_blank"
+                                                                        rel="noreferrer"
+                                                                        className="text-[10px] font-bold text-emerald-600 hover:underline"
+                                                                    >
+                                                                        WhatsApp
+                                                                    </a>
+                                                                </div>
+                                                            ) : undefined
+                                                        }
+                                                    >
+                                                        <div className="relative">
+                                                            <Phone className="w-3.5 h-3.5 text-blue-600 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                                            <Input
+                                                                type="text"
+                                                                defaultValue={selectedLead.phone || ''}
+                                                                placeholder="Añadir número de teléfono"
+                                                                onBlur={(e) => handleUpdateLead({ phone: e.target.value })}
+                                                                className="h-8.5 pl-8 rounded-md border-slate-300 bg-white font-medium text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-xs shadow-2xs"
+                                                            />
                                                         </div>
+                                                    </EnterpriseField>
 
-                                                        <div className="space-y-1.5">
-                                                            <div className="h-5 flex items-center">
-                                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate whitespace-nowrap">
-                                                                    Cierre Real
-                                                                </label>
-                                                            </div>
-                                                            <div className="relative">
-                                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">$</div>
-                                                                <Input
-                                                                    type="number"
-                                                                    defaultValue={selectedLead.closing_amount || 0}
-                                                                    onBlur={(e) => handleUpdateLead({ closing_amount: Number(e.target.value) })}
-                                                                    className="h-9 pl-7 rounded-md border-slate-300 bg-white font-bold text-emerald-700 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-xs shadow-2xs"
-                                                                />
-                                                            </div>
+                                                    {/* Email */}
+                                                    <EnterpriseField
+                                                        label="Correo Electrónico"
+                                                        actionBadge={
+                                                            selectedLead.email ? (
+                                                                <a
+                                                                    href={`mailto:${selectedLead.email}`}
+                                                                    className="text-[10px] font-bold text-blue-600 hover:underline"
+                                                                >
+                                                                    Enviar correo
+                                                                </a>
+                                                            ) : undefined
+                                                        }
+                                                    >
+                                                        <div className="relative">
+                                                            <Mail className="w-3.5 h-3.5 text-blue-600 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                                            <Input
+                                                                type="email"
+                                                                defaultValue={selectedLead.email || ''}
+                                                                placeholder="Añadir email"
+                                                                onBlur={(e) => handleUpdateLead({ email: e.target.value })}
+                                                                className="h-8.5 pl-8 rounded-md border-slate-300 bg-white font-medium text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-xs shadow-2xs"
+                                                            />
                                                         </div>
-                                                    </div>
+                                                    </EnterpriseField>
 
-                                                    {/* Canales de Contacto Directo */}
-                                                    <div className="pt-3 border-t border-slate-100 space-y-2">
-                                                        <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                                                            <MessageSquare className="w-3.5 h-3.5 text-blue-500" /> Mensajería Rápida
-                                                        </h5>
-                                                        <div className="grid grid-cols-2 gap-2.5">
+                                                    {/* Fecha de Registro */}
+                                                    <EnterpriseField label="Fecha de Registro">
+                                                        <CustomDatePicker
+                                                            value={selectedLead.created_at || ''}
+                                                            onChange={(date) => {
+                                                                if (date) {
+                                                                    const newDate = new Date(`${date}T12:00:00Z`);
+                                                                    handleUpdateLead({ created_at: newDate.toISOString() });
+                                                                }
+                                                            }}
+                                                            variant="light"
+                                                            className="w-full [&>div]:!h-8.5 [&>div]:!rounded-md [&>div]:!border-slate-300 [&>div]:!bg-white [&>div]:!shadow-2xs [&>div]:!text-xs"
+                                                        />
+                                                    </EnterpriseField>
+
+                                                    {/* Mensajería Rápida */}
+                                                    <div className="pt-2 border-t border-slate-100">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1.5">
+                                                            Mensajería Rápida
+                                                        </label>
+                                                        <div className="grid grid-cols-2 gap-2">
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'telegram' } });
                                                                 }}
-                                                                className="flex items-center justify-center gap-2 py-1.5 px-3 bg-sky-50/70 hover:bg-sky-100 text-sky-700 rounded-md font-bold text-xs transition-all border border-sky-200/60 shadow-2xs group cursor-pointer active:scale-95"
+                                                                className="flex items-center justify-center gap-1.5 h-8 px-2.5 bg-sky-50/80 hover:bg-sky-100 text-sky-700 rounded-md font-bold text-xs transition-all border border-sky-200/60 shadow-2xs cursor-pointer active:scale-95"
                                                             >
-                                                                <Send className="w-3.5 h-3.5 text-sky-500 group-hover:scale-110 transition-transform" /> Telegram Bot
+                                                                <Send className="w-3 h-3 text-sky-500" /> Telegram Bot
                                                             </button>
                                                             <button
                                                                 type="button"
@@ -764,28 +758,24 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                                     e.stopPropagation();
                                                                     navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'whatsapp' } });
                                                                 }}
-                                                                className="flex items-center justify-center gap-2 py-1.5 px-3 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 rounded-md font-bold text-xs transition-all border border-emerald-200/60 shadow-2xs group cursor-pointer active:scale-95"
+                                                                className="flex items-center justify-center gap-1.5 h-8 px-2.5 bg-emerald-50/80 hover:bg-emerald-100 text-emerald-700 rounded-md font-bold text-xs transition-all border border-emerald-200/60 shadow-2xs cursor-pointer active:scale-95"
                                                             >
-                                                                <Smartphone className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" /> WhatsApp
+                                                                <Smartphone className="w-3 h-3 text-emerald-600" /> WhatsApp
                                                             </button>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            </div>
+                                                </EnterpriseCardContent>
+                                            </EnterpriseCard>
 
                                             {/* Documentos Adjuntos */}
-                                            <div className="bg-white rounded-lg border border-slate-200 shadow-2xs">
+                                            <EnterpriseCard>
                                                 {/* Header Strip Documentos */}
-                                                <div className="bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between rounded-t-lg">
-                                                    <div className="flex items-center gap-2">
-                                                        <FileText className="w-3.5 h-3.5 text-blue-600" />
-                                                        <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
-                                                            Documento Adjunto
-                                                        </h4>
-                                                    </div>
-                                                </div>
+                                                <EnterpriseCardHeader
+                                                    title="Documento Adjunto"
+                                                    icon={<FileText className="w-3.5 h-3.5" />}
+                                                />
 
-                                                <div className="p-4 space-y-3">
+                                                <EnterpriseCardContent className="p-4 space-y-3">
                                                     {selectedLead.document_path ? (
                                                         <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
                                                             <div className="flex items-center gap-3 overflow-hidden">
@@ -838,8 +828,8 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                             </div>
                                                         </div>
                                                     )}
-                                                </div>
-                                            </div>
+                                                </EnterpriseCardContent>
+                                            </EnterpriseCard>
 
                                             {/* Call Bot AI Results (si existen) */}
                                             {selectedLead.call_bot_data && Object.keys(selectedLead.call_bot_data as object).length > 0 && (() => {

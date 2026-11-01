@@ -125,7 +125,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
             </button>
 
             {isOpen && (
-                <div className={`absolute z-[9999] ${openUpward ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 w-full min-w-[280px] sm:min-w-[320px] max-w-[420px] bg-white rounded-md shadow-[0_12px_36px_rgb(0,0,0,0.18)] border border-slate-300 overflow-hidden py-1 animate-in fade-in duration-100`}>
+                <div className={`absolute z-[9999] ${openUpward ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} left-0 w-full min-w-full sm:min-w-[300px] max-w-[calc(100vw-2.5rem)] sm:max-w-[420px] bg-white rounded-md shadow-[0_12px_36px_rgb(0,0,0,0.18)] border border-slate-300 overflow-hidden py-1 animate-in fade-in duration-100`}>
                     {/* Buscador con lupa */}
                     {isSearchEnabled && (
                         <div className="p-2 border-b border-slate-100 bg-slate-50/80">
