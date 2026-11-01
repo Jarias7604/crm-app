@@ -462,6 +462,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                         onChange={(val) => setNewStatus(val)}
                         options={statusOptions}
                         placeholder={`Sin cambio — Mantener (${lead.status})`}
+                        buttonClassName="w-full h-10 flex items-center justify-between bg-white border border-slate-200 shadow-2xs rounded-xl px-3.5 text-left text-xs font-semibold text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 cursor-pointer"
                     />
                     {newStatus && (
                         <p className="text-[11px] text-blue-600 font-bold mt-1.5 flex items-center gap-1">
@@ -556,9 +557,10 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
 
                     {wantsFollowUp && (
                         <div className="p-3 bg-indigo-50/30 space-y-2.5 animate-in fade-in duration-200">
-                            <div className="grid grid-cols-2 gap-2.5">
+                            {/* Fecha y Hora: Alineación perfecta horizontal y vertical (mismo baseline, mismo h-10) */}
+                            <div className="grid grid-cols-2 gap-2.5 items-end">
                                 <div>
-                                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
                                         Fecha
                                     </label>
                                     <CustomDatePicker
@@ -570,25 +572,27 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
                                         Hora
                                     </label>
-                                    <select
-                                        value={followUpTime}
-                                        onChange={(e) => setFollowUpTime(e.target.value)}
-                                        className="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all cursor-pointer h-9"
-                                    >
-                                        {TIME_SLOTS.map(slot => (
-                                            <option key={slot.value} value={slot.value}>{slot.label}</option>
-                                        ))}
-                                    </select>
+                                    <div className="relative flex items-center">
+                                        <div className="absolute left-3.5 pointer-events-none text-slate-400">
+                                            <Clock className="w-4 h-4" />
+                                        </div>
+                                        <input
+                                            type="time"
+                                            value={followUpTime}
+                                            onChange={(e) => setFollowUpTime(e.target.value)}
+                                            className="w-full h-10 pl-10 pr-3.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all cursor-pointer shadow-2xs"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
                             {/* Ejecutivo Asignado */}
                             {Array.isArray(teamMembers) && teamMembers.length > 0 && (
                                 <div>
-                                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
                                         Asignar a Ejecutivo
                                     </label>
                                     <CustomSelect
@@ -596,12 +600,13 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                                         onChange={setFollowUpAssignee}
                                         options={assigneeOptions}
                                         placeholder="Asignar ejecutivo"
+                                        buttonClassName="w-full h-10 flex items-center justify-between bg-white border border-slate-200 shadow-2xs rounded-xl px-3.5 text-left text-xs font-semibold text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 cursor-pointer"
                                     />
                                 </div>
                             )}
 
                             <div>
-                                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
                                     Objetivo del Seguimiento
                                 </label>
                                 <input
@@ -609,7 +614,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                                     value={followUpNote}
                                     onChange={(e) => setFollowUpNote(e.target.value)}
                                     placeholder='Ej: "Llamar para confirmar recepción de propuesta"'
-                                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                                    className="w-full h-10 bg-white border border-slate-200 rounded-xl px-3.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all shadow-2xs"
                                 />
                             </div>
                         </div>
