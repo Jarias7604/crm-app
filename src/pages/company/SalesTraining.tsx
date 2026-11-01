@@ -1,10 +1,11 @@
 // src/pages/company/SalesTraining.tsx
 // Módulo Oficial de Capacitación Comercial y Academia de Ventas en el CRM SaaS
-// Soporta modo presentación interactivo (25 slides), manual de referencia y multi-tenant white-label
+// Diseño dinámico, tipografía ejecutiva grande, transiciones fluidas, lightbox HD y multi-tenant white-label
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
+import toast from 'react-hot-toast';
 import {
     GraduationCap,
     ChevronLeft,
@@ -18,10 +19,15 @@ import {
     AlertCircle,
     Shield,
     Sparkles,
-    FileSpreadsheet,
     Building2,
-    ExternalLink,
-    X
+    X,
+    Play,
+    Pause,
+    Copy,
+    Check,
+    ZoomIn,
+    Volume2,
+    CheckSquare
 } from 'lucide-react';
 
 interface SlideData {
@@ -46,6 +52,9 @@ export default function SalesTraining() {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showNotes, setShowNotes] = useState(true);
     const [activeTab, setActiveTab] = useState<'presentation' | 'handbook'>('presentation');
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [zoomedImage, setZoomedImage] = useState<{ src: string; caption?: string } | null>(null);
+    const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
     const [showAiModal, setShowAiModal] = useState(false);
     const [isSimulatingAi, setIsSimulatingAi] = useState(false);
     const [simulatedComplete, setSimulatedComplete] = useState(false);
@@ -105,7 +114,7 @@ export default function SalesTraining() {
             {
                 num: 1,
                 isCover: true,
-                category: `Entrenamiento Comercial · ${tenantBrand.companyName}`,
+                category: isAriasDefense ? 'Entrenamiento Comercial · ARIAS DEFENSE COMPONENTS' : `Entrenamiento Comercial · ${tenantBrand.companyName}`,
                 title: 'Vendemos resultados. No pantallas.',
                 subtitle: 'El nuevo estándar de diagnóstico, demos de alto impacto y disciplina de cierre.',
                 speakerNotes: 'Equipo: bienvenidos. Esta reunión no es para hablar de teoría ni dar consejos genéricos. A partir de hoy cambiamos la forma en que vendemos. No somos operadores de software que muestran botones; somos consultores de negocios que resuelven problemas caros y cierran contratos.',
@@ -115,16 +124,16 @@ export default function SalesTraining() {
                 num: 2,
                 category: '01 · Diagnóstico del Problema',
                 title: '¿Por qué perdíamos ventas?',
-                subtitle: 'El error clásico: convertir una reunión de negocios en un paseo por pantallas.',
+                subtitle: 'El error clásico: convertir una reunión de negocios en un paseo por pantallas sin rumbo.',
                 imageSrc: '/real_performance_audits_table.png',
                 imageCaption: 'Registro de Demos Auditadas en el CRM',
                 badgeText: 'EL VIEJO HÁBITO A ERRADICAR',
                 badgeColor: 'red',
                 bullets: [
                     { label: 'Abrir Google Meet y decir de inmediato:', text: '«Mire, aquí están los clientes, aquí los productos, aquí las cotizaciones...»' },
-                    { label: '40 minutos mostrando botones:', text: 'Sin saber qué le duele al cliente ni cuánto dinero pierde al mes.' },
+                    { label: '40 minutos mostrando botones:', text: 'Sin saber qué le duele al cliente ni cuánto dinero pierde al mes en su operación.' },
                     { label: 'El cliente se abruma y termina diciendo:', text: '«Está bonito, mándame una cotización y yo te aviso.»' },
-                    { label: 'Resultado:', text: 'Semanas persiguiendo fantasmas y cero dólares en el banco.', isDanger: true }
+                    { label: 'Resultado inevitable:', text: 'Semanas persiguiendo fantasmas y cero dólares en el banco.', isDanger: true }
                 ],
                 speakerNotes: 'Si abren una llamada y se ponen a pasear por el sistema durante 40 minutos, el cliente los ve como un catálogo ambulante. El "yo te aviso" es culpa nuestra por no haber hecho las preguntas duras al inicio.'
             },
@@ -158,7 +167,7 @@ export default function SalesTraining() {
                     { label: '01 · SDR Califica y Agenda:', text: 'Cita agendada en Google Calendar con dolor inicial anotado.' },
                     { label: '02 · AE Conduce la Demo:', text: 'Usa el Guion Demo HUD lateral con las 7 preguntas obligatorias.' },
                     { label: '03 · Google Meet + Gemini Toma Notas:', text: 'Gemini transcribe y redacta el Google Doc en automático.' },
-                    { label: '04 · Auditoría en CRM (Auditar Gemini):', text: 'El CRM califica los 100 pts y vincula acuerdos al Lead al instante.' }
+                    { label: '04 · Auditoría en CRM (Auditar Gemini):', text: 'El CRM califica los 100 pts y vincula acuerdos al Lead al instante.', isSuccess: true }
                 ],
                 speakerNotes: 'Miren esto: no estamos improvisando. Cada videollamada de Google Meet ahora es transcrita por Gemini, evaluada bajo una rúbrica oficial de 100 puntos y vinculada directamente a la ficha del lead.'
             },
@@ -353,7 +362,7 @@ export default function SalesTraining() {
                 badgeText: 'OBJECIÓN DE PRECIO',
                 badgeColor: 'red',
                 bullets: [
-                    { label: 'Error fatal:', text: '«Déjeme hablar con mi jefe a ver si le rebajamos un 20%...» (Destruye autoridad y margen).', isDanger: true },
+                    { label: 'Error fatal a evitar:', text: '«Déjeme hablar con mi jefe a ver si le rebajamos un 20%...» (Destruye autoridad y margen).', isDanger: true },
                     { label: '1. Sondear:', text: '«Entiendo perfectamente. ¿El valor está fuera de su presupuesto total o comparado contra otra opción?»' },
                     { label: '2. Re-anclar al dolor:', text: '«Recuerde que hoy se le pierden $400 al mes en despachos erróneos.»' },
                     { label: '3. Cierre condicionado:', text: '«Si resolvemos el costo dentro de lo autorizado, ¿qué otra condición faltaría para programar la instalación?»', isSuccess: true }
@@ -370,7 +379,7 @@ export default function SalesTraining() {
                 badgeText: 'PRUEBA CONDICIONADA',
                 badgeColor: 'amber',
                 bullets: [
-                    { label: 'Alerta:', text: 'Una prueba gratis NO es una venta. Si das acceso libre sin tareas definidas, nadie entra y el lead se enfría.', isDanger: true },
+                    { label: 'Alerta crítica:', text: 'Una prueba gratis NO es una venta. Si das acceso libre sin tareas definidas, nadie entra y el lead se enfría.', isDanger: true },
                     { label: '1. Acotar el alcance:', text: '«Con gusto abrimos un entorno de 8 días. ¿Cuáles son las 3 tareas específicas que necesita verificar para tomar la decisión?»' },
                     { label: '2. Reunión de cierre:', text: '«Pactemos la reunión de revisión final para el día 8 a las 3:00 PM con quien aprueba la compra.»' },
                     { label: '3. Compromiso:', text: '«Si las 3 tareas cumplen, ¿avanzamos con la contratación?»', isSuccess: true }
@@ -387,7 +396,7 @@ export default function SalesTraining() {
                 badgeText: 'BLINDAJE DE PROPUESTA',
                 badgeColor: 'red',
                 bullets: [
-                    { label: 'Peligro:', text: 'Cotización en PDF enviada al aire = Venta muerta en el 90% de los casos.', isDanger: true },
+                    { label: 'Peligro mortal:', text: 'Cotización en PDF enviada al aire = Venta muerta en el 90% de los casos.', isDanger: true },
                     { label: 'Guión de Blindaje:', text: '«Con mucho gusto le preparo la propuesta formal con el alcance exacto. Para asegurar que no pague de más y solo incluya lo que necesita hoy... ¿podemos reservar 15 minutos este jueves a las 10:00 AM para revisarla en vivo junto con la persona que aprueba el presupuesto?»', isSuccess: true }
                 ],
                 speakerNotes: 'Nunca manden un documento de precios sin una reunión de revisión agendada. Un PDF no tiene voz para defender el valor frente a las dudas del cliente.'
@@ -419,8 +428,8 @@ export default function SalesTraining() {
                 badgeText: 'CERRADO GANADO · $1,400 USD',
                 badgeColor: 'green',
                 bullets: [
-                    { label: 'Calificación:', text: '92 / 100 Pts (Nivel Sólido)', isSuccess: true },
-                    { label: 'Factores de Victoria Auditados:', text: '1. Diagnóstico profundo de sucursales.\n2. Cuantificación de mermas e inventario desfasado.\n3. Mostró solo 2 flujos: catálogo y facturación.\n4. Cierre condicionado y fecha de pago pactada.' }
+                    { label: 'Calificación Auditada:', text: '92 / 100 Pts (Nivel Sólido de Excelencia)', isSuccess: true },
+                    { label: 'Factores de Victoria:', text: '1. Diagnóstico profundo de sucursales y procesos desfasados.\n2. Cuantificación de mermas e inventario descontrolado.\n3. Mostró solo 2 flujos: catálogo y facturación rápida.\n4. Cierre condicionado y fecha de pago pactada.' }
                 ],
                 speakerNotes: isAriasDefense
                     ? 'Este caso no es inventado. Está en el CRM, cerrado con $1,400 en caja. El asesor aplicó el guión: diagnosticó el dolor, mostró 2 flujos y cerró.'
@@ -436,7 +445,7 @@ export default function SalesTraining() {
                 badgeText: 'CERRADO GANADO · $1,200 USD',
                 badgeColor: 'green',
                 bullets: [
-                    { label: 'Calificación:', text: '88 / 100 Pts (Nivel Sólido)', isSuccess: true },
+                    { label: 'Calificación Auditada:', text: '88 / 100 Pts (Nivel Sólido de Excelencia)', isSuccess: true },
                     { label: 'Por qué se cerró en 1 sola llamada:', text: '• Se validó en el minuto 10 quién firmaba el cheque y el presupuesto disponible.\n• No regaló descuentos; demostró que la velocidad de cotizaciones pagaba el software en 30 días.\n• Contratación firmada al finalizar.' }
                 ],
                 speakerNotes: isAriasDefense
@@ -449,11 +458,11 @@ export default function SalesTraining() {
                 title: isAriasDefense ? 'Caso de Aprendizaje: Transportes Express' : 'Caso de Aprendizaje: Transporte Regional',
                 subtitle: 'Resultado: PERDIDO ($0 USD) · Auditoría: 45/100 Pts (Intervención)',
                 imageSrc: '/real_performance_audits_table.png',
-                imageCaption: 'Registro de Demo Perdida en Auditoría',
+                imageCaption: 'Registro de Oportunidad Perdida en Auditoría',
                 badgeText: 'CASO PERDIDO: $0 USD',
                 badgeColor: 'red',
                 bullets: [
-                    { label: 'Puntaje:', text: '45 / 100 Pts (Requiere Intervención Urgente)', isDanger: true },
+                    { label: 'Puntaje de Auditoría:', text: '45 / 100 Pts (Requiere Intervención Urgente)', isDanger: true },
                     { label: 'Errores Detectados por la IA en las Notas:', text: '• 40 minutos mostrando módulos sin preguntar cuánto perdían hoy.\n• No se validó quién tenía la chequera para autorizar.\n• Terminó con «mándame los precios por WhatsApp y yo te aviso».\n• No se agendó fecha ni hora en Google Calendar.' }
                 ],
                 speakerNotes: isAriasDefense
@@ -496,7 +505,7 @@ export default function SalesTraining() {
                 isCover: true,
                 category: '24 · Compromiso Comercial',
                 title: 'Las 3 Reglas No Negociables a Partir de Hoy',
-                subtitle: 'El estándar que nos llevará a duplicar las ventas de la empresa.',
+                subtitle: 'El estándar de excelencia que nos llevará a duplicar las ventas de la empresa.',
                 bullets: [
                     { label: '01. NINGUNA DEMO SIN DIAGNÓSTICO', text: 'Primero entendemos el dolor y el dinero que cuesta. Prohibido abrir pantallas a ciegas.' },
                     { label: '02. NINGUNA OBJECIÓN CON REBAJA REGALADA', text: 'Protegemos el valor de nuestro trabajo. Todo acuerdo comercial exige una fecha de pago firme.' },
@@ -509,21 +518,40 @@ export default function SalesTraining() {
 
     const slide = slides[currentSlide];
 
-    // Navegación por teclado
+    // Navegación por teclado (Flechas, Espacio, PageUp/Down, Tecla F)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (activeTab !== 'presentation') return;
             if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+                e.preventDefault();
                 setCurrentSlide(prev => Math.min(slides.length - 1, prev + 1));
             } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                e.preventDefault();
                 setCurrentSlide(prev => Math.max(0, prev - 1));
             } else if (e.key === 'f' || e.key === 'F') {
                 toggleFullscreen();
+            } else if (e.key === 'Escape' && zoomedImage) {
+                setZoomedImage(null);
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [slides.length, activeTab]);
+    }, [slides.length, activeTab, zoomedImage]);
+
+    // Auto Play Slideshow (10 segundos por slide)
+    useEffect(() => {
+        if (!isPlaying || activeTab !== 'presentation') return;
+        const interval = setInterval(() => {
+            setCurrentSlide(prev => {
+                if (prev >= slides.length - 1) {
+                    setIsPlaying(false);
+                    return prev;
+                }
+                return prev + 1;
+            });
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [isPlaying, activeTab, slides.length]);
 
     const toggleFullscreen = () => {
         if (!deckContainerRef.current) return;
@@ -534,318 +562,420 @@ export default function SalesTraining() {
         }
     };
 
+    const handleCopy = (text: string, id: string, label: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedIndex(id);
+        toast.success(`¡${label} copiado al portapapeles!`);
+        setTimeout(() => setCopiedIndex(null), 2000);
+    };
+
     return (
         <div className="space-y-6">
             {/* Header del Módulo con Tabs y Controles */}
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <div className="flex items-center gap-3">
-                    <div className="p-3 bg-rose-50 text-rose-600 rounded-xl">
-                        <GraduationCap className="w-6 h-6" />
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm">
+                <div className="flex items-center gap-4">
+                    <div className="p-3.5 bg-gradient-to-br from-rose-500 to-rose-600 text-white rounded-2xl shadow-md shadow-rose-600/20">
+                        <GraduationCap className="w-8 h-8" />
                     </div>
                     <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
                                 {isAriasDefense ? 'Academia de Ventas · ARIAS Sales Excellence' : `Academia de Ventas · ${tenantBrand.companyName}`}
                             </h1>
-                            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-600 border border-rose-200 rounded-md">
+                            <span className="px-3 py-1 text-xs font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200 rounded-full">
                                 25 Slides Oficiales
                             </span>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-sm md:text-base text-gray-600 mt-1 font-medium">
                             Metodología oficial de diagnóstico, manejo de objeciones y disciplina de cierre para el equipo comercial.
                         </p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 text-xs font-semibold">
+                <div className="flex items-center gap-2.5 w-full lg:w-auto justify-end flex-wrap">
+                    <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200 text-xs md:text-sm font-bold">
                         <button
                             onClick={() => setActiveTab('presentation')}
-                            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
                                 activeTab === 'presentation' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
                             }`}
                         >
-                            <Presentation className="w-3.5 h-3.5" />
+                            <Presentation className="w-4 h-4 text-rose-600" />
                             Modo Presentación
                         </button>
                         <button
                             onClick={() => setActiveTab('handbook')}
-                            className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
+                            className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
                                 activeTab === 'handbook' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
                             }`}
                         >
-                            <BookOpen className="w-3.5 h-3.5" />
+                            <BookOpen className="w-4 h-4 text-blue-600" />
                             Guía Rápida & Scripts
                         </button>
                     </div>
 
                     <button
                         onClick={() => setShowAiModal(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-violet-600/20"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-xs md:text-sm font-black transition-all shadow-sm shadow-violet-600/20 active:scale-95"
                     >
-                        <Sparkles className="w-3.5 h-3.5" />
+                        <Sparkles className="w-4 h-4" />
                         <span className="hidden sm:inline">Dinamizar con IA</span>
                     </button>
 
                     <a
                         href={tenantBrand.pptxFile}
                         download={tenantBrand.pptxDownloadName}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-emerald-600/20"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs md:text-sm font-black transition-all shadow-sm shadow-emerald-600/20 active:scale-95"
                     >
-                        <Download className="w-3.5 h-3.5" />
+                        <Download className="w-4 h-4" />
                         <span className="hidden sm:inline">Descargar PPTX</span>
                     </a>
                 </div>
             </div>
 
-            {/* TAB 1: PRESENTACIÓN INTERACTIVA */}
+            {/* TAB 1: PRESENTACIÓN INTERACTIVA DINÁMICA */}
             {activeTab === 'presentation' && (
-                <div ref={deckContainerRef} className={`space-y-4 ${isFullscreen ? 'bg-gray-900 p-8 min-h-screen flex flex-col justify-center' : ''}`}>
+                <div ref={deckContainerRef} className={`space-y-4 ${isFullscreen ? 'bg-slate-950 p-6 md:p-12 min-h-screen flex flex-col justify-center' : ''}`}>
+                    
+                    {/* Barra de progreso animada interactiva */}
+                    <div className="w-full bg-gray-200/80 h-2 rounded-full overflow-hidden shadow-inner">
+                        <div 
+                            className="h-full bg-gradient-to-r from-rose-500 via-rose-600 to-emerald-500 transition-all duration-500 ease-out"
+                            style={{ width: `${((currentSlide + 1) / slides.length) * 100}%` }}
+                        />
+                    </div>
+
                     {/* Barra de control superior de la diapositiva */}
-                    <div className="flex items-center justify-between bg-white px-5 py-3 rounded-xl border border-gray-200">
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-6 py-4 rounded-2xl border border-gray-200 shadow-sm">
                         <div className="flex items-center gap-3">
-                            <span className="font-mono text-xs font-bold text-gray-600 bg-gray-100 px-3 py-1 rounded-lg border border-gray-200">
+                            <span className="font-mono text-xs md:text-sm font-black text-rose-700 bg-rose-50 border border-rose-200 px-3.5 py-1.5 rounded-xl">
                                 Slide {slide.num} de {slides.length}
                             </span>
-                            <span className="text-xs font-semibold text-gray-500 hidden md:inline truncate max-w-md">
+                            <span className="text-xs md:text-sm font-black text-gray-800 hidden sm:inline truncate max-w-xs md:max-w-md">
                                 {slide.title}
+                            </span>
+                            <span className="text-[11px] font-bold text-gray-500 hidden lg:inline">
+                                ({Math.round(((currentSlide + 1) / slides.length) * 100)}% completado)
                             </span>
                         </div>
 
                         <div className="flex items-center gap-2">
+                            {/* Auto Play Slideshow */}
+                            <button
+                                onClick={() => setIsPlaying(!isPlaying)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                                    isPlaying ? 'bg-amber-50 text-amber-700 border-amber-300 shadow-sm animate-pulse' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                                }`}
+                                title={isPlaying ? 'Pausar Reproducción Automática' : 'Iniciar Reproducción Automática (10s por slide)'}
+                            >
+                                {isPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                                <span className="hidden sm:inline">{isPlaying ? 'Pausar' : 'Auto Play'}</span>
+                            </button>
+
+                            {/* Guion del Líder */}
                             <button
                                 onClick={() => setShowNotes(!showNotes)}
-                                className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                                    showNotes ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-white text-gray-600 border-gray-200'
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                    showNotes ? 'bg-blue-50 text-blue-700 border-blue-200 font-extrabold' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
                                 }`}
                             >
                                 Guion del Líder
                             </button>
+
+                            {/* Botón Anterior */}
                             <button
                                 onClick={() => setCurrentSlide(prev => Math.max(0, prev - 1))}
                                 disabled={currentSlide === 0}
-                                className="p-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                className="p-2 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-xs"
+                                title="Slide Anterior (Flecha Izquierda)"
                             >
                                 <ChevronLeft className="w-4 h-4" />
                             </button>
+
+                            {/* Botón Siguiente */}
                             <button
                                 onClick={() => setCurrentSlide(prev => Math.min(slides.length - 1, prev + 1))}
                                 disabled={currentSlide === slides.length - 1}
-                                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs md:text-sm font-black flex items-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md shadow-rose-600/20"
+                                title="Siguiente Slide (Espacio o Flecha Derecha)"
                             >
-                                Siguiente
+                                <span>Siguiente</span>
                                 <ChevronRight className="w-4 h-4" />
                             </button>
+
+                            {/* Pantalla Completa */}
                             <button
                                 onClick={toggleFullscreen}
-                                className="p-1.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg text-gray-700 transition-all ml-1"
-                                title="Pantalla Completa"
+                                className="p-2 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl text-gray-700 transition-all shadow-xs"
+                                title="Pantalla Completa (Tecla F)"
                             >
                                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                             </button>
                         </div>
                     </div>
 
-                    {/* Escenario de la diapositiva (Aspect Ratio 16:9 estricto) */}
-                    <div className="w-full aspect-[16/9] bg-white rounded-2xl border border-gray-200 shadow-md p-8 md:p-12 flex flex-col justify-between overflow-hidden relative">
-                        {slide.isCover ? (
-                            slide.num === 1 ? (
-                                <div className="flex justify-between items-stretch h-full gap-8">
-                                    <div className="flex-1 flex flex-col justify-center">
-                                        <div className="text-[11px] font-bold text-rose-600 tracking-widest uppercase mb-3">
-                                            {slide.category}
-                                        </div>
-                                        {tenantBrand.logoUrl ? (
-                                            <img
-                                                src={tenantBrand.logoUrl}
-                                                alt={tenantBrand.companyName}
-                                                className="h-12 w-auto object-contain self-start mb-4"
-                                            />
-                                        ) : (
-                                            <div className="flex items-center gap-2 mb-4 text-gray-900 font-extrabold text-xl">
-                                                <Building2 className="w-6 h-6 text-rose-600" />
-                                                {tenantBrand.companyName}
+                    {/* Escenario de la Diapositiva (Espacioso, Tipografía Grande y Animado) */}
+                    <div className="w-full min-h-[580px] lg:min-h-[640px] bg-white rounded-3xl border border-gray-200/90 shadow-xl shadow-gray-200/40 p-6 md:p-10 flex flex-col justify-between overflow-hidden relative">
+                        <div key={currentSlide} className="h-full flex flex-col justify-between animate-in fade-in zoom-in-[0.99] duration-300">
+                            {slide.isCover ? (
+                                slide.num === 1 ? (
+                                    <div className="flex flex-col lg:flex-row justify-between items-stretch h-full gap-8 my-auto">
+                                        <div className="flex-1 flex flex-col justify-center py-4">
+                                            <div className="text-xs md:text-sm font-black text-rose-600 tracking-widest uppercase mb-4 flex items-center gap-2">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-rose-600" />
+                                                {slide.category}
                                             </div>
-                                        )}
-                                        <h1 className="text-3xl md:text-5xl font-black text-gray-900 leading-tight mb-3">
-                                            Vendemos resultados.<br />
-                                            <span className="text-rose-600">No pantallas.</span>
-                                        </h1>
-                                        <p className="text-sm md:text-base text-gray-500 mb-6">
-                                            {slide.subtitle}
-                                        </p>
-                                        <div className="w-full h-0.5 bg-gray-900 mb-3" />
-                                        <div className="text-[11px] font-bold text-gray-700 tracking-wider">
-                                            CASOS REALES · PRÁCTICA EN VIVO · AUDITORÍA SEMANAL
+                                            {tenantBrand.logoUrl ? (
+                                                <img
+                                                    src={tenantBrand.logoUrl}
+                                                    alt={tenantBrand.companyName}
+                                                    className="h-14 md:h-16 w-auto object-contain self-start mb-6"
+                                                />
+                                            ) : (
+                                                <div className="flex items-center gap-3 mb-6 text-gray-900 font-black text-2xl md:text-3xl">
+                                                    <Building2 className="w-8 h-8 text-rose-600" />
+                                                    {tenantBrand.companyName}
+                                                </div>
+                                            )}
+                                            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-gray-900 leading-[1.08] tracking-tight mb-4">
+                                                Vendemos resultados.<br />
+                                                <span className="text-rose-600">No pantallas.</span>
+                                            </h1>
+                                            <p className="text-base md:text-xl text-gray-600 font-medium mb-8 max-w-xl leading-relaxed">
+                                                {slide.subtitle}
+                                            </p>
+                                            <div className="w-full h-1 bg-gray-900 rounded-full mb-4" />
+                                            <div className="text-xs md:text-sm font-extrabold text-gray-700 tracking-wider flex items-center gap-3 flex-wrap">
+                                                <span className="px-3 py-1 bg-gray-100 rounded-lg border border-gray-200">CASOS REALES</span>
+                                                <span>·</span>
+                                                <span className="px-3 py-1 bg-gray-100 rounded-lg border border-gray-200">PRÁCTICA EN VIVO</span>
+                                                <span>·</span>
+                                                <span className="px-3 py-1 bg-gray-100 rounded-lg border border-gray-200">AUDITORÍA SEMANAL</span>
+                                            </div>
+                                        </div>
+                                        <div className="w-full lg:w-2/5 bg-gradient-to-br from-rose-600 to-rose-700 rounded-2xl p-8 md:p-10 text-white flex flex-col justify-between shadow-2xl shadow-rose-900/20">
+                                            <div>
+                                                <div className="text-xs font-black tracking-widest uppercase opacity-85 mb-4 flex items-center gap-2">
+                                                    <Sparkles className="w-4 h-4" />
+                                                    OBJETIVO ESTRATÉGICO
+                                                </div>
+                                                <div className="text-2xl md:text-4xl font-black leading-tight">
+                                                    Más decisiones de compra, sin perder confianza ni integridad.
+                                                </div>
+                                            </div>
+                                            <div className="text-sm md:text-base space-y-2 opacity-95 border-t border-rose-500/50 pt-6 font-bold">
+                                                <div className="flex items-center gap-2">
+                                                    <CheckCircle2 className="w-5 h-5 text-rose-200" />
+                                                    Rúbrica Oficial de 100 Puntos
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <CheckCircle2 className="w-5 h-5 text-rose-200" />
+                                                    Auditoría Automática con IA
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <CheckCircle2 className="w-5 h-5 text-rose-200" />
+                                                    Trazabilidad en Vivo de cada Demo
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="w-1/3 bg-rose-600 rounded-xl p-8 text-white flex flex-col justify-between shadow-lg">
+                                ) : (
+                                    <div className="h-full flex flex-col justify-between py-2">
                                         <div>
-                                            <div className="text-[10px] font-extrabold tracking-widest uppercase opacity-80 mb-3">
-                                                OBJETIVO
+                                            <div className="text-xs md:text-sm font-black text-rose-600 tracking-wider uppercase mb-2">
+                                                {slide.category}
                                             </div>
-                                            <div className="text-2xl font-black leading-snug">
-                                                Más decisiones de compra, sin perder confianza ni integridad.
-                                            </div>
+                                            <h2 className="text-3xl md:text-5xl font-black text-gray-900 mb-3 tracking-tight">
+                                                {slide.title}
+                                            </h2>
+                                            <p className="text-base md:text-lg text-gray-600 font-medium mb-6">{slide.subtitle}</p>
                                         </div>
-                                        <div className="text-xs space-y-1 opacity-90 border-t border-rose-500/40 pt-4">
-                                            <div>Rúbrica de 100 Puntos</div>
-                                            <div>Auditoría Automática con IA</div>
-                                            <div>Trazabilidad en Vivo</div>
+
+                                        <div className="space-y-4 my-4">
+                                            {slide.bullets.map((b, idx) => (
+                                                <div key={idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-5 md:p-6 flex items-center gap-5 shadow-xs hover:border-rose-300 hover:shadow-md transition-all">
+                                                    <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white font-mono font-black text-xl flex items-center justify-center shrink-0 shadow-md shadow-rose-600/30">
+                                                        0{idx + 1}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-base md:text-xl font-extrabold text-gray-900">{b.label}</div>
+                                                        <div className="text-sm md:text-base text-gray-600 mt-1 font-medium">{b.text}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="p-5 bg-emerald-50 border border-emerald-300 rounded-2xl text-center text-sm md:text-base font-black text-emerald-900 shadow-sm">
+                                            «EL PROFESIONAL DE VENTAS NO ESPERA QUE EL CLIENTE COMPRE; LO GUÍA A TOMAR LA MEJOR DECISIÓN FINANCIERA PARA SU NEGOCIO.»
                                         </div>
                                     </div>
-                                </div>
+                                )
                             ) : (
-                                <div className="h-full flex flex-col justify-between">
-                                    <div>
-                                        <div className="text-xs font-bold text-rose-600 tracking-wider uppercase mb-1">
+                                <div className="flex flex-col h-full justify-between">
+                                    {/* Cabecera del Slide */}
+                                    <div className="pb-4">
+                                        <div className="text-xs md:text-sm font-black text-rose-600 tracking-widest uppercase mb-1.5 flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-rose-600" />
                                             {slide.category}
                                         </div>
-                                        <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-2">
+                                        <h2 className="text-2xl md:text-4xl lg:text-4xl font-extrabold text-gray-900 tracking-tight leading-tight">
                                             {slide.title}
                                         </h2>
-                                        <p className="text-xs text-gray-500 mb-4">{slide.subtitle}</p>
+                                        {slide.subtitle && (
+                                            <p className="text-sm md:text-lg text-gray-600 font-medium mt-1 leading-snug">
+                                                {slide.subtitle}
+                                            </p>
+                                        )}
+                                        <div className="w-full h-px bg-gray-200 mt-3" />
                                     </div>
 
-                                    <div className="space-y-3">
-                                        {slide.bullets.map((b, idx) => (
-                                            <div key={idx} className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-center gap-4">
-                                                <div className="text-xl font-mono font-bold text-rose-600">0{idx + 1}</div>
-                                                <div>
-                                                    <div className="text-sm font-bold text-gray-900">{b.label}</div>
-                                                    <div className="text-xs text-gray-600">{b.text}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    {/* Contenido en 2 Columnas de Gran Escala */}
+                                    <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch my-2">
+                                        
+                                        {/* Columna Izquierda: Bullets y Citas de Gran Tamaño */}
+                                        <div className="bg-slate-50/70 border border-slate-200/90 rounded-2xl p-5 md:p-6 flex flex-col justify-between overflow-y-auto">
+                                            <div className="space-y-4">
+                                                {slide.badgeText && (
+                                                    <span className={`inline-block px-3.5 py-1 text-xs font-black uppercase tracking-wider rounded-lg border ${
+                                                        slide.badgeColor === 'red' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                                        slide.badgeColor === 'green' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                        slide.badgeColor === 'amber' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                        'bg-blue-50 text-blue-700 border-blue-200'
+                                                    }`}>
+                                                        {slide.badgeText}
+                                                    </span>
+                                                )}
 
-                                    <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl text-center text-xs font-bold text-emerald-800">
-                                        «EL PROFESIONAL DE VENTAS NO ESPERA QUE EL CLIENTE COMPRE; LO GUÍA A TOMAR LA MEJOR DECISIÓN FINANCIERA PARA SU NEGOCIO.»
-                                    </div>
-                                </div>
-                            )
-                        ) : (
-                            <div className="flex flex-col h-full">
-                                <div>
-                                    <div className="text-[10px] font-bold text-rose-600 tracking-widest uppercase mb-1">
-                                        {slide.category}
-                                    </div>
-                                    <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight mb-1">
-                                        {slide.title}
-                                    </h2>
-                                    {slide.subtitle && (
-                                        <p className="text-xs text-gray-500 mb-3">{slide.subtitle}</p>
-                                    )}
-                                    <div className="w-full h-px bg-gray-200 mb-4" />
-                                </div>
-
-                                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch overflow-hidden">
-                                    {/* Columna Izquierda: Contenido y Bullets */}
-                                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 flex flex-col justify-between overflow-y-auto">
-                                        <div>
-                                            {slide.badgeText && (
-                                                <span className={`inline-block px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded border mb-3 ${
-                                                    slide.badgeColor === 'red' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                                                    slide.badgeColor === 'green' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                                    slide.badgeColor === 'amber' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                                    'bg-blue-50 text-blue-700 border-blue-200'
-                                                }`}>
-                                                    {slide.badgeText}
-                                                </span>
-                                            )}
-
-                                            {slide.mainQuote && (
-                                                <div className="text-sm md:text-base font-bold text-gray-900 leading-snug border-l-4 border-rose-600 pl-3 mb-4">
-                                                    {slide.mainQuote}
-                                                </div>
-                                            )}
-
-                                            <div className="space-y-3">
-                                                {slide.bullets.map((b, idx) => (
-                                                    <div key={idx} className="text-xs leading-relaxed">
-                                                        <strong className={`block ${b.isDanger ? 'text-rose-600' : b.isSuccess ? 'text-emerald-700' : 'text-gray-900'}`}>
-                                                            {b.label}
-                                                        </strong>
-                                                        <span className="text-gray-600">{b.text}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Columna Derecha: Captura de Pantalla Real del CRM */}
-                                    <div className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col items-center justify-center shadow-sm">
-                                        {slide.imageSrc ? (
-                                            <>
-                                                <img
-                                                    src={slide.imageSrc}
-                                                    alt={slide.imageCaption || 'Pantalla Real CRM'}
-                                                    className="max-h-full max-w-full object-contain rounded-lg border border-gray-100"
-                                                />
-                                                {slide.imageCaption && (
-                                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-2">
-                                                        {slide.imageCaption}
+                                                {slide.mainQuote && (
+                                                    <div className="text-base md:text-xl font-extrabold text-gray-900 leading-snug border-l-4 border-rose-600 pl-4 py-2.5 bg-gradient-to-r from-rose-50 to-white rounded-r-xl shadow-xs">
+                                                        {slide.mainQuote}
                                                     </div>
                                                 )}
-                                            </>
-                                        ) : (
-                                            <div className="text-center text-gray-400 text-xs">
-                                                Visualización Oficial
+
+                                                <div className="space-y-3">
+                                                    {slide.bullets.map((b, idx) => (
+                                                        <div 
+                                                            key={idx} 
+                                                            className={`p-3.5 md:p-4 rounded-xl border transition-all duration-200 hover:scale-[1.01] hover:shadow-md ${
+                                                                b.isDanger 
+                                                                    ? 'bg-rose-50/70 border-rose-200' 
+                                                                    : b.isSuccess 
+                                                                    ? 'bg-emerald-50/70 border-emerald-200' 
+                                                                    : 'bg-white border-gray-200/90 shadow-xs'
+                                                            }`}
+                                                        >
+                                                            <div className={`text-sm md:text-base font-extrabold flex items-center gap-2 ${
+                                                                b.isDanger ? 'text-rose-700' : b.isSuccess ? 'text-emerald-800' : 'text-gray-900'
+                                                            }`}>
+                                                                {b.isDanger && <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />}
+                                                                {b.isSuccess && <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />}
+                                                                {!b.isDanger && !b.isSuccess && <div className="w-2 h-2 rounded-full bg-rose-600 shrink-0" />}
+                                                                <span>{b.label}</span>
+                                                            </div>
+                                                            <div className="text-xs md:text-sm text-gray-700 leading-relaxed font-medium mt-1 pl-4 whitespace-pre-line">
+                                                                {b.text}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        )}
+                                        </div>
+
+                                        {/* Columna Derecha: Captura de Pantalla Real con Hover Zoom */}
+                                        <div 
+                                            onClick={() => slide.imageSrc && setZoomedImage({ src: slide.imageSrc, caption: slide.imageCaption })}
+                                            className="group relative bg-slate-100/70 hover:bg-slate-100 border-2 border-dashed border-gray-300 hover:border-rose-400 rounded-2xl p-4 flex flex-col items-center justify-center transition-all duration-300 cursor-pointer shadow-inner min-h-[300px] md:min-h-[380px]"
+                                        >
+                                            {slide.imageSrc ? (
+                                                <>
+                                                    <div className="relative w-full h-full flex items-center justify-center overflow-hidden rounded-xl">
+                                                        <img
+                                                            src={slide.imageSrc}
+                                                            alt={slide.imageCaption || 'Captura Real CRM'}
+                                                            className="max-h-[340px] md:max-h-[400px] w-auto object-contain rounded-xl shadow-lg border border-white group-hover:scale-[1.03] transition-transform duration-300"
+                                                        />
+                                                        <div className="absolute inset-0 bg-gray-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 text-white font-black text-xs md:text-sm rounded-xl backdrop-blur-xs">
+                                                            <ZoomIn className="w-5 h-5" />
+                                                            <span>Clic para ampliar captura en HD</span>
+                                                        </div>
+                                                    </div>
+                                                    {slide.imageCaption && (
+                                                        <div className="text-xs md:text-sm font-extrabold text-gray-700 uppercase tracking-wider mt-3 flex items-center gap-1.5">
+                                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                                            {slide.imageCaption}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div className="text-center text-gray-400 font-bold text-sm">
+                                                    Visualización Oficial
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
 
-                    {/* Guion del Líder (Speaker Notes) */}
+                    {/* Guion del Líder (Speaker Notes) con Tipografía Amplia */}
                     {showNotes && (
-                        <div className="bg-white p-4 rounded-xl border border-gray-200 flex items-start gap-3 shadow-sm">
-                            <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded font-mono text-[10px] font-bold uppercase shrink-0">
-                                Guion del Líder
-                            </span>
-                            <p className="text-xs text-gray-700 leading-relaxed italic">
-                                {slide.speakerNotes}
-                            </p>
+                        <div className="bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-white p-5 rounded-2xl border border-blue-200/90 flex items-start gap-4 shadow-sm animate-in fade-in duration-200">
+                            <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-sm shrink-0">
+                                <Volume2 className="w-5 h-5" />
+                            </div>
+                            <div className="space-y-1">
+                                <div className="text-xs font-black text-blue-900 uppercase tracking-wider flex items-center gap-2">
+                                    <span>Guion del Líder / Notas del Facilitador</span>
+                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-[10px]">OFICIAL</span>
+                                </div>
+                                <p className="text-sm md:text-base text-gray-800 leading-relaxed font-medium italic">
+                                    "{slide.speakerNotes}"
+                                </p>
+                            </div>
                         </div>
                     )}
 
-                    {/* Tira de Miniaturas */}
-                    <div className="flex gap-1.5 overflow-x-auto pb-2">
+                    {/* Tira de Miniaturas Interactiva */}
+                    <div className="flex gap-2 overflow-x-auto pb-2 pt-1 px-1 custom-scrollbar">
                         {slides.map((s, idx) => (
                             <button
                                 key={s.num}
                                 onClick={() => setCurrentSlide(idx)}
-                                className={`px-2.5 py-1 text-[11px] font-mono rounded shrink-0 border transition-all ${
+                                className={`px-3 py-2 text-xs font-bold rounded-xl shrink-0 border transition-all flex items-center gap-2 ${
                                     currentSlide === idx
-                                        ? 'bg-rose-600 text-white border-rose-600 font-bold'
-                                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                        ? 'bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-600/20 scale-105'
+                                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
                                 }`}
                             >
-                                {s.num}. {s.title.substring(0, 14)}...
+                                <span className={`w-5 h-5 rounded-md text-[10px] font-black flex items-center justify-center ${
+                                    currentSlide === idx ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                    {s.num}
+                                </span>
+                                <span className="truncate max-w-[130px]">{s.title}</span>
                             </button>
                         ))}
                     </div>
                 </div>
             )}
 
-            {/* TAB 2: GUÍA RÁPIDA & SCRIPTS (Para consulta rápida del vendedor) */}
+            {/* TAB 2: GUÍA RÁPIDA & SCRIPTS (Con botones de copiado y tipografía grande) */}
             {activeTab === 'handbook' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Las 7 Preguntas de Descubrimiento */}
-                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-                        <div className="flex items-center gap-2">
-                            <span className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                                <Sparkles className="w-4 h-4" />
+                    <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex items-center gap-3">
+                            <span className="p-3 bg-blue-50 text-blue-600 rounded-2xl shadow-xs">
+                                <Sparkles className="w-6 h-6" />
                             </span>
                             <div>
-                                <h2 className="text-base font-bold text-gray-900">Las 7 Preguntas Obligatorias de Descubrimiento</h2>
-                                <p className="text-xs text-gray-500">Ejecutar antes de compartir pantalla o hablar de precios</p>
+                                <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Las 7 Preguntas de Descubrimiento</h2>
+                                <p className="text-xs md:text-sm text-gray-500 font-medium">Ejecutar antes de compartir pantalla o hablar de precios</p>
                             </div>
                         </div>
 
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             {[
                                 { n: 1, q: '¿Qué proceso le está generando más errores o tiempo perdido hoy?', desc: 'Encontrar el dolor raíz y no asumir lo que el cliente necesita.' },
                                 { n: 2, q: '¿Cuánto le cuesta mensualmente este problema en dinero o pérdidas?', desc: 'Cuantificar el dolor financiero antes de cotizar.' },
@@ -855,13 +985,28 @@ export default function SalesTraining() {
                                 { n: 6, q: '¿Qué tendría que demostrarle hoy para ganar su total confianza?', desc: 'Fijar el criterio de victoria antes de la demo.' },
                                 { n: 7, q: '¿Esto que acaba de ver resuelve el problema específico que me describió?', desc: 'Validación obligatoria post-demo antes de cotizar.' }
                             ].map(item => (
-                                <div key={item.n} className="p-3 bg-gray-50 rounded-xl border border-gray-200">
-                                    <div className="flex items-start gap-2">
-                                        <span className="font-mono font-bold text-xs text-rose-600 shrink-0">#{item.n}</span>
-                                        <div>
-                                            <div className="text-xs font-bold text-gray-900">{item.q}</div>
-                                            <div className="text-[11px] text-gray-500 mt-0.5">{item.desc}</div>
+                                <div key={item.n} className="p-4 md:p-5 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all space-y-2">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex items-start gap-3">
+                                            <span className="w-8 h-8 rounded-xl bg-gradient-to-br from-rose-500 to-rose-700 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-sm shadow-rose-600/30">
+                                                #{item.n}
+                                            </span>
+                                            <div>
+                                                <h3 className="text-base md:text-lg font-extrabold text-gray-900 leading-snug">
+                                                    {item.q}
+                                                </h3>
+                                                <p className="text-xs md:text-sm text-gray-600 mt-1 font-medium leading-relaxed">
+                                                    {item.desc}
+                                                </p>
+                                            </div>
                                         </div>
+                                        <button
+                                            onClick={() => handleCopy(item.q, `q-${item.n}`, 'Pregunta')}
+                                            className="p-2 hover:bg-rose-50 text-gray-400 hover:text-rose-600 rounded-xl transition-all shrink-0 border border-transparent hover:border-rose-200"
+                                            title="Copiar pregunta"
+                                        >
+                                            {copiedIndex === `q-${item.n}` ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                                        </button>
                                     </div>
                                 </div>
                             ))}
@@ -869,23 +1014,23 @@ export default function SalesTraining() {
                     </div>
 
                     {/* Matriz de Objeciones (Método ESCUCHAR) */}
-                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-                        <div className="flex items-center gap-2">
-                            <span className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-                                <Shield className="w-4 h-4" />
+                    <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-5">
+                        <div className="flex items-center gap-3">
+                            <span className="p-3 bg-amber-50 text-amber-600 rounded-2xl shadow-xs">
+                                <Shield className="w-6 h-6" />
                             </span>
                             <div>
-                                <h2 className="text-base font-bold text-gray-900">Matriz de Objeciones (Método ESCUCHAR)</h2>
-                                <p className="text-xs text-gray-500">Cómo responder con postura firme sin regalar descuentos</p>
+                                <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Matriz de Objeciones (Método ESCUCHAR)</h2>
+                                <p className="text-xs md:text-sm text-gray-500 font-medium">Cómo responder con postura firme sin regalar descuentos</p>
                             </div>
                         </div>
 
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             {[
                                 {
-                                    tipo: 'Precio / Descuento',
+                                    tipo: 'Precio / Petición de Descuento',
                                     alerta: 'Prohibido ofrecer rebajas de inmediato',
-                                    script: '«Entiendo perfectamente. ¿El valor está fuera de su presupuesto total o comparado contra otra opción? Recuerde que hoy se le pierden $400/mes en errores. Si resolvemos el costo, ¿qué otra condición faltaría para programar la instalación?»'
+                                    script: '«Entiendo perfectamente. ¿El valor está fuera de su presupuesto total o comparado contra otra opción? Recuerde que hoy se le pierden $400 al mes en errores de inventario. Si resolvemos el costo dentro de lo autorizado, ¿qué otra condición faltaría para programar la instalación este mes?»'
                                 },
                                 {
                                     tipo: 'Petición de Prueba Gratis',
@@ -895,17 +1040,24 @@ export default function SalesTraining() {
                                 {
                                     tipo: 'Mándame la Cotización en PDF',
                                     alerta: 'Un PDF no defiende el valor',
-                                    script: '«Con gusto preparo la propuesta formal con el alcance exacto. Para garantizar que solo incluya lo que necesita... ¿podemos reservar 15 minutos este jueves a las 10:00 AM para revisarla en vivo junto con quien aprueba el presupuesto?»'
+                                    script: '«Con gusto preparo la propuesta formal con el alcance exacto. Para garantizar que solo incluya lo que necesita hoy y no pague de más... ¿podemos reservar 15 minutos este jueves a las 10:00 AM para revisarla en vivo junto con quien aprueba el presupuesto?»'
                                 }
                             ].map((obj, i) => (
-                                <div key={i} className="p-3 bg-gray-50 rounded-xl border border-gray-200">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-xs font-bold text-gray-900">{obj.tipo}</span>
-                                        <span className="text-[10px] text-rose-600 font-bold">{obj.alerta}</span>
+                                <div key={i} className="p-5 bg-slate-50 rounded-2xl border border-slate-200/90 shadow-xs hover:shadow-md transition-all space-y-3">
+                                    <div className="flex items-center justify-between flex-wrap gap-2">
+                                        <span className="text-sm md:text-base font-black text-gray-900">{obj.tipo}</span>
+                                        <span className="text-xs text-rose-700 bg-rose-50 border border-rose-200 px-3 py-1 rounded-full font-extrabold">{obj.alerta}</span>
                                     </div>
-                                    <p className="text-[11px] text-gray-600 leading-relaxed italic bg-white p-2 rounded-lg border border-gray-100">
-                                        {obj.script}
-                                    </p>
+                                    <div className="p-4 bg-white border border-gray-200 rounded-xl text-sm md:text-base text-gray-800 leading-relaxed italic relative group">
+                                        <p className="pr-8">{obj.script}</p>
+                                        <button
+                                            onClick={() => handleCopy(obj.script, `obj-${i}`, 'Guión')}
+                                            className="absolute top-3 right-3 p-1.5 bg-gray-50 shadow-sm border border-gray-200 hover:border-rose-300 text-gray-500 hover:text-rose-600 rounded-lg transition-all opacity-80 group-hover:opacity-100"
+                                            title="Copiar guión"
+                                        >
+                                            {copiedIndex === `obj-${i}` ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -913,20 +1065,51 @@ export default function SalesTraining() {
                 </div>
             )}
 
+            {/* Modal Lightbox de Capturas en Alta Definición */}
+            {zoomedImage && (
+                <div 
+                    onClick={() => setZoomedImage(null)}
+                    className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+                >
+                    <div 
+                        onClick={e => e.stopPropagation()}
+                        className="relative max-w-5xl w-full max-h-[92vh] bg-white rounded-3xl p-5 shadow-2xl flex flex-col items-center"
+                    >
+                        <div className="w-full flex items-center justify-between pb-3 border-b mb-3">
+                            <span className="text-base font-black text-gray-900 flex items-center gap-2">
+                                <Sparkles className="w-5 h-5 text-rose-600" />
+                                {zoomedImage.caption || 'Captura en Alta Definición del CRM'}
+                            </span>
+                            <button 
+                                onClick={() => setZoomedImage(null)}
+                                className="p-2 hover:bg-gray-100 rounded-xl text-gray-500 hover:text-gray-900 transition-all"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <img 
+                            src={zoomedImage.src} 
+                            alt={zoomedImage.caption} 
+                            className="max-h-[75vh] w-auto object-contain rounded-2xl border border-gray-100 shadow-md"
+                        />
+                    </div>
+                </div>
+            )}
+
             {/* Modal de Dinamización con IA (Visión Futura Solicitada por el Usuario) */}
             {showAiModal && (
                 <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl max-w-lg w-full border border-gray-100 shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-white rounded-3xl max-w-lg w-full border border-gray-100 shadow-2xl p-6 md:p-8 space-y-5 animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex items-center justify-between border-b border-gray-100 pb-4">
                             <div className="flex items-center gap-3">
-                                <div className="p-2.5 bg-violet-100 text-violet-700 rounded-xl">
-                                    <Sparkles className="w-5 h-5" />
+                                <div className="p-3 bg-violet-100 text-violet-700 rounded-2xl">
+                                    <Sparkles className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-gray-900 text-base">
-                                        Motor de Entrenamiento Dinámico con IA
+                                    <h3 className="font-black text-gray-900 text-lg">
+                                        Motor Dinámico con IA
                                     </h3>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-gray-500 font-bold">
                                         {tenantBrand.companyName}
                                     </p>
                                 </div>
@@ -937,41 +1120,41 @@ export default function SalesTraining() {
                                     setIsSimulatingAi(false);
                                     setSimulatedComplete(false);
                                 }}
-                                className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
+                                className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all"
                             >
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        <div className="space-y-3 text-xs text-gray-600 leading-relaxed">
-                            <p className="bg-violet-50 text-violet-900 p-3 rounded-xl border border-violet-200 font-medium">
+                        <div className="space-y-3 text-xs md:text-sm text-gray-600 leading-relaxed font-medium">
+                            <p className="bg-violet-50 text-violet-900 p-4 rounded-2xl border border-violet-200 font-bold">
                                 🤖 <strong>Actualización Autónoma de Capacitación:</strong> En la próxima versión, solo tendrás que presionar este botón para que la IA audite las grabaciones de Google Meet y los leads cerrados en tu CRM, actualizando automáticamente:
                             </p>
-                            <ul className="space-y-2 pl-1">
-                                <li className="flex items-start gap-2">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                            <ul className="space-y-2.5 pl-1">
+                                <li className="flex items-start gap-2.5">
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                                     <span><strong>Objeciones Reales del Mercado:</strong> Extraídas directamente de las transcripciones de Gemini de tu equipo.</span>
                                 </li>
-                                <li className="flex items-start gap-2">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                <li className="flex items-start gap-2.5">
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                                     <span><strong>Casos Reales Cerrados:</strong> Montos e industrias de los mejores contratos ganados de tu empresa.</span>
                                 </li>
-                                <li className="flex items-start gap-2">
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                <li className="flex items-start gap-2.5">
+                                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                                     <span><strong>Rúbrica HUD Calibrada:</strong> Adaptada a los flujos y productos específicos de tu software.</span>
                                 </li>
                             </ul>
                         </div>
 
                         {simulatedComplete ? (
-                            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2 text-center">
-                                <div className="inline-flex p-2 bg-emerald-100 text-emerald-700 rounded-full">
-                                    <CheckCircle2 className="w-5 h-5" />
+                            <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2 text-center animate-in zoom-in duration-300">
+                                <div className="inline-flex p-3 bg-emerald-100 text-emerald-700 rounded-full">
+                                    <CheckCircle2 className="w-6 h-6" />
                                 </div>
-                                <div className="text-xs font-bold text-emerald-900">
+                                <div className="text-sm font-black text-emerald-900">
                                     ¡Metodología Sincronizada con el CRM!
                                 </div>
-                                <p className="text-[11px] text-emerald-700">
+                                <p className="text-xs text-emerald-700 font-medium">
                                     Se auditaron las llamadas recientes. Las 25 diapositivas reflejan los casos de éxito y el nuevo estándar comercial de {tenantBrand.companyName}.
                                 </p>
                             </div>
@@ -986,7 +1169,7 @@ export default function SalesTraining() {
                                         }, 1800);
                                     }}
                                     disabled={isSimulatingAi}
-                                    className="w-full py-2.5 px-4 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                                    className="w-full py-3 px-5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-2xl text-xs md:text-sm font-black transition-all flex items-center justify-center gap-2 shadow-md shadow-violet-600/30 disabled:opacity-50"
                                 >
                                     {isSimulatingAi ? (
                                         <>
