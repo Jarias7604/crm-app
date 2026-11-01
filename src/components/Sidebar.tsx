@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall, Sparkles, Brain, Target, Globe, Radio, Clock, Calculator } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall, Sparkles, Brain, Target, Globe, Radio, Clock, Calculator, GraduationCap } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -199,7 +199,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const configPaths = ['/company/billing', '/company/branding', '/company/integrations', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/lead-sources', '/admin/call-bot'];
     const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings', '/marketing/cockpit', '/marketing/engine-config', '/marketing/predictions'];
     const socialPaths = ['/marketing/social', '/marketing/flyers', '/company/social-accounts'];
-    const teamPaths = ['/company/team', '/company/teams', '/company/performance'];
+    const teamPaths = ['/company/team', '/company/teams', '/company/performance', '/company/payroll', '/company/training'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
 
     // Only one accordion open at a time
@@ -586,15 +586,26 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             name: t('sidebar.team'),
             href: '/company/team',
             icon: Users,
-            current: location.pathname.startsWith('/company/team') || location.pathname.startsWith('/company/teams') || location.pathname.startsWith('/company/performance') || location.pathname.startsWith('/company/payroll'),
+            current: location.pathname.startsWith('/company/team') || location.pathname.startsWith('/company/teams') || location.pathname.startsWith('/company/performance') || location.pathname.startsWith('/company/payroll') || location.pathname.startsWith('/company/training'),
             subItems: [
                 { name: t('sidebar.members'), href: '/company/team', icon: UserCircle },
                 { name: t('sidebar.structure'), href: '/company/teams', icon: Network },
                 { name: t('sidebar.performance'), href: '/company/performance', icon: BarChart3 },
                 { name: 'Overtime & Planilla', href: '/company/payroll', icon: Calculator },
+                { name: 'Academia & Training', href: '/company/training', icon: GraduationCap },
             ]
         });
         navigation.push({ name: t('sidebar.permissions'), href: '/company/permissions', icon: ShieldCheck, current: location.pathname.startsWith('/company/permissions') });
+    }
+
+    // Academia & Training accesible directamente para agentes y colaboradores
+    if (profile?.role !== 'super_admin' && profile?.role !== 'company_admin') {
+        navigation.push({
+            name: 'Academia & Training',
+            href: '/training',
+            icon: GraduationCap,
+            current: location.pathname.startsWith('/training')
+        });
     }
 
     const getRoleTitle = () => {

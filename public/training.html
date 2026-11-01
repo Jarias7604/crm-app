@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARIAS Sales Excellence · Entrenamiento Comercial con Pantallas Reales</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #F8FAFC;
+      color: #0F172A;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #FFFFFF;
+      border-bottom: 1px solid #E2E8F0;
+      padding: 12px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .brand-logo {
+      height: 34px;
+    }
+    .brand-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: #0F172A;
+    }
+    .badge-official {
+      background: #FFF1F2;
+      border: 1px solid #BE123C;
+      color: #BE123C;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 3px 10px;
+      border-radius: 4px;
+      letter-spacing: 1px;
+    }
+    .nav-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .slide-counter {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+      background: #F1F5F9;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1px solid #CBD5E1;
+    }
+    .btn {
+      background: #FFFFFF;
+      color: #0F172A;
+      border: 1px solid #CBD5E1;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:hover { background: #F8FAFC; border-color: #94A3B8; }
+    .btn-primary { background: #BE123C; border-color: #BE123C; color: #FFFFFF; }
+    .btn-primary:hover { background: #9F1239; border-color: #9F1239; }
+
+    .deck-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      max-width: 1340px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .slide-frame {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      max-height: 720px;
+      background: #FFFFFF;
+      border-radius: 12px;
+      border: 1px solid #CBD5E1;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 36px 48px;
+    }
+
+    .slide-category {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #BE123C;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .slide-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #0F172A;
+      letter-spacing: -0.4px;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+    .slide-subtitle {
+      font-size: 13px;
+      color: #64748B;
+      margin-bottom: 16px;
+    }
+    .slide-divider {
+      width: 100%;
+      height: 1px;
+      background: #E2E8F0;
+      margin-bottom: 16px;
+    }
+
+    .slide-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 24px;
+      height: calc(100% - 80px);
+    }
+
+    .card {
+      background: #F8FAFC;
+      border: 1px solid #E2E8F0;
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100%;
+      overflow-y: auto;
+    }
+    .card-red { border-left: 4px solid #BE123C; }
+    .card-green { border-left: 4px solid #047857; }
+    .card-blue { border-left: 4px solid #1D4ED8; }
+    .card-amber { border-left: 4px solid #B45309; }
+
+    .badge-tag {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      width: fit-content;
+    }
+    .tag-red { background: #FFF1F2; color: #BE123C; border: 1px solid #FECDD3; }
+    .tag-green { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+    .tag-blue { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+    .tag-amber { background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A; }
+
+    .image-preview-container {
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    }
+    .image-preview {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 6px;
+      border: 1px solid #E2E8F0;
+    }
+    .image-caption {
+      font-size: 10px;
+      font-weight: 700;
+      color: #64748B;
+      margin-top: 6px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .list-item {
+      font-size: 13px;
+      line-height: 1.55;
+      color: #334155;
+    }
+    .list-item strong { color: #0F172A; }
+
+    .notes-drawer {
+      width: 100%;
+      max-width: 1340px;
+      margin-top: 14px;
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .notes-badge {
+      background: #F1F5F9;
+      color: #0F172A;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 4px;
+      border: 1px solid #CBD5E1;
+      white-space: nowrap;
+    }
+    .notes-content {
+      font-size: 13.5px;
+      color: #334155;
+      line-height: 1.5;
+    }
+
+    .thumbnails-nav {
+      max-width: 1340px;
+      width: 100%;
+      margin: 14px auto 24px auto;
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+    }
+    .thumb-btn {
+      background: #FFFFFF;
+      border: 1px solid #CBD5E1;
+      color: #475569;
+      padding: 5px 10px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .thumb-btn.active, .thumb-btn:hover {
+      background: #BE123C;
+      border-color: #BE123C;
+      color: #FFFFFF;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <img src="/arias_real_logo.png" class="brand-logo" alt="ARIAS Logo">
+      <div class="brand-title">ARIAS SALES EXCELLENCE</div>
+      <span class="badge-official">MÉTODO OFICIAL</span>
+    </div>
+    <div class="nav-controls">
+      <button class="btn" onclick="changeSlide(-1)">◀ Anterior</button>
+      <div class="slide-counter" id="slideCounter">Slide 1 / 25</div>
+      <button class="btn btn-primary" onclick="changeSlide(1)">Siguiente ▶</button>
+      <a href="/ARIAS_Training_Ventas_Equipo.pptx" download class="btn" style="background:#047857; color:#FFF; border-color:#047857;">Descargar PPTX</a>
+    </div>
+  </header>
+
+  <div class="deck-container">
+    <div class="slide-frame" id="slideFrame"></div>
+
+    <div class="notes-drawer">
+      <div class="notes-badge">GUION DEL LÍDER</div>
+      <div class="notes-content" id="notesContent"></div>
+    </div>
+
+    <div class="thumbnails-nav" id="thumbsNav"></div>
+  </div>
+
+  <script>
+    const slides = [
+      {
+        num: 1,
+        cat: "Entrenamiento Comercial · Octubre 2026",
+        title: "Vendemos resultados. No pantallas.",
+        subtitle: "El nuevo estándar de diagnóstico, demos de alto impacto y disciplina de cierre",
+        layout: "cover",
+        notes: "Equipo: bienvenidos. Esta reunión no es para hablar de teoría ni dar consejos genéricos. A partir de hoy cambiamos la forma en que vendemos en ARIAS. No somos operadores de software que muestran botones; somos consultores de negocios que resuelven problemas caros y cierran contratos.",
+        html: `
+          <div style="display:flex; justify-content:space-between; align-items:stretch; height:100%;">
+            <div style="max-width: 60%; display:flex; flex-direction:column; justify-content:center;">
+              <div style="font-size:11px; font-weight:800; color:#BE123C; letter-spacing:2px; margin-bottom:12px;">ENTRENAMIENTO COMERCIAL · ARIAS ERP</div>
+              <img src="/arias_real_logo.png" style="height:56px; width:auto; align-self:flex-start; margin-bottom:16px;" alt="Arias Logo">
+              <h1 style="font-size:40px; font-weight:800; line-height:1.1; color:#0F172A; margin-bottom:14px;">Vendemos resultados.<br><span style="color:#BE123C;">No pantallas.</span></h1>
+              <p style="font-size:15px; color:#64748B; margin-bottom:24px;">Equipo de ventas · Octubre 2026</p>
+              <div style="width:100%; height:2px; background:#0F172A; margin-bottom:14px;"></div>
+              <div style="font-size:11px; font-weight:700; color:#334155; letter-spacing:1px;">CASOS REALES · PRÁCTICA EN VIVO · AUDITORÍA SEMANAL</div>
+            </div>
+            <div style="background:#BE123C; border-radius:8px; padding:32px; width:34%; color:#FFFFFF; display:flex; flex-direction:column; justify-content:space-between;">
+              <div>
+                <div style="font-size:10px; font-weight:800; letter-spacing:2px; opacity:0.85; margin-bottom:14px;">OBJETIVO</div>
+                <div style="font-size:24px; font-weight:800; line-height:1.25;">Más decisiones de compra, sin perder confianza ni integridad.</div>
+              </div>
+              <div style="font-size:12px; line-height:1.6; border-top:1px solid rgba(255,255,255,0.25); padding-top:14px;">
+                Rúbrica de 100 Puntos<br>Auditoría Automática con IA<br>Trazabilidad en Vivo
+              </div>
+            </div>
+          </div>
+        `
+      },
+      {
+        num: 2,
+        cat: "01 · Diagnóstico del Problema",
+        title: "¿Por qué perdíamos ventas?",
+        subtitle: "El error clásico: convertir una reunión de negocios en un paseo por pantallas",
+        img: "/real_performance_audits_table.png",
+        imgCap: "Registro de Demos Auditadas en el CRM",
+        notes: "Si abren una llamada y se ponen a pasear por el sistema durante 40 minutos, el cliente los ve como un catálogo ambulante. El 'yo te aviso' es culpa nuestra por no haber hecho las preguntas duras al inicio.",
+        content: `
+          <div class="card card-red">
+            <span class="badge-tag tag-red">EL VIEJO HÁBITO A ERRADICAR</span>
+            <div class="list-item"><strong>• Abrir Google Meet y decir de inmediato:</strong><br>«Mire, aquí están los clientes, aquí los productos, aquí las cotizaciones...»</div>
+            <div class="list-item"><strong>• 40 minutos mostrando botones</strong> sin saber qué le duele al cliente ni cuánto dinero pierde al mes.</div>
+            <div class="list-item"><strong>• El cliente se abruma y termina diciendo:</strong><br>«Está bonito, mándame una cotización y yo te aviso.»</div>
+            <div class="list-item" style="color:#BE123C; font-weight:700;">• Resultado: Semanas persiguiendo fantasmas y cero dólares en el banco.</div>
+          </div>
+        `
+      },
+      {
+        num: 3,
+        cat: "02 · Filosofía de Venta",
+        title: "La Regla de Oro Comercial",
+        subtitle: "Ningún software es caro cuando resuelve un problema que cuesta el doble",
+        img: "/real_leads_pipeline.png",
+        imgCap: "Gestión de Oportunidades en CRM",
+        notes: "Grábense esto: cuando un cliente les dice 'está muy caro', no es por el precio, es porque no conectaron el sistema con la pérdida de dinero que tiene todos los días en su negocio.",
+        content: `
+          <div class="card card-red">
+            <span class="badge-tag tag-red">PRINCIPIO FUNDAMENTAL</span>
+            <div style="font-size:14px; font-weight:800; color:#BE123C; line-height:1.35; margin-bottom:8px;">«Ningún cliente compra módulos de ERP. Compra no perder $800 al mes en despachos erróneos, no sufrir robos y recuperar su tiempo.»</div>
+            <div class="list-item"><strong>1. Dolor Financiero:</strong> Si pierde $500/mes, pagar $80/mes por ARIAS es una ganancia neta.</div>
+            <div class="list-item"><strong>2. Silencio Activo:</strong> El cliente debe hablar el 70% del tiempo al inicio.</div>
+            <div class="list-item"><strong>3. Prohibido Pantallas:</strong> No abras el software sin saber qué le quita el sueño.</div>
+          </div>
+        `
+      },
+      {
+        num: 4,
+        cat: "03 · Arquitectura Comercial",
+        title: "El Nuevo Ecosistema ARIAS en Vivo",
+        subtitle: "Trazabilidad total desde la prospección hasta el cobro en caja",
+        img: "/real_lead_detail_panel.png",
+        imgCap: "Ficha del Lead con Botones HUD y Gemini",
+        notes: "Miren esto: no estamos improvisando. Cada videollamada de Google Meet ahora es transcrita por Gemini, evaluada bajo una rúbrica oficial de 100 puntos y vinculada directamente a la ficha del lead. La gerencia ve la calidad de cada demo en tiempo real.",
+        content: `
+          <div class="card card-blue">
+            <span class="badge-tag tag-blue">CIRCUITO OFICIAL EN 4 PASOS</span>
+            <div class="list-item"><strong>01 · SDR Califica y Agenda (Grecia):</strong><br>Cita en Google Calendar con dolor inicial anotado.</div>
+            <div class="list-item"><strong>02 · AE Conduce la Demo (Diana / Patricia):</strong><br>Usa el Guion Demo HUD lateral con las 7 preguntas.</div>
+            <div class="list-item"><strong>03 · Google Meet + Gemini Toma Notas:</strong><br>Gemini transcribe y redacta el Google Doc en automático.</div>
+            <div class="list-item"><strong>04 · Auditoría en CRM (Auditar Gemini):</strong><br>El CRM califica los 100 pts y vincula acuerdos al Lead.</div>
+          </div>
+        `
+      },
+      {
+        num: 5,
+        cat: "04 · Descubrimiento Obligatorio",
+        title: "Pregunta 1 · El Dolor Operativo Raíz",
+        subtitle: "Paso 1 del Guion HUD en Vivo antes de cualquier demostración",
+        img: "/real_hud_questions.png",
+        imgCap: "Pantalla Real del Guion Demo HUD",
+        notes: "No asuman lo que el cliente quiere. Empiecen la llamada con esta pregunta y cállense. Dejen que el cliente hable durante 3 minutos seguidos.",
+        content: `
+          <div class="card card-blue">
+            <span class="badge-tag tag-red">PREGUNTA OBLIGATORIA 1</span>
+            <div style="font-size:15px; font-weight:800; color:#BE123C; margin-bottom:8px;">«¿Qué proceso le está generando más errores o tiempo perdido hoy?»</div>
+            <div class="list-item">• Obliga al cliente a hablar desde el segundo uno.</div>
+            <div class="list-item">• Destruye las suposiciones del vendedor.</div>
+            <div class="list-item">• Te entrega en bandeja de plata los 2 únicos módulos que debes mostrar en la demo.</div>
+            <div class="list-item"><strong>Casos reales:</strong> Finca Miramar (despacho), Distribuidora San José (facturación fiscal).</div>
+          </div>
+        `
+      },
+      {
+        num: 6,
+        cat: "05 · Descubrimiento Obligatorio",
+        title: "Pregunta 2 · El Costo Financiero del Problema",
+        subtitle: "El ancla de valor que justifica el precio de ARIAS",
+        img: "/real_hud_questions.png",
+        imgCap: "Pantalla Real del Guion Demo HUD",
+        notes: "Si no sabemos cuánto le cuesta el dolor, ¿con qué cara vamos a defender nuestro precio al final? Si la demo no tiene un número anotado en este punto, reprueba la auditoría de inmediato.",
+        content: `
+          <div class="card card-red">
+            <span class="badge-tag tag-red">PREGUNTA OBLIGATORIA 2</span>
+            <div style="font-size:15px; font-weight:800; color:#BE123C; margin-bottom:8px;">«¿Cuánto le cuesta mensualmente este problema en dinero o pérdidas?»</div>
+            <div class="list-item">• Si la llamada termina sin cifra en dólares, reprueba la auditoría (0/10 pts).</div>
+            <div class="list-item">• Si dice «no sé», guíalo: ¿cuántas horas extra pagan o cuánto se merma?</div>
+            <div class="list-item"><strong>Justificación matemática:</strong> Si pierde $600/mes, pagar $80/mes por ARIAS le ahorra $520 limpios al mes.</div>
+            <div class="list-item" style="color:#BE123C; font-weight:700;">Sin dolor cuantificado, cualquier precio parecerá caro.</div>
+          </div>
+        `
+      },
+      {
+        num: 7,
+        cat: "06 · Descubrimiento Obligatorio",
+        title: "Pregunta 3 · El Sistema Actual y la Competencia",
+        subtitle: "Comprender qué método usan hoy y por qué quieren cambiar",
+        img: "/real_hud_questions.png",
+        imgCap: "Pantalla Real del Guion Demo HUD",
+        notes: "Cuando el cliente mismo dice: 'Excel ya no nos da abasto porque se borran fórmulas y nos roban', él mismo se está convenciendo de que necesita cambiar ya.",
+        content: `
+          <div class="card card-blue">
+            <span class="badge-tag tag-blue">PREGUNTA OBLIGATORIA 3</span>
+            <div style="font-size:15px; font-weight:800; color:#BE123C; margin-bottom:8px;">«¿Qué sistema o método usa hoy y qué debe mejorar para justificar el cambio?»</div>
+            <div class="list-item">• <strong>Excel / Libretas:</strong> Fórmulas borradas, descontrol de cajas y sin trazabilidad.</div>
+            <div class="list-item">• <strong>Software obsoleto:</strong> Lento, sin soporte local y caro de mantener.</div>
+            <div class="list-item">• <strong>Deseo de control:</strong> El dueño quiere ver sus ventas en su teléfono en tiempo real.</div>
+            <div class="list-item">Cuando el cliente enumera las fallas de su sistema actual, <strong>él solo se convence de comprar.</strong></div>
+          </div>
+        `
+      },
+      {
+        num: 8,
+        cat: "07 · Descubrimiento Obligatorio",
+        title: "Pregunta 4 · El Decisor y el Dinero",
+        subtitle: "Filtro crítico para no regalar demos a personas que no pueden comprar",
+        img: "/real_hud_questions.png",
+        imgCap: "Pantalla Real del Guion Demo HUD",
+        notes: "Si le dan una demo de 1 hora a un asistente sin preguntar quién firma el cheque, perdieron 60 minutos de su vida laboral. El asistente nunca va a saber venderle a su jefe con la misma fuerza que ustedes.",
+        content: `
+          <div class="card card-red">
+            <span class="badge-tag tag-red">PREGUNTA OBLIGATORIA 4</span>
+            <div style="font-size:15px; font-weight:800; color:#BE123C; margin-bottom:8px;">«¿Quién más además de usted participa en la aprobación del presupuesto y la compra?»</div>
+            <div class="list-item">• Nunca des una demo completa a un no-decisor sin acordar el puente al dueño.</div>
+            <div class="list-item">• Un asistente o cajero jamás le venderá a su jefe con la misma convicción que tú.</div>
+            <div class="list-item"><strong>Guión obligatorio:</strong><br>«Si confirmamos que ARIAS resuelve esto, ¿cómo agendamos 15 minutos con su socio para ver el presupuesto?»</div>
+          </div>
+        `
+      },
+      {
+        num: 9,
+        cat: "08 · Descubrimiento Obligatorio",
+        title: "Pregunta 5 · El Plazo de Implementación",
+        subtitle: "Separar a los curiosos de los clientes listos para firmar",
+        img: "/real_hud_questions.png",
+        imgCap: "Pantalla Real del Guion Demo HUD",
+        notes: "El tiempo es el mejor amigo del vendedor proactivo. Si necesitan el sistema para fin de mes, el cierre tiene que ocurrir hoy, no el próximo año.",
+        content: `
+          <div class="card card-blue">
+            <span class="badge-tag tag-blue">PREGUNTA OBLIGATORIA 5</span>
+            <div style="font-size:15px; font-weight:800; color:#BE123C; margin-bottom:8px;">«¿Para cuándo necesitan tener este sistema implementado y funcionando?»</div>
+            <div class="list-item">• <strong>Si dicen «para fin de mes»:</strong><br>«La parametrización toma 5 días, así que debemos firmar hoy.»</div>
+            <div class="list-item">• <strong>Si dicen «no tenemos prisa»:</strong><br>«Mientras no cambien, ¿cuánto dinero siguen perdiendo en mermas cada mes?»</div>
+            <div class="list-item" style="color:#047857; font-weight:700;">El sentido de urgencia acelera el contrato sin regalar descuentos.</div>
+          </div>
+        `
+      },
+      {
+        num: 10,
+        cat: "09 · Descubrimiento Obligatorio",
+        title: "Pregunta 6 · El Criterio de Victoria",
+        subtitle: "Fijar la condición exacta para ganar la venta antes de mostrar el sistema",
+        img: "/real_hud_questions.png",
+        imgCap: "Pantalla Real del Guion Demo HUD",
+        notes: "Esta pregunta es mágica. Cuando el cliente te dice: 'Si me demuestra que puedo controlar las cajas desde mi casa, lo compro', ya te dio la llave del cierre. Solo tienes que mostrarle eso.",
+        content: `
+          <div class="card card-green">
+            <span class="badge-tag tag-green">PREGUNTA OBLIGATORIA 6</span>
+            <div style="font-size:15px; font-weight:800; color:#BE123C; margin-bottom:8px;">«¿Qué tendría que demostrarle hoy en ARIAS para ganar su total confianza?»</div>
+            <div class="list-item">• El cliente te dice exactamente qué necesita ver para comprar.</div>
+            <div class="list-item">• Te ahorra 30 minutos de pasear por funciones secundarias.</div>
+            <div class="list-item"><strong>Ejemplos:</strong> «Que el cuadre de caja sea ciego», «Que facture en 10 segundos», «Que sincronice 3 locales».</div>
+            <div class="list-item" style="color:#047857; font-weight:700;">Muestras ese flujo específico y pasas al cierre.</div>
+          </div>
+        `
+      },
+      {
+        num: 11,
+        cat: "10 · Descubrimiento Obligatorio",
+        title: "Pregunta 7 · La Validación Inmediata Post-Demo",
+        subtitle: "El puente obligatorio antes de hablar de precios o cotizaciones",
+        img: "/real_hud_questions.png",
+        imgCap: "Pantalla Real del Guion Demo HUD",
+        notes: "Nunca hablen de precios sin que el cliente haya dicho 'SÍ, esto resuelve mi problema'. Si dan el precio antes del 'Sí', el cliente lo ve como un costo, no como una solución.",
+        content: `
+          <div class="card card-green">
+            <span class="badge-tag tag-green">PREGUNTA OBLIGATORIA 7</span>
+            <div style="font-size:15px; font-weight:800; color:#BE123C; margin-bottom:8px;">«¿Esto que acaba de ver resuelve el problema específico que me describió al inicio?»</div>
+            <div class="list-item">• <strong>Si responde que SÍ:</strong> Tienes autorización moral para avanzar inmediatamente a la contratación.</div>
+            <div class="list-item">• <strong>Si tiene dudas:</strong> PROHIBIDO hablar de precios. Indaga qué faltó antes de mostrar números.</div>
+            <div class="list-item" style="color:#047857; font-weight:700;">Guión: «Excelente, entonces avancemos con el plan de implementación y firma.»</div>
+          </div>
+        `
+      },
+      {
+        num: 12,
+        cat: "11 · Estructura de la Demo",
+        title: "La Regla de los 3 Flujos (Menos es Más)",
+        subtitle: "Cómo estructurar los 20 minutos de demostración para maximizar el impacto",
+        img: "/real_lead_detail_panel.png",
+        imgCap: "Flujo de Venta en la Ficha del Lead",
+        notes: "El cliente se abruma cuando le muestran 20 botones. Muéstrenle únicamente los 3 flujos donde le duele el bolsillo. Hagan que la demo dure 25 minutos de alto impacto, no 60 minutos de cansancio.",
+        content: `
+          <div class="card card-blue">
+            <span class="badge-tag tag-blue">ESTRUCTURA DE IMPACTO</span>
+            <div class="list-item"><strong>1. FLUJO 1 · EL DOLOR PRINCIPAL:</strong><br>El problema crítico de la Pregunta 1 (ej: facturación rápida o despacho entre bodegas).</div>
+            <div class="list-item"><strong>2. FLUJO 2 · LA PESADILLA OPERATIVA:</strong><br>Lo que quita el sueño al administrador (control de stock, inventario y cuentas por cobrar).</div>
+            <div class="list-item"><strong>3. FLUJO 3 · EL CONTROL DEL DUEÑO:</strong><br>La tranquilidad del que paga: reporte gerencial en el móvil en 3 clics.</div>
+          </div>
+        `
+      },
+      {
+        num: 13,
+        cat: "12 · Técnicas de Cierre",
+        title: "El Cierre Condicionado",
+        subtitle: "Cómo solicitar el compromiso con firmeza y elegancia comercial",
+        img: "/real_performance_audits_table.png",
+        imgCap: "Seguimiento de Cierres en el CRM",
+        notes: "No terminen la demo diciendo '¿Qué le pareció?'. Esa es la peor pregunta de la historia de las ventas. Pidan el compromiso con una pregunta cerrada y condicional.",
+        content: `
+          <div class="card card-red">
+            <span class="badge-tag tag-red">FÓRMULA OFICIAL DE CIERRE</span>
+            <div style="font-size:14px; font-weight:800; color:#BE123C; margin-bottom:8px;">«Si resolvemos [Condición X], ¿estamos listos para programar la instalación este [Día Y]?»</div>
+            <div class="list-item"><strong>• Validación Técnica:</strong> «Si confirmamos que el lector funciona sin cables, ¿arrancamos el lunes?»</div>
+            <div class="list-item"><strong>• Forma de Pago:</strong> «Si gerencia aprueba el pago en 2 cuotas, ¿firmamos el contrato hoy?»</div>
+            <div class="list-item"><strong>• Migración:</strong> «Si migramos los productos desde Excel sin costo, ¿capacitamos mañana?»</div>
+          </div>
+        `
+      },
+      {
+        num: 14,
+        cat: "13 · Disciplina de Cierre",
+        title: "La Regla de la Fecha Sagrada",
+        subtitle: "Toda conversación comercial termina con día y hora en Google Calendar",
+        img: "/real_finca_miramar_drawer.png",
+        imgCap: "Próximo Paso Fechado en Finca Miramar",
+        notes: "Si cuelgan la llamada sin haber fijado fecha y hora en Google Calendar para revisar la propuesta, esa llamada fue un fracaso comercial y el CRM la marcará en rojo.",
+        content: `
+          <div class="card card-green">
+            <span class="badge-tag tag-green">PROTOCOLO DE 100 PUNTOS</span>
+            <div class="list-item"><strong>Lo que reprueba la llamada (0 pts):</strong><br>• «Le mando la cotización y quedamos en contacto por WhatsApp.»<br>• «Piénselo y me avisa cuando tenga tiempo.»</div>
+            <div class="list-item" style="margin-top:8px;"><strong>Lo que aprueba con 100 puntos:</strong><br>• Abrir Google Calendar en vivo antes de colgar.<br>• «Para revisar la propuesta formal junto con su socio... ¿nos reunimos este jueves a las 10:00 AM o a las 3:00 PM?»<br>• Enviar la invitación de Google Calendar en ese mismo instante.</div>
+          </div>
+        `
+      },
+      {
+        num: 15,
+        cat: "14 · Manejo de Objeciones",
+        title: "El Método ESCUCHAR en el HUD",
+        subtitle: "Estructura oficial para neutralizar objeciones sin perder margen",
+        img: "/real_hud_objections.png",
+        imgCap: "Pestaña de Objeciones en el Guion Demo HUD",
+        notes: "Cuando un cliente pone una objeción, no se asusten. La objeción es el primer síntoma de que el cliente está considerando comprar. Respiren, no interrumpan y sigan el método.",
+        content: `
+          <div class="card card-amber">
+            <span class="badge-tag tag-amber">MÉTODO ESCUCHAR</span>
+            <div class="list-item"><strong>• E - Escuchar:</strong> Esperar 3 segundos de silencio antes de responder. No interrumpir jamás.</div>
+            <div class="list-item"><strong>• S - Sondear:</strong> ¿Es problema real de dinero o falta de confianza en el resultado?</div>
+            <div class="list-item"><strong>• C - Comprender:</strong> No discutir ni ponerse a la defensiva. Validar la duda del cliente.</div>
+            <div class="list-item"><strong>• U - Unir al Cierre:</strong> Vincular la objeción con la pérdida que sufre hoy y pedir decisión condicionada.</div>
+          </div>
+        `
+      },
+      {
+        num: 16,
+        cat: "15 · Casos Reales del CRM",
+        title: "Caso Real: Roberto Medina (Precio / Descuento)",
+        subtitle: "Objeción: «El precio está muy alto para mi presupuesto»",
+        img: "/real_hud_objections.png",
+        imgCap: "Script de Roberto Medina en el HUD",
+        notes: "Este es el caso real de Roberto Medina. El cliente siempre va a pedir rebaja por reflejo. Si ustedes se bajan los pantalones al segundo 1, el cliente piensa que el software no vale nada.",
+        content: `
+          <div class="card card-red">
+            <span class="badge-tag tag-red">CASO ROBERTO MEDINA</span>
+            <div class="list-item" style="color:#BE123C; font-weight:700;">Error fatal: «Déjeme hablar con mi jefe a ver si le rebajamos un 20%...»</div>
+            <div class="list-item" style="margin-top:6px;"><strong>Guión Oficial en el HUD:</strong><br>1. Sondear: «Entiendo perfectamente, don Roberto. ¿El valor está fuera de su presupuesto total o comparado contra otra opción?»<br>2. Re-anclar al dolor: «Recuerde que hoy se le pierden $400 al mes en despachos erróneos.»<br>3. Cierre condicionado: «Si resolvemos el costo dentro de lo autorizado, ¿qué otra condición faltaría para programar la instalación?»</div>
+          </div>
+        `
+      },
+      {
+        num: 17,
+        cat: "16 · Casos Reales del CRM",
+        title: "Caso Real: Luis Escobar (Prueba Gratis)",
+        subtitle: "Petición: «Actívame una prueba gratis de 8 días para evaluar»",
+        img: "/real_hud_objections.png",
+        imgCap: "Script de Luis Escobar en el HUD",
+        notes: "Miren el caso de Luis Escobar en el CRM. Está en negociación por $588 porque se le dio prueba, pero si no le fijamos los 3 criterios de éxito y la fecha de firma, esa prueba se convierte en un fantasma.",
+        content: `
+          <div class="card card-amber">
+            <span class="badge-tag tag-amber">CASO LUIS ESCOBAR · $588</span>
+            <div class="list-item" style="color:#B45309; font-weight:700;">Alerta: Una prueba gratis NO es una venta. Si das acceso libre sin tareas definidas, nadie entra y el lead se enfría.</div>
+            <div class="list-item" style="margin-top:6px;"><strong>Protocolo de Prueba en el HUD:</strong><br>1. Acotar el alcance: «Con gusto abrimos un entorno de 8 días. ¿Cuáles son las 3 tareas específicas que necesita verificar para tomar la decisión?»<br>2. Reunión de cierre en agenda: «Pactemos la reunión de revisión final para el día 8 a las 3:00 PM con quien aprueba la compra.»<br>3. Compromiso: «Si las 3 tareas cumplen, ¿avanzamos con la contratación?»</div>
+          </div>
+        `
+      },
+      {
+        num: 18,
+        cat: "17 · Casos Reales del CRM",
+        title: "Caso Real: Nehemías Regalo (Cotización Sola)",
+        subtitle: "Objeción: «Mándame la cotización y yo te aviso»",
+        img: "/real_hud_objections.png",
+        imgCap: "Script de Nehemías Regalo en el HUD",
+        notes: "Nunca manden un documento de precios sin una reunión de revisión agendada. Un PDF no tiene voz para defender el valor frente a las dudas del cliente.",
+        content: `
+          <div class="card card-red">
+            <span class="badge-tag tag-red">CASO NEHEMÍAS REGALO</span>
+            <div class="list-item" style="color:#BE123C; font-weight:700;">Peligro: Cotización en PDF enviada al aire = Venta muerta en el 90% de los casos.</div>
+            <div class="list-item" style="margin-top:6px;"><strong>Guión de Blindaje en el HUD:</strong><br>«Con mucho gusto le preparo la propuesta formal con el alcance exacto.<br><br>Para asegurar que no pague de más y solo incluya lo que su empresa necesita hoy...<br><br>¿Podemos reservar 15 minutos este jueves a las 10:00 AM para revisarla en vivo junto con la persona que aprueba el presupuesto?»</div>
+          </div>
+        `
+      },
+      {
+        num: 19,
+        cat: "18 · Casos Reales del CRM",
+        title: "Caso Real: Moisés Efigenio (Función Faltante)",
+        subtitle: "Objeción: «Le falta una función técnica / Fletes consolidados»",
+        img: "/real_hud_objections.png",
+        imgCap: "Script de Moisés Efigenio en el HUD",
+        notes: "Caso Moisés Efigenio: jamás inventen funciones que el CRM no tiene. Vender con integridad es lo que nos mantiene vivos. Documenten el caso y validen con gerencia.",
+        content: `
+          <div class="card card-blue">
+            <span class="badge-tag tag-blue">CASO MOISÉS EFIGENIO</span>
+            <div class="list-item" style="color:#1D4ED8; font-weight:700;">Prohibido prometer funcionalidades que ingeniería no ha autorizado.</div>
+            <div class="list-item" style="margin-top:6px;"><strong>Protocolo de Integridad en el HUD:</strong><br>1. Validar el impacto: «Entiendo la necesidad de ese flujo. ¿Cómo lo resuelven hoy y qué impacto tiene en costos?»<br>2. Postura profesional: «Validaremos este escenario con el equipo técnico para no prometer lo que no esté listo.»<br>3. Próximo paso: «Agendemos seguimiento para el viernes con el reporte de factibilidad técnica.»</div>
+          </div>
+        `
+      },
+      {
+        num: 20,
+        cat: "19 · Evidencia en Vivo",
+        title: "Caso Auditado de Éxito: Finca Miramar",
+        subtitle: "Cerrado Ganado: $1,400 USD · Rúbrica Oficial: 92/100 Pts",
+        img: "/real_finca_miramar_drawer.png",
+        imgCap: "Auditoría Real y Cierre de $1,400 USD en CRM",
+        notes: "Este caso de Finca Miramar no es inventado. Está en el CRM, cerrado con $1,400 en caja. Diana aplicó el guión: diagnosticó el dolor, mostró 2 flujos y cerró.",
+        content: `
+          <div class="card card-green">
+            <span class="badge-tag tag-green">CERRADO GANADO</span>
+            <div style="font-size:32px; font-weight:800; color:#047857; margin-bottom:8px;">$1,400 USD</div>
+            <div class="list-item"><strong>• Asesora:</strong> Diana Morales (AE)</div>
+            <div class="list-item"><strong>• Calificación:</strong> 92 / 100 Pts (Nivel Sólido)</div>
+            <div class="list-item"><strong>• Fecha:</strong> Martes 27 Octubre · 9:00 PM</div>
+            <div class="list-item" style="margin-top:10px;"><strong>Factores de Victoria Auditados por Gemini:</strong><br>1. Diagnóstico profundo de sucursales agrícolas.<br>2. Cuantificación de mermas e inventario desfasado.<br>3. Mostró solo 2 flujos: catálogo y facturación.<br>4. Cierre condicionado y fecha de pago pactada.</div>
+          </div>
+        `
+      },
+      {
+        num: 21,
+        cat: "20 · Evidencia en Vivo",
+        title: "Caso Auditado de Éxito: Kervin Roque",
+        subtitle: "Cerrado Ganado: $1,200 USD · Rúbrica Oficial: 88/100 Pts",
+        img: "/real_performance_audits_table.png",
+        imgCap: "Tabla de Rendimiento con $2,600 Cerrados",
+        notes: "Kervin Roque: $1,200 cerrados por Patricia. ¿Por qué se cerró rápido? Porque Patricia validó el presupuesto y quién firmaba desde los primeros 10 minutos.",
+        content: `
+          <div class="card card-green">
+            <span class="badge-tag tag-green">CERRADO GANADO</span>
+            <div style="font-size:32px; font-weight:800; color:#047857; margin-bottom:8px;">$1,200 USD</div>
+            <div class="list-item"><strong>• Asesora:</strong> Patricia Martínez (AE)</div>
+            <div class="list-item"><strong>• Calificación:</strong> 88 / 100 Pts (Nivel Sólido)</div>
+            <div class="list-item"><strong>• Fecha:</strong> Lunes 26 Octubre · 5:00 PM</div>
+            <div class="list-item" style="margin-top:10px;"><strong>Por qué se cerró en 1 sola llamada:</strong><br>• Patricia validó en el minuto 10 quién firmaba el cheque y el presupuesto disponible.<br>• No regaló descuentos; demostró que la velocidad de cotizaciones pagaba el software en 30 días.<br>• Contratación firmada al finalizar.</div>
+          </div>
+        `
+      },
+      {
+        num: 22,
+        cat: "21 · Evidencia en Vivo",
+        title: "Caso de Aprendizaje: Transportes Express",
+        subtitle: "Resultado: PERDIDO ($0 USD) · Auditoría: 45/100 Pts (Intervención)",
+        img: "/real_performance_audits_table.png",
+        imgCap: "Registro de Demo Perdida en Auditoría",
+        notes: "Transportes Express: $0. Perdimos tiempo y recursos. ¿Por qué? Porque fue un paseo de pantallas sin calificar al decisor ni fijar fecha. Esta diapositiva es el ejemplo exacto de lo que NO volveremos a hacer.",
+        content: `
+          <div class="card card-red">
+            <span class="badge-tag tag-red">CASO PERDIDO: $0 USD</span>
+            <div style="font-size:32px; font-weight:800; color:#BE123C; margin-bottom:8px;">45 / 100 Pts</div>
+            <div class="list-item" style="color:#BE123C; font-weight:700;">Calificación: Requiere Intervención Urgente</div>
+            <div class="list-item" style="margin-top:10px;"><strong>Errores Detectados por la IA en las Notas:</strong><br>• 40 minutos mostrando módulos sin preguntar cuánto perdían hoy.<br>• No se validó quién tenía la chequera para autorizar.<br>• Terminó con «mándame los precios por WhatsApp y yo te aviso».<br>• No se agendó fecha ni hora en Google Calendar.</div>
+          </div>
+        `
+      },
+      {
+        num: 23,
+        cat: "22 · Tus Armas en el CRM",
+        title: "Las Nuevas Herramientas en Pantalla",
+        subtitle: "Guion Demo HUD en vivo y Auditoría Gemini 100% automática",
+        img: "/real_gemini_evaluator.png",
+        imgCap: "Evaluador Automático de Gemini en CRM",
+        notes: "Tienen toda la ayuda en pantalla. Durante la llamada abren el HUD para ver qué preguntar. Al terminar, pegan el link de Gemini y el sistema les dice exactamente qué hicieron bien y qué mejorar.",
+        content: `
+          <div class="card card-blue">
+            <span class="badge-tag tag-blue">TECNOLOGÍA A TU FAVOR</span>
+            <div class="list-item"><strong>1. GUION DEMO HUD (DURANTE LA DEMO):</strong><br>• Botón directo en la ficha del lead en ariascrm.com/leads.<br>• Panel lateral flotante mientras das la llamada en Google Meet.<br>• Las 7 preguntas obligatorias y la matriz de objeciones a un clic.</div>
+            <div class="list-item" style="margin-top:10px;"><strong>2. AUDITAR GEMINI (100% AUTOMÁTICO):</strong><br>• Gemini toma las notas y transcribe en Google Meet automáticamente.<br>• Solo pegas el link del Google Doc en el CRM.<br>• El CRM califica los 9 criterios sobre 100 pts y actualiza el lead.</div>
+          </div>
+        `
+      },
+      {
+        num: 24,
+        cat: "23 · Medición y Rendimiento",
+        title: "La Rúbrica Oficial de 100 Puntos",
+        subtitle: "Cómo se audita la calidad comercial de cada demo semanalmente",
+        img: "/real_gemini_evaluator.png",
+        imgCap: "Calificación de los 9 Criterios en CRM",
+        notes: "Esta es la rúbrica con la que gerencia revisa cada demo los viernes. No se trata de suerte ni de si el cliente era simpático: se trata de cumplir estos 9 puntos en cada oportunidad.",
+        content: `
+          <div class="card card-blue">
+            <span class="badge-tag tag-blue">LOS 9 CRITERIOS OFICIALES</span>
+            <div class="list-item"><strong>• Preparación y Agenda:</strong> 10 pts</div>
+            <div class="list-item"><strong>• Diagnóstico y Preguntas Abiertas:</strong> 15 pts</div>
+            <div class="list-item"><strong>• Dolor Financiero Cuantificado:</strong> 10 pts</div>
+            <div class="list-item"><strong>• Decisor y Proceso de Compra:</strong> 10 pts</div>
+            <div class="list-item"><strong>• Demo Relevante de Valor:</strong> 15 pts</div>
+            <div class="list-item"><strong>• Manejo de Objeciones (ESCUCHAR):</strong> 15 pts</div>
+            <div class="list-item"><strong>• Solicitud de Cierre Condicionado:</strong> 10 pts</div>
+            <div class="list-item"><strong>• Próximo Paso Fechado en Calendar:</strong> 10 pts</div>
+            <div class="list-item"><strong>• Disciplina en CRM:</strong> 5 pts</div>
+          </div>
+        `
+      },
+      {
+        num: 25,
+        cat: "24 · Compromiso Comercial",
+        title: "Las 3 Reglas No Negociables a Partir de Hoy",
+        subtitle: "El estándar que nos llevará a duplicar las ventas de ARIAS",
+        layout: "cover",
+        notes: "Equipo: tenemos el producto, tenemos el CRM y tenemos los casos reales demostrados. Ahora salgamos a ejecutar este proceso en cada llamada. A partir de hoy, cada demo cuenta.",
+        html: `
+          <div style="display:flex; flex-direction:column; gap:14px; height:100%;">
+            <div style="font-size:11px; font-weight:800; color:#BE123C; letter-spacing:2px;">24 · COMPROMISO COMERCIAL</div>
+            <h2 style="font-size:26px; font-weight:800; color:#0F172A; margin-bottom:8px;">Las 3 Reglas No Negociables a Partir de Hoy</h2>
+            
+            <div class="card card-red" style="padding:14px 20px;">
+              <div style="display:flex; align-items:center; gap:16px;">
+                <div style="font-size:24px; font-weight:800; color:#BE123C; font-family:'JetBrains Mono';">01</div>
+                <div><strong style="font-size:14px; color:#0F172A;">NINGUNA DEMO SIN DIAGNÓSTICO</strong><br><span style="color:#64748B; font-size:12.5px;">Primero entendemos el dolor y el dinero que cuesta. Prohibido abrir pantallas a ciegas.</span></div>
+              </div>
+            </div>
+            
+            <div class="card card-amber" style="padding:14px 20px;">
+              <div style="display:flex; align-items:center; gap:16px;">
+                <div style="font-size:24px; font-weight:800; color:#B45309; font-family:'JetBrains Mono';">02</div>
+                <div><strong style="font-size:14px; color:#0F172A;">NINGUNA OBJECIÓN CON REBAJA REGALADA</strong><br><span style="color:#64748B; font-size:12.5px;">Protegemos el valor de nuestro trabajo. Todo acuerdo comercial exige una fecha de pago firme.</span></div>
+              </div>
+            </div>
+            
+            <div class="card card-green" style="padding:14px 20px;">
+              <div style="display:flex; align-items:center; gap:16px;">
+                <div style="font-size:24px; font-weight:800; color:#047857; font-family:'JetBrains Mono';">03</div>
+                <div><strong style="font-size:14px; color:#0F172A;">NINGUNA LLAMADA SIN FECHA SAGRADA</strong><br><span style="color:#64748B; font-size:12.5px;">Toda llamada termina con día y hora exacta en Google Calendar. Se acabó el «yo te aviso».</span></div>
+              </div>
+            </div>
+            
+            <div style="padding:16px; font-size:13.5px; font-weight:700; border-radius:8px; border:1px solid #047857; background:#ECFDF5; color:#047857; text-align:center; margin-top:4px;">
+              «EL PROFESIONAL DE VENTAS NO ESPERA QUE EL CLIENTE COMPRE; LO GUÍA A TOMAR LA MEJOR DECISIÓN FINANCIERA PARA SU NEGOCIO.»
+            </div>
+          </div>
+        `
+      }
+    ];
+
+    let currentIdx = 0;
+
+    function renderSlide() {
+      const s = slides[currentIdx];
+      const frame = document.getElementById('slideFrame');
+      
+      if (s.layout === 'cover') {
+        frame.innerHTML = s.html;
+      } else {
+        frame.innerHTML = `
+          <div class="slide-category">${s.cat}</div>
+          <div class="slide-title">${s.title}</div>
+          <div class="slide-subtitle">${s.subtitle || ''}</div>
+          <div class="slide-divider"></div>
+          <div class="slide-grid">
+            ${s.content}
+            <div class="image-preview-container">
+              <img src="${s.img}" class="image-preview" alt="Pantalla Real CRM">
+              <div class="image-caption">${s.imgCap || 'Pantalla Oficial ARIAS CRM'}</div>
+            </div>
+          </div>
+        `;
+      }
+
+      document.getElementById('notesContent').textContent = s.notes;
+      document.getElementById('slideCounter').textContent = `Slide ${s.num} / ${slides.length}`;
+      
+      document.querySelectorAll('.thumb-btn').forEach((btn, i) => {
+        btn.classList.toggle('active', i === currentIdx);
+      });
+    }
+
+    function changeSlide(direction) {
+      currentIdx = Math.max(0, Math.min(slides.length - 1, currentIdx + direction));
+      renderSlide();
+    }
+
+    function initThumbs() {
+      const container = document.getElementById('thumbsNav');
+      slides.forEach((s, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `thumb-btn ${idx === 0 ? 'active' : ''}`;
+        btn.textContent = `${s.num}. ${s.title.substring(0, 18)}...`;
+        btn.onclick = () => {
+          currentIdx = idx;
+          renderSlide();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        changeSlide(1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        changeSlide(-1);
+      }
+    });
+
+    initThumbs();
+    renderSlide();
+  </script>
+</body>
+</html>
