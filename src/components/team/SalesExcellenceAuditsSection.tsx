@@ -2,12 +2,13 @@
 // Panel de Auditoría y Calidad Comercial ARIAS para TeamPerformance
 // Con Filtro Interactivo por Ejecutivo y Diagnóstico Global Consolidado 1:1
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Award, ShieldAlert, CheckCircle2, TrendingUp, Users, Calendar,
     ExternalLink, Sparkles, Flame, ChevronRight, FileText, Target,
     Filter, X, Copy, Check, BarChart2, AlertTriangle, Layers, ArrowRight,
-    Lightbulb
+    Lightbulb, DollarSign
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { salesAuditService } from '../../services/salesAuditService';
@@ -61,8 +62,10 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         latestAudits: []
     });
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
     const [selectedAudit, setSelectedAudit] = useState<SalesCallAudit | null>(null);
     const [selectedRep, setSelectedRep] = useState<string | null>(null);
+    const [leadStatusFilter, setLeadStatusFilter] = useState<'all' | 'Cerrado' | 'Negociación' | 'En seguimiento' | 'Perdido'>('all');
     const [activeCoachingTab, setActiveCoachingTab] = useState<'aggregate' | 'single'>('aggregate');
     const [copiedPlan, setCopiedPlan] = useState(false);
     const [isCoachingModalOpen, setIsCoachingModalOpen] = useState(false);
@@ -290,14 +293,60 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         }
     };
 
-    // Filtrar auditorías mostradas en la lista inferior
+    // Estadísticas de Conversión y Negocio (Demos vs Cierres)
+    const dealStats = useMemo(() => {
+        const auditsToCount = selectedRep
+            ? stats.latestAudits.filter(a => {
+                const cleanRep = selectedRep.toLowerCase().trim();
+                const repName = (a.sales_rep_name || '').toLowerCase().trim();
+                const sdrName = (a.sdr_rep_name || '').toLowerCase().trim();
+                const evalId = (a.evaluated_user_id || '').toLowerCase().trim();
+                return repName.includes(cleanRep) || cleanRep.includes(repName) || sdrName.includes(cleanRep) || evalId === cleanRep;
+            })
+            : stats.latestAudits;
+
+        const total = auditsToCount.length;
+        const closed = auditsToCount.filter(a => a.lead_status === 'Cerrado' || a.lead_status === 'Cliente');
+        const closedCount = closed.length;
+        const closedAmount = closed.reduce((sum, a) => sum + (a.deal_value || 0), 0);
+        const inNegotiation = auditsToCount.filter(a => a.lead_status === 'Negociación');
+        const inNegotiationCount = inNegotiation.length;
+        const inNegotiationAmount = inNegotiation.reduce((sum, a) => sum + (a.deal_value || 0), 0);
+        const followUp = auditsToCount.filter(a => a.lead_status === 'En seguimiento' || a.lead_status === 'Lead calificado');
+        const followUpCount = followUp.length;
+        const lost = auditsToCount.filter(a => a.lead_status === 'Perdido');
+        const lostCount = lost.length;
+        const winRate = total > 0 ? Math.round((closedCount / total) * 100) : 0;
+
+        return {
+            total,
+            closedCount,
+            closedAmount,
+            inNegotiationCount,
+            inNegotiationAmount,
+            followUpCount,
+            lostCount,
+            winRate
+        };
+    }, [stats.latestAudits, selectedRep]);
+
+    // Filtrar auditorías mostradas en la lista inferior por Rep y por Estado del Lead
     const displayedAudits = stats.latestAudits.filter(a => {
-        if (!selectedRep) return true;
-        const cleanRep = selectedRep.toLowerCase().trim();
-        const repName = (a.sales_rep_name || '').toLowerCase().trim();
-        const sdrName = (a.sdr_rep_name || '').toLowerCase().trim();
-        const evalId = (a.evaluated_user_id || '').toLowerCase().trim();
-        return repName.includes(cleanRep) || cleanRep.includes(repName) || sdrName.includes(cleanRep) || evalId === cleanRep;
+        if (selectedRep) {
+            const cleanRep = selectedRep.toLowerCase().trim();
+            const repName = (a.sales_rep_name || '').toLowerCase().trim();
+            const sdrName = (a.sdr_rep_name || '').toLowerCase().trim();
+            const evalId = (a.evaluated_user_id || '').toLowerCase().trim();
+            const matchRep = repName.includes(cleanRep) || cleanRep.includes(repName) || sdrName.includes(cleanRep) || evalId === cleanRep;
+            if (!matchRep) return false;
+        }
+
+        if (leadStatusFilter === 'all') return true;
+        if (leadStatusFilter === 'Cerrado') return a.lead_status === 'Cerrado' || a.lead_status === 'Cliente';
+        if (leadStatusFilter === 'Negociación') return a.lead_status === 'Negociación';
+        if (leadStatusFilter === 'En seguimiento') return a.lead_status === 'En seguimiento' || a.lead_status === 'Lead calificado';
+        if (leadStatusFilter === 'Perdido') return a.lead_status === 'Perdido';
+        return true;
     });
 
     // Diagnóstico activo: de la persona seleccionada o de todo el equipo
@@ -529,13 +578,78 @@ ${activeDiagnostic.actionRequired}
                     <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
                         {/* ─── COLUMNA IZQUIERDA (Cols 1-7): TABLA COMPACTA DE AUDITORÍAS ─── */}
                         <div className="lg:col-span-7 p-4 space-y-3">
-                            <div className="flex items-center justify-between text-xs pb-1">
-                                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">
-                                    Historial de Demostraciones Evaluadas
-                                </span>
-                                <span className="text-[11px] text-slate-400">
-                                    Haz clic en una demo para ver su análisis
-                                </span>
+                            {/* Barra de Conversión Comercial (Demos vs Cierres) */}
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
+                                <div className="flex items-center justify-between text-xs">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                                            <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
+                                            Conversión Comercial de Demos
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={() => navigate('/leads')}
+                                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
+                                    >
+                                        <span>Ver Pipeline de Leads</span>
+                                        <ArrowRight className="w-3 h-3" />
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <button
+                                        onClick={() => setLeadStatusFilter('all')}
+                                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                            leadStatusFilter === 'all'
+                                                ? 'bg-slate-900 text-white shadow-2xs'
+                                                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                        Todas ({dealStats.total})
+                                    </button>
+                                    <button
+                                        onClick={() => setLeadStatusFilter('Cerrado')}
+                                        className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-all cursor-pointer flex items-center gap-1 ${
+                                            leadStatusFilter === 'Cerrado'
+                                                ? 'bg-emerald-600 text-white shadow-2xs'
+                                                : 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
+                                        }`}
+                                    >
+                                        <span>🔒 Cerrados: {dealStats.closedCount} ({dealStats.winRate}%)</span>
+                                        <span className="font-normal opacity-85">· ${dealStats.closedAmount.toLocaleString()}</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setLeadStatusFilter('Negociación')}
+                                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                            leadStatusFilter === 'Negociación'
+                                                ? 'bg-amber-600 text-white shadow-2xs'
+                                                : 'bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100'
+                                        }`}
+                                    >
+                                        <span>💼 Negociación: {dealStats.inNegotiationCount}</span>
+                                        <span className="font-normal opacity-85">· ${dealStats.inNegotiationAmount.toLocaleString()}</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setLeadStatusFilter('En seguimiento')}
+                                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                            leadStatusFilter === 'En seguimiento'
+                                                ? 'bg-teal-600 text-white shadow-2xs'
+                                                : 'bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100'
+                                        }`}
+                                    >
+                                        <span>📞 Seguimiento: {dealStats.followUpCount}</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setLeadStatusFilter('Perdido')}
+                                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                                            leadStatusFilter === 'Perdido'
+                                                ? 'bg-rose-600 text-white shadow-2xs'
+                                                : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'
+                                        }`}
+                                    >
+                                        <span>❌ Perdidos: {dealStats.lostCount}</span>
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Tabla Compacta Estilo Metricool con Scroll Contenido */}
@@ -547,7 +661,9 @@ ${activeDiagnostic.actionRequired}
                                             <th className="py-2.5 px-2">Presentador (AE)</th>
                                             <th className="py-2.5 px-2">SDR</th>
                                             <th className="py-2.5 px-2 text-center">Puntaje</th>
-                                            <th className="py-2.5 px-2 text-center">Estado</th>
+                                            <th className="py-2.5 px-2 text-center">Calidad Demo</th>
+                                            <th className="py-2.5 px-2 text-center">Resultado Lead</th>
+                                            <th className="py-2.5 px-2 text-center">Ficha</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -610,11 +726,55 @@ ${activeDiagnostic.actionRequired}
                                                         <span className="text-[10px] text-slate-400">/100</span>
                                                     </td>
 
-                                                    {/* Estado */}
+                                                    {/* Calidad Demo */}
                                                     <td className="py-2.5 px-2 text-center">
                                                         <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${badge.color}`}>
                                                             {badge.text}
                                                         </span>
+                                                    </td>
+
+                                                    {/* Resultado Comercial Lead */}
+                                                    <td className="py-2.5 px-2 text-center">
+                                                        {audit.lead_status === 'Cerrado' || audit.lead_status === 'Cliente' ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                                                                <span>🔒 Cerrado</span>
+                                                                {audit.deal_value ? <span className="opacity-80 font-normal">· ${audit.deal_value}</span> : null}
+                                                            </span>
+                                                        ) : audit.lead_status === 'Negociación' ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-50 text-amber-800 border border-amber-200">
+                                                                <span>💼 Negociación</span>
+                                                                {audit.deal_value ? <span className="opacity-80 font-normal">· ${audit.deal_value}</span> : null}
+                                                            </span>
+                                                        ) : audit.lead_status === 'En seguimiento' ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-teal-50 text-teal-800 border border-teal-200">
+                                                                <span>📞 Seguimiento</span>
+                                                            </span>
+                                                        ) : audit.lead_status === 'Lead calificado' ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-blue-50 text-blue-800 border border-blue-200">
+                                                                <span>⭐ Calificado</span>
+                                                            </span>
+                                                        ) : audit.lead_status === 'Perdido' ? (
+                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-rose-50 text-rose-700 border border-rose-200">
+                                                                <span>❌ Perdido</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] text-slate-400">—</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Acción Ver Lead */}
+                                                    <td className="py-2.5 px-2 text-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                navigate('/leads');
+                                                            }}
+                                                            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                                                            title="Ver este lead en el CRM"
+                                                        >
+                                                            <ExternalLink className="w-3.5 h-3.5" />
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             );
@@ -769,6 +929,43 @@ ${activeDiagnostic.actionRequired}
                                                 {getScoreBadge(selectedAudit.total_score).text}
                                             </span>
                                         </div>
+                                    </div>
+
+                                    {/* Tarjeta de Negocio y Resultado Comercial */}
+                                    <div className="p-2.5 rounded-xl bg-slate-900 text-white space-y-1.5 shadow-2xs">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1">
+                                                <DollarSign className="w-3 h-3 text-emerald-400" />
+                                                Resultado Comercial en CRM
+                                            </span>
+                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                                selectedAudit.lead_status === 'Cerrado' || selectedAudit.lead_status === 'Cliente'
+                                                    ? 'bg-emerald-500 text-white'
+                                                    : selectedAudit.lead_status === 'Negociación'
+                                                    ? 'bg-amber-400 text-slate-950 font-black'
+                                                    : selectedAudit.lead_status === 'Perdido'
+                                                    ? 'bg-rose-500 text-white'
+                                                    : 'bg-indigo-400 text-slate-950 font-black'
+                                            }`}>
+                                                {selectedAudit.lead_status ? `Estado: ${selectedAudit.lead_status}` : 'En Proceso'}
+                                            </span>
+                                        </div>
+                                        {selectedAudit.deal_value ? (
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-slate-300 text-[10px]">Valor de la Oportunidad:</span>
+                                                <strong className="text-emerald-400 text-xs font-black">
+                                                    ${selectedAudit.deal_value.toLocaleString()} USD
+                                                </strong>
+                                            </div>
+                                        ) : null}
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate('/leads')}
+                                            className="w-full mt-1 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                                        >
+                                            <span>Abrir Ficha de {resolveClientName(selectedAudit)} en CRM</span>
+                                            <ExternalLink className="w-3 h-3" />
+                                        </button>
                                     </div>
 
                                     {/* Fortaleza */}

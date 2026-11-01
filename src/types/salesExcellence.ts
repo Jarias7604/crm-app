@@ -47,6 +47,9 @@ export interface SalesCallAudit {
     coaching_summary: AuditCoachingSummary;
     extracted_data: ExtractedLeadData;
     status: 'completed' | 'draft' | 'reviewed';
+    clientName?: string;
+    lead_status?: string | null;
+    deal_value?: number | null;
     created_at: string;
     updated_at?: string;
     profiles?: {

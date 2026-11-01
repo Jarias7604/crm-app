@@ -16,6 +16,8 @@ import { logger } from '../../utils/logger';
 import { PRIORITY_CONFIG, STATUS_CONFIG, SOURCE_CONFIG, ACTION_TYPES } from '../../types';
 import { useLeadSources } from '../../hooks/useLeadSources';
 import type { Lead, FollowUp, LeadStatus, LeadPriority } from '../../types';
+import { salesAuditService } from '../../services/salesAuditService';
+import type { SalesCallAudit } from '../../types/salesExcellence';
 import { type CallActivity } from '../../services/callActivity';
 import { contractsService } from '../../services/contracts';
 import type { Contract } from '../../types/contracts';
@@ -132,6 +134,37 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     // ARIAS Sales Excellence & Gemini HUD
     const [isDemoHUDOpen, setIsDemoHUDOpen] = useState(false);
     const [isGeminiAuditOpen, setIsGeminiAuditOpen] = useState(false);
+    const [leadAudit, setLeadAudit] = useState<SalesCallAudit | null>(null);
+
+    const loadLeadAudit = async (leadId?: string, leadName?: string) => {
+        if (!leadId) return;
+        try {
+            const audits = await salesAuditService.getAuditsByLead(leadId, leadName);
+            if (audits && audits.length > 0) {
+                setLeadAudit(audits[0]);
+            } else {
+                setLeadAudit(null);
+            }
+        } catch {
+            setLeadAudit(null);
+        }
+    };
+
+    useEffect(() => {
+        if (lead?.id) {
+            loadLeadAudit(lead.id, lead.name);
+        }
+    }, [lead?.id, lead?.name]);
+
+    useEffect(() => {
+        const handleAuditUpdate = () => {
+            if (lead?.id) {
+                loadLeadAudit(lead.id, lead.name);
+            }
+        };
+        window.addEventListener('sales_audit_updated', handleAuditUpdate);
+        return () => window.removeEventListener('sales_audit_updated', handleAuditUpdate);
+    }, [lead?.id, lead?.name]);
 
     const handleInitiateContractCreation = () => {
         if (leadCotizaciones.length === 0) {
@@ -413,16 +446,61 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setIsGeminiAuditOpen(true)}
-                                        className="flex flex-col items-start p-3 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-indigo-500/30 hover:border-violet-400 transition-all text-left group cursor-pointer"
+                                        className={`flex flex-col items-start p-3 rounded-xl transition-all text-left group cursor-pointer border ${
+                                            leadAudit
+                                                ? 'bg-indigo-950/80 hover:bg-indigo-900/80 border-indigo-400/60'
+                                                : 'bg-slate-800/80 hover:bg-slate-800 border border-indigo-500/30 hover:border-violet-400'
+                                        }`}
                                     >
                                         <div className="flex items-center gap-1.5 text-violet-300 font-black text-[11px] mb-1">
                                             <span>⚡ Auditar Gemini</span>
                                         </div>
                                         <span className="text-[10px] text-slate-400 leading-tight">
-                                            Evalúa notas de Google Meet (100 pts)
+                                            {leadAudit ? 'Revisar rúbrica o re-auditar doc' : 'Evalúa notas de Google Meet (100 pts)'}
                                         </span>
                                     </button>
                                 </div>
+
+                                {/* Banner Visual de Estado de Auditoría Vinculado */}
+                                {leadAudit ? (
+                                    <div className="p-2.5 rounded-xl bg-slate-800/90 border border-indigo-500/30 flex items-center justify-between gap-2 relative z-10">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="text-xs">📊</span>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="text-[11px] font-black text-white">
+                                                        Demo Evaluada: {leadAudit.total_score}/100 pts
+                                                    </span>
+                                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-black uppercase border ${
+                                                        leadAudit.total_score >= 85 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
+                                                        leadAudit.total_score >= 70 ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                                                        'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                                                    }`}>
+                                                        {leadAudit.total_score >= 85 ? '🟢 Sólido' : leadAudit.total_score >= 70 ? '🟡 Coaching' : '🔴 Intervención'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[9px] text-slate-400 truncate">
+                                                    {leadAudit.google_doc_url ? 'Google Doc Vinculado' : 'Notas de Meet registradas'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsGeminiAuditOpen(true)}
+                                            className="px-2 py-1 rounded-lg text-[10px] font-black text-indigo-300 hover:text-white bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 transition-all cursor-pointer whitespace-nowrap"
+                                        >
+                                            Ver Rúbrica
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="px-2.5 py-1.5 rounded-xl bg-slate-800/40 border border-slate-700/50 flex items-center justify-between text-[10px] text-slate-400 relative z-10">
+                                        <span className="flex items-center gap-1.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                            Pega el link de Google Docs o Gemini Meet
+                                        </span>
+                                        <span className="text-emerald-400 font-bold">100% Automático</span>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Primary Action Button */}

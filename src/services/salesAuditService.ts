@@ -387,9 +387,9 @@ export const salesAuditService = {
     },
 
     /**
-     * Obtiene las auditorías de un lead
+     * Obtiene las auditorías de un lead (por ID o por nombre de cliente)
      */
-    async getAuditsByLead(leadId: string): Promise<SalesCallAudit[]> {
+    async getAuditsByLead(leadId: string, leadName?: string): Promise<SalesCallAudit[]> {
         try {
             const { data, error } = await supabase
                 .from('sales_call_audits')
@@ -400,13 +400,13 @@ export const salesAuditService = {
                 .eq('lead_id', leadId)
                 .order('created_at', { ascending: false });
 
-            if (error || !data) {
-                return this.getLocalAuditsByLead(leadId);
+            if (error || !data || data.length === 0) {
+                return this.getLocalAuditsByLead(leadId, leadName);
             }
 
             return data;
         } catch {
-            return this.getLocalAuditsByLead(leadId);
+            return this.getLocalAuditsByLead(leadId, leadName);
         }
     },
 
@@ -488,16 +488,36 @@ export const salesAuditService = {
         return fullAudit;
     },
 
-    getLocalAuditsByLead(leadId: string): SalesCallAudit[] {
+    getLocalAuditsByLead(leadId: string, leadName?: string): SalesCallAudit[] {
         try {
+            const cleanLeadName = (leadName || '').toLowerCase().trim();
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
                 if (key?.startsWith('arias_sales_audits_')) {
                     const list: SalesCallAudit[] = JSON.parse(localStorage.getItem(key) || '[]');
-                    const filtered = list.filter(a => a.lead_id === leadId);
+                    const filtered = list.filter(a => {
+                        if (a.lead_id === leadId) return true;
+                        if (cleanLeadName) {
+                            const cName = ((a as any).clientName || a.lead_id || '').toLowerCase().trim();
+                            if (cName && (cName.includes(cleanLeadName) || cleanLeadName.includes(cName))) return true;
+                        }
+                        return false;
+                    });
                     if (filtered.length > 0) return filtered;
                 }
             }
+
+            // Si no está en cache local dinámico, buscar en las demostraciones oficiales certificadas
+            const certified = this.getCertifiedDemosAudits('demo');
+            const certifiedMatch = certified.filter(a => {
+                if (a.lead_id === leadId) return true;
+                if (cleanLeadName) {
+                    const cName = ((a as any).clientName || a.lead_id || '').toLowerCase().trim();
+                    if (cName && (cName.includes(cleanLeadName) || cleanLeadName.includes(cName))) return true;
+                }
+                return false;
+            });
+            if (certifiedMatch.length > 0) return certifiedMatch;
         } catch {}
         return [];
     },
@@ -511,6 +531,8 @@ export const salesAuditService = {
                 created_at: '2026-10-27T21:00:00-04:00', // 9:00 PM en Google Calendar (Martes 27 Oct)
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Finca Miramar',
+                lead_status: 'Cerrado',
+                deal_value: 1400,
                 meeting_notes_raw: 'Demostración 9:00 PM - 10:00 PM · Catálogo, cotizaciones dinámicas y facturación electrónica para múltiples sucursales agrícolas. Pico de calidad comercial con validación de flujos.'
             },
             {
@@ -521,6 +543,8 @@ export const salesAuditService = {
                 created_at: '2026-10-27T17:00:00-04:00', // 5:00 PM en Google Calendar (Martes 27 Oct)
                 google_doc_url: 'https://docs.google.com/document/d/10gpzd_2sI2VPGxBOvcVNrFYR_0Ey9gevRE8ixtKhkKU/edit',
                 clientName: 'Luis Escobar',
+                lead_status: 'Negociación',
+                deal_value: 588,
                 meeting_notes_raw: 'Demostración 5:00 PM - 6:00 PM · Presentada por Diana Morales (AE) · Cita agendada por Grecia Vásquez (SDR). Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
             },
             {
@@ -530,6 +554,8 @@ export const salesAuditService = {
                 created_at: '2026-10-27T12:00:00-04:00', // 12:00 PM en Google Calendar (Martes 27 Oct)
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Demo Arias ERP (Lead General)',
+                lead_status: 'Lead calificado',
+                deal_value: 900,
                 meeting_notes_raw: 'Demostración 12:00 PM - 1:00 PM · Presentación completa de funcionalidades core de ERP, reportería financiera y control de compras.'
             },
             {
@@ -539,6 +565,8 @@ export const salesAuditService = {
                 created_at: '2026-10-26T17:00:00-04:00', // 5:00 PM en Google Calendar (Lunes 26 Oct)
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Kervin Roque',
+                lead_status: 'Cerrado',
+                deal_value: 1200,
                 meeting_notes_raw: 'Demostración 5:00 PM - 6:00 PM · Evaluación de requerimientos para empresa de servicios, cotizaciones y seguimiento de clientes.'
             },
             {
@@ -548,6 +576,8 @@ export const salesAuditService = {
                 created_at: '2026-10-25T16:15:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Distribuidora San José',
+                lead_status: 'Negociación',
+                deal_value: 850,
                 meeting_notes_raw: 'Revisión técnica de flujo de pedidos, facturación fiscal y control de inventarios para ferretería mayorista.'
             },
             {
@@ -557,6 +587,8 @@ export const salesAuditService = {
                 created_at: '2026-10-21T14:40:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Agropecuaria El Roble',
+                lead_status: 'Negociación',
+                deal_value: 1100,
                 meeting_notes_raw: 'Configuración de órdenes de compra, control de almacenes ganaderos y roles de usuario para gerencia.'
             },
             {
@@ -566,6 +598,8 @@ export const salesAuditService = {
                 created_at: '2026-10-18T11:20:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Supermercados La Canasta',
+                lead_status: 'En seguimiento',
+                deal_value: 1800,
                 meeting_notes_raw: 'Apertura de sesión, presentación de puntos de venta POS y diagnóstico de control de caja para cadena retail.'
             },
             {
@@ -575,6 +609,8 @@ export const salesAuditService = {
                 created_at: '2026-10-06T11:00:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Transportes Express',
+                lead_status: 'Perdido',
+                deal_value: 0,
                 meeting_notes_raw: 'Presentación inicial de módulo de contratos, clientes recurrentes y control de facturas de transporte.'
             }
         ];
@@ -586,6 +622,8 @@ export const salesAuditService = {
                 company_id: companyId,
                 lead_id: d.lead_id,
                 clientName: d.clientName,
+                lead_status: d.lead_status,
+                deal_value: d.deal_value,
                 sales_rep_name: d.sales_rep_name,
                 sdr_rep_name: (d as any).sdr_rep_name || null,
                 google_doc_url: d.google_doc_url,
