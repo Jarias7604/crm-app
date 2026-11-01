@@ -80,7 +80,7 @@ export const LiveDemoHUDModal: React.FC<LiveDemoHUDModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-[10000] flex justify-end bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
-            <div className="w-full max-w-2xl bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full text-slate-800 overflow-hidden">
+            <div className="w-full sm:w-[680px] md:w-[720px] lg:w-[750px] sm:max-w-[85vw] bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full text-slate-800 overflow-hidden">
                 {/* Header Superior Limpio */}
                 <div className="px-6 py-5 bg-white border-b border-slate-100 flex items-center justify-between">
                     <div className="flex items-center gap-3">

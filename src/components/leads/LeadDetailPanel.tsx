@@ -262,13 +262,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const setIsDetailOpen = (val: boolean) => { if (!val) onClose(); };
 
             return (
-                <div className="fixed inset-0 z-[9999]">
+                <div className="fixed inset-0 z-[9999] flex justify-end">
                     <div className="absolute inset-0 bg-black/40 lead-sheet-backdrop" onClick={() => setIsDetailOpen(false)} />
-                    <div className="absolute inset-x-0 bottom-0 max-h-[94vh] rounded-t-[28px] sm:inset-y-0 sm:bottom-auto sm:left-auto sm:right-0 sm:max-h-full sm:w-[680px] md:w-[720px] lg:w-[750px] sm:max-w-[85vw] sm:rounded-none bg-[#F8FAFC] shadow-[-16px_0_48px_rgba(15,23,42,0.12)] flex flex-col overflow-hidden lead-sheet transition-all duration-300 ease-out border-l border-slate-200/80">
-                        {/* Mobile drag handle pill */}
-                        <div className="flex justify-center pt-3 pb-0 flex-shrink-0 sm:hidden">
-                            <div className="w-10 h-1 bg-gray-200 rounded-full" />
-                        </div>
+                    <div className="relative z-10 w-full sm:w-[680px] md:w-[720px] lg:w-[750px] sm:max-w-[85vw] h-full bg-[#F8FAFC] shadow-[-16px_0_48px_rgba(15,23,42,0.12)] flex flex-col overflow-hidden lead-sheet transition-all duration-300 ease-out border-l border-slate-200/80">
                         {/* Header Premium (Modo Claro, Elegante y Minimalista) */}
                         <div className="px-6 py-4 bg-white border-b border-slate-200/80 relative z-30 shadow-xs space-y-3">
                             {/* Fila 1: Avatar + Nombre + Empresa (Izquierda) y Acciones Rápidas en una sola línea (Derecha) */}
@@ -386,7 +382,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     }`}
                                 >
                                     <User className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                                    <span className="truncate">Ficha & Negocio</span>
+                                    <span className="truncate">Ficha Lead</span>
                                 </button>
 
                                 <button
@@ -399,7 +395,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     }`}
                                 >
                                     <Flame className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                                    <span className="truncate">Ventas & Método Arias</span>
+                                    <span className="truncate">Método Arias</span>
                                     {leadAudit ? (
                                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5 shrink-0" title="Auditado" />
                                     ) : null}
@@ -415,7 +411,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     }`}
                                 >
                                     <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                    <span className="truncate">Cotizaciones & Contratos</span>
+                                    <span className="truncate">Cotizaciones</span>
                                     {(leadCotizaciones.length + leadContracts.length) > 0 && (
                                         <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                                             {leadCotizaciones.length + leadContracts.length}
@@ -489,38 +485,46 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             {/* ── TAB 1: FICHA & NEGOCIO ── */}
                             {activeTab === 'info' && (
                                 <div className="space-y-6 animate-in fade-in duration-200">
-                                    {/* Quick Stats Executive Banner */}
-                                    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs grid grid-cols-2 sm:grid-cols-4 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                                        <div className="flex flex-col items-center justify-center p-2">
-                                            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-1.5">
-                                                <DollarSign className="w-4 h-4" />
+                                    {/* Quick Stats Executive Banner (Compacto, Bajo Perfil y Elegante) */}
+                                    <div className="bg-white rounded-xl px-4 py-2 border border-slate-200/80 shadow-xs grid grid-cols-2 sm:grid-cols-4 gap-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                                        <div className="flex items-center gap-2.5 px-2 py-1 min-w-0">
+                                            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                                                <DollarSign className="w-3.5 h-3.5" />
                                             </div>
-                                            <p className="text-xl font-black text-slate-800 tracking-tight truncate">${(selectedLead.value || 0).toLocaleString()}</p>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Inversión Potencial</p>
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">Inversión Potencial</p>
+                                                <p className="text-sm font-black text-slate-800 tracking-tight truncate leading-tight mt-0.5">${(selectedLead.value || 0).toLocaleString()}</p>
+                                            </div>
                                         </div>
 
-                                        <div className="flex flex-col items-center justify-center p-2">
-                                            <div className="w-8 h-8 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center mb-1.5">
-                                                <Target className="w-4 h-4" />
+                                        <div className="flex items-center gap-2.5 px-2 py-1 min-w-0">
+                                            <div className="w-7 h-7 rounded-lg bg-orange-50 text-orange-500 flex items-center justify-center shrink-0 border border-orange-100">
+                                                <Target className="w-3.5 h-3.5" />
                                             </div>
-                                            <div className="flex justify-center scale-105 mb-0.5"><PriorityBadge priority={selectedLead.priority || 'medium'} /></div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Temperatura</p>
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Temperatura</p>
+                                                <div className="leading-none scale-95 origin-left"><PriorityBadge priority={selectedLead.priority || 'medium'} /></div>
+                                            </div>
                                         </div>
 
-                                        <div className="flex flex-col items-center justify-center p-2">
-                                            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center mb-1.5">
-                                                <Activity className="w-4 h-4" />
+                                        <div className="flex items-center gap-2.5 px-2 py-1 min-w-0">
+                                            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0 border border-indigo-100">
+                                                <Activity className="w-3.5 h-3.5" />
                                             </div>
-                                            <div className="flex justify-center scale-105 mb-0.5"><StatusBadge status={selectedLead.status} /></div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Estado Lead</p>
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Estado Lead</p>
+                                                <div className="leading-none scale-95 origin-left"><StatusBadge status={selectedLead.status} /></div>
+                                            </div>
                                         </div>
 
-                                        <div className="flex flex-col items-center justify-center p-2">
-                                            <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center mb-1.5">
-                                                <Phone className="w-4 h-4" />
+                                        <div className="flex items-center gap-2.5 px-2 py-1 min-w-0">
+                                            <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100">
+                                                <Phone className="w-3.5 h-3.5" />
                                             </div>
-                                            <p className="text-xl font-black text-slate-800 tracking-tight">{selectedLead.contact_count || 0}</p>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Intentos Contacto</p>
+                                            <div className="min-w-0">
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">Intentos Contacto</p>
+                                                <p className="text-sm font-black text-slate-800 tracking-tight truncate leading-tight mt-0.5">{selectedLead.contact_count || 0} <span className="text-[10px] font-medium text-slate-400">llamadas</span></p>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -569,9 +573,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                         <button
                                                             type="button"
                                                             onClick={() => setIsManageSourcesOpen(true)}
-                                                            className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] cursor-pointer"
+                                                            className="text-indigo-600 hover:text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
                                                         >
-                                                            + gestionar
+                                                            Gestionar
                                                         </button>
                                                     </div>
                                                     <CustomSelect
@@ -598,9 +602,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                         <button
                                                             type="button"
                                                             onClick={() => setIsManageIndustriesOpen(true)}
-                                                            className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] cursor-pointer"
+                                                            className="text-indigo-600 hover:text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
                                                         >
-                                                            + gestionar
+                                                            Gestionar
                                                         </button>
                                                     </div>
                                                     <CustomSelect
@@ -627,9 +631,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                         <button
                                                             type="button"
                                                             onClick={() => setIsManageModalOpen(true)}
-                                                            className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] cursor-pointer"
+                                                            className="text-indigo-600 hover:text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
                                                         >
-                                                            + gestionar
+                                                            Gestionar
                                                         </button>
                                                     </div>
                                                     <CustomSelect
@@ -683,74 +687,77 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
 
                                         {/* Right Column: Operaciones, Finanzas y Canales */}
                                         <div className="space-y-6">
-                                            {/* Proyecciones Económicas */}
+                                            {/* Finanzas & Canales de Contacto Rápido */}
                                             <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
-                                                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                                                    <DollarSign className="w-4 h-4 text-emerald-600" /> Proyecciones Económicas
-                                                </h4>
-                                                <div className="grid grid-cols-2 gap-4 items-start">
-                                                    <div className="space-y-1.5">
-                                                        <div className="h-5 flex items-center">
-                                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate whitespace-nowrap">
-                                                                Potencial Estimado
-                                                            </label>
+                                                {/* Proyecciones Económicas */}
+                                                <div className="space-y-3">
+                                                    <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                                                        <DollarSign className="w-4 h-4 text-emerald-600" /> Proyecciones Económicas
+                                                    </h4>
+                                                    <div className="grid grid-cols-2 gap-3 items-start">
+                                                        <div className="space-y-1.5">
+                                                            <div className="h-5 flex items-center">
+                                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate whitespace-nowrap">
+                                                                    Potencial Estimado
+                                                                </label>
+                                                            </div>
+                                                            <div className="relative">
+                                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">$</div>
+                                                                <Input
+                                                                    type="number"
+                                                                    defaultValue={selectedLead.value || 0}
+                                                                    onBlur={(e) => handleUpdateLead({ value: Number(e.target.value) })}
+                                                                    className="h-10 pl-7 rounded-xl border-slate-200 bg-slate-50 font-black text-slate-800 focus:bg-white focus:ring-indigo-500 shadow-xs text-sm"
+                                                                />
+                                                            </div>
                                                         </div>
-                                                        <div className="relative">
-                                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">$</div>
-                                                            <Input
-                                                                type="number"
-                                                                defaultValue={selectedLead.value || 0}
-                                                                onBlur={(e) => handleUpdateLead({ value: Number(e.target.value) })}
-                                                                className="h-10 pl-7 rounded-xl border-slate-200 bg-slate-50 font-black text-slate-800 focus:bg-white focus:ring-indigo-500 shadow-xs text-sm"
-                                                            />
-                                                        </div>
-                                                    </div>
 
-                                                    <div className="space-y-1.5">
-                                                        <div className="h-5 flex items-center">
-                                                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate whitespace-nowrap">
-                                                                Cierre Real
-                                                            </label>
-                                                        </div>
-                                                        <div className="relative">
-                                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">$</div>
-                                                            <Input
-                                                                type="number"
-                                                                defaultValue={selectedLead.closing_amount || 0}
-                                                                onBlur={(e) => handleUpdateLead({ closing_amount: Number(e.target.value) })}
-                                                                className="h-10 pl-7 rounded-xl border-slate-200 bg-emerald-50/50 font-black text-emerald-700 focus:bg-white focus:ring-emerald-500 shadow-xs text-sm"
-                                                            />
+                                                        <div className="space-y-1.5">
+                                                            <div className="h-5 flex items-center">
+                                                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider truncate whitespace-nowrap">
+                                                                    Cierre Real
+                                                                </label>
+                                                            </div>
+                                                            <div className="relative">
+                                                                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">$</div>
+                                                                <Input
+                                                                    type="number"
+                                                                    defaultValue={selectedLead.closing_amount || 0}
+                                                                    onBlur={(e) => handleUpdateLead({ closing_amount: Number(e.target.value) })}
+                                                                    className="h-10 pl-7 rounded-xl border-slate-200 bg-emerald-50/50 font-black text-emerald-700 focus:bg-white focus:ring-emerald-500 shadow-xs text-sm"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
 
-                                            {/* Canales de Comunicación Rápida */}
-                                            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-3.5">
-                                                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                                                    <MessageSquare className="w-4 h-4 text-indigo-600" /> Centro de Mensajería
-                                                </h4>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'telegram' } });
-                                                        }}
-                                                        className="flex items-center justify-center gap-2 py-2.5 px-3 bg-slate-50 text-slate-700 rounded-xl font-bold text-xs hover:bg-sky-500 hover:text-white hover:border-sky-500 transition-all border border-slate-200 shadow-xs group cursor-pointer"
-                                                    >
-                                                        <Send className="w-3.5 h-3.5 text-sky-500 group-hover:text-white" /> Telegram Bot
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'whatsapp' } });
-                                                        }}
-                                                        className="flex items-center justify-center gap-2 py-2.5 px-3 bg-slate-50 text-slate-700 rounded-xl font-bold text-xs hover:bg-[#25D366] hover:text-white hover:border-[#25D366] transition-all border border-slate-200 shadow-xs group cursor-pointer"
-                                                    >
-                                                        <Smartphone className="w-3.5 h-3.5 text-[#25D366] group-hover:text-white" /> WhatsApp
-                                                    </button>
+                                                {/* Canales de Contacto Directo */}
+                                                <div className="pt-2 border-t border-slate-100 space-y-2.5">
+                                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                                        <MessageSquare className="w-3.5 h-3.5 text-indigo-500" /> Mensajería Rápida
+                                                    </h5>
+                                                    <div className="grid grid-cols-2 gap-2.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'telegram' } });
+                                                            }}
+                                                            className="flex items-center justify-center gap-2 py-2 px-3 bg-sky-50/70 hover:bg-sky-100 text-sky-700 rounded-xl font-bold text-xs transition-all border border-sky-200/60 shadow-2xs group cursor-pointer active:scale-95"
+                                                        >
+                                                            <Send className="w-3.5 h-3.5 text-sky-500 group-hover:scale-110 transition-transform" /> Telegram Bot
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'whatsapp' } });
+                                                            }}
+                                                            className="flex items-center justify-center gap-2 py-2 px-3 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs transition-all border border-emerald-200/60 shadow-2xs group cursor-pointer active:scale-95"
+                                                        >
+                                                            <Smartphone className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" /> WhatsApp
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
 
