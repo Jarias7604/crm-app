@@ -1,13 +1,35 @@
 import { useState, useRef } from 'react';
-import { Phone, X, Loader2, Clock, CalendarPlus } from 'lucide-react';
+import { 
+    Phone, 
+    X, 
+    Loader2, 
+    Clock, 
+    CalendarPlus, 
+    Check, 
+    MessageSquare, 
+    Mail, 
+    Send, 
+    User, 
+    CheckCircle2, 
+    PhoneMissed, 
+    Voicemail, 
+    PhoneOff, 
+    AlertCircle, 
+    FileText, 
+    Users,
+    Sparkles
+} from 'lucide-react';
 import { SessionTimer } from './ui/SessionTimer';
-import { callActivityService, ACTION_TYPE_CONFIG, CALL_OUTCOME_CONFIG, type CallOutcome, type ActionType } from '../services/callActivity';
+import { callActivityService, type CallOutcome, type ActionType } from '../services/callActivity';
 import { leadsService } from '../services/leads';
 import { supabase } from '../services/supabase';
 import type { Lead, LeadStatus, FollowUpActionType } from '../types';
 import toast from 'react-hot-toast';
 import { useTimezone } from '../hooks/useTimezone';
 import { localToUtcISO, DEFAULT_TIMEZONE } from '../utils/timezone';
+import { CustomSelect } from './ui/CustomSelect';
+import { CustomDatePicker } from './ui/CustomDatePicker';
+import { STATUS_CONFIG } from '../types';
 
 interface QuickActionLoggerProps {
     lead: Lead;
@@ -20,8 +42,33 @@ interface QuickActionLoggerProps {
     callStartedAt?: number;
 }
 
-// Only these action types appear in the "Tipo de Acción" selector
-const CHANNEL_ACTION_TYPES: ActionType[] = ['call', 'email', 'whatsapp', 'telegram'];
+// ── Canales de contacto con iconos vectoriales ──────────────────────────────
+const CHANNEL_CONFIG: Record<ActionType, { label: string; icon: typeof Phone }> = {
+    call: { label: 'Llamada', icon: Phone },
+    whatsapp: { label: 'WhatsApp', icon: MessageSquare },
+    email: { label: 'Correo', icon: Mail },
+    telegram: { label: 'Telegram', icon: Send },
+    quote_sent: { label: 'Cotización', icon: FileText },
+    info_sent: { label: 'Info Enviada', icon: Send },
+    meeting: { label: 'Reunión', icon: Users },
+};
+const CHANNEL_ACTION_TYPES: ActionType[] = ['call', 'whatsapp', 'email', 'telegram'];
+
+// ── Resultados con iconos vectoriales y etiquetas limpias ───────────────────
+interface OutcomeConfig {
+    label: string;
+    icon: typeof CheckCircle2;
+    iconColor: string;
+}
+
+const OUTCOME_CONFIG_MAP: Record<CallOutcome, OutcomeConfig> = {
+    connected: { label: 'Conectado / Habló', icon: CheckCircle2, iconColor: 'text-emerald-600' },
+    no_answer: { label: 'Sin respuesta', icon: PhoneMissed, iconColor: 'text-amber-500' },
+    voicemail: { label: 'Buzón de voz', icon: Voicemail, iconColor: 'text-blue-500' },
+    busy: { label: 'Ocupado', icon: PhoneOff, iconColor: 'text-rose-500' },
+    wrong_number: { label: 'Nro. equivocado', icon: AlertCircle, iconColor: 'text-slate-400' },
+    scheduled: { label: 'Programada', icon: CalendarPlus, iconColor: 'text-indigo-500' },
+};
 
 // Which outcomes make sense for each channel action type
 const OUTCOME_BY_ACTION: Record<ActionType, CallOutcome[]> = {
@@ -34,38 +81,28 @@ const OUTCOME_BY_ACTION: Record<ActionType, CallOutcome[]> = {
     meeting: ['connected', 'no_answer'],
 };
 
-// Additional outcome-style options always shown in the Resultado section
+// Special outcomes
 type SpecialOutcome = 'quote_sent' | 'info_sent' | 'meeting';
-const SPECIAL_OUTCOME_CONFIG: Record<SpecialOutcome, { label: string; icon: string }> = {
-    quote_sent: { label: 'Cotización', icon: '📋' },
-    info_sent: { label: 'Info Enviada', icon: '📄' },
-    meeting: { label: 'Reunión', icon: '🤝' },
+const SPECIAL_OUTCOME_CONFIG: Record<SpecialOutcome, OutcomeConfig> = {
+    quote_sent: { label: 'Cotización Enviada', icon: FileText, iconColor: 'text-indigo-600' },
+    info_sent: { label: 'Info Enviada', icon: Send, iconColor: 'text-sky-600' },
+    meeting: { label: 'Reunión Realizada', icon: Users, iconColor: 'text-purple-600' },
 };
 const SPECIAL_OUTCOMES: SpecialOutcome[] = ['quote_sent', 'info_sent', 'meeting'];
 
-// Custom outcome labels per action type (override generic ones)
-const OUTCOME_OVERRIDES: Partial<Record<ActionType, Partial<Record<CallOutcome, { label: string; icon: string }>>>> = {
+// Custom outcome labels per action type
+const OUTCOME_OVERRIDES: Partial<Record<ActionType, Partial<Record<CallOutcome, Partial<OutcomeConfig>>>>> = {
     email: {
-        connected: { label: 'Enviado', icon: '✅' },
-        no_answer: { label: 'Sin respuesta', icon: '📵' },
+        connected: { label: 'Email enviado' },
+        no_answer: { label: 'Sin respuesta' },
     },
     whatsapp: {
-        connected: { label: 'Respondió', icon: '✅' },
-        no_answer: { label: 'No leído', icon: '📵' },
+        connected: { label: 'Respondió chat' },
+        no_answer: { label: 'No leído / Pendiente' },
     },
     telegram: {
-        connected: { label: 'Respondió', icon: '✅' },
-        no_answer: { label: 'No leído', icon: '📵' },
-    },
-    quote_sent: {
-        connected: { label: 'Enviada', icon: '✅' },
-    },
-    info_sent: {
-        connected: { label: 'Enviada', icon: '✅' },
-    },
-    meeting: {
-        connected: { label: 'Realizada', icon: '✅' },
-        no_answer: { label: 'No asistió', icon: '📵' },
+        connected: { label: 'Respondió mensaje' },
+        no_answer: { label: 'No leído / Pendiente' },
     },
 };
 
@@ -85,7 +122,7 @@ const TIME_SLOTS = (() => {
     const slots: { value: string; label: string }[] = [];
     for (let h = 6; h <= 21; h++) {
         for (const m of [0, 30]) {
-            if (h === 21 && m === 30) continue; // stop at 9:00 PM
+            if (h === 21 && m === 30) continue;
             const hour24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
             const hour12 = h === 12 ? 12 : h > 12 ? h - 12 : h === 0 ? 12 : h;
             const ampm = h >= 12 ? 'PM' : 'AM';
@@ -96,7 +133,6 @@ const TIME_SLOTS = (() => {
     return slots;
 })();
 
-// Format date for display in Spanish
 const formatDateES = (dateStr: string) => {
     if (!dateStr) return '';
     try {
@@ -120,32 +156,22 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
     const [isSaving, setIsSaving] = useState(false);
     const [newStatus, setNewStatus] = useState<string>('');
 
-    // Track when this form was opened — used for timer + quality score.
-    // If callStartedAt is provided (mobile click-to-call), use that as the real start time.
+    // Track when form was opened
     const openedAtRef = useRef(callStartedAt ?? Date.now());
 
-    // ── Quality Score: live calculation based on form state ──────────────────
+    // Quality Score calculation
     const calcQualityScore = () => {
         try {
             let score = 0;
             const effectiveOutcome = specialOutcome ? 'connected' : outcome;
             const sessionSecs = (Date.now() - (openedAtRef.current || Date.now())) / 1000;
 
-            // +20  Connected or special outcome (real conversation/action)
             if (effectiveOutcome === 'connected') score += 20;
-
-            // +10  Notes written (> 15 chars)
             if (notes && notes.trim().length > 15) score += 10;
-            // +5   Bonus: detailed notes (> 60 chars)
             if (notes && notes.trim().length > 60) score += 5;
-
-            // +20  Follow-up scheduled
             if (wantsFollowUp && followUpDate) score += 20;
-
-            // +15  Real session time > 90 seconds (conversation actually happened)
             if (sessionSecs > 90) score += 15;
 
-            // +30  Timely response: registered within 2h of scheduled follow-up
             if (lead?.next_followup_date) {
                 const targetTime = new Date(lead.next_followup_date).getTime();
                 if (!isNaN(targetTime)) {
@@ -160,18 +186,16 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
         }
     };
 
-    // Company timezone for correct UTC storage (fallback to El Salvador if not yet loaded)
     const { timezone: rawTimezone } = useTimezone(companyId);
     const companyTimezone = rawTimezone || DEFAULT_TIMEZONE;
 
-    // Independent follow-up toggle (decoupled from outcome)
+    // Follow-up scheduling
     const [wantsFollowUp, setWantsFollowUp] = useState(false);
     const [followUpDate, setFollowUpDate] = useState('');
     const [followUpTime, setFollowUpTime] = useState('09:00');
     const [followUpNote, setFollowUpNote] = useState('');
     const [followUpAssignee, setFollowUpAssignee] = useState(lead.assigned_to || '');
 
-    // When action type changes, reset outcome to first valid one
     const handleActionTypeChange = (type: ActionType) => {
         setActionType(type);
         const validOutcomes = OUTCOME_BY_ACTION[type];
@@ -180,19 +204,16 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
         }
     };
 
-    // Toggle special outcome (Cotización / Info Enviada / Reunión)
     const handleSpecialOutcome = (key: SpecialOutcome) => {
         setSpecialOutcome(prev => prev === key ? null : key);
     };
 
-    // Get outcome config with overrides
-    const getOutcomeConfig = (oc: CallOutcome) => {
+    const getOutcomeConfig = (oc: CallOutcome): OutcomeConfig => {
+        const base = OUTCOME_CONFIG_MAP[oc];
         const override = OUTCOME_OVERRIDES[actionType]?.[oc];
-        const base = CALL_OUTCOME_CONFIG[oc];
         return override ? { ...base, ...override } : base;
     };
 
-    // Default follow-up date to tomorrow
     const getDefaultDate = () => {
         try {
             const tomorrow = new Date();
@@ -203,27 +224,17 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
         }
     };
 
-    // Toggle follow-up scheduling
-    const handleFollowUpToggle = (e?: React.MouseEvent) => {
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-        try {
-            const next = !wantsFollowUp;
-            setWantsFollowUp(next);
-            if (next && !followUpDate) {
-                setFollowUpDate(getDefaultDate());
-            }
-        } catch (err) {
-            console.error('Error toggling follow-up:', err);
+    const handleFollowUpToggle = () => {
+        const next = !wantsFollowUp;
+        setWantsFollowUp(next);
+        if (next && !followUpDate) {
+            setFollowUpDate(getDefaultDate());
         }
     };
 
     const handleSubmit = async () => {
         if (isSaving) return;
 
-        // Validate follow-up date if scheduling
         if (wantsFollowUp && !followUpDate) {
             toast.error('Selecciona una fecha para el seguimiento');
             return;
@@ -232,8 +243,6 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
         setIsSaving(true);
 
         try {
-            // 1. Log the contact activity with the REAL outcome
-            // If a special outcome is selected, use it as the actionType and 'connected' as outcome
             const effectiveActionType: ActionType = specialOutcome ?? actionType;
             const effectiveOutcome: CallOutcome = specialOutcome ? 'connected' : outcome;
             await callActivityService.logCall({
@@ -247,12 +256,10 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                 durationSeconds: durationMinutes ? Number(durationMinutes) * 60 : undefined,
             });
 
-            // If asesor selected a new status, update the lead
             if (newStatus && newStatus !== lead.status) {
                 await leadsService.updateLead(lead.id, { status: newStatus as any });
             }
 
-            // Increment contact_count atomically (non-fatal if blocked)
             try {
                 const { data: currentLead } = await supabase.from('leads').select('contact_count').eq('id', lead.id).single();
                 await supabase.from('leads').update({ contact_count: ((currentLead?.contact_count as number) || 0) + 1 }).eq('id', lead.id);
@@ -260,9 +267,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                 console.warn('Non-fatal: could not increment contact_count:', cntErr);
             }
 
-            // 2. If user wants a follow-up, create it independently
             if (wantsFollowUp && followUpDate) {
-                // Convert local time → UTC using company timezone (e.g. America/El_Salvador)
                 const followUpDateTime = localToUtcISO(`${followUpDate}T${followUpTime}`, companyTimezone);
                 const followUpActionType = ACTION_TO_FOLLOWUP[actionType];
 
@@ -270,7 +275,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                     lead_id: lead.id,
                     company_id: companyId || lead.company_id,
                     date: followUpDateTime,
-                    notes: followUpNote.trim() || `Seguimiento: ${ACTION_TYPE_CONFIG[actionType].label}`,
+                    notes: followUpNote.trim() || `Seguimiento: ${CHANNEL_CONFIG[actionType].label}`,
                     action_type: followUpActionType,
                 }, followUpAssignee || undefined);
 
@@ -279,10 +284,9 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
             }
 
             const effectiveLabel = specialOutcome
-                ? SPECIAL_OUTCOME_CONFIG[specialOutcome].icon + ' ' + SPECIAL_OUTCOME_CONFIG[specialOutcome].label
-                : ACTION_TYPE_CONFIG[actionType].icon + ' ' + ACTION_TYPE_CONFIG[actionType].label;
-            const actionLabel = effectiveLabel;
-            toast.success(`${actionLabel} registrada`);
+                ? SPECIAL_OUTCOME_CONFIG[specialOutcome].label
+                : CHANNEL_CONFIG[actionType].label;
+            toast.success(`${effectiveLabel} registrada`);
 
             onCallLogged(!!(newStatus && newStatus !== lead.status), newStatus ? newStatus as any : undefined);
             onClose();
@@ -294,353 +298,379 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
         }
     };
 
-
-
-    // Show duration field for calls and meetings (including meeting as special outcome)
     const showDuration = actionType === 'call' || specialOutcome === 'meeting';
     const validOutcomes = OUTCOME_BY_ACTION[actionType];
 
+    // Status dropdown options
+    const statusOptions = [
+        { value: '', label: `Sin cambio — Mantener (${lead.status})` },
+        ...Object.entries(STATUS_CONFIG)
+            .filter(([key]) => key !== lead.status)
+            .map(([key, config]) => ({
+                value: key,
+                label: config.label,
+                icon: config.icon,
+            })),
+    ];
+
+    // Team member options for follow-up
+    const assigneeOptions = [
+        { value: '', label: 'Sin asignar' },
+        ...(Array.isArray(teamMembers) ? teamMembers : [])
+            .filter(Boolean)
+            .map(m => {
+                const emailPrefix = typeof m?.email === 'string' && m.email.includes('@') ? m.email.split('@')[0] : '';
+                return {
+                    value: m?.id || '',
+                    label: m?.full_name || emailPrefix || 'Usuario',
+                };
+            }),
+    ];
+
+    const leadSubtitle = lead.company_name && lead.company_name !== lead.name
+        ? `${lead.name} • ${lead.company_name}`
+        : lead.name;
+
     return (
-        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 p-5 animate-in fade-in duration-300">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-emerald-600 rounded-xl flex items-center justify-center shadow-md">
-                        <Phone className="w-4 h-4 text-white" />
+        <div className="bg-white rounded-t-2xl sm:rounded-2xl border-t sm:border border-slate-200/90 shadow-2xl overflow-hidden flex flex-col font-sans w-full">
+            {/* Header Limpio & Profesional (Modelo Enterprise) */}
+            <div className="px-3 sm:px-5 py-2.5 sm:py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-bold text-xs shadow-2xs shrink-0">
+                        <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </div>
-                    <div>
-                        <h4 className="text-xs font-black text-gray-900 uppercase tracking-widest">Registrar Acción</h4>
-                        <p className="text-[10px] text-gray-500 font-medium">{lead.name}</p>
+                    <div className="min-w-0">
+                        <h4 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight truncate">
+                            Registrar Seguimiento
+                        </h4>
+                        <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">
+                            {leadSubtitle}
+                        </p>
                     </div>
                 </div>
                 <button
+                    type="button"
                     onClick={onClose}
-                    className="p-1.5 rounded-lg hover:bg-white/60 transition-colors"
+                    className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
+                    title="Cerrar"
                 >
-                    <X className="w-4 h-4 text-gray-400" />
+                    <X className="w-4 h-4" />
                 </button>
             </div>
 
-            {/* Action Type Selector */}
-            <div className="mb-4">
-                <label className="block text-[9px] font-black uppercase tracking-widest text-gray-500 mb-2 ml-1">
-                    Tipo de Acción
-                </label>
-                <div className="flex gap-1.5 flex-wrap">
-                    {CHANNEL_ACTION_TYPES.map(key => {
-                        const config = ACTION_TYPE_CONFIG[key];
-                        return (
-                            <button
-                                key={key}
-                                onClick={() => handleActionTypeChange(key)}
-                                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${actionType === key
-                                    ? 'bg-white shadow-md border-emerald-300 text-gray-900 scale-[1.03]'
-                                    : 'bg-white/40 border-transparent text-gray-500 hover:bg-white/70 hover:border-gray-200'
+            {/* Contenido Formulario con Scroll Interno — Espacios optimizados en las esquinas */}
+            <div className="p-2 sm:p-4 space-y-3 overflow-y-auto max-h-[78vh]">
+                {/* ── 1. CANAL DE CONTACTO (4 Segmented Tabs con Iconos Vectoriales) ── */}
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                        Canal de Contacto
+                    </label>
+                    <div className="grid grid-cols-4 gap-1 p-0.5 bg-slate-100 rounded-xl border border-slate-200">
+                        {CHANNEL_ACTION_TYPES.map(key => {
+                            const config = CHANNEL_CONFIG[key];
+                            const ChannelIcon = config.icon;
+                            const isSelected = actionType === key;
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => handleActionTypeChange(key)}
+                                    className={`flex items-center justify-center gap-1 sm:gap-1.5 py-1.5 sm:py-2 px-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        isSelected
+                                            ? 'bg-white text-blue-700 shadow-sm border border-slate-200/80 font-black'
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
                                     }`}
-                            >
-                                <span className="text-sm">{config.icon}</span>
-                                <span className="hidden sm:inline">{config.label}</span>
-                            </button>
-                        );
-                    })}
+                                >
+                                    <ChannelIcon className={`w-3.5 h-3.5 ${isSelected ? 'text-blue-600' : 'text-slate-500'}`} />
+                                    <span className="text-[10px] sm:text-[11px] tracking-tight">{config.label}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
-            </div>
 
-            {/* Outcome Selector (adapts to action type — no more "scheduled") */}
-            <div className="mb-4">
-                <label className="block text-[9px] font-black uppercase tracking-widest text-gray-500 mb-2 ml-1">
-                    Resultado
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                    {validOutcomes.map(key => {
-                        const config = getOutcomeConfig(key);
-                        return (
-                            <button
-                                key={key}
-                                onClick={() => { setOutcome(key); setSpecialOutcome(null); }}
-                                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${outcome === key && !specialOutcome
-                                    ? 'bg-white shadow-md border-emerald-300 text-gray-900 scale-[1.02]'
-                                    : 'bg-white/40 border-transparent text-gray-500 hover:bg-white/70 hover:border-gray-200'
+                {/* ── 2. RESULTADO DE LA ACCIÓN (2 COLUMNAS ORDENADAS, ICONOS VECTORIALES, SIN RECORTE) ── */}
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                        Resultado del Contacto
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                        {validOutcomes.map(key => {
+                            const config = getOutcomeConfig(key);
+                            const OutcomeIcon = config.icon;
+                            const isSelected = outcome === key && !specialOutcome;
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => { setOutcome(key); setSpecialOutcome(null); }}
+                                    className={`min-h-[42px] px-2.5 py-2 rounded-xl text-xs transition-all border flex items-center gap-2 text-left cursor-pointer active:scale-98 ${
+                                        isSelected
+                                            ? 'bg-blue-50/80 border-blue-600 text-blue-950 font-bold ring-1 ring-blue-600 shadow-2xs'
+                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
                                     }`}
-                            >
-                                <span className="text-sm">{config.icon}</span>
-                                <span className="truncate">{config.label}</span>
-                            </button>
-                        );
-                    })}
-                    {/* Special outcomes: Cotización, Info Enviada, Reunión */}
-                    {SPECIAL_OUTCOMES.map(key => {
-                        const config = SPECIAL_OUTCOME_CONFIG[key];
-                        return (
-                            <button
-                                key={key}
-                                onClick={() => handleSpecialOutcome(key)}
-                                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${specialOutcome === key
-                                    ? 'bg-white shadow-md border-amber-300 text-gray-900 scale-[1.02]'
-                                    : 'bg-white/40 border-transparent text-gray-500 hover:bg-white/70 hover:border-gray-200'
-                                    }`}
-                            >
-                                <span className="text-sm">{config.icon}</span>
-                                <span className="truncate">{config.label}</span>
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
+                                >
+                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                                        isSelected ? 'bg-blue-100/80' : 'bg-slate-100'
+                                    }`}>
+                                        <OutcomeIcon className={`w-3.5 h-3.5 ${config.iconColor}`} />
+                                    </div>
+                                    <span className="text-[11px] font-semibold leading-tight line-clamp-2">
+                                        {config.label}
+                                    </span>
+                                </button>
+                            );
+                        })}
 
-            {/* ===== CAMBIO DE ESTADO (Opcional) ===== */}
-            <div className="mb-4">
-                <label className="block text-[9px] font-black uppercase tracking-widest text-gray-500 mb-2 ml-1">
-                    ¿Cambió el estado del lead? <span className="font-normal text-gray-400">(Opcional)</span>
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                    <button
-                        onClick={() => setNewStatus('')}
-                        className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all border ${
-                            newStatus === ''
-                                ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
-                                : 'bg-white/60 border-gray-200 text-gray-400 hover:border-gray-300'
-                        }`}
-                    >
-                        Sin cambio
-                    </button>
-                    {[
-                        { s: 'Llamada fría', icon: '📲' },
-                        { s: 'Lead calificado', icon: '⭐' },
-                        { s: 'En seguimiento', icon: '📞' },
-                        { s: 'Negociación', icon: '💼' },
-                        { s: 'En Nutrición', icon: '🌱' },
-                        { s: 'Perdido', icon: '❌' },
-                    ]
-                        .filter(({ s }) => s !== lead.status)
-                        .map(({ s, icon }) => (
-                            <button
-                                key={s}
-                                onClick={() => setNewStatus(prev => prev === s ? '' : s)}
-                                className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all border ${
-                                    newStatus === s
-                                        ? 'bg-violet-600 text-white border-violet-600 shadow-sm scale-[1.03]'
-                                        : 'bg-white/60 border-gray-200 text-gray-500 hover:border-violet-300 hover:text-violet-600'
-                                }`}
-                            >
-                                {icon} {s}
-                            </button>
-                        ))
-                    }
+                        {/* Special outcomes: Cotización, Info Enviada, Reunión */}
+                        {SPECIAL_OUTCOMES.map(key => {
+                            const config = SPECIAL_OUTCOME_CONFIG[key];
+                            const OutcomeIcon = config.icon;
+                            const isSelected = specialOutcome === key;
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => handleSpecialOutcome(key)}
+                                    className={`min-h-[42px] px-2.5 py-2 rounded-xl text-xs transition-all border flex items-center gap-2 text-left cursor-pointer active:scale-98 ${
+                                        isSelected
+                                            ? 'bg-indigo-50/80 border-indigo-600 text-indigo-950 font-bold ring-1 ring-indigo-600 shadow-2xs'
+                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-2xs'
+                                    }`}
+                                >
+                                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                                        isSelected ? 'bg-indigo-100/80' : 'bg-slate-100'
+                                    }`}>
+                                        <OutcomeIcon className={`w-3.5 h-3.5 ${config.iconColor}`} />
+                                    </div>
+                                    <span className="text-[11px] font-semibold leading-tight line-clamp-2">
+                                        {config.label}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
-                {newStatus && newStatus !== lead.status && (
-                    <p className="text-[9px] text-violet-600 font-bold mt-1.5 ml-1">
-                        ✓ Se registrará el cambio: <span className="font-black">{lead.status} → {newStatus}</span>
-                    </p>
+
+                {/* ── 3. CAMBIO DE ESTADO (CustomSelect) ── */}
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                        ¿Cambió el estado del prospecto? <span className="text-slate-400 font-normal lowercase">(opcional)</span>
+                    </label>
+                    <CustomSelect
+                        value={newStatus}
+                        onChange={(val) => setNewStatus(val)}
+                        options={statusOptions}
+                        placeholder={`Sin cambio — Mantener (${lead.status})`}
+                    />
+                    {newStatus && (
+                        <p className="text-[11px] text-blue-600 font-bold mt-1.5 flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Se actualizará a: <strong className="font-extrabold">{lead.status} → {newStatus}</strong></span>
+                        </p>
+                    )}
+                </div>
+
+                {/* ── 4. DURACIÓN DE LA LLAMADA ── */}
+                {showDuration && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-blue-600" />
+                                <span>Duración de la llamada</span>
+                            </label>
+                            <SessionTimer openedAt={openedAtRef.current} />
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            {(() => {
+                                const autoMin = Math.max(1, Math.round((Date.now() - openedAtRef.current) / 60000));
+                                return (
+                                    <button
+                                        type="button"
+                                        onClick={() => setDurationMinutes(autoMin)}
+                                        className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                            durationMinutes === autoMin
+                                                ? 'bg-blue-600 text-white shadow-2xs'
+                                                : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <Clock className="w-3 h-3" /> Auto ({autoMin}m)
+                                    </button>
+                                );
+                            })()}
+                            {[1, 5, 10, 15, 30].map(min => (
+                                <button
+                                    key={min}
+                                    type="button"
+                                    onClick={() => setDurationMinutes(min)}
+                                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                        durationMinutes === min
+                                            ? 'bg-blue-600 text-white shadow-2xs'
+                                            : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-300'
+                                    }`}
+                                >
+                                    {min} min
+                                </button>
+                            ))}
+                        </div>
+                    </div>
                 )}
-            </div>
 
-            {/* ===== INDEPENDENT FOLLOW-UP TOGGLE ===== */}
-            <div className="mb-4">
-                <div className="flex items-center gap-3">
+                {/* ── 5. NOTAS DE LA CONVERSACIÓN ── */}
+                <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                        Resumen de la Conversación / Notas <span className="text-slate-400 font-normal lowercase">(opcional)</span>
+                    </label>
+                    <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={2}
+                        placeholder="¿Qué se habló con el cliente? Requerimientos, acuerdos..."
+                        className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs sm:text-sm font-medium text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all resize-none shadow-2xs leading-relaxed"
+                    />
+                </div>
+
+                {/* ── 6. AGENDAR PRÓXIMO SEGUIMIENTO ── */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
                     <button
                         type="button"
                         onClick={handleFollowUpToggle}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${wantsFollowUp ? 'bg-purple-600' : 'bg-gray-200'
-                            }`}
+                        className={`w-full flex items-center justify-between p-3 transition-colors cursor-pointer text-left ${
+                            wantsFollowUp ? 'bg-indigo-50/70 border-b border-indigo-100' : 'bg-slate-50/70 hover:bg-slate-100/70'
+                        }`}
                     >
-                        <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${wantsFollowUp ? 'translate-x-6' : 'translate-x-1'
-                                }`}
-                        />
-                    </button>
-                    <div className="flex items-center gap-1.5">
-                        <CalendarPlus className={`w-3.5 h-3.5 ${wantsFollowUp ? 'text-purple-600' : 'text-gray-400'}`} />
-                        <span className={`text-xs font-bold ${wantsFollowUp ? 'text-purple-700' : 'text-gray-600'}`}>
-                            ¿Agendar seguimiento?
-                        </span>
-                    </div>
-                </div>
-
-                {/* Follow-Up Scheduler (independent from outcome) */}
-                {wantsFollowUp && (
-                    <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                        <div className="flex items-center gap-2 mb-3">
-                            <CalendarPlus className="w-4 h-4 text-purple-600" />
-                            <span className="text-[10px] font-black uppercase tracking-widest text-purple-700">
-                                Agendar Seguimiento
+                        <div className="flex items-center gap-2">
+                            <CalendarPlus className={`w-4 h-4 ${wantsFollowUp ? 'text-indigo-600' : 'text-slate-500'}`} />
+                            <span className={`text-xs font-bold ${wantsFollowUp ? 'text-indigo-900 font-extrabold' : 'text-slate-700'}`}>
+                                ¿Agendar próximo seguimiento con fecha?
                             </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div className={`w-9 h-5 rounded-full transition-colors relative flex items-center p-0.5 ${
+                            wantsFollowUp ? 'bg-indigo-600' : 'bg-slate-300'
+                        }`}>
+                            <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+                                wantsFollowUp ? 'translate-x-4' : 'translate-x-0'
+                            }`} />
+                        </div>
+                    </button>
+
+                    {wantsFollowUp && (
+                        <div className="p-3 bg-indigo-50/30 space-y-2.5 animate-in fade-in duration-200">
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                                        Fecha
+                                    </label>
+                                    <CustomDatePicker
+                                        value={followUpDate}
+                                        onChange={setFollowUpDate}
+                                        minDate={todayISO}
+                                        variant="white"
+                                        placeholder="Seleccionar fecha"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                                        Hora
+                                    </label>
+                                    <select
+                                        value={followUpTime}
+                                        onChange={(e) => setFollowUpTime(e.target.value)}
+                                        className="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-700 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all cursor-pointer h-9"
+                                    >
+                                        {TIME_SLOTS.map(slot => (
+                                            <option key={slot.value} value={slot.value}>{slot.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Ejecutivo Asignado */}
+                            {Array.isArray(teamMembers) && teamMembers.length > 0 && (
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                                        Asignar a Ejecutivo
+                                    </label>
+                                    <CustomSelect
+                                        value={followUpAssignee}
+                                        onChange={setFollowUpAssignee}
+                                        options={assigneeOptions}
+                                        placeholder="Asignar ejecutivo"
+                                    />
+                                </div>
+                            )}
+
                             <div>
-                                <label className="block text-[8px] font-bold text-purple-500 uppercase mb-1 ml-1">Fecha</label>
+                                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                                    Objetivo del Seguimiento
+                                </label>
                                 <input
-                                    type="date"
-                                    value={followUpDate}
-                                    min={todayISO}
-                                    onChange={(e) => setFollowUpDate(e.target.value)}
-                                    className="w-full bg-white border border-purple-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none cursor-pointer"
+                                    type="text"
+                                    value={followUpNote}
+                                    onChange={(e) => setFollowUpNote(e.target.value)}
+                                    placeholder='Ej: "Llamar para confirmar recepción de propuesta"'
+                                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
                                 />
                             </div>
-                            <div>
-                                <label className="block text-[8px] font-bold text-purple-500 uppercase mb-1 ml-1">Hora</label>
-                                <select
-                                    value={followUpTime}
-                                    onChange={(e) => setFollowUpTime(e.target.value)}
-                                    className="w-full bg-white border border-purple-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none appearance-none cursor-pointer"
-                                >
-                                    {TIME_SLOTS.map(slot => (
-                                        <option key={slot.value} value={slot.value}>{slot.label}</option>
-                                    ))}
-                                </select>
-                            </div>
                         </div>
-                        {/* Assignee Selector */}
-                        {Array.isArray(teamMembers) && teamMembers.length > 0 && (
-                            <div className="mb-3">
-                                <label className="block text-[8px] font-bold text-purple-500 uppercase mb-1 ml-1">Ejecutivo Asignado</label>
-                                <select
-                                    value={followUpAssignee}
-                                    onChange={(e) => setFollowUpAssignee(e.target.value)}
-                                    className="w-full bg-white border border-purple-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none appearance-none cursor-pointer"
-                                >
-                                    <option value="">Sin asignar</option>
-                                    {teamMembers.filter(Boolean).map(m => {
-                                        const emailPrefix = typeof m?.email === 'string' && m.email.includes('@') ? m.email.split('@')[0] : '';
-                                        const label = m?.full_name || emailPrefix || 'Usuario';
-                                        return (
-                                            <option key={m?.id || String(Math.random())} value={m?.id || ''}>
-                                                {label}
-                                            </option>
-                                        );
-                                    })}
-                                </select>
-                            </div>
-                        )}
-                        <input
-                            type="text"
-                            value={followUpNote}
-                            onChange={(e) => setFollowUpNote(e.target.value)}
-                            placeholder={`Nota: ej. "Enviar propuesta actualizada"`}
-                            className="w-full bg-white border border-purple-200 rounded-lg px-3 py-2 text-xs font-medium placeholder:text-gray-300 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none"
-                        />
-                    </div>
-                )}
-            </div>
-
-            {/* Quick Notes */}
-            <div className="mb-4">
-                <label className="block text-[9px] font-black uppercase tracking-widest text-gray-500 mb-2 ml-1">
-                    Nota rápida (opcional)
-                </label>
-                <textarea
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                    placeholder="¿Qué se discutió? ¿Próximos pasos?"
-                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium placeholder:text-gray-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all outline-none resize-none"
-                />
-            </div>
-
-            {/* Call Duration (only for calls & meetings) */}
-            {showDuration && (
-                <div className="mb-4">
-                    {/* Duration label + live session timer side by side */}
-                    <div className="flex items-center justify-between mb-2">
-                        <label className="text-[9px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-1 ml-1">
-                            <Clock className="w-3 h-3" />Duración (minutos)
-                        </label>
-                        <SessionTimer openedAt={openedAtRef.current} />
-                    </div>
-                    <div className="flex gap-1 flex-wrap">
-                        {/* Auto chip — session time suggestion */}
-                        {(() => {
-                            const autoMin = Math.max(1, Math.round((Date.now() - openedAtRef.current) / 60000));
-                            return (
-                                <button
-                                    type="button"
-                                    onClick={() => setDurationMinutes(autoMin)}
-                                    className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all flex items-center gap-1 ${durationMinutes === autoMin
-                                        ? 'bg-emerald-600 text-white shadow-sm'
-                                        : 'bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                                        }`}
-                                    title="Basado en tiempo de sesión"
-                                >
-                                    ⏱️ {autoMin}m
-                                </button>
-                            );
-                        })()}
-                        {[1, 5, 10, 15, 30].map(min => (
-                            <button
-                                key={min}
-                                type="button"
-                                onClick={() => setDurationMinutes(min)}
-                                className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all ${durationMinutes === min
-                                    ? 'bg-emerald-600 text-white shadow-sm'
-                                    : 'bg-white border border-gray-200 text-gray-500 hover:border-emerald-300 hover:text-emerald-600'
-                                    }`}
-                            >
-                                {min}m
-                            </button>
-                        ))}
-                    </div>
+                    )}
                 </div>
-            )}
 
-            {/* ── F2: Live Quality Score ─────────────────────────────────── */}
-            {(() => {
-                const score = calcQualityScore();
-                const isGreat = score >= 80;
-                const isOk = score >= 50;
-                const barColor = isGreat ? 'bg-green-500' : isOk ? 'bg-yellow-400' : 'bg-orange-400';
-                const textColor = isGreat ? 'text-green-600' : isOk ? 'text-yellow-600' : 'text-orange-500';
-                const label = isGreat ? 'Excelente' : isOk ? 'Buena' : 'Básica';
-                const sessionSecs = (Date.now() - openedAtRef.current) / 1000;
-                return (
-                    <div className="mb-4 bg-white/80 rounded-xl px-3 py-2.5 border border-gray-100">
-                        <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Calidad</span>
-                            <span className={`text-[10px] font-black ${textColor}`}>{score}/100 · {label}</span>
+                {/* ── 7. CALIDAD DEL REGISTRO (Minimalista) ── */}
+                {(() => {
+                    const score = calcQualityScore();
+                    const isGreat = score >= 80;
+                    const isOk = score >= 50;
+                    const barColor = isGreat ? 'bg-emerald-500' : isOk ? 'bg-amber-500' : 'bg-blue-500';
+                    const textColor = isGreat ? 'text-emerald-700' : isOk ? 'text-amber-700' : 'text-blue-700';
+                    const label = isGreat ? 'Excelente' : isOk ? 'Buena' : 'Básica';
+                    return (
+                        <div className="bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Calidad de Información</span>
+                                <span className={`text-[11px] font-black ${textColor}`}>{score}/100 • {label}</span>
+                            </div>
+                            <div className="w-full h-1 bg-slate-200 rounded-full overflow-hidden">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-300 ${barColor}`}
+                                    style={{ width: `${score}%` }}
+                                />
+                            </div>
                         </div>
-                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-2">
-                            <div
-                                className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                                style={{ width: `${score}%` }}
-                            />
-                        </div>
-                        <div className="flex gap-2 flex-wrap">
-                            {(specialOutcome ? 'connected' : outcome) === 'connected' && <span className="text-[8px] font-bold text-green-600">✓ Conectado</span>}
-                            {notes.trim().length > 15 && <span className="text-[8px] font-bold text-blue-600">✓ Notas</span>}
-                            {wantsFollowUp && followUpDate && <span className="text-[8px] font-bold text-purple-600">✓ Seguimiento</span>}
-                            {sessionSecs > 90 && <span className="text-[8px] font-bold text-teal-600">✓ Sesión activa</span>}
-                            {score < 50 && <span className="text-[8px] text-gray-400">Agrega notas y agenda seguimiento</span>}
-                        </div>
-                    </div>
-                );
-            })()}
+                    );
+                })()}
+            </div>
 
-            {/* Submit */}
-            <div className="flex gap-3">
+            {/* Footer con Botones de Acción (Accesibles al Pulgar) */}
+            <div className="p-2.5 sm:p-4 border-t border-slate-200/90 bg-slate-50/90 flex items-center gap-2 shrink-0">
                 <button
+                    type="button"
                     onClick={onClose}
-                    className="flex-1 bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 font-black px-4 py-3 rounded-xl text-[10px] uppercase tracking-widest transition-all"
+                    className="py-2.5 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs transition-all cursor-pointer"
                 >
                     Cancelar
                 </button>
                 <button
+                    type="button"
                     onClick={handleSubmit}
                     disabled={isSaving}
-                    className={`flex-[2] text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${wantsFollowUp
-                        ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
-                        : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
-                        }`}
+                    className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm text-white shadow-md flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer disabled:opacity-50 ${
+                        wantsFollowUp
+                            ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-indigo-600/20'
+                            : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-600/20'
+                    }`}
                 >
                     {isSaving ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                     ) : wantsFollowUp ? (
                         <>
-                            <CalendarPlus className="w-3.5 h-3.5" />
-                            Registrar + Agendar
+                            <CalendarPlus className="w-4 h-4" />
+                            <span>Registrar y Agendar</span>
                         </>
                     ) : (
                         <>
-                            <span className="text-sm">{ACTION_TYPE_CONFIG[actionType].icon}</span>
-                            Registrar {ACTION_TYPE_CONFIG[actionType].label}
+                            <Check className="w-4 h-4" />
+                            <span>Registrar {CHANNEL_CONFIG[actionType].label}</span>
                         </>
                     )}
                 </button>

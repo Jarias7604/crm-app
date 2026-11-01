@@ -267,26 +267,20 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                     <div className="absolute inset-0 bg-black/40 lead-sheet-backdrop" onClick={() => setIsDetailOpen(false)} />
                     <div className="relative z-10 w-full sm:w-[680px] md:w-[720px] lg:w-[750px] sm:max-w-[85vw] h-full bg-[#F8FAFC] shadow-[-16px_0_48px_rgba(15,23,42,0.12)] flex flex-col overflow-hidden lead-sheet transition-all duration-300 ease-out border-l border-slate-200/80">
                         {/* Header Enterprise Compacto & Cómodo (Bajo perfil, máximo espacio vertical para el teclado y datos) */}
-                        <div className="bg-white border-b border-slate-200 relative z-30 px-3.5 sm:px-6 py-2 sm:py-2.5 shadow-2xs space-y-1.5 shrink-0">
+                        <div className="bg-white border-b border-slate-200 relative z-30 px-2.5 sm:px-6 py-2 sm:py-2.5 shadow-2xs space-y-1.5 shrink-0">
                             {/* Fila 1: Breadcrumb + Acciones Rápidas */}
                             <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 text-xs text-slate-500 min-w-0">
-                                    <button 
-                                        type="button"
-                                        onClick={() => setIsDetailOpen(false)}
-                                        className="text-blue-600 hover:text-blue-800 font-semibold cursor-pointer truncate hover:underline flex items-center gap-0.5"
-                                    >
-                                        <ChevronLeft className="w-3.5 h-3.5" />
-                                        <span>Prospectos</span>
-                                    </button>
-                                    <span className="text-slate-300">/</span>
-                                    <span className="text-slate-700 font-bold truncate max-w-[130px] sm:max-w-[220px]">
-                                        {selectedLead.name || 'Detalle'}
-                                    </span>
-                                </div>
+                                <button 
+                                    type="button"
+                                    onClick={() => setIsDetailOpen(false)}
+                                    className="text-slate-600 hover:text-blue-600 font-bold text-xs cursor-pointer hover:underline flex items-center gap-1 py-1 px-1.5 -ml-1 rounded-lg hover:bg-slate-100 transition-all shrink-0"
+                                >
+                                    <ChevronLeft className="w-4 h-4 text-blue-600" />
+                                    <span>Prospectos</span>
+                                </button>
 
-                                {/* Acciones de Cabecera (Botones claros y cómodos para móvil y desktop) */}
-                                <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                                {/* Acciones de Cabecera (Separadas, cómodas y accesibles sin amontonamiento) */}
+                                <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
                                     {/* Botón WhatsApp directo (si tiene teléfono) */}
                                     {selectedLead.phone && (
                                         <button
@@ -295,7 +289,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 const link = getWhatsAppLink(selectedLead.phone || '');
                                                 if (link) window.open(link, '_blank');
                                             }}
-                                            className="h-7 sm:h-7.5 px-2 sm:px-2.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1 font-semibold text-xs transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                            className="h-8 sm:h-8.5 px-2.5 sm:px-3 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1.5 font-bold text-xs transition-all shadow-2xs active:scale-95 cursor-pointer"
                                             title="Abrir WhatsApp"
                                         >
                                             <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
@@ -303,29 +297,29 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         </button>
                                     )}
 
-                                    {/* Botón Registrar Acción */}
+                                    {/* Botón Registrar Acción / Seguimiento */}
                                     <button
                                         type="button"
                                         onClick={() => setIsCallLoggerOpen(!isCallLoggerOpen)}
-                                        className={`h-7 sm:h-7.5 px-2.5 sm:px-3 rounded-md font-semibold text-xs tracking-wide transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                                        className={`h-8 sm:h-8.5 px-2.5 sm:px-3 rounded-lg font-bold text-xs tracking-wide transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-95 ${
                                             isCallLoggerOpen
                                                 ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300'
                                                 : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
                                         }`}
-                                        title={isCallLoggerOpen ? 'Cerrar registro de actividad' : 'Registrar llamada o actividad'}
+                                        title={isCallLoggerOpen ? 'Cerrar registro de seguimiento' : 'Registrar nuevo seguimiento'}
                                     >
-                                        <Phone className="w-3.5 h-3.5" />
-                                        <span className="hidden sm:inline">{isCallLoggerOpen ? 'Cerrar' : 'Registrar Acción'}</span>
+                                        <Plus className="w-3.5 h-3.5" />
+                                        <span>{isCallLoggerOpen ? 'Cerrar' : 'Seguimiento'}</span>
                                     </button>
 
                                     {/* Botón QR */}
                                     <button
                                         type="button"
                                         onClick={handleOpenQr}
-                                        className="h-7 sm:h-7.5 w-7 sm:w-7.5 rounded-md bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                        className="h-8 sm:h-8.5 w-8 sm:w-8.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
                                         title="Código QR WhatsApp"
                                     >
-                                        <QrCode className="w-3.5 h-3.5" />
+                                        <QrCode className="w-4 h-4" />
                                     </button>
 
                                     {/* Botón Eliminar Lead (Admin) */}
@@ -333,10 +327,10 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         <button
                                             type="button"
                                             onClick={() => handleDeleteLead(selectedLead.id, selectedLead.name)}
-                                            className="h-7 sm:h-7.5 w-7 sm:w-7.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 border border-slate-200 hover:border-red-200 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                            className="h-8 sm:h-8.5 w-8 sm:w-8.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 border border-slate-200 hover:border-red-200 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
                                             title="Eliminar Lead"
                                         >
-                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <Trash2 className="w-4 h-4" />
                                         </button>
                                     )}
 
@@ -344,7 +338,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setIsDetailOpen(false)}
-                                        className="h-7 sm:h-7.5 w-7 sm:w-7.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
+                                        className="h-8 sm:h-8.5 w-8 sm:w-8.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 border border-slate-200 flex items-center justify-center transition-all shadow-2xs active:scale-95 cursor-pointer"
                                         title="Cerrar panel"
                                     >
                                         <X className="w-4 h-4" />
@@ -377,8 +371,8 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         </div>
 
                         {/* Navigation Tabs (Estilo Enterprise Limpio y Organizado — Sin fatiga visual) */}
-                        <div className="bg-white border-b border-slate-200 relative z-20 shrink-0 px-4 sm:px-6">
-                            <div className="flex items-center gap-4 sm:gap-8 text-xs overflow-x-auto no-scrollbar scroll-smooth">
+                        <div className="bg-white border-b border-slate-200 relative z-20 shrink-0 px-2.5 sm:px-6">
+                            <div className="flex items-center gap-2.5 sm:gap-8 text-xs overflow-x-auto no-scrollbar scroll-smooth">
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab('info')}
@@ -436,7 +430,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     }`}
                                 >
                                     <Clock className={`w-3.5 h-3.5 ${activeTab === 'activity' ? 'text-blue-600' : 'text-slate-400'}`} />
-                                    <span>Trazabilidad</span>
+                                    <span>Seguimientos</span>
                                     {(followUps.length + messages.length + callActivities.length) > 0 && (
                                         <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
                                             {followUps.length + messages.length + callActivities.length}
@@ -446,49 +440,8 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             </div>
                         </div>
 
-                        {/* Content Scrollable Container */}
-                        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-3.5 sm:p-6 pb-40 space-y-4 sm:space-y-6">
-                            {/* Quick Action Logger Drawer */}
-                            {isCallLoggerOpen && (
-                                <div className="bg-white rounded-2xl p-5 border border-indigo-100 shadow-md animate-in fade-in duration-200">
-                                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">
-                                                <Phone className="w-4 h-4" />
-                                            </div>
-                                            <h4 className="text-xs font-black uppercase text-slate-900 tracking-wider">
-                                                Registrador Rápido de Actividad
-                                            </h4>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsCallLoggerOpen(false)}
-                                            className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
-                                        >
-                                            Cerrar
-                                        </button>
-                                    </div>
-                                    <SectionErrorBoundary fallbackTitle="Error al mostrar el registrador de acciones">
-                                        <QuickActionLogger
-                                            lead={selectedLead}
-                                            companyId={localStorage.getItem('simulated_company_id') || profile?.company_id || ''}
-                                            teamMembers={Array.isArray(teamMembers) ? teamMembers : []}
-                                            callStartedAt={callStartedAt ?? undefined}
-                                            onCallLogged={async (statusChanged, newStatus) => {
-                                                if (statusChanged && newStatus) {
-                                                    await handleUpdateLead({ status: newStatus });
-                                                }
-                                                loadFollowUps(selectedLead.id);
-                                            }}
-                                            onClose={() => {
-                                                setIsCallLoggerOpen(false);
-                                                setCallStartedAt(null);
-                                            }}
-                                        />
-                                    </SectionErrorBoundary>
-                                </div>
-                            )}
-
+                        {/* Content Scrollable Container — Aprovechamiento total de esquinas */}
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-2 sm:p-6 pb-28 space-y-3 sm:space-y-6">
                             {/* ── TAB 1: FICHA & NEGOCIO ── */}
                             {activeTab === 'info' && (
                                 <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
@@ -1214,11 +1167,21 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 <div className="space-y-5 animate-in fade-in duration-200">
                                     {/* Filter Chips & Counter Header */}
                                     <div className="bg-white rounded-lg p-3.5 border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-                                        <div className="flex items-center gap-2">
-                                            <Clock className="w-4 h-4 text-blue-600" />
-                                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                                                Línea de Tiempo ({followUps.length + messages.length + callActivities.length})
-                                            </h4>
+                                        <div className="flex items-center justify-between w-full sm:w-auto gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <Clock className="w-4 h-4 text-blue-600" />
+                                                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                                                    Línea de Tiempo ({followUps.length + messages.length + callActivities.length})
+                                                </h4>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsCallLoggerOpen(true)}
+                                                className="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" />
+                                                <span>Nuevo</span>
+                                            </button>
                                         </div>
 
                                         <div className="flex items-center gap-1.5 text-xs font-bold">
@@ -1387,7 +1350,78 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 </div>
                             )}
                         </div>
+
+                        {/* ── BARRA FIJA INFERIOR DE ACCIÓN (ZONA DEL PULGAR - CRÍTICO EN MÓVIL) ── */}
+                        <div className="bg-white border-t border-slate-200/90 px-2.5 sm:px-6 py-2 sm:py-2.5 shadow-[0_-4px_20px_rgba(15,23,42,0.06)] relative z-30 shrink-0 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 shrink-0">
+                                {selectedLead.phone && (
+                                    <a
+                                        href={`tel:${selectedLead.phone}`}
+                                        className="h-10 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center gap-1.5 font-bold text-xs transition-all active:scale-95 border border-slate-200 shadow-2xs"
+                                        title="Llamar por teléfono"
+                                    >
+                                        <Phone className="w-4 h-4 text-slate-700" />
+                                        <span className="hidden sm:inline">Llamar</span>
+                                    </a>
+                                )}
+                                {selectedLead.phone && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const link = getWhatsAppLink(selectedLead.phone || '');
+                                            if (link) window.open(link, '_blank');
+                                        }}
+                                        className="h-10 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 flex items-center justify-center gap-1.5 font-bold text-xs transition-all active:scale-95 border border-emerald-200 shadow-2xs cursor-pointer"
+                                        title="Abrir WhatsApp"
+                                    >
+                                        <Smartphone className="w-4 h-4 text-emerald-600" />
+                                        <span className="hidden sm:inline">WhatsApp</span>
+                                    </button>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsCallLoggerOpen(true)}
+                                className="flex-1 h-10 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm tracking-wide shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 transition-all active:scale-98 cursor-pointer"
+                            >
+                                <Plus className="w-4 h-4" />
+                                <span>Registrar Seguimiento</span>
+                            </button>
+                        </div>
                     </div>
+
+                    {/* ── MODAL / BOTTOM SHEET: REGISTRADOR RÁPIDO DE ACCIONES & SEGUIMIENTO ── */}
+                    {isCallLoggerOpen && (
+                        <div className="fixed inset-0 z-[10000] flex flex-col justify-end bg-slate-900/60 backdrop-blur-sm animate-fade-in p-0 sm:p-4 sm:items-center sm:justify-center">
+                            <div 
+                                className="fixed inset-0 bg-transparent"
+                                onClick={() => {
+                                    setIsCallLoggerOpen(false);
+                                    setCallStartedAt(null);
+                                }}
+                            />
+                            <div className="relative max-w-lg w-full z-10 animate-in slide-in-from-bottom-5 duration-200">
+                                <SectionErrorBoundary fallbackTitle="Error al mostrar el registrador de acciones">
+                                    <QuickActionLogger
+                                        lead={selectedLead}
+                                        companyId={localStorage.getItem('simulated_company_id') || profile?.company_id || ''}
+                                        teamMembers={Array.isArray(teamMembers) ? teamMembers : []}
+                                        callStartedAt={callStartedAt ?? undefined}
+                                        onCallLogged={async (statusChanged, newStatus) => {
+                                            if (statusChanged && newStatus) {
+                                                await handleUpdateLead({ status: newStatus });
+                                            }
+                                            loadDetails();
+                                        }}
+                                        onClose={() => {
+                                            setIsCallLoggerOpen(false);
+                                            setCallStartedAt(null);
+                                        }}
+                                    />
+                                </SectionErrorBoundary>
+                            </div>
+                        </div>
+                    )}
 
                     {/* WhatsApp QR Modal overlay */}
                     {isQrModalOpen && selectedLead.phone && (

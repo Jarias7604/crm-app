@@ -37,7 +37,7 @@ export const EnterpriseCardHeader: React.FC<EnterpriseCardHeaderProps> = ({
 }) => {
     return (
         <div
-            className={`bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between rounded-t-lg ${className}`}
+            className={`bg-slate-50/90 border-b border-slate-200 px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between rounded-t-lg ${className}`}
         >
             <div className="flex items-center gap-2 min-w-0">
                 {icon && <span className="text-blue-600 shrink-0">{icon}</span>}
@@ -58,7 +58,7 @@ interface EnterpriseCardContentProps extends React.HTMLAttributes<HTMLDivElement
 
 export const EnterpriseCardContent: React.FC<EnterpriseCardContentProps> = ({
     children,
-    className = 'p-4 space-y-4',
+    className = 'p-3 sm:p-4 space-y-3 sm:space-y-4',
     ...props
 }) => {
     return (
