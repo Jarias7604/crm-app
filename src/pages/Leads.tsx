@@ -1566,7 +1566,7 @@ export default function Leads() {
     return (
         <>
             
-            <div className="w-full max-w-[1500px] mx-auto pb-6 space-y-3">
+            <div className="w-full max-w-[1500px] mx-auto pb-6 space-y-3 overflow-x-hidden">
                 <LeadToolbar 
                 filteredLeads={filteredLeads}
                 leads={leads}
@@ -1645,11 +1645,11 @@ export default function Leads() {
             )}
             {/* ── Pipeline Segment Toggle Banner ─────────────────────────────────── */}
             {statusFilter === 'all' && !filteredLeadId && !filteredLeadIds && (
-                <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-2xl px-3 py-2 shadow-sm">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-1 hidden sm:block">Vista:</span>
+                <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-2xl px-3 py-2 shadow-sm overflow-x-auto no-scrollbar scrollbar-none max-w-full">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-1 hidden sm:block shrink-0">Vista:</span>
                     <button
                         onClick={() => { setPipelineView('active'); }}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
+                        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
                             pipelineView === 'active'
                                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
                                 : 'text-gray-500 hover:bg-gray-50'
@@ -1672,7 +1672,7 @@ export default function Leads() {
                     </button>
                     <button
                         onClick={() => { setPipelineView('pool'); }}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
+                        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
                             pipelineView === 'pool'
                                 ? 'bg-orange-500 text-white shadow-md shadow-orange-200'
                                 : 'text-gray-500 hover:bg-gray-50'
@@ -1695,7 +1695,7 @@ export default function Leads() {
                     </button>
                     <button
                         onClick={() => { setPipelineView('all'); }}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
+                        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
                             pipelineView === 'all'
                                 ? 'bg-gray-700 text-white shadow-md shadow-gray-200'
                                 : 'text-gray-500 hover:bg-gray-50'

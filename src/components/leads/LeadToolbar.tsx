@@ -825,7 +825,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                             </div>
                         )}
 
-                        <div className="flex-1 min-w-[220px] max-w-sm">
+                        <div className="flex-1 min-w-0 w-full sm:w-auto sm:min-w-[200px] max-w-full sm:max-w-sm">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                                 <input

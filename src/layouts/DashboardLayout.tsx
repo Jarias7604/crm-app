@@ -27,7 +27,7 @@ export default function DashboardLayout() {
     useSessionTimeout();
 
     return (
-        <div className="min-h-screen bg-[#F8F9FD]">
+        <div className="min-h-screen bg-[#F8F9FD] w-full max-w-full overflow-x-hidden">
             {/* Desktop Sidebar - Hidden on mobile */}
             <div className="hidden md:block">
                 <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
@@ -39,7 +39,7 @@ export default function DashboardLayout() {
             {/* Main Content Area */}
             {/* Dynamic padding based on sidebar state */}
             <div className={cn(
-                "transition-all duration-300 ease-in-out flex flex-col",
+                "transition-all duration-300 ease-in-out flex flex-col w-full max-w-full overflow-x-hidden",
                 isImmersiveView
                     ? "h-screen overflow-hidden pb-16 md:pb-0"
                     : "min-h-screen pb-20 md:pb-0",
@@ -48,8 +48,8 @@ export default function DashboardLayout() {
                 {/* Optimized Global Header - Hidden on Quote Detail & Chat for immersion */}
                 {!isImmersiveView && (
                     <header className={cn(
-                        "w-full pt-3 pb-4",
-                        isFullWidthView ? "px-3 md:px-5" : "px-4 md:px-8"
+                        "w-full pt-3 pb-4 overflow-x-hidden",
+                        isFullWidthView ? "px-2.5 md:px-5" : "px-3 sm:px-4 md:px-8"
                     )}>
                         <div className={cn(
                             "flex items-center justify-between",
@@ -96,12 +96,12 @@ export default function DashboardLayout() {
 
                 {/* Main Content Area - Clean separation */}
                 <main className={cn(
-                    "w-full transition-all",
+                    "w-full max-w-full overflow-x-hidden transition-all",
                     isImmersiveView
                         ? "flex-1 overflow-hidden flex flex-col pt-0 px-0 pb-0"
                         : isFullWidthView
                             ? "flex-1 pb-6 w-full px-2 md:px-4"
-                            : "flex-1 pb-8 max-w-[1580px] mx-auto px-4 md:px-8"
+                            : "flex-1 pb-8 max-w-[1580px] mx-auto px-2 sm:px-4 md:px-8"
                 )}>
                     <Outlet />
                 </main>
