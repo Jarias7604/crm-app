@@ -63,7 +63,6 @@ const ProjectManagement = lazy(() => import('./pages/ProjectManagement'));
 const PipelineConfig    = lazy(() => import('./pages/admin/PipelineConfig'));
 const CallBot           = lazy(() => import('./pages/admin/CallBot'));
 const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
-const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })));
 const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
 const TestFlyer         = lazy(() => import('./pages/marketing/TestFlyer'));
 const SocialHub         = lazy(() => import('./pages/marketing/SocialHub'));
@@ -202,9 +201,6 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <Toaster position="top-right" reverseOrder={false} />
-          <Suspense fallback={null}>
-            <PWAInstallPrompt />
-          </Suspense>
           <Suspense fallback={<PageSkeleton />}>
             <NewAdminOnboardingGuard />
             <Routes>
