@@ -420,21 +420,7 @@ export const salesAuditService = {
         sdrTotals: Record<string, { count: number; lastDemo: string; demos: string[] }>;
         latestAudits: SalesCallAudit[];
     }> {
-        try {
-            const { data, error } = await supabase
-                .from('sales_call_audits')
-                .select(`
-                    *,
-                    profiles:evaluated_user_id(full_name, email, avatar_url)
-                `)
-                .eq('company_id', companyId)
-                .order('created_at', { ascending: false })
-                .limit(100);
-
-            const localAudits = this.getAllLocalAudits(companyId);
-            // Las demostraciones certificadas de Google Calendar tienen prioridad y verdad absoluta
-            const audits: SalesCallAudit[] = localAudits;
-
+        const computeStats = (audits: SalesCallAudit[]) => {
             if (audits.length === 0) {
                 return { totalAudits: 0, avgScore: 0, repAverages: {}, sdrTotals: {}, latestAudits: [] };
             }
@@ -472,15 +458,14 @@ export const salesAuditService = {
                 sdrTotals,
                 latestAudits: audits.slice(0, 10)
             };
+        };
+
+        try {
+            const localAudits = this.getAllLocalAudits(companyId);
+            return computeStats(localAudits);
         } catch {
-            const fallbackAudits = this.getAllLocalAudits(companyId);
-            return {
-                totalAudits: fallbackAudits.length,
-                avgScore: fallbackAudits.length ? Math.round(fallbackAudits.reduce((acc, a) => acc + a.total_score, 0) / fallbackAudits.length) : 0,
-                repAverages: {},
-                sdrTotals: {},
-                latestAudits: fallbackAudits.slice(0, 10)
-            };
+            const fallbackAudits = this.getCertifiedDemosAudits(companyId);
+            return computeStats(fallbackAudits);
         }
     },
 
@@ -523,7 +508,7 @@ export const salesAuditService = {
                 id: 'audit_finca_miramar',
                 lead_id: 'lead_finca_miramar',
                 sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-27T21:00:00Z', // 9:00 PM CST en Google Calendar (Martes 27 Oct)
+                created_at: '2026-10-27T21:00:00-04:00', // 9:00 PM en Google Calendar (Martes 27 Oct)
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Finca Miramar',
                 meeting_notes_raw: 'Demostración 9:00 PM - 10:00 PM · Catálogo, cotizaciones dinámicas y facturación electrónica para múltiples sucursales agrícolas. Pico de calidad comercial con validación de flujos.'
@@ -533,7 +518,7 @@ export const salesAuditService = {
                 lead_id: 'lead_luis_escobar',
                 sales_rep_name: 'Diana Morales', // AE que condujo y dio la demo
                 sdr_rep_name: 'Grecia Vásquez',  // SDR que coordinó y agendó la demo
-                created_at: '2026-10-27T17:00:00Z', // 5:00 PM CST en Google Calendar (Martes 27 Oct)
+                created_at: '2026-10-27T17:00:00-04:00', // 5:00 PM en Google Calendar (Martes 27 Oct)
                 google_doc_url: 'https://docs.google.com/document/d/10gpzd_2sI2VPGxBOvcVNrFYR_0Ey9gevRE8ixtKhkKU/edit',
                 clientName: 'Luis Escobar',
                 meeting_notes_raw: 'Demostración 5:00 PM - 6:00 PM · Presentada por Diana Morales (AE) · Cita agendada por Grecia Vásquez (SDR). Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
@@ -542,7 +527,7 @@ export const salesAuditService = {
                 id: 'audit_arias_demo_27',
                 lead_id: 'lead_arias_demo_27',
                 sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-27T12:00:00Z', // 12:00 PM CST en Google Calendar (Martes 27 Oct)
+                created_at: '2026-10-27T12:00:00-04:00', // 12:00 PM en Google Calendar (Martes 27 Oct)
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Demo Arias ERP (Lead General)',
                 meeting_notes_raw: 'Demostración 12:00 PM - 1:00 PM · Presentación completa de funcionalidades core de ERP, reportería financiera y control de compras.'
@@ -551,7 +536,7 @@ export const salesAuditService = {
                 id: 'audit_kervin_roque',
                 lead_id: 'lead_kervin_roque',
                 sales_rep_name: 'Patricia Martínez',
-                created_at: '2026-10-26T17:00:00Z', // 5:00 PM CST en Google Calendar (Lunes 26 Oct)
+                created_at: '2026-10-26T17:00:00-04:00', // 5:00 PM en Google Calendar (Lunes 26 Oct)
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Kervin Roque',
                 meeting_notes_raw: 'Demostración 5:00 PM - 6:00 PM · Evaluación de requerimientos para empresa de servicios, cotizaciones y seguimiento de clientes.'
@@ -560,7 +545,7 @@ export const salesAuditService = {
                 id: 'audit_distribuidora_sanjose',
                 lead_id: 'lead_distribuidora_sanjose',
                 sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-25T16:15:00Z',
+                created_at: '2026-10-25T16:15:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Distribuidora San José',
                 meeting_notes_raw: 'Revisión técnica de flujo de pedidos, facturación fiscal y control de inventarios para ferretería mayorista.'
@@ -569,7 +554,7 @@ export const salesAuditService = {
                 id: 'audit_agropecuaria_roble',
                 lead_id: 'lead_agropecuaria_roble',
                 sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-21T14:40:00Z',
+                created_at: '2026-10-21T14:40:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Agropecuaria El Roble',
                 meeting_notes_raw: 'Configuración de órdenes de compra, control de almacenes ganaderos y roles de usuario para gerencia.'
@@ -578,19 +563,19 @@ export const salesAuditService = {
                 id: 'audit_supermercados_canasta',
                 lead_id: 'lead_supermercados_canasta',
                 sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-18T11:20:00Z',
+                created_at: '2026-10-18T11:20:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Supermercados La Canasta',
                 meeting_notes_raw: 'Apertura de sesión, presentación de puntos de venta POS y diagnóstico de control de caja para cadena retail.'
             },
             {
-                id: 'audit_comercializadora_valle',
-                lead_id: 'lead_comercializadora_valle',
-                sales_rep_name: 'Diana Morales',
-                created_at: '2026-10-12T10:00:00Z',
+                id: 'audit_transportes_express',
+                lead_id: 'lead_transportes_express',
+                sales_rep_name: 'Patricia Martínez',
+                created_at: '2026-10-06T11:00:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
-                clientName: 'Comercializadora del Valle',
-                meeting_notes_raw: 'Presentación de reportería financiera ejecutiva, balance de costos y logística para distribución de alimentos.'
+                clientName: 'Transportes Express',
+                meeting_notes_raw: 'Presentación inicial de módulo de contratos, clientes recurrentes y control de facturas de transporte.'
             }
         ];
 

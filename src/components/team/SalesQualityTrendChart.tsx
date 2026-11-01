@@ -24,14 +24,14 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
 
     // Datos temporales de Octubre sincronizados con Google Calendar y Google Drive
     const timelineData = [
-        { date: 'Oct 01', label: 'Oct 1', scoreTeam: 24, scoreDiana: 24, scorePatricia: 24, demos: 0, client: 'Inicio de periodo', milestone: 'Línea base sin rúbrica' },
-        { date: 'Oct 12', label: 'Oct 12', scoreTeam: 31, scoreDiana: 32, scorePatricia: 29, demos: 1, client: 'Comercializadora del Valle', milestone: 'Diana M. · Reportería y costos' },
-        { date: 'Oct 18', label: 'Oct 18', scoreTeam: 36, scoreDiana: 37, scorePatricia: 32, demos: 1, client: 'Supermercados La Canasta', milestone: 'Diana M. · Diagnóstico de caja' },
-        { date: 'Oct 21', label: 'Oct 21', scoreTeam: 37, scoreDiana: 38, scorePatricia: 34, demos: 1, client: 'Agropecuaria El Roble', milestone: 'Diana M. · Adopción de agenda' },
-        { date: 'Oct 25', label: 'Oct 25', scoreTeam: 41, scoreDiana: 42, scorePatricia: 36, demos: 1, client: 'Distribuidora San José', milestone: 'Diana M. · Manejo de objeciones' },
-        { date: 'Oct 26', label: 'Oct 26', scoreTeam: 35, scoreDiana: 38, scorePatricia: 35, demos: 1, client: 'Kervin Roque', milestone: 'Patricia M. · 5-6pm Calendar' },
-        { date: 'Oct 27', label: 'Oct 27', scoreTeam: 39, scoreDiana: 39, scorePatricia: 35, demos: 3, client: '3 Demos Diana Morales: Demo ERP (12pm), Luis Escobar (5pm), Finca Miramar (9pm)', milestone: 'Diana M. · 3 Demos en Google Calendar (12pm, 5pm, 9pm)' },
-        { date: 'Oct 31', label: 'Oct 31', scoreTeam: 40, scoreDiana: 40, scorePatricia: 35, demos: 0, client: 'Cierre del Mes', milestone: 'Consolidación de rúbrica' }
+        { date: 'Oct 01', label: '1 oct', scoreTeam: 24, scoreDiana: 24, scorePatricia: 24, demos: 0, client: 'Inicio de periodo', milestone: 'Línea base sin rúbrica' },
+        { date: 'Oct 06', label: '6 oct', scoreTeam: 28, scoreDiana: 24, scorePatricia: 28, demos: 1, client: 'Transportes Express', milestone: 'Patricia M. · Flotillas y contratos' },
+        { date: 'Oct 18', label: '18 oct', scoreTeam: 36, scoreDiana: 37, scorePatricia: 28, demos: 1, client: 'Supermercados La Canasta', milestone: 'Diana M. · Diagnóstico de caja' },
+        { date: 'Oct 21', label: '21 oct', scoreTeam: 37, scoreDiana: 38, scorePatricia: 28, demos: 1, client: 'Agropecuaria El Roble', milestone: 'Diana M. · Adopción de agenda' },
+        { date: 'Oct 25', label: '25 oct', scoreTeam: 41, scoreDiana: 42, scorePatricia: 28, demos: 1, client: 'Distribuidora San José', milestone: 'Diana M. · Manejo de objeciones' },
+        { date: 'Oct 26', label: '26 oct', scoreTeam: 35, scoreDiana: 42, scorePatricia: 35, demos: 1, client: 'Kervin Roque', milestone: 'Patricia M. · 5-6pm Calendar' },
+        { date: 'Oct 27', label: '27 oct', scoreTeam: 39, scoreDiana: 39, scorePatricia: 35, demos: 3, client: '3 Demos Diana Morales: Demo ERP (12pm), Luis Escobar (5pm), Finca Miramar (9pm)', milestone: 'Diana M. · 3 Demos en Google Calendar (12pm, 5pm, 9pm)' },
+        { date: 'Oct 31', label: '31 oct', scoreTeam: 40, scoreDiana: 40, scorePatricia: 35, demos: 0, client: 'Cierre del Mes', milestone: 'Consolidación de rúbrica' }
     ];
 
     const chartData = useMemo(() => {
@@ -71,7 +71,7 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
 
             // Incluir punto base inicial de referencia para mostrar la evolución visual
             groupedByDate['2026-10-01'] = {
-                label: 'Oct 1',
+                label: '1 oct',
                 dateStr: '2026-10-01',
                 clients: ['Línea base sin rúbrica'],
                 scores: [24],
@@ -80,8 +80,12 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
 
             filteredAudits.forEach(a => {
                 const d = new Date(a.created_at);
-                const dayKey = d.toISOString().split('T')[0]; // YYYY-MM-DD
-                const label = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+                // Usar componentes locales para evitar que la zona horaria mueva la demo de las 9:00 PM al día siguiente en UTC
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const dayKey = `${year}-${month}-${day}`;
+                const label = `${d.getDate()} ${d.toLocaleDateString('es-ES', { month: 'short' }).replace('.', '')}`;
                 const clientName = (a as any).clientName || a.lead_id || 'Demostración';
 
                 if (!groupedByDate[dayKey]) {
@@ -133,11 +137,25 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
         });
     }, [audits, selectedRep, viewGranularity]);
 
+    // Promedios dinámicos calculados exactamente de las auditorías
+    const repScores = useMemo(() => {
+        const dianaAudits = audits.filter(a => (a.sales_rep_name || '').toLowerCase().includes('diana'));
+        const patriciaAudits = audits.filter(a => (a.sales_rep_name || '').toLowerCase().includes('patricia'));
+        const dianaAvg = dianaAudits.length ? Math.round(dianaAudits.reduce((acc, a) => acc + a.total_score, 0) / dianaAudits.length) : 44;
+        const patriciaAvg = patriciaAudits.length ? Math.round(patriciaAudits.reduce((acc, a) => acc + a.total_score, 0) / patriciaAudits.length) : 45;
+        const teamAvg = audits.length ? Math.round(audits.reduce((acc, a) => acc + a.total_score, 0) / audits.length) : 44;
+        return { dianaAvg, patriciaAvg, teamAvg };
+    }, [audits]);
+
+    const currentScore = useMemo(() => {
+        if (selectedRep?.toLowerCase().includes('diana')) return repScores.dianaAvg;
+        if (selectedRep?.toLowerCase().includes('patricia')) return repScores.patriciaAvg;
+        return repScores.teamAvg;
+    }, [selectedRep, repScores]);
+
     // Métricas clave estilo Metricool
     const baselineScore = 24;
-    const currentScore = selectedRep?.toLowerCase().includes('patricia') ? 27 : 45;
-    const peakScore = selectedRep?.toLowerCase().includes('patricia') ? 31 : 45;
-    const deltaGrowth = peakScore - baselineScore;
+    const deltaGrowth = Math.max(0, currentScore - baselineScore);
     const percentGrowth = Math.max(0, Math.round((deltaGrowth / baselineScore) * 100));
 
     return (
@@ -170,7 +188,7 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                             }`}
                         >
                             <span>Diana Morales</span>
-                            <span className="opacity-70 text-[10px]">(36)</span>
+                            <span className="opacity-70 text-[10px]">({repScores.dianaAvg})</span>
                         </button>
                         <button
                             onClick={() => onSelectRep('Patricia Martínez')}
@@ -181,7 +199,7 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                             }`}
                         >
                             <span>Patricia M.</span>
-                            <span className="opacity-70 text-[10px]">(27)</span>
+                            <span className="opacity-70 text-[10px]">({repScores.patriciaAvg})</span>
                         </button>
                     </div>
                 </div>
@@ -368,7 +386,7 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                         ✓
                     </span>
                     <p className="text-[11px] text-slate-700 leading-tight">
-                        <strong>Lo que mejoró:</strong> Preparación y agenda subió a <strong>100%</strong> y manejo de objeciones a <strong>86%</strong> (vs 20% hace 3 semanas).
+                        <strong>Lo que mejoró:</strong> {selectedRep?.toLowerCase().includes('patricia') ? 'Estructura de demo técnica en servicios y contratos al 100%.' : 'Preparación y apertura de demo subió al 100% y manejo de objeciones a 86%.'}
                     </p>
                 </div>
 
@@ -377,7 +395,7 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                         !
                     </span>
                     <p className="text-[11px] text-slate-700 leading-tight">
-                        <strong>Foco urgente:</strong> Cuantificar impacto financiero y fechar próximo paso en Google Calendar siguen en <strong>0%</strong>.
+                        <strong>Foco urgente:</strong> {selectedRep?.toLowerCase().includes('patricia') ? 'Validar quién autoriza la compra y amarrar reunión con el dueño decisor.' : 'Cuantificar impacto financiero antes de entregar pruebas gratis y fechar Calendar.'}
                     </p>
                 </div>
             </div>

@@ -825,8 +825,8 @@ ${activeDiagnostic.actionRequired}
                 onClose={() => setIsCoachingModalOpen(false)}
                 repName={selectedRep || (selectedAudit?.sales_rep_name || 'Diana Morales')}
                 repAvatar={getExecutiveAvatar(selectedRep || 'Diana Morales', selectedRep || 'Diana Morales')}
-                totalDemos={activeDiagnostic?.totalDemos || 7}
-                avgScore={activeDiagnostic?.avgScore || 36}
+                totalDemos={activeDiagnostic?.totalDemos || stats.totalAudits || 8}
+                avgScore={activeDiagnostic?.avgScore || stats.avgScore || 44}
                 initialDemoId={coachingModalDemoId}
             />
         </div>
