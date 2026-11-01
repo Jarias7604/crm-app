@@ -265,12 +265,26 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                 <div className="fixed inset-0 z-[9999] flex justify-end">
                     <div className="absolute inset-0 bg-black/40 lead-sheet-backdrop" onClick={() => setIsDetailOpen(false)} />
                     <div className="relative z-10 w-full sm:w-[680px] md:w-[720px] lg:w-[750px] sm:max-w-[85vw] h-full bg-[#F8FAFC] shadow-[-16px_0_48px_rgba(15,23,42,0.12)] flex flex-col overflow-hidden lead-sheet transition-all duration-300 ease-out border-l border-slate-200/80">
-                        {/* Header Premium (Modo Claro, Elegante y Minimalista) */}
-                        <div className="px-6 py-4 bg-white border-b border-slate-200/80 relative z-30 shadow-xs space-y-3">
-                            {/* Fila 1: Avatar + Nombre + Empresa (Izquierda) y Acciones Rápidas en una sola línea (Derecha) */}
+                        {/* Header Enterprise (Limpio, Sobrio, No cansa la vista) */}
+                        <div className="px-6 pt-3.5 pb-4 bg-white border-b border-slate-200 relative z-30 shadow-2xs space-y-3">
+                            {/* Breadcrumb de navegación estilo Enterprise */}
+                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-400">
+                                <span 
+                                    className="text-blue-600 hover:underline cursor-pointer font-semibold"
+                                    onClick={() => setIsDetailOpen(false)}
+                                >
+                                    Prospectos
+                                </span>
+                                <span className="text-slate-300">/</span>
+                                <span className="text-slate-700 font-semibold truncate max-w-[280px]">
+                                    {selectedLead.name || 'Detalle de Lead'}
+                                </span>
+                            </div>
+
+                            {/* Fila 1: Avatar + Nombre + Empresa (Izquierda) y Acciones Rápidas (Derecha) */}
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <div className="w-11 h-11 shrink-0 bg-indigo-50 border border-indigo-200/80 rounded-xl flex items-center justify-center text-indigo-600 shadow-xs">
+                                    <div className="w-10 h-10 shrink-0 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-center text-blue-600 shadow-2xs">
                                         <User className="w-5 h-5" />
                                     </div>
                                     <div className="min-w-0 flex-1">
@@ -278,7 +292,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             type="text"
                                             defaultValue={selectedLead.name}
                                             onBlur={(e) => handleUpdateLead({ name: e.target.value })}
-                                            className="block w-full text-xl font-black text-slate-900 tracking-tight border-none hover:bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded-lg px-2 py-0.5 -ml-2 transition-all bg-transparent placeholder-slate-400 truncate"
+                                            className="block w-full text-lg font-bold text-slate-900 tracking-tight border-none hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-600 rounded-md px-1.5 py-0.5 -ml-1.5 transition-all bg-transparent placeholder-slate-400 truncate"
                                             placeholder="Nombre del Lead"
                                         />
                                         <input
@@ -286,7 +300,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             defaultValue={selectedLead.company_name || ''}
                                             placeholder="Empresa no especificada"
                                             onBlur={(e) => handleUpdateLead({ company_name: e.target.value })}
-                                            className="block w-full text-xs font-semibold text-slate-500 border-none hover:bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded-lg px-2 -ml-2 -mt-0.5 transition-all bg-transparent placeholder-slate-400 truncate"
+                                            className="block w-full text-xs font-medium text-slate-500 border-none hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-600 rounded-md px-1.5 -ml-1.5 -mt-0.5 transition-all bg-transparent placeholder-slate-400 truncate"
                                         />
                                     </div>
                                 </div>
@@ -296,10 +310,10 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setIsCallLoggerOpen(!isCallLoggerOpen)}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-xs cursor-pointer active:scale-95 ${
+                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs tracking-wide transition-all shadow-2xs cursor-pointer active:scale-95 ${
                                             isCallLoggerOpen
-                                                ? 'bg-slate-200 hover:bg-slate-300 text-slate-800'
-                                                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
+                                                ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300'
+                                                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20'
                                         }`}
                                         title={isCallLoggerOpen ? 'Cerrar registro de actividad' : 'Registrar llamada o actividad'}
                                     >
@@ -309,7 +323,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     {isAdmin && (
                                         <button
                                             onClick={() => handleDeleteLead(selectedLead.id, selectedLead.name)}
-                                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-slate-200/60 hover:border-red-200 shadow-xs active:scale-95 cursor-pointer"
+                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all border border-slate-200 hover:border-red-200 shadow-2xs active:scale-95 cursor-pointer"
                                             title="Eliminar Lead"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -317,7 +331,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     )}
                                     <button
                                         onClick={() => setIsDetailOpen(false)}
-                                        className="p-2 bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-all border border-slate-200/80 shadow-xs active:scale-95 cursor-pointer"
+                                        className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all border border-slate-200 shadow-2xs active:scale-95 cursor-pointer"
                                         title="Cerrar panel"
                                     >
                                         <X className="w-4 h-4" />
@@ -327,24 +341,24 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
 
                             {/* Fila 2: Teléfono + Email + Fecha + WhatsApp QR — TODO EN UNA SOLA LÍNEA HORIZONTAL */}
                             <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                                <div className="flex items-center gap-2 group bg-slate-50 hover:bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-slate-300 shadow-xs transition-all h-[34px]">
-                                    <Phone className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                <div className="flex items-center gap-2 group bg-slate-50 hover:bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 shadow-2xs transition-all h-[34px]">
+                                    <Phone className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                                     <input
                                         type="text"
                                         defaultValue={selectedLead.phone || ''}
                                         placeholder="Añadir teléfono"
                                         onBlur={(e) => handleUpdateLead({ phone: e.target.value })}
-                                        className="text-xs text-slate-800 font-bold border-none bg-transparent p-0 focus:ring-0 w-24 placeholder-slate-400"
+                                        className="text-xs text-slate-800 font-semibold border-none bg-transparent p-0 focus:ring-0 w-24 placeholder-slate-400"
                                     />
                                 </div>
-                                <div className="flex items-center gap-2 group bg-slate-50 hover:bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-slate-300 shadow-xs transition-all h-[34px]">
-                                    <Mail className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                <div className="flex items-center gap-2 group bg-slate-50 hover:bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 shadow-2xs transition-all h-[34px]">
+                                    <Mail className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                                     <input
                                         type="text"
                                         defaultValue={selectedLead.email || ''}
                                         placeholder="Añadir email"
                                         onBlur={(e) => handleUpdateLead({ email: e.target.value })}
-                                        className="text-xs text-slate-800 font-bold border-none bg-transparent p-0 focus:ring-0 w-36 placeholder-slate-400"
+                                        className="text-xs text-slate-800 font-semibold border-none bg-transparent p-0 focus:ring-0 w-36 placeholder-slate-400"
                                     />
                                 </div>
                                 <CustomDatePicker
@@ -356,64 +370,64 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         }
                                     }}
                                     variant="light"
-                                    className="w-36 [&>div]:!py-1 [&>div]:!px-2.5 [&>div]:!h-[34px] [&>div]:!rounded-xl [&>div]:!border-slate-200 [&>div]:!bg-slate-50 hover:[&>div]:!bg-white [&>div]:!shadow-xs"
+                                    className="w-36 [&>div]:!py-1 [&>div]:!px-2.5 [&>div]:!h-[34px] [&>div]:!rounded-lg [&>div]:!border-slate-200 [&>div]:!bg-slate-50 hover:[&>div]:!bg-white [&>div]:!shadow-2xs"
                                 />
                                 <button
                                     onClick={handleOpenQr}
-                                    className="h-[34px] px-2.5 bg-slate-50 text-slate-700 border border-slate-200 hover:bg-white hover:border-slate-300 rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
+                                    className="h-[34px] px-2.5 bg-slate-50 text-slate-700 border border-slate-200 hover:bg-white hover:border-slate-300 rounded-lg transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
                                     title="Código QR de WhatsApp"
                                 >
-                                    <QrCode className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                                    <span className="text-xs font-bold text-slate-700 whitespace-nowrap">WhatsApp QR</span>
+                                    <QrCode className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                    <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">WhatsApp QR</span>
                                 </button>
                             </div>
                         </div>
 
-                        {/* Sub-Header / Segmented Navigation Tabs */}
-                        <div className="px-6 py-2 bg-white border-b border-slate-200/80 relative z-20 shrink-0">
-                            <div className="grid grid-cols-4 w-full p-1 bg-slate-100 rounded-xl border border-slate-200/60 gap-1 text-xs">
+                        {/* Navigation Tabs (Estilo Enterprise Limpio y Organizado — Sin fatiga visual) */}
+                        <div className="bg-white border-b border-slate-200 relative z-20 shrink-0 px-6">
+                            <div className="flex items-center gap-8 text-xs overflow-x-auto no-scrollbar">
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab('info')}
-                                    className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                                    className={`flex items-center gap-2 py-3 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
                                         activeTab === 'info'
-                                            ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/80'
-                                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                                            ? 'border-blue-600 text-blue-700'
+                                            : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
                                     }`}
                                 >
-                                    <User className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                                    <span className="truncate">Ficha Lead</span>
+                                    <User className={`w-3.5 h-3.5 ${activeTab === 'info' ? 'text-blue-600' : 'text-slate-400'}`} />
+                                    <span>Ficha Lead</span>
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab('sales')}
-                                    className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                                    className={`flex items-center gap-2 py-3 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
                                         activeTab === 'sales'
-                                            ? 'bg-white text-rose-700 shadow-xs border border-slate-200/80'
-                                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                                            ? 'border-blue-600 text-blue-700'
+                                            : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
                                     }`}
                                 >
-                                    <Flame className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                                    <span className="truncate">Método Arias</span>
-                                    {leadAudit ? (
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5 shrink-0" title="Auditado" />
-                                    ) : null}
+                                    <Flame className={`w-3.5 h-3.5 ${activeTab === 'sales' ? 'text-rose-600' : 'text-slate-400'}`} />
+                                    <span>Método Arias</span>
+                                    {leadAudit && (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 ml-0.5 shrink-0" title="Auditado" />
+                                    )}
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab('quotes')}
-                                    className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                                    className={`flex items-center gap-2 py-3 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
                                         activeTab === 'quotes'
-                                            ? 'bg-white text-emerald-700 shadow-xs border border-slate-200/80'
-                                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                                            ? 'border-blue-600 text-blue-700'
+                                            : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
                                     }`}
                                 >
-                                    <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                    <span className="truncate">Cotizaciones</span>
+                                    <FileText className={`w-3.5 h-3.5 ${activeTab === 'quotes' ? 'text-blue-600' : 'text-slate-400'}`} />
+                                    <span>Cotizaciones</span>
                                     {(leadCotizaciones.length + leadContracts.length) > 0 && (
-                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
                                             {leadCotizaciones.length + leadContracts.length}
                                         </span>
                                     )}
@@ -422,16 +436,16 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab('activity')}
-                                    className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                                    className={`flex items-center gap-2 py-3 border-b-2 font-bold transition-all cursor-pointer whitespace-nowrap ${
                                         activeTab === 'activity'
-                                            ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/80'
-                                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                                            ? 'border-blue-600 text-blue-700'
+                                            : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
                                     }`}
                                 >
-                                    <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                                    <span className="truncate">Trazabilidad</span>
+                                    <Clock className={`w-3.5 h-3.5 ${activeTab === 'activity' ? 'text-blue-600' : 'text-slate-400'}`} />
+                                    <span>Trazabilidad</span>
                                     {(followUps.length + messages.length + callActivities.length) > 0 && (
-                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
                                             {followUps.length + messages.length + callActivities.length}
                                         </span>
                                     )}
@@ -440,7 +454,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         </div>
 
                         {/* Content Scrollable Container */}
-                        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 sm:p-6 space-y-6">
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 sm:p-6 pb-40 space-y-6">
                             {/* Quick Action Logger Drawer */}
                             {isCallLoggerOpen && (
                                 <div className="bg-white rounded-2xl p-5 border border-indigo-100 shadow-md animate-in fade-in duration-200">
@@ -485,45 +499,45 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             {/* ── TAB 1: FICHA & NEGOCIO ── */}
                             {activeTab === 'info' && (
                                 <div className="space-y-6 animate-in fade-in duration-200">
-                                    {/* Quick Stats Executive Banner (Compacto, Bajo Perfil y Elegante) */}
-                                    <div className="bg-white rounded-xl px-4 py-2 border border-slate-200/80 shadow-xs grid grid-cols-2 sm:grid-cols-4 gap-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-                                        <div className="flex items-center gap-2.5 px-2 py-1 min-w-0">
-                                            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
+                                    {/* Quick Stats Executive Banner (Compacto, Bajo Perfil y Descansado a la Vista) */}
+                                    <div className="bg-white rounded-lg px-4 py-2.5 border border-slate-200 shadow-2xs grid grid-cols-2 sm:grid-cols-4 gap-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                                        <div className="flex items-center gap-2.5 px-2 py-0.5 min-w-0">
+                                            <div className="w-7 h-7 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100">
                                                 <DollarSign className="w-3.5 h-3.5" />
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">Inversión Potencial</p>
-                                                <p className="text-sm font-black text-slate-800 tracking-tight truncate leading-tight mt-0.5">${(selectedLead.value || 0).toLocaleString()}</p>
+                                                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none">Inversión Potencial</p>
+                                                <p className="text-sm font-bold text-slate-900 tracking-tight truncate leading-tight mt-0.5">${(selectedLead.value || 0).toLocaleString()}</p>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2.5 px-2 py-1 min-w-0">
-                                            <div className="w-7 h-7 rounded-lg bg-orange-50 text-orange-500 flex items-center justify-center shrink-0 border border-orange-100">
+                                        <div className="flex items-center gap-2.5 px-2 py-0.5 min-w-0">
+                                            <div className="w-7 h-7 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100">
                                                 <Target className="w-3.5 h-3.5" />
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Temperatura</p>
+                                                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Temperatura</p>
                                                 <div className="leading-none scale-95 origin-left"><PriorityBadge priority={selectedLead.priority || 'medium'} /></div>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2.5 px-2 py-1 min-w-0">
-                                            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-500 flex items-center justify-center shrink-0 border border-indigo-100">
+                                        <div className="flex items-center gap-2.5 px-2 py-0.5 min-w-0">
+                                            <div className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
                                                 <Activity className="w-3.5 h-3.5" />
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Estado Lead</p>
+                                                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none mb-0.5">Estado Lead</p>
                                                 <div className="leading-none scale-95 origin-left"><StatusBadge status={selectedLead.status} /></div>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2.5 px-2 py-1 min-w-0">
-                                            <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0 border border-sky-100">
+                                        <div className="flex items-center gap-2.5 px-2 py-0.5 min-w-0">
+                                            <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 border border-slate-200">
                                                 <Phone className="w-3.5 h-3.5" />
                                             </div>
                                             <div className="min-w-0">
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none">Intentos Contacto</p>
-                                                <p className="text-sm font-black text-slate-800 tracking-tight truncate leading-tight mt-0.5">{selectedLead.contact_count || 0} <span className="text-[10px] font-medium text-slate-400">llamadas</span></p>
+                                                <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider leading-none">Intentos Contacto</p>
+                                                <p className="text-sm font-bold text-slate-900 tracking-tight truncate leading-tight mt-0.5">{selectedLead.contact_count || 0} <span className="text-[10px] font-medium text-slate-400">llamadas</span></p>
                                             </div>
                                         </div>
                                     </div>
@@ -531,12 +545,18 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     {/* 2-Column Responsive Layout for Details */}
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                         {/* Left Column: Parámetros del Lead */}
-                                        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
-                                            <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                                                <Target className="w-4 h-4 text-indigo-600" /> Parámetros Comerciales
-                                            </h4>
+                                        <div className="bg-white rounded-lg border border-slate-200 shadow-2xs">
+                                            {/* Sub-header Strip Estructurado (Estilo Enterprise Limpio) */}
+                                            <div className="bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between rounded-t-lg">
+                                                <div className="flex items-center gap-2">
+                                                    <Target className="w-3.5 h-3.5 text-blue-600" />
+                                                    <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                                                        Parámetros Comerciales
+                                                    </h4>
+                                                </div>
+                                            </div>
 
-                                            <div className="space-y-4">
+                                            <div className="p-4 space-y-4">
                                                 <div className="space-y-1.5">
                                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Estado del Embudo</label>
                                                     <CustomSelect
@@ -573,7 +593,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                         <button
                                                             type="button"
                                                             onClick={() => setIsManageSourcesOpen(true)}
-                                                            className="text-indigo-600 hover:text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
+                                                            className="text-blue-600 hover:text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
                                                         >
                                                             Gestionar
                                                         </button>
@@ -602,7 +622,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                         <button
                                                             type="button"
                                                             onClick={() => setIsManageIndustriesOpen(true)}
-                                                            className="text-indigo-600 hover:text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
+                                                            className="text-blue-600 hover:text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
                                                         >
                                                             Gestionar
                                                         </button>
@@ -631,7 +651,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                         <button
                                                             type="button"
                                                             onClick={() => setIsManageModalOpen(true)}
-                                                            className="text-indigo-600 hover:text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
+                                                            className="text-blue-600 hover:text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
                                                         >
                                                             Gestionar
                                                         </button>
@@ -647,40 +667,26 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                     />
                                                 </div>
 
-                                                {/* Propietario del Lead */}
-                                                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 flex items-center gap-3 mt-2">
-                                                    <div className="flex-shrink-0">
-                                                        {(() => {
-                                                            const assignee = teamMembers.find(m => m.id === selectedLead.assigned_to);
-                                                            return assignee?.avatar_url ? (
-                                                                <img src={assignee.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-xs ring-1 ring-slate-200" />
-                                                            ) : (
-                                                                <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center border-2 border-white shadow-xs ring-1 ring-slate-100">
-                                                                    <User className="w-5 h-5 text-slate-500" />
-                                                                </div>
-                                                            );
-                                                        })()}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0 space-y-1">
-                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                                                            <Shield className="w-3 h-3 text-indigo-600" /> Asignado A
-                                                        </label>
-                                                        <CustomSelect
-                                                            value={selectedLead.assigned_to || ''}
-                                                            onChange={(val) => handleUpdateLead({ assigned_to: val || null })}
-                                                            options={[
-                                                                { value: '', label: 'Sin asignar' },
-                                                                ...teamMembers.map(m => {
-                                                                    const emailPrefix = typeof m.email === 'string' && m.email.includes('@') ? m.email.split('@')[0] : (m.email || '');
-                                                                    const label = m.full_name 
-                                                                        ? (emailPrefix ? `${m.full_name} (${emailPrefix})` : m.full_name)
-                                                                        : (m.email || 'Miembro');
-                                                                    return { value: m.id, label };
-                                                                })
-                                                            ]}
-                                                            placeholder="Sin asignar"
-                                                        />
-                                                    </div>
+                                                {/* Propietario del Lead (Diseño Plano y Limpio) */}
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                                        <Shield className="w-3 h-3 text-blue-600" /> Asignado A
+                                                    </label>
+                                                    <CustomSelect
+                                                        value={selectedLead.assigned_to || ''}
+                                                        onChange={(val) => handleUpdateLead({ assigned_to: val || null })}
+                                                        options={[
+                                                            { value: '', label: 'Sin asignar' },
+                                                            ...teamMembers.map(m => {
+                                                                const emailPrefix = typeof m.email === 'string' && m.email.includes('@') ? m.email.split('@')[0] : (m.email || '');
+                                                                const label = m.full_name 
+                                                                    ? (emailPrefix ? `${m.full_name} (${emailPrefix})` : m.full_name)
+                                                                    : (m.email || 'Miembro');
+                                                                return { value: m.id, label };
+                                                            })
+                                                        ]}
+                                                        placeholder="Sin asignar"
+                                                    />
                                                 </div>
                                             </div>
                                         </div>
@@ -688,12 +694,18 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         {/* Right Column: Operaciones, Finanzas y Canales */}
                                         <div className="space-y-6">
                                             {/* Finanzas & Canales de Contacto Rápido */}
-                                            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
-                                                {/* Proyecciones Económicas */}
-                                                <div className="space-y-3">
-                                                    <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2.5">
-                                                        <DollarSign className="w-4 h-4 text-emerald-600" /> Proyecciones Económicas
-                                                    </h4>
+                                            <div className="bg-white rounded-lg border border-slate-200 shadow-2xs">
+                                                {/* Header Strip Proyecciones */}
+                                                <div className="bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between rounded-t-lg">
+                                                    <div className="flex items-center gap-2">
+                                                        <DollarSign className="w-3.5 h-3.5 text-blue-600" />
+                                                        <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                                                            Proyecciones Económicas
+                                                        </h4>
+                                                    </div>
+                                                </div>
+
+                                                <div className="p-4 space-y-4">
                                                     <div className="grid grid-cols-2 gap-3 items-start">
                                                         <div className="space-y-1.5">
                                                             <div className="h-5 flex items-center">
@@ -707,7 +719,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                                     type="number"
                                                                     defaultValue={selectedLead.value || 0}
                                                                     onBlur={(e) => handleUpdateLead({ value: Number(e.target.value) })}
-                                                                    className="h-10 pl-7 rounded-xl border-slate-200 bg-slate-50 font-black text-slate-800 focus:bg-white focus:ring-indigo-500 shadow-xs text-sm"
+                                                                    className="h-9 pl-7 rounded-md border-slate-300 bg-white font-bold text-slate-800 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-xs shadow-2xs"
                                                                 />
                                                             </div>
                                                         </div>
@@ -724,100 +736,109 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                                     type="number"
                                                                     defaultValue={selectedLead.closing_amount || 0}
                                                                     onBlur={(e) => handleUpdateLead({ closing_amount: Number(e.target.value) })}
-                                                                    className="h-10 pl-7 rounded-xl border-slate-200 bg-emerald-50/50 font-black text-emerald-700 focus:bg-white focus:ring-emerald-500 shadow-xs text-sm"
+                                                                    className="h-9 pl-7 rounded-md border-slate-300 bg-white font-bold text-emerald-700 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 text-xs shadow-2xs"
                                                                 />
                                                             </div>
                                                         </div>
                                                     </div>
-                                                </div>
 
-                                                {/* Canales de Contacto Directo */}
-                                                <div className="pt-2 border-t border-slate-100 space-y-2.5">
-                                                    <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                                                        <MessageSquare className="w-3.5 h-3.5 text-indigo-500" /> Mensajería Rápida
-                                                    </h5>
-                                                    <div className="grid grid-cols-2 gap-2.5">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'telegram' } });
-                                                            }}
-                                                            className="flex items-center justify-center gap-2 py-2 px-3 bg-sky-50/70 hover:bg-sky-100 text-sky-700 rounded-xl font-bold text-xs transition-all border border-sky-200/60 shadow-2xs group cursor-pointer active:scale-95"
-                                                        >
-                                                            <Send className="w-3.5 h-3.5 text-sky-500 group-hover:scale-110 transition-transform" /> Telegram Bot
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'whatsapp' } });
-                                                            }}
-                                                            className="flex items-center justify-center gap-2 py-2 px-3 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 rounded-xl font-bold text-xs transition-all border border-emerald-200/60 shadow-2xs group cursor-pointer active:scale-95"
-                                                        >
-                                                            <Smartphone className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" /> WhatsApp
-                                                        </button>
+                                                    {/* Canales de Contacto Directo */}
+                                                    <div className="pt-3 border-t border-slate-100 space-y-2">
+                                                        <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                                                            <MessageSquare className="w-3.5 h-3.5 text-blue-500" /> Mensajería Rápida
+                                                        </h5>
+                                                        <div className="grid grid-cols-2 gap-2.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'telegram' } });
+                                                                }}
+                                                                className="flex items-center justify-center gap-2 py-1.5 px-3 bg-sky-50/70 hover:bg-sky-100 text-sky-700 rounded-md font-bold text-xs transition-all border border-sky-200/60 shadow-2xs group cursor-pointer active:scale-95"
+                                                            >
+                                                                <Send className="w-3.5 h-3.5 text-sky-500 group-hover:scale-110 transition-transform" /> Telegram Bot
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'whatsapp' } });
+                                                                }}
+                                                                className="flex items-center justify-center gap-2 py-1.5 px-3 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 rounded-md font-bold text-xs transition-all border border-emerald-200/60 shadow-2xs group cursor-pointer active:scale-95"
+                                                            >
+                                                                <Smartphone className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" /> WhatsApp
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {/* Documentos Adjuntos */}
-                                            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-3.5">
-                                                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                                                    <FileText className="w-4 h-4 text-rose-500" /> Documento Adjunto
-                                                </h4>
-                                                {selectedLead.document_path ? (
-                                                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                                        <div className="flex items-center gap-3 overflow-hidden">
-                                                            <div className="bg-white p-2 rounded-lg border border-slate-200 text-indigo-600 shadow-2xs">
-                                                                <FileText className="w-4 h-4" />
-                                                            </div>
-                                                            <div className="min-w-0">
-                                                                <p className="text-xs font-bold text-slate-800 truncate">
-                                                                    {selectedLead.document_path.startsWith('cotizacion:') ? 'Propuesta Comercial (CRM).pdf' : 'Documento del Lead.pdf'}
-                                                                </p>
-                                                                <p className="text-[10px] text-slate-500 uppercase">
-                                                                    {selectedLead.document_path.startsWith('cotizacion:') ? 'Cotización CRM' : 'PDF Adjunto'}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex gap-1.5">
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleFileDownload}
-                                                                className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all border border-transparent hover:border-slate-200 cursor-pointer"
-                                                                title="Descargar PDF"
-                                                            >
-                                                                <Download className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={handleFileDelete}
-                                                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                                                                title="Eliminar PDF"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
+                                            <div className="bg-white rounded-lg border border-slate-200 shadow-2xs">
+                                                {/* Header Strip Documentos */}
+                                                <div className="bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between rounded-t-lg">
+                                                    <div className="flex items-center gap-2">
+                                                        <FileText className="w-3.5 h-3.5 text-blue-600" />
+                                                        <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                                                            Documento Adjunto
+                                                        </h4>
                                                     </div>
-                                                ) : (
-                                                    <div className="relative border-2 border-dashed border-slate-200 rounded-xl p-5 transition-all hover:border-indigo-400 hover:bg-indigo-50/30 group text-center">
-                                                        <input
-                                                            type="file"
-                                                            accept=".pdf"
-                                                            onChange={handleFileUpload}
-                                                            disabled={isUploading}
-                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                                        />
-                                                        <div className="flex flex-col items-center gap-1.5">
-                                                            <div className="p-2 bg-slate-100 rounded-xl group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
-                                                                {isUploading ? <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" /> : <UploadCloud className="w-5 h-5 text-slate-500" />}
+                                                </div>
+
+                                                <div className="p-4 space-y-3">
+                                                    {selectedLead.document_path ? (
+                                                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                                <div className="bg-white p-2 rounded-md border border-slate-200 text-blue-600 shadow-2xs">
+                                                                    <FileText className="w-4 h-4" />
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <p className="text-xs font-bold text-slate-800 truncate">
+                                                                        {selectedLead.document_path.startsWith('cotizacion:') ? 'Propuesta Comercial (CRM).pdf' : 'Documento del Lead.pdf'}
+                                                                    </p>
+                                                                    <p className="text-[10px] text-slate-500 uppercase">
+                                                                        {selectedLead.document_path.startsWith('cotizacion:') ? 'Cotización CRM' : 'PDF Adjunto'}
+                                                                    </p>
+                                                                </div>
                                                             </div>
-                                                            <p className="text-xs font-bold text-slate-700">Subir Documento PDF</p>
-                                                            <p className="text-[10px] text-slate-400">Click o arrastra para adjuntar propuesta, contrato, etc.</p>
+                                                            <div className="flex gap-1.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={handleFileDownload}
+                                                                    className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded-md transition-all border border-transparent hover:border-slate-200 cursor-pointer"
+                                                                    title="Descargar PDF"
+                                                                >
+                                                                    <Download className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={handleFileDelete}
+                                                                    className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-md transition-all cursor-pointer"
+                                                                    title="Eliminar PDF"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                )}
+                                                    ) : (
+                                                        <div className="relative border-2 border-dashed border-slate-200 rounded-lg p-5 transition-all hover:border-blue-400 hover:bg-blue-50/20 group text-center">
+                                                            <input
+                                                                type="file"
+                                                                accept=".pdf"
+                                                                onChange={handleFileUpload}
+                                                                disabled={isUploading}
+                                                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                            />
+                                                            <div className="flex flex-col items-center gap-1.5">
+                                                                <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                                                                    {isUploading ? <Loader2 className="w-5 h-5 text-blue-600 animate-spin" /> : <UploadCloud className="w-5 h-5 text-slate-500" />}
+                                                                </div>
+                                                                <p className="text-xs font-bold text-slate-700">Subir Documento PDF</p>
+                                                                <p className="text-[10px] text-slate-400">Click o arrastra para adjuntar propuesta, contrato, etc.</p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {/* Call Bot AI Results (si existen) */}
@@ -984,11 +1005,11 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             {activeTab === 'quotes' && (
                                 <div className="space-y-6 animate-in fade-in duration-200">
                                     {/* Section 1: Cotizaciones & Propuestas */}
-                                    <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
-                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                    <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
+                                        <div className="bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <FileText className="w-4 h-4 text-emerald-600" />
-                                                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
+                                                <FileText className="w-3.5 h-3.5 text-blue-600" />
+                                                <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
                                                     Cotizaciones & Propuestas ({leadCotizaciones.length})
                                                 </h4>
                                             </div>
@@ -997,11 +1018,12 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 onClick={() => {
                                                     navigate('/cotizaciones/nueva-pro', { state: { lead: selectedLead } });
                                                 }}
-                                                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs border border-emerald-200/70"
+                                                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs border border-blue-200"
                                             >
                                                 <Plus className="w-3.5 h-3.5" /> Nueva Cotización
                                             </button>
                                         </div>
+                                        <div className="p-4 space-y-3">
 
                                         {leadCotizaciones.length > 0 ? (
                                             <div className="space-y-2.5">
@@ -1073,25 +1095,27 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 </button>
                                             </div>
                                         )}
+                                        </div>
                                     </div>
 
                                     {/* Section 2: Contratos de Servicios */}
-                                    <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
-                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                    <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
+                                        <div className="bg-slate-50/90 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between">
                                             <div className="flex items-center gap-2">
-                                                <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                                                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
+                                                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                                                <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
                                                     Contratos de Servicios ({leadContracts.length})
                                                 </h4>
                                             </div>
                                             <button
                                                 type="button"
                                                 onClick={handleInitiateContractCreation}
-                                                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-indigo-200/70"
+                                                className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-blue-200 shadow-2xs"
                                             >
                                                 <Plus className="w-3.5 h-3.5" /> Nuevo Contrato
                                             </button>
                                         </div>
+                                        <div className="p-4 space-y-3">
 
                                         {leadContracts.length > 0 ? (
                                             <div className="space-y-3">
@@ -1190,6 +1214,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 </button>
                                             </div>
                                         )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -1198,10 +1223,10 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             {activeTab === 'activity' && (
                                 <div className="space-y-5 animate-in fade-in duration-200">
                                     {/* Filter Chips & Counter Header */}
-                                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                                    <div className="bg-white rounded-lg p-3.5 border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
                                         <div className="flex items-center gap-2">
-                                            <Clock className="w-4 h-4 text-indigo-600" />
-                                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                                            <Clock className="w-4 h-4 text-blue-600" />
+                                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                                                 Línea de Tiempo ({followUps.length + messages.length + callActivities.length})
                                             </h4>
                                         </div>
@@ -1210,9 +1235,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => setTimelineFilter('all')}
-                                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                                                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                                                     timelineFilter === 'all'
-                                                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                                         : 'text-slate-500 hover:text-slate-800'
                                                 }`}
                                             >
@@ -1221,7 +1246,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => setTimelineFilter('calls')}
-                                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                                                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                                                     timelineFilter === 'calls'
                                                         ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                                         : 'text-slate-500 hover:text-slate-800'
@@ -1232,9 +1257,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => setTimelineFilter('messages')}
-                                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                                                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                                                     timelineFilter === 'messages'
-                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                                         : 'text-slate-500 hover:text-slate-800'
                                                 }`}
                                             >
@@ -1243,9 +1268,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => setTimelineFilter('followups')}
-                                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                                                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                                                     timelineFilter === 'followups'
-                                                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                                         : 'text-slate-500 hover:text-slate-800'
                                                 }`}
                                             >
