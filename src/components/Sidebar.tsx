@@ -487,6 +487,14 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: t('sidebar.reportsBi'), href: '/reports', icon: BarChart3, current: location.pathname.startsWith('/reports') });
     }
 
+    // Academia & Training (Módulo visible directamente para Administradores y Agentes)
+    navigation.push({
+        name: 'Academia & Training',
+        href: isSuperOrAdmin ? '/company/training' : '/training',
+        icon: GraduationCap,
+        current: location.pathname.startsWith('/company/training') || location.pathname.startsWith('/training')
+    });
+
     if (canAccess('tickets') || profile?.role === 'super_admin') {
         // Support Platform
         navigation.push({
@@ -596,16 +604,6 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             ]
         });
         navigation.push({ name: t('sidebar.permissions'), href: '/company/permissions', icon: ShieldCheck, current: location.pathname.startsWith('/company/permissions') });
-    }
-
-    // Academia & Training accesible directamente para agentes y colaboradores
-    if (profile?.role !== 'super_admin' && profile?.role !== 'company_admin') {
-        navigation.push({
-            name: 'Academia & Training',
-            href: '/training',
-            icon: GraduationCap,
-            current: location.pathname.startsWith('/training')
-        });
     }
 
     const getRoleTitle = () => {
