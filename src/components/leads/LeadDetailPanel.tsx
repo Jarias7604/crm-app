@@ -102,7 +102,8 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
         }
     }, [isOpen, lead?.id]);
 
-    const [activeTab, setActiveTab] = useState<'activity' | 'info' | 'quotes'>('activity');
+    const [activeTab, setActiveTab] = useState<'info' | 'sales' | 'quotes' | 'activity'>('info');
+    const [timelineFilter, setTimelineFilter] = useState<'all' | 'calls' | 'messages' | 'followups'>('all');
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
     const [isManageModalOpen, setIsManageModalOpen] = useState(false);
     const [isManageSourcesOpen, setIsManageSourcesOpen] = useState(false);
@@ -263,7 +264,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
             return (
                 <div className="fixed inset-0 z-[9999]">
                     <div className="absolute inset-0 bg-black/40 lead-sheet-backdrop" onClick={() => setIsDetailOpen(false)} />
-                    <div className="absolute inset-x-0 bottom-0 max-h-[93vh] rounded-t-[28px] sm:inset-y-0 sm:bottom-auto sm:left-auto sm:right-0 sm:max-h-full sm:w-[560px] sm:max-w-xl sm:rounded-none bg-[#F8FAFC] shadow-[0_8px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden lead-sheet transition-all duration-300 ease-out border-l border-slate-200/60">
+                    <div className="absolute inset-x-0 bottom-0 max-h-[94vh] rounded-t-[28px] sm:inset-y-0 sm:bottom-auto sm:left-auto sm:right-0 sm:max-h-full sm:w-[680px] md:w-[720px] lg:w-[750px] sm:max-w-[85vw] sm:rounded-none bg-[#F8FAFC] shadow-[-16px_0_48px_rgba(15,23,42,0.12)] flex flex-col overflow-hidden lead-sheet transition-all duration-300 ease-out border-l border-slate-200/80">
                         {/* Mobile drag handle pill */}
                         <div className="flex justify-center pt-3 pb-0 flex-shrink-0 sm:hidden">
                             <div className="w-10 h-1 bg-gray-200 rounded-full" />
@@ -356,167 +357,113 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             </div>
                         </div>
 
-                        {/* Content */}
+                        {/* Sub-Header / Segmented Navigation Tabs */}
+                        <div className="px-6 py-2.5 bg-white border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3 relative z-20 shrink-0">
+                            {/* Segmented Controls / Tabs */}
+                            <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200/60 gap-1 text-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('info')}
+                                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                                        activeTab === 'info'
+                                            ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/80'
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                                    }`}
+                                >
+                                    <User className="w-3.5 h-3.5 text-indigo-600" />
+                                    <span>Ficha & Negocio</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('sales')}
+                                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                                        activeTab === 'sales'
+                                            ? 'bg-white text-rose-700 shadow-xs border border-slate-200/80'
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                                    }`}
+                                >
+                                    <Flame className="w-3.5 h-3.5 text-rose-600" />
+                                    <span>Ventas & Método Arias</span>
+                                    {leadAudit ? (
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse ml-0.5" title="Auditado" />
+                                    ) : null}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('quotes')}
+                                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                                        activeTab === 'quotes'
+                                            ? 'bg-white text-emerald-700 shadow-xs border border-slate-200/80'
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                                    }`}
+                                >
+                                    <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Cotizaciones & Contratos</span>
+                                    {(leadCotizaciones.length + leadContracts.length) > 0 && (
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            {leadCotizaciones.length + leadContracts.length}
+                                        </span>
+                                    )}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('activity')}
+                                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                                        activeTab === 'activity'
+                                            ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/80'
+                                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                                    }`}
+                                >
+                                    <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                                    <span>Trazabilidad</span>
+                                    {(followUps.length + messages.length + callActivities.length) > 0 && (
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                            {followUps.length + messages.length + callActivities.length}
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
+
+                            {/* Primary Action Button: Registrar Acción */}
+                            <button
+                                type="button"
+                                onClick={() => setIsCallLoggerOpen(!isCallLoggerOpen)}
+                                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all shadow-xs cursor-pointer active:scale-95 ${
+                                    isCallLoggerOpen
+                                        ? 'bg-slate-200 hover:bg-slate-300 text-slate-800'
+                                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'
+                                }`}
+                            >
+                                <Phone className="w-3.5 h-3.5" />
+                                <span>{isCallLoggerOpen ? 'Cerrar Registro' : 'Registrar Acción'}</span>
+                            </button>
+                        </div>
+
+                        {/* Content Scrollable Container */}
                         <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 sm:p-6 space-y-6">
-                            {/* Quick Stats Premium Card */}
-                            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/60 shadow-sm flex items-center gap-4 divide-x divide-slate-100">
-                                <div className="flex-1 flex flex-col items-center">
-                                    <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center mb-2">
-                                        <DollarSign className="w-4 h-4 text-emerald-600" />
-                                    </div>
-                                    <p className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight truncate">${(selectedLead.value || 0).toLocaleString()}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Inversión</p>
-                                </div>
-                                <div className="flex-1 flex flex-col items-center">
-                                    <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center mb-2">
-                                        <Target className="w-4 h-4 text-orange-500" />
-                                    </div>
-                                    <div className="flex justify-center scale-110 mb-1"><PriorityBadge priority={selectedLead.priority || 'medium'} /></div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Temperatura</p>
-                                </div>
-                                <div className="flex-1 flex flex-col items-center">
-                                    <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center mb-2">
-                                        <Activity className="w-4 h-4 text-indigo-500" />
-                                    </div>
-                                    <div className="flex justify-center scale-110 mb-1"><StatusBadge status={selectedLead.status} /></div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Estado</p>
-                                </div>
-                            </div>
-
-                            {/* Canales de Chat Unificados */}
-                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-4">
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-3">
-                                    <MessageSquare className="w-3.5 h-3.5 text-indigo-400" /> Centro de Mensajería
-                                </h4>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'telegram' } });
-                                        }}
-                                        className="flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-700 rounded-xl font-bold text-[11px] hover:bg-sky-500 hover:text-white hover:border-sky-500 transition-all border border-slate-200 shadow-sm group"
-                                    >
-                                        <Send className="w-4 h-4 text-sky-500 group-hover:text-white" /> Telegram Bot
-                                    </button>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'whatsapp' } });
-                                        }}
-                                        className="flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-700 rounded-xl font-bold text-[11px] hover:bg-[#25D366] hover:text-white hover:border-[#25D366] transition-all border border-slate-200 shadow-sm group"
-                                    >
-                                        <Smartphone className="w-4 h-4 text-[#25D366] group-hover:text-white" /> WhatsApp
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* ARIAS Sales Excellence & Gemini HUD Card (Claro, Limpio, Premium) */}
-                            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-sm space-y-3.5 relative overflow-hidden">
-                                <div className="flex items-center justify-between border-b border-slate-100 pb-3 relative z-10">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-xs">
-                                            <Flame className="w-4 h-4" />
-                                        </div>
-                                        <div>
-                                            <span className="text-[11px] font-black uppercase text-slate-900 tracking-wider">
-                                                Arias Sales Excellence
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                        Método Oficial
-                                    </span>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-2.5 relative z-10">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsDemoHUDOpen(true)}
-                                        className="flex flex-col items-start p-3.5 rounded-xl bg-slate-50 hover:bg-rose-50/40 border border-slate-200 hover:border-rose-300 transition-all text-left group cursor-pointer shadow-xs"
-                                    >
-                                        <div className="flex items-center gap-1.5 text-rose-700 font-black text-[12px] mb-1">
-                                            <Target className="w-3.5 h-3.5 text-rose-600" />
-                                            <span>Guion Demo HUD</span>
-                                        </div>
-                                        <span className="text-[11px] text-slate-500 leading-snug font-medium">
-                                            7 preguntas obligatorias y objeciones en vivo
-                                        </span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsGeminiAuditOpen(true)}
-                                        className={`flex flex-col items-start p-3.5 rounded-xl transition-all text-left group cursor-pointer border shadow-xs ${
-                                            leadAudit
-                                                ? 'bg-indigo-50/60 hover:bg-indigo-50 border-indigo-300'
-                                                : 'bg-slate-50 hover:bg-indigo-50/40 border-slate-200 hover:border-indigo-300'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-1.5 text-indigo-700 font-black text-[12px] mb-1">
-                                            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                                            <span>Auditar Gemini</span>
-                                        </div>
-                                        <span className="text-[11px] text-slate-500 leading-snug font-medium">
-                                            {leadAudit ? 'Revisar rúbrica o re-auditar doc' : 'Evalúa notas de Google Meet (100 pts)'}
-                                        </span>
-                                    </button>
-                                </div>
-
-                                {/* Banner Visual de Estado de Auditoría Vinculado */}
-                                {leadAudit ? (
-                                    <div className="p-2.5 rounded-xl bg-indigo-50/50 border border-indigo-200/80 flex items-center justify-between gap-2 relative z-10">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Target className="w-4 h-4 text-indigo-600 shrink-0" />
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="text-[11px] font-black text-slate-900">
-                                                        Demo Evaluada: {leadAudit.total_score}/100 pts
-                                                    </span>
-                                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase border ${
-                                                        leadAudit.total_score >= 85 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                                        leadAudit.total_score >= 70 ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                                        'bg-rose-50 text-rose-700 border-rose-200'
-                                                    }`}>
-                                                        {leadAudit.total_score >= 85 ? 'Sólido' : leadAudit.total_score >= 70 ? 'Coaching' : 'Intervención'}
-                                                    </span>
-                                                </div>
-                                                <p className="text-[10px] text-slate-500 truncate">
-                                                    {leadAudit.google_doc_url ? 'Google Doc Vinculado' : 'Notas de Meet registradas'}
-                                                </p>
+                            {/* Quick Action Logger Drawer */}
+                            {isCallLoggerOpen && (
+                                <div className="bg-white rounded-2xl p-5 border border-indigo-100 shadow-md animate-in fade-in duration-200">
+                                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs">
+                                                <Phone className="w-4 h-4" />
                                             </div>
+                                            <h4 className="text-xs font-black uppercase text-slate-900 tracking-wider">
+                                                Registrador Rápido de Actividad
+                                            </h4>
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => setIsGeminiAuditOpen(true)}
-                                            className="px-2.5 py-1 rounded-lg text-[10px] font-black text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 border border-indigo-200 transition-all cursor-pointer whitespace-nowrap shadow-xs"
+                                            onClick={() => setIsCallLoggerOpen(false)}
+                                            className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
                                         >
-                                            Ver Rúbrica
+                                            Cerrar
                                         </button>
                                     </div>
-                                ) : (
-                                    <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-[11px] text-slate-500 relative z-10">
-                                        <span className="flex items-center gap-1.5">
-                                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                            Pega el link de Google Docs o Gemini Meet
-                                        </span>
-                                        <span className="text-emerald-700 font-bold">100% Automático</span>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Primary Action Button */}
-                            <div>
-                                {!isCallLoggerOpen ? (
-                                    <button
-                                        onClick={() => setIsCallLoggerOpen(true)}
-                                        className="w-full flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg font-black px-4 py-4 rounded-2xl text-[12px] uppercase tracking-widest transition-all active:scale-[0.98] group border border-indigo-500"
-                                    >
-                                        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:scale-110 transition-all">
-                                            <Phone className="w-4 h-4 text-white" />
-                                        </div>
-                                        Registrar Nueva Acción
-                                    </button>
-                                ) : (
                                     <SectionErrorBoundary fallbackTitle="Error al mostrar el registrador de acciones">
                                         <QuickActionLogger
                                             lead={selectedLead}
@@ -531,593 +478,769 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             }}
                                             onClose={() => {
                                                 setIsCallLoggerOpen(false);
-                                                setCallStartedAt(null); // reset mobile call start
+                                                setCallStartedAt(null);
                                             }}
                                         />
                                     </SectionErrorBoundary>
-                                )}
-                            </div>
+                                </div>
+                            )}
 
-                            {/* Detalles Principales Card */}
-                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-5">
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
-                                    <Target className="w-3.5 h-3.5" /> Detalles del Lead
-                                </h4>
-                                <div className="grid grid-cols-2 gap-5">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Cambiar Estado</label>
-                                        <div className="relative">
-                                            <CustomSelect
-                                                value={selectedLead.status}
-                                                onChange={(val) => handleUpdateLead({ status: val as LeadStatus })}
-                                                options={Object.entries(STATUS_CONFIG).map(([key, config]) => ({ value: key, label: config.label, icon: config.icon }))}
-                                            />
-                                        </div>
-                                        {(selectedLead.contact_count || 0) > 0 && (
-                                            <div className={`flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg text-[10px] font-black ${(selectedLead.contact_count || 0) >= 6 ? 'bg-red-50 text-red-600 border border-red-100' :
-                                                (selectedLead.contact_count || 0) >= 4 ? 'bg-amber-50 text-amber-600 border border-amber-100' :
-                                                    'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                                                }`}>
-                                                📞 {selectedLead.contact_count} intentos de contacto
+                            {/* ── TAB 1: FICHA & NEGOCIO ── */}
+                            {activeTab === 'info' && (
+                                <div className="space-y-6 animate-in fade-in duration-200">
+                                    {/* Quick Stats Executive Banner */}
+                                    <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/80 shadow-xs grid grid-cols-2 sm:grid-cols-4 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                                        <div className="flex flex-col items-center justify-center p-2">
+                                            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-1.5">
+                                                <DollarSign className="w-4 h-4" />
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Temperatura</label>
-                                        <div className="relative">
-                                            <CustomSelect
-                                                value={selectedLead.priority || 'medium'}
-                                                onChange={(val) => handleUpdateLead({ priority: val as LeadPriority })}
-                                                options={[
-                                                    { value: 'very_high', label: 'Altísima (Hot)', icon: '🔥' },
-                                                    { value: 'high', label: 'Alta (Warm)', icon: '⚡' },
-                                                    { value: 'medium', label: 'Media', icon: '🕑' },
-                                                    { value: 'low', label: 'Baja (Cold)', icon: '💤' },
-                                                ]}
-                                            />
+                                            <p className="text-xl font-black text-slate-800 tracking-tight truncate">${(selectedLead.value || 0).toLocaleString()}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Inversión Potencial</p>
                                         </div>
-                                        {(selectedLead.engagement_score || 0) > 0 && (
-                                            <div className={`flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg text-[10px] font-black ${(selectedLead.engagement_score || 0) >= 10 ? 'bg-rose-50 text-rose-600 border border-rose-100' :
-                                                (selectedLead.engagement_score || 0) >= 5 ? 'bg-orange-50 text-orange-600 border border-orange-100' :
-                                                    'bg-sky-50 text-sky-600 border border-sky-100'
-                                                }`}>
-                                                🔥 Nivel Engagement: {selectedLead.engagement_score} pts
+
+                                        <div className="flex flex-col items-center justify-center p-2">
+                                            <div className="w-8 h-8 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center mb-1.5">
+                                                <Target className="w-4 h-4" />
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center justify-between">
-                                            <span>Fuente de Origen</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsManageSourcesOpen(true)}
-                                                className="text-indigo-600 hover:text-indigo-800 font-bold text-[9px] lowercase tracking-wide cursor-pointer font-black"
-                                            >
-                                                + gestionar
-                                            </button>
-                                        </label>
-                                        <div className="relative">
-                                            <CustomSelect
-                                                value={selectedLead.source || ''}
-                                                onChange={(val) => handleUpdateLead({ source: val || null })}
-                                                options={(() => {
-                                                    const list = [
-                                                        { value: '', label: 'Sin especificar' },
-                                                        ...sourceOptions.map(opt => ({ value: opt.value, label: opt.label, icon: opt.icon }))
-                                                    ];
-                                                    // Ensure current lead source is present even if legacy string
-                                                    if (selectedLead.source && !list.some(o => o.value === selectedLead.source || (typeof o.label === 'string' && o.label.toLowerCase() === selectedLead.source?.toLowerCase()))) {
-                                                        list.push({
-                                                            value: selectedLead.source,
-                                                            label: selectedLead.source,
-                                                            icon: '📋'
-                                                        });
-                                                    }
-                                                    return list;
-                                                })()}
-                                                placeholder="Sin especificar"
-                                                searchable={true}
-                                            />
+                                            <div className="flex justify-center scale-105 mb-0.5"><PriorityBadge priority={selectedLead.priority || 'medium'} /></div>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Temperatura</p>
+                                        </div>
+
+                                        <div className="flex flex-col items-center justify-center p-2">
+                                            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-500 flex items-center justify-center mb-1.5">
+                                                <Activity className="w-4 h-4" />
+                                            </div>
+                                            <div className="flex justify-center scale-105 mb-0.5"><StatusBadge status={selectedLead.status} /></div>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Estado Lead</p>
+                                        </div>
+
+                                        <div className="flex flex-col items-center justify-center p-2">
+                                            <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center mb-1.5">
+                                                <Phone className="w-4 h-4" />
+                                            </div>
+                                            <p className="text-xl font-black text-slate-800 tracking-tight">{selectedLead.contact_count || 0}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Intentos Contacto</p>
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center justify-between">
-                                            <span>Rubro / Industria</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsManageIndustriesOpen(true)}
-                                                className="text-indigo-600 hover:text-indigo-800 font-bold text-[9px] lowercase tracking-wide cursor-pointer font-black"
-                                            >
-                                                + gestionar
-                                            </button>
-                                        </label>
-                                        <div className="relative">
-                                            <CustomSelect
-                                                value={selectedLead.industry || ''}
-                                                onChange={(val) => handleUpdateLead({ industry: val || null })}
-                                                options={(() => {
-                                                    const list = [
-                                                        { value: '', label: 'Sin especificar', icon: '🏢' },
-                                                        ...industries.map(ind => ({ value: ind.name, label: ind.name, icon: '🏢' }))
-                                                    ];
-                                                    if (selectedLead.industry && !list.some(o => o.value === selectedLead.industry || (typeof o.label === 'string' && o.label.toLowerCase() === selectedLead.industry?.toLowerCase()))) {
-                                                        list.push({
-                                                            value: selectedLead.industry,
-                                                            label: selectedLead.industry,
-                                                            icon: '🏢'
-                                                        });
-                                                    }
-                                                    return list;
-                                                })()}
-                                                placeholder="Sin especificar"
-                                                searchable={true}
-                                            />
+
+                                    {/* 2-Column Responsive Layout for Details */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        {/* Left Column: Parámetros del Lead */}
+                                        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+                                            <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                                                <Target className="w-4 h-4 text-indigo-600" /> Parámetros Comerciales
+                                            </h4>
+
+                                            <div className="space-y-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Estado del Embudo</label>
+                                                    <CustomSelect
+                                                        value={selectedLead.status}
+                                                        onChange={(val) => handleUpdateLead({ status: val as LeadStatus })}
+                                                        options={Object.entries(STATUS_CONFIG).map(([key, config]) => ({ value: key, label: config.label, icon: config.icon }))}
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Temperatura / Prioridad</label>
+                                                        {(selectedLead.engagement_score || 0) > 0 && (
+                                                            <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">
+                                                                Engagement: {selectedLead.engagement_score} pts
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <CustomSelect
+                                                        value={selectedLead.priority || 'medium'}
+                                                        onChange={(val) => handleUpdateLead({ priority: val as LeadPriority })}
+                                                        options={[
+                                                            { value: 'very_high', label: 'Altísima (Hot)' },
+                                                            { value: 'high', label: 'Alta (Warm)' },
+                                                            { value: 'medium', label: 'Media' },
+                                                            { value: 'low', label: 'Baja (Cold)' },
+                                                        ]}
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Fuente de Origen</label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsManageSourcesOpen(true)}
+                                                            className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] cursor-pointer"
+                                                        >
+                                                            + gestionar
+                                                        </button>
+                                                    </div>
+                                                    <CustomSelect
+                                                        value={selectedLead.source || ''}
+                                                        onChange={(val) => handleUpdateLead({ source: val || null })}
+                                                        options={(() => {
+                                                            const list = [
+                                                                { value: '', label: 'Sin especificar' },
+                                                                ...sourceOptions.map(opt => ({ value: opt.value, label: opt.label }))
+                                                            ];
+                                                            if (selectedLead.source && !list.some(o => o.value === selectedLead.source || (typeof o.label === 'string' && o.label.toLowerCase() === selectedLead.source?.toLowerCase()))) {
+                                                                list.push({ value: selectedLead.source, label: selectedLead.source });
+                                                            }
+                                                            return list;
+                                                        })()}
+                                                        placeholder="Sin especificar"
+                                                        searchable={true}
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Rubro / Industria</label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsManageIndustriesOpen(true)}
+                                                            className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] cursor-pointer"
+                                                        >
+                                                            + gestionar
+                                                        </button>
+                                                    </div>
+                                                    <CustomSelect
+                                                        value={selectedLead.industry || ''}
+                                                        onChange={(val) => handleUpdateLead({ industry: val || null })}
+                                                        options={(() => {
+                                                            const list = [
+                                                                { value: '', label: 'Sin especificar' },
+                                                                ...industries.map(ind => ({ value: ind.name, label: ind.name }))
+                                                            ];
+                                                            if (selectedLead.industry && !list.some(o => o.value === selectedLead.industry || (typeof o.label === 'string' && o.label.toLowerCase() === selectedLead.industry?.toLowerCase()))) {
+                                                                list.push({ value: selectedLead.industry, label: selectedLead.industry });
+                                                            }
+                                                            return list;
+                                                        })()}
+                                                        placeholder="Sin especificar"
+                                                        searchable={true}
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-1.5">
+                                                    <div className="flex items-center justify-between">
+                                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Producto de Interés</label>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsManageModalOpen(true)}
+                                                            className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] cursor-pointer"
+                                                        >
+                                                            + gestionar
+                                                        </button>
+                                                    </div>
+                                                    <CustomSelect
+                                                        value={selectedLead.interested_product_id || ''}
+                                                        onChange={(val) => handleUpdateLead({ interested_product_id: val || null })}
+                                                        options={[
+                                                            { value: '', label: 'Sin especificar' },
+                                                            ...products.map(p => ({ value: p.id, label: p.name }))
+                                                        ]}
+                                                        placeholder="Sin especificar"
+                                                    />
+                                                </div>
+
+                                                {/* Propietario del Lead */}
+                                                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 flex items-center gap-3 mt-2">
+                                                    <div className="flex-shrink-0">
+                                                        {(() => {
+                                                            const assignee = teamMembers.find(m => m.id === selectedLead.assigned_to);
+                                                            return assignee?.avatar_url ? (
+                                                                <img src={assignee.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-xs ring-1 ring-slate-200" />
+                                                            ) : (
+                                                                <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center border-2 border-white shadow-xs ring-1 ring-slate-100">
+                                                                    <User className="w-5 h-5 text-slate-500" />
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0 space-y-1">
+                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                                                            <Shield className="w-3 h-3 text-indigo-600" /> Asignado A
+                                                        </label>
+                                                        <CustomSelect
+                                                            value={selectedLead.assigned_to || ''}
+                                                            onChange={(val) => handleUpdateLead({ assigned_to: val || null })}
+                                                            options={[
+                                                                { value: '', label: 'Sin asignar' },
+                                                                ...teamMembers.map(m => {
+                                                                    const emailPrefix = typeof m.email === 'string' && m.email.includes('@') ? m.email.split('@')[0] : (m.email || '');
+                                                                    const label = m.full_name 
+                                                                        ? (emailPrefix ? `${m.full_name} (${emailPrefix})` : m.full_name)
+                                                                        : (m.email || 'Miembro');
+                                                                    return { value: m.id, label };
+                                                                })
+                                                            ]}
+                                                            placeholder="Sin asignar"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1 flex items-center justify-between">
-                                            <span>Producto</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsManageModalOpen(true)}
-                                                className="text-indigo-600 hover:text-indigo-800 font-bold text-[9px] lowercase tracking-wide cursor-pointer font-black"
-                                            >
-                                                + gestionar
-                                            </button>
-                                        </label>
-                                        <div className="relative">
-                                            <CustomSelect
-                                                value={selectedLead.interested_product_id || ''}
-                                                onChange={(val) => handleUpdateLead({ interested_product_id: val || null })}
-                                                options={[
-                                                    { value: '', label: 'Sin especificar', icon: '📦' },
-                                                    ...products.map(p => ({ value: p.id, label: p.name, icon: '📦' }))
-                                                ]}
-                                                placeholder="Sin especificar"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200 flex items-center gap-4 mt-2">
-                                        <div className="flex-shrink-0">
-                                            {(() => {
-                                                const assignee = teamMembers.find(m => m.id === selectedLead.assigned_to);
-                                                return assignee?.avatar_url ? (
-                                                    <img src={assignee.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm ring-2 ring-slate-200" />
+
+                                        {/* Right Column: Operaciones, Finanzas y Canales */}
+                                        <div className="space-y-6">
+                                            {/* Proyecciones Económicas */}
+                                            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+                                                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                                                    <DollarSign className="w-4 h-4 text-emerald-600" /> Proyecciones Económicas
+                                                </h4>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-1.5">
+                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Potencial Estimado ($)</label>
+                                                        <div className="relative">
+                                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">$</div>
+                                                            <Input
+                                                                type="number"
+                                                                defaultValue={selectedLead.value || 0}
+                                                                onBlur={(e) => handleUpdateLead({ value: Number(e.target.value) })}
+                                                                className="pl-7 rounded-xl border-slate-200 bg-slate-50 font-black text-slate-800 focus:bg-white focus:ring-indigo-500 shadow-xs text-sm"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-1.5">
+                                                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cierre Real ($)</label>
+                                                        <div className="relative">
+                                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">$</div>
+                                                            <Input
+                                                                type="number"
+                                                                defaultValue={selectedLead.closing_amount || 0}
+                                                                onBlur={(e) => handleUpdateLead({ closing_amount: Number(e.target.value) })}
+                                                                className="pl-7 rounded-xl border-slate-200 bg-emerald-50/50 font-black text-emerald-700 focus:bg-white focus:ring-emerald-500 shadow-xs text-sm"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Canales de Comunicación Rápida */}
+                                            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-3.5">
+                                                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                                                    <MessageSquare className="w-4 h-4 text-indigo-600" /> Centro de Mensajería
+                                                </h4>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'telegram' } });
+                                                        }}
+                                                        className="flex items-center justify-center gap-2 py-2.5 px-3 bg-slate-50 text-slate-700 rounded-xl font-bold text-xs hover:bg-sky-500 hover:text-white hover:border-sky-500 transition-all border border-slate-200 shadow-xs group cursor-pointer"
+                                                    >
+                                                        <Send className="w-3.5 h-3.5 text-sky-500 group-hover:text-white" /> Telegram Bot
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'whatsapp' } });
+                                                        }}
+                                                        className="flex items-center justify-center gap-2 py-2.5 px-3 bg-slate-50 text-slate-700 rounded-xl font-bold text-xs hover:bg-[#25D366] hover:text-white hover:border-[#25D366] transition-all border border-slate-200 shadow-xs group cursor-pointer"
+                                                    >
+                                                        <Smartphone className="w-3.5 h-3.5 text-[#25D366] group-hover:text-white" /> WhatsApp
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Documentos Adjuntos */}
+                                            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-3.5">
+                                                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                                                    <FileText className="w-4 h-4 text-rose-500" /> Documento Adjunto
+                                                </h4>
+                                                {selectedLead.document_path ? (
+                                                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                                        <div className="flex items-center gap-3 overflow-hidden">
+                                                            <div className="bg-white p-2 rounded-lg border border-slate-200 text-indigo-600 shadow-2xs">
+                                                                <FileText className="w-4 h-4" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-xs font-bold text-slate-800 truncate">
+                                                                    {selectedLead.document_path.startsWith('cotizacion:') ? 'Propuesta Comercial (CRM).pdf' : 'Documento del Lead.pdf'}
+                                                                </p>
+                                                                <p className="text-[10px] text-slate-500 uppercase">
+                                                                    {selectedLead.document_path.startsWith('cotizacion:') ? 'Cotización CRM' : 'PDF Adjunto'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-1.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleFileDownload}
+                                                                className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-white rounded-lg transition-all border border-transparent hover:border-slate-200 cursor-pointer"
+                                                                title="Descargar PDF"
+                                                            >
+                                                                <Download className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleFileDelete}
+                                                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                                                                title="Eliminar PDF"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 ) : (
-                                                    <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center border-2 border-white shadow-sm ring-2 ring-slate-100">
-                                                        <User className="w-6 h-6 text-slate-500" />
+                                                    <div className="relative border-2 border-dashed border-slate-200 rounded-xl p-5 transition-all hover:border-indigo-400 hover:bg-indigo-50/30 group text-center">
+                                                        <input
+                                                            type="file"
+                                                            accept=".pdf"
+                                                            onChange={handleFileUpload}
+                                                            disabled={isUploading}
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                        />
+                                                        <div className="flex flex-col items-center gap-1.5">
+                                                            <div className="p-2 bg-slate-100 rounded-xl group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                                                                {isUploading ? <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" /> : <UploadCloud className="w-5 h-5 text-slate-500" />}
+                                                            </div>
+                                                            <p className="text-xs font-bold text-slate-700">Subir Documento PDF</p>
+                                                            <p className="text-[10px] text-slate-400">Click o arrastra para adjuntar propuesta, contrato, etc.</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Call Bot AI Results (si existen) */}
+                                            {selectedLead.call_bot_data && Object.keys(selectedLead.call_bot_data as object).length > 0 && (() => {
+                                                const cbd = selectedLead.call_bot_data as Record<string, unknown>;
+                                                const calificado = cbd.calificado as boolean | undefined;
+                                                const score = cbd.score_calificacion as number | null | undefined;
+                                                const dtes = cbd.dtes_por_mes as number | null | undefined;
+                                                const tieneSistema = cbd.tiene_sistema_dte as boolean | undefined;
+                                                const demoAgendada = cbd.demo_agendada as boolean | undefined;
+                                                const notas = cbd.notas_llamada as string | undefined;
+                                                return (
+                                                    <div className="bg-slate-50 rounded-2xl border border-slate-200/80 p-4 space-y-3">
+                                                        <div className="flex items-center justify-between">
+                                                            <h4 className="text-[11px] font-black text-indigo-900 uppercase tracking-wider flex items-center gap-2">
+                                                                <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> Resultado Call Bot AI
+                                                            </h4>
+                                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${calificado ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                                                                {calificado ? 'Calificado' : 'No calificado'}
+                                                            </span>
+                                                        </div>
+                                                        {score !== null && score !== undefined && (
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                                                    <div className={`h-full rounded-full ${score >= 70 ? 'bg-emerald-500' : score >= 40 ? 'bg-amber-400' : 'bg-rose-400'}`} style={{ width: `${score}%` }} />
+                                                                </div>
+                                                                <span className="text-xs font-black text-slate-700">{score}/100</span>
+                                                            </div>
+                                                        )}
+                                                        {notas && (
+                                                            <p className="text-xs text-slate-600 bg-white p-2.5 rounded-xl border border-slate-200 leading-relaxed font-medium">
+                                                                {notas}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 );
                                             })()}
                                         </div>
-                                        <div className="flex-1 space-y-1.5">
-                                            <label className="block text-xs font-bold text-slate-600 flex items-center gap-1.5">
-                                                <Shield className="w-3.5 h-3.5 text-indigo-500" /> Propietario del Lead
-                                            </label>
-                                            <CustomSelect
-                                                value={selectedLead.assigned_to || ''}
-                                                onChange={(val) => handleUpdateLead({ assigned_to: val || null })}
-                                                options={[
-                                                    { value: '', label: 'Sin asignar' },
-                                                    ...teamMembers.map(m => {
-                                                        const emailPrefix = typeof m.email === 'string' && m.email.includes('@') ? m.email.split('@')[0] : (m.email || '');
-                                                        const label = m.full_name 
-                                                            ? (emailPrefix ? `${m.full_name} (${emailPrefix})` : m.full_name)
-                                                            : (m.email || 'Miembro');
-                                                        return { value: m.id, label };
-                                                    })
-                                                ]}
-                                                placeholder="Sin asignar"
-                                            />
-                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            )}
 
-                            {/* Editable Values Section */}
-                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-4">
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-3">
-                                    <DollarSign className="w-3.5 h-3.5 text-emerald-500" /> Proyecciones Económicas
-                                </h4>
-                                <div className="grid grid-cols-2 gap-5">
-                                    <div className="space-y-2">
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase ml-1 tracking-widest">Potencial Estimado ($)</label>
-                                        <div className="relative">
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</div>
-                                            <Input
-                                                type="number"
-                                                defaultValue={selectedLead.value || 0}
-                                                onBlur={(e) => handleUpdateLead({ value: Number(e.target.value) })}
-                                                className="pl-7 rounded-xl border-slate-200 bg-slate-50 font-black text-slate-800 focus:bg-white focus:ring-indigo-500 shadow-sm"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="block text-[10px] font-bold text-slate-500 uppercase ml-1 tracking-widest">Cierre Real ($)</label>
-                                        <div className="relative">
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</div>
-                                            <Input
-                                                type="number"
-                                                defaultValue={selectedLead.closing_amount || 0}
-                                                onBlur={(e) => handleUpdateLead({ closing_amount: Number(e.target.value) })}
-                                                className="pl-7 rounded-xl border-slate-200 bg-emerald-50/50 font-black text-emerald-700 focus:bg-white focus:ring-emerald-500 shadow-sm"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-
-                            {/* Documents Section */}
-                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-4">
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-3">
-                                    <FileText className="w-4 h-4 text-rose-500" /> Documentos Adjuntos
-                                </h4>
-
-                                {selectedLead.document_path ? (
-                                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="bg-white p-2 rounded border border-blue-200">
-                                                <FileText className="w-5 h-5 text-blue-600" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-bold text-blue-900 truncate">
-                                                    {selectedLead.document_path.startsWith('cotizacion:') ? 'Propuesta Comercial (CRM).pdf' : 'Documento del Lead.pdf'}
-                                                </p>
-                                                <p className="text-[10px] text-blue-600 uppercase">
-                                                    {selectedLead.document_path.startsWith('cotizacion:') ? 'Cotización CRM' : 'PDF Adjunto'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={handleFileDownload}
-                                                className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-all"
-                                                title="Descargar PDF"
-                                            >
-                                                <Download className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={handleFileDelete}
-                                                className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-all"
-                                                title="Eliminar PDF"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="relative border-2 border-dashed border-gray-200 rounded-xl p-8 transition-all hover:border-blue-400 hover:bg-blue-50 group text-center">
-                                        <input
-                                            type="file"
-                                            accept=".pdf"
-                                            onChange={handleFileUpload}
-                                            disabled={isUploading}
-                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                        />
-                                        <div className="flex flex-col items-center gap-2">
-                                            <div className="p-3 bg-gray-100 rounded-full group-hover:bg-blue-100 transition-colors">
-                                                {isUploading ? (
-                                                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-                                                ) : (
-                                                    <UploadCloud className="w-6 h-6 text-gray-400 group-hover:text-blue-600" />
-                                                )}
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-gray-700">Subir Documento PDF</p>
-                                                <p className="text-xs text-gray-500">Click o arrastra para adjuntar propuesta, contrato, etc.</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* ── Propuestas y Cotizaciones del Lead ── */}
-                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-4">
-                                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                                    <div className="flex items-center gap-2">
-                                        <FileText className="w-4 h-4 text-emerald-600" />
-                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                            Cotizaciones & Propuestas ({leadCotizaciones.length})
-                                        </h4>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            navigate('/cotizaciones/nueva-pro', { state: { lead: selectedLead } });
-                                        }}
-                                        className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer shadow-2xs border border-emerald-200/70"
-                                    >
-                                        <Plus className="w-3.5 h-3.5" /> Nueva Cotización
-                                    </button>
-                                </div>
-
-                                {leadCotizaciones.length > 0 ? (
-                                    <div className="space-y-2.5">
-                                        {leadCotizaciones.map((cot) => {
-                                            const total = cot.total_anual || cot.total_mensual || 0;
-                                            return (
-                                                <div
-                                                    key={cot.id}
-                                                    className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-emerald-200 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                                                >
-                                                    <div className="space-y-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-mono font-bold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-100">
-                                                                COT-{cot.id.slice(0, 6).toUpperCase()}
-                                                            </span>
-                                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
-                                                                cot.estado === 'aceptada'
-                                                                    ? 'bg-emerald-100 text-emerald-800'
-                                                                    : cot.estado === 'enviada'
-                                                                    ? 'bg-blue-100 text-blue-800'
-                                                                    : 'bg-amber-100 text-amber-800'
-                                                            }`}>
-                                                                {cot.estado === 'aceptada' ? '✅ Aceptada' : cot.estado === 'enviada' ? '📤 Enviada' : '📝 Borrador'}
-                                                            </span>
-                                                            {cot.volumen_dtes ? (
-                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                                                                    {cot.volumen_dtes.toLocaleString()} DTs
-                                                                </span>
-                                                            ) : null}
-                                                        </div>
-                                                        <p className="text-xs font-bold text-slate-800 truncate">{cot.plan_nombre || 'Propuesta Comercial'}</p>
-                                                        <p className="text-[10px] text-slate-500">
-                                                            Monto: <strong className="text-emerald-700">${total.toLocaleString()} USD</strong>
-                                                            {cot.created_at && ` • ${format(new Date(cot.created_at), 'dd MMM yyyy', { locale: es })}`}
-                                                        </p>
-                                                    </div>
-
-                                                    <div className="flex items-center gap-2 shrink-0">
-                                                        <a
-                                                            href={`/cotizaciones/${cot.id}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="px-2.5 py-1 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg text-[11px] font-bold border border-slate-200 transition-colors flex items-center gap-1"
-                                                        >
-                                                            <ExternalLink className="w-3 h-3" /> Ver
-                                                        </a>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleSelectQuoteForContract(cot)}
-                                                            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1 cursor-pointer"
-                                                            title="Formalizar esta cotización en un contrato oficial"
-                                                        >
-                                                            <ShieldCheck className="w-3 h-3" /> Crear Contrato
-                                                        </button>
-                                                    </div>
+                            {/* ── TAB 2: VENTAS & MÉTODO ARIAS ── */}
+                            {activeTab === 'sales' && (
+                                <div className="space-y-6 animate-in fade-in duration-200">
+                                    {/* Hero Card: Arias Sales Excellence */}
+                                    <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-xs space-y-5">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-xs">
+                                                    <Flame className="w-5 h-5" />
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <div className="p-3.5 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center space-y-1.5">
-                                        <p className="text-xs text-slate-500 font-medium">Este prospecto aún no tiene cotizaciones generadas.</p>
-                                        <button
-                                            type="button"
-                                            onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedLead } })}
-                                            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 inline-flex items-center gap-1 underline cursor-pointer"
-                                        >
-                                            <Plus className="w-3.5 h-3.5" /> Cotizar con Cotizador Pro
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* ── Contratos de Servicios Profesionales ── */}
-                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-4">
-                                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                        <ShieldCheck className="w-4 h-4 text-indigo-600" /> Contratos de Servicios ({leadContracts.length})
-                                    </h4>
-                                    <button
-                                        type="button"
-                                        onClick={handleInitiateContractCreation}
-                                        className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
-                                    >
-                                        <Plus className="w-3.5 h-3.5" /> Nuevo Contrato
-                                    </button>
-                                </div>
-
-                                {leadContracts.length > 0 ? (
-                                    <div className="space-y-3">
-                                        {leadContracts.map((c) => (
-                                            <div
-                                                key={c.id}
-                                                className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-indigo-200 transition-all space-y-2.5"
-                                            >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[10px] font-mono font-bold text-indigo-600 bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-2xs">
-                                                                {c.contract_number}
-                                                            </span>
-                                                            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                                                                c.status === 'firmado'
-                                                                    ? 'bg-emerald-100 text-emerald-800'
-                                                                    : c.status === 'enviado'
-                                                                    ? 'bg-blue-100 text-blue-800'
-                                                                    : 'bg-amber-100 text-amber-800'
-                                                            }`}>
-                                                                {c.status === 'firmado' ? '✅ Firmado' : c.status === 'enviado' ? '📤 Enviado' : '📝 Borrador'}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-xs font-bold text-slate-800 mt-1 line-clamp-1">{c.title}</p>
-                                                        <p className="text-[10px] text-slate-500">
-                                                            Monto: ${c.monto_total?.toLocaleString()} USD • {c.vigencia_meses} meses
-                                                        </p>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="text-base font-black text-slate-900 tracking-tight">
+                                                            Arias Sales Excellence
+                                                        </h3>
+                                                        <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                            Método Oficial
+                                                        </span>
                                                     </div>
-                                                </div>
-
-                                                <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
-                                                    <a
-                                                        href={`/contrato/${c.id}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 text-[11px]"
-                                                    >
-                                                        <ExternalLink className="w-3 h-3" /> Ver Enlace
-                                                    </a>
-
-                                                    <div className="flex items-center gap-1.5">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setContractForShare(c);
-                                                                setIsContractShareOpen(true);
-                                                            }}
-                                                            className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
-                                                            title="Compartir enlace / WhatsApp"
-                                                        >
-                                                            <Send className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={async () => {
-                                                                try {
-                                                                    await contractPdfService.downloadContractPDF(c);
-                                                                    toast.success('PDF descargado');
-                                                                } catch {
-                                                                    toast.error('Error al generar PDF');
-                                                                }
-                                                            }}
-                                                            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-                                                            title="Descargar PDF"
-                                                        >
-                                                            <Download className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                setSelectedContractForEdit(c);
-                                                                setIsContractEditorOpen(true);
-                                                            }}
-                                                            className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg font-bold text-[11px] border border-slate-200 shadow-2xs cursor-pointer"
-                                                        >
-                                                            Editar
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-6 px-4 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-                                        <p className="text-xs text-slate-500">No hay contratos generados para este prospecto.</p>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setSelectedContractForEdit(null);
-                                                setIsContractEditorOpen(true);
-                                            }}
-                                            className="mt-2 text-xs font-bold text-indigo-600 hover:text-indigo-700 cursor-pointer"
-                                        >
-                                            + Crear Contrato de Servicios
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* ── Call Bot AI Results ───────────────────────────────────────── */}
-                            {selectedLead.call_bot_data && Object.keys(selectedLead.call_bot_data as object).length > 0 && (() => {
-                                const cbd = selectedLead.call_bot_data as Record<string, unknown>;
-                                const calificado   = cbd.calificado as boolean | undefined;
-                                const score        = cbd.score_calificacion as number | null | undefined;
-                                const dtes         = cbd.dtes_por_mes as number | null | undefined;
-                                const tieneSistema = cbd.tiene_sistema_dte as boolean | undefined;
-                                const demoAgendada = cbd.demo_agendada as boolean | undefined;
-                                const notas        = cbd.notas_llamada as string | undefined;
-                                const llamadas     = cbd.llamadas_totales as number | undefined;
-                                const ultimaLlamada = cbd.ultima_llamada as string | undefined;
-                                return (
-                                    <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-2xl border border-violet-100 p-4 space-y-3">
-                                        {/* Header */}
-                                        <div className="flex items-center justify-between">
-                                            <h4 className="text-[10px] font-black text-violet-700 uppercase tracking-widest flex items-center gap-2">
-                                                <span className="text-base">🤖</span> Resultado Call Bot AI
-                                            </h4>
-                                            <div className="flex items-center gap-2">
-                                                {llamadas !== undefined && llamadas > 0 && (
-                                                    <span className="text-[9px] font-black text-violet-500 bg-violet-100 px-2 py-0.5 rounded-full">
-                                                        {llamadas} llamada{llamadas !== 1 ? 's' : ''}
-                                                    </span>
-                                                )}
-                                                {ultimaLlamada && (
-                                                    <span className="text-[9px] text-violet-400 font-medium">
-                                                        {(() => { try { return format(new Date(ultimaLlamada), 'dd MMM HH:mm', { locale: es }); } catch { return ''; } })()}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Score + Calificación */}
-                                        <div className="flex items-center gap-3">
-                                            <div className={`flex-none px-3 py-1.5 rounded-xl text-xs font-black border ${calificado ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-100'}`}>
-                                                {calificado ? '✅ Calificó' : '❌ No calificó'}
-                                            </div>
-                                            {score !== null && score !== undefined && (
-                                                <div className="flex-1 flex items-center gap-2">
-                                                    <div className="flex-1 h-2 bg-white/70 rounded-full overflow-hidden border border-violet-100">
-                                                        <div
-                                                            className={`h-full rounded-full transition-all ${score >= 70 ? 'bg-emerald-500' : score >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
-                                                            style={{ width: `${score}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="text-sm font-black text-violet-700 flex-none">{score}/100</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* DTE Data */}
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {dtes !== null && dtes !== undefined && (
-                                                <div className="bg-white/70 rounded-xl p-2.5 border border-violet-100">
-                                                    <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest">DTE / mes</p>
-                                                    <p className="text-lg font-black text-gray-900 mt-0.5">{dtes}<span className="text-xs text-gray-400 font-medium ml-1">docs</span></p>
-                                                </div>
-                                            )}
-                                            <div className="bg-white/70 rounded-xl p-2.5 border border-violet-100">
-                                                <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest">Sistema DTE</p>
-                                                <p className={`text-sm font-black mt-0.5 ${tieneSistema ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                                    {tieneSistema === undefined ? '—' : tieneSistema ? '⚠️ Ya tiene' : '✅ Sin sistema'}
-                                                </p>
-                                            </div>
-                                            {demoAgendada !== undefined && (
-                                                <div className={`bg-white/70 rounded-xl p-2.5 border ${demoAgendada ? 'border-purple-200' : 'border-violet-100'}`}>
-                                                    <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest">Demo</p>
-                                                    <p className={`text-sm font-black mt-0.5 ${demoAgendada ? 'text-purple-700' : 'text-gray-400'}`}>
-                                                        {demoAgendada ? '📅 Agendada' : 'No agendada'}
+                                                    <p className="text-xs text-slate-500 font-medium">
+                                                        Metodología oficial de ventas consultivas, guion de 7 preguntas y auditoría inteligente con Gemini AI.
                                                     </p>
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
 
-                                        {/* Notas de la llamada */}
-                                        {notas && (
-                                            <div className="bg-white/60 rounded-xl px-3 py-2.5 border border-violet-100">
-                                                <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest mb-1">Notas de Sofía</p>
-                                                <p className="text-xs text-gray-700 font-medium leading-relaxed">{notas}</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div
+                                                onClick={() => setIsDemoHUDOpen(true)}
+                                                className="p-5 rounded-2xl bg-slate-50 hover:bg-rose-50/40 border border-slate-200 hover:border-rose-300 transition-all text-left group cursor-pointer shadow-xs flex flex-col justify-between"
+                                            >
+                                                <div>
+                                                    <div className="w-8 h-8 rounded-xl bg-white border border-rose-200 flex items-center justify-center text-rose-600 mb-3 shadow-2xs">
+                                                        <Target className="w-4 h-4" />
+                                                    </div>
+                                                    <h4 className="text-sm font-black text-slate-900 group-hover:text-rose-700 transition-colors mb-1">
+                                                        Guion Demo HUD
+                                                    </h4>
+                                                    <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                                                        Abre el copiloto en vivo con las 7 preguntas obligatorias de dolor, decisor y objeciones de prueba.
+                                                    </p>
+                                                </div>
+                                                <div className="pt-4 flex items-center gap-1.5 text-xs font-bold text-rose-600">
+                                                    <span>Iniciar Guion en Vivo</span>
+                                                    <span>➔</span>
+                                                </div>
+                                            </div>
+
+                                            <div
+                                                onClick={() => setIsGeminiAuditOpen(true)}
+                                                className={`p-5 rounded-2xl transition-all text-left group cursor-pointer border shadow-xs flex flex-col justify-between ${
+                                                    leadAudit
+                                                        ? 'bg-indigo-50/60 hover:bg-indigo-50 border-indigo-300'
+                                                        : 'bg-slate-50 hover:bg-indigo-50/40 border-slate-200 hover:border-indigo-300'
+                                                }`}
+                                            >
+                                                <div>
+                                                    <div className="w-8 h-8 rounded-xl bg-white border border-indigo-200 flex items-center justify-center text-indigo-600 mb-3 shadow-2xs">
+                                                        <Sparkles className="w-4 h-4" />
+                                                    </div>
+                                                    <h4 className="text-sm font-black text-slate-900 group-hover:text-indigo-700 transition-colors mb-1">
+                                                        Auditar Demo con Gemini
+                                                    </h4>
+                                                    <p className="text-xs text-slate-500 leading-relaxed font-medium">
+                                                        {leadAudit ? 'Revisar rúbrica de 100 puntos y plan de coaching 1:1 generado.' : 'Pega las notas de Google Meet para auditar automáticamente contra la rúbrica oficial.'}
+                                                    </p>
+                                                </div>
+                                                <div className="pt-4 flex items-center gap-1.5 text-xs font-bold text-indigo-600">
+                                                    <span>{leadAudit ? 'Ver Resultados de Auditoría' : 'Auditar Ahora (100 Pts)'}</span>
+                                                    <span>➔</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Banner de Auditoría */}
+                                        {leadAudit ? (
+                                            <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-200 flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-10 h-10 rounded-xl bg-white border border-indigo-200 text-indigo-700 flex items-center justify-center font-black text-sm shrink-0">
+                                                        {leadAudit.total_score}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs font-black text-slate-900">
+                                                                Auditoría Oficial: {leadAudit.total_score}/100 pts
+                                                            </span>
+                                                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${
+                                                                leadAudit.total_score >= 85 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                                leadAudit.total_score >= 70 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                                'bg-rose-50 text-rose-700 border-rose-200'
+                                                            }`}>
+                                                                {leadAudit.total_score >= 85 ? 'Sólido' : leadAudit.total_score >= 70 ? 'Coaching' : 'Intervención'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[11px] text-slate-500">
+                                                            {leadAudit.google_doc_url ? 'Google Doc Vinculado' : 'Notas registradas en CRM'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsGeminiAuditOpen(true)}
+                                                    className="px-3 py-1.5 rounded-lg text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-white hover:bg-indigo-50 border border-indigo-200 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+                                                >
+                                                    Revisar Rúbrica
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs text-slate-600">
+                                                <span className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                                    Pega el enlace de Google Docs o el resumen de Gemini Meet
+                                                </span>
+                                                <span className="text-emerald-700 font-bold">100% Automático</span>
                                             </div>
                                         )}
                                     </div>
-                                );
-                            })()}
-
-                            {/* Follow-up History - Always visible */}
-                            <div className="pt-4 border-t border-gray-100">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                                        <Clock className="w-4 h-4 text-indigo-500" /> Trazabilidad del Prospecto
-                                    </h4>
-                                    {(followUps.length + messages.length + callActivities.length > 0) && (
-                                        <span className="text-[10px] font-black px-2.5 py-1 bg-indigo-50 text-indigo-500 rounded-full">
-                                            {followUps.length + messages.length + callActivities.length} actividades
-                                        </span>
-                                    )}
                                 </div>
-                                {(followUps.length > 0 || messages.length > 0 || callActivities.length > 0) ? (
-                                    <div className="relative pl-8 space-y-3 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-indigo-100 before:via-gray-100 before:to-transparent">
-                                        {[
+                            )}
+
+                            {/* ── TAB 3: COTIZACIONES & CONTRATOS ── */}
+                            {activeTab === 'quotes' && (
+                                <div className="space-y-6 animate-in fade-in duration-200">
+                                    {/* Section 1: Cotizaciones & Propuestas */}
+                                    <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="w-4 h-4 text-emerald-600" />
+                                                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
+                                                    Cotizaciones & Propuestas ({leadCotizaciones.length})
+                                                </h4>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    navigate('/cotizaciones/nueva-pro', { state: { lead: selectedLead } });
+                                                }}
+                                                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs border border-emerald-200/70"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" /> Nueva Cotización
+                                            </button>
+                                        </div>
+
+                                        {leadCotizaciones.length > 0 ? (
+                                            <div className="space-y-2.5">
+                                                {leadCotizaciones.map((cot) => {
+                                                    const total = cot.total_anual || cot.total_mensual || 0;
+                                                    return (
+                                                        <div
+                                                            key={cot.id}
+                                                            className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-emerald-200 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs"
+                                                        >
+                                                            <div className="space-y-1 min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] font-mono font-bold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-100">
+                                                                        COT-{cot.id.slice(0, 6).toUpperCase()}
+                                                                    </span>
+                                                                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                                                        cot.estado === 'aceptada'
+                                                                            ? 'bg-emerald-100 text-emerald-800'
+                                                                            : cot.estado === 'enviada'
+                                                                            ? 'bg-blue-100 text-blue-800'
+                                                                            : 'bg-amber-100 text-amber-800'
+                                                                    }`}>
+                                                                        {cot.estado === 'aceptada' ? 'Aceptada' : cot.estado === 'enviada' ? 'Enviada' : 'Borrador'}
+                                                                    </span>
+                                                                    {cot.volumen_dtes ? (
+                                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                                                                            {cot.volumen_dtes.toLocaleString()} DTs
+                                                                        </span>
+                                                                    ) : null}
+                                                                </div>
+                                                                <p className="text-xs font-bold text-slate-800 truncate">{cot.plan_nombre || 'Propuesta Comercial'}</p>
+                                                                <p className="text-[10px] text-slate-500">
+                                                                    Monto: <strong className="text-emerald-700">${total.toLocaleString()} USD</strong>
+                                                                    {cot.created_at && ` • ${format(new Date(cot.created_at), 'dd MMM yyyy', { locale: es })}`}
+                                                                </p>
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2 shrink-0">
+                                                                <a
+                                                                    href={`/cotizaciones/${cot.id}`}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="px-2.5 py-1 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-lg text-xs font-bold border border-slate-200 transition-colors flex items-center gap-1 cursor-pointer"
+                                                                >
+                                                                    <ExternalLink className="w-3 h-3" /> Ver
+                                                                </a>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSelectQuoteForContract(cot)}
+                                                                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                                                                    title="Formalizar esta cotización en un contrato oficial"
+                                                                >
+                                                                    <ShieldCheck className="w-3.5 h-3.5" /> Crear Contrato
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="p-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center space-y-2">
+                                                <p className="text-xs text-slate-500 font-medium">Este prospecto aún no tiene cotizaciones generadas.</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedLead } })}
+                                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+                                                >
+                                                    <Plus className="w-3.5 h-3.5" /> Cotizar con Cotizador Pro
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Section 2: Contratos de Servicios */}
+                                    <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs space-y-4">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                                            <div className="flex items-center gap-2">
+                                                <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                                                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-wider">
+                                                    Contratos de Servicios ({leadContracts.length})
+                                                </h4>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleInitiateContractCreation}
+                                                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer border border-indigo-200/70"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" /> Nuevo Contrato
+                                            </button>
+                                        </div>
+
+                                        {leadContracts.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {leadContracts.map((c) => (
+                                                    <div
+                                                        key={c.id}
+                                                        className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-white hover:border-indigo-200 transition-all space-y-2.5 shadow-2xs"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] font-mono font-bold text-indigo-600 bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-2xs">
+                                                                        {c.contract_number}
+                                                                    </span>
+                                                                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                                                        c.status === 'firmado'
+                                                                            ? 'bg-emerald-100 text-emerald-800'
+                                                                            : c.status === 'enviado'
+                                                                            ? 'bg-blue-100 text-blue-800'
+                                                                            : 'bg-amber-100 text-amber-800'
+                                                                    }`}>
+                                                                        {c.status === 'firmado' ? 'Firmado' : c.status === 'enviado' ? 'Enviado' : 'Borrador'}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-xs font-bold text-slate-800 mt-1 line-clamp-1">{c.title}</p>
+                                                                <p className="text-[10px] text-slate-500">
+                                                                    Monto: ${c.monto_total?.toLocaleString()} USD • {c.vigencia_meses} meses
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 text-xs">
+                                                            <a
+                                                                href={`/contrato/${c.id}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 text-[11px]"
+                                                            >
+                                                                <ExternalLink className="w-3 h-3" /> Ver Enlace
+                                                            </a>
+
+                                                            <div className="flex items-center gap-1.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setContractForShare(c);
+                                                                        setIsContractShareOpen(true);
+                                                                    }}
+                                                                    className="p-1.5 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                                                    title="Compartir enlace / WhatsApp"
+                                                                >
+                                                                    <Send className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={async () => {
+                                                                        try {
+                                                                            await contractPdfService.downloadContractPDF(c);
+                                                                            toast.success('PDF descargado');
+                                                                        } catch {
+                                                                            toast.error('Error al generar PDF');
+                                                                        }
+                                                                    }}
+                                                                    className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                                                                    title="Descargar PDF"
+                                                                >
+                                                                    <Download className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setSelectedContractForEdit(c);
+                                                                        setIsContractEditorOpen(true);
+                                                                    }}
+                                                                    className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg font-bold text-[11px] border border-slate-200 shadow-2xs cursor-pointer"
+                                                                >
+                                                                    Editar
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-6 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                                                <p className="text-xs text-slate-500">No hay contratos generados para este prospecto.</p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedContractForEdit(null);
+                                                        setIsContractEditorOpen(true);
+                                                    }}
+                                                    className="mt-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                                                >
+                                                    + Crear Contrato de Servicios
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── TAB 4: TRAZABILIDAD & ACTIVIDAD ── */}
+                            {activeTab === 'activity' && (
+                                <div className="space-y-5 animate-in fade-in duration-200">
+                                    {/* Filter Chips & Counter Header */}
+                                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2">
+                                            <Clock className="w-4 h-4 text-indigo-600" />
+                                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                                                Línea de Tiempo ({followUps.length + messages.length + callActivities.length})
+                                            </h4>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 text-xs font-bold">
+                                            <button
+                                                type="button"
+                                                onClick={() => setTimelineFilter('all')}
+                                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                                                    timelineFilter === 'all'
+                                                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                Todas
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setTimelineFilter('calls')}
+                                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                                                    timelineFilter === 'calls'
+                                                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                Llamadas ({callActivities.length})
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setTimelineFilter('messages')}
+                                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                                                    timelineFilter === 'messages'
+                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                Mensajes ({messages.length})
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setTimelineFilter('followups')}
+                                                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                                                    timelineFilter === 'followups'
+                                                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                        : 'text-slate-500 hover:text-slate-800'
+                                                }`}
+                                            >
+                                                Seguimientos ({followUps.length})
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Timeline Stream */}
+                                    {(() => {
+                                        const allItems = [
                                             ...followUps.map(f => ({ ...f, _type: 'follow_up' as const })),
                                             ...messages.map(m => ({ ...m, _type: 'message' as const, date: m.created_at })),
                                             ...callActivities.map(a => ({ ...a, _type: 'call_activity' as const })),
@@ -1126,134 +1249,112 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 ? new Date(x.call_date || x.created_at)
                                                 : new Date(x.created_at || x.date);
                                             return getDate(b).getTime() - getDate(a).getTime();
-                                        }).map((item: any) => {
-                                            // --- Unified card logic ---
-                                            const isActivity = item._type === 'call_activity';
-                                            const isMessage = item._type === 'message';
-                                            const isFollowUp = item._type === 'follow_up';
+                                        });
 
-                                            // Resolve icon, label, colors for the card
-                                            const actCfg = isActivity ? ACTION_TYPE_CONFIG[item.action_type as keyof typeof ACTION_TYPE_CONFIG] : null;
-                                            const outCfg = isActivity ? CALL_OUTCOME_CONFIG[item.outcome as keyof typeof CALL_OUTCOME_CONFIG] : null;
-                                            const followUpAction = isFollowUp ? ACTION_TYPES.find(t => t.value === item.action_type) : null;
+                                        const filteredItems = allItems.filter(item => {
+                                            if (timelineFilter === 'calls') return item._type === 'call_activity';
+                                            if (timelineFilter === 'messages') return item._type === 'message';
+                                            if (timelineFilter === 'followups') return item._type === 'follow_up';
+                                            return true;
+                                        });
 
-                                            // Channel config for messages
-                                            const channelCfg: Record<string, { icon: string; color: string; bg: string; border: string; label: string }> = {
-                                                whatsapp: { icon: '💬', color: 'text-green-700', bg: 'bg-green-50', border: 'border-l-green-400', label: 'WhatsApp' },
-                                                telegram: { icon: '✈️', color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-l-sky-400', label: 'Telegram' },
-                                                email: { icon: '📧', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-l-amber-400', label: 'Email' },
-                                            };
-                                            const msgCh = isMessage ? (channelCfg[item.channel] || { icon: '💬', color: 'text-gray-700', bg: 'bg-gray-50', border: 'border-l-gray-300', label: item.channel }) : null;
-
-                                            // Dot color
-                                            const dotBg = isActivity ? (actCfg?.bgColor || 'bg-gray-100') :
-                                                isMessage ? (msgCh?.bg || 'bg-gray-100') :
-                                                    'bg-indigo-50';
-                                            const dotIcon = isActivity ? (actCfg?.icon || '📋') :
-                                                isMessage ? (msgCh?.icon || '💬') :
-                                                    (followUpAction?.icon || '📌');
-
-                                            // Left border
-                                            const borderColorMap: Record<string, string> = {
-                                                call: 'border-l-blue-400', email: 'border-l-amber-400', whatsapp: 'border-l-green-400',
-                                                telegram: 'border-l-sky-400', quote_sent: 'border-l-indigo-400', info_sent: 'border-l-purple-400', meeting: 'border-l-rose-400',
-                                            };
-                                            const leftBorder = isActivity ? (borderColorMap[item.action_type] || 'border-l-gray-300') :
-                                                isMessage ? (msgCh?.border || 'border-l-gray-300') :
-                                                    'border-l-indigo-300';
-
-                                            // Type pill
-                                            const typePill = isActivity ? { icon: actCfg?.icon, label: actCfg?.label || item.action_type, bg: actCfg?.bgColor || 'bg-gray-100', color: actCfg?.color || 'text-gray-600' } :
-                                                isMessage ? { icon: msgCh?.icon, label: `${msgCh?.label} · ${item.direction === 'inbound' ? 'Recibido' : 'Enviado'}`, bg: msgCh?.bg || 'bg-gray-100', color: msgCh?.color || 'text-gray-600' } :
-                                                    { icon: followUpAction?.icon || '📌', label: 'Seguimiento', bg: 'bg-indigo-50', color: 'text-indigo-700' };
-
-                                            // Date
-                                            const itemDate = (() => {
-                                                try {
-                                                    if (isActivity) return format(new Date(item.call_date || item.created_at), 'dd MMM, HH:mm', { locale: es });
-                                                    if (isMessage) return format(new Date(item.created_at), 'dd MMM, HH:mm', { locale: es });
-                                                    if (!item.date) return 'Sin fecha';
-                                                    return format(new Date(`${item.date.split('T')[0]}T12:00:00`), 'dd MMM, yyyy', { locale: es });
-                                                } catch { return 'Sin fecha'; }
-                                            })();
-
-                                            // Content / note
-                                            const noteText = isActivity ? item.notes :
-                                                isMessage ? (item.channel === 'email' && item.metadata?.campaign_id ? 'Email de campaña enviado' : item.content) :
-                                                    item.notes;
-
-                                            // Assignee
-                                            const assignee = isFollowUp
-                                                ? (item.assigned_profile?.full_name || (typeof item.assigned_profile?.email === 'string' ? item.assigned_profile.email.split('@')[0] : null) || item.profiles?.full_name || (typeof item.profiles?.email === 'string' ? item.profiles.email.split('@')[0] : null) || null)
-                                                : null;
-
+                                        if (filteredItems.length === 0) {
                                             return (
-                                                <div key={`${item._type}-${item.id}`} className="relative group">
-                                                    {/* Timeline dot */}
-                                                    <div className={`absolute -left-[30px] top-1.5 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center shadow-sm z-10 group-hover:scale-110 transition-transform ${dotBg}`}>
-                                                        <span className="text-[10px] leading-none">{dotIcon}</span>
-                                                    </div>
-                                                    {/* Unified Card */}
-                                                    <div className={`bg-white rounded-xl p-4 border border-gray-100 border-l-4 ${leftBorder} shadow-[0_1px_6px_rgba(0,0,0,0.04)] group-hover:shadow-[0_4px_16px_rgba(0,0,0,0.07)] group-hover:-translate-y-0.5 transition-all`}>
-                                                        {/* Row 1: Type pill + Date */}
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <span className={`inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${typePill.bg} ${typePill.color}`}>
-                                                                {typePill.icon} {typePill.label}
-                                                            </span>
-                                                            <span className="text-[10px] font-bold text-gray-400">{itemDate}</span>
-                                                        </div>
-                                                        {/* Row 2: Outcome badge (only call_activity) */}
-                                                        {outCfg && (
-                                                            <div className="mb-2">
-                                                                <span className={`inline-flex items-center gap-1.5 text-[11px] font-black px-2.5 py-1 rounded-full ${outCfg.bgColor} ${outCfg.color}`}>
-                                                                    {outCfg.icon} {outCfg.label}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {/* Row 3: Campaign badge (only messages from campaigns) */}
-                                                        {isMessage && item.metadata?.campaign_id && (
-                                                            <div className="mb-2">
-                                                                <span className="inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-500 uppercase tracking-wider">
-                                                                    <TrendingUp className="w-2.5 h-2.5" /> Campaña
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {/* Row 4: Note / Content */}
-                                                        {noteText && (
-                                                            <p className="text-[13px] text-gray-600 leading-relaxed mt-1 whitespace-pre-wrap">
-                                                                {noteText}
-                                                            </p>
-                                                        )}
-                                                        {!noteText && isFollowUp && (
-                                                            <p className="text-[13px] text-gray-300 italic mt-1">Sin comentarios</p>
-                                                        )}
-                                                        {/* Row 5: Footer — duration / assignee */}
-                                                        {(assignee || (isActivity && item.duration_seconds > 0)) && (
-                                                            <div className="mt-2.5 pt-2 border-t border-gray-50 flex items-center gap-3 flex-wrap">
-                                                                {isActivity && item.duration_seconds > 0 && (
-                                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-400">
-                                                                        <Clock className="w-3 h-3" /> {Math.round(item.duration_seconds / 60)} min
-                                                                    </span>
-                                                                )}
-                                                                {assignee && (
-                                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-400">
-                                                                        <User className="w-3 h-3" /> <span className="font-black text-indigo-600 uppercase tracking-wider">{assignee}</span>
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                <div className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200">
+                                                    <Clock className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                        Sin actividad registrada en este filtro
+                                                    </p>
                                                 </div>
                                             );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-10 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                                        <Clock className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Sin actividad registrada</p>
-                                    </div>
-                                )}
-                            </div>
+                                        }
+
+                                        return (
+                                            <div className="relative pl-7 space-y-3 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                                                {filteredItems.map((item: any) => {
+                                                    const isActivity = item._type === 'call_activity';
+                                                    const isMessage = item._type === 'message';
+                                                    const isFollowUp = item._type === 'follow_up';
+
+                                                    const actCfg = isActivity ? ACTION_TYPE_CONFIG[item.action_type as keyof typeof ACTION_TYPE_CONFIG] : null;
+                                                    const outCfg = isActivity ? CALL_OUTCOME_CONFIG[item.outcome as keyof typeof CALL_OUTCOME_CONFIG] : null;
+                                                    const followUpAction = isFollowUp ? ACTION_TYPES.find(t => t.value === item.action_type) : null;
+
+                                                    const channelCfg: Record<string, { label: string; color: string; bg: string }> = {
+                                                        whatsapp: { label: 'WhatsApp', color: 'text-emerald-700', bg: 'bg-emerald-50' },
+                                                        telegram: { label: 'Telegram', color: 'text-sky-700', bg: 'bg-sky-50' },
+                                                        email: { label: 'Email', color: 'text-amber-700', bg: 'bg-amber-50' },
+                                                    };
+                                                    const msgCh = isMessage ? (channelCfg[item.channel] || { label: item.channel, color: 'text-slate-700', bg: 'bg-slate-50' }) : null;
+
+                                                    const dotBg = isActivity ? 'bg-blue-600' : isMessage ? 'bg-emerald-600' : 'bg-indigo-600';
+
+                                                    const itemDate = (() => {
+                                                        try {
+                                                            if (isActivity) return format(new Date(item.call_date || item.created_at), 'dd MMM, HH:mm', { locale: es });
+                                                            if (isMessage) return format(new Date(item.created_at), 'dd MMM, HH:mm', { locale: es });
+                                                            if (!item.date) return 'Sin fecha';
+                                                            return format(new Date(`${item.date.split('T')[0]}T12:00:00`), 'dd MMM, yyyy', { locale: es });
+                                                        } catch { return 'Sin fecha'; }
+                                                    })();
+
+                                                    const noteText = isActivity ? item.notes :
+                                                        isMessage ? (item.channel === 'email' && item.metadata?.campaign_id ? 'Email de campaña enviado' : item.content) :
+                                                            item.notes;
+
+                                                    const assignee = isFollowUp
+                                                        ? (item.assigned_profile?.full_name || (typeof item.assigned_profile?.email === 'string' ? item.assigned_profile.email.split('@')[0] : null) || item.profiles?.full_name || (typeof item.profiles?.email === 'string' ? item.profiles.email.split('@')[0] : null) || null)
+                                                        : null;
+
+                                                    return (
+                                                        <div key={`${item._type}-${item.id}`} className="relative group">
+                                                            {/* Timeline dot */}
+                                                            <div className={`absolute -left-[28px] top-2 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs z-10 ${dotBg}`} />
+
+                                                            <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-2xs hover:shadow-xs transition-all space-y-2">
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                                                                            {isActivity ? (actCfg?.label || item.action_type) : isMessage ? `${msgCh?.label} · ${item.direction === 'inbound' ? 'Recibido' : 'Enviado'}` : (followUpAction?.label || 'Seguimiento')}
+                                                                        </span>
+                                                                        {outCfg && (
+                                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${outCfg.bgColor} ${outCfg.color}`}>
+                                                                                {outCfg.label}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className="text-[10px] font-bold text-slate-400">{itemDate}</span>
+                                                                </div>
+
+                                                                {noteText && (
+                                                                    <p className="text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">
+                                                                        {noteText}
+                                                                    </p>
+                                                                )}
+
+                                                                {(assignee || (isActivity && item.duration_seconds > 0)) && (
+                                                                    <div className="pt-2 border-t border-slate-100 flex items-center gap-3 text-[10px] font-bold text-slate-400">
+                                                                        {isActivity && item.duration_seconds > 0 && (
+                                                                            <span className="flex items-center gap-1">
+                                                                                <Clock className="w-3 h-3" /> {Math.round(item.duration_seconds / 60)} min
+                                                                            </span>
+                                                                        )}
+                                                                        {assignee && (
+                                                                            <span className="flex items-center gap-1">
+                                                                                <User className="w-3 h-3" /> <span className="text-indigo-600 font-bold">{assignee}</span>
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            )}
                         </div>
                     </div>
 
