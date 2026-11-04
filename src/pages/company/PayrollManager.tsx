@@ -111,6 +111,7 @@ export default function PayrollManager() {
   const [companyProjectsMap, setCompanyProjectsMap] = useState<Record<string, string>>({});
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [kpiSourceFilter, setKpiSourceFilter] = useState<'ALL' | 'ticket' | 'task' | 'timesheet'>('ALL');
+  const [confrontationDayFilter, setConfrontationDayFilter] = useState<Record<string, string>>({});
 
   const toggleSelectUser = (userId: string) => {
     setSelectedUserIds((prev) =>
@@ -653,7 +654,7 @@ export default function PayrollManager() {
       const resolvedDate = toLocalDateStr(t.resolved_at);
 
       // Fecha real del ticket: priorizar fecha de jornada vinculada o fecha de creación real
-      let effectiveDate = tsLog?.date || createdDate;
+      let effectiveDate = (createdDate && createdDate >= startDate && createdDate <= endDate) ? createdDate : (tsLog?.date || createdDate);
       if (effectiveDate < startDate || effectiveDate > endDate) {
         if (resolvedDate && resolvedDate >= startDate && resolvedDate <= endDate) {
           effectiveDate = resolvedDate;
@@ -795,7 +796,47 @@ export default function PayrollManager() {
         .reduce((s, it) => s + (it.hoursTaken !== null ? it.hoursTaken : 0), 0)
         .toFixed(2);
 
-      const effectiveHoursInvested = totalTimesheetHours > 0 ? totalTimesheetHours : explicitTaskHoursSum;
+      const effectiveHoursInvested = explicitTaskHoursSum;
+      const hourlyRate = payItem?.effective_hourly_rate || (totalTimesheetHours > 0 && payItem?.gross_pay ? +(payItem.gross_pay / totalTimesheetHours).toFixed(2) : 0);
+      const unjustifiedHours = Math.max(0, +(totalTimesheetHours - explicitTaskHoursSum).toFixed(2));
+      const justificationPct = totalTimesheetHours > 0 ? Math.min(100, Math.round((explicitTaskHoursSum / totalTimesheetHours) * 100)) : (explicitTaskHoursSum > 0 ? 100 : 0);
+      const unjustifiedCost = +(unjustifiedHours * hourlyRate).toFixed(2);
+
+      const allDatesSet = new Set<string>();
+      userTimesheets.forEach((ts) => { if (ts.work_date) allDatesSet.add(ts.work_date); });
+      userTasks.forEach((tk) => { if (tk.dateStr) allDatesSet.add(tk.dateStr); });
+
+      const dailyBreakdown = Array.from(allDatesSet)
+        .sort((a, b) => b.localeCompare(a))
+        .map((d) => {
+          const dayTs = userTimesheets.filter((ts) => ts.work_date === d);
+          const dayTks = userTasks.filter((tk) => tk.dateStr === d);
+          const dReg = +dayTs.reduce((s, t) => s + Number(t.regular_hours || 0), 0).toFixed(2);
+          const dOt = +dayTs.reduce((s, t) => s + Number(t.overtime_hours || 0), 0).toFixed(2);
+          const reportedHours = +(dReg + dOt).toFixed(2);
+          const taskHours = +dayTks.reduce((s, tk) => s + (tk.hoursTaken !== null ? tk.hoursTaken : 0), 0).toFixed(2);
+          const missingHours = Math.max(0, +(reportedHours - taskHours).toFixed(2));
+          const dayPct = reportedHours > 0 ? Math.min(100, Math.round((taskHours / reportedHours) * 100)) : (taskHours > 0 ? 100 : 0);
+          const dayGrossPay = +(reportedHours * hourlyRate).toFixed(2);
+          const dayNetPay = totalTimesheetHours > 0 ? +((payItem?.net_pay || 0) * (reportedHours / totalTimesheetHours)).toFixed(2) : 0;
+          const dayMissingCost = +(missingHours * hourlyRate).toFixed(2);
+          const workSummary = dayTs.map((t) => t.work_summary).filter(Boolean).join(' • ');
+          return {
+            dateStr: d,
+            reportedRegHours: dReg,
+            reportedOtHours: dOt,
+            reportedHours,
+            taskHours,
+            missingHours,
+            dayPct,
+            dayGrossPay,
+            dayNetPay,
+            dayMissingCost,
+            tasksCount: dayTks.length,
+            workSummary,
+            dayTasks: dayTks,
+          };
+        });
 
       return {
         userId: tp.id,
@@ -815,6 +856,11 @@ export default function PayrollManager() {
         tasksCount: userTasks.length,
         timesheets: userTimesheets,
         tasks: userTasks,
+        hourlyRate,
+        unjustifiedHours,
+        justificationPct,
+        unjustifiedCost,
+        dailyBreakdown,
       };
     });
 
@@ -832,6 +878,8 @@ export default function PayrollManager() {
       .reduce((acc, c) => acc + c.effectiveHoursInvested, 0)
       .toFixed(1);
     const avgHoursPerTask = totalCompleted > 0 ? +(totalHoursInvested / totalCompleted).toFixed(1) : 0;
+    const totalReportedHours = +displayedConfrontations.reduce((acc, c) => acc + c.totalTimesheetHours, 0).toFixed(1);
+    const totalUnjustifiedHours = Math.max(0, +(totalReportedHours - totalHoursInvested).toFixed(1));
 
     return {
       items: filtered,
@@ -839,11 +887,532 @@ export default function PayrollManager() {
       totalCompleted,
       totalHoursInvested,
       avgHoursPerTask,
+      totalReportedHours,
+      totalUnjustifiedHours,
       activeCollaborators: displayedConfrontations.filter((c) => c.tasksCount > 0 || c.totalTimesheetHours > 0).length,
       confrontationCards,
       displayedConfrontations,
     };
   }, [teamProfiles, periodTimesheets, companyTickets, companyTasks, companyProjectsMap, payrollSummary.items, selectedUserIds, kpiSourceFilter, searchTerm, startDate, endDate]);
+
+  const renderCollaboratorConfrontationCard = (conf: (typeof completedTasksAnalytics.displayedConfrontations)[number]) => {
+    const daysWithTasks = conf.dailyBreakdown.filter((d) => d.tasksCount > 0 || d.taskHours > 0);
+    const defaultDayMode =
+      conf.dailyBreakdown.length > 1 && daysWithTasks.length === 1
+        ? daysWithTasks[0].dateStr
+        : conf.dailyBreakdown.length === 1
+        ? conf.dailyBreakdown[0].dateStr
+        : 'ALL';
+
+    const activeDayKey = confrontationDayFilter[conf.userId] || defaultDayMode;
+    const focusedDay = activeDayKey !== 'ALL' ? conf.dailyBreakdown.find((d) => d.dateStr === activeDayKey) || null : null;
+
+    const viewReportedHours = focusedDay ? focusedDay.reportedHours : conf.totalTimesheetHours;
+    const viewTaskHours = focusedDay ? focusedDay.taskHours : conf.explicitTaskHoursSum;
+    const viewMissingHours = focusedDay ? focusedDay.missingHours : conf.unjustifiedHours;
+    const viewTasksCount = focusedDay ? focusedDay.tasksCount : conf.tasksCount;
+    const viewPct = focusedDay ? focusedDay.dayPct : conf.justificationPct;
+    const viewNetPay = focusedDay ? focusedDay.dayNetPay : conf.netPay;
+    const viewGrossPay = focusedDay ? focusedDay.dayGrossPay : conf.grossPay;
+    const viewMissingCost = focusedDay ? focusedDay.dayMissingCost : conf.unjustifiedCost;
+    const viewTasksList = focusedDay ? focusedDay.dayTasks : conf.tasks;
+    const viewScopeLabel = focusedDay ? `Día ${focusedDay.dateStr}` : `Período (${conf.dailyBreakdown.length} ${conf.dailyBreakdown.length === 1 ? 'día' : 'días'})`;
+
+    const isUnjustified = viewMissingHours > 0;
+
+    return (
+      <div
+        key={conf.userId}
+        className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden transition-all"
+      >
+        {/* 1. HEADER MINIMALISTA DEL COLABORADOR + SELECTOR DE DÍA O PERÍODO */}
+        <div className="p-4 sm:p-5 bg-slate-50/70 border-b border-slate-200/80 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-slate-900 text-white font-black text-base flex items-center justify-center shrink-0 shadow-xs">
+              {conf.userName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
+                  {conf.userName}
+                </h3>
+                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                  📅 {focusedDay ? `Jornada del ${focusedDay.dateStr}` : periodLabel}
+                </span>
+                {isUnjustified ? (
+                  <span className="text-[11px] font-extrabold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200">
+                    ⚠️ {viewMissingHours}h sin justificar
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    ✓ Horas respaldadas
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Auditoría de horas reportadas en jornada vs. tiempo real demostrado en tareas terminadas.
+              </p>
+            </div>
+          </div>
+
+          {/* Selector rápido por día o período completo */}
+          {conf.dailyBreakdown.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap bg-white p-1.5 rounded-xl border border-slate-200/90 shadow-2xs">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2">
+                Confrontar por:
+              </span>
+              {conf.dailyBreakdown.map((d) => {
+                const isDayActive = focusedDay?.dateStr === d.dateStr;
+                return (
+                  <button
+                    key={d.dateStr}
+                    type="button"
+                    onClick={() =>
+                      setConfrontationDayFilter((prev) => ({
+                        ...prev,
+                        [conf.userId]: d.dateStr,
+                      }))
+                    }
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                      isDayActive
+                        ? 'bg-slate-900 text-white shadow-2xs'
+                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200/70'
+                    }`}
+                  >
+                    <span>📅 {d.dateStr}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                        isDayActive
+                          ? 'bg-white/20 text-white'
+                          : d.missingHours > 0
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : 'bg-emerald-50 text-emerald-700'
+                      }`}
+                    >
+                      {d.reportedHours}h rep. vs {d.taskHours}h tareas
+                    </span>
+                  </button>
+                );
+              })}
+              {conf.dailyBreakdown.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setConfrontationDayFilter((prev) => ({
+                      ...prev,
+                      [conf.userId]: 'ALL',
+                    }))
+                  }
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                    !focusedDay
+                      ? 'bg-indigo-600 text-white shadow-2xs'
+                      : 'bg-indigo-50/70 text-indigo-800 hover:bg-indigo-100 border border-indigo-200'
+                  }`}
+                >
+                  <span>📊 Total {conf.dailyBreakdown.length} días</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded font-mono ${
+                      !focusedDay ? 'bg-white/20 text-white' : 'bg-white text-indigo-700'
+                    }`}
+                  >
+                    {conf.totalTimesheetHours}h vs {conf.explicitTaskHoursSum}h
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 2. LAS 4 CARDS EJECUTIVAS DE CONFRONTACIÓN (PREMIUM, LIMPIAS, MINIMALISTAS) */}
+        <div className="p-4 sm:p-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* CARD 1: HORAS REPORTADAS POR EL COLABORADOR */}
+            <div className="bg-slate-50/70 border border-slate-200 rounded-xl p-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  1. Horas Reportadas
+                </span>
+                <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                  {viewScopeLabel}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-1.5">
+                <span className="text-2xl font-black text-slate-900 font-mono">
+                  {viewReportedHours}h
+                </span>
+                <span className="text-xs font-semibold text-slate-500">
+                  en Mi Jornada
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 font-medium">
+                {focusedDay && conf.dailyBreakdown.length > 1
+                  ? `Acumulado quincena: ${conf.totalTimesheetHours}h en ${conf.dailyBreakdown.length} días`
+                  : `${conf.regHrs}h regulares ${conf.otHrs > 0 ? `+ ${conf.otHrs}h extras` : ''}`}
+              </p>
+            </div>
+
+            {/* CARD 2: HORAS EN TAREAS HECHAS (LO QUE REALMENTE DEMUESTRA) */}
+            <div className="bg-indigo-50/50 border border-indigo-200 rounded-xl p-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">
+                  2. Horas en Tareas Hechas
+                </span>
+                <span className="text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                  {viewTasksCount} {viewTasksCount === 1 ? 'tarea' : 'tareas'}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-1.5">
+                <span className="text-2xl font-black text-indigo-950 font-mono">
+                  {viewTaskHours}h
+                </span>
+                <span className="text-xs font-bold text-indigo-700">
+                  respaldadas en tareas
+                </span>
+              </div>
+              <p className="text-[11px] text-indigo-800/80 mt-1 font-medium">
+                {viewTasksCount > 0
+                  ? `Suma real de las ${viewTasksCount} tareas registradas (${viewPct}% de ${viewReportedHours}h)`
+                  : '0 horas registradas en tareas o tickets'}
+              </p>
+            </div>
+
+            {/* CARD 3: HORAS SIN JUSTIFICAR (LA BRECHA A CONFRONTAR) */}
+            <div
+              className={`rounded-xl p-3.5 border ${
+                isUnjustified
+                  ? 'bg-rose-50/70 border-rose-300 ring-1 ring-rose-500/10'
+                  : 'bg-emerald-50/70 border-emerald-200'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-wider ${
+                    isUnjustified ? 'text-rose-800' : 'text-emerald-800'
+                  }`}
+                >
+                  3. Horas sin Justificar
+                </span>
+                <span
+                  className={`text-[10px] font-extrabold px-2 py-0.5 rounded border ${
+                    isUnjustified
+                      ? 'bg-rose-600 text-white border-rose-600'
+                      : 'bg-emerald-600 text-white border-emerald-600'
+                  }`}
+                >
+                  {isUnjustified ? 'FALTA RESPALDO' : '100% OK'}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-1.5">
+                <span
+                  className={`text-2xl font-black font-mono ${
+                    isUnjustified ? 'text-rose-700' : 'text-emerald-700'
+                  }`}
+                >
+                  {viewMissingHours}h
+                </span>
+                <span
+                  className={`text-xs font-bold ${
+                    isUnjustified ? 'text-rose-800' : 'text-emerald-800'
+                  }`}
+                >
+                  {isUnjustified ? `de ${viewReportedHours}h sin respaldo` : 'todo justificado'}
+                </span>
+              </div>
+              <p
+                className={`text-[11px] mt-1 font-semibold ${
+                  isUnjustified ? 'text-rose-800' : 'text-emerald-800'
+                }`}
+              >
+                {isUnjustified
+                  ? `Reportó ${viewReportedHours}h − ${viewTaskHours}h en tareas = ${viewMissingHours}h sin justificar`
+                  : 'Las tareas cubren las horas reportadas'}
+              </p>
+            </div>
+
+            {/* CARD 4: PAGO E IMPACTO MONETARIO */}
+            <div className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider">
+                  4. Pago vs. Respaldo ($)
+                </span>
+                <span className="text-[10px] font-bold text-emerald-800 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                  Neto Período: ${conf.netPay.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-1.5">
+                <span className="text-2xl font-black text-emerald-800 font-mono">
+                  ${viewNetPay.toFixed(2)}
+                </span>
+                <span className="text-[11px] font-semibold text-slate-500">
+                  neto ({focusedDay ? 'día' : 'período'}) • ${viewGrossPay.toFixed(2)} bruto
+                </span>
+              </div>
+              <p className="text-[11px] mt-1 font-semibold text-rose-700">
+                {viewMissingCost > 0
+                  ? `⚠️ Equivale a $${viewMissingCost.toFixed(2)} cobrados sin tareas que lo respalden`
+                  : `Tarifa efectiva: $${conf.hourlyRate.toFixed(2)}/hora`}
+              </p>
+            </div>
+          </div>
+
+          {/* 3. BANNER EJECUTIVO DE CONFRONTACIÓN DIRECTA + BARRA VISUAL */}
+          <div
+            className={`rounded-xl p-4 border ${
+              isUnjustified
+                ? 'bg-gradient-to-r from-amber-50/90 via-rose-50/60 to-white border-amber-300/90'
+                : 'bg-emerald-50/50 border-emerald-200'
+            }`}
+          >
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-900">
+                    💬 Argumento Directo de Confrontación ({focusedDay ? `Fecha: ${focusedDay.dateStr}` : periodLabel})
+                  </span>
+                </div>
+                {isUnjustified ? (
+                  <p className="text-xs sm:text-sm text-slate-800 leading-relaxed">
+                    “<strong>{conf.userName}</strong>, vos reportaste{' '}
+                    <strong className="text-slate-950 underline decoration-slate-400">{viewReportedHours} horas</strong>{' '}
+                    {focusedDay ? `el día ${focusedDay.dateStr}` : 'en el período'}, pero en base a las{' '}
+                    <strong>{viewTasksCount} tareas hechas</strong> que registraste solo sumás{' '}
+                    <strong className="text-indigo-700">{viewTaskHours} horas</strong>.{' '}
+                    <strong className="text-rose-700 bg-rose-100/80 px-1.5 py-0.5 rounded">
+                      ¿Cómo justificás las {viewMissingHours} horas restantes (${viewMissingCost.toFixed(2)})?
+                    </strong>”
+                  </p>
+                ) : (
+                  <p className="text-xs sm:text-sm text-emerald-900 leading-relaxed">
+                    <strong>{conf.userName}</strong> reportó <strong>{viewReportedHours} horas</strong> y respaldó{' '}
+                    <strong>{viewTaskHours} horas</strong> en <strong>{viewTasksCount} tareas</strong>.
+                  </p>
+                )}
+
+                {focusedDay && conf.dailyBreakdown.length > 1 && (
+                  <p className="text-[11px] text-slate-600 pt-0.5">
+                    📌 <strong>Acumulado en los {conf.dailyBreakdown.length} días del período:</strong> Reportó{' '}
+                    <strong>{conf.totalTimesheetHours}h</strong> (${conf.netPay.toFixed(2)} neto) y solo tiene{' '}
+                    <strong>{conf.explicitTaskHoursSum}h</strong> en tareas →{' '}
+                    <strong className="text-rose-700">{conf.unjustifiedHours}h sin justificar en total (${conf.unjustifiedCost.toFixed(2)})</strong>.
+                  </p>
+                )}
+              </div>
+
+              {/* Barra visual de proporción Justificado vs Sin Justificar */}
+              <div className="lg:w-72 shrink-0 bg-white p-3 rounded-xl border border-slate-200/90 space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] font-bold">
+                  <span className="text-indigo-700">✓ {viewTaskHours}h en tareas ({viewPct}%)</span>
+                  <span className="text-rose-600">⚠️ {viewMissingHours}h sin respaldo ({100 - viewPct}%)</span>
+                </div>
+                <div className="w-full h-2.5 bg-rose-100 rounded-full overflow-hidden flex">
+                  <div
+                    className="h-full bg-indigo-600 transition-all duration-300"
+                    style={{ width: `${Math.max(viewTaskHours > 0 ? 8 : 0, viewPct)}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. DESGLOSE DÍA POR DÍA (CONFRONTACIÓN DIARIA CLARA) */}
+          {conf.dailyBreakdown.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                  Confrontación Día por Día ({conf.dailyBreakdown.length} {conf.dailyBreakdown.length === 1 ? 'jornada' : 'jornadas'})
+                </h4>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Haz clic en cualquier día para enfocar las tarjetas superiores en esa fecha
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {conf.dailyBreakdown.map((d) => {
+                  const isSelectedDay = focusedDay?.dateStr === d.dateStr;
+                  return (
+                    <div
+                      key={d.dateStr}
+                      onClick={() =>
+                        setConfrontationDayFilter((prev) => ({
+                          ...prev,
+                          [conf.userId]: isSelectedDay && conf.dailyBreakdown.length > 1 ? 'ALL' : d.dateStr,
+                        }))
+                      }
+                      className={`rounded-xl p-3 border transition cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs ${
+                        isSelectedDay
+                          ? 'bg-indigo-50/40 border-indigo-400 ring-1 ring-indigo-500/20'
+                          : 'bg-slate-50/70 border-slate-200/80 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-extrabold text-slate-900 font-mono">
+                            📅 {d.dateStr}
+                          </span>
+                          <span className="font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+                            Reportó en jornada: {d.reportedHours}h
+                          </span>
+                          <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                            Hizo en tareas: {d.taskHours}h ({d.tasksCount} {d.tasksCount === 1 ? 'tarea' : 'tareas'})
+                          </span>
+                          {d.missingHours > 0 ? (
+                            <span className="font-extrabold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded border border-rose-200">
+                              ⚠️ Faltan {d.missingHours}h por justificar (${d.dayMissingCost.toFixed(2)})
+                            </span>
+                          ) : (
+                            <span className="font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+                              ✓ Jornada 100% justificada
+                            </span>
+                          )}
+                        </div>
+                        {d.workSummary && (
+                          <p className="text-slate-600 text-[11px]">
+                            <strong>Resumen escrito en jornada:</strong> {d.workSummary}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[11px] font-bold text-slate-500">
+                          {d.dayPct}% respaldado
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${
+                            isSelectedDay
+                              ? 'bg-slate-900 text-white border-slate-900'
+                              : 'bg-white text-slate-700 border-slate-200'
+                          }`}
+                        >
+                          {isSelectedDay ? '✓ Viendo este día' : 'Ver este día'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 5. TABLA DE TAREAS HECHAS CON FILA DE SUMA TOTAL VS HORAS REPORTADAS */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                Tareas y Tickets Hechos por {conf.userName}{' '}
+                {focusedDay ? `el ${focusedDay.dateStr}` : 'en el período'} ({viewTasksList.length})
+              </h4>
+              <div className="flex items-center gap-3">
+                {focusedDay && conf.tasks.length > viewTasksList.length && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setConfrontationDayFilter((prev) => ({
+                        ...prev,
+                        [conf.userId]: 'ALL',
+                      }))
+                    }
+                    className="text-[11px] font-bold text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                  >
+                    Ver todas las tareas del período ({conf.tasks.length})
+                  </button>
+                )}
+                {conf.tasks.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleExportTasksKpiCSV}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Download className="w-3 h-3" />
+                    Exportar CSV
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {viewTasksList.length === 0 ? (
+              <div className="bg-rose-50/40 border border-dashed border-rose-200 rounded-xl p-6 text-center text-xs text-rose-900">
+                🚨 <strong>{conf.userName}</strong> reportó <strong>{viewReportedHours} horas</strong> de jornada{' '}
+                {focusedDay ? `el ${focusedDay.dateStr}` : 'en este período'}, pero <strong>no tiene ninguna tarea o ticket registrado</strong> para respaldar ese tiempo.
+              </div>
+            ) : (
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Tarea / Ticket Hecho</th>
+                      <th className="py-2.5 px-3">Proyecto / Cliente</th>
+                      <th className="py-2.5 px-3 text-center">Tipo</th>
+                      <th className="py-2.5 px-3 text-center">Estado</th>
+                      <th className="py-2.5 px-3 text-center">Fecha</th>
+                      <th className="py-2.5 px-3 text-right">Horas en Tarea</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {viewTasksList.map((row) => (
+                      <tr key={row.uid} className="hover:bg-slate-50/80">
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {row.title}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                            📁 {row.projectOrClient}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                            {row.sourceLabel}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <Check className="w-3 h-3" />
+                            {row.statusLabel}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-[11px] text-slate-600">
+                          {row.dateStr}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          {row.hoursTaken !== null ? (
+                            <span className="inline-flex items-center gap-1 font-mono font-extrabold text-xs px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200">
+                              <Clock className="w-3 h-3 text-indigo-600" />
+                              {row.timeBadge}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                              0h (Sin tiempo especificado)
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-900 text-white text-xs font-bold">
+                      <td colSpan={4} className="py-2.5 px-3">
+                        BALANCE DE CONFRONTACIÓN ({focusedDay ? `Día ${focusedDay.dateStr}` : periodLabel})
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono text-[11px] text-slate-300">
+                        Reportó: {viewReportedHours}h
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono">
+                        <span className="text-emerald-300">Tareas: {viewTaskHours}h</span>
+                        {viewMissingHours > 0 && (
+                          <span className="ml-2 bg-rose-600 text-white px-2 py-0.5 rounded text-[11px]">
+                            Faltan: {viewMissingHours}h
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const handleExportTasksKpiCSV = () => {
     if (completedTasksAnalytics.items.length === 0) {
@@ -1110,7 +1679,7 @@ export default function PayrollManager() {
                     <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
                       isSel ? 'bg-indigo-600 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     }`}>
-                      {conf?.tasksCount || 0}t • {conf?.totalTimesheetHours || 0}h
+                      {conf?.explicitTaskHoursSum || 0}h tareas / {conf?.totalTimesheetHours || 0}h rep.
                     </span>
                   )}
                 </button>
@@ -1215,11 +1784,11 @@ export default function PayrollManager() {
               {completedTasksAnalytics.totalCompleted}
             </p>
             <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
-              {completedTasksAnalytics.totalHoursInvested}h total
+              {completedTasksAnalytics.totalHoursInvested}h en tareas
             </span>
           </div>
           <span className="text-[10px] text-slate-500 mt-0.5 block font-medium">
-            Prom: {completedTasksAnalytics.avgHoursPerTask}h/tarea • Ver reporte →
+            vs {completedTasksAnalytics.totalReportedHours}h reportadas ({completedTasksAnalytics.totalUnjustifiedHours}h sin respaldo) →
           </span>
         </div>
       </div>
@@ -1914,7 +2483,7 @@ export default function PayrollManager() {
                     >
                       <span>👤 Ver a {c.userName}</span>
                       <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-indigo-200 text-indigo-700">
-                        {c.tasksCount} tareas • ${c.netPay.toFixed(2)} neto
+                        {c.explicitTaskHoursSum}h en {c.tasksCount} tareas vs {c.totalTimesheetHours}h rep. • ${c.netPay.toFixed(2)} neto
                       </span>
                     </button>
                   ))}
@@ -1940,7 +2509,7 @@ export default function PayrollManager() {
             <>
               {/* Tarjetas de Confrontación Directa por cada Colaborador Seleccionado */}
               <div className="space-y-4">
-                {completedTasksAnalytics.displayedConfrontations.map((conf) => (
+                {completedTasksAnalytics.displayedConfrontations.map((conf) => renderCollaboratorConfrontationCard(conf))} {([] as typeof completedTasksAnalytics.displayedConfrontations).map((conf) => (
                   <div
                     key={conf.userId}
                     className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden"
