@@ -119,13 +119,19 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         }
     }, [isOpen, isSearchEnabled]);
 
-    // Flexible match: match by value OR match by label (case-insensitive)
+    // Flexible match: match by value, numeric equivalence (e.g. '1' === '1.0'), OR label (case-insensitive)
     const selectedOption = options.find(opt => {
-        const strVal = String(value || '').toLowerCase().trim();
+        const strVal = String(value ?? '').toLowerCase().trim();
         if (!strVal) return !opt.value;
-        const optVal = String(opt.value || '').toLowerCase().trim();
+        const optVal = String(opt.value ?? '').toLowerCase().trim();
         const optLabel = typeof opt.label === 'string' ? opt.label.toLowerCase().trim() : '';
-        return optVal === strVal || (optLabel && optLabel === strVal);
+        if (optVal === strVal || (optLabel && optLabel === strVal)) return true;
+        const numVal = Number(strVal);
+        const numOpt = Number(optVal);
+        if (strVal !== '' && optVal !== '' && !isNaN(numVal) && !isNaN(numOpt) && numVal === numOpt) {
+            return true;
+        }
+        return false;
     });
 
     const filteredOptions = useMemo(() => {

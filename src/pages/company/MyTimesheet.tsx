@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
 import { timesheetsService } from '../../services/timesheetsService';
-import type { TimesheetEntry } from '../../types/timesheets';
+import type { TimesheetEntry, TimesheetLinkedTask } from '../../types/timesheets';
 import { supabase } from '../../services/supabase';
 import SearchableSelect from '../../components/ui/SearchableSelect';
 import { 
@@ -44,7 +44,10 @@ export default function MyTimesheet() {
   const [overtimeReason, setOvertimeReason] = useState<string>('');
   const [workSummary, setWorkSummary] = useState<string>('');
   const [projectId, setProjectId] = useState<string>('');
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [ticketId, setTicketId] = useState<string>('');
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [taskHoursMap, setTaskHoursMap] = useState<Record<string, number>>({});
 
   // Horario de Horas Extras
   const [overtimeStartTime, setOvertimeStartTime] = useState<string>('17:00');
@@ -58,6 +61,14 @@ export default function MyTimesheet() {
     status?: string; 
     priority?: string; 
     lead_name?: string 
+  }[]>([]);
+  const [projectTasks, setProjectTasks] = useState<{
+    id: string;
+    title: string;
+    status?: string;
+    priority?: string;
+    project_id?: string;
+    project_name?: string;
   }[]>([]);
 
   // History State
@@ -120,8 +131,32 @@ export default function MyTimesheet() {
         .select('id, title, status, priority, lead_name')
         .eq('company_id', activeCompanyId)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(150);
       if (tickData) setTickets(tickData);
+
+      // 2b. Cargar tareas de proyectos (crm_tasks) de la empresa
+      if (projData && projData.length > 0) {
+        const projMap = new Map(projData.map((p: any) => [p.id, p.name]));
+        const projIds = projData.map((p: any) => p.id);
+        const { data: cTasks } = await supabase
+          .from('crm_tasks')
+          .select('id, title, status, priority, project_id')
+          .in('project_id', projIds)
+          .order('created_at', { ascending: false })
+          .limit(150);
+        if (cTasks) {
+          setProjectTasks(
+            cTasks.map((ct: any) => ({
+              id: ct.id,
+              title: ct.title,
+              status: ct.status,
+              priority: ct.priority,
+              project_id: ct.project_id,
+              project_name: projMap.get(ct.project_id) || 'Proyecto',
+            }))
+          );
+        }
+      }
 
       // 3. Cargar historial del usuario
       await fetchHistory();
@@ -217,8 +252,25 @@ export default function MyTimesheet() {
       setOvertimeStartTime(selectedDayEntry.overtime_start_time || '17:00');
       setOvertimeEndTime(selectedDayEntry.overtime_end_time || '21:00');
       setWorkSummary(selectedDayEntry.work_summary || '');
-      setProjectId(selectedDayEntry.project_id || '');
-      setTicketId(selectedDayEntry.ticket_id || '');
+      const pIds = selectedDayEntry.project_ids && selectedDayEntry.project_ids.length > 0
+        ? selectedDayEntry.project_ids
+        : (selectedDayEntry.project_id ? [selectedDayEntry.project_id] : []);
+      setSelectedProjectIds(pIds);
+      setProjectId(pIds[0] || '');
+
+      const lTasks = selectedDayEntry.linked_tasks && selectedDayEntry.linked_tasks.length > 0
+        ? selectedDayEntry.linked_tasks
+        : [
+            ...(selectedDayEntry.ticket_id ? [{ id: selectedDayEntry.ticket_id, title: '', type: 'ticket' as const }] : []),
+            ...(selectedDayEntry.task_id ? [{ id: selectedDayEntry.task_id, title: '', type: 'task' as const }] : []),
+          ];
+      setSelectedTaskIds(lTasks.map(t => t.id));
+      setTicketId(selectedDayEntry.ticket_id || lTasks[0]?.id || '');
+      const hMap: Record<string, number> = {};
+      lTasks.forEach(t => {
+        if (t.hours !== undefined && t.hours > 0) hMap[t.id] = t.hours;
+      });
+      setTaskHoursMap(hMap);
     } else {
       // Día nuevo: valores por defecto frescos
       setRegularHours(8);
@@ -228,7 +280,10 @@ export default function MyTimesheet() {
       setOvertimeEndTime('21:00');
       setWorkSummary('');
       setProjectId('');
+      setSelectedProjectIds([]);
       setTicketId('');
+      setSelectedTaskIds([]);
+      setTaskHoursMap({});
     }
   }, [selectedDate, selectedDayEntry]);
 
@@ -281,6 +336,63 @@ export default function MyTimesheet() {
     };
   }, [weekDays, entries]);
 
+  // Catálogo unificado de Tickets de Soporte + Tareas de Proyectos para selección múltiple
+  const allSelectableTasks = useMemo(() => {
+    const priorityMap: Record<string, { label: string; color: string }> = {
+      urgent: { label: '🔴 Urgente', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+      high: { label: '🟠 Alta', color: 'bg-amber-50 text-amber-800 border-amber-200' },
+      medium: { label: '🔵 Media', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+      low: { label: '⚪ Baja', color: 'bg-slate-100 text-slate-600 border-slate-200' },
+    };
+    const statusMap: Record<string, { label: string; color: string }> = {
+      new: { label: 'Nuevo', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+      open: { label: 'Abierto', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      pending: { label: 'En Espera', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+      resolved: { label: 'Resuelto', color: 'bg-slate-100 text-slate-600 border-slate-200' },
+      closed: { label: 'Cerrado', color: 'bg-slate-100 text-slate-500 border-slate-200' },
+      todo: { label: 'Por Hacer', color: 'bg-slate-100 text-slate-600 border-slate-200' },
+      in_progress: { label: 'En Progreso', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+      review: { label: 'En Revisión', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+      completed: { label: 'Completada', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    };
+
+    const ticketOptions = tickets.map((t) => {
+      const p = t.priority ? priorityMap[t.priority] : undefined;
+      const s = t.status ? statusMap[t.status] : undefined;
+      return {
+        id: t.id,
+        title: t.title,
+        type: 'ticket' as const,
+        status: t.status,
+        project_name: t.lead_name || undefined,
+        subtitle: t.lead_name ? `🎫 Ticket • 🏢 Cliente: ${t.lead_name}` : '🎫 Ticket de Soporte',
+        badge: p?.label || s?.label,
+        badgeColor: p?.color || s?.color || 'bg-slate-100 text-slate-600 border-slate-200',
+        secondaryBadge: p && s ? s.label : undefined,
+        secondaryBadgeColor: s?.color,
+      };
+    });
+
+    const taskOptions = projectTasks.map((ct) => {
+      const p = ct.priority ? priorityMap[ct.priority] : undefined;
+      const s = ct.status ? statusMap[ct.status] : undefined;
+      return {
+        id: ct.id,
+        title: ct.title,
+        type: 'task' as const,
+        status: ct.status,
+        project_name: ct.project_name,
+        subtitle: `📋 Tarea • 📁 ${ct.project_name || 'Proyecto'}`,
+        badge: p?.label || s?.label || '📋 Tarea',
+        badgeColor: p?.color || s?.color || 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        secondaryBadge: p && s ? s.label : undefined,
+        secondaryBadgeColor: s?.color,
+      };
+    });
+
+    return [...ticketOptions, ...taskOptions];
+  }, [tickets, projectTasks]);
+
   // Manejo del Envío
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -315,6 +427,19 @@ export default function MyTimesheet() {
       }
     }
 
+    const linkedTasksPayload: TimesheetLinkedTask[] = selectedTaskIds.map((id) => {
+      const found = allSelectableTasks.find((item) => item.id === id);
+      const existingItem = selectedDayEntry?.linked_tasks?.find((item) => item.id === id);
+      return {
+        id,
+        title: found?.title || existingItem?.title || 'Tarea / Ticket',
+        type: found?.type || existingItem?.type || 'ticket',
+        hours: taskHoursMap[id] && taskHoursMap[id] > 0 ? Number(taskHoursMap[id]) : undefined,
+        status: found?.status || existingItem?.status,
+        project_name: found?.project_name || existingItem?.project_name,
+      };
+    });
+
     setSubmitting(true);
     const res = await timesheetsService.submitTimesheet({
       companyId: activeCompanyId,
@@ -326,8 +451,11 @@ export default function MyTimesheet() {
       overtimeStartTime: overtimeHours > 0 ? overtimeStartTime : undefined,
       overtimeEndTime: overtimeHours > 0 ? overtimeEndTime : undefined,
       workSummary,
-      projectId: projectId || null,
-      ticketId: ticketId || null,
+      projectId: selectedProjectIds[0] || projectId || null,
+      projectIds: selectedProjectIds,
+      ticketId: linkedTasksPayload.find((t) => t.type === 'ticket')?.id || ticketId || null,
+      taskId: linkedTasksPayload.find((t) => t.type === 'task')?.id || null,
+      linkedTasks: linkedTasksPayload,
       isAdmin: Boolean(isAdmin && adminOverrideUnlocked),
     });
     setSubmitting(false);
@@ -905,20 +1033,25 @@ export default function MyTimesheet() {
               </div>
             )}
 
-            {/* SELECTORES MODERNOS BUSCABLES (Comboboxes amplios y legibles) */}
+            {/* SELECTORES MODERNOS BUSCABLES MULTI-OPCIÓN (Proyectos y Múltiples Tareas / Tickets) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {/* Proyecto Buscable */}
+              {/* Proyectos Buscables (Multi-Select) */}
               <SearchableSelect
-                label="Proyecto"
+                label="Proyectos"
                 icon={FolderGit2}
                 disabled={isFormDisabled}
-                placeholder="Seleccionar proyecto..."
+                multiple={true}
+                placeholder="Seleccionar uno o más proyectos..."
                 searchPlaceholder="Buscar proyecto por nombre o descripción..."
                 noneOptionLabel="(Opcional) Trabajo General / Sin Proyecto"
                 value={projectId}
                 onChange={setProjectId}
+                values={selectedProjectIds}
+                onChangeMultiple={(ids) => {
+                  setSelectedProjectIds(ids);
+                  setProjectId(ids[0] || '');
+                }}
                 align="left"
-                popoverWidthClass="w-full min-w-[320px] sm:min-w-[460px] md:min-w-[520px]"
                 options={projects.map((p) => ({
                   id: p.id,
                   title: p.name,
@@ -930,48 +1063,103 @@ export default function MyTimesheet() {
                 }))}
               />
 
-              {/* Ticket Buscable */}
+              {/* Tareas y Tickets Buscables (Multi-Select) */}
               <SearchableSelect
-                label="Ticket de Soporte"
+                label="Tareas / Tickets de Soporte"
                 icon={Ticket}
                 disabled={isFormDisabled}
-                placeholder="Vincular ticket de soporte..."
-                searchPlaceholder="Buscar por título, cliente, prioridad o estado..."
-                noneOptionLabel="(Opcional) Sin ticket asignado"
+                multiple={true}
+                placeholder="Vincular una o más tareas/tickets..."
+                searchPlaceholder="Buscar por título, cliente, proyecto o estado..."
+                noneOptionLabel="(Opcional) Sin tareas o tickets asignados"
                 value={ticketId}
                 onChange={setTicketId}
+                values={selectedTaskIds}
+                onChangeMultiple={(ids) => {
+                  setSelectedTaskIds(ids);
+                  setTicketId(ids[0] || '');
+                }}
                 align="right"
-                popoverWidthClass="w-full min-w-[320px] sm:min-w-[480px] md:min-w-[560px]"
-                options={tickets.map((t) => {
-                  const priorityMap: Record<string, { label: string; color: string }> = {
-                    urgent: { label: '🔴 Urgente', color: 'bg-rose-50 text-rose-700 border-rose-200' },
-                    high: { label: '🟠 Alta', color: 'bg-amber-50 text-amber-800 border-amber-200' },
-                    medium: { label: '🔵 Media', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-                    low: { label: '⚪ Baja', color: 'bg-slate-100 text-slate-600 border-slate-200' },
-                  };
-                  const statusMap: Record<string, { label: string; color: string }> = {
-                    new: { label: 'Nuevo', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-                    open: { label: 'Abierto', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-                    pending: { label: 'En Espera', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-                    resolved: { label: 'Resuelto', color: 'bg-slate-100 text-slate-600 border-slate-200' },
-                    closed: { label: 'Cerrado', color: 'bg-slate-100 text-slate-500 border-slate-200' },
-                  };
-
-                  const p = t.priority ? priorityMap[t.priority] : undefined;
-                  const s = t.status ? statusMap[t.status] : undefined;
-
-                  return {
-                    id: t.id,
-                    title: t.title,
-                    subtitle: t.lead_name ? `🏢 Cliente: ${t.lead_name}` : undefined,
-                    badge: p?.label || s?.label,
-                    badgeColor: p?.color || s?.color || 'bg-slate-100 text-slate-600 border-slate-200',
-                    secondaryBadge: p && s ? s.label : undefined,
-                    secondaryBadgeColor: s?.color,
-                  };
-                })}
+                options={allSelectableTasks}
               />
             </div>
+
+            {/* Lista de Tareas / Tickets Seleccionados con Tiempo Invertido por Tarea */}
+            {selectedTaskIds.length > 0 && (
+              <div className="bg-indigo-50/50 border border-indigo-200/80 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-indigo-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
+                    Tareas / Tickets Vinculados ({selectedTaskIds.length})
+                  </span>
+                  <span className="text-[10px] text-indigo-700 font-semibold">
+                    Tiempo por tarea (opcional)
+                  </span>
+                </div>
+                <div className="space-y-1.5 max-h-44 overflow-y-auto pr-0.5 custom-scrollbar">
+                  {selectedTaskIds.map((id) => {
+                    const item = allSelectableTasks.find((t) => t.id === id);
+                    const fallbackItem = selectedDayEntry?.linked_tasks?.find((t) => t.id === id);
+                    const title = item?.title || fallbackItem?.title || 'Tarea / Ticket vinculado';
+                    const itemType = item?.type || fallbackItem?.type || 'ticket';
+                    return (
+                      <div
+                        key={id}
+                        className="flex items-center justify-between gap-2 bg-white border border-indigo-100 rounded-lg px-2.5 py-1.5 shadow-2xs"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border shrink-0 ${
+                            itemType === 'task'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}>
+                            {itemType === 'task' ? '📋 TAREA' : '🎫 TICKET'}
+                          </span>
+                          <span className="text-xs font-bold text-slate-800 truncate" title={title}>
+                            {title}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <div className="relative w-20">
+                            <input
+                              type="number"
+                              min={0}
+                              max={24}
+                              step={0.25}
+                              disabled={isFormDisabled}
+                              placeholder="Horas"
+                              value={taskHoursMap[id] ?? ''}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? 0 : Number(e.target.value);
+                                setTaskHoursMap((prev) => ({ ...prev, [id]: val }));
+                              }}
+                              className="w-full px-2 py-1 pr-6 bg-slate-50 border border-slate-200 rounded-md text-[11px] font-bold text-slate-800 focus:bg-white focus:outline-none focus:border-indigo-500"
+                            />
+                            <span className="absolute right-1.5 top-1 text-[10px] font-semibold text-slate-400 pointer-events-none">
+                              h
+                            </span>
+                          </div>
+                          {!isFormDisabled && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const next = selectedTaskIds.filter((tid) => tid !== id);
+                                setSelectedTaskIds(next);
+                                setTicketId(next[0] || '');
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer"
+                              title="Quitar tarea"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Notas y Entregables del Día */}
             <div className="space-y-1.5">
@@ -1149,6 +1337,39 @@ export default function MyTimesheet() {
                     <p className="text-xs text-slate-700 leading-snug line-clamp-2">
                       {entry.work_summary}
                     </p>
+
+                    {/* Badges de Proyectos y Tareas / Tickets Vinculados */}
+                    {((entry.project_ids && entry.project_ids.length > 0) || (entry.linked_tasks && entry.linked_tasks.length > 0)) && (
+                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                        {(entry.project_ids || []).map((pid) => {
+                          const proj = projects.find((p) => p.id === pid);
+                          if (!proj) return null;
+                          return (
+                            <span
+                              key={pid}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200"
+                            >
+                              📁 {proj.name}
+                            </span>
+                          );
+                        })}
+                        {(entry.linked_tasks || []).map((lt) => {
+                          const resolvedTitle =
+                            lt.title ||
+                            allSelectableTasks.find((item) => item.id === lt.id)?.title ||
+                            'Tarea / Ticket';
+                          return (
+                            <span
+                              key={lt.id}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200"
+                            >
+                              {lt.type === 'task' ? '📋' : '🎫'} {resolvedTitle}
+                              {lt.hours ? ` (${lt.hours}h)` : ''}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
 
                     {/* Justificación de horas extras */}
                     {entry.overtime_hours > 0 && entry.overtime_reason && (

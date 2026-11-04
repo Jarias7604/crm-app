@@ -19,7 +19,7 @@ import {
   Users, Settings2, Calculator, ShieldCheck, Filter, Download,
   ChevronLeft, ChevronRight, Search, Plus, Trash2, Edit3, Eye, FileText,
   Printer, ArrowUpRight, Check, Sparkles, Building2, Calendar, RefreshCw,
-  FileCheck2, Award, Briefcase, Zap, Info
+  FileCheck2, Award, Briefcase, Zap, Info, BarChart3, Layers, Ticket
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { numberToWordsSpanish } from '../../utils/numberToWords';
@@ -29,7 +29,7 @@ export default function PayrollManager() {
   const activeCompanyId = simulatedCompanyId || profile?.company_id;
 
   // Active Main View Tab
-  const [activeTab, setActiveTab] = useState<'payroll' | 'approvals' | 'settings'>('payroll');
+  const [activeTab, setActiveTab] = useState<'payroll' | 'approvals' | 'tasks_kpi' | 'settings'>('payroll');
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -104,6 +104,14 @@ export default function PayrollManager() {
   const [adjCommissionAmount, setAdjCommissionAmount] = useState<number>(0);
   const [adjCommissionNotes, setAdjCommissionNotes] = useState<string>('');
 
+  // Estados para el Reporte & KPI Dashboard de Tareas Terminadas y Tiempos
+  const [periodTimesheets, setPeriodTimesheets] = useState<TimesheetEntry[]>([]);
+  const [companyTickets, setCompanyTickets] = useState<any[]>([]);
+  const [companyTasks, setCompanyTasks] = useState<any[]>([]);
+  const [companyProjectsMap, setCompanyProjectsMap] = useState<Record<string, string>>({});
+  const [kpiEmployeeFilter, setKpiEmployeeFilter] = useState<string>('ALL');
+  const [kpiSourceFilter, setKpiSourceFilter] = useState<'ALL' | 'ticket' | 'task' | 'timesheet'>('ALL');
+
   useEffect(() => {
     if (activeCompanyId) {
       loadAllData();
@@ -153,6 +161,43 @@ export default function PayrollManager() {
       // 4. Cargar configuraciones de miembros
       const configs = await timesheetsService.getPayrollConfigs(activeCompanyId);
       setMemberConfigs(configs);
+
+      // 5. Cargar datos para el Reporte & KPI Dashboard de Tareas Terminadas y Tiempos
+      const periodTs = await timesheetsService.getTimesheets({
+        companyId: activeCompanyId,
+        startDate,
+        endDate,
+      });
+      setPeriodTimesheets(periodTs);
+
+      const { data: tickData } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('company_id', activeCompanyId)
+        .order('updated_at', { ascending: false })
+        .limit(250);
+      if (tickData) setCompanyTickets(tickData);
+
+      const { data: projData } = await supabase
+        .from('crm_projects')
+        .select('id, name')
+        .eq('company_id', activeCompanyId);
+      if (projData && projData.length > 0) {
+        const pMap: Record<string, string> = {};
+        projData.forEach((p: any) => { pMap[p.id] = p.name; });
+        setCompanyProjectsMap(pMap);
+
+        const { data: cTasks } = await supabase
+          .from('crm_tasks')
+          .select('*')
+          .in('project_id', projData.map((p: any) => p.id))
+          .order('updated_at', { ascending: false })
+          .limit(250);
+        if (cTasks) setCompanyTasks(cTasks);
+      } else {
+        setCompanyProjectsMap({});
+        setCompanyTasks([]);
+      }
     } catch (err) {
       console.error('Error loading payroll data:', err);
     } finally {
@@ -501,6 +546,253 @@ export default function PayrollManager() {
     return 'custom';
   }, [startDate, endDate]);
 
+  // ── MOTOR DE REPORTE Y MINI KPI DASHBOARD DE TAREAS TERMINADAS Y TIEMPOS ──
+  const completedTasksAnalytics = useMemo(() => {
+    const profileMap = new Map<string, { name: string; email: string }>();
+    teamProfiles.forEach((p) => {
+      profileMap.set(p.id, { name: p.full_name || p.email || 'Colaborador', email: p.email || '' });
+    });
+
+    // Mapear horas registradas en timesheets por tarea/ticket ID
+    const timesheetTaskHours = new Map<string, { hours: number; userId: string; userName: string; date: string; projectNames: string[] }>();
+    periodTimesheets.forEach((ts) => {
+      const linked = ts.linked_tasks || [];
+      const totalDayHrs = Number(ts.regular_hours || 0) + Number(ts.overtime_hours || 0);
+      const defaultShare = linked.length > 0 ? +(totalDayHrs / linked.length).toFixed(2) : totalDayHrs;
+      const pNames = (ts.project_ids || (ts.project_id ? [ts.project_id] : []))
+        .map((pid) => companyProjectsMap[pid])
+        .filter(Boolean);
+
+      linked.forEach((lt) => {
+        if (!lt.id) return;
+        const prev = timesheetTaskHours.get(lt.id);
+        const addHrs = lt.hours !== undefined && lt.hours > 0 ? Number(lt.hours) : defaultShare;
+        timesheetTaskHours.set(lt.id, {
+          hours: +((prev?.hours || 0) + addHrs).toFixed(2),
+          userId: ts.user_id,
+          userName: ts.user_name || profileMap.get(ts.user_id)?.name || 'Colaborador',
+          date: ts.work_date,
+          projectNames: pNames,
+        });
+      });
+    });
+
+    const ticketTitleMap = new Map<string, any>();
+    companyTickets.forEach((t) => ticketTitleMap.set(t.id, t));
+    const taskTitleMap = new Map<string, any>();
+    companyTasks.forEach((ct) => taskTitleMap.set(ct.id, ct));
+
+    type UnifiedTaskReportItem = {
+      uid: string;
+      id: string;
+      title: string;
+      source: 'ticket' | 'task' | 'timesheet';
+      sourceLabel: string;
+      projectOrClient: string;
+      userId: string;
+      userName: string;
+      statusLabel: string;
+      dateStr: string;
+      hoursTaken: number;
+      timeBadge: string;
+    };
+
+    const items: UnifiedTaskReportItem[] = [];
+    const seenIds = new Set<string>();
+
+    // 1. Tickets cerrados / resueltos o trabajados en el período
+    companyTickets.forEach((t) => {
+      const isCompleted = t.status === 'resolved' || t.status === 'closed';
+      const tsLog = timesheetTaskHours.get(t.id);
+      if (!isCompleted && !tsLog) return;
+
+      const dateRaw = tsLog?.date || (t.resolved_at || t.updated_at || t.created_at || '').split('T')[0];
+      const assignedProfile = t.assigned_to ? profileMap.get(t.assigned_to) : undefined;
+      const userId = tsLog?.userId || t.assigned_to || 'unassigned';
+      const userName = tsLog?.userName || assignedProfile?.name || 'Equipo de Soporte';
+
+      let hoursTaken = tsLog?.hours || Number(t.actual_hours || t.estimated_hours || 0);
+      if (!hoursTaken && t.created_at && (t.resolved_at || t.updated_at)) {
+        const diffMs = new Date(t.resolved_at || t.updated_at).getTime() - new Date(t.created_at).getTime();
+        const diffHrs = Math.max(0.25, +(diffMs / (1000 * 60 * 60)).toFixed(1));
+        hoursTaken = diffHrs <= 24 ? diffHrs : 1.5;
+      }
+      if (!hoursTaken) hoursTaken = 1.0;
+
+      seenIds.add(t.id);
+      items.push({
+        uid: `ticket-${t.id}`,
+        id: t.id,
+        title: t.title || 'Ticket de Soporte',
+        source: 'ticket',
+        sourceLabel: '🎫 Ticket Soporte',
+        projectOrClient: t.lead_name || tsLog?.projectNames?.[0] || 'Soporte General',
+        userId,
+        userName,
+        statusLabel: t.status === 'closed' ? 'Cerrado' : t.status === 'resolved' ? 'Resuelto' : 'Trabajado en Jornada',
+        dateStr: dateRaw || endDate,
+        hoursTaken: +hoursTaken.toFixed(2),
+        timeBadge: `${+hoursTaken.toFixed(2)} hrs`,
+      });
+    });
+
+    // 2. Tareas de Proyectos (crm_tasks) completadas o trabajadas en el período
+    companyTasks.forEach((ct) => {
+      const isCompleted = ct.status === 'completed';
+      const tsLog = timesheetTaskHours.get(ct.id);
+      if (!isCompleted && !tsLog) return;
+
+      const dateRaw = tsLog?.date || (ct.completed_at || ct.updated_at || ct.created_at || '').split('T')[0];
+      const assignedProfile = ct.assigned_to ? profileMap.get(ct.assigned_to) : undefined;
+      const userId = tsLog?.userId || ct.assigned_to || 'unassigned';
+      const userName = tsLog?.userName || assignedProfile?.name || 'Colaborador';
+
+      let hoursTaken = tsLog?.hours || Number(ct.actual_hours || ct.estimated_hours || 0);
+      if (!hoursTaken) hoursTaken = 1.5;
+
+      seenIds.add(ct.id);
+      items.push({
+        uid: `task-${ct.id}`,
+        id: ct.id,
+        title: ct.title || 'Tarea de Proyecto',
+        source: 'task',
+        sourceLabel: '📋 Tarea Proyecto',
+        projectOrClient: companyProjectsMap[ct.project_id] || tsLog?.projectNames?.[0] || 'Proyecto Interno',
+        userId,
+        userName,
+        statusLabel: ct.status === 'completed' ? 'Terminada' : 'En Progreso (Jornada)',
+        dateStr: dateRaw || endDate,
+        hoursTaken: +hoursTaken.toFixed(2),
+        timeBadge: `${+hoursTaken.toFixed(2)} hrs`,
+      });
+    });
+
+    // 3. Tareas múltiples y entregables registrados directamente en Mi Jornada (team_timesheets)
+    periodTimesheets.forEach((ts) => {
+      const linked = ts.linked_tasks || [];
+      const totalDayHrs = Number(ts.regular_hours || 0) + Number(ts.overtime_hours || 0);
+      const pNames = (ts.project_ids || (ts.project_id ? [ts.project_id] : []))
+        .map((pid) => companyProjectsMap[pid])
+        .filter(Boolean);
+
+      linked.forEach((lt) => {
+        if (seenIds.has(lt.id)) return;
+        const resolvedTitle =
+          lt.title ||
+          ticketTitleMap.get(lt.id)?.title ||
+          taskTitleMap.get(lt.id)?.title ||
+          'Tarea registrada en jornada';
+        const hrs = lt.hours && lt.hours > 0 ? Number(lt.hours) : +(totalDayHrs / Math.max(1, linked.length)).toFixed(2);
+        items.push({
+          uid: `ts-linked-${ts.id}-${lt.id}`,
+          id: lt.id,
+          title: resolvedTitle,
+          source: lt.type === 'task' ? 'task' : 'ticket',
+          sourceLabel: lt.type === 'task' ? '📋 Tarea Jornada' : '🎫 Ticket Jornada',
+          projectOrClient: lt.project_name || pNames[0] || 'General',
+          userId: ts.user_id,
+          userName: ts.user_name || profileMap.get(ts.user_id)?.name || 'Colaborador',
+          statusLabel: 'Reportada en Jornada',
+          dateStr: ts.work_date,
+          hoursTaken: +hrs.toFixed(2),
+          timeBadge: `${+hrs.toFixed(2)} hrs`,
+        });
+      });
+
+      // También incluir el entregable diario si no tenía tareas vinculadas o como registro de actividad
+      if (linked.length === 0 && ts.work_summary) {
+        items.push({
+          uid: `ts-summary-${ts.id}`,
+          id: ts.id,
+          title: ts.work_summary,
+          source: 'timesheet',
+          sourceLabel: '⏱️ Entregable Jornada',
+          projectOrClient: pNames.join(', ') || 'Trabajo General',
+          userId: ts.user_id,
+          userName: ts.user_name || profileMap.get(ts.user_id)?.name || 'Colaborador',
+          statusLabel: ts.status === 'approved' ? 'Jornada Aprobada' : 'Jornada Enviada',
+          dateStr: ts.work_date,
+          hoursTaken: +totalDayHrs.toFixed(2),
+          timeBadge: `${+totalDayHrs.toFixed(2)} hrs`,
+        });
+      }
+    });
+
+    // Ordenar por fecha más reciente
+    items.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
+
+    // Filtrar según selectores de búsqueda, empleado y fuente
+    const filtered = items.filter((item) => {
+      if (kpiEmployeeFilter !== 'ALL' && item.userId !== kpiEmployeeFilter) return false;
+      if (kpiSourceFilter !== 'ALL' && item.source !== kpiSourceFilter) return false;
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        const matchTitle = item.title.toLowerCase().includes(q);
+        const matchUser = item.userName.toLowerCase().includes(q);
+        const matchProj = item.projectOrClient.toLowerCase().includes(q);
+        if (!matchTitle && !matchUser && !matchProj) return false;
+      }
+      return true;
+    });
+
+    const totalCompleted = filtered.length;
+    const totalHoursInvested = +filtered.reduce((acc, it) => acc + it.hoursTaken, 0).toFixed(1);
+    const avgHoursPerTask = totalCompleted > 0 ? +(totalHoursInvested / totalCompleted).toFixed(1) : 0;
+
+    // Agrupar KPIs por colaborador
+    const byUserMap = new Map<string, { userId: string; userName: string; count: number; totalHours: number; projects: Set<string> }>();
+    filtered.forEach((it) => {
+      const curr = byUserMap.get(it.userId) || {
+        userId: it.userId,
+        userName: it.userName,
+        count: 0,
+        totalHours: 0,
+        projects: new Set<string>(),
+      };
+      curr.count += 1;
+      curr.totalHours = +(curr.totalHours + it.hoursTaken).toFixed(2);
+      if (it.projectOrClient) curr.projects.add(it.projectOrClient);
+      byUserMap.set(it.userId, curr);
+    });
+
+    const collaboratorKpis = Array.from(byUserMap.values()).sort((a, b) => b.count - a.count);
+
+    return {
+      items: filtered,
+      totalCompleted,
+      totalHoursInvested,
+      avgHoursPerTask,
+      activeCollaborators: collaboratorKpis.length,
+      collaboratorKpis,
+    };
+  }, [teamProfiles, periodTimesheets, companyTickets, companyTasks, companyProjectsMap, kpiEmployeeFilter, kpiSourceFilter, searchTerm, endDate]);
+
+  const handleExportTasksKpiCSV = () => {
+    if (completedTasksAnalytics.items.length === 0) {
+      toast.error('No hay tareas para exportar');
+      return;
+    }
+    const headers = ['Fecha', 'Colaborador', 'Tipo', 'Tarea / Ticket / Entregable', 'Proyecto / Cliente', 'Estado', 'Tiempo Invertido (Horas)'];
+    const rows = completedTasksAnalytics.items.map((it) => [
+      it.dateStr,
+      `"${it.userName.replace(/"/g, '""')}"`,
+      `"${it.sourceLabel}"`,
+      `"${it.title.replace(/"/g, '""')}"`,
+      `"${it.projectOrClient.replace(/"/g, '""')}"`,
+      `"${it.statusLabel}"`,
+      it.hoursTaken.toFixed(2),
+    ]);
+    const csv = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reporte_tareas_tiempos_kpi_${startDate}_a_${endDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Reporte KPI de Tareas exportado en CSV');
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-5 animate-fadeIn font-sans text-slate-800">
       
@@ -539,7 +831,7 @@ export default function PayrollManager() {
 
           <button
             onClick={() => setActiveTab('approvals')}
-            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'approvals'
                 ? 'bg-white text-indigo-700 shadow-sm font-bold'
                 : 'text-slate-600 hover:text-slate-900'
@@ -555,8 +847,25 @@ export default function PayrollManager() {
           </button>
 
           <button
+            onClick={() => setActiveTab('tasks_kpi')}
+            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'tasks_kpi'
+                ? 'bg-white text-indigo-700 shadow-sm font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            Tareas & KPIs
+            {completedTasksAnalytics.totalCompleted > 0 && (
+              <span className="bg-indigo-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                {completedTasksAnalytics.totalCompleted}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => setActiveTab('settings')}
-            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'settings'
                 ? 'bg-white text-indigo-700 shadow-sm font-bold'
                 : 'text-slate-600 hover:text-slate-900'
@@ -683,8 +992,8 @@ export default function PayrollManager() {
         </div>
       </div>
 
-      {/* ── 3. METRIC STRIP (ESTILO QUICKBOOKS / ADP EXECUTIVE) ─────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* ── 3. METRIC STRIP (ESTILO QUICKBOOKS / ADP EXECUTIVE + KPI TAREAS) ─────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {/* Total Neto */}
         <div className="bg-white border border-emerald-200/90 rounded-xl p-3.5 shadow-xs relative overflow-hidden">
           <div className="flex items-center justify-between">
@@ -744,6 +1053,35 @@ export default function PayrollManager() {
           </div>
           <span className="text-[10px] text-slate-400 mt-0.5 block font-medium">
             {pendingApprovals.length === 0 ? 'Sin solicitudes pendientes' : 'Requiere tu autorización'}
+          </span>
+        </div>
+
+        {/* KPI Tareas Terminadas & Tiempo Invertido */}
+        <div
+          onClick={() => setActiveTab('tasks_kpi')}
+          className={`bg-white border rounded-xl p-3.5 shadow-xs cursor-pointer transition col-span-2 lg:col-span-1 ${
+            activeTab === 'tasks_kpi'
+              ? 'border-indigo-500 ring-2 ring-indigo-500/10 bg-indigo-50/20'
+              : 'border-indigo-200/90 hover:border-indigo-400'
+          }`}
+          title="Abrir Reporte y KPI Dashboard de Tareas Terminadas y Tiempos"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">
+              Tareas & Tiempo KPI
+            </span>
+            <BarChart3 className="w-3.5 h-3.5 text-indigo-600" />
+          </div>
+          <div className="flex items-baseline gap-2 mt-1">
+            <p className="text-2xl font-bold text-indigo-950 tracking-tight">
+              {completedTasksAnalytics.totalCompleted}
+            </p>
+            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+              {completedTasksAnalytics.totalHoursInvested}h total
+            </span>
+          </div>
+          <span className="text-[10px] text-slate-500 mt-0.5 block font-medium">
+            Prom: {completedTasksAnalytics.avgHoursPerTask}h/tarea • Ver reporte →
           </span>
         </div>
       </div>
@@ -1395,6 +1733,258 @@ export default function PayrollManager() {
         </div>
       )}
 
+      {/* ── 6B. REPORTE Y MINI KPI DASHBOARD DE TAREAS TERMINADAS Y TIEMPOS (ADMIN & SUPER ADMIN) ── */}
+      {activeTab === 'tasks_kpi' && (
+        <div className="space-y-4 animate-fadeIn">
+          {/* Mini KPI Dashboard Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-white border border-indigo-200/90 rounded-2xl p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">
+                  Tareas / Tickets Terminados
+                </span>
+                <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+              </div>
+              <p className="text-2xl font-black text-indigo-950 mt-1">
+                {completedTasksAnalytics.totalCompleted}
+              </p>
+              <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
+                Tickets resueltos, tareas de proyecto y entregables
+              </span>
+            </div>
+
+            <div className="bg-white border border-emerald-200/90 rounded-2xl p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">
+                  Tiempo Total Invertido
+                </span>
+                <Clock className="w-4 h-4 text-emerald-600" />
+              </div>
+              <p className="text-2xl font-black text-emerald-800 mt-1">
+                {completedTasksAnalytics.totalHoursInvested} <span className="text-sm font-bold">hrs</span>
+              </p>
+              <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
+                Suma de horas reportadas y tiempos de resolución
+              </span>
+            </div>
+
+            <div className="bg-white border border-amber-200/90 rounded-2xl p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
+                  Tiempo Promedio / Tarea
+                </span>
+                <Zap className="w-4 h-4 text-amber-600" />
+              </div>
+              <p className="text-2xl font-black text-amber-900 mt-1">
+                {completedTasksAnalytics.avgHoursPerTask} <span className="text-sm font-bold">hrs / tarea</span>
+              </p>
+              <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
+                Velocidad media de ejecución del equipo
+              </span>
+            </div>
+
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Colaboradores con Entregas
+                </span>
+                <Users className="w-4 h-4 text-slate-500" />
+              </div>
+              <p className="text-2xl font-black text-slate-900 mt-1">
+                {completedTasksAnalytics.activeCollaborators}
+              </p>
+              <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
+                Miembros activos con tareas concluidas
+              </span>
+            </div>
+          </div>
+
+          {/* Resumen de Productividad y Tiempos por Colaborador */}
+          {completedTasksAnalytics.collaboratorKpis.length > 0 && (
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Award className="w-4 h-4 text-indigo-600" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Rendimiento y Tiempo Invertido por Colaborador
+                  </h3>
+                </div>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  Haz clic en un colaborador para filtrar sus tareas
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {completedTasksAnalytics.collaboratorKpis.map((col) => {
+                  const avg = col.count > 0 ? +(col.totalHours / col.count).toFixed(1) : 0;
+                  const isSelected = kpiEmployeeFilter === col.userId;
+                  return (
+                    <button
+                      key={col.userId}
+                      type="button"
+                      onClick={() => setKpiEmployeeFilter(isSelected ? 'ALL' : col.userId)}
+                      className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between gap-2 ${
+                        isSelected
+                          ? 'bg-indigo-50/80 border-indigo-500 ring-2 ring-indigo-500/15'
+                          : 'bg-slate-50/60 hover:bg-slate-100/70 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-xs text-slate-900 truncate">
+                          {col.userName}
+                        </span>
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 shrink-0">
+                          {col.count} {col.count === 1 ? 'tarea' : 'tareas'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-600 border-t border-slate-200/70 pt-1.5">
+                        <span>⏱️ Total: <strong className="text-slate-900">{col.totalHours}h</strong></span>
+                        <span>Prom: <strong className="text-emerald-700">{avg}h/tarea</strong></span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Tabla Detallada de Todas las Tareas Terminadas y el Tiempo que Tomó Cada Una */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-indigo-600" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Control de Tareas Terminadas y Tiempo por Tarea
+                </h2>
+                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                  {completedTasksAnalytics.items.length} registros
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filtro por Tipo de Fuente */}
+                <div className="inline-flex bg-slate-200/70 p-0.5 rounded-lg text-[11px] font-semibold">
+                  {[
+                    { id: 'ALL', label: 'Todas' },
+                    { id: 'ticket', label: '🎫 Tickets' },
+                    { id: 'task', label: '📋 Tareas Proyecto' },
+                    { id: 'timesheet', label: '⏱️ Jornadas' },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setKpiSourceFilter(tab.id as any)}
+                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                        kpiSourceFilter === tab.id
+                          ? 'bg-white text-indigo-700 font-bold shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Filtro por Colaborador */}
+                <select
+                  value={kpiEmployeeFilter}
+                  onChange={(e) => setKpiEmployeeFilter(e.target.value)}
+                  className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none"
+                >
+                  <option value="ALL">Todos los colaboradores</option>
+                  {teamProfiles.map((tp) => (
+                    <option key={tp.id} value={tp.id}>
+                      {tp.full_name || tp.email}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Exportar CSV */}
+                <button
+                  type="button"
+                  onClick={handleExportTasksKpiCSV}
+                  className="px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-500" />
+                  Exportar CSV
+                </button>
+              </div>
+            </div>
+
+            {completedTasksAnalytics.items.length === 0 ? (
+              <div className="p-10 text-center space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-sm font-bold text-slate-700">No se encontraron tareas con este filtro</p>
+                <p className="text-xs text-slate-400">
+                  Las tareas completadas, tickets cerrados/resueltos y múltiples tareas vinculadas en Mi Jornada aparecerán aquí con su tiempo exacto.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/30">
+                      <th className="py-2.5 px-4">Tarea / Ticket / Entregable</th>
+                      <th className="py-2.5 px-3">Proyecto / Cliente</th>
+                      <th className="py-2.5 px-3">Colaborador</th>
+                      <th className="py-2.5 px-3 text-center">Tipo</th>
+                      <th className="py-2.5 px-3 text-center">Estado</th>
+                      <th className="py-2.5 px-3 text-center">Fecha</th>
+                      <th className="py-2.5 px-4 text-right">Tiempo que Tomó</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {completedTasksAnalytics.items.map((row) => (
+                      <tr key={row.uid} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-4 max-w-md">
+                          <p className="font-bold text-slate-900 leading-snug whitespace-normal break-words">
+                            {row.title}
+                          </p>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                            📁 {row.projectOrClient}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-slate-800">
+                          {row.userName}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            row.source === 'ticket'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200'
+                              : row.source === 'task'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}>
+                            {row.sourceLabel}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <Check className="w-3 h-3" />
+                            {row.statusLabel}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center text-slate-500 font-mono text-[11px]">
+                          {row.dateStr}
+                        </td>
+                        <td className="py-2.5 px-4 text-right">
+                          <span className="inline-flex items-center gap-1 font-mono font-extrabold text-xs px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200">
+                            <Clock className="w-3 h-3 text-indigo-600" />
+                            {row.timeBadge}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── 7. COMPROBANTE OFICIAL DE PAGO (FORMATO CORPORATIVO INSTITUCIONAL / ADP / SAP) ── */}
       {selectedPayStub && (() => {
         const cfg = memberConfigs.find(c => c.user_id === selectedPayStub.user_id);
@@ -1903,7 +2493,9 @@ export default function PayrollManager() {
             : +(weeklyHrs).toFixed(1);
         const baseSal = Number(editingConfig.base_salary) || 0;
         const equivHourly = expectedPeriodHrs > 0 ? (baseSal / expectedPeriodHrs) : 0;
-        const otMultiplier = Number(editingConfig.overtime_multiplier || 1.5);
+        const otMultiplier = editingConfig.overtime_multiplier !== undefined && editingConfig.overtime_multiplier !== null
+          ? Number(editingConfig.overtime_multiplier)
+          : 1.5;
         const hourlyOtRate = +(equivHourly * otMultiplier).toFixed(2);
         const isHourly = editingConfig.contract_type === 'hourly';
         const isServices = editingConfig.contract_type === 'services_sv' || editingConfig.contract_type === 'services';
@@ -1915,10 +2507,10 @@ export default function PayrollManager() {
         ];
 
         const overtimeMultiplierOptions: SelectOption[] = [
-          { value: '1.5', label: '1.5x — Extra Ordinaria Diurna (+50%)', shortLabel: '1.5x (Diurna +50%)' },
-          { value: '2.0', label: '2.0x — Extra Festivo / Día de Descanso (+100%)', shortLabel: '2.0x (Nocturna/Doble)' },
-          { value: '1.25', label: '1.25x — Recargo Nocturno Ordinario (+25%)', shortLabel: '1.25x (Nocturna +25%)' },
-          { value: '1.0', label: '1.0x — Tarifa Regular Plana (Sin recargo adicional)', shortLabel: '1.0x (Tarifa Plana)' },
+          { value: '1.5', label: '1.5x — Extra Ordinaria Diurna (+50%)', shortLabel: '1.5x — Extra Ordinaria Diurna (+50%)' },
+          { value: '2', label: '2.0x — Extra Festivo / Día de Descanso (+100%)', shortLabel: '2.0x — Extra Festivo (+100%)' },
+          { value: '1.25', label: '1.25x — Recargo Nocturno Ordinario (+25%)', shortLabel: '1.25x — Recargo Nocturno (+25%)' },
+          { value: '1', label: '1.0x — Tarifa Regular Plana (Sin recargo adicional)', shortLabel: '1.0x — Tarifa Regular Plana' },
         ];
 
         const commissionModeOptions: SelectOption[] = [
@@ -2449,7 +3041,7 @@ export default function PayrollManager() {
                                 Recargo Legal Horas Extras
                               </label>
                               <CustomSelect
-                                value={String(editingConfig.overtime_multiplier || 1.5)}
+                                value={String(otMultiplier)}
                                 onChange={(val) => setEditingConfig({ ...editingConfig, overtime_multiplier: Number(val) })}
                                 options={overtimeMultiplierOptions}
                                 placeholder="Selecciona recargo..."
@@ -2462,7 +3054,7 @@ export default function PayrollManager() {
                               </label>
                               <div className="h-11 px-4 bg-white border border-slate-200 rounded-xl flex items-center justify-between shadow-2xs">
                                 <span className="text-xs text-slate-500 font-medium">
-                                  Tarifa ({editingConfig.overtime_multiplier || 1.5}x):
+                                  Tarifa ({otMultiplier}x):
                                 </span>
                                 <strong className="text-sm font-bold font-mono text-emerald-700">
                                   {baseSal > 0 

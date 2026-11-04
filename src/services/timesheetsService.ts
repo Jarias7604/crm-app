@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import type { 
   TimesheetEntry, 
+  TimesheetLinkedTask,
   PayrollMemberConfig, 
   PayrollCalculationItem, 
   PayrollRun,
@@ -143,6 +144,33 @@ export const timesheetsService = {
           }
         }
 
+        // Extraer metadatos de múltiples proyectos y múltiples tareas/tickets si vienen embebidos en work_summary
+        let rawSummary = String(row.work_summary || '');
+        let parsedProjectIds: string[] = [];
+        let parsedLinkedTasks: TimesheetLinkedTask[] = [];
+
+        const metaMatch = rawSummary.match(/\n?<!--TS_META:([\s\S]*?)-->/);
+        if (metaMatch) {
+          rawSummary = rawSummary.replace(metaMatch[0], '').trim();
+          try {
+            const parsed = JSON.parse(metaMatch[1]);
+            if (Array.isArray(parsed.p)) parsedProjectIds = parsed.p.filter(Boolean);
+            if (Array.isArray(parsed.t)) parsedLinkedTasks = parsed.t;
+          } catch (e) {
+            // Ignore malformed meta
+          }
+        }
+
+        if (row.project_id && !parsedProjectIds.includes(row.project_id)) {
+          parsedProjectIds.unshift(row.project_id);
+        }
+        if (row.ticket_id && !parsedLinkedTasks.some(t => t.id === row.ticket_id)) {
+          parsedLinkedTasks.unshift({ id: row.ticket_id, title: '', type: 'ticket' });
+        }
+        if (row.task_id && !parsedLinkedTasks.some(t => t.id === row.task_id)) {
+          parsedLinkedTasks.unshift({ id: row.task_id, title: '', type: 'task' });
+        }
+
         return {
           id: row.id,
           company_id: row.company_id,
@@ -156,10 +184,12 @@ export const timesheetsService = {
           overtime_reason: row.overtime_reason,
           overtime_start_time: otStart,
           overtime_end_time: otEnd,
-          work_summary: row.work_summary,
-          project_id: row.project_id,
-          task_id: row.task_id,
-          ticket_id: row.ticket_id,
+          work_summary: rawSummary,
+          project_id: row.project_id || parsedProjectIds[0] || null,
+          project_ids: parsedProjectIds,
+          task_id: row.task_id || parsedLinkedTasks.find(t => t.type === 'task')?.id || null,
+          ticket_id: row.ticket_id || parsedLinkedTasks.find(t => t.type === 'ticket')?.id || null,
+          linked_tasks: parsedLinkedTasks,
           status: row.status,
           reviewed_by: row.reviewed_by,
           reviewed_name: row.reviewer?.full_name || null,
@@ -186,8 +216,10 @@ export const timesheetsService = {
     overtimeEndTime?: string | null;
     workSummary: string;
     projectId?: string | null;
+    projectIds?: string[];
     taskId?: string | null;
     ticketId?: string | null;
+    linkedTasks?: TimesheetLinkedTask[];
     isAdmin?: boolean;
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
@@ -203,6 +235,24 @@ export const timesheetsService = {
           formattedReason = `[Horario: ${payload.overtimeStartTime} a ${payload.overtimeEndTime}] ${formattedReason || ''}`.trim();
         }
       }
+
+      // Preparar proyectos y tareas vinculadas (soporte multi-selección sin romper columnas UUID existentes)
+      const cleanSummary = (payload.workSummary || '').replace(/\n?<!--TS_META:[\s\S]*?-->/g, '').trim();
+      const finalProjectIds = payload.projectIds && payload.projectIds.length > 0
+        ? payload.projectIds.filter(Boolean)
+        : (payload.projectId ? [payload.projectId] : []);
+      const finalLinkedTasks = payload.linkedTasks && payload.linkedTasks.length > 0
+        ? payload.linkedTasks
+        : [];
+
+      const primaryProjectId = payload.projectId || finalProjectIds[0] || null;
+      const primaryTicketId = payload.ticketId || finalLinkedTasks.find(t => t.type === 'ticket')?.id || null;
+      const primaryTaskId = payload.taskId || finalLinkedTasks.find(t => t.type === 'task')?.id || null;
+
+      const shouldEmbedMeta = finalProjectIds.length > 0 || finalLinkedTasks.length > 0;
+      const serializedWorkSummary = shouldEmbedMeta
+        ? `${cleanSummary}\n<!--TS_META:${JSON.stringify({ p: finalProjectIds, t: finalLinkedTasks })}-->`
+        : cleanSummary;
 
       // 1. Verificar si ya existe registro para ese colaborador en esa fecha
       const { data: existing } = await supabase
@@ -234,10 +284,10 @@ export const timesheetsService = {
           regular_hours: payload.regularHours,
           overtime_hours: payload.overtimeHours,
           overtime_reason: formattedReason,
-          work_summary: payload.workSummary,
-          project_id: payload.projectId || null,
-          task_id: payload.taskId || null,
-          ticket_id: payload.ticketId || null,
+          work_summary: serializedWorkSummary,
+          project_id: primaryProjectId,
+          task_id: primaryTaskId,
+          ticket_id: primaryTicketId,
           status: existing.status === 'approved' ? (payload.isAdmin ? 'approved' : 'submitted') : 'submitted',
           rejection_reason: null,
           updated_at: new Date().toISOString(),
@@ -280,10 +330,10 @@ export const timesheetsService = {
         regular_hours: payload.regularHours,
         overtime_hours: payload.overtimeHours,
         overtime_reason: formattedReason,
-        work_summary: payload.workSummary,
-        project_id: payload.projectId || null,
-        task_id: payload.taskId || null,
-        ticket_id: payload.ticketId || null,
+        work_summary: serializedWorkSummary,
+        project_id: primaryProjectId,
+        task_id: primaryTaskId,
+        ticket_id: primaryTicketId,
         status: 'submitted',
       };
 

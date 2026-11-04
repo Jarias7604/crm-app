@@ -1,5 +1,14 @@
 export type TimesheetStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'paid';
 
+export interface TimesheetLinkedTask {
+  id: string;
+  title: string;
+  type: 'ticket' | 'task';
+  hours?: number;
+  status?: string;
+  project_name?: string;
+}
+
 export interface TimesheetEntry {
   id: string;
   company_id: string;
@@ -15,11 +24,13 @@ export interface TimesheetEntry {
   overtime_end_time?: string | null;
   work_summary: string;
   project_id?: string | null;
+  project_ids?: string[];
   project_name?: string | null;
   task_id?: string | null;
   task_title?: string | null;
   ticket_id?: string | null;
   ticket_title?: string | null;
+  linked_tasks?: TimesheetLinkedTask[];
   status: TimesheetStatus;
   reviewed_by?: string | null;
   reviewed_name?: string | null;
