@@ -60,7 +60,10 @@ export default function MyTimesheet() {
     title: string; 
     status?: string; 
     priority?: string; 
-    lead_name?: string 
+    lead_name?: string;
+    actual_hours?: number | null;
+    estimated_hours?: number | null;
+    description?: string | null;
   }[]>([]);
   const [projectTasks, setProjectTasks] = useState<{
     id: string;
@@ -69,6 +72,9 @@ export default function MyTimesheet() {
     priority?: string;
     project_id?: string;
     project_name?: string;
+    actual_hours?: number | null;
+    estimated_hours?: number | null;
+    description?: string | null;
   }[]>([]);
 
   // History State
@@ -128,7 +134,7 @@ export default function MyTimesheet() {
       // 2. Cargar tickets con prioridad, estado y cliente
       const { data: tickData } = await supabase
         .from('tickets')
-        .select('id, title, status, priority, lead_name')
+        .select('*')
         .eq('company_id', activeCompanyId)
         .order('created_at', { ascending: false })
         .limit(150);
@@ -140,7 +146,7 @@ export default function MyTimesheet() {
         const projIds = projData.map((p: any) => p.id);
         const { data: cTasks } = await supabase
           .from('crm_tasks')
-          .select('id, title, status, priority, project_id')
+          .select('*')
           .in('project_id', projIds)
           .order('created_at', { ascending: false })
           .limit(150);
@@ -153,6 +159,9 @@ export default function MyTimesheet() {
               priority: ct.priority,
               project_id: ct.project_id,
               project_name: projMap.get(ct.project_id) || 'Proyecto',
+              actual_hours: ct.actual_hours,
+              estimated_hours: ct.estimated_hours,
+              description: ct.description,
             }))
           );
         }
@@ -338,6 +347,20 @@ export default function MyTimesheet() {
 
   // Catálogo unificado de Tickets de Soporte + Tareas de Proyectos para selección múltiple
   const allSelectableTasks = useMemo(() => {
+    const extractExplicitHours = (title?: string | null, desc?: string | null): number | null => {
+      const text = `${title || ''} ${desc || ''}`;
+      const hrMatch = text.match(/(?:^|\s|:|\()(\d+(?:[.,]\d+)?)\s*(?:h|hr|hrs|hora|horas)(?:\b|$)/i);
+      if (hrMatch) {
+        const val = parseFloat(hrMatch[1].replace(',', '.'));
+        if (!isNaN(val) && val > 0 && val <= 24) return +val.toFixed(2);
+      }
+      const minMatch = text.match(/(?:^|\s|:|\()(\d+)\s*(?:min|mins|minutos)(?:\b|$)/i);
+      if (minMatch) {
+        const mins = parseInt(minMatch[1], 10);
+        if (!isNaN(mins) && mins > 0 && mins <= 720) return +(mins / 60).toFixed(2);
+      }
+      return null;
+    };
     const priorityMap: Record<string, { label: string; color: string }> = {
       urgent: { label: '🔴 Urgente', color: 'bg-rose-50 text-rose-700 border-rose-200' },
       high: { label: '🟠 Alta', color: 'bg-amber-50 text-amber-800 border-amber-200' },
@@ -359,6 +382,11 @@ export default function MyTimesheet() {
     const ticketOptions = tickets.map((t) => {
       const p = t.priority ? priorityMap[t.priority] : undefined;
       const s = t.status ? statusMap[t.status] : undefined;
+      const defaultHours =
+        Number(t.actual_hours || 0) > 0
+          ? +Number(t.actual_hours).toFixed(2)
+          : extractExplicitHours(t.title, t.description) ??
+            (Number(t.estimated_hours || 0) > 0 ? +Number(t.estimated_hours).toFixed(2) : 0);
       return {
         id: t.id,
         title: t.title,
@@ -368,14 +396,21 @@ export default function MyTimesheet() {
         subtitle: t.lead_name ? `🎫 Ticket • 🏢 Cliente: ${t.lead_name}` : '🎫 Ticket de Soporte',
         badge: p?.label || s?.label,
         badgeColor: p?.color || s?.color || 'bg-slate-100 text-slate-600 border-slate-200',
-        secondaryBadge: p && s ? s.label : undefined,
-        secondaryBadgeColor: s?.color,
+        secondaryBadge: `⏱️ ${defaultHours}h${s ? ` • ${s.label}` : ''}`,
+        secondaryBadgeColor: defaultHours > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-amber-50 text-amber-800 border-amber-200',
+        defaultHours,
+
       };
     });
 
     const taskOptions = projectTasks.map((ct) => {
       const p = ct.priority ? priorityMap[ct.priority] : undefined;
       const s = ct.status ? statusMap[ct.status] : undefined;
+      const defaultHours =
+        Number(ct.actual_hours || 0) > 0
+          ? +Number(ct.actual_hours).toFixed(2)
+          : extractExplicitHours(ct.title, ct.description) ??
+            (Number(ct.estimated_hours || 0) > 0 ? +Number(ct.estimated_hours).toFixed(2) : 0);
       return {
         id: ct.id,
         title: ct.title,
@@ -385,13 +420,40 @@ export default function MyTimesheet() {
         subtitle: `📋 Tarea • 📁 ${ct.project_name || 'Proyecto'}`,
         badge: p?.label || s?.label || '📋 Tarea',
         badgeColor: p?.color || s?.color || 'bg-indigo-50 text-indigo-700 border-indigo-200',
-        secondaryBadge: p && s ? s.label : undefined,
-        secondaryBadgeColor: s?.color,
+        secondaryBadge: `⏱️ ${defaultHours}h${s ? ` • ${s.label}` : ''}`,
+        secondaryBadgeColor: defaultHours > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-amber-50 text-amber-800 border-amber-200',
+        defaultHours,
+
       };
     });
 
     return [...ticketOptions, ...taskOptions];
   }, [tickets, projectTasks]);
+
+  // Validación estricta: las horas de los tickets/tareas seleccionados deben coincidir con las horas trabajadas
+  const totalWorkdayHours = useMemo(() => {
+    return +(Number(regularHours || 0) + Number(overtimeHours || 0)).toFixed(2);
+  }, [regularHours, overtimeHours]);
+
+  const totalSelectedTasksHours = useMemo(() => {
+    return +selectedTaskIds
+      .reduce((sum, id) => {
+        if (taskHoursMap[id] !== undefined) return sum + Number(taskHoursMap[id] || 0);
+        const opt = allSelectableTasks.find((o) => o.id === id);
+        return sum + Number(opt?.defaultHours || 0);
+      }, 0)
+      .toFixed(2);
+  }, [selectedTaskIds, taskHoursMap, allSelectableTasks]);
+
+  const hoursDifference = useMemo(() => {
+    return +(totalWorkdayHours - totalSelectedTasksHours).toFixed(2);
+  }, [totalWorkdayHours, totalSelectedTasksHours]);
+
+  const isHoursMatched = useMemo(() => {
+    if (totalWorkdayHours <= 0) return false;
+    if (selectedTaskIds.length === 0) return false;
+    return Math.abs(totalWorkdayHours - totalSelectedTasksHours) < 0.01;
+  }, [totalWorkdayHours, selectedTaskIds.length, totalSelectedTasksHours]);
 
   // Manejo del Envío
   const handleSubmit = async (e: React.FormEvent) => {
@@ -427,6 +489,18 @@ export default function MyTimesheet() {
       }
     }
 
+    if (selectedTaskIds.length === 0) {
+      toast.error(`Debes seleccionar los tickets o tareas de proyecto que respalden tus ${totalWorkdayHours}h trabajadas.`);
+      return;
+    }
+
+    if (!isHoursMatched) {
+      toast.error(
+        `Las horas de tus tareas/tickets (${totalSelectedTasksHours}h) no coinciden con las horas trabajadas (${totalWorkdayHours}h). Ajusta las horas antes de enviar.`
+      );
+      return;
+    }
+
     const linkedTasksPayload: TimesheetLinkedTask[] = selectedTaskIds.map((id) => {
       const found = allSelectableTasks.find((item) => item.id === id);
       const existingItem = selectedDayEntry?.linked_tasks?.find((item) => item.id === id);
@@ -434,7 +508,7 @@ export default function MyTimesheet() {
         id,
         title: found?.title || existingItem?.title || 'Tarea / Ticket',
         type: found?.type || existingItem?.type || 'ticket',
-        hours: taskHoursMap[id] && taskHoursMap[id] > 0 ? Number(taskHoursMap[id]) : undefined,
+        hours: taskHoursMap[id] !== undefined ? Number(taskHoursMap[id] || 0) : (found?.defaultHours || 0),
         status: found?.status || existingItem?.status,
         project_name: found?.project_name || existingItem?.project_name,
       };
@@ -1077,6 +1151,16 @@ export default function MyTimesheet() {
                 values={selectedTaskIds}
                 onChangeMultiple={(ids) => {
                   setSelectedTaskIds(ids);
+                  setTaskHoursMap((prev) => {
+                    const next = { ...prev };
+                    ids.forEach((id) => {
+                      if (next[id] === undefined) {
+                        const opt = allSelectableTasks.find((o) => o.id === id);
+                        next[id] = opt?.defaultHours ?? 0;
+                      }
+                    });
+                    return next;
+                  });
                   setTicketId(ids[0] || '');
                 }}
                 align="right"
@@ -1093,7 +1177,7 @@ export default function MyTimesheet() {
                     Tareas / Tickets Vinculados ({selectedTaskIds.length})
                   </span>
                   <span className="text-[10px] text-indigo-700 font-semibold">
-                    Tiempo por tarea (opcional)
+                    Suma en tareas: {totalSelectedTasksHours}h / {totalWorkdayHours}h jornada
                   </span>
                 </div>
                 <div className="space-y-1.5 max-h-44 overflow-y-auto pr-0.5 custom-scrollbar">
@@ -1128,7 +1212,7 @@ export default function MyTimesheet() {
                               step={0.25}
                               disabled={isFormDisabled}
                               placeholder="Horas"
-                              value={taskHoursMap[id] ?? ''}
+                              value={taskHoursMap[id] !== undefined ? taskHoursMap[id] : (item?.defaultHours ?? 0)}
                               onChange={(e) => {
                                 const val = e.target.value === '' ? 0 : Number(e.target.value);
                                 setTaskHoursMap((prev) => ({ ...prev, [id]: val }));
@@ -1161,6 +1245,68 @@ export default function MyTimesheet() {
               </div>
             )}
 
+            {/* Validador Estricto: Horas en Tareas/Tickets vs. Horas Trabajadas */}
+            <div
+              className={`rounded-xl p-3 border text-xs transition-all ${
+                isHoursMatched
+                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                  : selectedTaskIds.length === 0
+                  ? 'bg-amber-50/70 border-amber-200 text-amber-900'
+                  : 'bg-rose-50/80 border-rose-300 text-rose-900 ring-1 ring-rose-500/10'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="font-extrabold uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                  {isHoursMatched ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Horas Verificadas y Cuadradas
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                      Validación Obligatoria: Horas Jornada vs. Tareas
+                    </>
+                  )}
+                </span>
+                <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
+                  <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-800">
+                    Jornada: {totalWorkdayHours}h
+                  </span>
+                  <span>vs</span>
+                  <span
+                    className={`px-2 py-0.5 rounded border ${
+                      isHoursMatched
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-rose-600 text-white border-rose-600'
+                    }`}
+                  >
+                    Tareas: {totalSelectedTasksHours}h
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[11px] mt-1.5 leading-snug font-medium">
+                {isHoursMatched ? (
+                  <>
+                    ✓ Las horas de tus <strong>{selectedTaskIds.length} tareas/tickets ({totalSelectedTasksHours}h)</strong> coinciden exactamente con tus <strong>{totalWorkdayHours}h trabajadas</strong>. Puedes enviar tu jornada.
+                  </>
+                ) : selectedTaskIds.length === 0 ? (
+                  <>
+                    ⚠️ Debes seleccionar los tickets o tareas de proyecto realizados hoy y sus horas deben sumar exactamente las <strong>{totalWorkdayHours}h</strong> trabajadas para poder enviar.
+                  </>
+                ) : hoursDifference > 0 ? (
+                  <>
+                    ❌ <strong>No coincide:</strong> Estás reportando <strong>{totalWorkdayHours}h</strong> trabajadas, pero tus {selectedTaskIds.length} tareas seleccionadas solo suman <strong>{totalSelectedTasksHours}h</strong>. <strong>Faltan {hoursDifference}h por justificar en tareas</strong> para poder enviar la jornada.
+                  </>
+                ) : (
+                  <>
+                    ❌ <strong>No coincide:</strong> La suma de tus tareas seleccionadas (<strong>{totalSelectedTasksHours}h</strong>) supera las horas trabajadas reportadas (<strong>{totalWorkdayHours}h</strong>) por <strong>{Math.abs(hoursDifference)}h</strong>. Ajusta las horas para poder enviar.
+                  </>
+                )}
+              </p>
+            </div>
+
             {/* Notas y Entregables del Día */}
             <div className="space-y-1.5">
               <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
@@ -1188,7 +1334,8 @@ export default function MyTimesheet() {
             ) : (
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || !isHoursMatched}
+                title={!isHoursMatched ? `Las horas en tareas (${totalSelectedTasksHours}h) deben coincidir con las horas trabajadas (${totalWorkdayHours}h)` : undefined}
                 className={`w-full py-2.5 px-4 font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer text-white ${
                   adminOverrideUnlocked
                     ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20'
@@ -1210,7 +1357,7 @@ export default function MyTimesheet() {
                 ) : (
                   <>
                     <Send className="w-3.5 h-3.5" />
-                    {submitting ? 'Guardando...' : selectedDayEntry ? 'Actualizar Reporte del Día' : 'Enviar Reporte de Jornada'}
+                    {!isHoursMatched ? `No coincide: Tareas (${totalSelectedTasksHours}h) vs Jornada (${totalWorkdayHours}h)` : submitting ? 'Guardando...' : selectedDayEntry ? 'Actualizar Reporte del Día' : 'Enviar Reporte de Jornada'}
                   </>
                 )}
               </button>
