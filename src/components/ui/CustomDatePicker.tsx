@@ -171,7 +171,7 @@ export function CustomDatePicker({
             <div
                 ref={calendarPortalRef}
                 style={calendarStyle}
-                className={`${fixedPos ? '' : alignRight ? 'absolute right-0' : 'absolute right-0 md:right-auto md:left-0'} z-[10001] bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-5 w-[310px] animate-in fade-in zoom-in duration-200 transform ${!fixedPos && openUp ? 'bottom-full mb-2 origin-bottom-left' : !fixedPos ? 'top-full mt-2 origin-top-left' : 'origin-bottom-left'}`}>
+                className={`${fixedPos ? '' : alignRight ? 'absolute right-0' : 'absolute right-0 md:right-auto md:left-0'} z-[10005] bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-5 w-[310px] animate-in fade-in zoom-in duration-200 transform ${!fixedPos && openUp ? 'bottom-full mb-2 origin-bottom-left' : !fixedPos ? 'top-full mt-2 origin-top-left' : 'origin-bottom-left'}`}>
                 <div className="flex items-center justify-between mb-4">
                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] capitalize">
                         {format(currentMonth, 'MMMM yyyy', { locale: es })}

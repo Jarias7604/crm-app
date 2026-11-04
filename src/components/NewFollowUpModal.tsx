@@ -2,11 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import {
     X, Phone, Mail, MessageSquare, Video, FileText,
-    Calendar, Clock, User, Target, Search, Check, Loader2, Sparkles
+    Calendar, Target, Search, Check, Loader2
 } from 'lucide-react';
 import { leadsService } from '../services/leads';
-import { supabase } from '../services/supabase';
 import { localToUtcISO } from '../utils/timezone';
+import { CustomDatePicker } from './ui/CustomDatePicker';
+import { CustomTimePicker } from './ui/CustomTimePicker';
+import { CustomSelect } from './ui/CustomSelect';
 import toast from 'react-hot-toast';
 
 interface NewFollowUpModalProps {
@@ -28,12 +30,6 @@ const ACTION_OPTIONS = [
     { type: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, color: 'text-teal-700 bg-teal-50 border-teal-300 ring-teal-400' },
     { type: 'email', label: 'Email', icon: Mail, color: 'text-blue-700 bg-blue-50 border-blue-300 ring-blue-400' },
     { type: 'quote', label: 'Cotización', icon: FileText, color: 'text-amber-700 bg-amber-50 border-amber-300 ring-amber-400' },
-];
-
-const TIME_SLOTS = [
-    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30',
-    '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30'
 ];
 
 export default function NewFollowUpModal({
@@ -129,7 +125,13 @@ export default function NewFollowUpModal({
                 action_type: actionType as any,
             }, assignedTo || undefined);
 
-            toast.success(`📅 Seguimiento agendado para el ${date} a las ${time}`);
+            const [hStr, mStr] = (time || '09:00').split(':');
+            const hNum = parseInt(hStr, 10);
+            const displayTime = !isNaN(hNum)
+                ? `${hNum % 12 === 0 ? 12 : hNum % 12}:${(mStr || '00').slice(0, 2)} ${hNum >= 12 ? 'PM' : 'AM'}`
+                : time;
+
+            toast.success(`📅 Seguimiento agendado para el ${date} a las ${displayTime}`);
             onSuccess();
             onClose();
         } catch (error: any) {
@@ -139,6 +141,14 @@ export default function NewFollowUpModal({
             setIsSaving(false);
         }
     };
+
+    const assigneeOptions = [
+        { value: '', label: 'Sin asignar / Empresa' },
+        ...teamMembers.map(m => ({
+            value: m.id,
+            label: `${m.full_name || 'Usuario'}${m.role ? ` (${m.role})` : ''}`,
+        })),
+    ];
 
     return (
         <div className="fixed inset-0 z-[200] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
@@ -157,7 +167,7 @@ export default function NewFollowUpModal({
                         </div>
                         <button
                             onClick={onClose}
-                            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+                            className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -180,7 +190,7 @@ export default function NewFollowUpModal({
                                         key={opt.type}
                                         type="button"
                                         onClick={() => setActionType(opt.type)}
-                                        className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border-2 transition-all ${
+                                        className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border-2 transition-all cursor-pointer ${
                                             isSelected
                                                 ? `${opt.color} ring-2 shadow-sm font-black scale-[1.03]`
                                                 : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200 hover:text-slate-800'
@@ -215,7 +225,7 @@ export default function NewFollowUpModal({
                                 <button
                                     type="button"
                                     onClick={() => setSelectedLead(null)}
-                                    className="p-1 rounded-lg hover:bg-indigo-100 text-indigo-600 transition-colors"
+                                    className="p-1 rounded-lg hover:bg-indigo-100 text-indigo-600 transition-colors cursor-pointer"
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
@@ -251,7 +261,7 @@ export default function NewFollowUpModal({
                                                     setIsLeadDropdownOpen(false);
                                                     setLeadSearch('');
                                                 }}
-                                                className="w-full text-left px-3.5 py-2 hover:bg-indigo-50 flex items-center justify-between text-xs transition-colors"
+                                                className="w-full text-left px-3.5 py-2 hover:bg-indigo-50 flex items-center justify-between text-xs transition-colors cursor-pointer"
                                             >
                                                 <div className="min-w-0">
                                                     <p className="font-bold text-slate-800 truncate">{l.name}</p>
@@ -268,37 +278,27 @@ export default function NewFollowUpModal({
                         )}
                     </div>
 
-                    {/* 3. Fecha y Hora */}
-                    <div className="grid grid-cols-2 gap-3">
+                    {/* 3. Fecha y Hora (Portal-based Pickers, same baseline h-10) */}
+                    <div className="grid grid-cols-2 gap-3 items-end">
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
                                 Fecha
                             </label>
-                            <div className="relative">
-                                <input
-                                    type="date"
-                                    value={date}
-                                    onChange={e => setDate(e.target.value)}
-                                    required
-                                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
-                                />
-                            </div>
+                            <CustomDatePicker
+                                value={date}
+                                onChange={setDate}
+                                variant="white"
+                                placeholder="Seleccionar fecha"
+                            />
                         </div>
                         <div>
                             <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
                                 Hora
                             </label>
-                            <div className="relative">
-                                <select
-                                    value={time}
-                                    onChange={e => setTime(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer bg-white"
-                                >
-                                    {TIME_SLOTS.map(t => (
-                                        <option key={t} value={t}>{t}</option>
-                                    ))}
-                                </select>
-                            </div>
+                            <CustomTimePicker
+                                value={time}
+                                onChange={setTime}
+                            />
                         </div>
                     </div>
 
@@ -307,21 +307,15 @@ export default function NewFollowUpModal({
                         <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">
                             Responsable Asignado
                         </label>
-                        <select
-                            value={assignedTo}
-                            onChange={e => setAssignedTo(e.target.value)}
-                            disabled={!canAssignOthers}
-                            className={`w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${
-                                !canAssignOthers ? 'bg-slate-100 cursor-not-allowed text-slate-500' : 'bg-white cursor-pointer'
-                            }`}
-                        >
-                            <option value="">Sin asignar / Empresa</option>
-                            {teamMembers.map(m => (
-                                <option key={m.id} value={m.id}>
-                                    {m.full_name || 'Usuario'} {m.role ? `(${m.role})` : ''}
-                                </option>
-                            ))}
-                        </select>
+                        <div className={!canAssignOthers ? 'opacity-60 pointer-events-none' : ''}>
+                            <CustomSelect
+                                value={assignedTo}
+                                onChange={setAssignedTo}
+                                options={assigneeOptions}
+                                placeholder="Sin asignar / Empresa"
+                                buttonClassName="w-full h-10 flex items-center justify-between bg-white border border-slate-200 shadow-2xs rounded-xl px-3.5 text-left text-xs font-semibold text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                            />
+                        </div>
                     </div>
 
                     {/* 5. Notas */}
@@ -344,14 +338,14 @@ export default function NewFollowUpModal({
                             type="button"
                             onClick={onClose}
                             disabled={isSaving}
-                            className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-50"
+                            className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-50 cursor-pointer"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
                             disabled={isSaving}
-                            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-lg shadow-indigo-200 transition-all disabled:opacity-50"
+                            className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-lg shadow-indigo-200 transition-all disabled:opacity-50 cursor-pointer"
                         >
                             {isSaving ? (
                                 <>

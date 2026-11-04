@@ -280,7 +280,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                     action_type: followUpActionType,
                 }, followUpAssignee || undefined);
 
-                const displayTime = TIME_SLOTS.find(s => s.value === followUpTime)?.label || followUpTime;
+                const displayTime = (() => { const [h, m] = (followUpTime || '09:00').split(':'); const hn = parseInt(h, 10); return !isNaN(hn) ? `${hn % 12 || 12}:${(m || '00').slice(0, 2)} ${hn >= 12 ? 'PM' : 'AM'}` : followUpTime; })();
                 toast.success(`📅 Seguimiento agendado: ${formatDateES(followUpDate)} a las ${displayTime}`);
             }
 
@@ -533,12 +533,12 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                 </div>
 
                 {/* ── 6. AGENDAR PRÓXIMO SEGUIMIENTO ── */}
-                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                <div className="border border-slate-200 rounded-xl bg-white">
                     <button
                         type="button"
                         onClick={handleFollowUpToggle}
                         className={`w-full flex items-center justify-between p-3 transition-colors cursor-pointer text-left ${
-                            wantsFollowUp ? 'bg-indigo-50/70 border-b border-indigo-100' : 'bg-slate-50/70 hover:bg-slate-100/70'
+                            wantsFollowUp ? 'bg-indigo-50/70 border-b border-indigo-100 rounded-t-xl' : 'bg-slate-50/70 hover:bg-slate-100/70 rounded-xl'
                         }`}
                     >
                         <div className="flex items-center gap-2">
@@ -557,7 +557,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                     </button>
 
                     {wantsFollowUp && (
-                        <div className="p-3 bg-indigo-50/30 space-y-2.5 animate-in fade-in duration-200">
+                        <div className="p-3 bg-indigo-50/30 rounded-b-xl space-y-2.5 animate-in fade-in duration-200">
                             {/* Fecha y Hora: Alineación perfecta horizontal y vertical (mismo baseline, mismo h-10) */}
                             <div className="grid grid-cols-2 gap-2.5 items-end">
                                 <div>

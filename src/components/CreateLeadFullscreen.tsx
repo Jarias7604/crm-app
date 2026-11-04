@@ -1,27 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Plus, Building2, Phone, MapPin, DollarSign, Globe, UserCheck, StickyNote, ChevronDown, CheckCircle, Mail, Clock, Box } from 'lucide-react';
 import type { Lead, LeadStatus, LeadPriority, Profile, Industry, LeadProduct } from '../types';
 import { STATUS_CONFIG, SOURCE_CONFIG, PRIORITY_CONFIG } from '../types';
 import { CustomDatePicker } from './ui/CustomDatePicker';
+import { CustomTimePicker } from './ui/CustomTimePicker';
 import { format } from 'date-fns';
-import { leadProductsService } from '../services/leadProducts';
 import { ManageProductsModal } from './leads/ManageProductsModal';
-
-// 12h time slots (every 30 min) — 6:00 AM to 9:00 PM
-const TIME_SLOTS = (() => {
-    const slots: { value: string; label: string }[] = [];
-    for (let h = 6; h <= 21; h++) {
-        for (const m of [0, 30]) {
-            if (h === 21 && m === 30) continue;
-            const hour24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-            const hour12 = h === 12 ? 12 : h > 12 ? h - 12 : h === 0 ? 12 : h;
-            const ampm = h >= 12 ? 'PM' : 'AM';
-            const label = `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
-            slots.push({ value: hour24, label });
-        }
-    }
-    return slots;
-})();
 
 interface CreateLeadFullscreenProps {
     isOpen: boolean;
@@ -37,7 +22,7 @@ interface CreateLeadFullscreenProps {
     loadProducts: () => Promise<void>;
 }
 
-/* ─── Premium Dropdown ─── */
+/* ─── Premium Dropdown (Portal-based to prevent clipping) ─── */
 function PremiumSelect({
     value,
     onChange,
@@ -52,26 +37,63 @@ function PremiumSelect({
     icon?: any;
 }) {
     const [open, setOpen] = useState(false);
-    const [openUp, setOpenUp] = useState(false);
+    const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({});
     const ref = useRef<HTMLDivElement>(null);
+    const portalRef = useRef<HTMLDivElement>(null);
     const btnRef = useRef<HTMLButtonElement>(null);
+
+    const updatePosition = useCallback(() => {
+        if (!btnRef.current) return;
+        const rect = btnRef.current.getBoundingClientRect();
+        const MARGIN = 8;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const shouldOpenUp = spaceBelow < 260 && spaceAbove > spaceBelow;
+
+        const width = Math.min(Math.max(rect.width, 220), window.innerWidth - MARGIN * 2);
+        const left = Math.max(MARGIN, Math.min(rect.left, window.innerWidth - width - MARGIN));
+
+        if (shouldOpenUp) {
+            setPopoverStyle({
+                position: 'fixed',
+                bottom: `${Math.max(MARGIN, window.innerHeight - rect.top + 6)}px`,
+                left: `${left}px`,
+                width: `${width}px`,
+                zIndex: 10005,
+            });
+        } else {
+            setPopoverStyle({
+                position: 'fixed',
+                top: `${Math.max(MARGIN, rect.bottom + 6)}px`,
+                left: `${left}px`,
+                width: `${width}px`,
+                zIndex: 10005,
+            });
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!open) return;
+        updatePosition();
+        window.addEventListener('resize', updatePosition);
+        window.addEventListener('scroll', updatePosition, true);
+        return () => {
+            window.removeEventListener('resize', updatePosition);
+            window.removeEventListener('scroll', updatePosition, true);
+        };
+    }, [open, updatePosition]);
 
     useEffect(() => {
         const handler = (e: MouseEvent) => {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+            const inTrigger = ref.current?.contains(e.target as Node);
+            const inPortal = portalRef.current?.contains(e.target as Node);
+            if (!inTrigger && !inPortal) setOpen(false);
         };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
-
-    const handleToggle = () => {
-        if (!open && btnRef.current) {
-            const rect = btnRef.current.getBoundingClientRect();
-            const spaceBelow = window.innerHeight - rect.bottom;
-            setOpenUp(spaceBelow < 280);
+        if (open) {
+            document.addEventListener('mousedown', handler);
         }
-        setOpen(!open);
-    };
+        return () => document.removeEventListener('mousedown', handler);
+    }, [open]);
 
     const selected = options.find(o => o.value === value);
 
@@ -80,8 +102,8 @@ function PremiumSelect({
             <button
                 ref={btnRef}
                 type="button"
-                onClick={handleToggle}
-                className={`w-full h-12 rounded-xl border-2 bg-white px-4 flex items-center justify-between transition-all text-sm ${open ? 'border-indigo-400 ring-4 ring-indigo-50 shadow-md' : 'border-gray-200 hover:border-gray-300 shadow-sm'
+                onClick={() => setOpen(!open)}
+                className={`w-full h-12 rounded-xl border-2 bg-white px-4 flex items-center justify-between transition-all text-sm cursor-pointer ${open ? 'border-indigo-400 ring-4 ring-indigo-50 shadow-md' : 'border-gray-200 hover:border-gray-300 shadow-sm'
                     }`}
             >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -98,28 +120,33 @@ function PremiumSelect({
                 <ChevronDown className={`w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
             </button>
 
-            {open && (
-                <div className={`absolute left-0 right-0 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 py-2 animate-in fade-in duration-200 max-h-60 overflow-y-auto ${openUp ? 'bottom-full mb-2 slide-in-from-bottom-2' : 'top-full mt-2 slide-in-from-top-2'
-                    }`}>
-                    {options.map((opt) => (
-                        <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => { onChange(opt.value); setOpen(false); }}
-                            className={`w-full text-left px-4 py-3 flex items-center justify-between transition-colors ${value === opt.value
-                                ? 'bg-indigo-50 text-indigo-700'
-                                : 'text-gray-600 hover:bg-gray-50'
-                                }`}
-                        >
-                            <span className="flex items-center gap-2.5">
-                                {opt.icon && <span className="text-base">{opt.icon}</span>}
-                                <span className="font-semibold text-sm">{opt.label}</span>
-                            </span>
-                            {value === opt.value && <CheckCircle className="w-4 h-4 text-indigo-500" />}
-                        </button>
-                    ))}
-                </div>
-            )}
+            {open &&
+                createPortal(
+                    <div
+                        ref={portalRef}
+                        style={popoverStyle}
+                        className="bg-white rounded-2xl shadow-2xl border border-gray-200 py-2 animate-in fade-in duration-150 max-h-60 overflow-y-auto overscroll-contain font-sans"
+                    >
+                        {options.map((opt) => (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => { onChange(opt.value); setOpen(false); }}
+                                className={`w-full text-left px-4 py-2.5 flex items-center justify-between transition-colors cursor-pointer ${value === opt.value
+                                    ? 'bg-indigo-50 text-indigo-700'
+                                    : 'text-gray-600 hover:bg-gray-50'
+                                    }`}
+                            >
+                                <span className="flex items-center gap-2.5">
+                                    {opt.icon && <span className="text-base">{opt.icon}</span>}
+                                    <span className="font-semibold text-sm">{opt.label}</span>
+                                </span>
+                                {value === opt.value && <CheckCircle className="w-4 h-4 text-indigo-500" />}
+                            </button>
+                        ))}
+                    </div>,
+                    document.body
+                )}
         </div>
     );
 }
@@ -445,16 +472,13 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                                     <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] mb-1.5">
                                         <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Hora</span>
                                     </label>
-                                    <select
-                                        value={followUpTime}
-                                        onChange={(e) => setFollowUpTime(e.target.value)}
-                                        disabled={!formData.next_followup_date}
-                                        className="w-full h-12 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-medium text-gray-700 bg-white px-3 shadow-sm outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed appearance-none cursor-pointer"
-                                    >
-                                        {TIME_SLOTS.map(slot => (
-                                            <option key={slot.value} value={slot.value}>{slot.label}</option>
-                                        ))}
-                                    </select>
+                                    <div className={!formData.next_followup_date ? 'opacity-40 pointer-events-none' : ''}>
+                                        <CustomTimePicker
+                                            value={followUpTime}
+                                            onChange={setFollowUpTime}
+                                            className="!h-12 !rounded-xl !border-2 !border-gray-200 !text-sm"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Asignado */}
