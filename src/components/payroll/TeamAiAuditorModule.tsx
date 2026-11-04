@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
   Sparkles,
-  Clock,
   Repeat,
   KeyRound,
   ExternalLink,
@@ -10,8 +9,10 @@ import {
   RefreshCw,
   HelpCircle,
   SearchCheck,
-  FileWarning,
   Bot,
+  CheckCircle2,
+  AlertTriangle,
+  MessageSquareWarning,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -61,43 +62,32 @@ interface TeamAiAuditorModuleProps {
 
 type AiProvider = 'claude' | 'chatgpt' | 'gemini';
 
-interface TaskAuditDiagnosis {
-  uid: string;
+interface StructuredTaskEval {
   title: string;
   dateStr: string;
   projectOrClient: string;
   reportedHours: number;
-  estimatedIdealHours: number;
-  verdict: 'honest' | 'questionable' | 'inflated_or_filler';
-  verdictLabel: string;
-  reason: string;
-  isRepetitive: boolean;
+  shouldTakeHours: number;
+  status: 'ok' | 'warning' | 'danger';
+  statusLabel: string;
+  shortNote: string;
 }
 
-interface CollaboratorForensicReport {
-  userId: string;
-  userName: string;
+interface StructuredAuditReport {
+  sourceLabel: string; // ej: 'Análisis Instantáneo' o 'Claude (claude-sonnet-4-6)'
+  isLiveAi: boolean;
   credibilityScore: number;
-  riskLevel: 'ALTO RIESGO (POSIBLE RELLENO / INFLACIÓN)' | 'RIESGO MEDIO (REVISAR TIEMPOS)' | 'CONFIABLE (ENTREGABLES CLAROS)';
-  repetitivePatterns: {
-    topic: string;
-    count: number;
-    details: string;
-    diagnosis: string;
-  }[];
-  fillerOrVagueSummaries: {
-    dateStr: string;
-    text: string;
-    reportedHours: number;
-    issue: string;
-  }[];
-  taskDiagnoses: TaskAuditDiagnosis[];
-  totalReportedWorkdayHours: number;
-  totalTaskHours: number;
-  totalEstimatedRealHours: number;
-  suspectedOverchargedHours: number;
-  suspectedOverchargedCost: number;
-  confrontationQuestions: string[];
+  verdictStatus: 'ok' | 'warning' | 'danger';
+  verdictTitle: string;
+  shortExecutiveSummary: string;
+  reportedHours: number;
+  declaredTaskHours: number;
+  estimatedRealHours: number;
+  inflatedOrMissingHours: number;
+  repetitionSummary: string;
+  repetitionBullets: string[];
+  taskEvaluations: StructuredTaskEval[];
+  questionsToAsk: string[];
 }
 
 const STORAGE_KEYS: Record<AiProvider, string> = {
@@ -123,7 +113,7 @@ export default function TeamAiAuditorModule({
   const [showKeyConfig, setShowKeyConfig] = useState<boolean>(false);
   const [keyInput, setKeyInput] = useState<string>('');
   const [runningUserId, setRunningUserId] = useState<string | null>(null);
-  const [liveAiOutput, setLiveAiOutput] = useState<Record<string, { text: string; modelUsed: string }>>({});
+  const [liveAiReports, setLiveAiReports] = useState<Record<string, StructuredAuditReport>>({});
 
   const activeCollaborators = useMemo(() => {
     const withData = collaborators.filter(
@@ -142,15 +132,15 @@ export default function TeamAiAuditorModule({
     setShowKeyConfig(false);
     toast.success(
       clean
-        ? `Cuenta / API Key de ${provider.toUpperCase()} conectada correctamente.`
+        ? `Cuenta / API Key de ${provider.toUpperCase()} conectada.`
         : `API Key de ${provider.toUpperCase()} eliminada.`
     );
   };
 
-  // ── MOTOR FORENSE INTELIGENTE (ANALIZA REPETICIÓN, TIEMPOS INFLADOS Y MENTIRAS/RELLENO) ──
-  const forensicReports = useMemo<CollaboratorForensicReport[]>(() => {
+  // ── MOTOR BASE ORGANIZADO Y CLARO (SE REEMPLAZA POR EL REPORTE EN VIVO DE CLAUDE/CHATGPT/GEMINI AL PULSAR EL BOTÓN) ──
+  const defaultStructuredReports = useMemo<Record<string, StructuredAuditReport>>(() => {
     const stopWords = new Set([
-      'de', 'la', 'el', 'en', 'y', 'a', 'los', 'del', 'las', 'un', 'por', 'con', 'no', 'una', 'su', 'para', 'es', 'al', 'lo', 'como', 'mas', 'o', 'pero', 'sus', 'le', 'ha', 'me', 'si', 'sin', 'sobre', 'este', 'ya', 'entre', 'cuando', 'todo', 'esta', 'ser', 'son', 'dos', 'tambien', 'fue', 'habia', 'era', 'muy', 'anos', 'hasta', 'desde', 'esta', 'mi', 'porque', 'que', 'dia', '1h', '2h', '3h', '4h', '8h', 'hrs', 'hora', 'horas'
+      'de', 'la', 'el', 'en', 'y', 'a', 'los', 'del', 'las', 'un', 'por', 'con', 'no', 'una', 'su', 'para', 'es', 'al', 'lo', 'como', 'mas', 'o', 'pero', 'sus', 'le', 'ha', 'me', 'si', 'sin', 'sobre', 'este', 'ya', 'entre', 'cuando', 'todo', 'esta', 'ser', 'son', 'dos', 'tambien', 'fue', 'muy', 'hasta', 'desde', 'mi', 'porque', 'que', 'dia', '1h', '2h', '3h', '4h', '8h', 'hrs', 'hora', 'horas', 'soporte', 'general', 'ticket', 'tarea'
     ]);
 
     const normalizeWords = (text: string): string[] => {
@@ -163,15 +153,17 @@ export default function TeamAiAuditorModule({
         .filter((w) => w.length >= 3 && !stopWords.has(w));
     };
 
-    return activeCollaborators.map((collab) => {
+    const result: Record<string, StructuredAuditReport> = {};
+
+    activeCollaborators.forEach((collab) => {
       const userFirstName = (collab.userName.split(' ')[0] || '').toLowerCase();
 
-      // 1. Detectar patrones repetitivos o mismo problema reportado varias veces
+      // 1. Detectar repetición
       const keywordBuckets = new Map<string, { count: number; titles: string[] }>();
       collab.tasks.forEach((t) => {
         const words = new Set(normalizeWords(`${t.title} ${t.projectOrClient}`));
         words.forEach((w) => {
-          if (w === userFirstName || w === 'soporte' || w === 'general' || w === 'ticket' || w === 'tarea') return;
+          if (w === userFirstName) return;
           const prev = keywordBuckets.get(w) || { count: 0, titles: [] };
           prev.count += 1;
           if (!prev.titles.includes(t.title)) prev.titles.push(t.title);
@@ -179,187 +171,184 @@ export default function TeamAiAuditorModule({
         });
       });
 
-      const repetitivePatterns: CollaboratorForensicReport['repetitivePatterns'] = [];
-      Array.from(keywordBuckets.entries())
+      const repeatedEntries = Array.from(keywordBuckets.entries())
         .filter(([, info]) => info.count >= 2)
         .sort((a, b) => b[1].count - a[1].count)
-        .slice(0, 4)
-        .forEach(([word, info]) => {
-          const isGenericWord = ['jornada', 'varias', 'tareas', 'reunion', 'revision'].includes(word);
-          repetitivePatterns.push({
-            topic: word.toUpperCase(),
-            count: info.count,
-            details: info.titles.join('  •  '),
-            diagnosis: isGenericWord
-              ? `Usa la palabra genérica "${word}" en ${info.count} registros distintos para llenar su reporte sin especificar el entregable técnico exacto.`
-              : `El tema/cliente "${word.toUpperCase()}" se repite en ${info.count} tareas (${info.titles.join(', ')}). Validar si es el mismo problema sin resolver que está reportando varias veces o si dividió una sola gestión en varios tickets.`,
-          });
-        });
+        .slice(0, 3);
 
-      // Revisar también resúmenes de jornada repetidos o evasivos
-      const fillerOrVagueSummaries: CollaboratorForensicReport['fillerOrVagueSummaries'] = [];
+      const repetitionBullets: string[] = repeatedEntries.map(([word, info]) => {
+        const isGeneric = ['jornada', 'varias', 'tareas', 'reunion', 'revision', 'tecnico'].includes(word);
+        return isGeneric
+          ? `Usa el término genérico "${word.toUpperCase()}" en ${info.count} tareas (${info.titles.join(', ')}) sin especificar qué problema técnico resolvió.`
+          : `Repite el tema/cliente "${word.toUpperCase()}" ${info.count} veces (${info.titles.join(', ')}). Validar si dividió un mismo trabajo en varios tickets.`;
+      });
+
       collab.timesheets.forEach((ts) => {
-        const summaryLower = (ts.work_summary || '').toLowerCase();
-        const isEvasive =
-          summaryLower.includes('descrita en el ticket') ||
-          summaryLower.includes('descripcion en ticket') ||
-          summaryLower.includes('tareas varias') ||
-          summaryLower.includes('jornada trabajada') ||
-          summaryLower.trim().length < 25;
-
-        if (isEvasive) {
-          fillerOrVagueSummaries.push({
-            dateStr: ts.work_date,
-            text: ts.work_summary,
-            reportedHours: Number(ts.regular_hours || 0) + Number(ts.overtime_hours || 0),
-            issue:
-              summaryLower.includes('ticket')
-                ? 'Resumen evasivo: remite a los tickets ("descrita en el ticket"), pero los tickets de ese día no cubren las horas cobradas.'
-                : 'Descripción demasiado genérica para justificar un día completo de salario.',
-          });
+        const sLower = (ts.work_summary || '').toLowerCase();
+        if (sLower.includes('descrita en el ticket') || sLower.includes('descripcion en ticket')) {
+          repetitionBullets.push(
+            `El ${ts.work_date} cobró ${ts.regular_hours + ts.overtime_hours}h poniendo solo "${ts.work_summary}", sin detallar entregables.`
+          );
         }
       });
 
-      // 2. Evaluar tarea por tarea: ¿Debía tomar menos tiempo? ¿Es relleno?
-      const taskDiagnoses: TaskAuditDiagnosis[] = collab.tasks.map((t) => {
+      const repetitionSummary =
+        repetitionBullets.length > 0
+          ? `Se detectaron ${repetitionBullets.length} patrones de títulos repetidos o genéricos.`
+          : 'No se detectan tareas recicladas ni textos repetitivos en este período.';
+
+      // 2. Evaluar tiempos por tarea
+      const taskEvaluations: StructuredTaskEval[] = collab.tasks.map((t) => {
         const lower = t.title.toLowerCase();
         const repHrs = t.hoursTaken !== null ? t.hoursTaken : 0;
-        const isSelfNamedJornada =
+        const isFiller =
           lower.includes('jornada ') ||
           (userFirstName && lower.includes(userFirstName)) ||
           lower.includes('tareas varias');
         const isMeeting = lower.includes('reunion') || lower.includes('reunión') || lower.includes('llamada');
-        const isSimpleReview = lower.includes('revision') || lower.includes('revisión') || lower.includes('validar');
 
-        let estimatedIdealHours = repHrs;
-        let verdict: TaskAuditDiagnosis['verdict'] = 'honest';
-        let verdictLabel = '🟢 Tiempo Razonable';
-        let reason = 'El tiempo reportado es proporcional a una actividad operativa estándar.';
-
-        if (isSelfNamedJornada) {
-          estimatedIdealHours = 0;
-          verdict = 'inflated_or_filler';
-          verdictLabel = '🔴 Ticket de Relleno / Genérico';
-          reason =
-            repHrs > 0
-              ? `Le asignó ${repHrs}h a un ticket llamado "${t.title}". Poner "jornada" o "tareas varias" NO es un entregable verificable; debería valer 0h hasta que detalle qué resolvió.`
-              : `Ticket comodín ("${t.title}") sin horas ni entregable específico. No justifica horas de nómina.`;
-        } else if (isMeeting) {
-          estimatedIdealHours = Math.min(repHrs > 0 ? repHrs : 0.5, 0.5);
-          if (repHrs >= 1) {
-            verdict = 'questionable';
-            verdictLabel = '🟡 Reunión (Validar Duración)';
-            reason = `Reporta ${repHrs}h en reunión ("${t.title}"). Una reunión operativa/revisión suele tomar 20–30 min (0.5h) salvo sesión extensa con acta de acuerdos.`;
-          }
-        } else if (isSimpleReview && repHrs > 1) {
-          estimatedIdealHours = 0.5;
-          verdict = 'inflated_or_filler';
-          verdictLabel = '🔴 Tiempo Excesivo';
-          reason = `Reporta ${repHrs}h para una revisión simple ("${t.title}"), que normalmente toma 30 min (0.5h).`;
-        } else if (repHrs === 0) {
-          estimatedIdealHours = 0.5;
-          verdict = 'questionable';
-          verdictLabel = '🟡 Sin Tiempo Declarado (0h)';
-          reason = `Cerró el ticket "${t.title}" sin registrar cuánto tiempo le tomó.`;
+        if (isFiller) {
+          return {
+            title: t.title,
+            dateStr: t.dateStr,
+            projectOrClient: t.projectOrClient,
+            reportedHours: repHrs,
+            shouldTakeHours: 0,
+            status: 'danger',
+            statusLabel: '🔴 Relleno / Genérico',
+            shortNote: 'Poner "jornada" o "tareas varias" no es una tarea real; no justifica tiempo.',
+          };
         }
-
-        const isRepetitive = repetitivePatterns.some((rp) =>
-          lower.includes(rp.topic.toLowerCase())
-        );
-
+        if (isMeeting && repHrs >= 1) {
+          return {
+            title: t.title,
+            dateStr: t.dateStr,
+            projectOrClient: t.projectOrClient,
+            reportedHours: repHrs,
+            shouldTakeHours: 0.5,
+            status: 'warning',
+            statusLabel: '🟡 Reunión Larga',
+            shortNote: 'Una reunión interna suele tomar 30 min (0.5h). Pedir acuerdos concretos.',
+          };
+        }
+        if (repHrs === 0) {
+          return {
+            title: t.title,
+            dateStr: t.dateStr,
+            projectOrClient: t.projectOrClient,
+            reportedHours: 0,
+            shouldTakeHours: 0.5,
+            status: 'warning',
+            statusLabel: '🟡 Sin Horas (0h)',
+            shortNote: 'Registró el ticket sin indicar cuánto tiempo le tomó.',
+          };
+        }
         return {
-          uid: t.uid,
           title: t.title,
           dateStr: t.dateStr,
           projectOrClient: t.projectOrClient,
           reportedHours: repHrs,
-          estimatedIdealHours: +estimatedIdealHours.toFixed(2),
-          verdict,
-          verdictLabel,
-          reason,
-          isRepetitive,
+          shouldTakeHours: repHrs,
+          status: 'ok',
+          statusLabel: '🟢 Tiempo Razonable',
+          shortNote: 'Tiempo acorde para este tipo de soporte o tarea.',
         };
       });
 
-      const totalEstimatedRealHours = +taskDiagnoses
-        .reduce((acc, td) => acc + td.estimatedIdealHours, 0)
+      const estimatedRealHours = +taskEvaluations
+        .reduce((acc, item) => acc + item.shouldTakeHours, 0)
         .toFixed(2);
-
-      const suspectedOverchargedHours = Math.max(
+      const inflatedOrMissingHours = Math.max(
         0,
-        +(collab.totalTimesheetHours - totalEstimatedRealHours).toFixed(2)
+        +(collab.totalTimesheetHours - estimatedRealHours).toFixed(2)
       );
-      const suspectedOverchargedCost = +(suspectedOverchargedHours * collab.hourlyRate).toFixed(2);
 
-      // Calcular Score de Credibilidad (0 a 100)
-      const baseCoverage =
+      const credibilityScore =
         collab.totalTimesheetHours > 0
-          ? Math.min(100, (totalEstimatedRealHours / collab.totalTimesheetHours) * 100)
-          : collab.tasksCount > 0
-          ? 75
-          : 0;
-      const fillerPenalty = fillerOrVagueSummaries.length * 12;
-      const inflatedPenalty = taskDiagnoses.filter((d) => d.verdict === 'inflated_or_filler').length * 15;
-      const credibilityScore = Math.max(5, Math.min(100, Math.round(baseCoverage - fillerPenalty - inflatedPenalty)));
+          ? Math.max(
+              10,
+              Math.min(
+                100,
+                Math.round((estimatedRealHours / collab.totalTimesheetHours) * 100) -
+                  taskEvaluations.filter((e) => e.status === 'danger').length * 10
+              )
+            )
+          : 80;
 
-      const riskLevel: CollaboratorForensicReport['riskLevel'] =
-        credibilityScore < 45 || collab.unjustifiedHours >= 4
-          ? 'ALTO RIESGO (POSIBLE RELLENO / INFLACIÓN)'
-          : credibilityScore < 75
-          ? 'RIESGO MEDIO (REVISAR TIEMPOS)'
-          : 'CONFIABLE (ENTREGABLES CLAROS)';
+      const verdictStatus: 'ok' | 'warning' | 'danger' =
+        credibilityScore < 50 || inflatedOrMissingHours >= 4
+          ? 'danger'
+          : credibilityScore < 80 || inflatedOrMissingHours >= 1
+          ? 'warning'
+          : 'ok';
 
-      // 3. Construir preguntas directas de confrontación para el Admin
-      const confrontationQuestions: string[] = [];
+      const verdictTitle =
+        verdictStatus === 'danger'
+          ? 'Alerta: Horas sin Respaldo y Tickets Genéricos'
+          : verdictStatus === 'warning'
+          ? 'Observación: Revisar Detalle y Tiempos de Tareas'
+          : 'Productividad Clara y Respaldada';
+
+      // 3. Resumen corto y claro (máximo 2-3 líneas)
+      const shortExecutiveSummary =
+        inflatedOrMissingHours > 0
+          ? `${collab.userName} reportó ${collab.totalTimesheetHours}h de jornada, pero sumando sus ${collab.tasksCount} tareas registradas solo respalda ${collab.explicitTaskHoursSum}h (y descontando tickets genéricos o reuniones largas equivale a ~${estimatedRealHours}h de trabajo real). Hay ${inflatedOrMissingHours}h que requieren explicación directa.`
+          : `${collab.userName} reportó ${collab.totalTimesheetHours}h de jornada y respaldó ${collab.explicitTaskHoursSum}h distribuidas en ${collab.tasksCount} tareas con tiempos proporcionales.`;
+
+      // 4. Preguntas cortas y directas para hacerle al colaborador
+      const questionsToAsk: string[] = [];
       if (collab.unjustifiedHours > 0) {
-        confrontationQuestions.push(
-          `1. Brecha de Horas: Reportaste ${collab.totalTimesheetHours}h de jornada ($${collab.netPay.toFixed(2)} neto), pero tus tickets solo suman ${collab.explicitTaskHoursSum}h (y según auditoría técnica equivalen a ~${totalEstimatedRealHours}h reales). ¿Qué entregables exactos hiciste en las ${collab.unjustifiedHours}h restantes?`
+        questionsToAsk.push(
+          `¿Qué tareas específicas realizaste durante las ${collab.unjustifiedHours} horas que faltan entre las ${collab.totalTimesheetHours}h que reportaste en tu jornada y las ${collab.explicitTaskHoursSum}h que suman tus tickets?`
         );
       }
-      const fillerTasks = taskDiagnoses.filter((d) => d.verdict === 'inflated_or_filler');
-      if (fillerTasks.length > 0) {
-        confrontationQuestions.push(
-          `2. Tickets de Relleno Detectados: Creaste ${fillerTasks.map((f) => `"${f.title}" (${f.reportedHours}h)`).join(', ')}. Un ticket llamado "jornada" o "tareas varias" no demuestra trabajo real. ¿Cuáles fueron los cambios o soluciones específicas entregadas al cliente?`
+      const dangerTasks = taskEvaluations.filter((t) => t.status === 'danger');
+      if (dangerTasks.length > 0) {
+        questionsToAsk.push(
+          `En el ticket "${dangerTasks[0].title}" pusiste ${dangerTasks[0].reportedHours}h con un título genérico: ¿qué problema técnico resolviste exactamente y a qué cliente se le entregó?`
         );
       }
-      if (repetitivePatterns.length > 0) {
-        const topRep = repetitivePatterns[0];
-        confrontationQuestions.push(
-          `3. Repetición del Mismo Tema (${topRep.topic}): Aparece ${topRep.count} veces en tus reportes (${topRep.details}). ¿Seguimos con el mismo problema sin resolver o estás dividiendo una misma tarea en varios tickets para sumar horas?`
+      if (repeatedEntries.length > 0) {
+        const [topWord, topInfo] = repeatedEntries[0];
+        questionsToAsk.push(
+          `Tienes ${topInfo.count} registros sobre "${topWord.toUpperCase()}" (${topInfo.titles.slice(0, 3).join(', ')}): ¿por qué se crearon varios tickets separados en lugar de cerrar el requerimiento en uno solo?`
         );
       }
-      if (fillerOrVagueSummaries.length > 0) {
-        confrontationQuestions.push(
-          `4. Reportes de Jornada Evasivos: En tus jornadas escribiste "${fillerOrVagueSummaries[0].text}". A partir de hoy cada jornada requiere listar los entregables reales terminados y que la suma de horas coincida exactamente.`
+      if (questionsToAsk.length === 0) {
+        questionsToAsk.push(
+          `Para los ${collab.tasksCount} tickets cerrados en este corte, ¿quedó documentada la solución técnica dentro de cada ticket para consulta del equipo?`
         );
       }
 
-      return {
-        userId: collab.userId,
-        userName: collab.userName,
+      result[collab.userId] = {
+        sourceLabel: 'Motor Auditor Integrado',
+        isLiveAi: false,
         credibilityScore,
-        riskLevel,
-        repetitivePatterns,
-        fillerOrVagueSummaries,
-        taskDiagnoses,
-        totalReportedWorkdayHours: collab.totalTimesheetHours,
-        totalTaskHours: collab.explicitTaskHoursSum,
-        totalEstimatedRealHours,
-        suspectedOverchargedHours,
-        suspectedOverchargedCost,
-        confrontationQuestions,
+        verdictStatus,
+        verdictTitle,
+        shortExecutiveSummary,
+        reportedHours: collab.totalTimesheetHours,
+        declaredTaskHours: collab.explicitTaskHoursSum,
+        estimatedRealHours,
+        inflatedOrMissingHours,
+        repetitionSummary,
+        repetitionBullets,
+        taskEvaluations,
+        questionsToAsk,
       };
     });
+
+    return result;
   }, [activeCollaborators]);
 
-  // ── GENERADOR DE PROMPT FORENSE PARA CLAUDE, CHATGPT O GEMINI ──
-  const buildForensicPromptForCollaborator = (collab: AuditorCollaboratorData) => {
+  // ── PROMPT ESTRUCTURADO EN JSON PARA QUE CLAUDE / CHATGPT / GEMINI ENTREGUEN UN REPORTE LIMPIO Y FÁCIL DE LEER ──
+  const buildStructuredJsonPrompt = (collab: AuditorCollaboratorData) => {
     const timesheetsText =
       collab.timesheets.length > 0
         ? collab.timesheets
             .map(
               (ts) =>
-                `- Fecha ${ts.work_date}: Reportó ${ts.regular_hours}h regulares + ${ts.overtime_hours}h extras. Resumen escrito: "${ts.work_summary}"`
+                `- Fecha ${ts.work_date}: ${ts.regular_hours}h reg + ${ts.overtime_hours}h ext. Resumen: "${ts.work_summary}"`
             )
             .join('\n')
         : '- Sin registros de jornada.';
@@ -369,46 +358,173 @@ export default function TeamAiAuditorModule({
         ? collab.tasks
             .map(
               (t, idx) =>
-                `${idx + 1}. [${t.dateStr}] Título: "${t.title}" | Cliente/Proyecto: ${t.projectOrClient} | Estado: ${t.statusLabel} | Tiempo reportado en tarea: ${t.hoursTaken !== null ? `${t.hoursTaken}h` : '0h (Sin especificar)'}`
+                `${idx + 1}. [${t.dateStr}] "${t.title}" | Cliente/Proyecto: ${t.projectOrClient} | Horas reportadas: ${t.hoursTaken !== null ? `${t.hoursTaken}h` : '0h'}`
             )
             .join('\n')
         : '- Sin tareas ni tickets registrados.';
 
-    return `Actúa como un Auditor Forense Senior de Productividad, Ingeniería y Nómina.
-Necesito que analices de forma directa, sin filtros y muy clara el trabajo reportado por el colaborador: ${collab.userName} en el período ${periodLabel} (${startDate} a ${endDate}).
+    return `Eres un Auditor Ejecutivo de Productividad. Analiza de forma MUY CLARA, CORTA, SIMPLE y DIRECTA el trabajo de ${collab.userName} (${periodLabel}: ${startDate} a ${endDate}).
 
-DATOS DE NÓMINA Y HORAS REPORTADAS:
-- Horas totales cobradas en jornada: ${collab.totalTimesheetHours} horas
-- Horas sumadas en tareas/tickets: ${collab.explicitTaskHoursSum} horas
-- Horas sin justificar: ${collab.unjustifiedHours} horas
-- Pago Neto en el período: $${collab.netPay.toFixed(2)} USD ($${collab.grossPay.toFixed(2)} bruto | Tarifa: $${collab.hourlyRate.toFixed(2)}/h)
+DATOS:
+- Horas cobradas en jornada: ${collab.totalTimesheetHours}h
+- Horas sumadas en tareas/tickets: ${collab.explicitTaskHoursSum}h
+- Horas sin justificar: ${collab.unjustifiedHours}h
 
-JORNADAS REPORTADAS POR EL COLABORADOR:
+JORNADAS:
 ${timesheetsText}
 
-TAREAS Y TICKETS COMPLETADOS POR EL COLABORADOR:
+TAREAS / TICKETS:
 ${tasksText}
 
-POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
-1. 🔁 ¿ESTÁ REPORTANDO LO MISMO TODO EL TIEMPO / MISMOS PROBLEMAS?: Analiza si los tickets son repetitivos, si está reportando el mismo cliente/reunión varias veces o si usa títulos genéricos ("jornada", "tareas varias") como relleno.
-2. ⏱️ ¿LE DEBIÓ TOMAR MENOS TIEMPO? (DETECTOR DE MENTIRAS / INFLACIÓN DE HORAS): Evalúa cada tarea una por una y dime cuánto tiempo real debería tomarle a un profesional vs. lo que reportó.
-3. 💵 IMPACTO EN NÓMINA: ¿Cuántas de las ${collab.totalTimesheetHours} horas cobradas están realmente justificadas y cuánto dinero se le está pagando sin respaldo?
-4. 💬 GUIÓN DE CONFRONTACIÓN: Dame 3 preguntas directas y objetivas para confrontar a ${collab.userName} hoy mismo.`;
+Responde ÚNICAMENTE con un objeto JSON válido (sin texto adicional fuera del JSON ni bloques markdown) con esta estructura exacta:
+{
+  "credibilityScore": 0-100,
+  "verdictStatus": "ok" | "warning" | "danger",
+  "verdictTitle": "Título corto de 4 a 7 palabras",
+  "shortExecutiveSummary": "Resumen ejecutivo MUY CLARO y CORTO (máximo 3 líneas) explicando en lenguaje sencillo qué hizo, si las horas tienen sentido o si faltan horas por justificar.",
+  "estimatedRealHours": numero_horas_reales_que_debio_tomar,
+  "inflatedOrMissingHours": numero_horas_infladas_o_sin_justificar,
+  "repetitionSummary": "1 frase corta diciendo si repite siempre lo mismo o si usa títulos genéricos.",
+  "repetitionBullets": [
+    "Punto corto y claro 1 sobre tareas repetidas o genéricas",
+    "Punto corto y claro 2"
+  ],
+  "taskEvaluations": [
+    {
+      "title": "Nombre de la tarea",
+      "dateStr": "YYYY-MM-DD",
+      "projectOrClient": "Cliente o Proyecto",
+      "reportedHours": 1,
+      "shouldTakeHours": 0.5,
+      "status": "ok" | "warning" | "danger",
+      "statusLabel": "🟢 Justo | 🟡 Dudoso | 🔴 Inflado/Relleno",
+      "shortNote": "Explicación de 1 sola línea muy fácil de entender de por qué debió tomar ese tiempo."
+    }
+  ],
+  "questionsToAsk": [
+    "Pregunta directa, corta y clara #1 para hacerle al colaborador en reunión",
+    "Pregunta directa, corta y clara #2",
+    "Pregunta directa, corta y clara #3"
+  ]
+}`;
   };
 
-  // ── LLAMADA EN VIVO A LA API DE CLAUDE, CHATGPT O GEMINI CON AUTO-DETECCIÓN DE MODELOS ACTIVOS ──
+  // Prompt legible para cuando el usuario abre Claude.ai / ChatGPT / Gemini en otra pestaña
+  const buildHumanReadablePrompt = (collab: AuditorCollaboratorData) => {
+    const timesheetsText =
+      collab.timesheets
+        .map((ts) => `- ${ts.work_date}: ${ts.regular_hours + ts.overtime_hours}h ("${ts.work_summary}")`)
+        .join('\n') || '- Sin jornadas';
+    const tasksText =
+      collab.tasks
+        .map((t, i) => `${i + 1}. [${t.dateStr}] "${t.title}" (${t.projectOrClient}) -> ${t.hoursTaken ?? 0}h`)
+        .join('\n') || '- Sin tareas';
+
+    return `Analiza de forma MUY CORTA, ORGANIZADA y FÁCIL DE ENTENDER el trabajo de ${collab.userName} (${periodLabel}):
+- Horas reportadas en jornada: ${collab.totalTimesheetHours}h
+- Horas en tareas hechas: ${collab.explicitTaskHoursSum}h
+-Jornadas:\n${timesheetsText}
+-Tareas:\n${tasksText}
+
+Por favor dame solo 4 bloques cortos y al grano:
+1. RESUMEN CORTO (3 líneas): ¿Qué pasó realmente con sus horas y tareas?
+2. ¿REPITE LO MISMO?: ¿Está reportando lo mismo o usando nombres genéricos?
+3. TIEMPO QUE DEBIÓ TOMAR: Lista cada tarea con (Reportó Xh -> Debió tomar Yh) y 1 frase corta.
+4. 3 PREGUNTAS DIRECTAS que debo hacerle hoy mismo para confrontarlo.`;
+  };
+
+  // Parsear la respuesta JSON de Claude / ChatGPT / Gemini de forma segura
+  const parseAiJsonToReport = (
+    rawText: string,
+    collab: AuditorCollaboratorData,
+    sourceLabel: string,
+    fallbackReport: StructuredAuditReport
+  ): StructuredAuditReport => {
+    try {
+      const cleaned = rawText
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .trim();
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
+      const jsonSlice =
+        firstBrace !== -1 && lastBrace !== -1 ? cleaned.slice(firstBrace, lastBrace + 1) : cleaned;
+      const parsed = JSON.parse(jsonSlice);
+
+      return {
+        sourceLabel,
+        isLiveAi: true,
+        credibilityScore:
+          typeof parsed.credibilityScore === 'number'
+            ? Math.max(0, Math.min(100, Math.round(parsed.credibilityScore)))
+            : fallbackReport.credibilityScore,
+        verdictStatus:
+          parsed.verdictStatus === 'ok' || parsed.verdictStatus === 'warning' || parsed.verdictStatus === 'danger'
+            ? parsed.verdictStatus
+            : fallbackReport.verdictStatus,
+        verdictTitle: parsed.verdictTitle || fallbackReport.verdictTitle,
+        shortExecutiveSummary: parsed.shortExecutiveSummary || fallbackReport.shortExecutiveSummary,
+        reportedHours: collab.totalTimesheetHours,
+        declaredTaskHours: collab.explicitTaskHoursSum,
+        estimatedRealHours:
+          typeof parsed.estimatedRealHours === 'number'
+            ? +parsed.estimatedRealHours.toFixed(2)
+            : fallbackReport.estimatedRealHours,
+        inflatedOrMissingHours:
+          typeof parsed.inflatedOrMissingHours === 'number'
+            ? +parsed.inflatedOrMissingHours.toFixed(2)
+            : fallbackReport.inflatedOrMissingHours,
+        repetitionSummary: parsed.repetitionSummary || fallbackReport.repetitionSummary,
+        repetitionBullets: Array.isArray(parsed.repetitionBullets)
+          ? parsed.repetitionBullets
+          : fallbackReport.repetitionBullets,
+        taskEvaluations:
+          Array.isArray(parsed.taskEvaluations) && parsed.taskEvaluations.length > 0
+            ? parsed.taskEvaluations.map((te: any) => ({
+                title: te.title || 'Tarea',
+                dateStr: te.dateStr || '',
+                projectOrClient: te.projectOrClient || 'General',
+                reportedHours: Number(te.reportedHours || 0),
+                shouldTakeHours: Number(te.shouldTakeHours || 0),
+                status: te.status === 'ok' || te.status === 'warning' || te.status === 'danger' ? te.status : 'warning',
+                statusLabel: te.statusLabel || '🟡 Revisar',
+                shortNote: te.shortNote || '',
+              }))
+            : fallbackReport.taskEvaluations,
+        questionsToAsk:
+          Array.isArray(parsed.questionsToAsk) && parsed.questionsToAsk.length > 0
+            ? parsed.questionsToAsk
+            : fallbackReport.questionsToAsk,
+      };
+    } catch {
+      // Si el modelo respondió texto libre, limpiamos cualquier símbolo markdown (#, **, |) y lo mostramos limpio en el resumen
+      const cleanPlain = rawText
+        .replace(/[#*|>`_~-]{2,}/g, '')
+        .replace(/^#+\s*/gm, '')
+        .trim()
+        .slice(0, 600);
+      return {
+        ...fallbackReport,
+        sourceLabel,
+        isLiveAi: true,
+        shortExecutiveSummary: cleanPlain || fallbackReport.shortExecutiveSummary,
+      };
+    }
+  };
+
+  // ── EJECUTAR ANÁLISIS EN VIVO CON CLAUDE, CHATGPT O GEMINI ──
   const handleRunLiveAi = async (collab: AuditorCollaboratorData) => {
     const key = apiKeys[activeProvider];
     if (!key) {
       setKeyInput('');
       setShowKeyConfig(true);
-      toast('Conecta tu API Key de ' + activeProvider.toUpperCase() + ' o usa el botón "Abrir en mi Cuenta Web" al lado.', {
+      toast('Conecta tu API Key de ' + activeProvider.toUpperCase() + ' arriba.', {
         icon: '🔌',
       });
       return;
     }
 
-    const prompt = buildForensicPromptForCollaborator(collab);
+    const prompt = buildStructuredJsonPrompt(collab);
     setRunningUserId(collab.userId);
     try {
       let responseText = '';
@@ -422,7 +538,6 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
           'anthropic-dangerous-direct-browser-access': 'true',
         };
 
-        // 1. Consultar dinámicamente qué modelos tiene activos la cuenta de Anthropic del usuario
         let candidateModels: string[] = [];
         try {
           const modelsRes = await fetch('https://api.anthropic.com/v1/models', {
@@ -434,23 +549,21 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
             const fetchedIds: string[] = (modelsJson?.data || [])
               .map((m: any) => m?.id)
               .filter(Boolean);
-            // Priorizar Sonnet 4.x / 3.7 / Haiku activos en la cuenta
             const sonnets = fetchedIds.filter((id) => id.includes('sonnet'));
             const others = fetchedIds.filter((id) => !id.includes('sonnet'));
             candidateModels = [...sonnets, ...others];
           }
         } catch {
-          // Si falla el listado, usamos la lista de respaldo oficial
+          // fallback
         }
 
-        const fallbackClaudeModels = [
+        [
           'claude-sonnet-4-5-20250929',
           'claude-sonnet-4-20250514',
           'claude-3-7-sonnet-20250219',
           'claude-3-5-haiku-20241022',
           'claude-3-haiku-20240307',
-        ];
-        fallbackClaudeModels.forEach((m) => {
+        ].forEach((m) => {
           if (!candidateModels.includes(m)) candidateModels.push(m);
         });
 
@@ -461,21 +574,20 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
             headers: claudeHeaders,
             body: JSON.stringify({
               model: modelId,
-              max_tokens: 1600,
-              temperature: 0.2,
+              max_tokens: 1500,
+              temperature: 0.1,
               messages: [{ role: 'user', content: prompt }],
             }),
           });
           const data = await res.json();
           if (res.ok) {
-            responseText = data?.content?.[0]?.text || 'Sin respuesta.';
+            responseText = data?.content?.[0]?.text || '';
             modelUsed = modelId;
             break;
           } else {
             const errType = data?.error?.type || '';
             const errMsg = data?.error?.message || '';
             lastError = errMsg || `Error HTTP ${res.status}`;
-            // Si es un error de modelo no encontrado, probamos el siguiente modelo automáticamente
             if (errType === 'not_found_error' || errMsg.toLowerCase().includes('model')) {
               continue;
             } else {
@@ -483,17 +595,9 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
             }
           }
         }
-
-        if (!responseText) {
-          throw new Error(lastError);
-        }
+        if (!responseText) throw new Error(lastError);
       } else if (activeProvider === 'gemini') {
-        const geminiCandidates = [
-          'gemini-2.5-flash',
-          'gemini-2.0-flash',
-          'gemini-1.5-flash-latest',
-          'gemini-1.5-pro-latest',
-        ];
+        const geminiCandidates = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
         let lastError = 'Error en Gemini API';
 
         for (const modelId of geminiCandidates) {
@@ -504,30 +608,24 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { temperature: 0.2 },
+                generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
               }),
             }
           );
           const data = await res.json();
           if (res.ok) {
-            responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta.';
+            responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
             modelUsed = modelId;
             break;
           } else {
             lastError = data?.error?.message || `Error HTTP ${res.status}`;
-            if (res.status === 404 || lastError.toLowerCase().includes('not found')) {
-              continue;
-            } else {
-              throw new Error(lastError);
-            }
+            if (res.status === 404 || lastError.toLowerCase().includes('not found')) continue;
+            throw new Error(lastError);
           }
         }
-
-        if (!responseText) {
-          throw new Error(lastError);
-        }
+        if (!responseText) throw new Error(lastError);
       } else if (activeProvider === 'chatgpt') {
-        const openAiCandidates = ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'];
+        const openAiCandidates = ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'];
         let lastError = 'Error en OpenAI API';
 
         for (const modelId of openAiCandidates) {
@@ -539,105 +637,89 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
             },
             body: JSON.stringify({
               model: modelId,
-              temperature: 0.2,
+              temperature: 0.1,
+              response_format: { type: 'json_object' },
               messages: [
-                { role: 'system', content: 'Eres un auditor forense ejecutivo de productividad y nómina.' },
+                { role: 'system', content: 'Responde siempre en JSON válido, claro y conciso.' },
                 { role: 'user', content: prompt },
               ],
             }),
           });
           const data = await res.json();
           if (res.ok) {
-            responseText = data?.choices?.[0]?.message?.content || 'Sin respuesta.';
+            responseText = data?.choices?.[0]?.message?.content || '';
             modelUsed = modelId;
             break;
           } else {
             lastError = data?.error?.message || `Error HTTP ${res.status}`;
-            if (lastError.toLowerCase().includes('model') || res.status === 404) {
-              continue;
-            } else {
-              throw new Error(lastError);
-            }
+            if (lastError.toLowerCase().includes('model') || res.status === 404) continue;
+            throw new Error(lastError);
           }
         }
-
-        if (!responseText) {
-          throw new Error(lastError);
-        }
+        if (!responseText) throw new Error(lastError);
       }
 
-      setLiveAiOutput((prev) => ({
+      const fallback = defaultStructuredReports[collab.userId];
+      const structured = parseAiJsonToReport(
+        responseText,
+        collab,
+        `${activeProvider.toUpperCase()} (${modelUsed})`,
+        fallback
+      );
+
+      setLiveAiReports((prev) => ({
         ...prev,
-        [collab.userId]: { text: responseText, modelUsed },
+        [collab.userId]: structured,
       }));
-      toast.success(`Auditoría completada con ${activeProvider.toUpperCase()} (${modelUsed})`);
+      toast.success(`Reporte ejecutivo actualizado con ${activeProvider.toUpperCase()}`);
     } catch (err: any) {
-      toast.error(`Error al conectar con ${activeProvider.toUpperCase()}: ${err.message}`, {
-        duration: 6000,
-      });
+      toast.error(`Error con ${activeProvider.toUpperCase()}: ${err.message}`, { duration: 6000 });
     } finally {
       setRunningUserId(null);
     }
   };
 
-  // ── PUENTE EN 1 CLIC A LA CUENTA WEB (CLAUDE.AI, CHATGPT.COM, GEMINI.GOOGLE.COM) ──
   const handleOpenInWebAccount = async (collab: AuditorCollaboratorData, provider: AiProvider) => {
-    const prompt = buildForensicPromptForCollaborator(collab);
+    const prompt = buildHumanReadablePrompt(collab);
     try {
       await navigator.clipboard.writeText(prompt);
     } catch {
-      // fallback
+      // ignore
     }
-
     const urls: Record<AiProvider, string> = {
       claude: 'https://claude.ai/new',
       chatgpt: 'https://chatgpt.com/',
       gemini: 'https://gemini.google.com/app',
     };
-    const names: Record<AiProvider, string> = {
-      claude: 'Claude.ai',
-      chatgpt: 'ChatGPT',
-      gemini: 'Google Gemini',
-    };
-
-    toast.success(
-      `¡Datos de ${collab.userName} copiados! Solo pega (Ctrl+V) en tu cuenta de ${names[provider]}.`,
-      { duration: 5000 }
-    );
+    toast.success(`Resumen copiado. Solo pega (Ctrl+V) en ${provider.toUpperCase()}.`);
     window.open(urls[provider], '_blank', 'noopener,noreferrer');
   };
 
   return (
     <div className="space-y-4 animate-fadeIn">
-      {/* ── 1. BARRA SUPERIOR DE CONEXIÓN A TUS CUENTAS DE IA (CLAUDE, CHATGPT, GEMINI) ── */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 sm:p-5 shadow-md border border-indigo-500/20">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0 text-indigo-300">
-              <Bot className="w-6 h-6" />
+      {/* ── 1. BARRA SUPERIOR MINIMALISTA DE CONEXIÓN IA ── */}
+      <div className="bg-slate-900 text-white rounded-2xl p-4 shadow-xs border border-slate-800">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0 text-indigo-300">
+              <Bot className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base font-extrabold tracking-tight text-white">
-                  AI Workforce Auditor — Detector de Repetición, Tiempos Inflados y Productividad
-                </h2>
-                <span className="text-[10px] font-black uppercase tracking-wider bg-indigo-500 text-white px-2.5 py-0.5 rounded-full">
-                  Claude • ChatGPT • Gemini
-                </span>
-              </div>
-              <p className="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
-                Analiza automáticamente si un colaborador reporta siempre las mismas tareas, si usa tickets genéricos de relleno o si reporta más horas de las que realmente toma cada tarea.
+              <h2 className="text-sm sm:text-base font-extrabold text-white">
+                Auditoría Ejecutiva IA — Resumen Claro, Tiempos Reales y Preguntas de Confrontación
+              </h2>
+              <p className="text-xs text-slate-400">
+                Conecta Claude, ChatGPT o Gemini para obtener un diagnóstico limpio, directo y fácil de entender.
               </p>
             </div>
           </div>
 
-          {/* Selector de Motor de IA + Botón de Conexión */}
           <div className="flex flex-wrap items-center gap-2">
             {(
               [
-                { id: 'claude' as const, label: '🟣 Claude', desc: 'Anthropic' },
-                { id: 'chatgpt' as const, label: '🟢 ChatGPT', desc: 'OpenAI' },
-                { id: 'gemini' as const, label: '🔵 Gemini', desc: 'Google' },
+                { id: 'claude' as const, label: '🟣 Claude' },
+                { id: 'chatgpt' as const, label: '🟢 ChatGPT' },
+                { id: 'gemini' as const, label: '🔵 Gemini' },
               ]
             ).map((prov) => {
               const isSel = activeProvider === prov.id;
@@ -650,16 +732,14 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
                     setActiveProvider(prov.id);
                     setKeyInput(apiKeys[prov.id] || '');
                   }}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer border flex items-center gap-2 ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border flex items-center gap-1.5 ${
                     isSel
-                      ? 'bg-white text-slate-900 border-white shadow-sm'
-                      : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-800'
+                      ? 'bg-white text-slate-900 border-white'
+                      : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
                   }`}
                 >
                   <span>{prov.label}</span>
-                  {hasKey && (
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" title="API Key conectada" />
-                  )}
+                  {hasKey && <span className="w-2 h-2 rounded-full bg-emerald-500" />}
                 </button>
               );
             })}
@@ -670,7 +750,7 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
                 setKeyInput(apiKeys[activeProvider] || '');
                 setShowKeyConfig(!showKeyConfig);
               }}
-              className="px-3 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-400/40 transition cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition cursor-pointer flex items-center gap-1.5"
             >
               <KeyRound className="w-3.5 h-3.5" />
               {apiKeys[activeProvider] ? 'API Conectada ✓' : 'Conectar API Key'}
@@ -678,88 +758,63 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
           </div>
         </div>
 
-        {/* Panel desplegable para pegar la API Key de Claude, ChatGPT o Gemini */}
         {showKeyConfig && (
-          <div className="mt-4 pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-            <div className="flex-1">
-              <label className="block text-[11px] font-bold text-indigo-300 uppercase tracking-wider mb-1">
-                API Key de {activeProvider === 'claude' ? 'Claude (Anthropic)' : activeProvider === 'chatgpt' ? 'ChatGPT (OpenAI)' : 'Google Gemini'} (Se guarda en tu navegador)
-              </label>
-              <input
-                type="password"
-                value={keyInput}
-                onChange={(e) => setKeyInput(e.target.value)}
-                placeholder={
-                  activeProvider === 'claude'
-                    ? 'sk-ant-api03-...'
-                    : activeProvider === 'chatgpt'
-                    ? 'sk-proj-...'
-                    : 'AIzaSy...'
-                }
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-indigo-400"
-              />
-            </div>
-            <div className="flex items-end gap-2 sm:pt-5">
-              <button
-                type="button"
-                onClick={() => handleSaveApiKey(activeProvider, keyInput)}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition cursor-pointer"
-              >
-                Guardar Conexión
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowKeyConfig(false)}
-                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
-              >
-                Cerrar
-              </button>
-            </div>
+          <div className="mt-3 pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <input
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              placeholder={`Pega tu API Key de ${activeProvider.toUpperCase()}...`}
+              className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-indigo-400"
+            />
+            <button
+              type="button"
+              onClick={() => handleSaveApiKey(activeProvider, keyInput)}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer"
+            >
+              Guardar
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowKeyConfig(false)}
+              className="px-3 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold cursor-pointer"
+            >
+              Cerrar
+            </button>
           </div>
         )}
       </div>
 
-      {/* ── 2. RESULTADOS DE AUDITORÍA FORENSE POR COLABORADOR ── */}
-      {forensicReports.length === 0 ? (
+      {/* ── 2. REPORTE ORGANIZADO EN 4 BLOQUES CLAROS POR COLABORADOR ── */}
+      {activeCollaborators.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-3">
           <Sparkles className="w-8 h-8 text-indigo-600 mx-auto" />
           <h3 className="text-sm font-bold text-slate-900">
-            Selecciona un colaborador arriba para auditar sus tareas y tiempos con IA
+            Selecciona un colaborador arriba para ver su Resumen de Auditoría IA
           </h3>
-          <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
-            {collaborators
-              .filter((c) => c.tasksCount > 0 || c.totalTimesheetHours > 0)
-              .map((c) => (
-                <button
-                  key={c.userId}
-                  type="button"
-                  onClick={() => onSelectUserIds([c.userId])}
-                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 text-xs font-bold cursor-pointer"
-                >
-                  🔍 Auditar a {c.userName} ({c.tasksCount} tareas • {c.totalTimesheetHours}h)
-                </button>
-              ))}
-          </div>
         </div>
       ) : (
         <div className="space-y-5">
-          {forensicReports.map((report) => {
-            const collab = activeCollaborators.find((c) => c.userId === report.userId)!;
-            const isHighRisk = report.riskLevel.startsWith('ALTO');
-            const isMedRisk = report.riskLevel.startsWith('RIESGO MEDIO');
-            const isRunningThisUser = runningUserId === report.userId;
+          {activeCollaborators.map((collab) => {
+            const report = liveAiReports[collab.userId] || defaultStructuredReports[collab.userId];
+            if (!report) return null;
+            const isRunning = runningUserId === collab.userId;
 
             return (
               <div
-                key={report.userId}
+                key={collab.userId}
                 className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden"
               >
-                {/* CABECERA DEL REPORTE DE AUDITORÍA DEL COLABORADOR */}
-                <div className="p-4 sm:p-5 bg-slate-50/80 border-b border-slate-200/80 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                {/* CABECERA LIMPIA DEL COLABORADOR */}
+                <div className="p-4 sm:p-5 bg-slate-50 border-b border-slate-200/80 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-12 h-12 rounded-2xl font-black text-lg flex items-center justify-center shrink-0 text-white shadow-xs ${
-                        isHighRisk ? 'bg-rose-600' : isMedRisk ? 'bg-amber-600' : 'bg-emerald-600'
+                      className={`w-12 h-12 rounded-2xl font-black text-base flex items-center justify-center shrink-0 text-white shadow-xs ${
+                        report.verdictStatus === 'danger'
+                          ? 'bg-rose-600'
+                          : report.verdictStatus === 'warning'
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-600'
                       }`}
                     >
                       {report.credibilityScore}%
@@ -767,273 +822,245 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-base font-extrabold text-slate-900">
-                          Auditoría IA: {report.userName}
+                          {collab.userName}
                         </h3>
                         <span
-                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
-                            isHighRisk
+                          className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                            report.verdictStatus === 'danger'
                               ? 'bg-rose-50 text-rose-700 border-rose-200'
-                              : isMedRisk
+                              : report.verdictStatus === 'warning'
                               ? 'bg-amber-50 text-amber-800 border-amber-200'
                               : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                           }`}
                         >
-                          {report.riskLevel}
+                          {report.verdictTitle}
                         </span>
-                        <span className="text-[11px] font-semibold text-slate-500">
-                          📅 {periodLabel}
+                        <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                          ✨ {report.sourceLabel}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-600 mt-0.5">
-                        Índice de Credibilidad Operativa: <strong>{report.credibilityScore}/100</strong> •{' '}
-                        Reportó <strong>{report.totalReportedWorkdayHours}h</strong> en jornada |{' '}
-                        Declaró <strong>{report.totalTaskHours}h</strong> en tareas |{' '}
-                        Tiempo real estimado por IA: <strong className="text-indigo-700">{report.totalEstimatedRealHours}h</strong>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Período: <strong>{periodLabel}</strong> • {collab.tasksCount} tareas evaluadas
                       </p>
                     </div>
                   </div>
 
-                  {/* BOTONES PARA LANZAR EN TU CUENTA DE CLAUDE, CHATGPT O GEMINI */}
+                  {/* Botones de Acción IA */}
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      disabled={isRunningThisUser}
+                      disabled={isRunning}
                       onClick={() => handleRunLiveAi(collab)}
-                      className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
                     >
-                      {isRunningThisUser ? (
+                      {isRunning ? (
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       ) : (
                         <Zap className="w-3.5 h-3.5" />
                       )}
-                      {isRunningThisUser
-                        ? 'Analizando con IA...'
-                        : `Analizar con ${activeProvider === 'claude' ? 'Claude' : activeProvider === 'chatgpt' ? 'ChatGPT' : 'Gemini'} (API)`}
+                      {isRunning
+                        ? `Analizando con ${activeProvider.toUpperCase()}...`
+                        : `Generar Análisis Profundo con ${activeProvider === 'claude' ? 'Claude' : activeProvider === 'chatgpt' ? 'ChatGPT' : 'Gemini'}`}
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => handleOpenInWebAccount(collab, 'claude')}
-                      className="px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
-                      title="Copia el análisis de este empleado y abre tu cuenta de Claude.ai"
+                      onClick={() => handleOpenInWebAccount(collab, activeProvider)}
+                      className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                      title="Copia el resumen limpio y abre tu cuenta web"
                     >
-                      <span>🟣 Abrir en Claude.ai</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenInWebAccount(collab, 'chatgpt')}
-                      className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
-                      title="Copia el análisis de este empleado y abre tu cuenta de ChatGPT"
-                    >
-                      <span>🟢 ChatGPT</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenInWebAccount(collab, 'gemini')}
-                      className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
-                      title="Copia el análisis de este empleado y abre tu cuenta de Google Gemini"
-                    >
-                      <span>🔵 Gemini</span>
-                      <ExternalLink className="w-3 h-3" />
+                      <span>Abrir en Web</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
 
-                {/* CUERPO DEL ANÁLISIS FORENSE */}
+                {/* CUERPO ORGANIZADO EN 4 SECCIONES CLARAS Y FÁCILES DE LEER */}
                 <div className="p-4 sm:p-5 space-y-5">
-                  {/* RESPUESTA EN VIVO DEL MODELO EXTERNO SI SE EJECUTÓ CON API KEY */}
-                  {liveAiOutput[report.userId] && (
-                    <div className="bg-indigo-950 text-indigo-50 rounded-2xl p-4 border border-indigo-700 space-y-2">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
-                          <Sparkles className="w-4 h-4 text-indigo-400" />
-                          Dictamen en Vivo de {activeProvider.toUpperCase()} ({liveAiOutput[report.userId].modelUsed})
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(liveAiOutput[report.userId].text);
-                            toast.success('Dictamen copiado al portapapeles');
-                          }}
-                          className="text-[11px] font-bold text-indigo-300 hover:text-white flex items-center gap-1 cursor-pointer"
-                        >
-                          <Copy className="w-3 h-3" /> Copiar
-                        </button>
-                      </div>
-                      <div className="text-xs leading-relaxed whitespace-pre-wrap font-sans text-slate-100 bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
-                        {liveAiOutput[report.userId].text}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 3 PILARES DEL DIAGNÓSTICO DE HONESTIDAD DE TIEMPOS */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                        1. Horas Cobradas vs. Horas en Tareas
-                      </span>
-                      <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-xl font-black text-slate-900 font-mono">
-                          {report.totalReportedWorkdayHours}h cobradas
-                        </span>
-                        <span className="text-xs font-bold text-indigo-700">
-                          vs {report.totalTaskHours}h en tareas
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        Pago neto del período: <strong>${collab.netPay.toFixed(2)}</strong>
-                      </p>
-                    </div>
-
-                    <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-3.5">
-                      <span className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider block">
-                        2. Tiempo Real que Debió Tomar (IA)
-                      </span>
-                      <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-xl font-black text-indigo-950 font-mono">
-                          ~{report.totalEstimatedRealHours}h reales
-                        </span>
-                        <span className="text-xs font-bold text-indigo-700">
-                          según complejidad real
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-indigo-800 mt-1">
-                        Descontando tickets genéricos/relleno y reuniones infladas.
-                      </p>
-                    </div>
-
+                  {/* ── PASO 1: RESUMEN EJECUTIVO CORTO Y CLARO + 3 NÚMEROS CLAVE ── */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+                    {/* Resumen corto en lenguaje sencillo */}
                     <div
-                      className={`rounded-xl p-3.5 border ${
-                        report.suspectedOverchargedHours > 0
-                          ? 'bg-rose-50/70 border-rose-300'
-                          : 'bg-emerald-50/70 border-emerald-200'
+                      className={`lg:col-span-7 rounded-2xl p-4 border flex flex-col justify-between ${
+                        report.verdictStatus === 'danger'
+                          ? 'bg-rose-50/50 border-rose-200'
+                          : report.verdictStatus === 'warning'
+                          ? 'bg-amber-50/50 border-amber-200'
+                          : 'bg-emerald-50/50 border-emerald-200'
                       }`}
                     >
-                      <span
-                        className={`text-[10px] font-bold uppercase tracking-wider block ${
-                          report.suspectedOverchargedHours > 0 ? 'text-rose-800' : 'text-emerald-800'
+                      <div className="space-y-1.5">
+                        <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4 text-indigo-600" />
+                          1. Resumen Corto y Claro del Análisis
+                        </span>
+                        <p className="text-sm font-medium text-slate-900 leading-relaxed">
+                          {report.shortExecutiveSummary}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 3 Tarjetas de Números Clave al lado */}
+                    <div className="lg:col-span-5 grid grid-cols-3 gap-2.5">
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col justify-center">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase">
+                          Reportó Jornada
+                        </span>
+                        <span className="text-xl font-black text-slate-900 font-mono mt-1">
+                          {report.reportedHours}h
+                        </span>
+                        <span className="text-[10px] text-slate-500 mt-0.5">
+                          En tareas: {report.declaredTaskHours}h
+                        </span>
+                      </div>
+
+                      <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3 flex flex-col justify-center">
+                        <span className="text-[10px] font-bold text-indigo-800 uppercase">
+                          Debió Tomar (IA)
+                        </span>
+                        <span className="text-xl font-black text-indigo-950 font-mono mt-1">
+                          ~{report.estimatedRealHours}h
+                        </span>
+                        <span className="text-[10px] text-indigo-700 mt-0.5">
+                          Tiempo real justo
+                        </span>
+                      </div>
+
+                      <div
+                        className={`rounded-xl p-3 border flex flex-col justify-center ${
+                          report.inflatedOrMissingHours > 0
+                            ? 'bg-rose-50 border-rose-200'
+                            : 'bg-emerald-50 border-emerald-200'
                         }`}
                       >
-                        3. Tiempo Inflado / Sin Respaldo Real
-                      </span>
-                      <div className="flex items-baseline gap-2 mt-1">
                         <span
-                          className={`text-xl font-black font-mono ${
-                            report.suspectedOverchargedHours > 0 ? 'text-rose-700' : 'text-emerald-700'
+                          className={`text-[10px] font-bold uppercase ${
+                            report.inflatedOrMissingHours > 0 ? 'text-rose-800' : 'text-emerald-800'
                           }`}
                         >
-                          {report.suspectedOverchargedHours}h sin sustento
+                          Sin Sustento
                         </span>
-                        {report.suspectedOverchargedCost > 0 && (
-                          <span className="text-xs font-extrabold text-rose-800">
-                            (${report.suspectedOverchargedCost.toFixed(2)})
-                          </span>
-                        )}
+                        <span
+                          className={`text-xl font-black font-mono mt-1 ${
+                            report.inflatedOrMissingHours > 0 ? 'text-rose-700' : 'text-emerald-700'
+                          }`}
+                        >
+                          {report.inflatedOrMissingHours}h
+                        </span>
+                        <span
+                          className={`text-[10px] font-semibold mt-0.5 ${
+                            report.inflatedOrMissingHours > 0 ? 'text-rose-700' : 'text-emerald-700'
+                          }`}
+                        >
+                          {report.inflatedOrMissingHours > 0 ? 'Falta justificar' : 'Todo cuadrado'}
+                        </span>
                       </div>
-                      <p
-                        className={`text-[11px] mt-1 font-medium ${
-                          report.suspectedOverchargedHours > 0 ? 'text-rose-800' : 'text-emerald-800'
-                        }`}
+                    </div>
+                  </div>
+
+                  {/* ── PASO 2: PREGUNTAS QUE DEBES HACERLE AL COLABORADOR (DESTACADAS Y CLARAS) ── */}
+                  <div className="bg-gradient-to-r from-amber-50/90 to-orange-50/50 border border-amber-300/90 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center font-black text-xs">
+                          ?
+                        </span>
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-extrabold text-slate-900">
+                            2. Preguntas Directas para Hacerle a {collab.userName}
+                          </h4>
+                          <p className="text-[11px] text-slate-600">
+                            Úsalas en tu reunión o envíaselas por mensaje para que justifique sus tiempos y entregables.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const text = report.questionsToAsk
+                            .map((q, i) => `${i + 1}. ${q}`)
+                            .join('\n\n');
+                          navigator.clipboard.writeText(text);
+                          toast.success('Preguntas copiadas al portapapeles');
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
                       >
-                        {report.suspectedOverchargedHours > 0
-                          ? `Cobró ${report.totalReportedWorkdayHours}h pero el trabajo real equivale a ~${report.totalEstimatedRealHours}h.`
-                          : 'El tiempo cobrado concuerda con la complejidad de las tareas.'}
-                      </p>
+                        <Copy className="w-3.5 h-3.5" />
+                        Copiar todas las preguntas
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2">
+                      {report.questionsToAsk.map((q, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-white border border-amber-200/90 rounded-xl p-3 flex items-start justify-between gap-3 shadow-2xs"
+                        >
+                          <div className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-800 font-medium leading-relaxed">
+                            <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 font-black text-xs flex items-center justify-center shrink-0 mt-0.5">
+                              {idx + 1}
+                            </span>
+                            <span>“{q}”</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(q);
+                              toast.success(`Pregunta #${idx + 1} copiada`);
+                            }}
+                            className="text-[11px] font-bold text-slate-400 hover:text-slate-800 shrink-0 px-2 py-1 rounded hover:bg-slate-100 cursor-pointer"
+                            title="Copiar esta pregunta"
+                          >
+                            Copiar
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  {/* SECCIÓN A: DETECTOR DE TAREAS REPETIDAS / MISMOS PROBLEMAS / RELLENO */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="border border-slate-200 rounded-xl p-4 space-y-2.5 bg-slate-50/40">
+                  {/* ── PASO 3: ¿ESTÁ REPORTANDO LO MISMO O TAREAS GENÉRICAS? ── */}
+                  <div className="border border-slate-200 rounded-2xl p-4 space-y-2.5 bg-slate-50/40">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                        <Repeat className="w-4 h-4 text-amber-600" />
-                        1. ¿Está reportando lo mismo o el mismo problema?
+                        <Repeat className="w-4 h-4 text-indigo-600" />
+                        3. ¿Está reportando siempre lo mismo o el mismo problema?
                       </h4>
-
-                      {report.repetitivePatterns.length === 0 ? (
-                        <p className="text-xs text-emerald-700 bg-emerald-50 p-3 rounded-lg border border-emerald-200 font-medium">
-                          ✓ No se detectaron tareas repetitivas ni reciclaje del mismo ticket en este período.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {report.repetitivePatterns.map((pat) => (
-                            <div
-                              key={pat.topic}
-                              className="bg-white border border-amber-200 rounded-xl p-3 space-y-1 shadow-2xs"
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-black text-amber-950">
-                                  🔁 Tema repetido: “{pat.topic}”
-                                </span>
-                                <span className="text-[10px] font-extrabold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">
-                                  {pat.count} veces en el período
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-slate-600 font-mono bg-slate-50 px-2 py-1 rounded border border-slate-100">
-                                {pat.details}
-                              </p>
-                              <p className="text-xs text-slate-800 font-medium leading-snug">
-                                💡 <strong>Análisis IA:</strong> {pat.diagnosis}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <span className="text-xs font-semibold text-slate-600">
+                        {report.repetitionSummary}
+                      </span>
                     </div>
 
-                    {/* RESÚMENES DE JORNADA EVASIVOS O COPIADOS */}
-                    <div className="border border-slate-200 rounded-xl p-4 space-y-2.5 bg-slate-50/40">
-                      <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                        <FileWarning className="w-4 h-4 text-rose-600" />
-                        2. Auditoría de lo que escribe en “Mi Jornada”
-                      </h4>
-
-                      {report.fillerOrVagueSummaries.length === 0 ? (
-                        <p className="text-xs text-emerald-700 bg-emerald-50 p-3 rounded-lg border border-emerald-200 font-medium">
-                          ✓ Los resúmenes escritos en Mi Jornada describen actividades concretas.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {report.fillerOrVagueSummaries.map((fv, i) => (
-                            <div
-                              key={`${fv.dateStr}-${i}`}
-                              className="bg-white border border-rose-200 rounded-xl p-3 space-y-1 shadow-2xs"
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-slate-900">
-                                  📅 Jornada {fv.dateStr} ({fv.reportedHours}h cobradas)
-                                </span>
-                                <span className="text-[10px] font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">
-                                  Texto Evasivo / Genérico
-                                </span>
-                              </div>
-                              <p className="text-xs italic text-slate-700 bg-slate-50 px-2.5 py-1 rounded border border-slate-200">
-                                “{fv.text}”
-                              </p>
-                              <p className="text-[11px] text-rose-800 font-semibold">
-                                ⚠️ {fv.issue}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    {report.repetitionBullets.length === 0 ? (
+                      <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-3 text-xs font-medium flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        No se encontraron tareas repetidas ni reciclaje del mismo problema en este período.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {report.repetitionBullets.map((bullet, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-white border border-slate-200 rounded-xl p-3 text-xs text-slate-800 flex items-start gap-2 shadow-2xs"
+                          >
+                            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                            <span className="leading-snug">{bullet}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {/* SECCIÓN B: EVALUACIÓN TAREA POR TAREA (¿DEBIÓ TOMAR MENOS TIEMPO?) */}
+                  {/* ── PASO 4: TABLA SIMPLE TAREA POR TAREA (¿DEBIÓ TOMAR MENOS TIEMPO?) ── */}
                   <div className="space-y-2">
                     <h4 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                       <SearchCheck className="w-4 h-4 text-indigo-600" />
-                      3. Evaluación de Tiempos por Tarea: ¿Debió tomar menos tiempo o es relleno?
+                      4. Tiempos por Tarea: ¿Cuánto reportó vs. cuánto debió tomar realmente?
                     </h4>
 
-                    {report.taskDiagnoses.length === 0 ? (
-                      <div className="bg-rose-50/60 border border-rose-200 rounded-xl p-4 text-xs text-rose-900 font-medium">
-                        🚨 Este colaborador reportó <strong>{report.totalReportedWorkdayHours}h</strong> de jornada pero tiene <strong>0 tareas o tickets</strong> registrados en este período.
+                    {report.taskEvaluations.length === 0 ? (
+                      <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-xs text-rose-800 font-medium">
+                        No registró ninguna tarea o ticket para respaldar sus {report.reportedHours}h de jornada.
                       </div>
                     ) : (
                       <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -1041,46 +1068,42 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
                           <thead>
                             <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                               <th className="py-2.5 px-3">Tarea / Ticket</th>
-                              <th className="py-2.5 px-3 text-center">Fecha</th>
                               <th className="py-2.5 px-3 text-center">Reportó</th>
-                              <th className="py-2.5 px-3 text-center">Tiempo Ideal IA</th>
-                              <th className="py-2.5 px-3">Dictamen IA</th>
-                              <th className="py-2.5 px-3">Explicación Objetiva</th>
+                              <th className="py-2.5 px-3 text-center">Debió Tomar (IA)</th>
+                              <th className="py-2.5 px-3 text-center">Estado</th>
+                              <th className="py-2.5 px-3">Observación Corta</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 text-xs">
-                            {report.taskDiagnoses.map((td) => (
-                              <tr key={td.uid} className="hover:bg-slate-50/70">
+                            {report.taskEvaluations.map((item, i) => (
+                              <tr key={i} className="hover:bg-slate-50/80">
                                 <td className="py-2.5 px-3 font-bold text-slate-900">
-                                  <div>{td.title}</div>
-                                  <span className="text-[10px] font-semibold text-slate-500">
-                                    📁 {td.projectOrClient}
+                                  <div>{item.title}</div>
+                                  <span className="text-[10px] text-slate-500 font-medium">
+                                    📅 {item.dateStr} • 📁 {item.projectOrClient}
                                   </span>
                                 </td>
-                                <td className="py-2.5 px-3 text-center font-mono text-[11px] text-slate-600">
-                                  {td.dateStr}
-                                </td>
                                 <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
-                                  {td.reportedHours}h
+                                  {item.reportedHours}h
                                 </td>
                                 <td className="py-2.5 px-3 text-center font-mono font-extrabold text-indigo-700">
-                                  {td.estimatedIdealHours}h
+                                  {item.shouldTakeHours}h
                                 </td>
-                                <td className="py-2.5 px-3">
+                                <td className="py-2.5 px-3 text-center">
                                   <span
-                                    className={`inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
-                                      td.verdict === 'inflated_or_filler'
+                                    className={`inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                                      item.status === 'danger'
                                         ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                        : td.verdict === 'questionable'
+                                        : item.status === 'warning'
                                         ? 'bg-amber-50 text-amber-800 border-amber-200'
                                         : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                     }`}
                                   >
-                                    {td.verdictLabel}
+                                    {item.statusLabel}
                                   </span>
                                 </td>
-                                <td className="py-2.5 px-3 text-[11px] text-slate-700 leading-snug max-w-md">
-                                  {td.reason}
+                                <td className="py-2.5 px-3 text-slate-700 text-xs">
+                                  {item.shortNote}
                                 </td>
                               </tr>
                             ))}
@@ -1089,35 +1112,6 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
                       </div>
                     )}
                   </div>
-
-                  {/* SECCIÓN C: PREGUNTAS DIRECTAS SUGERIDAS POR LA IA PARA CONFRONTAR AL COLABORADOR */}
-                  {report.confrontationQuestions.length > 0 && (
-                    <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-extrabold uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
-                          <HelpCircle className="w-4 h-4 text-amber-700" />
-                          4. Preguntas Exactas Sugeridas por la IA para Confrontar a {report.userName}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(report.confrontationQuestions.join('\n\n'));
-                            toast.success('Preguntas de confrontación copiadas');
-                          }}
-                          className="text-[11px] font-bold text-amber-900 hover:underline flex items-center gap-1 cursor-pointer"
-                        >
-                          <Copy className="w-3 h-3" /> Copiar preguntas
-                        </button>
-                      </div>
-                      <div className="space-y-1.5 text-xs text-slate-800">
-                        {report.confrontationQuestions.map((q, idx) => (
-                          <p key={idx} className="bg-white/90 p-2.5 rounded-lg border border-amber-200/70 leading-relaxed">
-                            {q}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             );
