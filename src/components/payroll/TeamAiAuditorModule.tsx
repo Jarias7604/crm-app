@@ -1,9 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
   Sparkles,
-  ShieldAlert,
-  CheckCircle2,
-  AlertTriangle,
   Clock,
   Repeat,
   KeyRound,
@@ -15,7 +12,6 @@ import {
   SearchCheck,
   FileWarning,
   Bot,
-  Check,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -126,9 +122,8 @@ export default function TeamAiAuditorModule({
   }));
   const [showKeyConfig, setShowKeyConfig] = useState<boolean>(false);
   const [keyInput, setKeyInput] = useState<string>('');
-  const [runningLiveAi, setRunningLiveAi] = useState<boolean>(false);
-  const [liveAiOutput, setLiveAiOutput] = useState<Record<string, string>>({});
-  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
+  const [runningUserId, setRunningUserId] = useState<string | null>(null);
+  const [liveAiOutput, setLiveAiOutput] = useState<Record<string, { text: string; modelUsed: string }>>({});
 
   const activeCollaborators = useMemo(() => {
     const withData = collaborators.filter(
@@ -299,7 +294,7 @@ export default function TeamAiAuditorModule({
       // Calcular Score de Credibilidad (0 a 100)
       const baseCoverage =
         collab.totalTimesheetHours > 0
-          ? Math.min(100, ( totalEstimatedRealHours / collab.totalTimesheetHours) * 100)
+          ? Math.min(100, (totalEstimatedRealHours / collab.totalTimesheetHours) * 100)
           : collab.tasksCount > 0
           ? 75
           : 0;
@@ -401,7 +396,7 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
 4. 💬 GUIÓN DE CONFRONTACIÓN: Dame 3 preguntas directas y objetivas para confrontar a ${collab.userName} hoy mismo.`;
   };
 
-  // ── LLAMADA EN VIVO A LA API DE CLAUDE, CHATGPT O GEMINI SI EL USUARIO CONECTÓ SU KEY ──
+  // ── LLAMADA EN VIVO A LA API DE CLAUDE, CHATGPT O GEMINI CON AUTO-DETECCIÓN DE MODELOS ACTIVOS ──
   const handleRunLiveAi = async (collab: AuditorCollaboratorData) => {
     const key = apiKeys[activeProvider];
     if (!key) {
@@ -414,74 +409,174 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
     }
 
     const prompt = buildForensicPromptForCollaborator(collab);
-    setRunningLiveAi(true);
+    setRunningUserId(collab.userId);
     try {
       let responseText = '';
+      let modelUsed = '';
 
-      if (activeProvider === 'gemini') {
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(key)}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.2 },
-            }),
+      if (activeProvider === 'claude') {
+        const claudeHeaders = {
+          'Content-Type': 'application/json',
+          'x-api-key': key,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        };
+
+        // 1. Consultar dinámicamente qué modelos tiene activos la cuenta de Anthropic del usuario
+        let candidateModels: string[] = [];
+        try {
+          const modelsRes = await fetch('https://api.anthropic.com/v1/models', {
+            method: 'GET',
+            headers: claudeHeaders,
+          });
+          if (modelsRes.ok) {
+            const modelsJson = await modelsRes.json();
+            const fetchedIds: string[] = (modelsJson?.data || [])
+              .map((m: any) => m?.id)
+              .filter(Boolean);
+            // Priorizar Sonnet 4.x / 3.7 / Haiku activos en la cuenta
+            const sonnets = fetchedIds.filter((id) => id.includes('sonnet'));
+            const others = fetchedIds.filter((id) => !id.includes('sonnet'));
+            candidateModels = [...sonnets, ...others];
           }
-        );
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error?.message || 'Error en Gemini API');
-        responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta.';
+        } catch {
+          // Si falla el listado, usamos la lista de respaldo oficial
+        }
+
+        const fallbackClaudeModels = [
+          'claude-sonnet-4-5-20250929',
+          'claude-sonnet-4-20250514',
+          'claude-3-7-sonnet-20250219',
+          'claude-3-5-haiku-20241022',
+          'claude-3-haiku-20240307',
+        ];
+        fallbackClaudeModels.forEach((m) => {
+          if (!candidateModels.includes(m)) candidateModels.push(m);
+        });
+
+        let lastError = 'No se pudo completar la llamada a Claude API';
+        for (const modelId of candidateModels) {
+          const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: claudeHeaders,
+            body: JSON.stringify({
+              model: modelId,
+              max_tokens: 1600,
+              temperature: 0.2,
+              messages: [{ role: 'user', content: prompt }],
+            }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            responseText = data?.content?.[0]?.text || 'Sin respuesta.';
+            modelUsed = modelId;
+            break;
+          } else {
+            const errType = data?.error?.type || '';
+            const errMsg = data?.error?.message || '';
+            lastError = errMsg || `Error HTTP ${res.status}`;
+            // Si es un error de modelo no encontrado, probamos el siguiente modelo automáticamente
+            if (errType === 'not_found_error' || errMsg.toLowerCase().includes('model')) {
+              continue;
+            } else {
+              throw new Error(lastError);
+            }
+          }
+        }
+
+        if (!responseText) {
+          throw new Error(lastError);
+        }
+      } else if (activeProvider === 'gemini') {
+        const geminiCandidates = [
+          'gemini-2.5-flash',
+          'gemini-2.0-flash',
+          'gemini-1.5-flash-latest',
+          'gemini-1.5-pro-latest',
+        ];
+        let lastError = 'Error en Gemini API';
+
+        for (const modelId of geminiCandidates) {
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${encodeURIComponent(key)}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { temperature: 0.2 },
+              }),
+            }
+          );
+          const data = await res.json();
+          if (res.ok) {
+            responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta.';
+            modelUsed = modelId;
+            break;
+          } else {
+            lastError = data?.error?.message || `Error HTTP ${res.status}`;
+            if (res.status === 404 || lastError.toLowerCase().includes('not found')) {
+              continue;
+            } else {
+              throw new Error(lastError);
+            }
+          }
+        }
+
+        if (!responseText) {
+          throw new Error(lastError);
+        }
       } else if (activeProvider === 'chatgpt') {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${key}`,
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            temperature: 0.2,
-            messages: [
-              { role: 'system', content: 'Eres un auditor forense ejecutivo de productividad y nómina.' },
-              { role: 'user', content: prompt },
-            ],
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error?.message || 'Error en OpenAI API');
-        responseText = data?.choices?.[0]?.message?.content || 'Sin respuesta.';
-      } else if (activeProvider === 'claude') {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': key,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model: 'claude-3-5-sonnet-latest',
-            max_tokens: 1500,
-            temperature: 0.2,
-            messages: [{ role: 'user', content: prompt }],
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error?.message || 'Error en Claude API');
-        responseText = data?.content?.[0]?.text || 'Sin respuesta.';
+        const openAiCandidates = ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'];
+        let lastError = 'Error en OpenAI API';
+
+        for (const modelId of openAiCandidates) {
+          const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${key}`,
+            },
+            body: JSON.stringify({
+              model: modelId,
+              temperature: 0.2,
+              messages: [
+                { role: 'system', content: 'Eres un auditor forense ejecutivo de productividad y nómina.' },
+                { role: 'user', content: prompt },
+              ],
+            }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            responseText = data?.choices?.[0]?.message?.content || 'Sin respuesta.';
+            modelUsed = modelId;
+            break;
+          } else {
+            lastError = data?.error?.message || `Error HTTP ${res.status}`;
+            if (lastError.toLowerCase().includes('model') || res.status === 404) {
+              continue;
+            } else {
+              throw new Error(lastError);
+            }
+          }
+        }
+
+        if (!responseText) {
+          throw new Error(lastError);
+        }
       }
 
       setLiveAiOutput((prev) => ({
         ...prev,
-        [collab.userId]: responseText,
+        [collab.userId]: { text: responseText, modelUsed },
       }));
-      toast.success(`Auditoría completada con ${activeProvider.toUpperCase()}`);
+      toast.success(`Auditoría completada con ${activeProvider.toUpperCase()} (${modelUsed})`);
     } catch (err: any) {
-      toast.error(`Error al conectar con ${activeProvider.toUpperCase()}: ${err.message}`);
+      toast.error(`Error al conectar con ${activeProvider.toUpperCase()}: ${err.message}`, {
+        duration: 6000,
+      });
     } finally {
-      setRunningLiveAi(false);
+      setRunningUserId(null);
     }
   };
 
@@ -490,8 +585,6 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
     const prompt = buildForensicPromptForCollaborator(collab);
     try {
       await navigator.clipboard.writeText(prompt);
-      setCopiedUserId(collab.userId);
-      setTimeout(() => setCopiedUserId(null), 3500);
     } catch {
       // fallback
     }
@@ -654,6 +747,7 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
             const collab = activeCollaborators.find((c) => c.userId === report.userId)!;
             const isHighRisk = report.riskLevel.startsWith('ALTO');
             const isMedRisk = report.riskLevel.startsWith('RIESGO MEDIO');
+            const isRunningThisUser = runningUserId === report.userId;
 
             return (
               <div
@@ -703,16 +797,18 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      disabled={runningLiveAi}
+                      disabled={isRunningThisUser}
                       onClick={() => handleRunLiveAi(collab)}
                       className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
                     >
-                      {runningLiveAi ? (
+                      {isRunningThisUser ? (
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       ) : (
                         <Zap className="w-3.5 h-3.5" />
                       )}
-                      Analizar con {activeProvider === 'claude' ? 'Claude' : activeProvider === 'chatgpt' ? 'ChatGPT' : 'Gemini'} (API)
+                      {isRunningThisUser
+                        ? 'Analizando con IA...'
+                        : `Analizar con ${activeProvider === 'claude' ? 'Claude' : activeProvider === 'chatgpt' ? 'ChatGPT' : 'Gemini'} (API)`}
                     </button>
 
                     <button
@@ -752,15 +848,15 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
                   {/* RESPUESTA EN VIVO DEL MODELO EXTERNO SI SE EJECUTÓ CON API KEY */}
                   {liveAiOutput[report.userId] && (
                     <div className="bg-indigo-950 text-indigo-50 rounded-2xl p-4 border border-indigo-700 space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <span className="text-xs font-extrabold uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
                           <Sparkles className="w-4 h-4 text-indigo-400" />
-                          Dictamen en Vivo de {activeProvider.toUpperCase()}
+                          Dictamen en Vivo de {activeProvider.toUpperCase()} ({liveAiOutput[report.userId].modelUsed})
                         </span>
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText(liveAiOutput[report.userId]);
+                            navigator.clipboard.writeText(liveAiOutput[report.userId].text);
                             toast.success('Dictamen copiado al portapapeles');
                           }}
                           className="text-[11px] font-bold text-indigo-300 hover:text-white flex items-center gap-1 cursor-pointer"
@@ -769,7 +865,7 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
                         </button>
                       </div>
                       <div className="text-xs leading-relaxed whitespace-pre-wrap font-sans text-slate-100 bg-slate-900/90 p-3.5 rounded-xl border border-slate-800">
-                        {liveAiOutput[report.userId]}
+                        {liveAiOutput[report.userId].text}
                       </div>
                     </div>
                   )}
@@ -1031,4 +1127,3 @@ POR FAVOR RESPONDE DE FORMA EJECUTIVA Y CLARA ESTOS 4 PUNTOS:
     </div>
   );
 }
-
