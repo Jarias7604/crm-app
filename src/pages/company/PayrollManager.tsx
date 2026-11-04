@@ -23,13 +23,14 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { numberToWordsSpanish } from '../../utils/numberToWords';
+import TeamAiAuditorModule from '../../components/payroll/TeamAiAuditorModule';
 
 export default function PayrollManager() {
   const { profile, simulatedCompanyId } = useAuth();
   const activeCompanyId = simulatedCompanyId || profile?.company_id;
 
   // Active Main View Tab
-  const [activeTab, setActiveTab] = useState<'payroll' | 'approvals' | 'tasks_kpi' | 'settings'>('payroll');
+  const [activeTab, setActiveTab] = useState<'payroll' | 'approvals' | 'tasks_kpi' | 'ai_auditor' | 'settings'>('payroll');
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -949,6 +950,19 @@ export default function PayrollManager() {
                   </span>
                 )}
               </div>
+              <div className="mt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedUserIds([conf.userId]);
+                    setActiveTab('ai_auditor');
+                  }}
+                  className="text-[11px] font-extrabold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 px-2.5 py-0.5 rounded-full shadow-2xs inline-flex items-center gap-1 cursor-pointer transition"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  Analizar Tareas y Tiempos con IA (Claude / ChatGPT / Gemini) →
+                </button>
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">
                 Auditoría de horas reportadas en jornada vs. tiempo real demostrado en tareas terminadas.
               </p>
@@ -1508,6 +1522,18 @@ export default function PayrollManager() {
                 {completedTasksAnalytics.totalCompleted}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('ai_auditor')}
+            className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
+              activeTab === 'ai_auditor'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm font-bold'
+                : 'text-indigo-700 hover:text-indigo-900 bg-indigo-50/70'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            AI Auditor
           </button>
 
           <button
@@ -2726,6 +2752,18 @@ export default function PayrollManager() {
             </>
           )}
         </div>
+      )}
+
+      {/* ── 6C. MINI-MÓDULO DE AUDITORÍA CON IA (CLAUDE, CHATGPT, GEMINI) ── */}
+      {activeTab === 'ai_auditor' && (
+        <TeamAiAuditorModule
+          collaborators={completedTasksAnalytics.confrontationCards}
+          periodLabel={periodLabel}
+          startDate={startDate}
+          endDate={endDate}
+          selectedUserIds={selectedUserIds}
+          onSelectUserIds={setSelectedUserIds}
+        />
       )}
 
       {/* ── 7. COMPROBANTE OFICIAL DE PAGO (FORMATO CORPORATIVO INSTITUCIONAL / ADP / SAP) ── */}
