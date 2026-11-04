@@ -109,8 +109,14 @@ export default function PayrollManager() {
   const [companyTickets, setCompanyTickets] = useState<any[]>([]);
   const [companyTasks, setCompanyTasks] = useState<any[]>([]);
   const [companyProjectsMap, setCompanyProjectsMap] = useState<Record<string, string>>({});
-  const [kpiEmployeeFilter, setKpiEmployeeFilter] = useState<string>('ALL');
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [kpiSourceFilter, setKpiSourceFilter] = useState<'ALL' | 'ticket' | 'task' | 'timesheet'>('ALL');
+
+  const toggleSelectUser = (userId: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+    );
+  };
 
   useEffect(() => {
     if (activeCompanyId) {
@@ -480,16 +486,17 @@ export default function PayrollManager() {
     toast.success(`Bonos y comisiones actualizados para ${adjustingItem.user_name}.`);
   };
 
-  // Filtrado de Colaboradores
+  // Filtrado de Colaboradores (Sincronizado con búsqueda, país, horas y selección múltiple de usuarios)
   const filteredItems = useMemo(() => {
     return payrollSummary.items.filter(item => {
+      const matchUserSelect = selectedUserIds.length === 0 || selectedUserIds.includes(item.user_id);
       const matchSearch = item.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           item.user_email.toLowerCase().includes(searchTerm.toLowerCase());
       const matchCountry = countryFilter === 'ALL' || item.country === countryFilter;
       const matchHours = onlyWithHours ? (item.regular_hours > 0 || item.overtime_hours > 0) : true;
-      return matchSearch && matchCountry && matchHours;
+      return matchUserSelect && matchSearch && matchCountry && matchHours;
     });
-  }, [payrollSummary.items, searchTerm, countryFilter, onlyWithHours]);
+  }, [payrollSummary.items, selectedUserIds, searchTerm, countryFilter, onlyWithHours]);
 
   // Totales reactivos y exactos calculados directamente sobre la lista mostrada en pantalla
   const totals = useMemo(() => {
@@ -546,29 +553,68 @@ export default function PayrollManager() {
     return 'custom';
   }, [startDate, endDate]);
 
-  // ── MOTOR DE REPORTE Y MINI KPI DASHBOARD DE TAREAS TERMINADAS Y TIEMPOS ──
+  // ── MOTOR DE REPORTE, FILTRADO ESTRICTO (FECHAS + USUARIOS) Y CONFRONTACIÓN NÓMINA VS. TAREAS ──
   const completedTasksAnalytics = useMemo(() => {
-    const profileMap = new Map<string, { name: string; email: string }>();
+    const toLocalDateStr = (iso?: string | null): string => {
+      if (!iso) return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return iso.split('T')[0] || '';
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    // Extrae tiempo explícito si el usuario lo escribió en el título (ej: "1h reunion...", "reunion argoz: 1h", "30 min...")
+    const extractExplicitHours = (title?: string | null, desc?: string | null): number | null => {
+      const text = `${title || ''} ${desc || ''}`;
+      const hrMatch = text.match(/(?:^|\s|:|\()(\d+(?:[.,]\d+)?)\s*(?:h|hr|hrs|hora|horas)(?:\b|$)/i);
+      if (hrMatch) {
+        const val = parseFloat(hrMatch[1].replace(',', '.'));
+        if (!isNaN(val) && val > 0 && val <= 24) return +val.toFixed(2);
+      }
+      const minMatch = text.match(/(?:^|\s|:|\()(\d+)\s*(?:min|mins|minutos)(?:\b|$)/i);
+      if (minMatch) {
+        const mins = parseInt(minMatch[1], 10);
+        if (!isNaN(mins) && mins > 0 && mins <= 720) return +(mins / 60).toFixed(2);
+      }
+      return null;
+    };
+
+    const profileMap = new Map<string, { id: string; name: string; email: string }>();
     teamProfiles.forEach((p) => {
-      profileMap.set(p.id, { name: p.full_name || p.email || 'Colaborador', email: p.email || '' });
+      profileMap.set(p.id, { id: p.id, name: p.full_name || p.email || 'Colaborador', email: p.email || '' });
     });
 
-    // Mapear horas registradas en timesheets por tarea/ticket ID
-    const timesheetTaskHours = new Map<string, { hours: number; userId: string; userName: string; date: string; projectNames: string[] }>();
+    // Resolver usuario por nombre en el título si el ticket no tenía assigned_to directo
+    const resolveUserFromTitle = (title?: string | null): { id: string; name: string } | null => {
+      if (!title) return null;
+      const lower = title.toLowerCase();
+      for (const p of teamProfiles) {
+        const firstName = (p.full_name || '').split(' ')[0]?.toLowerCase();
+        if (firstName && firstName.length >= 3 && lower.includes(firstName)) {
+          return { id: p.id, name: p.full_name || p.email };
+        }
+      }
+      return null;
+    };
+
+    // Mapear únicamente las tareas vinculadas en jornadas DENTRO del rango de fechas [startDate, endDate]
+    const timesheetTaskMap = new Map<string, { explicitHours: number | null; userId: string; userName: string; date: string; projectNames: string[] }>();
     periodTimesheets.forEach((ts) => {
+      if (ts.work_date < startDate || ts.work_date > endDate) return;
       const linked = ts.linked_tasks || [];
-      const totalDayHrs = Number(ts.regular_hours || 0) + Number(ts.overtime_hours || 0);
-      const defaultShare = linked.length > 0 ? +(totalDayHrs / linked.length).toFixed(2) : totalDayHrs;
       const pNames = (ts.project_ids || (ts.project_id ? [ts.project_id] : []))
         .map((pid) => companyProjectsMap[pid])
         .filter(Boolean);
 
       linked.forEach((lt) => {
         if (!lt.id) return;
-        const prev = timesheetTaskHours.get(lt.id);
-        const addHrs = lt.hours !== undefined && lt.hours > 0 ? Number(lt.hours) : defaultShare;
-        timesheetTaskHours.set(lt.id, {
-          hours: +((prev?.hours || 0) + addHrs).toFixed(2),
+        const prev = timesheetTaskMap.get(lt.id);
+        const explicitHrs = lt.hours !== undefined && lt.hours > 0 ? Number(lt.hours) : null;
+        timesheetTaskMap.set(lt.id, {
+          explicitHours: explicitHrs !== null ? +((prev?.explicitHours || 0) + explicitHrs).toFixed(2) : (prev?.explicitHours ?? null),
           userId: ts.user_id,
           userName: ts.user_name || profileMap.get(ts.user_id)?.name || 'Colaborador',
           date: ts.work_date,
@@ -593,31 +639,38 @@ export default function PayrollManager() {
       userName: string;
       statusLabel: string;
       dateStr: string;
-      hoursTaken: number;
+      hoursTaken: number | null; // null si es parte general de la jornada sin tiempo individual separado
       timeBadge: string;
     };
 
     const items: UnifiedTaskReportItem[] = [];
     const seenIds = new Set<string>();
 
-    // 1. Tickets cerrados / resueltos o trabajados en el período
+    // 1. Tickets de Soporte estrictamente dentro de [startDate, endDate]
     companyTickets.forEach((t) => {
-      const isCompleted = t.status === 'resolved' || t.status === 'closed';
-      const tsLog = timesheetTaskHours.get(t.id);
-      if (!isCompleted && !tsLog) return;
+      const tsLog = timesheetTaskMap.get(t.id);
+      const createdDate = toLocalDateStr(t.created_at);
+      const resolvedDate = toLocalDateStr(t.resolved_at);
 
-      const dateRaw = tsLog?.date || (t.resolved_at || t.updated_at || t.created_at || '').split('T')[0];
-      const assignedProfile = t.assigned_to ? profileMap.get(t.assigned_to) : undefined;
-      const userId = tsLog?.userId || t.assigned_to || 'unassigned';
-      const userName = tsLog?.userName || assignedProfile?.name || 'Equipo de Soporte';
-
-      let hoursTaken = tsLog?.hours || Number(t.actual_hours || t.estimated_hours || 0);
-      if (!hoursTaken && t.created_at && (t.resolved_at || t.updated_at)) {
-        const diffMs = new Date(t.resolved_at || t.updated_at).getTime() - new Date(t.created_at).getTime();
-        const diffHrs = Math.max(0.25, +(diffMs / (1000 * 60 * 60)).toFixed(1));
-        hoursTaken = diffHrs <= 24 ? diffHrs : 1.5;
+      // Fecha real del ticket: priorizar fecha de jornada vinculada o fecha de creación real
+      let effectiveDate = tsLog?.date || createdDate;
+      if (effectiveDate < startDate || effectiveDate > endDate) {
+        if (resolvedDate && resolvedDate >= startDate && resolvedDate <= endDate) {
+          effectiveDate = resolvedDate;
+        } else {
+          return; // ESTRICTO: Excluir cualquier ticket fuera del rango de fechas seleccionado
+        }
       }
-      if (!hoursTaken) hoursTaken = 1.0;
+
+      const assignedProfile = (t.assigned_to && profileMap.get(t.assigned_to)) || (t.created_by && profileMap.get(t.created_by));
+      const nameMatched = !assignedProfile ? resolveUserFromTitle(t.title) : null;
+      const userId = tsLog?.userId || assignedProfile?.id || nameMatched?.id || t.assigned_to || t.created_by || '';
+      const userName = tsLog?.userName || assignedProfile?.name || nameMatched?.name || 'Sin asignar';
+
+      // Determinar tiempo objetivo (SOLO horas reales especificadas, sin inventar horas falsas)
+      const dbHours = Number(t.actual_hours || 0) > 0 ? Number(t.actual_hours) : null;
+      const parsedTitleHours = extractExplicitHours(t.title, t.description);
+      const realHours = tsLog?.explicitHours ?? dbHours ?? parsedTitleHours ?? null;
 
       seenIds.add(t.id);
       items.push({
@@ -625,30 +678,35 @@ export default function PayrollManager() {
         id: t.id,
         title: t.title || 'Ticket de Soporte',
         source: 'ticket',
-        sourceLabel: '🎫 Ticket Soporte',
+        sourceLabel: '🎫 Ticket',
         projectOrClient: t.lead_name || tsLog?.projectNames?.[0] || 'Soporte General',
         userId,
         userName,
-        statusLabel: t.status === 'closed' ? 'Cerrado' : t.status === 'resolved' ? 'Resuelto' : 'Trabajado en Jornada',
-        dateStr: dateRaw || endDate,
-        hoursTaken: +hoursTaken.toFixed(2),
-        timeBadge: `${+hoursTaken.toFixed(2)} hrs`,
+        statusLabel: t.status === 'closed' ? 'Cerrado' : t.status === 'resolved' ? 'Resuelto' : 'Abierto / En Jornada',
+        dateStr: effectiveDate,
+        hoursTaken: realHours !== null ? +realHours.toFixed(2) : null,
+        timeBadge: realHours !== null ? `${+realHours.toFixed(2)} hrs` : 'En jornada del día',
       });
     });
 
-    // 2. Tareas de Proyectos (crm_tasks) completadas o trabajadas en el período
+    // 2. Tareas de Proyectos (crm_tasks) estrictamente dentro de [startDate, endDate]
     companyTasks.forEach((ct) => {
-      const isCompleted = ct.status === 'completed';
-      const tsLog = timesheetTaskHours.get(ct.id);
-      if (!isCompleted && !tsLog) return;
+      const tsLog = timesheetTaskMap.get(ct.id);
+      const createdDate = toLocalDateStr(ct.created_at);
+      const completedDate = toLocalDateStr(ct.completed_at);
 
-      const dateRaw = tsLog?.date || (ct.completed_at || ct.updated_at || ct.created_at || '').split('T')[0];
+      let effectiveDate = tsLog?.date || completedDate || createdDate;
+      if (!effectiveDate || effectiveDate < startDate || effectiveDate > endDate) {
+        return; // ESTRICTO: Excluir tareas fuera del rango de fechas
+      }
+
       const assignedProfile = ct.assigned_to ? profileMap.get(ct.assigned_to) : undefined;
-      const userId = tsLog?.userId || ct.assigned_to || 'unassigned';
-      const userName = tsLog?.userName || assignedProfile?.name || 'Colaborador';
+      const userId = tsLog?.userId || assignedProfile?.id || ct.assigned_to || '';
+      const userName = tsLog?.userName || assignedProfile?.name || 'Sin asignar';
 
-      let hoursTaken = tsLog?.hours || Number(ct.actual_hours || ct.estimated_hours || 0);
-      if (!hoursTaken) hoursTaken = 1.5;
+      const dbHours = Number(ct.actual_hours || 0) > 0 ? Number(ct.actual_hours) : null;
+      const parsedTitleHours = extractExplicitHours(ct.title, ct.description);
+      const realHours = tsLog?.explicitHours ?? dbHours ?? parsedTitleHours ?? null;
 
       seenIds.add(ct.id);
       items.push({
@@ -657,20 +715,20 @@ export default function PayrollManager() {
         title: ct.title || 'Tarea de Proyecto',
         source: 'task',
         sourceLabel: '📋 Tarea Proyecto',
-        projectOrClient: companyProjectsMap[ct.project_id] || tsLog?.projectNames?.[0] || 'Proyecto Interno',
+        projectOrClient: companyProjectsMap[ct.project_id] || tsLog?.projectNames?.[0] || 'Proyecto',
         userId,
         userName,
-        statusLabel: ct.status === 'completed' ? 'Terminada' : 'En Progreso (Jornada)',
-        dateStr: dateRaw || endDate,
-        hoursTaken: +hoursTaken.toFixed(2),
-        timeBadge: `${+hoursTaken.toFixed(2)} hrs`,
+        statusLabel: ct.status === 'completed' ? 'Terminada' : 'En Progreso',
+        dateStr: effectiveDate,
+        hoursTaken: realHours !== null ? +realHours.toFixed(2) : null,
+        timeBadge: realHours !== null ? `${+realHours.toFixed(2)} hrs` : 'En jornada del día',
       });
     });
 
-    // 3. Tareas múltiples y entregables registrados directamente en Mi Jornada (team_timesheets)
+    // 3. Tareas adicionales o resúmenes de Mi Jornada (team_timesheets) dentro de [startDate, endDate]
     periodTimesheets.forEach((ts) => {
+      if (ts.work_date < startDate || ts.work_date > endDate) return;
       const linked = ts.linked_tasks || [];
-      const totalDayHrs = Number(ts.regular_hours || 0) + Number(ts.overtime_hours || 0);
       const pNames = (ts.project_ids || (ts.project_id ? [ts.project_id] : []))
         .map((pid) => companyProjectsMap[pid])
         .filter(Boolean);
@@ -682,48 +740,30 @@ export default function PayrollManager() {
           ticketTitleMap.get(lt.id)?.title ||
           taskTitleMap.get(lt.id)?.title ||
           'Tarea registrada en jornada';
-        const hrs = lt.hours && lt.hours > 0 ? Number(lt.hours) : +(totalDayHrs / Math.max(1, linked.length)).toFixed(2);
+        const explicitHrs = lt.hours && lt.hours > 0 ? Number(lt.hours) : extractExplicitHours(resolvedTitle, null);
         items.push({
           uid: `ts-linked-${ts.id}-${lt.id}`,
           id: lt.id,
           title: resolvedTitle,
           source: lt.type === 'task' ? 'task' : 'ticket',
-          sourceLabel: lt.type === 'task' ? '📋 Tarea Jornada' : '🎫 Ticket Jornada',
+          sourceLabel: lt.type === 'task' ? '📋 Tarea' : '🎫 Ticket',
           projectOrClient: lt.project_name || pNames[0] || 'General',
           userId: ts.user_id,
           userName: ts.user_name || profileMap.get(ts.user_id)?.name || 'Colaborador',
           statusLabel: 'Reportada en Jornada',
           dateStr: ts.work_date,
-          hoursTaken: +hrs.toFixed(2),
-          timeBadge: `${+hrs.toFixed(2)} hrs`,
+          hoursTaken: explicitHrs !== null ? +explicitHrs.toFixed(2) : null,
+          timeBadge: explicitHrs !== null ? `${+explicitHrs.toFixed(2)} hrs` : 'En jornada del día',
         });
       });
-
-      // También incluir el entregable diario si no tenía tareas vinculadas o como registro de actividad
-      if (linked.length === 0 && ts.work_summary) {
-        items.push({
-          uid: `ts-summary-${ts.id}`,
-          id: ts.id,
-          title: ts.work_summary,
-          source: 'timesheet',
-          sourceLabel: '⏱️ Entregable Jornada',
-          projectOrClient: pNames.join(', ') || 'Trabajo General',
-          userId: ts.user_id,
-          userName: ts.user_name || profileMap.get(ts.user_id)?.name || 'Colaborador',
-          statusLabel: ts.status === 'approved' ? 'Jornada Aprobada' : 'Jornada Enviada',
-          dateStr: ts.work_date,
-          hoursTaken: +totalDayHrs.toFixed(2),
-          timeBadge: `${+totalDayHrs.toFixed(2)} hrs`,
-        });
-      }
     });
 
     // Ordenar por fecha más reciente
     items.sort((a, b) => (b.dateStr || '').localeCompare(a.dateStr || ''));
 
-    // Filtrar según selectores de búsqueda, empleado y fuente
+    // Filtrar por usuarios seleccionados, tipo y búsqueda
     const filtered = items.filter((item) => {
-      if (kpiEmployeeFilter !== 'ALL' && item.userId !== kpiEmployeeFilter) return false;
+      if (selectedUserIds.length > 0 && !selectedUserIds.includes(item.userId)) return false;
       if (kpiSourceFilter !== 'ALL' && item.source !== kpiSourceFilter) return false;
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
@@ -735,44 +775,82 @@ export default function PayrollManager() {
       return true;
     });
 
-    const totalCompleted = filtered.length;
-    const totalHoursInvested = +filtered.reduce((acc, it) => acc + it.hoursTaken, 0).toFixed(1);
-    const avgHoursPerTask = totalCompleted > 0 ? +(totalHoursInvested / totalCompleted).toFixed(1) : 0;
+    // Construir Confrontación Nómina vs. Tareas por Colaborador para el rango [startDate, endDate]
+    const targetUsers = selectedUserIds.length > 0
+      ? teamProfiles.filter((tp) => selectedUserIds.includes(tp.id))
+      : teamProfiles;
 
-    // Agrupar KPIs por colaborador
-    const byUserMap = new Map<string, { userId: string; userName: string; count: number; totalHours: number; projects: Set<string> }>();
-    filtered.forEach((it) => {
-      const curr = byUserMap.get(it.userId) || {
-        userId: it.userId,
-        userName: it.userName,
-        count: 0,
-        totalHours: 0,
-        projects: new Set<string>(),
+    const confrontationCards = targetUsers.map((tp) => {
+      const payItem = payrollSummary.items.find((pi) => pi.user_id === tp.id);
+      const userTimesheets = periodTimesheets.filter(
+        (ts) => ts.user_id === tp.id && ts.work_date >= startDate && ts.work_date <= endDate
+      );
+      const userTasks = items.filter((it) => it.userId === tp.id);
+
+      const regHrs = +userTimesheets.reduce((s, t) => s + Number(t.regular_hours || 0), 0).toFixed(1);
+      const otHrs = +userTimesheets.reduce((s, t) => s + Number(t.overtime_hours || 0), 0).toFixed(1);
+      const totalTimesheetHours = +(regHrs + otHrs).toFixed(1);
+
+      const explicitTaskHoursSum = +userTasks
+        .reduce((s, it) => s + (it.hoursTaken !== null ? it.hoursTaken : 0), 0)
+        .toFixed(2);
+
+      const effectiveHoursInvested = totalTimesheetHours > 0 ? totalTimesheetHours : explicitTaskHoursSum;
+
+      return {
+        userId: tp.id,
+        userName: tp.full_name || tp.email || 'Colaborador',
+        userEmail: tp.email || '',
+        netPay: payItem?.net_pay || 0,
+        grossPay: payItem?.gross_pay || 0,
+        deductions: payItem ? +(payItem.isss + payItem.afp + payItem.renta + payItem.other_deductions).toFixed(2) : 0,
+        regularPay: payItem?.regular_pay || 0,
+        overtimePay: payItem?.overtime_pay || 0,
+        effectiveHourlyRate: payItem?.effective_hourly_rate || 0,
+        regHrs,
+        otHrs,
+        totalTimesheetHours,
+        explicitTaskHoursSum,
+        effectiveHoursInvested,
+        tasksCount: userTasks.length,
+        timesheets: userTimesheets,
+        tasks: userTasks,
       };
-      curr.count += 1;
-      curr.totalHours = +(curr.totalHours + it.hoursTaken).toFixed(2);
-      if (it.projectOrClient) curr.projects.add(it.projectOrClient);
-      byUserMap.set(it.userId, curr);
     });
 
-    const collaboratorKpis = Array.from(byUserMap.values()).sort((a, b) => b.count - a.count);
+    // Colaboradores que tienen actividad (horas o tareas) en el rango de fechas seleccionado
+    const activeCollaboratorsInPeriod = confrontationCards.filter(
+      (c) => c.tasksCount > 0 || c.totalTimesheetHours > 0 || c.grossPay > 0
+    );
+
+    const displayedConfrontations = selectedUserIds.length > 0
+      ? confrontationCards
+      : activeCollaboratorsInPeriod;
+
+    const totalCompleted = filtered.length;
+    const totalHoursInvested = +displayedConfrontations
+      .reduce((acc, c) => acc + c.effectiveHoursInvested, 0)
+      .toFixed(1);
+    const avgHoursPerTask = totalCompleted > 0 ? +(totalHoursInvested / totalCompleted).toFixed(1) : 0;
 
     return {
       items: filtered,
+      allPeriodItemsCount: items.length,
       totalCompleted,
       totalHoursInvested,
       avgHoursPerTask,
-      activeCollaborators: collaboratorKpis.length,
-      collaboratorKpis,
+      activeCollaborators: displayedConfrontations.filter((c) => c.tasksCount > 0 || c.totalTimesheetHours > 0).length,
+      confrontationCards,
+      displayedConfrontations,
     };
-  }, [teamProfiles, periodTimesheets, companyTickets, companyTasks, companyProjectsMap, kpiEmployeeFilter, kpiSourceFilter, searchTerm, endDate]);
+  }, [teamProfiles, periodTimesheets, companyTickets, companyTasks, companyProjectsMap, payrollSummary.items, selectedUserIds, kpiSourceFilter, searchTerm, startDate, endDate]);
 
   const handleExportTasksKpiCSV = () => {
     if (completedTasksAnalytics.items.length === 0) {
-      toast.error('No hay tareas para exportar');
+      toast.error('No hay tareas para exportar en este filtro');
       return;
     }
-    const headers = ['Fecha', 'Colaborador', 'Tipo', 'Tarea / Ticket / Entregable', 'Proyecto / Cliente', 'Estado', 'Tiempo Invertido (Horas)'];
+    const headers = ['Fecha', 'Colaborador', 'Tipo', 'Tarea / Ticket', 'Proyecto / Cliente', 'Estado', 'Tiempo Específico (Horas)'];
     const rows = completedTasksAnalytics.items.map((it) => [
       it.dateStr,
       `"${it.userName.replace(/"/g, '""')}"`,
@@ -780,17 +858,17 @@ export default function PayrollManager() {
       `"${it.title.replace(/"/g, '""')}"`,
       `"${it.projectOrClient.replace(/"/g, '""')}"`,
       `"${it.statusLabel}"`,
-      it.hoursTaken.toFixed(2),
+      it.hoursTaken !== null ? it.hoursTaken.toFixed(2) : 'En jornada',
     ]);
     const csv = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `reporte_tareas_tiempos_kpi_${startDate}_a_${endDate}.csv`;
+    a.download = `confrontacion_tareas_nomina_${startDate}_a_${endDate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Reporte KPI de Tareas exportado en CSV');
+    toast.success('Reporte exportado en CSV');
   };
 
   return (
@@ -972,7 +1050,7 @@ export default function PayrollManager() {
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
             <input
               type="text"
-              placeholder="Buscar colaborador..."
+              placeholder="Buscar colaborador o tarea..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8 pr-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 w-48 sm:w-56"
@@ -989,6 +1067,66 @@ export default function PayrollManager() {
             <option value="US">🇺🇸 USA</option>
             <option value="OTHER">🌎 LATAM</option>
           </select>
+        </div>
+
+        {/* Filtro Rápido Multi-Colaborador (Selecciona 1 o varios para filtrar Nómina y Tareas) */}
+        <div className="w-full pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1 flex items-center gap-1">
+              <Users className="w-3.5 h-3.5 text-indigo-600" />
+              Colaboradores:
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedUserIds([])}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition cursor-pointer border ${
+                selectedUserIds.length === 0
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              Todos ({teamProfiles.length})
+            </button>
+            {teamProfiles.map((tp) => {
+              const isSel = selectedUserIds.includes(tp.id);
+              const conf = completedTasksAnalytics.confrontationCards.find((c) => c.userId === tp.id);
+              const hasActivity = (conf?.tasksCount || 0) > 0 || (conf?.totalTimesheetHours || 0) > 0;
+              return (
+                <button
+                  key={tp.id}
+                  type="button"
+                  onClick={() => toggleSelectUser(tp.id)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer border flex items-center gap-1.5 ${
+                    isSel
+                      ? 'bg-indigo-50 text-indigo-800 border-indigo-500 ring-1 ring-indigo-500/30 font-bold'
+                      : hasActivity
+                      ? 'bg-white text-slate-800 border-slate-300 hover:border-indigo-300'
+                      : 'bg-slate-50/70 text-slate-400 border-slate-200/70 hover:text-slate-700'
+                  }`}
+                  title="Haz clic para seleccionar uno o varios colaboradores"
+                >
+                  <span>{tp.full_name || tp.email}</span>
+                  {hasActivity && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                      isSel ? 'bg-indigo-600 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    }`}>
+                      {conf?.tasksCount || 0}t • {conf?.totalTimesheetHours || 0}h
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedUserIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedUserIds([])}
+              className="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2 py-1 rounded-lg transition cursor-pointer"
+            >
+              ✕ Limpiar ({selectedUserIds.length} seleccionados)
+            </button>
+          )}
         </div>
       </div>
 
@@ -1412,6 +1550,18 @@ export default function PayrollManager() {
                         <td className="py-2.5 px-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
+                              id={`btn-confront-${item.user_id}`}
+                              aria-label="Confrontar pago vs tareas de este colaborador"
+                              onClick={() => {
+                                setSelectedUserIds([item.user_id]);
+                                setActiveTab('tasks_kpi');
+                              }}
+                              className="p-1 text-indigo-600 hover:text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 rounded transition cursor-pointer"
+                              title="Confrontar Pago vs. Tareas realizadas y Tiempo"
+                            >
+                              <BarChart3 className="w-4 h-4" />
+                            </button>
+                            <button
                               id={`btn-days-${item.user_id}`}
                               aria-label="Ver y gestionar jornadas de este colaborador"
                               onClick={() => handleOpenMemberDays(item)}
@@ -1733,255 +1883,279 @@ export default function PayrollManager() {
         </div>
       )}
 
-      {/* ── 6B. REPORTE Y MINI KPI DASHBOARD DE TAREAS TERMINADAS Y TIEMPOS (ADMIN & SUPER ADMIN) ── */}
+      {/* ── 6B. CONFRONTACIÓN OBJETIVA: PAGO DE NÓMINA VS. TAREAS TERMINADAS Y TIEMPOS ── */}
       {activeTab === 'tasks_kpi' && (
         <div className="space-y-4 animate-fadeIn">
-          {/* Mini KPI Dashboard Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-white border border-indigo-200/90 rounded-2xl p-4 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">
-                  Tareas / Tickets Terminados
-                </span>
-                <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+          {/* Si no ha seleccionado ningún colaborador, mostrar invitación limpia sin ruido */}
+          {selectedUserIds.length === 0 ? (
+            <div className="bg-white border border-indigo-200/90 rounded-2xl p-8 text-center shadow-xs space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center mx-auto">
+                <BarChart3 className="w-6 h-6" />
               </div>
-              <p className="text-2xl font-black text-indigo-950 mt-1">
-                {completedTasksAnalytics.totalCompleted}
-              </p>
-              <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
-                Tickets resueltos, tareas de proyecto y entregables
-              </span>
-            </div>
-
-            <div className="bg-white border border-emerald-200/90 rounded-2xl p-4 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">
-                  Tiempo Total Invertido
-                </span>
-                <Clock className="w-4 h-4 text-emerald-600" />
-              </div>
-              <p className="text-2xl font-black text-emerald-800 mt-1">
-                {completedTasksAnalytics.totalHoursInvested} <span className="text-sm font-bold">hrs</span>
-              </p>
-              <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
-                Suma de horas reportadas y tiempos de resolución
-              </span>
-            </div>
-
-            <div className="bg-white border border-amber-200/90 rounded-2xl p-4 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
-                  Tiempo Promedio / Tarea
-                </span>
-                <Zap className="w-4 h-4 text-amber-600" />
-              </div>
-              <p className="text-2xl font-black text-amber-900 mt-1">
-                {completedTasksAnalytics.avgHoursPerTask} <span className="text-sm font-bold">hrs / tarea</span>
-              </p>
-              <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
-                Velocidad media de ejecución del equipo
-              </span>
-            </div>
-
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                  Colaboradores con Entregas
-                </span>
-                <Users className="w-4 h-4 text-slate-500" />
-              </div>
-              <p className="text-2xl font-black text-slate-900 mt-1">
-                {completedTasksAnalytics.activeCollaborators}
-              </p>
-              <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
-                Miembros activos con tareas concluidas
-              </span>
-            </div>
-          </div>
-
-          {/* Resumen de Productividad y Tiempos por Colaborador */}
-          {completedTasksAnalytics.collaboratorKpis.length > 0 && (
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Award className="w-4 h-4 text-indigo-600" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    Rendimiento y Tiempo Invertido por Colaborador
-                  </h3>
-                </div>
-                <span className="text-[11px] text-slate-500 font-medium">
-                  Haz clic en un colaborador para filtrar sus tareas
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                {completedTasksAnalytics.collaboratorKpis.map((col) => {
-                  const avg = col.count > 0 ? +(col.totalHours / col.count).toFixed(1) : 0;
-                  const isSelected = kpiEmployeeFilter === col.userId;
-                  return (
-                    <button
-                      key={col.userId}
-                      type="button"
-                      onClick={() => setKpiEmployeeFilter(isSelected ? 'ALL' : col.userId)}
-                      className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between gap-2 ${
-                        isSelected
-                          ? 'bg-indigo-50/80 border-indigo-500 ring-2 ring-indigo-500/15'
-                          : 'bg-slate-50/60 hover:bg-slate-100/70 border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-bold text-xs text-slate-900 truncate">
-                          {col.userName}
-                        </span>
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 shrink-0">
-                          {col.count} {col.count === 1 ? 'tarea' : 'tareas'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-600 border-t border-slate-200/70 pt-1.5">
-                        <span>⏱️ Total: <strong className="text-slate-900">{col.totalHours}h</strong></span>
-                        <span>Prom: <strong className="text-emerald-700">{avg}h/tarea</strong></span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Tabla Detallada de Todas las Tareas Terminadas y el Tiempo que Tomó Cada Una */}
-          <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-indigo-600" />
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Control de Tareas Terminadas y Tiempo por Tarea
-                </h2>
-                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                  {completedTasksAnalytics.items.length} registros
-                </span>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Filtro por Tipo de Fuente */}
-                <div className="inline-flex bg-slate-200/70 p-0.5 rounded-lg text-[11px] font-semibold">
-                  {[
-                    { id: 'ALL', label: 'Todas' },
-                    { id: 'ticket', label: '🎫 Tickets' },
-                    { id: 'task', label: '📋 Tareas Proyecto' },
-                    { id: 'timesheet', label: '⏱️ Jornadas' },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setKpiSourceFilter(tab.id as any)}
-                      className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
-                        kpiSourceFilter === tab.id
-                          ? 'bg-white text-indigo-700 font-bold shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Filtro por Colaborador */}
-                <select
-                  value={kpiEmployeeFilter}
-                  onChange={(e) => setKpiEmployeeFilter(e.target.value)}
-                  className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none"
-                >
-                  <option value="ALL">Todos los colaboradores</option>
-                  {teamProfiles.map((tp) => (
-                    <option key={tp.id} value={tp.id}>
-                      {tp.full_name || tp.email}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Exportar CSV */}
-                <button
-                  type="button"
-                  onClick={handleExportTasksKpiCSV}
-                  className="px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5 text-slate-500" />
-                  Exportar CSV
-                </button>
-              </div>
-            </div>
-
-            {completedTasksAnalytics.items.length === 0 ? (
-              <div className="p-10 text-center space-y-2">
-                <CheckCircle2 className="w-8 h-8 text-slate-300 mx-auto" />
-                <p className="text-sm font-bold text-slate-700">No se encontraron tareas con este filtro</p>
-                <p className="text-xs text-slate-400">
-                  Las tareas completadas, tickets cerrados/resueltos y múltiples tareas vinculadas en Mi Jornada aparecerán aquí con su tiempo exacto.
+              <div className="max-w-lg mx-auto space-y-1.5">
+                <h3 className="text-base font-bold text-slate-900">
+                  Selecciona uno o más colaboradores para confrontar su Nómina vs. Tareas
+                </h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Para mostrarte información limpia, exacta y sin ruido del período <strong>{periodLabel}</strong>, haz clic arriba en el colaborador (o varios colaboradores) que deseas evaluar.
                 </p>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-200/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50/30">
-                      <th className="py-2.5 px-4">Tarea / Ticket / Entregable</th>
-                      <th className="py-2.5 px-3">Proyecto / Cliente</th>
-                      <th className="py-2.5 px-3">Colaborador</th>
-                      <th className="py-2.5 px-3 text-center">Tipo</th>
-                      <th className="py-2.5 px-3 text-center">Estado</th>
-                      <th className="py-2.5 px-3 text-center">Fecha</th>
-                      <th className="py-2.5 px-4 text-right">Tiempo que Tomó</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs">
-                    {completedTasksAnalytics.items.map((row) => (
-                      <tr key={row.uid} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-2.5 px-4 max-w-md">
-                          <p className="font-bold text-slate-900 leading-snug whitespace-normal break-words">
-                            {row.title}
-                          </p>
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                            📁 {row.projectOrClient}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 font-bold text-slate-800">
-                          {row.userName}
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                            row.source === 'ticket'
-                              ? 'bg-blue-50 text-blue-700 border-blue-200'
-                              : row.source === 'task'
-                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                              : 'bg-slate-100 text-slate-700 border-slate-200'
-                          }`}>
-                            {row.sourceLabel}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <Check className="w-3 h-3" />
-                            {row.statusLabel}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center text-slate-500 font-mono text-[11px]">
-                          {row.dateStr}
-                        </td>
-                        <td className="py-2.5 px-4 text-right">
-                          <span className="inline-flex items-center gap-1 font-mono font-extrabold text-xs px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200">
-                            <Clock className="w-3 h-3 text-indigo-600" />
-                            {row.timeBadge}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+              {/* Botones rápidos de colaboradores con actividad en las fechas seleccionadas */}
+              <div className="flex items-center justify-center gap-2 flex-wrap pt-2">
+                {completedTasksAnalytics.confrontationCards
+                  .filter((c) => c.tasksCount > 0 || c.totalTimesheetHours > 0 || c.grossPay > 0)
+                  .map((c) => (
+                    <button
+                      key={c.userId}
+                      type="button"
+                      onClick={() => setSelectedUserIds([c.userId])}
+                      className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 text-xs font-bold transition cursor-pointer flex items-center gap-2 shadow-2xs"
+                    >
+                      <span>👤 Ver a {c.userName}</span>
+                      <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-indigo-200 text-indigo-700">
+                        {c.tasksCount} tareas • ${c.netPay.toFixed(2)} neto
+                      </span>
+                    </button>
+                  ))}
+
+                {completedTasksAnalytics.confrontationCards.some((c) => c.tasksCount > 0 || c.totalTimesheetHours > 0) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedUserIds(
+                        completedTasksAnalytics.confrontationCards
+                          .filter((c) => c.tasksCount > 0 || c.totalTimesheetHours > 0 || c.grossPay > 0)
+                          .map((c) => c.userId)
+                      )
+                    }
+                    className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer shadow-2xs"
+                  >
+                    👥 Ver todos los que registraron actividad en esta fecha
+                  </button>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <>
+              {/* Tarjetas de Confrontación Directa por cada Colaborador Seleccionado */}
+              <div className="space-y-4">
+                {completedTasksAnalytics.displayedConfrontations.map((conf) => (
+                  <div
+                    key={conf.userId}
+                    className="bg-white border border-slate-200/90 rounded-2xl shadow-xs overflow-hidden"
+                  >
+                    {/* Encabezado del Colaborador + Resumen Ejecutivo Pago vs. Productividad */}
+                    <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-50 via-white to-indigo-50/30 border-b border-slate-200/80 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white font-black text-base flex items-center justify-center shrink-0 shadow-xs">
+                          {conf.userName.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="text-base font-extrabold text-slate-900">
+                              {conf.userName}
+                            </h3>
+                            <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                              📅 {periodLabel}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            Confrontación directa entre pago de planilla, horas de jornada y tareas realizadas en las fechas seleccionadas.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Los 3 Pilares Objetivos para Confrontar: ¿Cuánto le pagamos? vs ¿Cuántas horas reportó? vs ¿Qué tareas completó? */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 lg:min-w-[540px]">
+                        {/* 1. Lo que se le paga */}
+                        <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3">
+                          <span className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider block">
+                            💵 1. Pago Neto en Período
+                          </span>
+                          <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className="text-xl font-black text-emerald-700 font-mono">
+                              ${conf.netPay.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-semibold">
+                              (Bruto: ${conf.grossPay.toFixed(2)})
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-emerald-800 font-medium block mt-0.5">
+                            {conf.deductions > 0 ? `Retención: -$${conf.deductions.toFixed(2)}` : 'Sin retenciones'}
+                          </span>
+                        </div>
+
+                        {/* 2. Horas de Jornada vs Horas en Tareas */}
+                        <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3">
+                          <span className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider block">
+                            ⏱️ 2. Tiempo Trabajado
+                          </span>
+                          <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className="text-xl font-black text-indigo-900 font-mono">
+                              {conf.totalTimesheetHours}h
+                            </span>
+                            <span className="text-[10px] text-indigo-700 font-bold">
+                              en jornada ({conf.regHrs}h reg {conf.otHrs > 0 ? `+ ${conf.otHrs}h ext` : ''})
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-indigo-800 font-medium block mt-0.5">
+                            {conf.explicitTaskHoursSum > 0
+                              ? `${conf.explicitTaskHoursSum}h detalladas en tareas individuales`
+                              : 'Tareas incluidas dentro de la jornada'}
+                          </span>
+                        </div>
+
+                        {/* 3. Total Tareas / Entregables */}
+                        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3">
+                          <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block">
+                            ✅ 3. Tareas del Período
+                          </span>
+                          <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className="text-xl font-black text-amber-950 font-mono">
+                              {conf.tasksCount}
+                            </span>
+                            <span className="text-xs font-bold text-amber-800">
+                              {conf.tasksCount === 1 ? 'tarea / ticket' : 'tareas / tickets'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-amber-800 font-medium block mt-0.5">
+                            {conf.timesheets.length} {conf.timesheets.length === 1 ? 'día de jornada reportado' : 'días de jornada reportados'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cuerpo de la Tarjeta: 1) Resumen de Jornada reportada ese día y 2) Lista exacta de Tareas realizadas */}
+                    <div className="p-4 sm:p-5 space-y-4">
+                      {/* Jornadas reportadas en Mi Jornada para esas fechas */}
+                      {conf.timesheets.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                            Reporte de Jornada del Colaborador ({conf.timesheets.length})
+                          </h4>
+                          <div className="grid grid-cols-1 gap-2">
+                            {conf.timesheets.map((ts) => (
+                              <div
+                                key={ts.id}
+                                className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                              >
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-bold text-slate-900">
+                                      📅 {ts.work_date}
+                                    </span>
+                                    <span className="font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+                                      {ts.regular_hours}h regulares
+                                    </span>
+                                    {ts.overtime_hours > 0 && (
+                                      <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                        +{ts.overtime_hours}h extras {ts.overtime_start_time && ts.overtime_end_time ? `(${ts.overtime_start_time} a ${ts.overtime_end_time})` : ''}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-slate-700 leading-relaxed">
+                                    <strong>Entregable reportado:</strong> {ts.work_summary}
+                                  </p>
+                                  {ts.overtime_hours > 0 && ts.overtime_reason && (
+                                    <p className="text-[11px] text-amber-900 italic">
+                                      <strong>Motivo horas extras:</strong> {ts.overtime_reason}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tabla limpia y objetiva de Tareas / Tickets de este Colaborador en estas fechas */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Tareas y Tickets Realizados por {conf.userName} ({conf.tasks.length})
+                          </h4>
+                          {conf.tasks.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleExportTasksKpiCSV}
+                              className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
+                            >
+                              <Download className="w-3 h-3" />
+                              Exportar CSV
+                            </button>
+                          )}
+                        </div>
+
+                        {conf.tasks.length === 0 ? (
+                          <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-6 text-center text-xs text-slate-500">
+                            No hay tickets o tareas individuales registradas para <strong>{conf.userName}</strong> entre el <strong>{startDate}</strong> y el <strong>{endDate}</strong>.
+                          </div>
+                        ) : (
+                          <div className="border border-slate-200 rounded-xl overflow-hidden">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                  <th className="py-2 px-3">Tarea / Ticket Realizado</th>
+                                  <th className="py-2 px-3">Proyecto / Cliente</th>
+                                  <th className="py-2 px-3 text-center">Tipo</th>
+                                  <th className="py-2 px-3 text-center">Estado</th>
+                                  <th className="py-2 px-3 text-center">Fecha</th>
+                                  <th className="py-2 px-3 text-right">Tiempo que le Tomó</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-xs">
+                                {conf.tasks.map((row) => (
+                                  <tr key={row.uid} className="hover:bg-slate-50/80">
+                                    <td className="py-2.5 px-3 font-bold text-slate-900">
+                                      {row.title}
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                        📁 {row.projectOrClient}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-3 text-center">
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                        {row.sourceLabel}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-3 text-center">
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                        <Check className="w-3 h-3" />
+                                        {row.statusLabel}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-3 text-center font-mono text-[11px] text-slate-600">
+                                      {row.dateStr}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right">
+                                      {row.hoursTaken !== null ? (
+                                        <span className="inline-flex items-center gap-1 font-mono font-extrabold text-xs px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-800 border border-indigo-200">
+                                          <Clock className="w-3 h-3 text-indigo-600" />
+                                          {row.timeBadge}
+                                        </span>
+                                      ) : (
+                                        <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                                          📌 En jornada del día
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
