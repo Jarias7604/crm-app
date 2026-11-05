@@ -504,6 +504,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             icon: Headset,
             current: location.pathname.startsWith('/support'),
             subItems: [
+                { name: 'Chat Soporte (WhatsApp)', href: '/support/chat', icon: MessageSquare },
                 { name: t('sidebar.tickets'), href: '/support/tickets', icon: TicketIcon },
                 { name: 'Inteligencia & QA (IA)', href: '/support/intelligence', icon: Brain },
                 { name: t('sidebar.overdue'), href: '/support/atrasados', icon: AlertTriangle },

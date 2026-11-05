@@ -234,8 +234,178 @@ serve(async (req: Request) => {
     const url = new URL(req.url);
     const companyIdParam = url.searchParams.get('company_id');
 
+    // ─── OUTBOUND REPLY FROM CRM SUPPORT CHAT ("Circles / Live Chat") ─────────
+    if (payload?.action === 'send_reply') {
+      const {
+        ticket_id,
+        company_id,
+        author_id,
+        author_name,
+        message_text,
+        response_minutes,
+        custom_evolution_url,
+        custom_evolution_key,
+        custom_evolution_instance,
+      } = payload;
+
+      if (!ticket_id || !message_text?.trim()) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Missing ticket_id or message_text' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: ticketRow } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('id', ticket_id)
+        .maybeSingle();
+
+      if (!ticketRow) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Ticket not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const nowTimeStr = new Date().toLocaleTimeString('es-SV', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'America/El_Salvador',
+      });
+      const techLabel = `👨‍💻 ${author_name || 'Soporte CRM'}`;
+      const formattedLine = `[${nowTimeStr}] ${techLabel}: ${message_text.trim()}`;
+
+      // 1. Insert into ticket_comments
+      const { data: createdComment } = await supabase
+        .from('ticket_comments')
+        .insert({
+          ticket_id,
+          company_id: company_id || ticketRow.company_id,
+          author_id: author_id || null,
+          body: formattedLine,
+          is_internal: false,
+        })
+        .select('*')
+        .single();
+
+      // 2. Append to ticket description + track staff text reply metrics
+      const meta = ticketRow.metadata || {};
+      const prevDesc = ticketRow.description || '';
+      const updatedDescription = prevDesc.includes('💬 Historial de WhatsApp:')
+        ? `${prevDesc}\n${formattedLine}`
+        : `${prevDesc}\n\n💬 Historial de WhatsApp:\n${formattedLine}`;
+
+      const prevReplies = Number(meta.staff_text_reply_count || 0) + 1;
+      const prevReplyMins = Number(meta.text_reply_minutes || 0) + (Number(response_minutes) || 2);
+
+      // Try to find Evolution API server_url & apikey from ticket metadata, recent tickets, or env
+      let evoUrl =
+        custom_evolution_url ||
+        meta.evolution_server_url ||
+        Deno.env.get('EVOLUTION_API_URL') ||
+        '';
+      let evoKey =
+        custom_evolution_key ||
+        meta.evolution_apikey ||
+        Deno.env.get('EVOLUTION_API_KEY') ||
+        '';
+      let evoInstance =
+        custom_evolution_instance ||
+        meta.evolution_instance ||
+        Deno.env.get('EVOLUTION_INSTANCE') ||
+        'arias';
+
+      if (!evoUrl || !evoKey) {
+        const { data: recentWithCreds } = await supabase
+          .from('tickets')
+          .select('metadata')
+          .eq('company_id', ticketRow.company_id)
+          .not('metadata->evolution_server_url', 'is', null)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (recentWithCreds?.metadata) {
+          evoUrl = evoUrl || recentWithCreds.metadata.evolution_server_url || '';
+          evoKey = evoKey || recentWithCreds.metadata.evolution_apikey || '';
+          evoInstance = evoInstance || recentWithCreds.metadata.evolution_instance || 'arias';
+        }
+      }
+
+      const targetNumberOrJid = meta.whatsapp_jid || meta.whatsapp_phone || '';
+      let whatsappDelivered = false;
+      let whatsappDeliveryNote = '';
+
+      if (evoUrl && evoKey && targetNumberOrJid) {
+        try {
+          const cleanBaseUrl = evoUrl.replace(/\/+$/, '');
+          const sendEndpoint = `${cleanBaseUrl}/message/sendText/${encodeURIComponent(evoInstance)}`;
+          const evoRes = await fetch(sendEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: evoKey,
+            },
+            body: JSON.stringify({
+              number: targetNumberOrJid,
+              text: message_text.trim(),
+            }),
+          });
+          if (evoRes.ok) {
+            whatsappDelivered = true;
+          } else {
+            whatsappDeliveryNote = `Evolution HTTP ${evoRes.status}`;
+          }
+        } catch (e: any) {
+          whatsappDeliveryNote = e?.message || 'Evolution connection error';
+        }
+      }
+
+      const updatedMeta = {
+        ...meta,
+        whatsapp_message_count: Number(meta.whatsapp_message_count || 1) + 1,
+        last_whatsapp_message: message_text.trim().slice(0, 200),
+        last_whatsapp_at: new Date().toISOString(),
+        last_staff_reply_at: new Date().toISOString(),
+        last_staff_reply_by: author_name || 'Soporte',
+        staff_text_reply_count: prevReplies,
+        text_reply_minutes: prevReplyMins,
+        ...(custom_evolution_url ? { evolution_server_url: custom_evolution_url } : {}),
+        ...(custom_evolution_key ? { evolution_apikey: custom_evolution_key } : {}),
+        ...(custom_evolution_instance ? { evolution_instance: custom_evolution_instance } : {}),
+      };
+
+      const updateTicketPayload: Record<string, any> = {
+        description: updatedDescription,
+        updated_at: new Date().toISOString(),
+        metadata: updatedMeta,
+      };
+      if (author_id && !ticketRow.assigned_to) {
+        updateTicketPayload.assigned_to = author_id;
+      }
+
+      await supabase.from('tickets').update(updateTicketPayload).eq('id', ticket_id);
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          action: 'reply_logged',
+          whatsapp_delivered: whatsappDelivered,
+          whatsapp_note: whatsappDeliveryNote,
+          comment: createdComment,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const eventType = String(payload?.event || payload?.type || 'messages.upsert').toLowerCase();
-    const instanceName = payload?.instance || payload?.instanceName || 'soporte';
+    const instanceName = payload?.instance || payload?.instanceName || 'arias';
+    const incomingEvoServerUrl = payload?.server_url || payload?.serverUrl || '';
+    const incomingEvoApiKey =
+      payload?.apikey ||
+      req.headers.get('apikey') ||
+      req.headers.get('x-evolution-apikey') ||
+      '';
 
     const rawData = payload?.data || payload;
     const msgEntry = Array.isArray(rawData)
@@ -447,6 +617,9 @@ serve(async (req: Request) => {
           whatsapp_message_count: msgCount,
           last_whatsapp_message: messageText.slice(0, 200),
           last_whatsapp_at: new Date().toISOString(),
+          ...(incomingEvoServerUrl ? { evolution_server_url: incomingEvoServerUrl } : {}),
+          ...(incomingEvoApiKey ? { evolution_apikey: incomingEvoApiKey } : {}),
+          evolution_instance: instanceName || currentMeta.evolution_instance || 'arias',
           ai_category: shouldUpgradeProblemTitle
             ? classification.category
             : currentMeta.ai_category || classification.category,
@@ -553,6 +726,8 @@ serve(async (req: Request) => {
           source: 'whatsapp_evolution',
           support_phone: '50379718911',
           evolution_instance: instanceName,
+          ...(incomingEvoServerUrl ? { evolution_server_url: incomingEvoServerUrl } : {}),
+          ...(incomingEvoApiKey ? { evolution_apikey: incomingEvoApiKey } : {}),
           whatsapp_jid: remoteJid,
           whatsapp_phone: cleanPhone,
           whatsapp_push_name: pushName,
