@@ -213,7 +213,66 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get('CRM_SUPABASE_URL') || Deno.env.get('SUPABASE_URL') || '';
+  const supabaseServiceKey =
+    Deno.env.get('CRM_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const url = new URL(req.url);
+
   if (req.method === 'GET') {
+    const getAction = url.searchParams.get('action');
+
+    // Zero-restart local bridge for Gerson's localhost:8085 Evolution API (no YML edit, no Docker restart)
+    if (getAction === 'bridge_sh') {
+      const { data: recentTickets } = await supabase
+        .from('tickets')
+        .select('id, metadata')
+        .not('metadata->pending_whatsapp_outbox', 'is', null)
+        .order('updated_at', { ascending: false })
+        .limit(15);
+
+      const shellLines: string[] = [];
+      for (const row of recentTickets || []) {
+        const m = row.metadata || {};
+        const queue: any[] = Array.isArray(m.pending_whatsapp_outbox) ? m.pending_whatsapp_outbox : [];
+        const pendingItems = queue.filter((item) => item && item.status === 'pending');
+        if (pendingItems.length === 0) continue;
+
+        const updatedQueue = queue.map((item) =>
+          item && item.status === 'pending'
+            ? { ...item, status: 'dispatched', dispatched_at: new Date().toISOString() }
+            : item
+        );
+
+        await supabase
+          .from('tickets')
+          .update({
+            metadata: {
+              ...m,
+              pending_whatsapp_outbox: updatedQueue.slice(-10),
+            },
+          })
+          .eq('id', row.id);
+
+        for (const item of pendingItems) {
+          const payloadJson = JSON.stringify({
+            number: item.number,
+            text: item.text,
+          });
+          const b64Payload = btoa(unescape(encodeURIComponent(payloadJson)));
+          const inst = (item.instance || 'soporte').replace(/[^a-zA-Z0-9_-]/g, '');
+          const key = (item.apikey || '10C73BF4-D3D9-4CDB-9855-85E346468546').replace(/[^a-zA-Z0-9_-]/g, '');
+          shellLines.push(
+            `echo "${b64Payload}" | base64 -d | curl -s -X POST "http://localhost:8085/message/sendText/${inst}" -H "Content-Type: application/json" -H "apikey: ${key}" -d @- >/dev/null 2>&1`
+          );
+        }
+      }
+
+      return new Response(shellLines.length > 0 ? shellLines.join('\n') + '\n' : '# idle\n', {
+        headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,
@@ -225,13 +284,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('CRM_SUPABASE_URL') || Deno.env.get('SUPABASE_URL') || '';
-    const supabaseServiceKey =
-      Deno.env.get('CRM_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     const payload = await req.json();
-    const url = new URL(req.url);
     const companyIdParam = url.searchParams.get('company_id');
 
     // ─── OUTBOUND REPLY FROM CRM SUPPORT CHAT ("Circles / Live Chat") ─────────
@@ -369,6 +422,26 @@ serve(async (req: Request) => {
         whatsappDeliveryNote = 'LOCALHOST_URL';
       }
 
+      const prevOutbox: any[] = Array.isArray(meta.pending_whatsapp_outbox)
+        ? meta.pending_whatsapp_outbox
+        : [];
+      const outboxItemId = crypto.randomUUID();
+      const updatedOutbox =
+        !whatsappDelivered && targetNumberOrJid
+          ? [
+              ...prevOutbox.slice(-9),
+              {
+                id: outboxItemId,
+                status: 'pending',
+                number: targetNumberOrJid,
+                text: message_text.trim(),
+                instance: evoInstance || 'soporte',
+                apikey: evoKey || '10C73BF4-D3D9-4CDB-9855-85E346468546',
+                created_at: new Date().toISOString(),
+              },
+            ]
+          : prevOutbox;
+
       const updatedMeta = {
         ...meta,
         whatsapp_message_count: Number(meta.whatsapp_message_count || 1) + 1,
@@ -378,6 +451,7 @@ serve(async (req: Request) => {
         last_staff_reply_by: author_name || 'Soporte',
         staff_text_reply_count: prevReplies,
         text_reply_minutes: prevReplyMins,
+        pending_whatsapp_outbox: updatedOutbox,
         ...(custom_evolution_url ? { evolution_server_url: custom_evolution_url, evolution_public_url: custom_evolution_url } : {}),
         ...(custom_evolution_key ? { evolution_apikey: custom_evolution_key } : {}),
         ...(custom_evolution_instance ? { evolution_instance: custom_evolution_instance } : {}),
@@ -393,6 +467,22 @@ serve(async (req: Request) => {
       }
 
       await supabase.from('tickets').update(updateTicketPayload).eq('id', ticket_id);
+
+      // Wait briefly (2.2s) in case Gerson's zero-restart local bridge is running and picks it up immediately
+      if (!whatsappDelivered && targetNumberOrJid) {
+        await new Promise((r) => setTimeout(r, 2200));
+        const { data: checkRow } = await supabase
+          .from('tickets')
+          .select('metadata')
+          .eq('id', ticket_id)
+          .maybeSingle();
+        const checkOutbox: any[] = checkRow?.metadata?.pending_whatsapp_outbox || [];
+        const matched = checkOutbox.find((i) => i && i.id === outboxItemId);
+        if (matched && matched.status === 'dispatched') {
+          whatsappDelivered = true;
+          whatsappDeliveryNote = 'DELIVERED_VIA_LOCAL_BRIDGE';
+        }
+      }
 
       return new Response(
         JSON.stringify({
