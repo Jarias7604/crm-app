@@ -57,6 +57,7 @@ const Teams             = lazy(() => import('./pages/company/Teams'));
 const TeamPerformance   = lazy(() => import('./pages/company/TeamPerformance'));
 const Tickets           = lazy(() => import('./pages/support/Tickets'));
 const OverdueTickets    = lazy(() => import('./pages/support/OverdueTickets'));
+const SupportIntelligence = lazy(() => import('./pages/support/SupportIntelligence'));
 const Clientes          = lazy(() => import('./pages/clientes/Clientes'));
 const ClientPortal      = lazy(() => import('./pages/clientes/ClientPortal'));
 const ProjectManagement = lazy(() => import('./pages/ProjectManagement'));
@@ -321,6 +322,7 @@ function App() {
                   {/* Support Routes */}
                   <Route element={<FeatureProtectedRoute feature="tickets" />}>
                     <Route path="/support/tickets" element={<Tickets />} />
+                    <Route path="/support/intelligence" element={<SupportIntelligence />} />
                     <Route path="/support/atrasados" element={<OverdueTickets />} />
                   </Route>
                   <Route path="/onboarding" element={<OnboardingWizard />} />

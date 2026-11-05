@@ -803,6 +803,15 @@ Estructura tu respuesta en 4 secciones cortas:
             })}
           </div>
 
+          <a
+            href="/support/intelligence"
+            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+            title="Abrir Inteligencia de Tickets, Errores Repetitivos y WhatsApp (+503 7971-8911)"
+          >
+            <Repeat className="w-3.5 h-3.5" />
+            Inteligencia de Tickets & Fallas (IA)
+          </a>
+
           <button
             type="button"
             onClick={() => {

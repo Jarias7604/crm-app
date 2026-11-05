@@ -109,6 +109,172 @@ async function processLeadAd(entry: any, companyId: string, platform: 'facebook'
     }
 }
 
+// ─── SUPPORT WHATSAPP AUTO-TICKET ENGINE (50379718911 & Evolution API `arias`) ─
+function classifySupportIssue(text: string): {
+    category: string;
+    isSupportIssue: boolean;
+    priority: 'low' | 'medium' | 'high' | 'urgent';
+} {
+    const lower = (text || '').toLowerCase();
+    const urgentKeywords = ['urgente', 'caido', 'caído', 'no funciona nada', 'bloqueado', 'no podemos facturar', 'produccion', 'producción', 'error critico', 'error crítico'];
+    const supportKeywords = [
+        'error', 'problema', 'falla', 'fallando', 'no deja', 'no puedo', 'no carga',
+        'no sale', 'no aparece', 'ayuda', 'soporte', 'bug', 'lento', 'traba',
+        'factura', 'dte', 'hacienda', 'invalidacion', 'invalidación', 'correo',
+        'whatsapp', 'mensaje', 'reporte', 'planilla', 'calculo', 'cálculo',
+        'permiso', 'acceso', 'contraseña', 'login', 'sincroniza', 'base de datos',
+        'cobro', 'pago', 'impresora', 'ticket', 'pendiente', 'arreglar', 'revisar'
+    ];
+    const isUrgent = urgentKeywords.some((k) => lower.includes(k));
+    const isSupportIssue = isUrgent || supportKeywords.some((k) => lower.includes(k)) || lower.length >= 12;
+
+    let category = 'Soporte General / Consulta';
+    if (/dte|hacienda|factura|invalidaci|credito fiscal|crédito fiscal|fe\b|contingencia/i.test(lower)) {
+        category = 'Facturación Electrónica / DTE / Hacienda';
+    } else if (/whatsapp|mensaje|cola|api|envio|envío|notificaci/i.test(lower)) {
+        category = 'WhatsApp / Mensajería / API';
+    } else if (/login|acceso|usuario|permiso|contrase|rol|sesion|sesión/i.test(lower)) {
+        category = 'Accesos / Usuarios / Permisos';
+    } else if (/reporte|excel|pdf|descarga|filtro|estadistica|dashboard/i.test(lower)) {
+        category = 'Reportes / Exportación / Datos';
+    } else if (/calculo|cálculo|monto|iva|total|descuento|planilla|pago|cobro/i.test(lower)) {
+        category = 'Cálculos / Finanzas / Pagos';
+    } else if (/lento|carga|caido|caído|servidor|base de datos|sql|sincroni/i.test(lower)) {
+        category = 'Infraestructura / Base de Datos / Lentitud';
+    }
+
+    return {
+        category,
+        isSupportIssue,
+        priority: isUrgent ? 'urgent' : 'high',
+    };
+}
+
+async function processSupportWhatsAppMessage(params: {
+    companyId: string | null;
+    remoteJid: string;
+    cleanPhone: string;
+    pushName: string;
+    messageText: string;
+    fromMe: boolean;
+    isGroup: boolean;
+    instanceName: string;
+}) {
+    const { remoteJid, cleanPhone, pushName, messageText, fromMe, isGroup, instanceName } = params;
+    if (!messageText || messageText.trim().length < 2) return { ok: true, ignored: true };
+
+    let companyId = params.companyId;
+    if (!companyId) {
+        const { data: comp } = await supabase
+            .from('companies')
+            .select('id')
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .single();
+        companyId = comp?.id || null;
+    }
+    if (!companyId) return { ok: false, error: 'No companyId' };
+
+    let matchedLead: { id: string; name: string; phone: string | null } | null = null;
+    if (cleanPhone && cleanPhone.length >= 7) {
+        const last8 = cleanPhone.slice(-8);
+        const { data: leadsByPhone } = await supabase
+            .from('leads')
+            .select('id, name, phone')
+            .eq('company_id', companyId)
+            .ilike('phone', `%${last8}%`)
+            .limit(1);
+        if (leadsByPhone && leadsByPhone.length > 0) matchedLead = leadsByPhone[0];
+    }
+
+    if (!matchedLead && pushName && pushName !== 'Cliente WhatsApp') {
+        const { data: leadsByName } = await supabase
+            .from('leads')
+            .select('id, name, phone')
+            .eq('company_id', companyId)
+            .ilike('name', `%${pushName.trim()}%`)
+            .limit(1);
+        if (leadsByName && leadsByName.length > 0) matchedLead = leadsByName[0];
+    }
+
+    const clientDisplayName = matchedLead?.name || pushName || `WhatsApp +${cleanPhone}`;
+    const classification = classifySupportIssue(messageText);
+
+    // Check if an open/pending ticket already exists for this client or WhatsApp JID
+    const { data: existingTickets } = await supabase
+        .from('tickets')
+        .select('id, title, status, metadata, lead_id')
+        .eq('company_id', companyId)
+        .in('status', ['new', 'open', 'pending'])
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+    const openForSameClient = (existingTickets || []).find((t: any) => {
+        const meta = t.metadata || {};
+        if (remoteJid && meta.whatsapp_jid === remoteJid) return true;
+        if (cleanPhone && meta.whatsapp_phone === cleanPhone) return true;
+        if (matchedLead?.id && t.lead_id === matchedLead.id) return true;
+        return false;
+    });
+
+    const isResolutionReply =
+        fromMe &&
+        /listo|resuelto|solucionado|arreglado|ya quedo|ya quedó|corregido|actualizado/i.test(messageText);
+
+    if (openForSameClient) {
+        await supabase.from('ticket_comments').insert({
+            ticket_id: openForSameClient.id,
+            company_id: companyId,
+            body: `[WhatsApp ${fromMe ? 'Equipo Soporte (50379718911)' : clientDisplayName}]: ${messageText}`,
+            is_internal: false,
+        });
+
+        if (isResolutionReply) {
+            await supabase
+                .from('tickets')
+                .update({
+                    status: 'resolved',
+                    resolved_at: new Date().toISOString(),
+                    last_status_change_at: new Date().toISOString(),
+                    solution: messageText,
+                })
+                .eq('id', openForSameClient.id);
+        }
+        return { ok: true, action: isResolutionReply ? 'ticket_resolved' : 'comment_added', ticket_id: openForSameClient.id };
+    }
+
+    if (!fromMe && classification.isSupportIssue) {
+        const shortTitle = messageText.length > 85 ? `${messageText.slice(0, 82).trim()}...` : messageText.trim();
+        const { data: createdTicket } = await supabase
+            .from('tickets')
+            .insert({
+                company_id: companyId,
+                lead_id: matchedLead?.id || null,
+                lead_name: clientDisplayName,
+                title: `[WhatsApp] ${clientDisplayName}: ${shortTitle}`,
+                description: messageText,
+                status: 'open',
+                priority: classification.priority,
+                metadata: {
+                    source: 'whatsapp_evolution',
+                    support_phone: '50379718911',
+                    evolution_instance: instanceName,
+                    whatsapp_jid: remoteJid,
+                    whatsapp_phone: cleanPhone,
+                    whatsapp_push_name: pushName,
+                    is_group: isGroup,
+                    ai_category: classification.category,
+                },
+            })
+            .select('id')
+            .single();
+
+        return { ok: true, action: 'ticket_created', ticket_id: createdTicket?.id };
+    }
+
+    return { ok: true, ignored: true };
+}
+
 // ─── MAIN HANDLER ─────────────────────────────────────────────────────────────
 serve(async (req) => {
     try {
@@ -130,6 +296,49 @@ serve(async (req) => {
         // ── POST: Incoming events ────────────────────────────────────────────
         if (req.method === 'POST') {
             const body = await req.json();
+
+            // A0. EVOLUTION API WEBHOOK (Instancia `arias` / Número 50379718911) ──
+            if (body.event || body.instance || body.instanceName || body.data?.key?.remoteJid) {
+                const eventType = String(body.event || body.type || 'messages.upsert').toLowerCase();
+                if (!eventType.includes('message')) {
+                    return new Response(JSON.stringify({ ok: true, ignored: true }), { status: 200 });
+                }
+                const evoData = body.data || body;
+                const key = evoData?.key || {};
+                const remoteJid = key?.remoteJid || evoData?.remoteJid || '';
+                const fromMe = Boolean(key?.fromMe ?? evoData?.fromMe ?? false);
+                const participant = key?.participant || evoData?.participant || '';
+                const pushName = evoData?.pushName || body?.sender || 'Cliente WhatsApp';
+                const msgObj = evoData?.message || {};
+                const messageText =
+                    msgObj?.conversation ||
+                    msgObj?.extendedTextMessage?.text ||
+                    msgObj?.imageMessage?.caption ||
+                    msgObj?.videoMessage?.caption ||
+                    msgObj?.documentMessage?.caption ||
+                    evoData?.body ||
+                    evoData?.text ||
+                    '';
+                const isGroup = remoteJid.endsWith('@g.us');
+                const cleanPhone = (isGroup ? participant : remoteJid)
+                    .replace(/@s\.whatsapp\.net|@g\.us|@c\.us/g, '')
+                    .replace(/\D/g, '');
+
+                const res = await processSupportWhatsAppMessage({
+                    companyId: url.searchParams.get('company_id'),
+                    remoteJid,
+                    cleanPhone,
+                    pushName,
+                    messageText,
+                    fromMe,
+                    isGroup,
+                    instanceName: body.instance || body.instanceName || 'arias',
+                });
+                return new Response(JSON.stringify(res), {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            }
 
             // A. META LEAD ADS ─ Facebook Ads / Instagram Ads ─────────────────
             if (body.object === 'page') {
@@ -195,9 +404,30 @@ serve(async (req) => {
                         const phoneNumberId = metadataObj.phone_number_id;
                         const displayPhone  = metadataObj.display_phone_number ? metadataObj.display_phone_number.replace(/\D/g, '') : null;
 
-                        // 🛑 CRITICAL SECURITY FILTER: Explicitly block Patricia's number (+503 7971 8911 / 516453938224335) and any rogue IDs
-                        const BLOCKED_PHONE_NUMBER_IDS = ['516453938224335', '564050433468481'];
-                        if (BLOCKED_PHONE_NUMBER_IDS.includes(phoneNumberId) || (displayPhone && displayPhone.includes('79718911'))) {
+                        // 🎧 SUPPORT PHONE ROUTER (+503 7971 8911 / 516453938224335):
+                        // Route messages on 50379718911 directly to Support Tickets & AI QA (never to Sales Leads)
+                        if (phoneNumberId === '516453938224335' || (displayPhone && displayPhone.includes('79718911'))) {
+                            for (const msg of change.value.messages) {
+                                const contact = change.value.contacts?.find((c: any) => c.wa_id === msg.from);
+                                const senderName = contact?.profile?.name || msg.from;
+                                const textBody = msg.type === 'text' ? (msg.text?.body || '') : `[Adjunto ${msg.type}]`;
+                                await processSupportWhatsAppMessage({
+                                    companyId: url.searchParams.get('company_id'),
+                                    remoteJid: `${msg.from}@s.whatsapp.net`,
+                                    cleanPhone: (msg.from || '').replace(/\D/g, ''),
+                                    pushName: senderName,
+                                    messageText: textBody,
+                                    fromMe: false,
+                                    isGroup: false,
+                                    instanceName: 'arias-50379718911',
+                                });
+                            }
+                            continue;
+                        }
+
+                        // Block rogue test IDs from creating sales leads
+                        const BLOCKED_PHONE_NUMBER_IDS = ['564050433468481'];
+                        if (BLOCKED_PHONE_NUMBER_IDS.includes(phoneNumberId)) {
                             console.warn(`[SECURITY FILTER] Dropping message to blocked phone number: ${displayPhone || phoneNumberId}`);
                             continue;
                         }

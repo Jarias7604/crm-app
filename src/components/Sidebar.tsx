@@ -505,6 +505,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             current: location.pathname.startsWith('/support'),
             subItems: [
                 { name: t('sidebar.tickets'), href: '/support/tickets', icon: TicketIcon },
+                { name: 'Inteligencia & QA (IA)', href: '/support/intelligence', icon: Brain },
                 { name: t('sidebar.overdue'), href: '/support/atrasados', icon: AlertTriangle },
                 { name: t('sidebar.manualCrm'), href: '/support/manual', icon: BookOpen },
             ]
