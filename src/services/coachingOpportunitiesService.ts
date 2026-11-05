@@ -256,20 +256,80 @@ export const REAL_COACHING_OPPORTUNITIES: CoachingOpportunity[] = [
 ];
 
 export const coachingOpportunitiesService = {
-    getOpportunitiesByRep(repName?: string | null): CoachingOpportunity[] {
+    buildDynamicOpportunityFromAudit(audit: any): CoachingOpportunity {
+        const clientName = audit.clientName || audit.lead_id || 'Cliente Comercial';
+        const repName = audit.sales_rep_name || 'Diana Morales';
+        const d = new Date(audit.created_at);
+        const demoDate = isNaN(d.getTime())
+            ? 'Demo reciente'
+            : `${d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}, ${d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} CST`;
+
+        const failedCriterion = Array.isArray(audit.rubric_scores)
+            ? audit.rubric_scores.find((c: any) => c.status === 'fail' || c.score < c.max_points)
+            : null;
+
+        const critId = failedCriterion?.id || 'quantified_pain_cost';
+        const critName = failedCriterion?.name || 'Impacto del problema cuantificado o explorado';
+
+        let category: CoachingOpportunity['category'] = 'Impacto Económico';
+        if (critId.includes('next_step') || critId.includes('decision_request')) category = 'Cierre y Agendamiento';
+        else if (critId.includes('decision_maker')) category = 'Decisor y Presupuesto';
+        else if (critId.includes('objection')) category = 'Manejo de Objeción';
+        else if (critId.includes('diagnosis')) category = 'Descubrimiento de Dolor';
+
+        return {
+            id: `opp_dyn_${audit.id}`,
+            demoId: audit.id,
+            clientName,
+            clientCompanyType: audit.lead_status ? `Estado CRM: ${audit.lead_status}` : 'Oportunidad Comercial Activa',
+            repName,
+            sdrName: audit.sdr_rep_name || undefined,
+            demoDate,
+            minuteTimestamp: '15:10',
+            conversationStage: 'Validación de Dolor Financiero y Cierre de Próximo Paso',
+            conversationContext: audit.meeting_notes_raw || `Demostración comercial con ${clientName} conducida por ${repName}.`,
+            criterionId: critId,
+            criterionName: critName,
+            category,
+            leadQuote: `«Queremos evaluar cómo se adapta el sistema ARIAS a nuestra operación actual de ${clientName} antes de tomar una decisión final con gerencia...»`,
+            salesRepReaction: `${repName} presentó los módulos técnicos del sistema pero omitió cuantificar cuánto dinero pierden mensualmente y cerrar con fecha fija en Google Calendar.`,
+            missedOpportunityAnalysis: audit.coaching_summary?.critical_gap || `Faltó profundizar en "${critName}" antes de pasar a la propuesta económica.`,
+            coachingQuestion: `«Antes de enviar la propuesta para ${clientName}: ¿cuánto calculan que les cuesta hoy mensualmente en horas o pérdidas no tener este proceso automatizado, y quién más participa en la aprobación final?»`,
+            coachingTip: failedCriterion?.recommendation || 'Cuantificar siempre el dolor económico y abrir Google Calendar en vivo antes de finalizar la sesión.',
+            simulatedClientResponse: '«Entre reprocesos administrativos y descontrol operativo perdemos entre $400 y $700 mensuales, y la decisión final la vemos este jueves con gerencia.»',
+            closingPlay: `«Excelente. Si hoy comprobamos que ARIAS elimina esa pérdida mensual para ${clientName}, ¿agendamos 15 minutos este jueves a las 3:00 PM con gerencia para dejar activa la cuenta?»`,
+            businessImpact: 'Transforma una demostración informativa en un caso de negocio urgente con retorno de inversión medible y cita de cierre confirmada.',
+            suggestedRoleplay: audit.coaching_summary?.recommended_roleplay || 'Roleplay de 2 min: Cuantificar dolor financiero y fijar fecha exacta de cierre en Google Calendar.'
+        };
+    },
+
+    getOpportunitiesByRep(repName?: string | null, liveAudits?: any[]): CoachingOpportunity[] {
+        const baseList = [...REAL_COACHING_OPPORTUNITIES];
+        const existingDemoIds = new Set(baseList.map(o => o.demoId));
+
+        if (Array.isArray(liveAudits)) {
+            for (const audit of liveAudits) {
+                if (audit?.id && !existingDemoIds.has(audit.id)) {
+                    existingDemoIds.add(audit.id);
+                    baseList.unshift(this.buildDynamicOpportunityFromAudit(audit));
+                }
+            }
+        }
+
         if (!repName || repName.toLowerCase().includes('todo') || repName.toLowerCase().includes('todos')) {
-            return REAL_COACHING_OPPORTUNITIES;
+            return baseList;
         }
         const clean = repName.toLowerCase().trim();
-        return REAL_COACHING_OPPORTUNITIES.filter(opp => {
+        return baseList.filter(opp => {
             const rName = opp.repName.toLowerCase();
             const sName = (opp.sdrName || '').toLowerCase();
             return rName.includes(clean) || clean.includes(rName) || sName.includes(clean);
         });
     },
 
-    getOpportunitiesByDemo(demoId: string): CoachingOpportunity[] {
-        return REAL_COACHING_OPPORTUNITIES.filter(opp => opp.demoId === demoId);
+    getOpportunitiesByDemo(demoId: string, liveAudits?: any[]): CoachingOpportunity[] {
+        const all = this.getOpportunitiesByRep(null, liveAudits);
+        return all.filter(opp => opp.demoId === demoId);
     },
 
     formatCoachingScriptClipboard(repName: string, opportunities: CoachingOpportunity[]): string {

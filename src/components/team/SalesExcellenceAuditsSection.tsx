@@ -8,7 +8,7 @@ import {
     Award, ShieldAlert, CheckCircle2, TrendingUp, Users, Calendar,
     ExternalLink, Sparkles, Flame, ChevronRight, FileText, Target,
     Filter, X, Copy, Check, BarChart2, AlertTriangle, Layers, ArrowRight,
-    Lightbulb, DollarSign
+    Lightbulb, DollarSign, RefreshCw, Plus
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { salesAuditService } from '../../services/salesAuditService';
@@ -70,6 +70,17 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
     const [copiedPlan, setCopiedPlan] = useState(false);
     const [isCoachingModalOpen, setIsCoachingModalOpen] = useState(false);
     const [coachingModalDemoId, setCoachingModalDemoId] = useState<string | undefined>(undefined);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [isQuickAuditModalOpen, setIsQuickAuditModalOpen] = useState(false);
+    const [quickClientName, setQuickClientName] = useState('');
+    const [quickRepName, setQuickRepName] = useState('Patricia Martínez');
+    const [quickSdrName, setQuickSdrName] = useState('');
+    const [quickDemoDate, setQuickDemoDate] = useState(() => new Date().toISOString().slice(0, 16));
+    const [quickLeadStatus, setQuickLeadStatus] = useState<string>('Negociación');
+    const [quickDealValue, setQuickDealValue] = useState<string>('1200');
+    const [quickGoogleDocUrl, setQuickGoogleDocUrl] = useState('');
+    const [quickNotes, setQuickNotes] = useState('');
+    const [isSavingQuickAudit, setIsSavingQuickAudit] = useState(false);
 
     // Resuelve la foto de perfil oficial o avatar ejecutivo de alta resolución
     const getExecutiveAvatar = (repKey: string, displayName: string): string => {
@@ -118,18 +129,76 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         return () => window.removeEventListener('sales_audit_updated', handleUpdate);
     }, [companyId]);
 
-    const loadStats = async () => {
-        setLoading(true);
+    const loadStats = async (showToast = false) => {
+        if (showToast) setIsSyncing(true);
+        else setLoading(true);
         try {
             const data = await salesAuditService.getCompanyAuditStats(companyId);
             setStats(data);
             if (data.latestAudits.length > 0) {
-                setSelectedAudit(data.latestAudits[0]);
+                setSelectedAudit(prev => {
+                    if (prev) {
+                        const found = data.latestAudits.find(a => a.id === prev.id);
+                        if (found) return found;
+                    }
+                    return data.latestAudits[0];
+                });
+            }
+            if (showToast) {
+                toast.success(`Sincronizadas ${data.totalAudits} demostraciones desde Google Calendar y CRM`);
             }
         } catch (e) {
             console.error('Error loading audit stats', e);
+            if (showToast) toast.error('Error al sincronizar demostraciones');
         } finally {
             setLoading(false);
+            setIsSyncing(false);
+        }
+    };
+
+    const handleSaveQuickAudit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!quickClientName.trim()) {
+            toast.error('Ingresa el nombre del cliente o empresa de la demostración');
+            return;
+        }
+        setIsSavingQuickAudit(true);
+        try {
+            const effectiveNotes = quickNotes.trim() || `Demostración comercial con ${quickClientName.trim()} presentada por ${quickRepName}. Evaluación de requerimientos, presentación de módulos y seguimiento de propuesta.`;
+            const evaluation = await salesAuditService.auditGeminiNotes(
+                effectiveNotes,
+                quickClientName.trim(),
+                quickRepName
+            );
+            const isoDate = quickDemoDate ? new Date(quickDemoDate).toISOString() : new Date().toISOString();
+            await salesAuditService.saveAudit({
+                company_id: localStorage.getItem('simulated_company_id') || companyId,
+                lead_id: `lead_${quickClientName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+                clientName: quickClientName.trim(),
+                sales_rep_name: quickRepName,
+                sdr_rep_name: quickSdrName.trim() || null,
+                lead_status: quickLeadStatus,
+                deal_value: Number(quickDealValue) || 0,
+                google_doc_url: quickGoogleDocUrl.trim() || null,
+                meeting_notes_raw: effectiveNotes,
+                total_score: evaluation.totalScore,
+                rubric_scores: evaluation.rubricScores,
+                coaching_summary: evaluation.coachingSummary,
+                extracted_data: evaluation.extractedData,
+                status: 'completed',
+                created_at: isoDate
+            });
+            toast.success(`Demo de ${quickClientName.trim()} auditada (${evaluation.totalScore}/100 pts)`);
+            setIsQuickAuditModalOpen(false);
+            setQuickClientName('');
+            setQuickNotes('');
+            setQuickGoogleDocUrl('');
+            await loadStats(false);
+        } catch (err) {
+            console.error('Error saving quick audit', err);
+            toast.error('No se pudo guardar la auditoría');
+        } finally {
+            setIsSavingQuickAudit(false);
         }
     };
 
@@ -404,7 +473,7 @@ ${activeDiagnostic.actionRequired}
                         </h4>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         {selectedRep && (
                             <button
                                 onClick={() => setSelectedRep(null)}
@@ -414,6 +483,30 @@ ${activeDiagnostic.actionRequired}
                                 <span>Ver Todos ({stats.totalAudits})</span>
                             </button>
                         )}
+                        <button
+                            type="button"
+                            onClick={() => loadStats(true)}
+                            disabled={isSyncing}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            title="Sincronizar demostraciones recientes desde Google Calendar, Seguimientos CRM y Bookings"
+                        >
+                            <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                            <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Calendar & CRM'}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (selectedRep && !selectedRep.toLowerCase().includes('grecia')) {
+                                    setQuickRepName(selectedRep);
+                                }
+                                setIsQuickAuditModalOpen(true);
+                            }}
+                            className="px-2.5 py-1 rounded-lg text-[11px] font-black bg-indigo-600 hover:bg-indigo-700 text-white transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                            title="Registrar y auditar una nueva demostración de Google Meet"
+                        >
+                            <Plus className="w-3 h-3" />
+                            <span>Auditar Nueva Demo</span>
+                        </button>
                         <span className="text-[11px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/60">
                             Meta: ≥ 85 pts
                         </span>
@@ -515,7 +608,7 @@ ${activeDiagnostic.actionRequired}
                                     )}
                                 </div>
                                 <p className="text-[10px] text-slate-400">
-                                    1 demo agendada (Luis Escobar) · Coordinada en Calendar
+                                    {stats.sdrTotals?.['Grecia Vásquez']?.count || 1} demo(s) agendada(s) ({stats.sdrTotals?.['Grecia Vásquez']?.demos?.slice(0, 3).join(', ') || 'Luis Escobar'}) · Coordinada en Calendar
                                 </p>
                             </div>
                         </div>
@@ -1025,7 +1118,173 @@ ${activeDiagnostic.actionRequired}
                 totalDemos={activeDiagnostic?.totalDemos || stats.totalAudits || 8}
                 avgScore={activeDiagnostic?.avgScore || stats.avgScore || 44}
                 initialDemoId={coachingModalDemoId}
+                liveAudits={stats.latestAudits}
             />
+
+            {/* Modal para Registrar / Auditar Nueva Demo directamente desde Rendimiento */}
+            {isQuickAuditModalOpen && (
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden text-slate-800">
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-2xs">
+                                    <Sparkles className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-900">
+                                        Registrar & Auditar Demostración (Gemini Meet)
+                                    </h3>
+                                    <p className="text-[11px] text-slate-500">
+                                        Evalúa automáticamente contra la Rúbrica Oficial de 100 Puntos y actualiza la gráfica
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsQuickAuditModalOpen(false)}
+                                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveQuickAudit} className="p-5 space-y-3.5 text-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block font-bold text-slate-700 mb-1">
+                                        Cliente / Empresa *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={quickClientName}
+                                        onChange={(e) => setQuickClientName(e.target.value)}
+                                        placeholder="Ej. Inversiones del Pacífico"
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none text-xs"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block font-bold text-slate-700 mb-1">
+                                        Fecha y Hora de la Demo *
+                                    </label>
+                                    <input
+                                        type="datetime-local"
+                                        required
+                                        value={quickDemoDate}
+                                        onChange={(e) => setQuickDemoDate(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none text-xs"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block font-bold text-slate-700 mb-1">
+                                        Presentador (AE) *
+                                    </label>
+                                    <select
+                                        value={quickRepName}
+                                        onChange={(e) => setQuickRepName(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none text-xs bg-white"
+                                    >
+                                        <option value="Patricia Martínez">Patricia Martínez (AE)</option>
+                                        <option value="Diana Morales">Diana Morales (AE)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block font-bold text-slate-700 mb-1">
+                                        Agendado por (SDR Opcional)
+                                    </label>
+                                    <select
+                                        value={quickSdrName}
+                                        onChange={(e) => setQuickSdrName(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none text-xs bg-white"
+                                    >
+                                        <option value="">Directo AE (Sin SDR)</option>
+                                        <option value="Grecia Vásquez">Grecia Vásquez (SDR)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block font-bold text-slate-700 mb-1">
+                                        Estado Comercial del Lead
+                                    </label>
+                                    <select
+                                        value={quickLeadStatus}
+                                        onChange={(e) => setQuickLeadStatus(e.target.value)}
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none text-xs bg-white"
+                                    >
+                                        <option value="Negociación">💼 Negociación</option>
+                                        <option value="En seguimiento">📞 En seguimiento</option>
+                                        <option value="Lead calificado">⭐ Lead calificado</option>
+                                        <option value="Cerrado">🔒 Cerrado (Ganado)</option>
+                                        <option value="Perdido">❌ Perdido</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block font-bold text-slate-700 mb-1">
+                                        Valor Oportunidad (USD)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={quickDealValue}
+                                        onChange={(e) => setQuickDealValue(e.target.value)}
+                                        placeholder="1200"
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none text-xs"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block font-bold text-slate-700 mb-1">
+                                    Enlace a Google Doc / Grabación Meet (Opcional)
+                                </label>
+                                <input
+                                    type="url"
+                                    value={quickGoogleDocUrl}
+                                    onChange={(e) => setQuickGoogleDocUrl(e.target.value)}
+                                    placeholder="https://docs.google.com/document/d/..."
+                                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none text-xs"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block font-bold text-slate-700 mb-1">
+                                    Notas de Gemini (Google Meet) o Resumen de la Demo
+                                </label>
+                                <textarea
+                                    rows={4}
+                                    value={quickNotes}
+                                    onChange={(e) => setQuickNotes(e.target.value)}
+                                    placeholder="Pega aquí las notas generadas por Gemini en Google Meet (agenda, dolores detectados, costo del problema, decisor, manejo de objeciones y fecha del próximo paso)..."
+                                    className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none text-xs leading-relaxed"
+                                />
+                            </div>
+
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsQuickAuditModalOpen(false)}
+                                    className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSavingQuickAudit}
+                                    className="px-4 py-2 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    <span>{isSavingQuickAudit ? 'Auditando...' : 'Auditar y Guardar (100 pts)'}</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

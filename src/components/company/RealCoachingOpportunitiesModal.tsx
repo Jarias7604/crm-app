@@ -22,6 +22,7 @@ interface RealCoachingOpportunitiesModalProps {
     totalDemos?: number;
     avgScore?: number;
     initialDemoId?: string;
+    liveAudits?: any[];
 }
 
 export const RealCoachingOpportunitiesModal: React.FC<RealCoachingOpportunitiesModalProps> = ({
@@ -31,12 +32,13 @@ export const RealCoachingOpportunitiesModal: React.FC<RealCoachingOpportunitiesM
     repAvatar,
     totalDemos = 7,
     avgScore = 36,
-    initialDemoId
+    initialDemoId,
+    liveAudits
 }) => {
     if (!isOpen) return null;
 
-    // Obtener oportunidades de la ejecutiva seleccionada
-    const repOpportunities = coachingOpportunitiesService.getOpportunitiesByRep(repName);
+    // Obtener oportunidades de la ejecutiva seleccionada (incluyendo demos nuevas sincronizadas)
+    const repOpportunities = coachingOpportunitiesService.getOpportunitiesByRep(repName, liveAudits);
 
     // Estado del caso activo en el simulador
     const initialIndex = initialDemoId

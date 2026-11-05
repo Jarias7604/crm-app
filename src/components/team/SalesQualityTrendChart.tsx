@@ -80,6 +80,7 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
 
             filteredAudits.forEach(a => {
                 const d = new Date(a.created_at);
+                if (isNaN(d.getTime())) return;
                 // Usar componentes locales para evitar que la zona horaria mueva la demo de las 9:00 PM al día siguiente en UTC
                 const year = d.getFullYear();
                 const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -104,16 +105,35 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                 }
             });
 
+            // Asegurar que el eje temporal llegue hasta la fecha actual (Noviembre / Hoy)
+            const now = new Date();
+            const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const sortedKeys = Object.keys(groupedByDate).sort();
+            const lastKey = sortedKeys[sortedKeys.length - 1];
+
+            if (lastKey && lastKey < todayKey) {
+                const lastGroup = groupedByDate[lastKey];
+                const lastAvg = Math.round(lastGroup.scores.reduce((s, v) => s + v, 0) / lastGroup.scores.length);
+                const todayLabel = `${now.getDate()} ${now.toLocaleDateString('es-ES', { month: 'short' }).replace('.', '')}`;
+                groupedByDate[todayKey] = {
+                    label: todayLabel,
+                    dateStr: todayKey,
+                    clients: ['Corte actual sincronizado'],
+                    scores: [lastAvg],
+                    milestones: ['Sincronizado al día de hoy (Calendar & CRM)']
+                };
+            }
+
             return Object.keys(groupedByDate).sort().map(key => {
                 const g = groupedByDate[key];
-                const isBase = key === '2026-10-01';
-                const demoCount = isBase ? 0 : g.scores.length; // Si hubo 3 demos ese día, la barra = 3
+                const isAnchorWithoutDemos = key === '2026-10-01' || (key === todayKey && g.clients[0] === 'Corte actual sincronizado');
+                const demoCount = isAnchorWithoutDemos ? 0 : g.scores.length; // Si hubo 3 demos ese día, la barra = 3
                 const avgScore = Math.round(g.scores.reduce((sum, s) => sum + s, 0) / g.scores.length);
                 const clientsList = g.clients.slice(0, 3).join(', ') + (g.clients.length > 3 ? ` (+${g.clients.length - 3})` : '');
 
                 return {
                     label: g.label,
-                    fullTitle: isBase ? `${g.label} · ${g.clients[0]}` : `${g.label} · ${demoCount} demo${demoCount > 1 ? 's' : ''}: ${clientsList}`,
+                    fullTitle: isAnchorWithoutDemos ? `${g.label} · ${g.clients[0]}` : `${g.label} · ${demoCount} demo${demoCount > 1 ? 's' : ''}: ${clientsList}`,
                     score: avgScore,
                     demos: demoCount, // Altura de la barra en la gráfica Metricool
                     milestone: g.milestones[0] || `${demoCount} demo(s) evaluada(s)`
@@ -157,6 +177,14 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
     const baselineScore = 24;
     const deltaGrowth = Math.max(0, currentScore - baselineScore);
     const percentGrowth = Math.max(0, Math.round((deltaGrowth / baselineScore) * 100));
+    const maxDemosDomain = useMemo(() => {
+        const maxVal = chartData.reduce((m, item: any) => Math.max(m, Number(item.demos || 0)), 0);
+        return Math.max(3, maxVal);
+    }, [chartData]);
+    const demoAxisTicks = useMemo(
+        () => Array.from({ length: maxDemosDomain + 1 }, (_, idx) => idx),
+        [maxDemosDomain]
+    );
 
     return (
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3.5 sm:p-4 space-y-3">
@@ -284,11 +312,11 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                             axisLine={{ stroke: '#e2e8f0' }}
                         />
 
-                        {/* Eje Izquierdo: Demos (0 a 3) */}
+                        {/* Eje Izquierdo: Demos */}
                         <YAxis
                             yAxisId="left"
-                            domain={[0, 3]}
-                            ticks={[0, 1, 2, 3]}
+                            domain={[0, maxDemosDomain]}
+                            ticks={demoAxisTicks}
                             stroke="#d4a373"
                             fontSize={9}
                             tickLine={false}
