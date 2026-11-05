@@ -237,6 +237,14 @@ function inferClientFromText(
   const combined = `${title || ''} ${description || ''}`;
   const lower = combined.toLowerCase();
 
+  // Extract explicit "<Categoría>: <Nombre Cliente>" pattern used in tickets (e.g. "Soporte tecnico: Medicina Popular", "Error reportado: Labclimend")
+  const colonPrefixMatch = (title || '').match(
+    /^(?:soporte(?:\s+t[eé]cnico)?|error(?:\s+reportado)?|capacitaci[oó]n(?:\s+presencial|\s+virtual)?|pregunta(?:\s+frecuente)?|implementaci[oó]n|revisi[oó]n|atenci[oó]n|caso|cliente)\s*:\s*([^(\-\n,]{2,45})/i
+  );
+  if (colonPrefixMatch && colonPrefixMatch[1]) {
+    return colonPrefixMatch[1].trim();
+  }
+
   // Check against real CRM leads first
   for (const leadName of knownLeadNames) {
     if (leadName.length >= 4 && lower.includes(leadName.toLowerCase())) {
@@ -266,7 +274,7 @@ function inferClientFromText(
     return projectName;
   }
 
-  return 'Soporte Interno / Cliente por Clasificar';
+  return 'Soporte Interno / General';
 }
 
 export default function SupportIntelligence() {
