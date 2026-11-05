@@ -25,6 +25,8 @@ import {
   Zap,
   Layers,
   ChevronRight,
+  ChevronDown,
+  FileBadge2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
@@ -50,6 +52,12 @@ interface UnifiedSupportRecord {
   subPatternKey: string;
   subPatternLabel: string;
   isFromWhatsApp: boolean;
+  findings: string;
+  rootCause: string;
+  solution: string;
+  hasResolutionReport: boolean;
+  closedWithoutResolution: boolean;
+  isInternalRoutine: boolean;
 }
 
 interface RecurringPatternCluster {
@@ -62,6 +70,7 @@ interface RecurringPatternCluster {
   techsInvolved: string[];
   openCount: number;
   resolvedCount: number;
+  unreportedCloseCount: number;
   totalHours: number;
   avgResolutionHours: number;
   severity: 'critical' | 'high' | 'normal';
@@ -74,6 +83,7 @@ interface ClientSupportSummary {
   totalTickets: number;
   openTickets: number;
   resolvedTickets: number;
+  unreportedCloseCount: number;
   repeatedIssuesCount: number;
   topCategory: string;
   primaryTech: string;
@@ -217,6 +227,30 @@ function classifySupportProblem(title: string, description: string): {
   };
 }
 
+function normalizeClientDisplayName(raw: string): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return 'Soporte Interno / General';
+  const low = trimmed.toLowerCase();
+  if (/arg[oó]z|argos/i.test(low)) return 'Corporación Argoz';
+  if (/la\s+econ[oó]mica/i.test(low)) return 'La Económica';
+  if (/medicina\s+popular/i.test(low)) return 'Medicina Popular';
+  if (/conta\s+ohs/i.test(low)) return 'Conta OHS';
+  if (/don\s+carret[oó]n/i.test(low)) return 'Don Carretón';
+  if (/labclimend/i.test(low)) return 'Labclimend';
+  if (/cartopa(ck|q)/i.test(low)) return 'Cartopaq';
+  if (/marisela\s+lino/i.test(low)) return 'Marisela Lino';
+  if (/yanci\s+deodanes/i.test(low)) return 'Yanci Deodanes';
+  return trimmed;
+}
+
+function isInternalRoutineTicket(title: string, clientName: string): boolean {
+  const t = (title || '').trim().toLowerCase();
+  if (/^jornada\s+(melvin|gerson|diaria)/i.test(t)) return true;
+  if (/reuni[oó]n\s+jorge\s+primera\s+revisi[oó]n\s+planillas/i.test(t)) return true;
+  if (clientName === 'Soporte Interno / General') return true;
+  return false;
+}
+
 function inferClientFromText(
   rawLeadName: string | null | undefined,
   projectName: string | null | undefined,
@@ -231,7 +265,7 @@ function inferClientFromText(
     cleanLead.toLowerCase() !== 'general' &&
     cleanLead.toLowerCase() !== 'proyecto'
   ) {
-    return cleanLead;
+    return normalizeClientDisplayName(cleanLead);
   }
 
   const combined = `${title || ''} ${description || ''}`;
@@ -242,13 +276,13 @@ function inferClientFromText(
     /^(?:soporte(?:\s+t[eé]cnico)?|error(?:\s+reportado)?|capacitaci[oó]n(?:\s+presencial|\s+virtual)?|pregunta(?:\s+frecuente)?|implementaci[oó]n|revisi[oó]n|atenci[oó]n|caso|cliente)\s*:\s*([^(\-\n,]{2,45})/i
   );
   if (colonPrefixMatch && colonPrefixMatch[1]) {
-    return colonPrefixMatch[1].trim();
+    return normalizeClientDisplayName(colonPrefixMatch[1].trim());
   }
 
   // Check against real CRM leads first
   for (const leadName of knownLeadNames) {
     if (leadName.length >= 4 && lower.includes(leadName.toLowerCase())) {
-      return leadName;
+      return normalizeClientDisplayName(leadName);
     }
   }
 
@@ -258,20 +292,18 @@ function inferClientFromText(
     const match = combined.match(regex);
     if (match) {
       const normalized = match[0];
-      if (/arg[oó]z|argos/i.test(normalized)) return 'Argos / Argóz';
-      if (/cartopa(ck|q)/i.test(normalized)) return 'Cartopaq';
-      return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+      return normalizeClientDisplayName(normalized.charAt(0).toUpperCase() + normalized.slice(1));
     }
   }
 
   // Check "cliente X" pattern
   const clientMatch = combined.match(/cliente\s+([A-ZÁÉÍÓÚÑa-záéíóúñ0-9\s]{3,25}?)(?:[,.:;\-\n]|$)/i);
   if (clientMatch && clientMatch[1]) {
-    return clientMatch[1].trim();
+    return normalizeClientDisplayName(clientMatch[1].trim());
   }
 
   if (projectName && projectName.toLowerCase() !== 'general') {
-    return projectName;
+    return normalizeClientDisplayName(projectName);
   }
 
   return 'Soporte Interno / General';
@@ -288,11 +320,32 @@ export default function SupportIntelligence() {
   const [teamProfiles, setTeamProfiles] = useState<{ id: string; full_name: string; email: string }[]>([]);
   const [leadsList, setLeadsList] = useState<{ id: string; name: string; phone: string | null }[]>([]);
 
-  // Filters
+  // Filters & Accordion State
   const [activeTab, setActiveTab] = useState<'overview' | 'waiting' | 'recurring' | 'clients' | 'techs' | 'whatsapp'>('overview');
+  const [recurringGroupMode, setRecurringGroupMode] = useState<'by_client' | 'by_pattern'>('by_client');
+  const [expandedAccordionKeys, setExpandedAccordionKeys] = useState<Set<string>>(new Set());
+  const [expandedClientRows, setExpandedClientRows] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTechFilter, setSelectedTechFilter] = useState<string>('all');
   const [dateRangeDays, setDateRangeDays] = useState<number>(60);
+
+  const toggleAccordionKey = (key: string) => {
+    setExpandedAccordionKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleClientRow = (clientName: string) => {
+    setExpandedClientRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(clientName)) next.delete(clientName);
+      else next.add(clientName);
+      return next;
+    });
+  };
 
   // WhatsApp Evolution API Configuration State
   const [supportPhone, setSupportPhone] = useState<string>(() =>
@@ -460,6 +513,12 @@ export default function SupportIntelligence() {
 
         const classified = classifySupportProblem(t.title || '', t.description || '');
         const meta = t.metadata || {};
+        const findingsStr = String(t.findings || '').trim();
+        const rootCauseStr = String(t.root_cause || '').trim();
+        const solutionStr = String(t.solution || '').trim();
+        const hasResReport =
+          findingsStr.length >= 3 && rootCauseStr.length >= 3 && solutionStr.length >= 3;
+        const internalRoutine = isInternalRoutineTicket(t.title || '', clientName);
 
         unified.push({
           id: t.id,
@@ -483,6 +542,12 @@ export default function SupportIntelligence() {
           isFromWhatsApp:
             Boolean(meta.source === 'whatsapp_evolution') ||
             /whatsapp/i.test(t.title || ''),
+          findings: findingsStr,
+          rootCause: rootCauseStr,
+          solution: solutionStr,
+          hasResolutionReport: hasResReport,
+          closedWithoutResolution: isClosedOrResolved && !hasResReport,
+          isInternalRoutine: internalRoutine,
         });
       });
 
@@ -523,6 +588,7 @@ export default function SupportIntelligence() {
           knownLeadNames
         );
         const classified = classifySupportProblem(ct.title || '', ct.description || '');
+        const internalRoutine = isInternalRoutineTicket(ct.title || '', clientName);
 
         unified.push({
           id: ct.id,
@@ -544,6 +610,12 @@ export default function SupportIntelligence() {
           subPatternKey: classified.subPatternKey,
           subPatternLabel: classified.subPatternLabel,
           isFromWhatsApp: /whatsapp/i.test(`${ct.title || ''} ${ct.description || ''}`),
+          findings: '',
+          rootCause: '',
+          solution: ct.description || '',
+          hasResolutionReport: Boolean(ct.description && ct.description.trim().length > 10),
+          closedWithoutResolution: false,
+          isInternalRoutine: internalRoutine,
         });
       });
 
@@ -566,6 +638,7 @@ export default function SupportIntelligence() {
             knownLeadNames
           );
           const classified = classifySupportProblem(title, ts.work_summary || '');
+          const internalRoutine = isInternalRoutineTicket(title, clientName);
 
           unified.push({
             id: lid,
@@ -587,6 +660,12 @@ export default function SupportIntelligence() {
             subPatternKey: classified.subPatternKey,
             subPatternLabel: classified.subPatternLabel,
             isFromWhatsApp: /whatsapp/i.test(title),
+            findings: '',
+            rootCause: '',
+            solution: ts.work_summary || '',
+            hasResolutionReport: Boolean(ts.work_summary && ts.work_summary.trim().length > 5),
+            closedWithoutResolution: false,
+            isInternalRoutine: internalRoutine,
           });
         });
       });
@@ -631,6 +710,7 @@ export default function SupportIntelligence() {
   const recurringClusters = useMemo<RecurringPatternCluster[]>(() => {
     const map = new Map<string, UnifiedSupportRecord[]>();
     filteredRecords.forEach((r) => {
+      if (/^jornada\s+(melvin|gerson)/i.test(r.title)) return;
       const list = map.get(r.subPatternKey) || [];
       list.push(r);
       map.set(r.subPatternKey, list);
@@ -643,6 +723,7 @@ export default function SupportIntelligence() {
       const techsSet = new Set<string>();
       let openCount = 0;
       let resolvedCount = 0;
+      let unreportedCloseCount = 0;
       let totalHours = 0;
       let resHoursSum = 0;
       let resHoursCount = 0;
@@ -652,7 +733,10 @@ export default function SupportIntelligence() {
           techsSet.add(item.techName);
         }
         if (item.status === 'open' || item.status === 'pending') openCount++;
-        else resolvedCount++;
+        else {
+          resolvedCount++;
+          if (item.closedWithoutResolution) unreportedCloseCount++;
+        }
 
         totalHours += item.hoursSpent || 0;
         if (item.resolutionHours && item.resolutionHours > 0) {
@@ -660,10 +744,12 @@ export default function SupportIntelligence() {
           resHoursCount++;
         }
 
-        const cEntry = clientCounts.get(item.clientName) || { count: 0, techs: new Set<string>() };
-        cEntry.count++;
-        if (item.techName) cEntry.techs.add(item.techName);
-        clientCounts.set(item.clientName, cEntry);
+        if (!item.isInternalRoutine && item.clientName !== 'Soporte Interno / General') {
+          const cEntry = clientCounts.get(item.clientName) || { count: 0, techs: new Set<string>() };
+          cEntry.count++;
+          if (item.techName) cEntry.techs.add(item.techName);
+          clientCounts.set(item.clientName, cEntry);
+        }
       });
 
       const sameClientRepeats: { clientName: string; count: number; techs: string[] }[] = [];
@@ -698,6 +784,7 @@ export default function SupportIntelligence() {
         techsInvolved: Array.from(techsSet),
         openCount,
         resolvedCount,
+        unreportedCloseCount,
         totalHours: +totalHours.toFixed(1),
         avgResolutionHours: resHoursCount > 0 ? +(resHoursSum / resHoursCount).toFixed(1) : 1.5,
         severity,
@@ -709,10 +796,11 @@ export default function SupportIntelligence() {
     return clusters.sort((a, b) => b.totalOccurrences - a.totalOccurrences);
   }, [filteredRecords]);
 
-  // 3. Top Clients by Frequency & Waiting Status
+  // 3. Top Clients by Frequency & Waiting Status (Real External Clients Ranked First)
   const clientSummaries = useMemo<ClientSupportSummary[]>(() => {
     const map = new Map<string, UnifiedSupportRecord[]>();
     filteredRecords.forEach((r) => {
+      if (r.isInternalRoutine || r.clientName === 'Soporte Interno / General') return;
       const list = map.get(r.clientName) || [];
       list.push(r);
       map.set(r.clientName, list);
@@ -722,6 +810,7 @@ export default function SupportIntelligence() {
     map.forEach((items, clientName) => {
       let openTickets = 0;
       let resolvedTickets = 0;
+      let unreportedCloseCount = 0;
       let totalHoursSpent = 0;
       let resHoursSum = 0;
       let resHoursCount = 0;
@@ -737,6 +826,7 @@ export default function SupportIntelligence() {
           if (item.waitingHours > maxWaitingHours) maxWaitingHours = item.waitingHours;
         } else {
           resolvedTickets++;
+          if (item.closedWithoutResolution) unreportedCloseCount++;
         }
         totalHoursSpent += item.hoursSpent || 0;
         if (item.resolutionHours && item.resolutionHours > 0) {
@@ -765,6 +855,7 @@ export default function SupportIntelligence() {
         totalTickets: items.length,
         openTickets,
         resolvedTickets,
+        unreportedCloseCount,
         repeatedIssuesCount,
         topCategory,
         primaryTech: techBreakdown[0]?.techName || 'Sin asignar',
@@ -1420,140 +1511,494 @@ Exigir que cada ticket recurrente documente la "Causa Raíz" antes de cerrarse y
         </div>
       )}
 
-      {/* SECTION 2: PROBLEMAS Y ERRORES QUE SE REPITEN (PARCHE VS SOLUCIÓN DE RAÍZ) */}
+      {/* SECTION 2: PROBLEMAS Y ERRORES QUE SE REPITEN — ACORDEÓN CON HISTORIAL COMPLETO */}
       {(activeTab === 'overview' || activeTab === 'recurring') && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-amber-50/40">
+          <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-amber-50/40">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
                 <Repeat className="w-4 h-4" />
               </div>
               <div>
                 <h2 className="text-sm md:text-base font-black text-slate-900">
-                  2. Detector IA de Problemas que se Repiten (Mismo Cliente vs. Varios Clientes)
+                  2. Acordeón de Problemas que se Repiten — Historial Detallado (Cuándo, Empresa, Técnico, Problema y Solución)
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Identifica si las soluciones de Melvin o Gerson fueron definitivas o si el mismo problema volvió a aparecer.
+                  Haz clic en cualquier fila del acordeón para desplegar el historial completo de cada caso, quién lo atendió y si documentaron la Causa Raíz antes de cerrarlo.
                 </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex bg-white border border-slate-200 rounded-xl p-1 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setRecurringGroupMode('by_client')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    recurringGroupMode === 'by_client'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🏢 Agrupar por Empresa / Cliente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecurringGroupMode('by_pattern')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    recurringGroupMode === 'by_pattern'
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🛠️ Agrupar por Tipo de Problema
+                </button>
               </div>
             </div>
           </div>
 
-          <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {recurringClusters.map((cluster) => (
-              <div
-                key={cluster.key}
-                className={`rounded-2xl border p-4 transition ${
-                  cluster.sameClientRepeats.length > 0
-                    ? 'border-amber-300 bg-amber-50/20'
-                    : 'border-slate-200 bg-white'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">
-                      {cluster.categoryLabel}
-                    </span>
-                    <h3 className="text-sm font-black text-slate-900 mt-0.5">
-                      {cluster.subPatternLabel}
-                    </h3>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-slate-900 text-white">
-                      {cluster.totalOccurrences} veces
-                    </span>
-                  </div>
+          <div className="p-4 md:p-5 space-y-3">
+            {recurringGroupMode === 'by_client' ? (
+              clientSummaries.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  No se encontraron empresas con reportes en este filtro.
                 </div>
-
-                {/* Badges showing Same-Client Reincidence vs Multi-Client */}
-                <div className="flex flex-wrap items-center gap-2 mt-3">
-                  {cluster.sameClientRepeats.length > 0 ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                      <ShieldAlert className="w-3.5 h-3.5" />
-                      Reincidencia en Mismo Cliente:{' '}
-                      {cluster.sameClientRepeats
-                        .slice(0, 3)
-                        .map((r) => `${r.clientName} (${r.count}x)`)
-                        .join(', ')}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Sin reincidencia repetida en un mismo cliente
-                    </span>
-                  )}
-
-                  {cluster.uniqueClients.length > 1 && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-100 text-amber-800">
-                      Afecta a {cluster.uniqueClients.length} clientes distintos
-                    </span>
-                  )}
-                </div>
-
-                {/* Metrics row */}
-                <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">
-                      Atendido por
-                    </span>
-                    <span className="font-bold text-slate-800">
-                      {cluster.techsInvolved.join(', ') || 'Equipo'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">
-                      Tiempo Invertido
-                    </span>
-                    <span className="font-bold text-slate-800">
-                      {cluster.totalHours}h total (prom {cluster.avgResolutionHours}h)
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">
-                      Estado
-                    </span>
-                    <span className="font-bold text-slate-800">
-                      {cluster.resolvedCount} resueltos ·{' '}
-                      <span className={cluster.openCount > 0 ? 'text-rose-600' : ''}>
-                        {cluster.openCount} abiertos
-                      </span>
-                    </span>
-                  </div>
-                </div>
-
-                {/* Root cause AI box */}
-                <div className="mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 text-[11px] text-slate-600">
-                  <strong className="text-slate-800">💡 Diagnóstico IA de Causa Raíz:</strong>{' '}
-                  {cluster.rootCauseDiagnosis}
-                </div>
-
-                {/* Recent examples */}
-                <div className="mt-3 space-y-1">
-                  <div className="text-[10px] font-bold uppercase text-slate-400">
-                    Últimos reportes de este patrón:
-                  </div>
-                  {cluster.records.slice(0, 3).map((rec) => (
+              ) : (
+                clientSummaries.map((client, idx) => {
+                  const accKey = `client__${client.clientName}`;
+                  const isOpen =
+                    expandedAccordionKeys.has(accKey) ||
+                    (expandedAccordionKeys.size === 0 && idx === 0);
+                  return (
                     <div
-                      key={rec.id}
-                      className="flex items-center justify-between text-[11px] bg-white px-2.5 py-1.5 rounded-lg border border-slate-100"
+                      key={accKey}
+                      className={`rounded-2xl border transition overflow-hidden ${
+                        client.totalTickets >= 2
+                          ? 'border-amber-300 bg-amber-50/10'
+                          : 'border-slate-200 bg-white'
+                      }`}
                     >
-                      <span className="truncate max-w-[65%] text-slate-700">
-                        <strong className="text-slate-900">{rec.clientName}:</strong> {rec.title}
-                      </span>
-                      <span className="text-slate-400 shrink-0 ml-2">
-                        {rec.techName.split(' ')[0]} · {rec.hoursSpent}h
-                      </span>
+                      {/* Accordion Header */}
+                      <button
+                        type="button"
+                        onClick={() => toggleAccordionKey(accKey)}
+                        className="w-full px-4 py-3.5 flex flex-wrap items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
+                            {isOpen ? (
+                              <ChevronDown className="w-4 h-4" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-black text-slate-900">
+                                🏢 {client.clientName}
+                              </span>
+                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-indigo-600 text-white">
+                                {client.totalTickets} {client.totalTickets === 1 ? 'reporte' : 'veces reportado'}
+                              </span>
+                              {client.repeatedIssuesCount >= 2 && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                  🔄 {client.repeatedIssuesCount} reincidencias del mismo tema
+                                </span>
+                              )}
+                              {client.unreportedCloseCount > 0 && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                                  ⚠️ {client.unreportedCloseCount} cerrado(s) sin Causa Raíz / Solución
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-3">
+                              <span>
+                                <strong>Problema principal:</strong> {client.topCategory}
+                              </span>
+                              <span>
+                                <strong>Atendido por:</strong>{' '}
+                                {client.techBreakdown
+                                  .map((t) => `${t.techName} (${t.count})`)
+                                  .join(', ')}
+                              </span>
+                              <span>
+                                <strong>Tiempo total:</strong> {client.totalHoursSpent}h (prom {client.avgResolutionHours}h)
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {client.openTickets > 0 ? (
+                            <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-rose-100 text-rose-700">
+                              ⏳ {client.openTickets} abierto(s)
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              ✓ {client.resolvedTickets} cerrado(s)
+                            </span>
+                          )}
+                          <span className="text-xs font-bold text-indigo-600 underline ml-1">
+                            {isOpen ? 'Ocultar historial' : 'Ver historial (' + client.records.length + ')'}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Accordion Body: Complete Chronological History Table */}
+                      {isOpen && (
+                        <div className="border-t border-slate-200/80 bg-white overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-slate-50 border-b border-slate-200/70 text-[10px] font-extrabold uppercase text-slate-500">
+                                <th className="py-2.5 px-4">📅 Cuándo (Ingreso / Cierre)</th>
+                                <th className="py-2.5 px-4">🏢 Empresa / Canal</th>
+                                <th className="py-2.5 px-4">👨‍💻 Quién lo Hizo (Técnico)</th>
+                                <th className="py-2.5 px-4">🛠️ El Problema Reportado</th>
+                                <th className="py-2.5 px-4">🔬 Hallazgos, Causa Raíz y Solución</th>
+                                <th className="py-2.5 px-4 text-right">Acción</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-xs">
+                              {client.records.map((rec) => (
+                                <tr key={rec.id} className="hover:bg-slate-50/70 align-top">
+                                  <td className="py-3 px-4 whitespace-nowrap">
+                                    <div className="font-bold text-slate-900">
+                                      {new Date(rec.createdAt).toLocaleDateString('es-SV', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                        year: 'numeric',
+                                      })}{' '}
+                                      ·{' '}
+                                      {new Date(rec.createdAt).toLocaleTimeString('es-SV', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </div>
+                                    {rec.resolvedAt ? (
+                                      <div className="text-[11px] text-emerald-700 font-semibold mt-0.5">
+                                        ✓ Cerrado:{' '}
+                                        {new Date(rec.resolvedAt).toLocaleDateString('es-SV', {
+                                          day: '2-digit',
+                                          month: 'short',
+                                        })}{' '}
+                                        ·{' '}
+                                        {new Date(rec.resolvedAt).toLocaleTimeString('es-SV', {
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                        })}
+                                      </div>
+                                    ) : (
+                                      <div className="text-[11px] text-rose-600 font-bold mt-0.5">
+                                        ⏳ Esperando hace {rec.waitingHours}h
+                                      </div>
+                                    )}
+                                    <div className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                      ⏱ Tiempo invertido: {rec.hoursSpent}h
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-4">
+                                    <div className="font-bold text-slate-900">{rec.clientName}</div>
+                                    <span
+                                      className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-[10px] font-bold ${
+                                        rec.isFromWhatsApp
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                          : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                      }`}
+                                    >
+                                      {rec.isFromWhatsApp ? '📲 WhatsApp' : '🎫 Ticket CRM'}
+                                    </span>
+                                  </td>
+
+                                  <td className="py-3 px-4">
+                                    <div className="font-bold text-slate-900">{rec.techName}</div>
+                                    <div className="text-[10px] text-slate-400">
+                                      {rec.status === 'resolved' || rec.status === 'closed'
+                                        ? 'Finalizado'
+                                        : 'En atención'}
+                                    </div>
+                                  </td>
+
+                                  <td className="py-3 px-4 max-w-sm">
+                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                      <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                                        #{rec.id.slice(0, 8).toUpperCase()}
+                                      </span>
+                                      <span className="text-[10px] font-bold text-indigo-600">
+                                        {rec.subPatternLabel}
+                                      </span>
+                                    </div>
+                                    <div className="font-bold text-slate-900">{rec.title}</div>
+                                    {rec.description && (
+                                      <div className="text-[11px] text-slate-600 mt-1 whitespace-pre-wrap line-clamp-3">
+                                        {rec.description}
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  <td className="py-3 px-4 max-w-md">
+                                    {rec.hasResolutionReport ? (
+                                      <div className="space-y-1 bg-emerald-50/60 border border-emerald-200 rounded-xl p-2.5 text-[11px]">
+                                        {rec.findings && (
+                                          <div>
+                                            <strong className="text-slate-900">Hallazgos:</strong>{' '}
+                                            <span className="text-slate-700">{rec.findings}</span>
+                                          </div>
+                                        )}
+                                        {rec.rootCause && (
+                                          <div>
+                                            <strong className="text-amber-900">Causa Raíz:</strong>{' '}
+                                            <span className="text-slate-700">{rec.rootCause}</span>
+                                          </div>
+                                        )}
+                                        {rec.solution && (
+                                          <div>
+                                            <strong className="text-emerald-900">Solución:</strong>{' '}
+                                            <span className="text-slate-700">{rec.solution}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : rec.closedWithoutResolution ? (
+                                      <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 text-[11px] text-red-800 space-y-1">
+                                        <div className="font-black flex items-center gap-1 text-red-700">
+                                          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                          Cerrado SIN documentar Resolución
+                                        </div>
+                                        <p className="text-[10px] text-red-600">
+                                          {rec.techName} cerró este ticket dejando vacíos Hallazgos, Causa Raíz y Solución Aplicada.
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-2.5 text-[11px] text-amber-800">
+                                        ⏳ En curso — Obligatorio llenar Causa Raíz y Solución para poder cerrar.
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  <td className="py-3 px-4 text-right whitespace-nowrap">
+                                    {rec.source === 'ticket' && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          navigate('/support/tickets', {
+                                            state: { openTicketId: rec.id },
+                                          })
+                                        }
+                                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition cursor-pointer"
+                                      >
+                                        Abrir Ticket <ExternalLink className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+                  );
+                })
+              )
+            ) : (
+              /* MODE 2: GROUPED BY TECHNICAL PROBLEM PATTERN */
+              recurringClusters.map((cluster, idx) => {
+                const accKey = `pattern__${cluster.key}`;
+                const isOpen =
+                  expandedAccordionKeys.has(accKey) ||
+                  (expandedAccordionKeys.size === 0 && idx === 0);
+                return (
+                  <div
+                    key={accKey}
+                    className={`rounded-2xl border transition overflow-hidden ${
+                      cluster.sameClientRepeats.length > 0
+                        ? 'border-amber-300 bg-amber-50/15'
+                        : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    {/* Accordion Header */}
+                    <button
+                      type="button"
+                      onClick={() => toggleAccordionKey(accKey)}
+                      className="w-full px-4 py-3.5 flex flex-wrap items-center justify-between gap-3 text-left hover:bg-slate-50/80 transition cursor-pointer"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
+                          {isOpen ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600">
+                              {cluster.categoryLabel}
+                            </span>
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-slate-900 text-white">
+                              {cluster.totalOccurrences} casos
+                            </span>
+                            {cluster.sameClientRepeats.length > 0 && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                🔄 Reincidencia en:{' '}
+                                {cluster.sameClientRepeats
+                                  .slice(0, 4)
+                                  .map((r) => `${r.clientName} (${r.count}x)`)
+                                  .join(', ')}
+                              </span>
+                            )}
+                            {cluster.unreportedCloseCount > 0 && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                                ⚠️ {cluster.unreportedCloseCount} cerrado(s) sin Causa Raíz
+                              </span>
+                            )}
+                          </div>
+                          <h3 className="text-sm font-black text-slate-900 mt-0.5">
+                            {cluster.subPatternLabel}
+                          </h3>
+                          <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-3">
+                            <span>
+                              <strong>Atendido por:</strong>{' '}
+                              {cluster.techsInvolved.join(', ') || 'Equipo'}
+                            </span>
+                            <span>
+                              <strong>Tiempo total:</strong> {cluster.totalHours}h (prom {cluster.avgResolutionHours}h)
+                            </span>
+                            <span>
+                              <strong>Empresas afectadas:</strong> {cluster.uniqueClients.length}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-bold text-indigo-600 underline">
+                          {isOpen ? 'Ocultar casos' : `Ver los ${cluster.records.length} casos →`}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Accordion Body: Complete Chronological History Table */}
+                    {isOpen && (
+                      <div className="border-t border-slate-200/80 bg-white overflow-x-auto">
+                        <div className="px-4 py-2.5 bg-slate-50/80 border-b border-slate-200/60 text-xs text-slate-700">
+                          <strong>💡 Diagnóstico IA de Causa Raíz:</strong> {cluster.rootCauseDiagnosis}
+                        </div>
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200/70 text-[10px] font-extrabold uppercase text-slate-500">
+                              <th className="py-2.5 px-4">📅 Cuándo (Ingreso / Cierre)</th>
+                              <th className="py-2.5 px-4">🏢 Qué Empresa</th>
+                              <th className="py-2.5 px-4">👨‍💻 Quién lo Hizo</th>
+                              <th className="py-2.5 px-4">🛠️ El Problema Reportado</th>
+                              <th className="py-2.5 px-4">🔬 Hallazgos, Causa Raíz y Solución</th>
+                              <th className="py-2.5 px-4 text-right">Acción</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-xs">
+                            {cluster.records.map((rec) => (
+                              <tr key={rec.id} className="hover:bg-slate-50/70 align-top">
+                                <td className="py-3 px-4 whitespace-nowrap">
+                                  <div className="font-bold text-slate-900">
+                                    {new Date(rec.createdAt).toLocaleDateString('es-SV', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                      year: 'numeric',
+                                    })}{' '}
+                                    ·{' '}
+                                    {new Date(rec.createdAt).toLocaleTimeString('es-SV', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </div>
+                                  {rec.resolvedAt ? (
+                                    <div className="text-[11px] text-emerald-700 font-semibold mt-0.5">
+                                      ✓ Cerrado:{' '}
+                                      {new Date(rec.resolvedAt).toLocaleDateString('es-SV', {
+                                        day: '2-digit',
+                                        month: 'short',
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <div className="text-[11px] text-rose-600 font-bold mt-0.5">
+                                      ⏳ Esperando hace {rec.waitingHours}h
+                                    </div>
+                                  )}
+                                  <div className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                    ⏱ {rec.hoursSpent}h invertidas
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 font-bold text-slate-900">
+                                  {rec.clientName}
+                                </td>
+                                <td className="py-3 px-4 font-bold text-slate-800">
+                                  {rec.techName}
+                                </td>
+                                <td className="py-3 px-4 max-w-sm">
+                                  <div className="font-bold text-slate-900">
+                                    <span className="text-[10px] font-mono text-indigo-600 mr-1">
+                                      #{rec.id.slice(0, 8).toUpperCase()}
+                                    </span>
+                                    {rec.title}
+                                  </div>
+                                  {rec.description && (
+                                    <div className="text-[11px] text-slate-600 mt-0.5 line-clamp-2">
+                                      {rec.description}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 max-w-md">
+                                  {rec.hasResolutionReport ? (
+                                    <div className="space-y-1 bg-emerald-50/60 border border-emerald-200 rounded-xl p-2 text-[11px]">
+                                      <div>
+                                        <strong>Causa Raíz:</strong> {rec.rootCause}
+                                      </div>
+                                      <div>
+                                        <strong>Solución:</strong> {rec.solution}
+                                      </div>
+                                    </div>
+                                  ) : rec.closedWithoutResolution ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 text-red-700 border border-red-200 text-[11px] font-bold">
+                                      ⚠️ Cerrado sin documentar Causa Raíz ni Solución
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] text-amber-700 font-semibold">
+                                      ⏳ En atención
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-right whitespace-nowrap">
+                                  {rec.source === 'ticket' && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        navigate('/support/tickets', {
+                                          state: { openTicketId: rec.id },
+                                        })
+                                      }
+                                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition cursor-pointer"
+                                    >
+                                      Abrir Ticket <ExternalLink className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       )}
 
       {/* SECTION 3 & 4: CLIENTES MÁS FRECUENTES + RENDIMIENTO DE TÉCNICOS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Top Clients Table */}
+        {/* Top Clients Table with Expandable History Rows */}
         {(activeTab === 'overview' || activeTab === 'clients') && (
           <div
             className={`${
@@ -1567,10 +2012,10 @@ Exigir que cada ticket recurrente documente la "Causa Raíz" antes de cerrarse y
                 </div>
                 <div>
                   <h2 className="text-sm md:text-base font-black text-slate-900">
-                    3. Clientes que Vienen Más Frecuente y Quién los Atiende
+                    3. Ranking de Empresas / Clientes Más Frecuentes (Haz clic para desplegar historial)
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Frecuencia de reportes por cliente, problemas repetidos y tiempo de atención.
+                    Toca cualquier empresa para ver todos sus tickets, fechas, qué técnico la atendió y su solución.
                   </p>
                 </div>
               </div>
@@ -1580,7 +2025,7 @@ Exigir que cada ticket recurrente documente la "Causa Raíz" antes de cerrarse y
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100 text-[11px] font-extrabold uppercase text-slate-400 bg-slate-50/50">
-                    <th className="py-3 px-4">Cliente / Proyecto</th>
+                    <th className="py-3 px-4">Empresa / Cliente</th>
                     <th className="py-3 px-4">Veces que Reportó</th>
                     <th className="py-3 px-4">Problema Principal</th>
                     <th className="py-3 px-4">Quién lo Atiende</th>
@@ -1590,56 +2035,128 @@ Exigir que cada ticket recurrente documente la "Causa Raíz" antes de cerrarse y
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {clientSummaries
-                    .slice(0, activeTab === 'clients' ? 50 : 10)
-                    .map((client) => (
-                      <tr key={client.clientName} className="hover:bg-slate-50/80 transition">
-                        <td className="py-3 px-4 font-bold text-slate-900">
-                          {client.clientName}
-                          {client.repeatedIssuesCount >= 2 && (
-                            <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
-                              🔄 {client.repeatedIssuesCount} repetidos
-                            </span>
+                    .slice(0, activeTab === 'clients' ? 50 : 12)
+                    .map((client) => {
+                      const isRowOpen = expandedClientRows.has(client.clientName);
+                      return (
+                        <React.Fragment key={client.clientName}>
+                          <tr
+                            onClick={() => toggleClientRow(client.clientName)}
+                            className="hover:bg-indigo-50/40 transition cursor-pointer"
+                          >
+                            <td className="py-3 px-4 font-bold text-slate-900">
+                              <div className="flex items-center gap-1.5">
+                                {isRowOpen ? (
+                                  <ChevronDown className="w-4 h-4 text-indigo-600 shrink-0" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                                )}
+                                <span>{client.clientName}</span>
+                                {client.repeatedIssuesCount >= 2 && (
+                                  <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                                    🔄 {client.repeatedIssuesCount} repetidos
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="px-2.5 py-1 rounded-lg font-black bg-indigo-50 text-indigo-700">
+                                {client.totalTickets} veces
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-slate-600 font-medium">
+                              {client.topCategory}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-slate-800">{client.primaryTech}</div>
+                              {client.techBreakdown.length > 1 && (
+                                <div className="text-[10px] text-slate-400">
+                                  {client.techBreakdown
+                                    .map((tb) => `${tb.techName.split(' ')[0]} (${tb.count})`)
+                                    .join(', ')}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-slate-800">
+                                Prom: {client.avgResolutionHours}h
+                              </div>
+                              <div className="text-[10px] text-slate-400">
+                                Total: {client.totalHoursSpent} hrs
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              {client.openTickets > 0 ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700">
+                                  ⏳ {client.openTickets} esperando
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
+                                  ✓ Al día
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                          {isRowOpen && (
+                            <tr>
+                              <td colSpan={6} className="bg-slate-50/90 px-4 py-3 border-b border-indigo-100">
+                                <div className="space-y-2">
+                                  <div className="text-[11px] font-black text-indigo-900 uppercase tracking-wider">
+                                    📋 Historial de tickets de {client.clientName} ({client.records.length}):
+                                  </div>
+                                  {client.records.map((rec) => (
+                                    <div
+                                      key={rec.id}
+                                      className="bg-white rounded-xl border border-slate-200 p-3 flex flex-wrap items-start justify-between gap-3"
+                                    >
+                                      <div className="space-y-1 max-w-xl">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                                            #{rec.id.slice(0, 8).toUpperCase()}
+                                          </span>
+                                          <span className="font-bold text-slate-900">{rec.title}</span>
+                                          <span className="text-[11px] text-slate-500">
+                                            · 📅 {new Date(rec.createdAt).toLocaleDateString('es-SV')} · 👨‍💻 {rec.techName} ({rec.hoursSpent}h)
+                                          </span>
+                                        </div>
+                                        {rec.description && (
+                                          <p className="text-[11px] text-slate-600 line-clamp-2">
+                                            {rec.description}
+                                          </p>
+                                        )}
+                                        {rec.hasResolutionReport ? (
+                                          <p className="text-[11px] text-emerald-800 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+                                            <strong>Causa Raíz:</strong> {rec.rootCause} | <strong>Solución:</strong> {rec.solution}
+                                          </p>
+                                        ) : rec.closedWithoutResolution ? (
+                                          <p className="text-[11px] text-red-700 bg-red-50 px-2 py-1 rounded-lg border border-red-200 font-bold">
+                                            ⚠️ Cerrado por {rec.techName} sin documentar Causa Raíz ni Solución
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                      {rec.source === 'ticket' && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate('/support/tickets', {
+                                              state: { openTicketId: rec.id },
+                                            });
+                                          }}
+                                          className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold shrink-0"
+                                        >
+                                          Ver Ticket →
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
                           )}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="px-2.5 py-1 rounded-lg font-black bg-indigo-50 text-indigo-700">
-                            {client.totalTickets} veces
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-slate-600 font-medium">
-                          {client.topCategory}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="font-bold text-slate-800">{client.primaryTech}</div>
-                          {client.techBreakdown.length > 1 && (
-                            <div className="text-[10px] text-slate-400">
-                              {client.techBreakdown
-                                .map((tb) => `${tb.techName.split(' ')[0]} (${tb.count})`)
-                                .join(', ')}
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="font-bold text-slate-800">
-                            Prom: {client.avgResolutionHours}h
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            Total: {client.totalHoursSpent} hrs
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          {client.openTickets > 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700">
-                              ⏳ {client.openTickets} esperando
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
-                              ✓ Al día
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                        </React.Fragment>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>

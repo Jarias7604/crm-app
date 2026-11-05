@@ -231,6 +231,35 @@ export const ticketService = {
         ticketId: string,
         updates: Partial<Pick<Ticket, 'status' | 'priority' | 'assigned_to' | 'title' | 'description' | 'category_id' | 'due_date' | 'lead_id' | 'findings' | 'root_cause' | 'solution' | 'created_by' | 'resolved_at' | 'parent_ticket_id' | 'estimated_hours' | 'actual_hours' | 'checklist'>> & { metadata?: Record<string, unknown> }
     ): Promise<Ticket> {
+        if (updates.status && ['resolved', 'closed'].includes(updates.status)) {
+            let findingsVal = updates.findings;
+            let rootCauseVal = updates.root_cause;
+            let solutionVal = updates.solution;
+
+            if (findingsVal === undefined || rootCauseVal === undefined || solutionVal === undefined) {
+                const { data: current } = await supabase
+                    .from('tickets')
+                    .select('findings, root_cause, solution')
+                    .eq('id', ticketId)
+                    .maybeSingle();
+                if (current) {
+                    if (findingsVal === undefined) findingsVal = current.findings;
+                    if (rootCauseVal === undefined) rootCauseVal = current.root_cause;
+                    if (solutionVal === undefined) solutionVal = current.solution;
+                }
+            }
+
+            if (
+                String(findingsVal || '').trim().length < 5 ||
+                String(rootCauseVal || '').trim().length < 5 ||
+                String(solutionVal || '').trim().length < 5
+            ) {
+                throw new Error(
+                    'Es obligatorio completar Hallazgos, Causa Raíz y Solución Aplicada en la pestaña "Resolución" antes de cerrar o resolver un ticket.'
+                );
+            }
+        }
+
         const payload: Record<string, unknown> = {
             ...updates,
             updated_at: new Date().toISOString(),

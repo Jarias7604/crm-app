@@ -215,13 +215,22 @@ export default function Tickets() {
     useEffect(() => { load(); }, [load]);
 
     useEffect(() => {
-        const state = location.state as { parentTicketId?: string } | null;
+        const state = location.state as { parentTicketId?: string; openTicketId?: string } | null;
         if (state?.parentTicketId) {
             openCreateModalWithParent(state.parentTicketId);
-            // Clear location state to avoid opening the modal again on refresh or subsequent navigation
             window.history.replaceState({}, document.title);
         }
-    }, [location.state]);
+        if (state?.openTicketId && allTickets.length > 0) {
+            const target = allTickets.find(t => t.id === state.openTicketId);
+            if (target) {
+                if (!statusFilter.includes(target.status)) {
+                    setStatusFilter(prev => [...prev, target.status]);
+                }
+                setSelected(target);
+                window.history.replaceState({}, document.title);
+            }
+        }
+    }, [location.state, allTickets, statusFilter]);
 
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
@@ -692,6 +701,15 @@ export default function Tickets() {
                                                             {ticket.resolved_at && (
                                                                 <p className="text-[9px] text-emerald-500 font-bold mt-0.5 ml-5">
                                                                     {format(new Date(ticket.resolved_at), "dd MMM · HH:mm", { locale: es })}
+                                                                </p>
+                                                            )}
+                                                            {(!ticket.findings?.trim() || !ticket.root_cause?.trim() || !ticket.solution?.trim()) ? (
+                                                                <p className="text-[9px] font-black text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded mt-1 inline-flex items-center gap-1">
+                                                                    <AlertTriangle className="w-2.5 h-2.5" /> Sin Causa Raíz / Solución
+                                                                </p>
+                                                            ) : (
+                                                                <p className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded mt-1 inline-flex items-center gap-1">
+                                                                    ✓ Resolución documentada
                                                                 </p>
                                                             )}
                                                         </div>

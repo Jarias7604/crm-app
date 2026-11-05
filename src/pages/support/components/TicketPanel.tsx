@@ -234,7 +234,26 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
         setTempAct((ticket.actual_hours ?? 0).toString());
     }, [ticket]);
 
-    async function handleSaveResolution() {
+    const hasCompleteResolution = Boolean(
+        (resForm.findings || ticket.findings || '').trim().length >= 5 &&
+        (resForm.root_cause || ticket.root_cause || '').trim().length >= 5 &&
+        (resForm.solution || ticket.solution || '').trim().length >= 5
+    );
+
+    async function handleSaveResolution(closeTicketAfterSave = false) {
+        if (closeTicketAfterSave) {
+            if (
+                resForm.findings.trim().length < 5 ||
+                resForm.root_cause.trim().length < 5 ||
+                resForm.solution.trim().length < 5
+            ) {
+                toast.error(
+                    '⚠️ Para cerrar o dar por resuelto el ticket es obligatorio describir: 1) Hallazgos, 2) Causa Raíz y 3) Solución Aplicada (mínimo 5 caracteres cada uno).'
+                );
+                return;
+            }
+        }
+
         setResSaving(true);
         try {
             let newAttachments: ResolutionAttachment[] = [...existingResAttachments];
@@ -246,20 +265,46 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                 newAttachments = [...newAttachments, ...uploaded];
                 setResUploading(false);
             }
-            const updated = await ticketService.updateTicket(ticket.id, {
-                findings: resForm.findings || null,
-                root_cause: resForm.root_cause || null,
-                solution: resForm.solution || null,
+            const updatePayload: Parameters<typeof ticketService.updateTicket>[1] = {
+                findings: resForm.findings.trim() || null,
+                root_cause: resForm.root_cause.trim() || null,
+                solution: resForm.solution.trim() || null,
                 metadata: { ...ticket.metadata, resolution_attachments: newAttachments },
-            });
+            };
+            if (closeTicketAfterSave) {
+                updatePayload.status = 'closed';
+                updatePayload.resolved_at = ticket.resolved_at || new Date().toISOString();
+            }
+            const updated = await ticketService.updateTicket(ticket.id, updatePayload);
             onUpdate(updated);
             setResFiles([]);
-            toast.success('Reporte de resolución guardado ✓');
+            if (closeTicketAfterSave) {
+                toast.success('Reporte de resolución guardado y Ticket CERRADO ✓');
+                setTab('info');
+            } else {
+                toast.success('Reporte de resolución guardado ✓');
+            }
         } catch { toast.error('Error al guardar el reporte'); }
         finally { setResSaving(false); setResUploading(false); }
     }
 
     async function handleSave() {
+        const isTryingToCloseOrResolve = ['resolved', 'closed'].includes(form.status);
+        const currentFindings = (resForm.findings || ticket.findings || '').trim();
+        const currentRootCause = (resForm.root_cause || ticket.root_cause || '').trim();
+        const currentSolution = (resForm.solution || ticket.solution || '').trim();
+
+        if (
+            isTryingToCloseOrResolve &&
+            (currentFindings.length < 5 || currentRootCause.length < 5 || currentSolution.length < 5)
+        ) {
+            toast.error(
+                '⚠️ No puedes cerrar ni resolver este ticket sin completar el Reporte de Resolución (Hallazgos, Causa Raíz y Solución Aplicada).'
+            );
+            setTab('resolution');
+            return;
+        }
+
         setSaving(true);
         try {
             const updated = await ticketService.updateTicket(ticket.id, {
@@ -270,6 +315,9 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                 created_by: form.created_by || null,
                 resolved_at: form.resolved_at ? new Date(form.resolved_at).toISOString() : null,
                 parent_ticket_id: form.parent_ticket_id || null,
+                findings: currentFindings || null,
+                root_cause: currentRootCause || null,
+                solution: currentSolution || null,
             });
             onUpdate(updated); setTab('info'); toast.success('Ticket actualizado ✓');
         } catch (err: any) {
@@ -565,7 +613,47 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                             </div>
                         )}
 
-                        {ticket.description && <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100"><p className="text-[9px] font-black text-gray-400 uppercase mb-1.5">Descripción</p><p className="text-xs text-gray-600 leading-relaxed">{ticket.description}</p></div>}
+                        {ticket.description && <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100"><p className="text-[9px] font-black text-gray-400 uppercase mb-1.5">Descripción</p><p className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">{ticket.description}</p></div>}
+
+                        {/* ── Resumen o Alerta de Reporte de Resolución ── */}
+                        {hasCompleteResolution ? (
+                            <div className="bg-emerald-50/70 rounded-xl p-3.5 border border-emerald-200 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[9px] font-black text-emerald-700 uppercase flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Reporte de Resolución Documentado
+                                    </p>
+                                    <button type="button" onClick={() => setTab('resolution')} className="text-[10px] font-bold text-emerald-700 hover:underline">
+                                        Editar reporte
+                                    </button>
+                                </div>
+                                <div className="space-y-1.5 text-xs text-gray-700">
+                                    <p><strong className="text-gray-900">Hallazgos:</strong> {ticket.findings || resForm.findings}</p>
+                                    <p><strong className="text-gray-900">Causa Raíz:</strong> {ticket.root_cause || resForm.root_cause}</p>
+                                    <p><strong className="text-gray-900">Solución:</strong> {ticket.solution || resForm.solution}</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className={`rounded-xl p-3.5 border flex items-center justify-between gap-3 ${['resolved', 'closed'].includes(ticket.status) ? 'bg-red-50 border-red-200' : 'bg-amber-50/70 border-amber-200'}`}>
+                                <div className="min-w-0">
+                                    <p className={`text-[10px] font-black uppercase flex items-center gap-1.5 ${['resolved', 'closed'].includes(ticket.status) ? 'text-red-700' : 'text-amber-800'}`}>
+                                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                        {['resolved', 'closed'].includes(ticket.status)
+                                            ? 'Cerrado sin documentar Causa Raíz ni Solución'
+                                            : 'Requisito para cerrar: Reporte de Resolución'}
+                                    </p>
+                                    <p className="text-[11px] text-gray-600 mt-0.5">
+                                        El técnico debe llenar Hallazgos, Causa Raíz y Solución Aplicada para poder cerrar este ticket.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setTab('resolution')}
+                                    className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-black shrink-0 shadow-sm transition"
+                                >
+                                    Documentar y Cerrar →
+                                </button>
+                            </div>
+                        )}
                         {/* ── Attachments Section (Max 2) ── */}
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
@@ -711,6 +799,20 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                                 />
                             </div>
                         </div>
+                        {(['resolved', 'closed'] as TicketStatus[]).includes(form.status) && !hasCompleteResolution && (
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between gap-2">
+                                <div className="text-[11px] text-red-700 font-bold leading-snug">
+                                    ⚠️ Bloqueo de Calidad: No se permite cambiar a <strong>{SC[form.status].label}</strong> sin completar Hallazgos, Causa Raíz y Solución Aplicada.
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setTab('resolution')}
+                                    className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-[10px] font-black shrink-0"
+                                >
+                                    Ir a Resolución →
+                                </button>
+                            </div>
+                        )}
                         <div>
                             <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1"><UserCheck className="w-3 h-3" />Agente</label>
                             <CustomSelect
@@ -1036,25 +1138,35 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                 {tab === 'resolution' && (
                     <div className="space-y-5">
                         {/* ── Header Banner ── */}
-                        <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-200">
-                                    <FileBadge2 className="w-5 h-5 text-white" />
+                        <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl p-4 space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-200">
+                                        <FileBadge2 className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-black text-gray-900">Reporte de Resolución Obligatorio</p>
+                                        <p className="text-[10px] text-violet-600 font-bold">Los 3 campos son obligatorios para poder cerrar o resolver el ticket</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-sm font-black text-gray-900">Reporte de Resolución</p>
-                                    <p className="text-[10px] text-violet-500 font-bold">Documenta hallazgos para evitar recurrencia</p>
-                                </div>
+                                <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${hasCompleteResolution ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                                    {hasCompleteResolution ? '✓ Completo' : '⚠ Requerido para Cerrar'}
+                                </span>
                             </div>
                         </div>
 
                         {/* ── Findings ── */}
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                                <div className="w-5 h-5 rounded-md bg-blue-100 flex items-center justify-center">
-                                    <Microscope className="w-3 h-3 text-blue-600" />
-                                </div>
-                                Findings / Hallazgos
+                            <label className="flex items-center justify-between text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                                <span className="flex items-center gap-2">
+                                    <div className="w-5 h-5 rounded-md bg-blue-100 flex items-center justify-center">
+                                        <Microscope className="w-3 h-3 text-blue-600" />
+                                    </div>
+                                    1. Findings / Hallazgos *
+                                </span>
+                                <span className={`text-[9px] font-bold ${resForm.findings.trim().length >= 5 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                    {resForm.findings.trim().length >= 5 ? '✓ Listo' : 'Obligatorio'}
+                                </span>
                             </label>
                             <textarea
                                 rows={3}
@@ -1067,11 +1179,16 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
 
                         {/* ── Root Cause ── */}
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                                <div className="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center">
-                                    <SearchCode className="w-3 h-3 text-amber-600" />
-                                </div>
-                                Causa Raíz / Root Cause
+                            <label className="flex items-center justify-between text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                                <span className="flex items-center gap-2">
+                                    <div className="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center">
+                                        <SearchCode className="w-3 h-3 text-amber-600" />
+                                    </div>
+                                    2. Causa Raíz / Root Cause *
+                                </span>
+                                <span className={`text-[9px] font-bold ${resForm.root_cause.trim().length >= 5 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                    {resForm.root_cause.trim().length >= 5 ? '✓ Listo' : 'Obligatorio'}
+                                </span>
                             </label>
                             <textarea
                                 rows={3}
@@ -1084,11 +1201,16 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
 
                         {/* ── Solution ── */}
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-wider">
-                                <div className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center">
-                                    <Lightbulb className="w-3 h-3 text-emerald-600" />
-                                </div>
-                                Solución Aplicada
+                            <label className="flex items-center justify-between text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                                <span className="flex items-center gap-2">
+                                    <div className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center">
+                                        <Lightbulb className="w-3 h-3 text-emerald-600" />
+                                    </div>
+                                    3. Solución Aplicada *
+                                </span>
+                                <span className={`text-[9px] font-bold ${resForm.solution.trim().length >= 5 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                    {resForm.solution.trim().length >= 5 ? '✓ Listo' : 'Obligatorio'}
+                                </span>
                             </label>
                             <textarea
                                 rows={4}
@@ -1453,15 +1575,27 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
 
             {/* ── Save Button (Resolution tab) ── */}
             {tab === 'resolution' && (
-                <div className="px-5 py-4 border-t border-violet-100 bg-gradient-to-t from-violet-50/60 to-white">
-                    <button
-                        onClick={handleSaveResolution}
-                        disabled={resSaving || resUploading}
-                        className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-violet-200/50 disabled:opacity-60 transition-all"
-                    >
-                        {resSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : resUploading ? <UploadCloud className="w-4 h-4 animate-pulse" /> : <FileBadge2 className="w-4 h-4" />}
-                        {resSaving ? 'Guardando...' : resUploading ? 'Subiendo archivos...' : 'Guardar Reporte'}
-                    </button>
+                <div className="px-5 py-4 border-t border-violet-100 bg-gradient-to-t from-violet-50/60 to-white space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            onClick={() => handleSaveResolution(false)}
+                            disabled={resSaving || resUploading}
+                            className="w-full bg-white hover:bg-violet-50 text-violet-700 border border-violet-200 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-60 transition-all"
+                        >
+                            {resSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                            Guardar Avance
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleSaveResolution(true)}
+                            disabled={resSaving || resUploading}
+                            className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-200/50 disabled:opacity-60 transition-all"
+                        >
+                            {resSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : resUploading ? <UploadCloud className="w-3.5 h-3.5 animate-pulse" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                            {['resolved', 'closed'].includes(ticket.status) ? 'Guardar Resolución ✓' : 'Guardar y Cerrar Ticket ✓'}
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
