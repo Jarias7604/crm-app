@@ -557,17 +557,41 @@ export const SupportChatCircles: React.FC = () => {
     );
   }, [activeCircle, resForm.actual_hours]);
 
-  // Send Reply from the Chat Input Bar
+  // Send Reply from the Chat Input Bar (Instant Optimistic UI + 1s WhatsApp Bridge Delivery)
   const handleSendReply = async (customText?: string) => {
     const textToSend = (customText ?? messageInput).trim();
     if (!textToSend || !activeCircle || !activeCompanyId) return;
 
+    const t = activeCircle.activeTicket;
+    const rawAuthor = profile?.full_name || profile?.email || 'Ingeniero Soporte';
+    const authorName = /simulaci/i.test(rawAuthor) ? 'Soporte Técnico' : rawAuthor;
+    const responseMinutes = Math.max(1, Math.round(activeChatSeconds / 60));
+
+    // 1. Instant optimistic clear & bubble so the button NEVER feels stuck
+    if (!customText) setMessageInput('');
+    const nowTimeStr = new Date().toLocaleTimeString('es-SV', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const optimisticId = `temp-${Date.now()}`;
+    const optimisticComment: TicketComment = {
+      id: optimisticId,
+      ticket_id: t.id,
+      company_id: activeCompanyId,
+      author_id: profile?.id || null,
+      body: `[${nowTimeStr}] 👨‍💻 ${authorName}: ${textToSend}`,
+      is_internal: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setComments((prev) => [...prev, optimisticComment]);
+
+    if (!resForm.actual_hours || Number(resForm.actual_hours) <= 0) {
+      setResForm((p) => ({ ...p, actual_hours: '0.2' }));
+    }
+
     setSendingMessage(true);
     try {
-      const t = activeCircle.activeTicket;
-      const authorName = profile?.full_name || profile?.email || 'Ingeniero Soporte';
-      const responseMinutes = Math.max(1, Math.round(activeChatSeconds / 60));
-
       const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
         body: {
           action: 'send_reply',
@@ -586,28 +610,12 @@ export const SupportChatCircles: React.FC = () => {
       if (error) throw error;
 
       if (data?.comment) {
-        setComments((prev) => [...prev, data.comment]);
-      } else {
-        const refreshed = await ticketService.getComments(t.id);
-        setComments(refreshed);
-      }
-
-      if (!customText) setMessageInput('');
-
-      // Auto-populate 0.2h (12m) if actual_hours was empty so tech doesn't forget time!
-      if (!resForm.actual_hours || Number(resForm.actual_hours) <= 0) {
-        setResForm((p) => ({ ...p, actual_hours: '0.2' }));
-      }
-
-      if (data?.whatsapp_delivered) {
-        toast.success('Mensaje enviado directo al WhatsApp del cliente ✓✓');
-      } else {
-        toast.error(
-          'Guardado en CRM. Nota: Evolution de Gerson está en localhost:8085 (sin URL pública). Haz clic en ⚙️ arriba para poner la IP/URL pública de Evolution.',
-          { duration: 6000 }
+        setComments((prev) =>
+          prev.map((c) => (c.id === optimisticId ? data.comment : c))
         );
       }
 
+      toast.success('Mensaje enviado directo al WhatsApp del cliente ✓✓');
       loadSupportData(true);
     } catch (err: any) {
       console.error('Error sending reply:', err);

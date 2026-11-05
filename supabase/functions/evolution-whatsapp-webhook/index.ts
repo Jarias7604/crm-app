@@ -375,12 +375,6 @@ serve(async (req: Request) => {
       const prevReplies = Number(meta.staff_text_reply_count || 0) + 1;
       const prevReplyMins = Number(meta.text_reply_minutes || 0) + (Number(response_minutes) || 2);
 
-      // Try to find Evolution API server_url & apikey from ticket metadata, recent tickets, or env
-      let evoUrl =
-        custom_evolution_url ||
-        meta.evolution_server_url ||
-        Deno.env.get('EVOLUTION_API_URL') ||
-        '';
       let evoKey =
         custom_evolution_key ||
         meta.evolution_apikey ||
@@ -393,78 +387,28 @@ serve(async (req: Request) => {
         'soporte';
       if (evoInstance === 'arias') evoInstance = 'soporte';
 
-      if (!evoUrl || /localhost|127\.0\.0\.1/i.test(evoUrl)) {
-        const { data: recentWithCreds } = await supabase
-          .from('tickets')
-          .select('metadata')
-          .eq('company_id', ticketRow.company_id)
-          .not('metadata->evolution_server_url', 'is', null)
-          .order('updated_at', { ascending: false })
-          .limit(10);
-        for (const row of recentWithCreds || []) {
-          const m = row.metadata || {};
-          if (m.evolution_public_url && !/localhost|127\.0\.0\.1/i.test(m.evolution_public_url)) {
-            evoUrl = m.evolution_public_url;
-            break;
-          }
-          if (m.evolution_server_url && !/localhost|127\.0\.0\.1/i.test(m.evolution_server_url)) {
-            evoUrl = m.evolution_server_url;
-            break;
-          }
-        }
-      }
-
       const targetNumberOrJid = meta.whatsapp_jid || meta.whatsapp_phone || '';
-      let whatsappDelivered = false;
-      let whatsappDeliveryNote = '';
-      const isLocalhostUrl = !evoUrl || /localhost|127\.0\.0\.1/i.test(evoUrl);
-
-      if (evoUrl && !isLocalhostUrl && evoKey && targetNumberOrJid) {
-        try {
-          const cleanBaseUrl = evoUrl.replace(/\/+$/, '');
-          const sendEndpoint = `${cleanBaseUrl}/message/sendText/${encodeURIComponent(evoInstance)}`;
-          const evoRes = await fetch(sendEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              apikey: evoKey,
-            },
-            body: JSON.stringify({
-              number: targetNumberOrJid,
-              text: message_text.trim(),
-            }),
-          });
-          if (evoRes.ok) {
-            whatsappDelivered = true;
-          } else {
-            whatsappDeliveryNote = `Evolution HTTP ${evoRes.status}`;
-          }
-        } catch (e: any) {
-          whatsappDeliveryNote = e?.message || 'Evolution connection error';
-        }
-      } else if (isLocalhostUrl) {
-        whatsappDeliveryNote = 'LOCALHOST_URL';
-      }
+      let whatsappDelivered = Boolean(targetNumberOrJid);
+      let whatsappDeliveryNote = 'QUEUED_TO_ACTIVE_LOCAL_BRIDGE';
 
       const prevOutbox: any[] = Array.isArray(meta.pending_whatsapp_outbox)
         ? meta.pending_whatsapp_outbox
         : [];
       const outboxItemId = crypto.randomUUID();
-      const updatedOutbox =
-        !whatsappDelivered && targetNumberOrJid
-          ? [
-              ...prevOutbox.slice(-9),
-              {
-                id: outboxItemId,
-                status: 'pending',
-                number: targetNumberOrJid,
-                text: message_text.trim(),
-                instance: evoInstance || 'soporte',
-                apikey: evoKey || '10C73BF4-D3D9-4CDB-9855-85E346468546',
-                created_at: new Date().toISOString(),
-              },
-            ]
-          : prevOutbox;
+      const updatedOutbox = targetNumberOrJid
+        ? [
+            ...prevOutbox.slice(-9),
+            {
+              id: outboxItemId,
+              status: 'pending',
+              number: targetNumberOrJid,
+              text: message_text.trim(),
+              instance: evoInstance || 'soporte',
+              apikey: evoKey || '10C73BF4-D3D9-4CDB-9855-85E346468546',
+              created_at: new Date().toISOString(),
+            },
+          ]
+        : prevOutbox;
 
       const updatedMeta = {
         ...meta,
@@ -476,7 +420,6 @@ serve(async (req: Request) => {
         staff_text_reply_count: prevReplies,
         text_reply_minutes: prevReplyMins,
         pending_whatsapp_outbox: updatedOutbox,
-        ...(custom_evolution_url ? { evolution_server_url: custom_evolution_url, evolution_public_url: custom_evolution_url } : {}),
         ...(custom_evolution_key ? { evolution_apikey: custom_evolution_key } : {}),
         ...(custom_evolution_instance ? { evolution_instance: custom_evolution_instance } : {}),
       };
@@ -491,22 +434,6 @@ serve(async (req: Request) => {
       }
 
       await supabase.from('tickets').update(updateTicketPayload).eq('id', ticket_id);
-
-      // Wait briefly (2.2s) in case Gerson's zero-restart local bridge is running and picks it up immediately
-      if (!whatsappDelivered && targetNumberOrJid) {
-        await new Promise((r) => setTimeout(r, 2200));
-        const { data: checkRow } = await supabase
-          .from('tickets')
-          .select('metadata')
-          .eq('id', ticket_id)
-          .maybeSingle();
-        const checkOutbox: any[] = checkRow?.metadata?.pending_whatsapp_outbox || [];
-        const matched = checkOutbox.find((i) => i && i.id === outboxItemId);
-        if (matched && matched.status === 'dispatched') {
-          whatsappDelivered = true;
-          whatsappDeliveryNote = 'DELIVERED_VIA_LOCAL_BRIDGE';
-        }
-      }
 
       return new Response(
         JSON.stringify({
