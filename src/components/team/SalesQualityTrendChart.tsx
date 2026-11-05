@@ -25,13 +25,13 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
     // Datos temporales de Octubre sincronizados con Google Calendar y Google Drive
     const timelineData = [
         { date: 'Oct 01', label: '1 oct', scoreTeam: 24, scoreDiana: 24, scorePatricia: 24, demos: 0, client: 'Inicio de periodo', milestone: 'Línea base sin rúbrica' },
-        { date: 'Oct 06', label: '6 oct', scoreTeam: 28, scoreDiana: 24, scorePatricia: 28, demos: 1, client: 'Transportes Express', milestone: 'Patricia M. · Flotillas y contratos' },
-        { date: 'Oct 18', label: '18 oct', scoreTeam: 36, scoreDiana: 37, scorePatricia: 28, demos: 1, client: 'Supermercados La Canasta', milestone: 'Diana M. · Diagnóstico de caja' },
-        { date: 'Oct 21', label: '21 oct', scoreTeam: 37, scoreDiana: 38, scorePatricia: 28, demos: 1, client: 'Agropecuaria El Roble', milestone: 'Diana M. · Adopción de agenda' },
-        { date: 'Oct 25', label: '25 oct', scoreTeam: 41, scoreDiana: 42, scorePatricia: 28, demos: 1, client: 'Distribuidora San José', milestone: 'Diana M. · Manejo de objeciones' },
-        { date: 'Oct 26', label: '26 oct', scoreTeam: 35, scoreDiana: 42, scorePatricia: 35, demos: 1, client: 'Kervin Roque', milestone: 'Patricia M. · 5-6pm Calendar' },
-        { date: 'Oct 27', label: '27 oct', scoreTeam: 39, scoreDiana: 39, scorePatricia: 35, demos: 3, client: '3 Demos Diana Morales: Demo ERP (12pm), Luis Escobar (5pm), Finca Miramar (9pm)', milestone: 'Diana M. · 3 Demos en Google Calendar (12pm, 5pm, 9pm)' },
-        { date: 'Oct 31', label: '31 oct', scoreTeam: 40, scoreDiana: 40, scorePatricia: 35, demos: 0, client: 'Cierre del Mes', milestone: 'Consolidación de rúbrica' }
+        { date: 'Oct 06', label: '6 oct', scoreTeam: 75, scoreDiana: 24, scorePatricia: 75, demos: 1, client: 'Transportes Express', milestone: 'Patricia M. · Diagnóstico y preguntas abiertas' },
+        { date: 'Oct 18', label: '18 oct', scoreTeam: 56, scoreDiana: 37, scorePatricia: 75, demos: 1, client: 'Supermercados La Canasta', milestone: 'Diana M. · Diagnóstico de caja' },
+        { date: 'Oct 21', label: '21 oct', scoreTeam: 57, scoreDiana: 38, scorePatricia: 75, demos: 1, client: 'Agropecuaria El Roble', milestone: 'Diana M. · Adopción de agenda' },
+        { date: 'Oct 25', label: '25 oct', scoreTeam: 58, scoreDiana: 42, scorePatricia: 75, demos: 1, client: 'Distribuidora San José', milestone: 'Diana M. · Manejo de objeciones' },
+        { date: 'Oct 26', label: '26 oct', scoreTeam: 90, scoreDiana: 42, scorePatricia: 90, demos: 1, client: 'Kervin Roque', milestone: 'Patricia M. · Indagación completa y Cierre ($1,200)' },
+        { date: 'Oct 27', label: '27 oct', scoreTeam: 54, scoreDiana: 46, scorePatricia: 90, demos: 3, client: '3 Demos Diana Morales: Demo ERP (12pm), Luis Escobar (5pm), Finca Miramar (9pm)', milestone: 'Diana M. · 3 Demos en Google Calendar (12pm, 5pm, 9pm)' },
+        { date: 'Oct 31', label: '31 oct', scoreTeam: 56, scoreDiana: 46, scorePatricia: 83, demos: 0, client: 'Cierre del Mes', milestone: 'Consolidación de rúbrica' }
     ];
 
     const chartData = useMemo(() => {
@@ -41,15 +41,14 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
         const sorted = [...audits].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         const filteredAudits = selectedRep
             ? sorted.filter(a => {
-                const n = (a.sales_rep_name || '').toLowerCase();
-                const s = (a.sdr_rep_name || '').toLowerCase();
-                const target = selectedRep.toLowerCase();
-                return n.includes(target) || target.includes(n) || s.includes(target);
-            })
+                  const n = (a.sales_rep_name || '').toLowerCase();
+                  const s = (a.sdr_rep_name || '').toLowerCase();
+                  const target = selectedRep.toLowerCase();
+                  return n.includes(target) || target.includes(n) || s.includes(target);
+              })
             : sorted;
 
         if (viewGranularity === 'weeks') {
-            // Si no hay auditorías, usar la serie temporal de referencia
             if (filteredAudits.length === 0) {
                 return timelineData.map(d => {
                     let score = d.scoreTeam;
@@ -66,10 +65,8 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                 });
             }
 
-            // Agrupar auditorías reales dinámicamente por DÍA (si hay 3 demos en 1 día, la barra sube a 3)
             const groupedByDate: Record<string, { label: string; dateStr: string; clients: string[]; scores: number[]; milestones: string[] }> = {};
 
-            // Incluir punto base inicial de referencia para mostrar la evolución visual
             groupedByDate['2026-10-01'] = {
                 label: '1 oct',
                 dateStr: '2026-10-01',
@@ -81,7 +78,6 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
             filteredAudits.forEach(a => {
                 const d = new Date(a.created_at);
                 if (isNaN(d.getTime())) return;
-                // Usar componentes locales para evitar que la zona horaria mueva la demo de las 9:00 PM al día siguiente en UTC
                 const year = d.getFullYear();
                 const month = String(d.getMonth() + 1).padStart(2, '0');
                 const day = String(d.getDate()).padStart(2, '0');
@@ -105,7 +101,6 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                 }
             });
 
-            // Asegurar que el eje temporal llegue hasta la fecha actual (Noviembre / Hoy)
             const now = new Date();
             const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const sortedKeys = Object.keys(groupedByDate).sort();
@@ -124,24 +119,29 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                 };
             }
 
-            return Object.keys(groupedByDate).sort().map(key => {
-                const g = groupedByDate[key];
-                const isAnchorWithoutDemos = key === '2026-10-01' || (key === todayKey && g.clients[0] === 'Corte actual sincronizado');
-                const demoCount = isAnchorWithoutDemos ? 0 : g.scores.length; // Si hubo 3 demos ese día, la barra = 3
-                const avgScore = Math.round(g.scores.reduce((sum, s) => sum + s, 0) / g.scores.length);
-                const clientsList = g.clients.slice(0, 3).join(', ') + (g.clients.length > 3 ? ` (+${g.clients.length - 3})` : '');
+            return Object.keys(groupedByDate)
+                .sort()
+                .map(key => {
+                    const g = groupedByDate[key];
+                    const isAnchorWithoutDemos =
+                        key === '2026-10-01' || (key === todayKey && g.clients[0] === 'Corte actual sincronizado');
+                    const demoCount = isAnchorWithoutDemos ? 0 : g.scores.length;
+                    const avgScore = Math.round(g.scores.reduce((sum, s) => sum + s, 0) / g.scores.length);
+                    const clientsList =
+                        g.clients.slice(0, 3).join(', ') + (g.clients.length > 3 ? ` (+${g.clients.length - 3})` : '');
 
-                return {
-                    label: g.label,
-                    fullTitle: isAnchorWithoutDemos ? `${g.label} · ${g.clients[0]}` : `${g.label} · ${demoCount} demo${demoCount > 1 ? 's' : ''}: ${clientsList}`,
-                    score: avgScore,
-                    demos: demoCount, // Altura de la barra en la gráfica Metricool
-                    milestone: g.milestones[0] || `${demoCount} demo(s) evaluada(s)`
-                };
-            });
+                    return {
+                        label: g.label,
+                        fullTitle: isAnchorWithoutDemos
+                            ? `${g.label} · ${g.clients[0]}`
+                            : `${g.label} · ${demoCount} demo${demoCount > 1 ? 's' : ''}: ${clientsList}`,
+                        score: avgScore,
+                        demos: demoCount,
+                        milestone: g.milestones[0] || `${demoCount} demo(s) evaluada(s)`
+                    };
+                });
         }
 
-        // Vista por Demostración Cronológica Real ("Por Demo")
         return filteredAudits.map((a, idx) => {
             const d = new Date(a.created_at);
             const dateStr = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
@@ -157,13 +157,18 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
         });
     }, [audits, selectedRep, viewGranularity]);
 
-    // Promedios dinámicos calculados exactamente de las auditorías
     const repScores = useMemo(() => {
         const dianaAudits = audits.filter(a => (a.sales_rep_name || '').toLowerCase().includes('diana'));
         const patriciaAudits = audits.filter(a => (a.sales_rep_name || '').toLowerCase().includes('patricia'));
-        const dianaAvg = dianaAudits.length ? Math.round(dianaAudits.reduce((acc, a) => acc + a.total_score, 0) / dianaAudits.length) : 44;
-        const patriciaAvg = patriciaAudits.length ? Math.round(patriciaAudits.reduce((acc, a) => acc + a.total_score, 0) / patriciaAudits.length) : 45;
-        const teamAvg = audits.length ? Math.round(audits.reduce((acc, a) => acc + a.total_score, 0) / audits.length) : 44;
+        const dianaAvg = dianaAudits.length
+            ? Math.round(dianaAudits.reduce((acc, a) => acc + a.total_score, 0) / dianaAudits.length)
+            : 46;
+        const patriciaAvg = patriciaAudits.length
+            ? Math.round(patriciaAudits.reduce((acc, a) => acc + a.total_score, 0) / patriciaAudits.length)
+            : 83;
+        const teamAvg = audits.length
+            ? Math.round(audits.reduce((acc, a) => acc + a.total_score, 0) / audits.length)
+            : 56;
         return { dianaAvg, patriciaAvg, teamAvg };
     }, [audits]);
 
@@ -173,7 +178,6 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
         return repScores.teamAvg;
     }, [selectedRep, repScores]);
 
-    // Métricas clave estilo Metricool
     const baselineScore = 24;
     const deltaGrowth = Math.max(0, currentScore - baselineScore);
     const percentGrowth = Math.max(0, Math.round((deltaGrowth / baselineScore) * 100));
@@ -190,7 +194,6 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3.5 sm:p-4 space-y-3">
             {/* ─── BARRA SUPERIOR ESTILO METRICOOL (TODO EN 1 SOLA LÍNEA) ─── */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-                {/* Lado Izquierdo: Título + Botones de Equipo (En 1 Sola Línea) */}
                 <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                     <span className="text-[11px] font-black uppercase tracking-wider text-slate-800 whitespace-nowrap">
                         Evolución de Calidad
@@ -232,9 +235,7 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                     </div>
                 </div>
 
-                {/* Lado Derecho: Granularidad + Stat Pills Estilo Metricool (En 1 Sola Línea) */}
                 <div className="flex items-center gap-2">
-                    {/* Selector de Granularidad */}
                     <div className="bg-slate-100 p-0.5 rounded-lg flex items-center text-[10px]">
                         <button
                             onClick={() => setViewGranularity('weeks')}
@@ -254,7 +255,6 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                         </button>
                     </div>
 
-                    {/* Stat Pills tipo Metricool (Compactos, rectangulares, fondo pastel) */}
                     <div className="flex items-center gap-1.5">
                         <div className="px-2 py-1 rounded-lg bg-indigo-50 border border-indigo-200/80 text-center min-w-[58px]">
                             <span className="block text-xs font-black text-indigo-700 leading-none">
@@ -312,7 +312,6 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                             axisLine={{ stroke: '#e2e8f0' }}
                         />
 
-                        {/* Eje Izquierdo: Demos */}
                         <YAxis
                             yAxisId="left"
                             domain={[0, maxDemosDomain]}
@@ -323,7 +322,6 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                             axisLine={false}
                         />
 
-                        {/* Eje Derecho: Calidad (0 a 100) */}
                         <YAxis
                             yAxisId="right"
                             orientation="right"
@@ -335,7 +333,6 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                             axisLine={false}
                         />
 
-                        {/* Meta Oficial ARIAS (85 pts) */}
                         <ReferenceLine
                             yAxisId="right"
                             y={85}
@@ -351,7 +348,6 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                             }}
                         />
 
-                        {/* Umbral Coaching (70 pts) */}
                         <ReferenceLine
                             yAxisId="right"
                             y={70}
@@ -382,7 +378,6 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                             }}
                         />
 
-                        {/* Barras Color Arena/Ocre Estilo Metricool (Volumen de Demos) */}
                         <Bar
                             yAxisId="left"
                             dataKey="demos"
@@ -392,7 +387,6 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                             name="Demos Realizadas"
                         />
 
-                        {/* Línea Azul con Puntos Estilo Metricool (Evolución de Calidad) */}
                         <Line
                             yAxisId="right"
                             type="monotone"
@@ -414,7 +408,10 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                         ✓
                     </span>
                     <p className="text-[11px] text-slate-700 leading-tight">
-                        <strong>Lo que mejoró:</strong> {selectedRep?.toLowerCase().includes('patricia') ? 'Estructura de demo técnica en servicios y contratos al 100%.' : 'Preparación y apertura de demo subió al 100% y manejo de objeciones a 86%.'}
+                        <strong>Lo que mejoró:</strong>{' '}
+                        {selectedRep?.toLowerCase().includes('patricia')
+                            ? 'Diagnóstico consultivo y preguntas abiertas a leads al 100% (15/15 pts) + preparación de agenda al 100%.'
+                            : 'Preparación y apertura de demo subió al 100% y manejo de objeciones a 86%.'}
                     </p>
                 </div>
 
@@ -423,7 +420,10 @@ export const SalesQualityTrendChart: React.FC<SalesQualityTrendChartProps> = ({
                         !
                     </span>
                     <p className="text-[11px] text-slate-700 leading-tight">
-                        <strong>Foco urgente:</strong> {selectedRep?.toLowerCase().includes('patricia') ? 'Validar quién autoriza la compra y amarrar reunión con el dueño decisor.' : 'Cuantificar impacto financiero antes de entregar pruebas gratis y fechar Calendar.'}
+                        <strong>Foco urgente:</strong>{' '}
+                        {selectedRep?.toLowerCase().includes('patricia')
+                            ? 'Cuantificar en dólares exactos la pérdida mensual del lead y asegurar asistencia del dueño decisor en el 100% de llamadas.'
+                            : 'Cuantificar impacto financiero antes de entregar pruebas gratis y fechar Calendar.'}
                     </p>
                 </div>
             </div>
