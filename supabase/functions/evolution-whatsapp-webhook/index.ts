@@ -299,7 +299,7 @@ serve(async (req: Request) => {
             });
             const b64FindReq = btoa(unescape(encodeURIComponent(findReqJson)));
             shellLines.push(
-              `MSG_KEY=$(echo "${b64FindReq}" | base64 -d | curl -s -X POST "http://localhost:8085/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${key}" -d @- | grep -o '{"id":"[^"]*","fromMe":false,"remoteJid":"[^"]*"}' | head -n 1); if [ -n "$MSG_KEY" ]; then curl -s -X POST "http://localhost:8085/chat/getBase64FromMediaMessage/${inst}" -H "Content-Type: application/json" -H "apikey: ${key}" -d "{\\"message\\":{\\"key\\":$MSG_KEY},\\"convertToMp4\\":false}" | curl -s -X POST "${uploadUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1; fi`
+              `MSG_KEY=$(echo "${b64FindReq}" | base64 -d | curl -s -X POST "http://localhost:8085/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${key}" -d @- | jq -c '(.. | objects | select(.messageType? == "audioMessage" or .message?.audioMessage != null) | .key) // empty' 2>/dev/null | head -n 1); if [ -n "$MSG_KEY" ]; then curl -s -X POST "http://localhost:8085/chat/getBase64FromMediaMessage/${inst}" -H "Content-Type: application/json" -H "apikey: ${key}" -d "{\\"message\\":{\\"key\\":$MSG_KEY},\\"convertToMp4\\":false}" | curl -s -X POST "${uploadUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1; fi`
             );
           }
         }
