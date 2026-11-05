@@ -80,6 +80,7 @@ export default function PayrollManager() {
   const [rejectModalOpen, setRejectModalOpen] = useState<boolean>(false);
   const [selectedEntryToReject, setSelectedEntryToReject] = useState<TimesheetEntry | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState<string>('');
+  const [rejectingTimesheet, setRejectingTimesheet] = useState<boolean>(false);
 
   // Delete Timesheet Modal (Hard Delete exclusivo de Administrador)
   const [deleteModalOpen, setDeleteModalOpen] = useState<boolean>(false);
@@ -276,14 +277,21 @@ export default function PayrollManager() {
     setEndDate(nextEnd.toISOString().split('T')[0]);
   };
 
-  // ── Aprobación y Rechazo de Overtime ───────────────────────────
+  // ── Aprobación y Rechazo de Jornadas y Overtime ───────────────────────────
 
   const handleApprove = async (entry: TimesheetEntry) => {
-    if (!profile?.id) return;
-    const res = await timesheetsService.approveTimesheet(entry.id, profile.id);
+    const reviewerId = profile?.id || entry.user_id;
+    const res = await timesheetsService.approveTimesheet(entry.id, reviewerId);
     if (res.success) {
-      toast.success(`Horas extras de ${entry.user_name} aprobadas (+${entry.overtime_hours}h)`);
+      toast.success(
+        entry.overtime_hours > 0
+          ? `Jornada y horas extras de ${entry.user_name} aprobadas (+${entry.overtime_hours}h)`
+          : `Jornada de ${entry.user_name} (${entry.regular_hours}h) aprobada.`
+      );
       await loadAllData();
+      if (inspectingMember) {
+        await refreshMemberDays(inspectingMember.id);
+      }
     } else {
       toast.error('Error al aprobar: ' + res.error);
     }
@@ -291,24 +299,48 @@ export default function PayrollManager() {
 
   const handleOpenReject = (entry: TimesheetEntry) => {
     setSelectedEntryToReject(entry);
-    setRejectionReasonInput('Horas extras no autorizadas previamente.');
+    setRejectionReasonInput(
+      entry.overtime_hours > 0
+        ? 'Horas extras no autorizadas previamente.'
+        : 'Falta detallar entregables reales o respaldar las horas en tickets/tareas.'
+    );
     setRejectModalOpen(true);
   };
 
   const handleConfirmReject = async () => {
-    if (!selectedEntryToReject || !profile?.id) return;
-    const res = await timesheetsService.rejectTimesheet(
-      selectedEntryToReject.id, 
-      profile.id, 
-      rejectionReasonInput
-    );
-    if (res.success) {
-      toast.success('Horas extras rechazadas. Quedan excluidas de la nómina.');
-      setRejectModalOpen(false);
-      setSelectedEntryToReject(null);
-      await loadAllData();
-    } else {
-      toast.error('Error al rechazar: ' + res.error);
+    if (!selectedEntryToReject) return;
+    setRejectingTimesheet(true);
+    try {
+      const reviewerId = profile?.id || selectedEntryToReject.user_id;
+      const reason =
+        rejectionReasonInput.trim() ||
+        (selectedEntryToReject.overtime_hours > 0
+          ? 'Horas extras no autorizadas previamente.'
+          : 'Jornada rechazada por falta de respaldo o detalle de entregables.');
+      const res = await timesheetsService.rejectTimesheet(
+        selectedEntryToReject.id,
+        reviewerId,
+        reason
+      );
+      if (res.success) {
+        toast.success(
+          selectedEntryToReject.overtime_hours > 0
+            ? `Horas extras de ${selectedEntryToReject.user_name} rechazadas y excluidas de nómina.`
+            : `Jornada de ${selectedEntryToReject.user_name} rechazada. El colaborador podrá corregirla.`
+        );
+        setRejectModalOpen(false);
+        setSelectedEntryToReject(null);
+        await loadAllData();
+        if (inspectingMember) {
+          await refreshMemberDays(inspectingMember.id);
+        }
+      } else {
+        toast.error('Error al rechazar: ' + res.error);
+      }
+    } catch (err: any) {
+      toast.error('Error inesperado al rechazar: ' + err.message);
+    } finally {
+      setRejectingTimesheet(false);
     }
   };
 
@@ -4349,16 +4381,40 @@ export default function PayrollManager() {
                         </span>
                       </div>
 
-                      {/* Botón de Eliminación Directa de la Jornada */}
-                      <button
-                        type="button"
-                        onClick={() => handleOpenDelete(entry)}
-                        title="Eliminar permanentemente este día (Admin)"
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Eliminar Día</span>
-                      </button>
+                      {/* Botones de Acción Directa de la Jornada (Aprobar / Rechazar / Eliminar) */}
+                      <div className="flex items-center gap-1.5">
+                        {entry.status !== 'approved' && (
+                          <button
+                            type="button"
+                            onClick={() => handleApprove(entry)}
+                            title="Aprobar esta jornada"
+                            className="p-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Aprobar</span>
+                          </button>
+                        )}
+                        {entry.status !== 'rejected' && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenReject(entry)}
+                            title="Rechazar esta jornada para que el colaborador la corrija"
+                            className="p-1.5 text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Rechazar</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDelete(entry)}
+                          title="Eliminar permanentemente este día (Admin)"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Eliminar Día</span>
+                        </button>
+                      </div>
                     </div>
 
                     {entry.work_summary && (
@@ -4387,6 +4443,118 @@ export default function PayrollManager() {
                 className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 11B. MODAL DE RECHAZO DE JORNADA U HORAS EXTRAS ── */}
+      {rejectModalOpen && selectedEntryToReject && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-rose-100 animate-scaleUp">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 text-rose-600">
+                <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                  <XCircle className="w-5 h-5 text-rose-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">
+                    {selectedEntryToReject.overtime_hours > 0
+                      ? 'Rechazar Jornada / Horas Extras'
+                      : 'Rechazar Jornada Laboral'}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Quedará excluida de la nómina hasta ser corregida
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setRejectModalOpen(false);
+                  setSelectedEntryToReject(null);
+                }}
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center font-bold text-xs transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-xs space-y-1.5 text-slate-700">
+              <p><strong>Colaborador:</strong> {selectedEntryToReject.user_name}</p>
+              <p><strong>Fecha de labor:</strong> {selectedEntryToReject.work_date}</p>
+              <p>
+                <strong>Horas reportadas:</strong> {selectedEntryToReject.regular_hours}h regulares
+                {selectedEntryToReject.overtime_hours > 0 ? ` + ${selectedEntryToReject.overtime_hours}h extras` : ' (Sin overtime)'}
+              </p>
+              {selectedEntryToReject.work_summary && (
+                <p className="line-clamp-3"><strong>Entregables:</strong> {selectedEntryToReject.work_summary}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-700">
+                Motivo del rechazo (lo verá el colaborador):
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'Falta respaldar las horas en tickets o tareas reales.',
+                  'Descripción de entregables incompleta ("en tickets" no es válido).',
+                  'Horas extras no autorizadas previamente.',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setRejectionReasonInput(preset)}
+                    className={`text-[10px] px-2 py-1 rounded-lg border font-semibold transition cursor-pointer ${
+                      rejectionReasonInput === preset
+                        ? 'bg-rose-50 text-rose-700 border-rose-300'
+                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <textarea
+                rows={3}
+                value={rejectionReasonInput}
+                onChange={(e) => setRejectionReasonInput(e.target.value)}
+                placeholder="Escribe por qué se rechaza esta jornada..."
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={rejectingTimesheet}
+                onClick={() => {
+                  setRejectModalOpen(false);
+                  setSelectedEntryToReject(null);
+                }}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={rejectingTimesheet}
+                onClick={handleConfirmReject}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {rejectingTimesheet ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    Rechazando...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3.5 h-3.5" />
+                    Confirmar Rechazo
+                  </>
+                )}
               </button>
             </div>
           </div>

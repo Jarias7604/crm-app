@@ -369,16 +369,27 @@ export const timesheetsService = {
 
   async approveTimesheet(id: string, reviewerId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
+      const payload: Record<string, any> = {
+        status: 'approved',
+        reviewed_at: new Date().toISOString(),
+        rejection_reason: null,
+        updated_at: new Date().toISOString(),
+      };
+      if (reviewerId) payload.reviewed_by = reviewerId;
+
+      let { error } = await supabase
         .from('team_timesheets')
-        .update({
-          status: 'approved',
-          reviewed_by: reviewerId,
-          reviewed_at: new Date().toISOString(),
-          rejection_reason: null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(payload)
         .eq('id', id);
+
+      if (error && payload.reviewed_by) {
+        delete payload.reviewed_by;
+        const retry = await supabase
+          .from('team_timesheets')
+          .update(payload)
+          .eq('id', id);
+        error = retry.error;
+      }
 
       if (error) throw error;
       return { success: true };
@@ -389,16 +400,27 @@ export const timesheetsService = {
 
   async rejectTimesheet(id: string, reviewerId: string, reason: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const { error } = await supabase
+      const payload: Record<string, any> = {
+        status: 'rejected',
+        reviewed_at: new Date().toISOString(),
+        rejection_reason: reason || 'Horas extras no autorizadas',
+        updated_at: new Date().toISOString(),
+      };
+      if (reviewerId) payload.reviewed_by = reviewerId;
+
+      let { error } = await supabase
         .from('team_timesheets')
-        .update({
-          status: 'rejected',
-          reviewed_by: reviewerId,
-          reviewed_at: new Date().toISOString(),
-          rejection_reason: reason || 'Horas extras no autorizadas',
-          updated_at: new Date().toISOString(),
-        })
+        .update(payload)
         .eq('id', id);
+
+      if (error && payload.reviewed_by) {
+        delete payload.reviewed_by;
+        const retry = await supabase
+          .from('team_timesheets')
+          .update(payload)
+          .eq('id', id);
+        error = retry.error;
+      }
 
       if (error) throw error;
       return { success: true };
