@@ -1,6 +1,6 @@
 // src/components/team/SalesExcellenceAuditsSection.tsx
 // Panel de Auditoría y Calidad Comercial ARIAS para TeamPerformance
-// Con Filtro Interactivo por Ejecutivo y Diagnóstico Global Consolidado 1:1
+// Con Filtro Estricto por Título de Documento (Google Drive / Gemini) y Diagnóstico Global Consolidado 1:1
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,7 @@ import {
     Award, ShieldAlert, CheckCircle2, TrendingUp, Users, Calendar,
     ExternalLink, Sparkles, Flame, ChevronRight, FileText, Target,
     Filter, X, Copy, Check, BarChart2, AlertTriangle, Layers, ArrowRight,
-    Lightbulb, DollarSign, RefreshCw, Plus
+    Lightbulb, DollarSign, RefreshCw, Plus, Search
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { salesAuditService } from '../../services/salesAuditService';
@@ -71,7 +71,17 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
     const [isCoachingModalOpen, setIsCoachingModalOpen] = useState(false);
     const [coachingModalDemoId, setCoachingModalDemoId] = useState<string | undefined>(undefined);
     const [isSyncing, setIsSyncing] = useState(false);
+
+    // Filtro por Título de Documento en Google Drive / Gemini
+    const [documentTitleKeyword, setDocumentTitleKeyword] = useState<string>(() => {
+        return salesAuditService.getDemoTitleFilterConfig(companyId).requiredKeyword || 'DEMO';
+    });
+    const [activeDocumentTitleKeyword, setActiveDocumentTitleKeyword] = useState<string>(() => {
+        return salesAuditService.getDemoTitleFilterConfig(companyId).requiredKeyword || 'DEMO';
+    });
+
     const [isQuickAuditModalOpen, setIsQuickAuditModalOpen] = useState(false);
+    const [quickDocumentTitle, setQuickDocumentTitle] = useState('');
     const [quickClientName, setQuickClientName] = useState('');
     const [quickRepName, setQuickRepName] = useState('Patricia Martínez');
     const [quickSdrName, setQuickSdrName] = useState('');
@@ -84,12 +94,10 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
 
     // Resuelve la foto de perfil oficial o avatar ejecutivo de alta resolución
     const getExecutiveAvatar = (repKey: string, displayName: string): string => {
-        // 1. Directo desde profileAvatars (por UUID o nombre)
         if (profileAvatars[repKey]) return profileAvatars[repKey]!;
         if (profileAvatars[displayName]) return profileAvatars[displayName]!;
         if (profileAvatars[displayName.toLowerCase().trim()]) return profileAvatars[displayName.toLowerCase().trim()]!;
 
-        // 2. Búsqueda en profileNames (UUID -> Nombre Completo)
         const cleanName = (displayName || '').toLowerCase().trim();
         const cleanKey = (repKey || '').toLowerCase().trim();
         for (const [uid, fullName] of Object.entries(profileNames)) {
@@ -101,7 +109,6 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
             }
         }
 
-        // 3. Retratos oficiales ejecutivos ARIAS (garantiza foto real siempre, incluso sin upload en DB)
         if (cleanName.includes('diana') || cleanKey.includes('diana')) {
             return 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80';
         }
@@ -112,12 +119,14 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
             return 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80';
         }
 
-        // 4. Fallback de alta resolución con iniciales
         return `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName || 'User')}&background=4f46e5&color=fff&size=128&bold=true`;
     };
 
     useEffect(() => {
         if (companyId) {
+            const cfg = salesAuditService.getDemoTitleFilterConfig(companyId);
+            setDocumentTitleKeyword(cfg.requiredKeyword || 'DEMO');
+            setActiveDocumentTitleKeyword(cfg.requiredKeyword || 'DEMO');
             loadStats();
         }
 
@@ -129,7 +138,7 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         return () => window.removeEventListener('sales_audit_updated', handleUpdate);
     }, [companyId]);
 
-    const loadStats = async (showToast = false) => {
+    const loadStats = async (showToast = false, customKeyword?: string) => {
         if (showToast) setIsSyncing(true);
         else setLoading(true);
         try {
@@ -143,9 +152,14 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
                     }
                     return data.latestAudits[0];
                 });
+            } else {
+                setSelectedAudit(null);
             }
             if (showToast) {
-                toast.success(`Sincronizadas ${data.totalAudits} demostraciones desde Google Calendar y CRM`);
+                const kwLabel = customKeyword || activeDocumentTitleKeyword || 'DEMO';
+                toast.success(
+                    `Sincronizados ${data.totalAudits} documento(s) con título "${kwLabel}" desde Google Drive & Meet`
+                );
             }
         } catch (e) {
             console.error('Error loading audit stats', e);
@@ -156,6 +170,17 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         }
     };
 
+    const handleApplyDocumentTitleFilter = async (overrideKeyword?: string) => {
+        const cleanVal = (overrideKeyword !== undefined ? overrideKeyword : documentTitleKeyword).trim() || 'DEMO';
+        setDocumentTitleKeyword(cleanVal);
+        setActiveDocumentTitleKeyword(cleanVal);
+        salesAuditService.saveDemoTitleFilterConfig(companyId, {
+            requiredKeyword: cleanVal,
+            onlyDemosFilter: true
+        });
+        await loadStats(true, cleanVal);
+    };
+
     const handleSaveQuickAudit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!quickClientName.trim()) {
@@ -164,7 +189,13 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         }
         setIsSavingQuickAudit(true);
         try {
-            const effectiveNotes = quickNotes.trim() || `Demostración comercial con ${quickClientName.trim()} presentada por ${quickRepName}. Evaluación de requerimientos, presentación de módulos y seguimiento de propuesta.`;
+            const mainKeyword = (activeDocumentTitleKeyword.split(',')[0] || 'DEMO').trim();
+            const effectiveDocTitle =
+                quickDocumentTitle.trim() ||
+                `${mainKeyword} - ${quickClientName.trim()} - Notas de Gemini`;
+            const effectiveNotes =
+                quickNotes.trim() ||
+                `Documento ${effectiveDocTitle}. Demostración comercial con ${quickClientName.trim()} presentada por ${quickRepName}. Evaluación de requerimientos, presentación de módulos y seguimiento de propuesta.`;
             const evaluation = await salesAuditService.auditGeminiNotes(
                 effectiveNotes,
                 quickClientName.trim(),
@@ -175,6 +206,7 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
                 company_id: localStorage.getItem('simulated_company_id') || companyId,
                 lead_id: `lead_${quickClientName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
                 clientName: quickClientName.trim(),
+                documentTitle: effectiveDocTitle,
                 sales_rep_name: quickRepName,
                 sdr_rep_name: quickSdrName.trim() || null,
                 lead_status: quickLeadStatus,
@@ -188,8 +220,9 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
                 status: 'completed',
                 created_at: isoDate
             });
-            toast.success(`Demo de ${quickClientName.trim()} auditada (${evaluation.totalScore}/100 pts)`);
+            toast.success(`Documento "${effectiveDocTitle}" auditado (${evaluation.totalScore}/100 pts)`);
             setIsQuickAuditModalOpen(false);
+            setQuickDocumentTitle('');
             setQuickClientName('');
             setQuickNotes('');
             setQuickGoogleDocUrl('');
@@ -223,6 +256,13 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         return audit.lead_id || 'Cliente Comercial';
     };
 
+    const resolveDocumentTitle = (audit: SalesCallAudit | null | undefined): string => {
+        if (!audit) return 'DEMO - Notas de Gemini';
+        if ((audit as any).documentTitle) return String((audit as any).documentTitle);
+        const cName = resolveClientName(audit);
+        return `DEMO - ${cName} - Notas de Gemini`;
+    };
+
     // ─── Motor de Diagnóstico Global Agregado por Persona ────────────────────────
     const calculateRepDiagnostic = (targetRep: string, allAudits: SalesCallAudit[]): RepAggregateDiagnostic | null => {
         const cleanTarget = targetRep.toLowerCase().trim();
@@ -231,28 +271,35 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         const repAudits = isTeamAll
             ? allAudits
             : allAudits.filter(a => {
-                const name = (a.sales_rep_name || '').toLowerCase().trim();
-                const sdr = (a.sdr_rep_name || '').toLowerCase().trim();
-                const id = (a.evaluated_user_id || '').toLowerCase().trim();
-                return name.includes(cleanTarget) || cleanTarget.includes(name) || sdr.includes(cleanTarget) || id === cleanTarget;
-            });
+                  const name = (a.sales_rep_name || '').toLowerCase().trim();
+                  const sdr = (a.sdr_rep_name || '').toLowerCase().trim();
+                  const id = (a.evaluated_user_id || '').toLowerCase().trim();
+                  return (
+                      name.includes(cleanTarget) ||
+                      cleanTarget.includes(name) ||
+                      sdr.includes(cleanTarget) ||
+                      id === cleanTarget
+                  );
+              });
 
         if (repAudits.length === 0) return null;
 
         const totalDemos = repAudits.length;
         const avgScore = Math.round(repAudits.reduce((acc, a) => acc + a.total_score, 0) / totalDemos);
 
-        // Agrupación por los 9 criterios de la Rúbrica Oficial
-        const criteriaMap: Record<string, {
-            id: string;
-            name: string;
-            maxPoints: number;
-            passCount: number;
-            coachingCount: number;
-            failCount: number;
-            quotes: string[];
-            recommendation: string;
-        }> = {};
+        const criteriaMap: Record<
+            string,
+            {
+                id: string;
+                name: string;
+                maxPoints: number;
+                passCount: number;
+                coachingCount: number;
+                failCount: number;
+                quotes: string[];
+                recommendation: string;
+            }
+        > = {};
 
         OFFICIAL_ARIAS_RUBRIC.forEach(rubric => {
             criteriaMap[rubric.id] = {
@@ -296,7 +343,6 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
             commonGapQuote: c.quotes[0]
         }));
 
-        // Top Errores Recurrentes (ordenados por mayor cantidad de fallas)
         const sortedByFail = [...criteriaStats].sort((a, b) => b.failCount - a.failCount || a.passRate - b.passRate);
         const topGaps = sortedByFail
             .filter(c => c.failCount > 0 || c.passRate < 70)
@@ -308,7 +354,6 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
                 recommendation: criteriaMap[c.id]?.recommendation || 'Reforzar en coaching semanal'
             }));
 
-        // Top Fortalezas Demostradas
         const sortedByPass = [...criteriaStats].sort((a, b) => b.passRate - a.passRate);
         const topStrengths = sortedByPass
             .filter(c => c.passCount > 0)
@@ -319,19 +364,36 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
                 percentage: c.passRate
             }));
 
-        // Roleplay de 7 minutos sugerido según la mayor brecha
         let roleplayFocus = 'Roleplay general de estructura de demo y descubrimiento BANT.';
-        if (topGaps.some(g => g.name.toLowerCase().includes('próximo paso') || g.name.toLowerCase().includes('decisión') || g.name.toLowerCase().includes('agenda'))) {
-            roleplayFocus = 'Roleplay de Cierre y Agendamiento (7 min): Cierre condicionado y cómo abrir Google Calendar en vivo antes de colgar.';
-        } else if (topGaps.some(g => g.name.toLowerCase().includes('impacto') || g.name.toLowerCase().includes('cuantificado') || g.name.toLowerCase().includes('diagnóstico'))) {
-            roleplayFocus = 'Roleplay de Diagnóstico Financiero (7 min): Preguntar cuántas horas o dólares le cuesta hoy el dolor al cliente.';
+        if (
+            topGaps.some(
+                g =>
+                    g.name.toLowerCase().includes('próximo paso') ||
+                    g.name.toLowerCase().includes('decisión') ||
+                    g.name.toLowerCase().includes('agenda')
+            )
+        ) {
+            roleplayFocus =
+                'Roleplay de Cierre y Agendamiento (7 min): Cierre condicionado y cómo abrir Google Calendar en vivo antes de colgar.';
+        } else if (
+            topGaps.some(
+                g =>
+                    g.name.toLowerCase().includes('impacto') ||
+                    g.name.toLowerCase().includes('cuantificado') ||
+                    g.name.toLowerCase().includes('diagnóstico')
+            )
+        ) {
+            roleplayFocus =
+                'Roleplay de Diagnóstico Financiero (7 min): Preguntar cuántas horas o dólares le cuesta hoy el dolor al cliente.';
         } else if (topGaps.some(g => g.name.toLowerCase().includes('objeciones'))) {
-            roleplayFocus = 'Roleplay de Manejo de Objeciones (7 min): Método ESCUCHAR sin regalar descuentos ni promesas prematuras.';
+            roleplayFocus =
+                'Roleplay de Manejo de Objeciones (7 min): Método ESCUCHAR sin regalar descuentos ni promesas prematuras.';
         }
 
-        const actionRequired = topGaps.length > 0
-            ? `Enfocar la sesión 1:1 de esta semana en corregir: "${topGaps[0].name}" (falló en ${topGaps[0].failCount} de ${totalDemos} demos, ${topGaps[0].percentage}% de incidencia).`
-            : 'Felicitar al vendedor por mantener 100% de apego a la metodología en todas las demostraciones.';
+        const actionRequired =
+            topGaps.length > 0
+                ? `Enfocar la sesión 1:1 de esta semana en corregir: "${topGaps[0].name}" (falló en ${topGaps[0].failCount} de ${totalDemos} demos, ${topGaps[0].percentage}% de incidencia).`
+                : 'Felicitar al vendedor por mantener 100% de apego a la metodología en todas las demostraciones.';
 
         return {
             repName: targetRep,
@@ -345,7 +407,6 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         };
     };
 
-    // Manejador del click en un ejecutivo para filtrar
     const handleToggleRepFilter = (name: string | null) => {
         if (!name || selectedRep === name) {
             setSelectedRep(null);
@@ -353,25 +414,29 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         } else {
             setSelectedRep(name);
             setActiveCoachingTab('aggregate');
-            // Auto-seleccionar la primera demo de ese vendedor
-            const repFirst = stats.latestAudits.find(a => 
-                (a.sales_rep_name || '').toLowerCase().includes(name.toLowerCase()) ||
-                (a.sdr_rep_name || '').toLowerCase().includes(name.toLowerCase())
+            const repFirst = stats.latestAudits.find(
+                a =>
+                    (a.sales_rep_name || '').toLowerCase().includes(name.toLowerCase()) ||
+                    (a.sdr_rep_name || '').toLowerCase().includes(name.toLowerCase())
             );
             if (repFirst) setSelectedAudit(repFirst);
         }
     };
 
-    // Estadísticas de Conversión y Negocio (Demos vs Cierres)
     const dealStats = useMemo(() => {
         const auditsToCount = selectedRep
             ? stats.latestAudits.filter(a => {
-                const cleanRep = selectedRep.toLowerCase().trim();
-                const repName = (a.sales_rep_name || '').toLowerCase().trim();
-                const sdrName = (a.sdr_rep_name || '').toLowerCase().trim();
-                const evalId = (a.evaluated_user_id || '').toLowerCase().trim();
-                return repName.includes(cleanRep) || cleanRep.includes(repName) || sdrName.includes(cleanRep) || evalId === cleanRep;
-            })
+                  const cleanRep = selectedRep.toLowerCase().trim();
+                  const repName = (a.sales_rep_name || '').toLowerCase().trim();
+                  const sdrName = (a.sdr_rep_name || '').toLowerCase().trim();
+                  const evalId = (a.evaluated_user_id || '').toLowerCase().trim();
+                  return (
+                      repName.includes(cleanRep) ||
+                      cleanRep.includes(repName) ||
+                      sdrName.includes(cleanRep) ||
+                      evalId === cleanRep
+                  );
+              })
             : stats.latestAudits;
 
         const total = auditsToCount.length;
@@ -381,7 +446,9 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         const inNegotiation = auditsToCount.filter(a => a.lead_status === 'Negociación');
         const inNegotiationCount = inNegotiation.length;
         const inNegotiationAmount = inNegotiation.reduce((sum, a) => sum + (a.deal_value || 0), 0);
-        const followUp = auditsToCount.filter(a => a.lead_status === 'En seguimiento' || a.lead_status === 'Lead calificado');
+        const followUp = auditsToCount.filter(
+            a => a.lead_status === 'En seguimiento' || a.lead_status === 'Lead calificado'
+        );
         const followUpCount = followUp.length;
         const lost = auditsToCount.filter(a => a.lead_status === 'Perdido');
         const lostCount = lost.length;
@@ -399,40 +466,48 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         };
     }, [stats.latestAudits, selectedRep]);
 
-    // Filtrar auditorías mostradas en la lista inferior por Rep y por Estado del Lead
     const displayedAudits = stats.latestAudits.filter(a => {
         if (selectedRep) {
             const cleanRep = selectedRep.toLowerCase().trim();
             const repName = (a.sales_rep_name || '').toLowerCase().trim();
             const sdrName = (a.sdr_rep_name || '').toLowerCase().trim();
             const evalId = (a.evaluated_user_id || '').toLowerCase().trim();
-            const matchRep = repName.includes(cleanRep) || cleanRep.includes(repName) || sdrName.includes(cleanRep) || evalId === cleanRep;
+            const matchRep =
+                repName.includes(cleanRep) ||
+                cleanRep.includes(repName) ||
+                sdrName.includes(cleanRep) ||
+                evalId === cleanRep;
             if (!matchRep) return false;
         }
 
         if (leadStatusFilter === 'all') return true;
         if (leadStatusFilter === 'Cerrado') return a.lead_status === 'Cerrado' || a.lead_status === 'Cliente';
         if (leadStatusFilter === 'Negociación') return a.lead_status === 'Negociación';
-        if (leadStatusFilter === 'En seguimiento') return a.lead_status === 'En seguimiento' || a.lead_status === 'Lead calificado';
+        if (leadStatusFilter === 'En seguimiento')
+            return a.lead_status === 'En seguimiento' || a.lead_status === 'Lead calificado';
         if (leadStatusFilter === 'Perdido') return a.lead_status === 'Perdido';
         return true;
     });
 
-    // Diagnóstico activo: de la persona seleccionada o de todo el equipo
     const activeDiagnostic = calculateRepDiagnostic(selectedRep || 'Todo el Equipo', stats.latestAudits);
 
-    // Copiar resumen 1:1 al portapapeles
     const handleCopyCoachingReport = () => {
         if (!activeDiagnostic) return;
         const text = `📊 REPORTE DE CALIDAD COMERCIAL 1:1 - ${activeDiagnostic.repName.toUpperCase()}
 Calidad Comercial Media: ${activeDiagnostic.avgScore}/100 (${activeDiagnostic.totalDemos} demostraciones auditadas)
 
 🚨 TOP ERRORES SISTÉMICOS RECURRENTES (A Corregir en 1:1):
-${activeDiagnostic.topGaps.map((g, i) => `${i + 1}. ${g.name}: Falló en ${g.failCount} de ${activeDiagnostic.totalDemos} demos (${g.percentage}% de error).
-   ↳ Corrección: ${g.recommendation}`).join('\n\n')}
+${activeDiagnostic.topGaps
+    .map(
+        (g, i) => `${i + 1}. ${g.name}: Falló en ${g.failCount} de ${activeDiagnostic.totalDemos} demos (${g.percentage}% de error).
+   ↳ Corrección: ${g.recommendation}`
+    )
+    .join('\n\n')}
 
 🌟 FORTALEZAS DEMOSTRADAS CONSISTENTES:
-${activeDiagnostic.topStrengths.map((s, i) => `✓ ${s.name}: Cumplido en ${s.passCount} de ${activeDiagnostic.totalDemos} demos (${s.percentage}% de éxito).`).join('\n')}
+${activeDiagnostic.topStrengths
+    .map(s => `✓ ${s.name}: Cumplido en ${s.passCount} de ${activeDiagnostic.totalDemos} demos (${s.percentage}% de éxito).`)
+    .join('\n')}
 
 🎯 ROLEPLAY DE 7 MINUTOS PARA ESTA SEMANA:
 ${activeDiagnostic.roleplayFocus}
@@ -448,6 +523,84 @@ ${activeDiagnostic.actionRequired}
 
     return (
         <div className="space-y-4">
+            {/* ─── BARRA DE CONTROL: ESCRIBE EL TÍTULO DEL DOCUMENTO DE GOOGLE DRIVE / GEMINI ─── */}
+            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl border border-indigo-500/30 p-3.5 sm:p-4 text-white shadow-sm">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <div className="flex items-start sm:items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0">
+                            <FileText className="w-4 h-4 text-amber-300" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-black uppercase tracking-wider text-white">
+                                    Filtro por Título de Documento (Google Drive & Gemini Meet)
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                                    Activo: "{activeDocumentTitleKeyword}"
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-indigo-200/80 mt-0.5">
+                                Escribe qué palabra debe tener el <strong>título del documento</strong> cuando hacen una demo (ej. <code className="text-amber-300 font-bold">DEMO</code>, <code className="text-amber-300 font-bold">DEMO ERP</code>). Se ignoran reuniones de Desarrollo, Contabilidad o Soporte.
+                            </p>
+                        </div>
+                    </div>
+
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            handleApplyDocumentTitleFilter();
+                        }}
+                        className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0"
+                    >
+                        <div className="relative flex-1 sm:w-56">
+                            <Search className="w-3.5 h-3.5 text-indigo-300 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                value={documentTitleKeyword}
+                                onChange={(e) => setDocumentTitleKeyword(e.target.value)}
+                                placeholder="Escribe el título (ej: DEMO)"
+                                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-white/10 border border-indigo-400/40 text-white placeholder-indigo-300/60 text-xs font-mono font-bold focus:outline-none focus:border-amber-400 focus:bg-white/15"
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={isSyncing}
+                            className="px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                            <span>Traer Solo Este Título</span>
+                        </button>
+                    </form>
+                </div>
+
+                {/* Atajos rápidos de títulos de documento */}
+                <div className="flex items-center justify-between flex-wrap gap-2 mt-2.5 pt-2.5 border-t border-white/10 text-[11px]">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-indigo-200/70 font-semibold">Títulos rápidos:</span>
+                        {['DEMO', 'DEMO ERP', 'DEMO 1', 'Demo Arias ERP'].map(preset => {
+                            const isCurrent = activeDocumentTitleKeyword.toLowerCase().trim() === preset.toLowerCase();
+                            return (
+                                <button
+                                    key={preset}
+                                    type="button"
+                                    onClick={() => handleApplyDocumentTitleFilter(preset)}
+                                    className={`px-2.5 py-0.5 rounded-lg font-mono text-[10px] font-black transition-all cursor-pointer ${
+                                        isCurrent
+                                            ? 'bg-indigo-500 text-white border border-indigo-300 shadow-2xs'
+                                            : 'bg-white/10 text-indigo-100 hover:bg-white/20 border border-white/10'
+                                    }`}
+                                >
+                                    📄 {preset}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <span className="text-[10px] text-emerald-300/90 font-semibold">
+                        ✓ {stats.totalAudits} documento(s) encontrados con título "{activeDocumentTitleKeyword}"
+                    </span>
+                </div>
+            </div>
+
             {/* Gráfico Ejecutivo de Evolución Temporal (Estilo Metricool) */}
             <SalesQualityTrendChart
                 audits={stats.latestAudits}
@@ -460,7 +613,7 @@ ${activeDiagnostic.actionRequired}
                 }}
             />
 
-            {/* Scorecard Unificado del Equipo Comercial (Compacto, Ordenado, No Inflado) */}
+            {/* Scorecard Unificado del Equipo Comercial (Solo Ejecutivas Comerciales: Diana, Patricia, Grecia) */}
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                     <div className="flex items-center gap-2">
@@ -488,10 +641,10 @@ ${activeDiagnostic.actionRequired}
                             onClick={() => loadStats(true)}
                             disabled={isSyncing}
                             className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                            title="Sincronizar demostraciones recientes desde Google Calendar, Seguimientos CRM y Bookings"
+                            title="Sincronizar documentos de Google Drive y Google Meet con el título configurado"
                         >
                             <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
-                            <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Calendar & CRM'}</span>
+                            <span>{isSyncing ? 'Sincronizando...' : 'Sincronizar Google Drive'}</span>
                         </button>
                         <button
                             type="button"
@@ -499,10 +652,12 @@ ${activeDiagnostic.actionRequired}
                                 if (selectedRep && !selectedRep.toLowerCase().includes('grecia')) {
                                     setQuickRepName(selectedRep);
                                 }
+                                const mainKw = (activeDocumentTitleKeyword.split(',')[0] || 'DEMO').trim();
+                                setQuickDocumentTitle(`${mainKw} - `);
                                 setIsQuickAuditModalOpen(true);
                             }}
                             className="px-2.5 py-1 rounded-lg text-[11px] font-black bg-indigo-600 hover:bg-indigo-700 text-white transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
-                            title="Registrar y auditar una nueva demostración de Google Meet"
+                            title="Registrar y auditar un documento de notas de Gemini"
                         >
                             <Plus className="w-3 h-3" />
                             <span>Auditar Nueva Demo</span>
@@ -515,10 +670,14 @@ ${activeDiagnostic.actionRequired}
 
                 {/* Filas Compactas de Rendimiento (AEs y SDRs juntos de forma ordenada) */}
                 <div className="divide-y divide-slate-100">
-                    {/* Filas de AEs */}
                     {Object.entries(stats.repAverages).map(([repId, repData]) => {
-                        const matchingAudit = stats.latestAudits.find(a => (a.evaluated_user_id === repId || a.sales_rep_name === repId) && a.sales_rep_name);
-                        const name = profileNames[repId] || matchingAudit?.sales_rep_name || (repId !== 'unassigned' && !repId.includes('-') ? repId : 'Ejecutivo de Ventas');
+                        const matchingAudit = stats.latestAudits.find(
+                            a => (a.evaluated_user_id === repId || a.sales_rep_name === repId) && a.sales_rep_name
+                        );
+                        const name =
+                            profileNames[repId] ||
+                            matchingAudit?.sales_rep_name ||
+                            (repId !== 'unassigned' && !repId.includes('-') ? repId : 'Ejecutivo de Ventas');
                         const avatar = getExecutiveAvatar(repId, name);
                         const badge = getScoreBadge(repData.avgScore);
                         const isSelected = selectedRep === name;
@@ -557,7 +716,7 @@ ${activeDiagnostic.actionRequired}
                                             )}
                                         </div>
                                         <p className="text-[10px] text-slate-400">
-                                            {repData.count} demo(s) · Clic para filtrar
+                                            {repData.count} demo(s) con título "{activeDocumentTitleKeyword}" · Clic para filtrar
                                         </p>
                                     </div>
                                 </div>
@@ -626,18 +785,17 @@ ${activeDiagnostic.actionRequired}
                 </div>
             </div>
 
-            {/* ─── WORKSPACE DE AUDITORÍAS & COACHING (Estilo Metricool: Compacto, Ordenado, No Inflado) ─── */}
+            {/* ─── WORKSPACE DE AUDITORÍAS & COACHING ─── */}
             {stats.latestAudits.length > 0 && (
                 <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
-                    {/* Barra de Encabezado Superior de la Sección */}
                     <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 bg-slate-50/50">
                         <div className="flex items-center gap-2">
                             <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
-                                Centro de Grabaciones & Coaching
+                                Centro de Documentos Gemini & Coaching
                             </span>
                             <span className="text-slate-300">/</span>
                             <span className="text-xs font-black text-slate-850">
-                                {selectedRep ? `Auditorías de ${selectedRep}` : `Todas las Demos (${displayedAudits.length})`}
+                                {selectedRep ? `Auditorías de ${selectedRep}` : `Documentos "${activeDocumentTitleKeyword}" (${displayedAudits.length})`}
                             </span>
                         </div>
 
@@ -667,11 +825,9 @@ ${activeDiagnostic.actionRequired}
                         </div>
                     </div>
 
-                    {/* Layout de 2 Columnas de Alta Densidad (Master-Detail sin scrolls inflados) */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
-                        {/* ─── COLUMNA IZQUIERDA (Cols 1-7): TABLA COMPACTA DE AUDITORÍAS ─── */}
+                        {/* ─── COLUMNA IZQUIERDA (Cols 1-7): TABLA COMPACTA DE DOCUMENTOS AUDITADOS ─── */}
                         <div className="lg:col-span-7 p-4 space-y-3">
-                            {/* Barra de Conversión Comercial (Demos vs Cierres) */}
                             <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-2">
                                 <div className="flex items-center justify-between text-xs">
                                     <div className="flex items-center gap-1.5">
@@ -745,12 +901,11 @@ ${activeDiagnostic.actionRequired}
                                 </div>
                             </div>
 
-                            {/* Tabla Compacta Estilo Metricool con Scroll Contenido */}
                             <div className="overflow-x-auto overflow-y-auto max-h-[440px] border border-slate-200/80 rounded-xl">
                                 <table className="w-full text-left text-xs">
                                     <thead className="sticky top-0 z-10">
                                         <tr className="bg-slate-100/90 text-[10px] font-black uppercase tracking-wider text-slate-600 border-b border-slate-200 backdrop-blur-xs">
-                                            <th className="py-2.5 px-3">Cliente / Reunión</th>
+                                            <th className="py-2.5 px-3">Cliente / Título Documento Gemini</th>
                                             <th className="py-2.5 px-2">Presentador (AE)</th>
                                             <th className="py-2.5 px-2">SDR</th>
                                             <th className="py-2.5 px-2 text-center">Puntaje</th>
@@ -764,6 +919,7 @@ ${activeDiagnostic.actionRequired}
                                             const isSelected = selectedAudit?.id === audit.id;
                                             const badge = getScoreBadge(audit.total_score);
                                             const clientTitle = resolveClientName(audit);
+                                            const docTitle = resolveDocumentTitle(audit);
                                             const d = new Date(audit.created_at);
                                             const dateShort = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
                                             const timeShort = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
@@ -781,16 +937,22 @@ ${activeDiagnostic.actionRequired}
                                                             : 'hover:bg-slate-50/80'
                                                     }`}
                                                 >
-                                                    {/* Cliente & Fecha */}
+                                                    {/* Cliente & Título del Documento */}
                                                     <td className="py-2.5 px-3">
                                                         <div className="flex items-center gap-1.5">
-                                                            <span className="font-bold text-slate-900 truncate max-w-[130px]">
+                                                            <span className="font-bold text-slate-900 truncate max-w-[160px]">
                                                                 {clientTitle}
                                                             </span>
+                                                            <span className="text-[10px] text-slate-400 shrink-0">
+                                                                · {dateShort} {timeShort}
+                                                            </span>
                                                         </div>
-                                                        <span className="text-[10px] text-slate-400">
-                                                            {dateShort} · {timeShort}
-                                                        </span>
+                                                        <p
+                                                            className="text-[10px] text-indigo-700 font-mono truncate max-w-[230px]"
+                                                            title={docTitle}
+                                                        >
+                                                            📄 {docTitle}
+                                                        </p>
                                                     </td>
 
                                                     {/* AE */}
@@ -879,7 +1041,6 @@ ${activeDiagnostic.actionRequired}
 
                         {/* ─── COLUMNA DERECHA (Cols 8-12): INSPECTOR COMPACTO DE COACHING ─── */}
                         <div className="lg:col-span-5 p-4 space-y-3 bg-slate-50/30 max-h-[480px] overflow-y-auto">
-                            {/* Pestañas del Inspector (Estilo Metricool) */}
                             <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                                 <div className="flex items-center gap-1 text-[11px]">
                                     <button
@@ -912,10 +1073,8 @@ ${activeDiagnostic.actionRequired}
                                 </span>
                             </div>
 
-                            {/* VISTA 1: DIAGNÓSTICO 1:1 GLOBAL CONSOLIDADO (Compacto, elegante, no inflado) */}
                             {activeCoachingTab === 'aggregate' && activeDiagnostic && (
                                 <div className="space-y-3 text-xs">
-                                    {/* Resumen Superior */}
                                     <div className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-slate-200/80">
                                         <div>
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
@@ -935,7 +1094,6 @@ ${activeDiagnostic.actionRequired}
                                         </div>
                                     </div>
 
-                                    {/* Brechas Críticas (Cards elegantes con borde izquierdo rojo) */}
                                     <div className="space-y-1.5">
                                         <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 flex items-center gap-1">
                                             <AlertTriangle className="w-3 h-3 text-rose-500" />
@@ -961,7 +1119,6 @@ ${activeDiagnostic.actionRequired}
                                         ))}
                                     </div>
 
-                                    {/* Roleplay de 7 minutos */}
                                     <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 border-l-3 border-l-indigo-500 space-y-1 shadow-2xs">
                                         <span className="text-[10px] font-black uppercase text-indigo-700 flex items-center gap-1">
                                             <Sparkles className="w-3 h-3 text-indigo-500" />
@@ -972,7 +1129,6 @@ ${activeDiagnostic.actionRequired}
                                         </p>
                                     </div>
 
-                                    {/* Fortalezas Clave */}
                                     <div className="p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-100 space-y-1">
                                         <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
                                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
@@ -983,7 +1139,6 @@ ${activeDiagnostic.actionRequired}
                                         </p>
                                     </div>
 
-                                    {/* Botón Accionador para abrir el simulador */}
                                     <button
                                         onClick={() => {
                                             setCoachingModalDemoId(undefined);
@@ -997,24 +1152,21 @@ ${activeDiagnostic.actionRequired}
                                 </div>
                             )}
 
-                            {/* VISTA 2: AUDITORÍA DE LA DEMO SELECCIONADA */}
                             {activeCoachingTab === 'single' && selectedAudit && (
                                 <div className="space-y-3 text-xs">
                                     <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between">
-                                        <div>
+                                        <div className="min-w-0 pr-2">
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                                                Reunión Evaluada
+                                                Documento Evaluado
                                             </span>
-                                            <strong className="text-slate-900 font-black text-xs">
+                                            <strong className="text-slate-900 font-black text-xs block truncate">
                                                 {selectedAudit.sales_rep_name || 'Diana Morales'} · {resolveClientName(selectedAudit)}
                                             </strong>
-                                            {selectedAudit.sdr_rep_name && (
-                                                <span className="text-[10px] text-indigo-600 block">
-                                                    Agendada por {selectedAudit.sdr_rep_name} (SDR)
-                                                </span>
-                                            )}
+                                            <span className="text-[10px] text-indigo-600 font-mono truncate block">
+                                                📄 {resolveDocumentTitle(selectedAudit)}
+                                            </span>
                                         </div>
-                                        <div className="text-right">
+                                        <div className="text-right shrink-0">
                                             <span className="text-sm font-black text-slate-900 block">
                                                 {selectedAudit.total_score} pts
                                             </span>
@@ -1024,7 +1176,6 @@ ${activeDiagnostic.actionRequired}
                                         </div>
                                     </div>
 
-                                    {/* Tarjeta de Negocio y Resultado Comercial */}
                                     <div className="p-2.5 rounded-xl bg-slate-900 text-white space-y-1.5 shadow-2xs">
                                         <div className="flex items-center justify-between">
                                             <span className="text-[9px] font-black uppercase tracking-wider text-indigo-300 flex items-center gap-1">
@@ -1061,7 +1212,6 @@ ${activeDiagnostic.actionRequired}
                                         </button>
                                     </div>
 
-                                    {/* Fortaleza */}
                                     <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-100 space-y-0.5">
                                         <span className="text-[9px] font-black uppercase text-emerald-800 block">
                                             ✓ Fortaleza Demostrada
@@ -1071,7 +1221,6 @@ ${activeDiagnostic.actionRequired}
                                         </p>
                                     </div>
 
-                                    {/* Falla Crítica */}
                                     <div className="p-2.5 rounded-xl bg-rose-50/60 border border-rose-100 space-y-0.5">
                                         <span className="text-[9px] font-black uppercase text-rose-800 block">
                                             ⚠️ Falla Crítica a Corregir
@@ -1081,7 +1230,6 @@ ${activeDiagnostic.actionRequired}
                                         </p>
                                     </div>
 
-                                    {/* Acción Inmediata */}
                                     <div className="p-2.5 rounded-xl bg-amber-50/60 border border-amber-100 space-y-0.5">
                                         <span className="text-[9px] font-black uppercase text-amber-800 block">
                                             ⚡ Acción Inmediata
@@ -1091,7 +1239,6 @@ ${activeDiagnostic.actionRequired}
                                         </p>
                                     </div>
 
-                                    {/* Botón Oportunidades Reales para esta demo */}
                                     <button
                                         onClick={() => {
                                             setCoachingModalDemoId(selectedAudit.id);
@@ -1121,7 +1268,7 @@ ${activeDiagnostic.actionRequired}
                 liveAudits={stats.latestAudits}
             />
 
-            {/* Modal para Registrar / Auditar Nueva Demo directamente desde Rendimiento */}
+            {/* Modal para Registrar / Auditar Documento de Demo */}
             {isQuickAuditModalOpen && (
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
                     <div className="w-full max-w-xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden text-slate-800">
@@ -1132,10 +1279,10 @@ ${activeDiagnostic.actionRequired}
                                 </div>
                                 <div>
                                     <h3 className="text-sm font-black text-slate-900">
-                                        Registrar & Auditar Demostración (Gemini Meet)
+                                        Registrar & Auditar Documento de Demo (Gemini Meet)
                                     </h3>
                                     <p className="text-[11px] text-slate-500">
-                                        Evalúa automáticamente contra la Rúbrica Oficial de 100 Puntos y actualiza la gráfica
+                                        Escribe el título del documento de Google Drive (debe incluir "{activeDocumentTitleKeyword}")
                                     </p>
                                 </div>
                             </div>
@@ -1149,6 +1296,20 @@ ${activeDiagnostic.actionRequired}
                         </div>
 
                         <form onSubmit={handleSaveQuickAudit} className="p-5 space-y-3.5 text-xs">
+                            <div>
+                                <label className="block font-bold text-slate-700 mb-1">
+                                    Título del Documento en Google Drive / Gemini *
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={quickDocumentTitle}
+                                    onChange={(e) => setQuickDocumentTitle(e.target.value)}
+                                    placeholder={`Ej. ${activeDocumentTitleKeyword} - Nombre del Cliente - Notas de Gemini`}
+                                    className="w-full px-3 py-2 rounded-xl border border-indigo-300 bg-indigo-50/40 font-mono font-bold text-slate-900 focus:border-indigo-500 focus:outline-none text-xs"
+                                />
+                            </div>
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block font-bold text-slate-700 mb-1">
@@ -1158,7 +1319,12 @@ ${activeDiagnostic.actionRequired}
                                         type="text"
                                         required
                                         value={quickClientName}
-                                        onChange={(e) => setQuickClientName(e.target.value)}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setQuickClientName(val);
+                                            const mainKw = (activeDocumentTitleKeyword.split(',')[0] || 'DEMO').trim();
+                                            setQuickDocumentTitle(`${mainKw} - ${val} - Notas de Gemini`);
+                                        }}
                                         placeholder="Ej. Inversiones del Pacífico"
                                         className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-indigo-500 focus:outline-none text-xs"
                                     />

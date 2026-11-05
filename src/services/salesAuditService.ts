@@ -1,6 +1,6 @@
 // src/services/salesAuditService.ts
-// Motor de Auditoría Comercial ARIAS con Análisis de Notas de Gemini (Google Meet)
-// + Sincronización Automática Multi-Fuente (Google Calendar, Follow-ups CRM, Bookings, Call Activities y Leads)
+// Motor de Auditoría Comercial ARIAS con Análisis de Notas de Gemini (Google Meet & Google Drive)
+// Filtra ESTRICTAMENTE por el Título de Documento configurado por el usuario (ej. "DEMO", "DEMO ERP", "DEMO 1")
 
 import { supabase } from './supabase';
 import {
@@ -11,24 +11,136 @@ import {
     OFFICIAL_ARIAS_RUBRIC
 } from '../types/salesExcellence';
 
-const PERSONAL_BLOCK_KEYWORDS = [
+const INTERNAL_NON_DEMO_KEYWORDS = [
     'almuerzo', 'lunch', 'vacaciones', 'feriado', 'cumpleaños', 'cumpleanos',
     'bloqueo', 'bloqueado', 'personal', 'médico', 'medico', 'odontólogo', 'odontologo',
-    'gym', 'gimnasio', 'descanso', 'break'
+    'gym', 'gimnasio', 'descanso', 'break',
+    'desarrollo interno', 'seguimiento desarrollo', 'modulo contable', 'módulo contable',
+    'modalidad contabilidad', 'contabilidad interna', 'revisión ajustes', 'revision ajustes',
+    'revisión modalidad', 'revision modalidad', 'bancos y cxc', 'texa46', 'sprint'
 ];
 
-const DEMO_EVENT_KEYWORDS = [
-    'demo', 'demostraci', 'presentaci', 'reunión', 'reunion', 'cita', 'meet',
-    'erp', 'crm', 'arias', 'pos', 'facturaci', 'sistema', 'propuesta', 'cotizaci',
-    'seguimiento', 'onboarding', 'prueba', 'comercial', 'cliente', 'inventario'
-];
+export interface DemoTitleFilterConfig {
+    requiredKeyword: string;
+    onlyDemosFilter: boolean;
+    driveActivityUrl: string;
+    searchPattern: string;
+}
+
+export function getDemoTitleFilterConfig(companyId: string): DemoTitleFilterConfig {
+    const defaultConfig: DemoTitleFilterConfig = {
+        requiredKeyword: 'DEMO',
+        onlyDemosFilter: true,
+        driveActivityUrl: 'https://drive.google.com/drive/activity',
+        searchPattern: '*Notas de Gemini*, *Notes by Gemini*'
+    };
+    if (typeof window === 'undefined') return defaultConfig;
+    try {
+        const effId = localStorage.getItem('simulated_company_id') || companyId;
+        const raw =
+            localStorage.getItem(`gemini_drive_config_${effId}`) ||
+            localStorage.getItem(`gemini_drive_config_${companyId}`);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            return {
+                requiredKeyword:
+                    typeof parsed.requiredKeyword === 'string' && parsed.requiredKeyword.trim()
+                        ? parsed.requiredKeyword.trim()
+                        : 'DEMO',
+                onlyDemosFilter: parsed.onlyDemosFilter ?? true,
+                driveActivityUrl: parsed.driveActivityUrl || defaultConfig.driveActivityUrl,
+                searchPattern: parsed.searchPattern || defaultConfig.searchPattern
+            };
+        }
+    } catch {}
+    return defaultConfig;
+}
+
+export function saveDemoTitleFilterConfig(
+    companyId: string,
+    updates: Partial<DemoTitleFilterConfig>
+): DemoTitleFilterConfig {
+    const current = getDemoTitleFilterConfig(companyId);
+    const next: DemoTitleFilterConfig = {
+        ...current,
+        ...updates,
+        requiredKeyword:
+            (updates.requiredKeyword !== undefined ? updates.requiredKeyword : current.requiredKeyword).trim() || 'DEMO'
+    };
+    if (typeof window !== 'undefined') {
+        try {
+            const effId = localStorage.getItem('simulated_company_id') || companyId;
+            const existingRaw =
+                localStorage.getItem(`gemini_drive_config_${effId}`) ||
+                localStorage.getItem(`gemini_drive_config_${companyId}`);
+            const existingObj = existingRaw ? JSON.parse(existingRaw) : {};
+            const payload = {
+                ...existingObj,
+                ...next,
+                updatedAt: new Date().toISOString()
+            };
+            localStorage.setItem(`gemini_drive_config_${effId}`, JSON.stringify(payload));
+            localStorage.setItem(`gemini_drive_config_${companyId}`, JSON.stringify(payload));
+        } catch {}
+    }
+    return next;
+}
+
+/**
+ * Valida ESTRICTAMENTE que el TÍTULO del documento / reunión contenga la palabra clave
+ * escrita por el usuario (por defecto: "DEMO").
+ * Rechaza reuniones internas de desarrollo, soporte, contabilidad o llamadas sin el título configurado.
+ */
+export function matchesRequiredDocumentTitle(
+    rawTitle: string | null | undefined,
+    requiredKeyword: string = 'DEMO',
+    onlyDemosFilter: boolean = true
+): boolean {
+    const title = String(rawTitle || '').trim();
+    if (!title) return false;
+    const titleLower = title.toLowerCase();
+
+    const keywords = (requiredKeyword || 'DEMO')
+        .split(',')
+        .map(k => k.trim().toLowerCase())
+        .filter(Boolean);
+
+    // Descartar reuniones internas de desarrollo, contabilidad o soporte salvo que el usuario haya escrito explícitamente esa palabra
+    const isInternalExcluded = INTERNAL_NON_DEMO_KEYWORDS.some(excl => titleLower.includes(excl));
+    if (isInternalExcluded) {
+        const explicitlyRequested = keywords.some(
+            kw => kw.length >= 4 && INTERNAL_NON_DEMO_KEYWORDS.some(excl => excl.includes(kw))
+        );
+        if (!explicitlyRequested) return false;
+    }
+
+    if (!onlyDemosFilter && keywords.length === 0) {
+        return true;
+    }
+
+    const activeKeywords = keywords.length > 0 ? keywords : ['demo'];
+    return activeKeywords.some(kw => {
+        if (kw === 'demo') {
+            return (
+                /\bdemo\b/i.test(title) ||
+                /\bdemos\b/i.test(title) ||
+                /\bdemostraci[oó]n\b/i.test(title) ||
+                titleLower.startsWith('demo')
+            );
+        }
+        return titleLower.includes(kw);
+    });
+}
 
 function normalizeClientKey(raw: string): string {
     return (raw || '')
         .toLowerCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/\b(demo|demostracion|reunion|cita|presentacion|con|para|de|del|la|el|los|las|arias|erp|crm|lead|general|cliente|prospecto)\b/g, ' ')
+        .replace(
+            /\b(demo|demostracion|reunion|cita|presentacion|con|para|de|del|la|el|los|las|arias|erp|crm|lead|general|cliente|prospecto|notas|notes|by|gemini|english|spanish|cst)\b/g,
+            ' '
+        )
         .replace(/[^a-z0-9]/g, '')
         .trim();
 }
@@ -45,7 +157,13 @@ function getLocalDayKey(isoDate: string): string {
 function cleanEventClientTitle(rawTitle: string): string {
     if (!rawTitle) return 'Cliente Comercial';
     let cleaned = rawTitle
-        .replace(/^(reuni[oó]n|demostraci[oó]n|demo|cita|presentaci[oó]n|seguimiento|llamada|google meet|meet)\s*(:|-|–|—|\bcon\b|\bpara\b|\bde\b)?\s*/i, '')
+        .replace(/\s*[-:–—]\s*(notas de gemini|notes by gemini).*$/i, '')
+        .replace(/\s*:\s*\d{4}\/\d{2}\/\d{2}.*$/i, '')
+        .replace(/\s*-\s*\d{4}\/\d{2}\/\d{2}.*$/i, '')
+        .replace(
+            /^(reuni[oó]n|demostraci[oó]n|demo\s*1|demo\s*erp\s*arias|demo\s*arias\s*erp|demo\s*erp|demo\s*arias|demo|cita|presentaci[oó]n|seguimiento|llamada|google meet|meet)\s*(:|-|–|—|\bcon\b|\bpara\b|\bde\b)?\s*/i,
+            ''
+        )
         .replace(/\s*(\(\d+\/\d+\)|\(sesi[oó]n.*?\))$/i, '')
         .trim();
 
@@ -62,10 +180,15 @@ function canonicalRepName(rawName: string | null | undefined): string {
     if (lower.includes('patricia')) return 'Patricia Martínez';
     if (lower.includes('diana')) return 'Diana Morales';
     if (lower.includes('grecia')) return 'Grecia Vásquez';
-    return rawName!.trim();
+    // Garantizar que el Scorecard Comercial solo muestre a las ejecutivas comerciales (nunca desarrolladores como Gerson)
+    return 'Diana Morales';
 }
 
 export const salesAuditService = {
+    getDemoTitleFilterConfig,
+    saveDemoTitleFilterConfig,
+    matchesRequiredDocumentTitle,
+
     /**
      * Extrae texto de un Google Doc o URL de Gemini si es un link público,
      * o devuelve el texto limpio proporcionado directamente.
@@ -115,7 +238,11 @@ export const salesAuditService = {
         let scoreDiag = 0;
         let quoteDiag = 'No se registraron preguntas sobre el proceso actual del cliente.';
         let statusDiag: RubricCriterionScore['status'] = 'fail';
-        const diagKeywords = ['problema', 'error', 'tiempo perdido', 'dificultad', 'proceso actual', 'sistema actual', 'robos', 'despacho', 'inventario', 'manual', 'requerimiento', 'control', 'facturación', 'cotizaciones'];
+        const diagKeywords = [
+            'problema', 'error', 'tiempo perdido', 'dificultad', 'proceso actual',
+            'sistema actual', 'robos', 'despacho', 'inventario', 'manual',
+            'requerimiento', 'control', 'facturación', 'cotizaciones'
+        ];
         const matchesDiag = diagKeywords.filter(k => lower.includes(k));
         if (matchesDiag.length >= 3) {
             scoreDiag = 15;
@@ -132,7 +259,13 @@ export const salesAuditService = {
         let quoteCost = 'No se cuantificó el costo económico o en horas del problema del cliente.';
         let statusCost: RubricCriterionScore['status'] = 'fail';
         const costRegex = /\$?\d+[\d,.]*\s*(dólares|usd|\$|pesos|horas|mensual|mes|semanal|pérdidas|dtes|sucursales)/i;
-        const hasCost = costRegex.test(notes) || lower.includes('costo') || lower.includes('pérdida') || lower.includes('mensualidad') || lower.includes('merma') || lower.includes('ahorro');
+        const hasCost =
+            costRegex.test(notes) ||
+            lower.includes('costo') ||
+            lower.includes('pérdida') ||
+            lower.includes('mensualidad') ||
+            lower.includes('merma') ||
+            lower.includes('ahorro');
         if (hasCost) {
             scoreCost = 10;
             statusCost = 'pass';
@@ -147,7 +280,10 @@ export const salesAuditService = {
         let scoreDecision = 0;
         let quoteDecision = 'No se indagó quién autoriza el presupuesto ni la fecha límite de compra.';
         let statusDecision: RubricCriterionScore['status'] = 'fail';
-        const decisionKeywords = ['decisor', 'socio', 'dueño', 'gerente', 'administrador', 'junta', 'aprobación', 'presupuesto', 'comité', 'compra', 'director', 'propietario'];
+        const decisionKeywords = [
+            'decisor', 'socio', 'dueño', 'gerente', 'administrador',
+            'junta', 'aprobación', 'presupuesto', 'comité', 'compra', 'director', 'propietario'
+        ];
         const hasDecision = decisionKeywords.some(k => lower.includes(k));
         if (hasDecision) {
             scoreDecision = 10;
@@ -190,7 +326,13 @@ export const salesAuditService = {
         const objKeywords = ['precio', 'caro', 'presupuesto', 'descuento', 'flete', 'función', 'evaluar', 'pensar', 'duda', 'objeción'];
         const hasObj = objKeywords.some(k => lower.includes(k));
         if (hasObj) {
-            if (lower.includes('autoriza') || lower.includes('gerencia') || lower.includes('acordó') || lower.includes('condición') || lower.includes('escuchar')) {
+            if (
+                lower.includes('autoriza') ||
+                lower.includes('gerencia') ||
+                lower.includes('acordó') ||
+                lower.includes('condición') ||
+                lower.includes('escuchar')
+            ) {
                 scoreObj = 15;
                 statusObj = 'pass';
                 quoteObj = 'Objeción tratada profesionalmente sin regalar descuentos y protegiendo el margen.';
@@ -200,7 +342,7 @@ export const salesAuditService = {
                 quoteObj = 'Se detectó objeción (precio o requerimiento), pero se respondió sin cierre condicionado firme.';
             }
         } else {
-            scoreObj = 15; // Si no hubo objeción, puntuación completa por no generar fricciones ficticias
+            scoreObj = 15;
             statusObj = 'pass';
             quoteObj = 'Sesión sin objeciones bloqueantes documentadas por el cliente.';
         }
@@ -232,8 +374,17 @@ export const salesAuditService = {
         let scoreNext = 0;
         let quoteNext = 'No se documentó una fecha y hora exacta para el siguiente paso.';
         let statusNext: RubricCriterionScore['status'] = 'fail';
-        const dateKeywords = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'octubre', 'noviembre', 'diciembre', 'am', 'pm', 'hora', 'fecha', 'reunión'];
-        const hasDatedNext = dateKeywords.some(k => lower.includes(k)) && (lower.includes('revisión') || lower.includes('llamada') || lower.includes('demo') || lower.includes('seguimiento') || lower.includes('whatsapp'));
+        const dateKeywords = [
+            'lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes',
+            'sábado', 'sabado', 'octubre', 'noviembre', 'diciembre', 'am', 'pm', 'hora', 'fecha', 'reunión'
+        ];
+        const hasDatedNext =
+            dateKeywords.some(k => lower.includes(k)) &&
+            (lower.includes('revisión') ||
+                lower.includes('llamada') ||
+                lower.includes('demo') ||
+                lower.includes('seguimiento') ||
+                lower.includes('whatsapp'));
         if (hasDatedNext) {
             scoreNext = 10;
             statusNext = 'pass';
@@ -249,7 +400,6 @@ export const salesAuditService = {
         const statusCrm: RubricCriterionScore['status'] = 'pass';
         const quoteCrm = 'Auditoría registrada y evidencia vinculada al historial del lead.';
 
-        // Sumar puntuación total
         const rubricScores: RubricCriterionScore[] = [
             {
                 id: 'prep_agenda',
@@ -336,29 +486,33 @@ export const salesAuditService = {
 
         const totalScore = rubricScores.reduce((acc, c) => acc + c.score, 0);
 
-        // Coaching Summary
         const failedCriteria = rubricScores.filter(c => c.status === 'fail');
         const passedCriteria = rubricScores.filter(c => c.status === 'pass');
 
-        const strength = passedCriteria.length > 0
-            ? `Fortaleza destacada en "${passedCriteria[0].name}": ${passedCriteria[0].evidence_quote}`
-            : 'Mantuvo la interacción y recopiló información del prospecto.';
+        const strength =
+            passedCriteria.length > 0
+                ? `Fortaleza destacada en "${passedCriteria[0].name}": ${passedCriteria[0].evidence_quote}`
+                : 'Mantuvo la interacción y recopiló información del prospecto.';
 
-        const criticalGap = failedCriteria.length > 0
-            ? `Brecha crítica en "${failedCriteria[0].name}": ${failedCriteria[0].evidence_quote}`
-            : 'Falta afinar la velocidad de seguimiento post-demo.';
+        const criticalGap =
+            failedCriteria.length > 0
+                ? `Brecha crítica en "${failedCriteria[0].name}": ${failedCriteria[0].evidence_quote}`
+                : 'Falta afinar la velocidad de seguimiento post-demo.';
 
-        const recommendedRoleplay = failedCriteria.some(c => c.id === 'objections_listen_method' || c.id === 'quantified_pain_cost')
+        const recommendedRoleplay = failedCriteria.some(
+            c => c.id === 'objections_listen_method' || c.id === 'quantified_pain_cost'
+        )
             ? 'Roleplay de 7 minutos: Manejo de objeción de precio y cuantificación del dolor financiero (Método ESCUCHAR).'
             : failedCriteria.some(c => c.id === 'next_step_accepted_dated' || c.id === 'clear_decision_request')
             ? 'Roleplay de 7 minutos: Cierre condicionado y cómo agendar la reunión de revisión de propuesta en vivo.'
             : 'Roleplay de 7 minutos: Preguntas de descubrimiento BANT al inicio de la demo.';
 
-        const immediateAction = scoreNext === 0
-            ? 'URGENTE: Enviar WhatsApp hoy al cliente para fijar fecha y hora exacta de revisión de propuesta.'
-            : scoreDecision === 0
-            ? 'URGENTE: Identificar quién autoriza el pago antes de emitir la cotización formal.'
-            : 'Enviar propuesta con vigencia y confirmar asistencia a la reunión agendada.';
+        const immediateAction =
+            scoreNext === 0
+                ? 'URGENTE: Enviar WhatsApp hoy al cliente para fijar fecha y hora exacta de revisión de propuesta.'
+                : scoreDecision === 0
+                ? 'URGENTE: Identificar quién autoriza el pago antes de emitir la cotización formal.'
+                : 'Enviar propuesta con vigencia y confirmar asistencia a la reunión agendada.';
 
         const extractedData: ExtractedLeadData = {
             pain_point: matchesDiag.length > 0 ? `Problemas con: ${matchesDiag.join(', ')}` : undefined,
@@ -398,7 +552,13 @@ export const salesAuditService = {
     /**
      * Guarda la auditoría en Supabase y en cache local sin sobrescribir auditorías previas
      */
-    async saveAudit(audit: Omit<SalesCallAudit, 'id' | 'created_at'> & { created_at?: string; clientName?: string }): Promise<SalesCallAudit> {
+    async saveAudit(
+        audit: Omit<SalesCallAudit, 'id' | 'created_at'> & {
+            created_at?: string;
+            clientName?: string;
+            documentTitle?: string;
+        }
+    ): Promise<SalesCallAudit> {
         let result: SalesCallAudit;
         const isUuid = (val?: string | null) =>
             !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
@@ -434,7 +594,7 @@ export const salesAuditService = {
                     result = {
                         ...audit,
                         ...data,
-                        sales_rep_name: audit.sales_rep_name,
+                        sales_rep_name: canonicalRepName(audit.sales_rep_name),
                         sdr_rep_name: audit.sdr_rep_name,
                         lead_status: audit.lead_status,
                         deal_value: audit.deal_value
@@ -482,13 +642,8 @@ export const salesAuditService = {
     },
 
     /**
-     * Sincroniza y obtiene TODAS las demostraciones (Octubre + Noviembre + Hoy) desde:
-     * 1. Google Calendar Live Events (google-calendar-sync Edge Function)
-     * 2. Seguimientos y Reuniones del CRM (tabla follow_ups)
-     * 3. Citas agendadas por Booking Links (tabla booking_appointments)
-     * 4. Actividades de reunión registradas (tabla call_activities)
-     * 5. Auditorías explícitas de Gemini (tabla sales_call_audits + LocalStorage)
-     * 6. Demos históricas certificadas de Octubre + enriquecimiento en vivo con tabla leads
+     * Sincroniza y obtiene ÚNICAMENTE las demostraciones cuyo TÍTULO DE DOCUMENTO coincide
+     * con la palabra clave escrita por el usuario (por defecto: "DEMO").
      */
     async getCompanyAuditStats(companyId: string): Promise<{
         totalAudits: number;
@@ -560,20 +715,18 @@ export const salesAuditService = {
     },
 
     /**
-     * Motor de Sincronización en Vivo Multi-Fuente
+     * Motor de Sincronización en Vivo con Filtro Estricto por Título de Documento (Google Drive / Gemini / Calendar)
      */
     async syncAllLiveCompanyDemos(companyId: string): Promise<SalesCallAudit[]> {
+        const filterConfig = getDemoTitleFilterConfig(companyId);
         const sinceDate = '2026-10-01T00:00:00.000Z';
-        // Permitir demos hasta el final del día de hoy + próximas 48h agendadas
         const maxDateCutoff = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
-        // 1. Consultas paralelas a Supabase (Perfiles, Leads, Follow-ups, Bookings, Call Activities, Sales Audits, Calendars)
+        // 1. Consultas paralelas a Supabase
         const [
             profilesRes,
             leadsRes,
             followUpsRes,
-            bookingsRes,
-            callActsRes,
             dbAuditsRes,
             companyCalsRes,
             calIntsRes
@@ -599,25 +752,7 @@ export const salesAuditService = {
                 .gte('date', sinceDate)
                 .lte('date', maxDateCutoff)
                 .order('date', { ascending: false })
-                .limit(500),
-            supabase
-                .from('booking_appointments')
-                .select('id, user_id, guest_name, guest_email, guest_company, notes, start_time, end_time, status, lead_id, meeting_url, created_at')
-                .eq('company_id', companyId)
-                .neq('status', 'cancelled')
-                .gte('start_time', sinceDate)
-                .lte('start_time', maxDateCutoff)
-                .order('start_time', { ascending: false })
-                .limit(300),
-            supabase
-                .from('call_activities')
-                .select('id, user_id, lead_id, call_date, duration_seconds, outcome, action_type, notes, status_before, status_after, created_at')
-                .eq('company_id', companyId)
-                .eq('action_type', 'meeting')
-                .gte('call_date', sinceDate)
-                .lte('call_date', maxDateCutoff)
-                .order('call_date', { ascending: false })
-                .limit(300),
+                .limit(400),
             supabase
                 .from('sales_call_audits')
                 .select('*, profiles:evaluated_user_id(full_name, email, avatar_url)')
@@ -639,8 +774,6 @@ export const salesAuditService = {
         const profiles: any[] = profilesRes.status === 'fulfilled' ? (profilesRes.value.data || []) : [];
         const leads: any[] = leadsRes.status === 'fulfilled' ? (leadsRes.value.data || []) : [];
         const followUps: any[] = followUpsRes.status === 'fulfilled' ? (followUpsRes.value.data || []) : [];
-        const bookings: any[] = bookingsRes.status === 'fulfilled' ? (bookingsRes.value.data || []) : [];
-        const callActs: any[] = callActsRes.status === 'fulfilled' ? (callActsRes.value.data || []) : [];
         const dbAudits: any[] = dbAuditsRes.status === 'fulfilled' ? (dbAuditsRes.value.data || []) : [];
         const companyCals: any[] = companyCalsRes.status === 'fulfilled' ? (companyCalsRes.value.data || []) : [];
         const calInts: any[] = calIntsRes.status === 'fulfilled' ? (calIntsRes.value.data || []) : [];
@@ -689,7 +822,7 @@ export const salesAuditService = {
             return null;
         };
 
-        // Helper para resolver AE (Presentador) y SDR (Agendador)
+        // Helper para resolver AE (SOLO equipo comercial: Diana Morales y Patricia Martínez) y SDR (Grecia Vásquez)
         const resolveRepAttribution = (params: {
             assignedUserId?: string | null;
             creatorUserId?: string | null;
@@ -711,7 +844,9 @@ export const salesAuditService = {
                 leadProfile?.full_name,
                 organizerProfile?.full_name,
                 creatorProfile?.full_name
-            ].filter(Boolean).map(n => String(n));
+            ]
+                .filter(Boolean)
+                .map(n => String(n));
 
             const allSignals = `${candidateNames.join(' ')} ${combinedText}`.toLowerCase();
 
@@ -720,15 +855,21 @@ export const salesAuditService = {
                 sdrRepName = 'Grecia Vásquez';
             }
 
-            // Determinar AE principal
-            if (combinedText.includes('patricia') || assignedProfile?.full_name?.toLowerCase().includes('patricia') || leadProfile?.full_name?.toLowerCase().includes('patricia')) {
+            if (
+                combinedText.includes('patricia') ||
+                assignedProfile?.full_name?.toLowerCase().includes('patricia') ||
+                leadProfile?.full_name?.toLowerCase().includes('patricia')
+            ) {
                 return { salesRepName: 'Patricia Martínez', sdrRepName };
             }
-            if (combinedText.includes('diana') || assignedProfile?.full_name?.toLowerCase().includes('diana') || leadProfile?.full_name?.toLowerCase().includes('diana')) {
+            if (
+                combinedText.includes('diana') ||
+                assignedProfile?.full_name?.toLowerCase().includes('diana') ||
+                leadProfile?.full_name?.toLowerCase().includes('diana')
+            ) {
                 return { salesRepName: 'Diana Morales', sdrRepName };
             }
 
-            // Revisar asistentes del evento de Google Calendar contra perfiles de la empresa
             if (params.attendeeEmails && params.attendeeEmails.length > 0) {
                 for (const email of params.attendeeEmails) {
                     const prof = profileByEmail.get(email.toLowerCase().trim());
@@ -740,18 +881,10 @@ export const salesAuditService = {
                 }
             }
 
-            // Si hay un perfil asignado que no sea admin genérico ni SDR sola
-            for (const cName of candidateNames) {
-                const lower = cName.toLowerCase();
-                if (!lower.includes('grecia') && !lower.includes('jimmy') && !lower.includes('simulaci')) {
-                    return { salesRepName: canonicalRepName(cName), sdrRepName };
-                }
-            }
-
             return { salesRepName: 'Diana Morales', sdrRepName };
         };
 
-        // 2. Obtener eventos en vivo de Google Calendar (si hay integraciones activas)
+        // 2. Obtener eventos en vivo de Google Calendar / Google Meet (con documentos adjuntos de Gemini)
         let googleEvents: any[] = [];
         try {
             const sourceMap = new Map<string, { integration_id: string; group_name: string; color: string }>();
@@ -787,7 +920,7 @@ export const salesAuditService = {
                         integration_sources: integrationSources
                     }
                 });
-                const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+                const timeoutPromise = new Promise<{ data: null; error: Error }>(resolve =>
                     setTimeout(() => resolve({ data: null, error: new Error('Timeout google-calendar-sync') }), 6000)
                 );
 
@@ -800,7 +933,7 @@ export const salesAuditService = {
             console.warn('Non-fatal: Google Calendar live sync skipped:', gErr);
         }
 
-        // 3. Construir colección unificada y deduplicada de demostraciones
+        // 3. Construir colección unificada y deduplicada SOLO de documentos que cumplen el Título Requerido
         const mergedMap = new Map<string, SalesCallAudit>();
 
         const makeDedupeKey = (clientName: string, isoDate: string, leadId?: string | null) => {
@@ -827,15 +960,19 @@ export const salesAuditService = {
             return audit;
         };
 
-        // ── PASO A: Cargar las 8 demostraciones históricas certificadas de Octubre como base
+        // ── PASO A: Cargar las demostraciones de Google Drive / Gemini que coincidan con el Título Requerido
         const certifiedBase = this.getCertifiedDemosAudits(companyId);
         for (const cert of certifiedBase) {
+            const docTitle = (cert as any).documentTitle || `${(cert as any).clientName}`;
+            if (!matchesRequiredDocumentTitle(docTitle, filterConfig.requiredKeyword, filterConfig.onlyDemosFilter)) {
+                continue;
+            }
             const enriched = enrichWithLead(cert);
             const key = makeDedupeKey((enriched as any).clientName || enriched.lead_id, enriched.created_at, enriched.lead_id);
             mergedMap.set(key, enriched);
         }
 
-        // ── PASO B: Incorporar Eventos en Vivo de Google Calendar (Octubre, Noviembre y Posteriores)
+        // ── PASO B: Incorporar Eventos de Google Meet / Calendar SOLO si su TÍTULO coincide con la palabra clave escrita
         for (const ev of googleEvents) {
             if (ev.status === 'cancelled') continue;
             const startIso = ev.start?.dateTime || ev.start?.date;
@@ -844,32 +981,35 @@ export const salesAuditService = {
 
             const summary = String(ev.summary || '').trim();
             const description = String(ev.description || '').trim();
-            const calendarLabel = String(ev._calendarName || ev._groupName || '').trim();
-            const combinedLower = `${summary} ${description} ${calendarLabel}`.toLowerCase();
 
-            // Descartar bloqueos personales o almuerzos
-            if (PERSONAL_BLOCK_KEYWORDS.some(kw => combinedLower.includes(kw))) continue;
+            // También revisar títulos de documentos adjuntos de Gemini en el evento
+            const attachmentTitles = Array.isArray(ev.attachments)
+                ? ev.attachments.map((att: any) => String(att.title || '')).join(' ')
+                : '';
+            const candidateTitle = `${summary} ${attachmentTitles}`.trim();
 
-            const hasMeetLink = Boolean(ev.hangoutLink || ev.conferenceData?.entryPoints?.length);
+            // FILTRO ESTRICTO POR TÍTULO DE DOCUMENTO ESCRITO POR EL USUARIO (ej. "DEMO")
+            if (!matchesRequiredDocumentTitle(candidateTitle, filterConfig.requiredKeyword, filterConfig.onlyDemosFilter)) {
+                continue;
+            }
+
             const attendeeEmails: string[] = Array.isArray(ev.attendees)
                 ? ev.attendees.map((a: any) => String(a.email || '')).filter(Boolean)
                 : [];
-            const hasKeyword = DEMO_EVENT_KEYWORDS.some(kw => combinedLower.includes(kw));
-
-            if (!hasKeyword && !hasMeetLink && attendeeEmails.length === 0) continue;
 
             const rawClientTitle = cleanEventClientTitle(summary);
             const externalAttendee = Array.isArray(ev.attendees)
                 ? ev.attendees.find((a: any) => a.email && !profileByEmail.has(String(a.email).toLowerCase().trim()))
                 : null;
 
-            const matchedLead = findMatchingLead(
-                null,
-                rawClientTitle,
-                externalAttendee?.email || null
-            );
+            const matchedLead = findMatchingLead(null, rawClientTitle, externalAttendee?.email || null);
 
-            const clientName = matchedLead?.company_name || matchedLead?.name || rawClientTitle || externalAttendee?.displayName || 'Demostración Google Meet';
+            const clientName =
+                matchedLead?.company_name ||
+                matchedLead?.name ||
+                rawClientTitle ||
+                externalAttendee?.displayName ||
+                'Demostración Google Meet';
 
             const { salesRepName, sdrRepName } = resolveRepAttribution({
                 leadAssignedUserId: matchedLead?.assigned_to,
@@ -879,31 +1019,35 @@ export const salesAuditService = {
                 calendarGroupName: `${ev._groupName || ''} ${ev._calendarName || ''}`
             });
 
-            // Extraer link de Google Doc si Gemini adjuntó notas a la cita de Calendar
             let docUrl: string | null = ev.htmlLink || ev.hangoutLink || null;
+            let docTitle = `${summary} - Notas de Gemini`;
             if (Array.isArray(ev.attachments) && ev.attachments.length > 0) {
                 const docAtt = ev.attachments.find((att: any) => att.fileUrl);
                 if (docAtt?.fileUrl) docUrl = docAtt.fileUrl;
+                if (docAtt?.title) docTitle = String(docAtt.title);
             } else {
                 const docMatch = description.match(/https:\/\/docs\.google\.com\/document\/d\/[^\s)>"]+/i);
                 if (docMatch) docUrl = docMatch[0];
             }
 
             const notesToEvaluate = [
-                `Demostración en Google Calendar: ${summary}.`,
+                `Documento Gemini / Google Meet: ${docTitle}.`,
                 description ? `Notas de reunión: ${description}` : '',
                 matchedLead?.next_action_notes ? `Seguimiento CRM: ${matchedLead.next_action_notes}` : '',
                 `Presentada por ${salesRepName}${sdrRepName ? ` · Agendada por ${sdrRepName} (SDR)` : ''}. Diagnóstico de requerimientos, presentación de módulos del sistema y seguimiento comercial.`
-            ].filter(Boolean).join(' ');
+            ]
+                .filter(Boolean)
+                .join(' ');
 
             const evaluated = this.evaluateNotesSync(notesToEvaluate, clientName, salesRepName);
-            const dealValue = matchedLead ? (Number(matchedLead.closing_amount) || Number(matchedLead.value) || 0) : 0;
+            const dealValue = matchedLead ? Number(matchedLead.closing_amount) || Number(matchedLead.value) || 0 : 0;
 
             const auditObj: SalesCallAudit = {
                 id: `gcal_${ev.id}`,
                 company_id: companyId,
                 lead_id: matchedLead?.id || `lead_${normalizeClientKey(clientName) || ev.id}`,
                 clientName,
+                documentTitle: docTitle,
                 lead_status: matchedLead?.status || 'En seguimiento',
                 deal_value: dealValue,
                 sales_rep_name: salesRepName,
@@ -924,30 +1068,20 @@ export const salesAuditService = {
             }
         }
 
-        // ── PASO C: Incorporar Reuniones y Demos de `follow_ups` del CRM
+        // ── PASO C: Incorporar Reuniones de `follow_ups` SOLO si su título en primera línea contiene el Título Requerido
         for (const fu of followUps) {
             const notesStr = String(fu.notes || '').trim();
-            const lowerNotes = notesStr.toLowerCase();
-            const isMeetingOrDemo =
-                fu.action_type === 'meeting' ||
-                Boolean(fu.meet_link) ||
-                Boolean(fu.google_event_id) ||
-                lowerNotes.includes('demo') ||
-                lowerNotes.includes('demostraci') ||
-                lowerNotes.includes('meet.google.com') ||
-                lowerNotes.includes('reunión') ||
-                lowerNotes.includes('reunion') ||
-                lowerNotes.includes('presentaci');
-
-            if (!isMeetingOrDemo) continue;
-            if (PERSONAL_BLOCK_KEYWORDS.some(kw => lowerNotes.includes(kw))) continue;
+            const firstLineTitle = notesStr.split('\n')[0]?.trim() || '';
+            if (!matchesRequiredDocumentTitle(firstLineTitle, filterConfig.requiredKeyword, filterConfig.onlyDemosFilter)) {
+                continue;
+            }
 
             const joinedLead = Array.isArray(fu.lead) ? fu.lead[0] : fu.lead;
-            const matchedLead = joinedLead || findMatchingLead(fu.lead_id, cleanEventClientTitle(notesStr), null);
+            const matchedLead = joinedLead || findMatchingLead(fu.lead_id, cleanEventClientTitle(firstLineTitle), null);
             const clientName =
                 matchedLead?.company_name ||
                 matchedLead?.name ||
-                cleanEventClientTitle(notesStr.split('\n')[0] || 'Cliente Comercial');
+                cleanEventClientTitle(firstLineTitle || 'Cliente Comercial');
 
             const { salesRepName, sdrRepName } = resolveRepAttribution({
                 assignedUserId: fu.assigned_to,
@@ -960,10 +1094,12 @@ export const salesAuditService = {
                 notesStr || `Demostración comercial con ${clientName}`,
                 matchedLead?.next_action_notes || '',
                 `Demostración y validación de requerimientos de sistema con ${clientName}.`
-            ].filter(Boolean).join(' · ');
+            ]
+                .filter(Boolean)
+                .join(' · ');
 
             const evaluated = this.evaluateNotesSync(fullNotes, clientName, salesRepName);
-            const dealValue = matchedLead ? (Number(matchedLead.closing_amount) || Number(matchedLead.value) || 0) : 0;
+            const dealValue = matchedLead ? Number(matchedLead.closing_amount) || Number(matchedLead.value) || 0 : 0;
             const dateIso = fu.date || fu.created_at;
 
             const auditObj: SalesCallAudit = {
@@ -971,6 +1107,7 @@ export const salesAuditService = {
                 company_id: companyId,
                 lead_id: matchedLead?.id || fu.lead_id || `lead_${fu.id}`,
                 clientName,
+                documentTitle: firstLineTitle,
                 lead_status: matchedLead?.status || (fu.completed ? 'Negociación' : 'En seguimiento'),
                 deal_value: dealValue,
                 evaluated_user_id: fu.assigned_to || matchedLead?.assigned_to || null,
@@ -992,182 +1129,45 @@ export const salesAuditService = {
             }
         }
 
-        // ── PASO D: Incorporar Citas de `booking_appointments`
-        for (const bk of bookings) {
-            const matchedLead = findMatchingLead(bk.lead_id, bk.guest_company || bk.guest_name, bk.guest_email);
-            const clientName = bk.guest_company || bk.guest_name || matchedLead?.company_name || matchedLead?.name || 'Cita Agendada';
-
-            const { salesRepName, sdrRepName } = resolveRepAttribution({
-                assignedUserId: bk.user_id,
-                leadAssignedUserId: matchedLead?.assigned_to,
-                textHint: bk.notes
-            });
-
-            const fullNotes = [
-                `Demostración agendada con ${clientName}.`,
-                bk.notes || '',
-                matchedLead?.next_action_notes || '',
-                'Presentación de módulos del sistema, diagnóstico operativo y propuesta comercial.'
-            ].filter(Boolean).join(' ');
-
-            const evaluated = this.evaluateNotesSync(fullNotes, clientName, salesRepName);
-            const dealValue = matchedLead ? (Number(matchedLead.closing_amount) || Number(matchedLead.value) || 0) : 0;
-
-            const auditObj: SalesCallAudit = {
-                id: `booking_${bk.id}`,
-                company_id: companyId,
-                lead_id: matchedLead?.id || bk.lead_id || `lead_${bk.id}`,
-                clientName,
-                lead_status: matchedLead?.status || 'Lead calificado',
-                deal_value: dealValue,
-                evaluated_user_id: bk.user_id || null,
-                sales_rep_name: salesRepName,
-                sdr_rep_name: sdrRepName,
-                google_doc_url: bk.meeting_url || null,
-                meeting_notes_raw: fullNotes,
-                total_score: evaluated.totalScore,
-                rubric_scores: evaluated.rubricScores,
-                coaching_summary: evaluated.coachingSummary,
-                extracted_data: evaluated.extractedData,
-                status: 'completed',
-                created_at: bk.start_time || bk.created_at
-            } as SalesCallAudit;
-
-            const dedupeKey = makeDedupeKey(clientName, bk.start_time || bk.created_at, matchedLead?.id || bk.lead_id);
-            if (!mergedMap.has(dedupeKey)) {
-                mergedMap.set(dedupeKey, auditObj);
-            }
-        }
-
-        // ── PASO E: Incorporar Reuniones de `call_activities` (action_type === 'meeting')
-        for (const ca of callActs) {
-            const matchedLead = findMatchingLead(ca.lead_id, null, null);
-            const clientName = matchedLead?.company_name || matchedLead?.name || cleanEventClientTitle(ca.notes || 'Reunión Comercial');
-
-            const { salesRepName, sdrRepName } = resolveRepAttribution({
-                assignedUserId: ca.user_id,
-                leadAssignedUserId: matchedLead?.assigned_to,
-                textHint: ca.notes
-            });
-
-            const fullNotes = [
-                ca.notes || `Reunión de demostración con ${clientName}.`,
-                matchedLead?.next_action_notes || '',
-                'Demostración comercial registrada en actividades.'
-            ].filter(Boolean).join(' ');
-
-            const evaluated = this.evaluateNotesSync(fullNotes, clientName, salesRepName);
-            const dealValue = matchedLead ? (Number(matchedLead.closing_amount) || Number(matchedLead.value) || 0) : 0;
-            const dateIso = ca.call_date || ca.created_at;
-
-            const auditObj: SalesCallAudit = {
-                id: `callact_${ca.id}`,
-                company_id: companyId,
-                lead_id: matchedLead?.id || ca.lead_id,
-                clientName,
-                lead_status: matchedLead?.status || ca.status_after || 'En seguimiento',
-                deal_value: dealValue,
-                evaluated_user_id: ca.user_id || null,
-                sales_rep_name: salesRepName,
-                sdr_rep_name: sdrRepName,
-                google_doc_url: null,
-                meeting_notes_raw: fullNotes,
-                total_score: evaluated.totalScore,
-                rubric_scores: evaluated.rubricScores,
-                coaching_summary: evaluated.coachingSummary,
-                extracted_data: evaluated.extractedData,
-                status: 'completed',
-                created_at: dateIso
-            } as SalesCallAudit;
-
-            const dedupeKey = makeDedupeKey(clientName, dateIso, matchedLead?.id || ca.lead_id);
-            if (!mergedMap.has(dedupeKey)) {
-                mergedMap.set(dedupeKey, auditObj);
-            }
-        }
-
-        // ── PASO F: Incorporar Leads con `demo_agendada` o notas de demo posteriores al 26 de Octubre
-        for (const l of leads) {
-            const cbd = (l.call_bot_data || {}) as Record<string, any>;
-            const nextNotes = String(l.next_action_notes || '');
-            const hasDemoSignal =
-                cbd.demo_agendada === true ||
-                /\b(demo\s+realizada|demostraci[oó]n\s+realizada|auditor[ií]a\s+gemini|demo\s+presentada|demo\s+con)\b/i.test(nextNotes);
-
-            if (!hasDemoSignal) continue;
-            const refDate = l.last_follow_up_at || l.created_at;
-            if (!refDate || refDate < '2026-10-26T00:00:00Z') continue;
-
-            const clientName = l.company_name || l.name || 'Cliente Comercial';
-            // Verificar si este lead ya tiene alguna demo en mergedMap
-            const normLead = normalizeClientKey(clientName);
-            const alreadyIncluded = Array.from(mergedMap.values()).some(
-                existing => existing.lead_id === l.id || normalizeClientKey((existing as any).clientName || '') === normLead
-            );
-            if (alreadyIncluded) continue;
-
-            const { salesRepName, sdrRepName } = resolveRepAttribution({
-                assignedUserId: l.assigned_to,
-                leadAssignedUserId: l.assigned_to,
-                textHint: `${nextNotes} ${cbd.notas_llamada || ''}`
-            });
-
-            const fullNotes = [
-                nextNotes,
-                cbd.notas_llamada || '',
-                `Demostración comercial para ${clientName}. Evaluación de sistema y propuesta.`
-            ].filter(Boolean).join(' ');
-
-            const evaluated = this.evaluateNotesSync(fullNotes, clientName, salesRepName);
-            const dealValue = Number(l.closing_amount) || Number(l.value) || 0;
-
-            const auditObj: SalesCallAudit = {
-                id: `lead_demo_${l.id}`,
-                company_id: companyId,
-                lead_id: l.id,
-                clientName,
-                lead_status: l.status || 'En seguimiento',
-                deal_value: dealValue,
-                evaluated_user_id: l.assigned_to || null,
-                sales_rep_name: salesRepName,
-                sdr_rep_name: sdrRepName,
-                google_doc_url: null,
-                meeting_notes_raw: fullNotes,
-                total_score: evaluated.totalScore,
-                rubric_scores: evaluated.rubricScores,
-                coaching_summary: evaluated.coachingSummary,
-                extracted_data: evaluated.extractedData,
-                status: 'completed',
-                created_at: refDate
-            } as SalesCallAudit;
-
-            const dedupeKey = makeDedupeKey(clientName, refDate, l.id);
-            mergedMap.set(dedupeKey, auditObj);
-        }
-
-        // ── PASO G: Auditorías Explícitas de Gemini (Supabase `sales_call_audits` + LocalStorage) -> Máxima Prioridad
+        // ── PASO D: Auditorías Explícitas de Gemini (Supabase `sales_call_audits` + LocalStorage manuales)
         const localCustomAudits = this.getCustomLocalAudits(companyId);
         const explicitAudits = [...localCustomAudits, ...dbAudits];
 
         for (const exp of explicitAudits) {
             const matchedLead = findMatchingLead(exp.lead_id, (exp as any).clientName, null);
-            const clientName = (exp as any).clientName || matchedLead?.company_name || matchedLead?.name || exp.lead_id || 'Demostración Auditada';
-            const repFromProfile = exp.profiles?.full_name || (exp.evaluated_user_id ? profileById.get(exp.evaluated_user_id)?.full_name : null);
+            const clientName =
+                (exp as any).clientName ||
+                matchedLead?.company_name ||
+                matchedLead?.name ||
+                exp.lead_id ||
+                'Demostración Auditada';
+            const docTitle =
+                (exp as any).documentTitle ||
+                `DEMO - ${clientName} - Notas de Gemini`;
+
+            if (!matchesRequiredDocumentTitle(`${docTitle} ${exp.meeting_notes_raw || ''}`, filterConfig.requiredKeyword, filterConfig.onlyDemosFilter)) {
+                continue;
+            }
+
+            const repFromProfile =
+                exp.profiles?.full_name ||
+                (exp.evaluated_user_id ? profileById.get(exp.evaluated_user_id)?.full_name : null);
             const salesRepName = canonicalRepName(exp.sales_rep_name || repFromProfile || 'Diana Morales');
             const dealValue = matchedLead
-                ? (Number(matchedLead.closing_amount) || Number(matchedLead.value) || exp.deal_value || 0)
-                : (exp.deal_value || 0);
+                ? Number(matchedLead.closing_amount) || Number(matchedLead.value) || exp.deal_value || 0
+                : exp.deal_value || 0;
 
             const normalizedAudit: SalesCallAudit = {
                 ...exp,
                 company_id: exp.company_id || companyId,
                 lead_id: matchedLead?.id || exp.lead_id,
                 clientName,
+                documentTitle: docTitle,
                 lead_status: matchedLead?.status || exp.lead_status || 'En seguimiento',
                 deal_value: dealValue,
                 sales_rep_name: salesRepName,
                 sdr_rep_name: exp.sdr_rep_name ? canonicalRepName(exp.sdr_rep_name) : null
-            };
+            } as SalesCallAudit;
 
             const dedupeKey = makeDedupeKey(clientName, normalizedAudit.created_at, normalizedAudit.lead_id);
             mergedMap.set(dedupeKey, normalizedAudit);
@@ -1177,7 +1177,7 @@ export const salesAuditService = {
             (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
-        // Actualizar cache combinada para acceso offline e instantáneo en LeadDetailPanel
+        // Actualizar cache limpia sin registros contaminados
         try {
             const key = `arias_sales_audits_${companyId}`;
             localStorage.setItem(key, JSON.stringify(finalAudits.slice(0, 150)));
@@ -1187,8 +1187,15 @@ export const salesAuditService = {
     },
 
     // ── Local Fallback & Storage Helpers ─────────────────────────────────────
-    saveToLocalCache(audit: Omit<SalesCallAudit, 'id' | 'created_at'> & { id?: string; created_at?: string; clientName?: string }): SalesCallAudit {
-        const id = audit.id || ('local_audit_' + Date.now());
+    saveToLocalCache(
+        audit: Omit<SalesCallAudit, 'id' | 'created_at'> & {
+            id?: string;
+            created_at?: string;
+            clientName?: string;
+            documentTitle?: string;
+        }
+    ): SalesCallAudit {
+        const id = audit.id || 'local_audit_' + Date.now();
         const fullAudit: SalesCallAudit = {
             ...audit,
             id,
@@ -1216,19 +1223,17 @@ export const salesAuditService = {
         try {
             const customKey = `arias_custom_sales_audits_${companyId}`;
             const customList: SalesCallAudit[] = JSON.parse(localStorage.getItem(customKey) || '[]');
-
-            // También rescatar cualquier auditoría manual previa guardada en la llave general
-            const generalKey = `arias_sales_audits_${companyId}`;
-            const generalList: SalesCallAudit[] = JSON.parse(localStorage.getItem(generalKey) || '[]');
-            const certifiedIds = new Set(this.getCertifiedDemosAudits(companyId).map(c => c.id));
-
-            const merged = [...customList];
-            for (const item of generalList) {
-                if (!certifiedIds.has(item.id) && !merged.some(m => m.id === item.id)) {
-                    merged.push(item);
-                }
-            }
-            return merged;
+            // Ignorar entradas automáticas previas (gcal_, followup_, booking_, callact_, lead_demo_) para evitar contaminación
+            return customList.filter(item => {
+                const id = String(item.id || '');
+                return (
+                    !id.startsWith('gcal_') &&
+                    !id.startsWith('followup_') &&
+                    !id.startsWith('booking_') &&
+                    !id.startsWith('callact_') &&
+                    !id.startsWith('lead_demo_')
+                );
+            });
         } catch {
             return [];
         }
@@ -1276,9 +1281,11 @@ export const salesAuditService = {
                 created_at: '2026-10-27T21:00:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Finca Miramar',
+                documentTitle: 'Demo Arias ERP - Finca Miramar: 2026/10/27 18:59 CST - Notas de Gemini',
                 lead_status: 'Cerrado',
                 deal_value: 1400,
-                meeting_notes_raw: 'Demostración 9:00 PM - 10:00 PM · Catálogo, cotizaciones dinámicas y facturación electrónica para múltiples sucursales agrícolas. Pico de calidad comercial con validación de flujos.'
+                meeting_notes_raw:
+                    'Demostración 9:00 PM - 10:00 PM · Catálogo, cotizaciones dinámicas y facturación electrónica para múltiples sucursales agrícolas. Pico de calidad comercial con validación de flujos.'
             },
             {
                 id: 'audit_luis_escobar',
@@ -1288,9 +1295,11 @@ export const salesAuditService = {
                 created_at: '2026-10-27T17:00:00-04:00',
                 google_doc_url: 'https://docs.google.com/document/d/10gpzd_2sI2VPGxBOvcVNrFYR_0Ey9gevRE8ixtKhkKU/edit',
                 clientName: 'Luis Escobar',
+                documentTitle: 'DEMO ERP - LUIS ESCOBAR - 2026/10/27 15:00 CST - Notes by Gemini (English)',
                 lead_status: 'Negociación',
                 deal_value: 588,
-                meeting_notes_raw: 'Demostración 5:00 PM - 6:00 PM · Presentada por Diana Morales (AE) · Cita agendada por Grecia Vásquez (SDR). Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
+                meeting_notes_raw:
+                    'Demostración 5:00 PM - 6:00 PM · Presentada por Diana Morales (AE) · Cita agendada por Grecia Vásquez (SDR). Minisúper familiar; se ofrece entorno de prueba de 8 días para evaluar POS e inventario. Tareas clave por validar.'
             },
             {
                 id: 'audit_arias_demo_27',
@@ -1299,9 +1308,11 @@ export const salesAuditService = {
                 created_at: '2026-10-27T12:00:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Demo Arias ERP (Lead General)',
+                documentTitle: 'Demo Arias ERP: 2026/10/27 09:57 CST - Notas de Gemini',
                 lead_status: 'Lead calificado',
                 deal_value: 900,
-                meeting_notes_raw: 'Demostración 12:00 PM - 1:00 PM · Presentación completa de funcionalidades core de ERP, reportería financiera y control de compras.'
+                meeting_notes_raw:
+                    'Demostración 12:00 PM - 1:00 PM · Presentación completa de funcionalidades core de ERP, reportería financiera y control de compras.'
             },
             {
                 id: 'audit_kervin_roque',
@@ -1310,9 +1321,11 @@ export const salesAuditService = {
                 created_at: '2026-10-26T17:00:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Kervin Roque',
+                documentTitle: 'Demo ERP Arias - Kervin Roque - 2026/10/26 14:39 CST - Notes by Gemini',
                 lead_status: 'Cerrado',
                 deal_value: 1200,
-                meeting_notes_raw: 'Demostración 5:00 PM - 6:00 PM · Evaluación de requerimientos para empresa de servicios, cotizaciones y seguimiento de clientes.'
+                meeting_notes_raw:
+                    'Demostración 5:00 PM - 6:00 PM · Evaluación de requerimientos para empresa de servicios, cotizaciones y seguimiento de clientes.'
             },
             {
                 id: 'audit_distribuidora_sanjose',
@@ -1321,9 +1334,11 @@ export const salesAuditService = {
                 created_at: '2026-10-25T16:15:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Distribuidora San José',
+                documentTitle: 'Demo Arias ERP - Distribuidora San José - Notas de Gemini',
                 lead_status: 'Negociación',
                 deal_value: 850,
-                meeting_notes_raw: 'Revisión técnica de flujo de pedidos, facturación fiscal y control de inventarios para ferretería mayorista.'
+                meeting_notes_raw:
+                    'Revisión técnica de flujo de pedidos, facturación fiscal y control de inventarios para ferretería mayorista.'
             },
             {
                 id: 'audit_agropecuaria_roble',
@@ -1332,9 +1347,11 @@ export const salesAuditService = {
                 created_at: '2026-10-21T14:40:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Agropecuaria El Roble',
+                documentTitle: 'Demo Arias ERP - Agropecuaria El Roble - Notas de Gemini',
                 lead_status: 'Negociación',
                 deal_value: 1100,
-                meeting_notes_raw: 'Configuración de órdenes de compra, control de almacenes ganaderos y roles de usuario para gerencia.'
+                meeting_notes_raw:
+                    'Configuración de órdenes de compra, control de almacenes ganaderos y roles de usuario para gerencia.'
             },
             {
                 id: 'audit_supermercados_canasta',
@@ -1343,9 +1360,11 @@ export const salesAuditService = {
                 created_at: '2026-10-18T11:20:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Supermercados La Canasta',
+                documentTitle: 'Demo Arias ERP - Supermercados La Canasta - Notas de Gemini',
                 lead_status: 'En seguimiento',
                 deal_value: 1800,
-                meeting_notes_raw: 'Apertura de sesión, presentación de puntos de venta POS y diagnóstico de control de caja para cadena retail.'
+                meeting_notes_raw:
+                    'Apertura de sesión, presentación de puntos de venta POS y diagnóstico de control de caja para cadena retail.'
             },
             {
                 id: 'audit_transportes_express',
@@ -1354,9 +1373,11 @@ export const salesAuditService = {
                 created_at: '2026-10-06T11:00:00-04:00',
                 google_doc_url: 'https://drive.google.com/drive/activity',
                 clientName: 'Transportes Express',
+                documentTitle: 'Demo ERP Arias - Transportes Express - Notas de Gemini',
                 lead_status: 'Perdido',
                 deal_value: 0,
-                meeting_notes_raw: 'Presentación inicial de módulo de contratos, clientes recurrentes y control de facturas de transporte.'
+                meeting_notes_raw:
+                    'Presentación inicial de módulo de contratos, clientes recurrentes y control de facturas de transporte.'
             }
         ];
 
@@ -1367,6 +1388,7 @@ export const salesAuditService = {
                 company_id: companyId,
                 lead_id: d.lead_id,
                 clientName: d.clientName,
+                documentTitle: d.documentTitle,
                 lead_status: d.lead_status,
                 deal_value: d.deal_value,
                 sales_rep_name: d.sales_rep_name,
@@ -1379,12 +1401,13 @@ export const salesAuditService = {
                 extracted_data: evaluated.extractedData,
                 status: 'completed' as const,
                 created_at: d.created_at
-            };
+            } as SalesCallAudit;
         });
     },
 
     getAllLocalAudits(companyId: string): SalesCallAudit[] {
         try {
+            const filterConfig = getDemoTitleFilterConfig(companyId);
             const custom = this.getCustomLocalAudits(companyId);
             const certified8 = this.getCertifiedDemosAudits(companyId);
             const merged = [...custom];
@@ -1393,7 +1416,15 @@ export const salesAuditService = {
                     merged.push(cert);
                 }
             }
-            return merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            return merged
+                .filter(a =>
+                    matchesRequiredDocumentTitle(
+                        (a as any).documentTitle || (a as any).clientName || '',
+                        filterConfig.requiredKeyword,
+                        filterConfig.onlyDemosFilter
+                    )
+                )
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         } catch {
             return this.getCertifiedDemosAudits(companyId);
         }
