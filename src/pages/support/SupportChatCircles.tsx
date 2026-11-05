@@ -58,12 +58,90 @@ interface ParsedChatBubble {
   isRecurringAlert?: boolean;
 }
 
+export type SupportChannelType = 'soporte' | 'contabilidad' | 'ventas' | 'otros';
+
+export const SUPPORT_CHANNELS: Record<
+  SupportChannelType,
+  { id: SupportChannelType; label: string; shortLabel: string; badgeBg: string; badgeText: string }
+> = {
+  soporte: {
+    id: 'soporte',
+    label: '🛠️ Soporte Técnico',
+    shortLabel: '🛠️ Soporte',
+    badgeBg: 'bg-indigo-100 border-indigo-200',
+    badgeText: 'text-indigo-800',
+  },
+  contabilidad: {
+    id: 'contabilidad',
+    label: '📊 Contabilidad / IVA',
+    shortLabel: '📊 Contabilidad',
+    badgeBg: 'bg-sky-100 border-sky-200',
+    badgeText: 'text-sky-800',
+  },
+  ventas: {
+    id: 'ventas',
+    label: '💰 Ventas / Precios',
+    shortLabel: '💰 Ventas / Precios',
+    badgeBg: 'bg-emerald-100 border-emerald-200',
+    badgeText: 'text-emerald-800',
+  },
+  otros: {
+    id: 'otros',
+    label: '📦 Otros / General',
+    shortLabel: '📦 Otros',
+    badgeBg: 'bg-slate-100 border-slate-200',
+    badgeText: 'text-slate-700',
+  },
+};
+
+const DEFAULT_PROMPTS: Record<SupportChannelType, string> = {
+  soporte:
+    'Eres el Asistente IA de Soporte Técnico de Arias Defense / ERP Facturación Electrónica (DTE Hacienda). Lee o escucha lo que el cliente reportó y respóndele de forma amable, clara y resolutiva en máximo 3 líneas por WhatsApp. Confírmale que entendiste su reporte técnico y pídele captura de pantalla del error o su código de AnyDesk si requiere revisión en su equipo.',
+  contabilidad:
+    'Eres el Asistente IA del Área Contable y Fiscal (Libros de IVA, Planillas, Declaraciones F07/F14, Anexos Hacienda y Retenciones). Lee o escucha la consulta del cliente y respóndele de forma profesional, precisa y amable en máximo 3 líneas por WhatsApp. Si necesita revisión de algún libro, anexo o cuadre contable, pídele el período (mes/año) o captura del reporte para que el especialista contable lo valide.',
+  ventas:
+    'Eres el Asesor Comercial IA de Arias Defense (Sistemas ERP, Facturación Electrónica DTE, Contabilidad, POS e Inventarios). El cliente está consultando por precios, planes, demostración o nuevos productos. Respóndele con entusiasmo, cortesía y enfoque comercial en máximo 3 líneas por WhatsApp: infórmale que contamos con planes adaptados a su volumen de facturación/operación y pregúntale su giro de negocio o cantidad aproximada de documentos mensuales para enviarle su cotización o agendar una demo.',
+  otros:
+    'Eres el Asistente IA de Atención al Cliente de Arias Defense. Lee o escucha el mensaje del cliente y respóndele de forma cortés, clara y servicial en máximo 3 líneas por WhatsApp, confirmando que recibimos su consulta y canalizándola con el área correspondiente.',
+};
+
+function detectTicketSupportChannel(t: Ticket): SupportChannelType {
+  const meta = (t.metadata || {}) as Record<string, any>;
+  if (
+    meta.support_channel &&
+    ['soporte', 'contabilidad', 'ventas', 'otros'].includes(meta.support_channel)
+  ) {
+    return meta.support_channel as SupportChannelType;
+  }
+  const combined = `${t.title || ''} ${t.description || ''} ${meta.ai_category || ''}`.toLowerCase();
+  if (
+    /precio|costo|cotizaci|cuanto cuesta|cuánto cuesta|cuanto vale|mensualidad|demo\b|demostraci|comprar|adquirir|licencia|ventas/i.test(
+      combined
+    )
+  ) {
+    return 'ventas';
+  }
+  if (
+    /contabilidad|contable|libro de iva|libros de iva|declaraci|anexo|f07|f14|retenci|planilla|balance general|partida contable/i.test(
+      combined
+    )
+  ) {
+    return 'contabilidad';
+  }
+  if (/otro producto|otros productos|información general|catalogo|catálogo/i.test(combined)) {
+    return 'otros';
+  }
+  return 'soporte';
+}
+
 interface SupportCircle {
   circleId: string;
   clientName: string;
   phone: string;
   whatsappJid: string;
   isWhatsApp: boolean;
+  supportChannel: SupportChannelType;
+  promotedLeadId: string | null;
   activeTicket: Ticket;
   allClientTickets: Ticket[];
   unreadOrWaitingReply: boolean;
@@ -167,12 +245,15 @@ export const SupportChatCircles: React.FC = () => {
 
   // Filters in left Circles column (default to WhatsApp chats so it's clean!)
   const [searchQuery, setSearchQuery] = useState('');
-  const [circleFilter, setCircleFilter] = useState<'all' | 'waiting' | 'whatsapp' | 'p1'>('whatsapp');
+  const [circleFilter, setCircleFilter] = useState<
+    'whatsapp' | 'soporte' | 'contabilidad' | 'ventas' | 'otros' | 'waiting' | 'all'
+  >('whatsapp');
 
   // Message input & sending state
   const [messageInput, setMessageInput] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [promotingLead, setPromotingLead] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -199,18 +280,77 @@ export const SupportChatCircles: React.FC = () => {
     instance: localStorage.getItem('crm_evo_instance') || 'soporte',
   }));
 
-  // AI Voice & Auto-Reply Prompt Modal
+  // Multi-Category AI Auto-Responder (BOTH Text & Audio + OpenAI Live Verification)
   const [showAiPromptModal, setShowAiPromptModal] = useState(false);
-  const [aiAutoReplyEnabled, setAiAutoReplyEnabled] = useState(true);
-  const [aiVoicePrompt, setAiVoicePrompt] = useState(
-    () =>
-      localStorage.getItem('crm_support_ai_voice_prompt') ||
-      'Eres el Asistente IA de Soporte Técnico de Arias Defense / ERP Facturación Electrónica (DTE Hacienda). Escucha lo que el cliente dijo en su nota de voz y respóndele de forma amable, clara y resolutiva en máximo 3 líneas por WhatsApp. Confírmale exactamente que entendiste su reporte y pídele captura de pantalla o código de AnyDesk si requiere revisión técnica.'
-  );
+  const [activePromptTab, setActivePromptTab] = useState<SupportChannelType>('soporte');
+  const [aiAutoReplyText, setAiAutoReplyText] = useState(true);
+  const [aiAutoReplyAudio, setAiAutoReplyAudio] = useState(true);
+  const [aiPrompts, setAiPrompts] = useState<Record<SupportChannelType, string>>(() => ({
+    soporte: localStorage.getItem('crm_support_ai_prompt_soporte') || DEFAULT_PROMPTS.soporte,
+    contabilidad:
+      localStorage.getItem('crm_support_ai_prompt_contabilidad') || DEFAULT_PROMPTS.contabilidad,
+    ventas: localStorage.getItem('crm_support_ai_prompt_ventas') || DEFAULT_PROMPTS.ventas,
+    otros: localStorage.getItem('crm_support_ai_prompt_otros') || DEFAULT_PROMPTS.otros,
+  }));
+  const [openAiStatus, setOpenAiStatus] = useState<{
+    checking: boolean;
+    verified: boolean;
+    model: string;
+    error: string;
+  }>({
+    checking: true,
+    verified: false,
+    model: 'gpt-4o-mini',
+    error: '',
+  });
+  const [savingAiConfig, setSavingAiConfig] = useState(false);
+
+  const verifyAndLoadAiConfig = async (showToast = false) => {
+    setOpenAiStatus((p) => ({ ...p, checking: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
+        body: { action: 'get_ai_config' },
+      });
+      if (error) throw error;
+      if (data) {
+        setOpenAiStatus({
+          checking: false,
+          verified: Boolean(data.openai_verified),
+          model: data.openai_model || 'gpt-4o-mini',
+          error: data.openai_error || '',
+        });
+        if (typeof data.auto_reply_text === 'boolean') setAiAutoReplyText(data.auto_reply_text);
+        if (typeof data.auto_reply_audio === 'boolean') setAiAutoReplyAudio(data.auto_reply_audio);
+        if (data.prompts) {
+          setAiPrompts({
+            soporte: data.prompts.soporte || DEFAULT_PROMPTS.soporte,
+            contabilidad: data.prompts.contabilidad || DEFAULT_PROMPTS.contabilidad,
+            ventas: data.prompts.ventas || DEFAULT_PROMPTS.ventas,
+            otros: data.prompts.otros || DEFAULT_PROMPTS.otros,
+          });
+        }
+        if (showToast) {
+          if (data.openai_verified) {
+            toast.success(`OpenAI Conectado y Verificado (${data.openai_model || 'gpt-4o-mini'} + Whisper)`);
+          } else {
+            toast.error(`OpenAI no respondió: ${data.openai_error || 'Verificar API Key'}`);
+          }
+        }
+      }
+    } catch (e: any) {
+      setOpenAiStatus({
+        checking: false,
+        verified: false,
+        model: 'gpt-4o-mini',
+        error: e?.message || 'Error al verificar',
+      });
+    }
+  };
 
   useEffect(() => {
     if (activeCompanyId) {
       loadSupportData();
+      verifyAndLoadAiConfig(false);
     }
   }, [activeCompanyId]);
 
@@ -334,6 +474,8 @@ export const SupportChatCircles: React.FC = () => {
       const isOpen = ['new', 'open', 'pending'].includes(activeTicket.status);
       const lastWasClient = !lastChatLine || lastChatLine.includes('👤');
       const unreadOrWaitingReply = isOpen && lastWasClient;
+      const supportChannel = detectTicketSupportChannel(activeTicket);
+      const promotedLeadId = String(activeTicket.lead_id || meta.promoted_lead_id || '') || null;
 
       list.push({
         circleId: key,
@@ -341,6 +483,8 @@ export const SupportChatCircles: React.FC = () => {
         phone,
         whatsappJid,
         isWhatsApp,
+        supportChannel,
+        promotedLeadId,
         activeTicket,
         allClientTickets: sorted,
         unreadOrWaitingReply,
@@ -366,12 +510,28 @@ export const SupportChatCircles: React.FC = () => {
     });
   }, [tickets, categories, agents]);
 
+  const channelCounts = useMemo(() => {
+    const waCircles = circles.filter((c) => c.isWhatsApp);
+    return {
+      whatsapp: waCircles.length,
+      soporte: circles.filter((c) => c.supportChannel === 'soporte').length,
+      contabilidad: circles.filter((c) => c.supportChannel === 'contabilidad').length,
+      ventas: circles.filter((c) => c.supportChannel === 'ventas').length,
+      otros: circles.filter((c) => c.supportChannel === 'otros').length,
+      waiting: circles.filter((c) => c.unreadOrWaitingReply).length,
+      all: circles.length,
+    };
+  }, [circles]);
+
   // Filtered Circles in left sidebar
   const filteredCircles = useMemo(() => {
     return circles.filter((c) => {
       if (circleFilter === 'waiting' && !c.unreadOrWaitingReply) return false;
       if (circleFilter === 'whatsapp' && !c.isWhatsApp) return false;
-      if (circleFilter === 'p1' && c.categoryCode !== 'P1' && c.categoryCode !== 'P2') return false;
+      if (circleFilter === 'soporte' && c.supportChannel !== 'soporte') return false;
+      if (circleFilter === 'contabilidad' && c.supportChannel !== 'contabilidad') return false;
+      if (circleFilter === 'ventas' && c.supportChannel !== 'ventas') return false;
+      if (circleFilter === 'otros' && c.supportChannel !== 'otros') return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -473,7 +633,7 @@ export const SupportChatCircles: React.FC = () => {
             !isClientSender &&
             (icon === '👨‍💻' ||
               Boolean(c.author_id) ||
-              /melvin|gerson|soporte|equipo|platform owner|simulaci|ia soporte/i.test(sender));
+              /melvin|gerson|soporte|equipo|platform owner|simulaci|🤖 ia|ia /i.test(sender));
 
           list.push({
             id: c.id,
@@ -523,7 +683,7 @@ export const SupportChatCircles: React.FC = () => {
           const isStaff =
             !isClientSender &&
             (lineMatch[2] === '👨‍💻' ||
-              /melvin|gerson|soporte|equipo|platform owner|simulaci|ia soporte/i.test(sender));
+              /melvin|gerson|soporte|equipo|platform owner|simulaci|🤖 ia|ia /i.test(sender));
           list.push({
             id: `desc-${idx}`,
             senderType: isStaff ? 'staff' : 'client',
@@ -705,6 +865,56 @@ export const SupportChatCircles: React.FC = () => {
     }
   };
 
+  // Switch Channel Category (Soporte | Contabilidad | Ventas | Otros) with 1 click
+  const handleSwitchChannel = async (newChannel: SupportChannelType) => {
+    if (!activeCircle) return;
+    try {
+      const { error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
+        body: {
+          action: 'set_ticket_channel',
+          ticket_id: activeCircle.activeTicket.id,
+          support_channel: newChannel,
+        },
+      });
+      if (error) throw error;
+      toast.success(`Canal cambiado a ${SUPPORT_CHANNELS[newChannel].label}`);
+      loadSupportData(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al cambiar categoría');
+    }
+  };
+
+  // 1-Click Promote WhatsApp Chat to Sales Lead ("Pasar a Ventas")
+  const handlePromoteToLead = async () => {
+    if (!activeCircle) return;
+    if (activeCircle.promotedLeadId) {
+      navigate('/leads');
+      return;
+    }
+    setPromotingLead(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
+        body: {
+          action: 'promote_to_lead',
+          ticket_id: activeCircle.activeTicket.id,
+          client_name: activeCircle.clientName,
+          phone: activeCircle.phone,
+        },
+      });
+      if (error) throw error;
+      toast.success(
+        data?.already_existed
+          ? `Vinculado con Lead existente en Ventas (${activeCircle.clientName})`
+          : `¡Prospecto creado en Ventas (Leads) para ${activeCircle.clientName}!`
+      );
+      loadSupportData(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al crear Lead en Ventas');
+    } finally {
+      setPromotingLead(false);
+    }
+  };
+
   // Save Resolution + Time + Optionally Close & Notify Client
   const handleCompleteAndCloseTicket = async (notifyClient: boolean) => {
     if (!activeCircle || !aiTimeAudit) return;
@@ -806,8 +1016,31 @@ export const SupportChatCircles: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <span className="hidden md:inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#EEF0FF] text-indigo-700">
-            {profile?.role === 'super_admin' ? 'ADMINISTRATOR' : 'SUPPORT ENGINEER'}
+          <span
+            onClick={() => verifyAndLoadAiConfig(true)}
+            title="Haz clic para probar en vivo la conexión con OpenAI GPT-4o-mini y Whisper"
+            className={`hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black cursor-pointer border transition ${
+              openAiStatus.checking
+                ? 'bg-slate-100 text-slate-600 border-slate-200'
+                : openAiStatus.verified
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                openAiStatus.checking
+                  ? 'bg-amber-400 animate-pulse'
+                  : openAiStatus.verified
+                  ? 'bg-emerald-500'
+                  : 'bg-rose-500'
+              }`}
+            />
+            {openAiStatus.checking
+              ? 'Verificando OpenAI...'
+              : openAiStatus.verified
+              ? 'OpenAI Activo (Texto + Voz)'
+              : 'OpenAI Desconectado'}
           </span>
 
           <button
@@ -815,7 +1048,7 @@ export const SupportChatCircles: React.FC = () => {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/70 transition"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Prompt IA (Audios)
+            Prompt IA (Texto y Voz)
           </button>
 
           <button
@@ -890,20 +1123,23 @@ export const SupportChatCircles: React.FC = () => {
               />
             </div>
 
-            {/* Filter Mini-Pills */}
-            <div className="flex items-center gap-1 mt-2.5 overflow-x-auto pb-1">
+            {/* Category Filter Mini-Pills (Soporte | Contabilidad | Ventas | Otros) */}
+            <div className="flex items-center gap-1 mt-2.5 flex-wrap">
               {[
-                { id: 'all', label: 'Todos' },
-                { id: 'waiting', label: '🔴 Sin Responder' },
-                { id: 'whatsapp', label: '💬 WhatsApp' },
-                { id: 'p1', label: '🔥 P1/P2' },
+                { id: 'whatsapp', label: `💬 WhatsApp (${channelCounts.whatsapp})` },
+                { id: 'soporte', label: `🛠️ Soporte (${channelCounts.soporte})` },
+                { id: 'contabilidad', label: `📊 Contabilidad (${channelCounts.contabilidad})` },
+                { id: 'ventas', label: `💰 Ventas (${channelCounts.ventas})` },
+                { id: 'otros', label: `📦 Otros (${channelCounts.otros})` },
+                { id: 'waiting', label: `🔴 Sin Responder (${channelCounts.waiting})` },
+                { id: 'all', label: `Todos (${channelCounts.all})` },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setCircleFilter(tab.id as any)}
                   className={`px-2.5 py-1 rounded-full text-[10px] font-black whitespace-nowrap transition ${
                     circleFilter === tab.id
-                      ? 'bg-indigo-600 text-white'
+                      ? 'bg-indigo-600 text-white shadow-2xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -917,7 +1153,7 @@ export const SupportChatCircles: React.FC = () => {
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
             {filteredCircles.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-400 font-semibold">
-                No se encontraron chats con ese filtro.
+                No se encontraron chats en esta categoría.
               </div>
             ) : (
               filteredCircles.map((circle) => {
@@ -926,6 +1162,7 @@ export const SupportChatCircles: React.FC = () => {
                   hour: '2-digit',
                   minute: '2-digit',
                 });
+                const chBadge = SUPPORT_CHANNELS[circle.supportChannel] || SUPPORT_CHANNELS.soporte;
 
                 return (
                   <button
@@ -944,7 +1181,11 @@ export const SupportChatCircles: React.FC = () => {
                     <div className="relative shrink-0">
                       <div
                         className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-xs text-white shadow-xs ${
-                          circle.isWhatsApp
+                          circle.supportChannel === 'ventas'
+                            ? 'bg-gradient-to-br from-emerald-600 to-teal-600'
+                            : circle.supportChannel === 'contabilidad'
+                            ? 'bg-gradient-to-br from-sky-600 to-blue-600'
+                            : circle.isWhatsApp
                             ? 'bg-gradient-to-br from-indigo-600 to-violet-600'
                             : 'bg-slate-700'
                         }`}
@@ -982,6 +1223,12 @@ export const SupportChatCircles: React.FC = () => {
                       {/* Bottom mini badges */}
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                         <span
+                          className={`px-1.5 py-0.5 rounded text-[9px] font-black border ${chBadge.badgeBg} ${chBadge.badgeText}`}
+                        >
+                          {chBadge.shortLabel}
+                        </span>
+
+                        <span
                           className="px-1.5 py-0.5 rounded text-[9px] font-black text-white"
                           style={{ backgroundColor: circle.categoryColor }}
                         >
@@ -992,9 +1239,9 @@ export const SupportChatCircles: React.FC = () => {
                           👨‍💻 {circle.assignedTechName.split(' ')[0]}
                         </span>
 
-                        {circle.repeatTicketsCount > 0 && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800">
-                            {circle.allClientTickets.length} tickets
+                        {circle.promotedLeadId && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-800">
+                            ✓ Lead Ventas
                           </span>
                         )}
                       </div>
@@ -1021,7 +1268,7 @@ export const SupportChatCircles: React.FC = () => {
                     .toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight truncate">
                       {activeCircle.clientName}
                     </h3>
@@ -1031,6 +1278,21 @@ export const SupportChatCircles: React.FC = () => {
                     >
                       {activeCircle.categoryName}
                     </span>
+
+                    {/* 1-Click Channel Category Switcher */}
+                    <select
+                      value={activeCircle.supportChannel}
+                      onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
+                      title="Cambiar categoría de esta conversación (Soporte, Contabilidad, Ventas u Otros)"
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border cursor-pointer focus:outline-none ${
+                        SUPPORT_CHANNELS[activeCircle.supportChannel]?.badgeBg
+                      } ${SUPPORT_CHANNELS[activeCircle.supportChannel]?.badgeText}`}
+                    >
+                      <option value="soporte">🛠️ Área: Soporte Técnico</option>
+                      <option value="contabilidad">📊 Área: Contabilidad / IVA</option>
+                      <option value="ventas">💰 Área: Ventas / Precios</option>
+                      <option value="otros">📦 Área: Otros Productos</option>
+                    </select>
                   </div>
                   <p className="text-[11px] font-semibold text-slate-400">
                     {activeCircle.phone ? `+${activeCircle.phone} · ` : ''}
@@ -1041,11 +1303,35 @@ export const SupportChatCircles: React.FC = () => {
               </div>
 
               {/* Right controls in Chat Header */}
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2">
+                {/* 1-Click Promote to Sales Lead Button */}
+                <button
+                  type="button"
+                  disabled={promotingLead}
+                  onClick={handlePromoteToLead}
+                  title="Crear Prospecto en el módulo de Leads / Ventas con 1 clic"
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border transition ${
+                    activeCircle.promotedLeadId
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
+                      : activeCircle.supportChannel === 'ventas'
+                      ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-xs animate-pulse'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                  }`}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>
+                    {promotingLead
+                      ? 'Creando Lead...'
+                      : activeCircle.promotedLeadId
+                      ? '✓ En Ventas (Ver Lead)'
+                      : 'Pasar a Ventas (Lead)'}
+                  </span>
+                </button>
+
                 {/* Live Chat Session Timer */}
                 <div
                   title="Tiempo activo del técnico en este chat"
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black"
+                  className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black"
                 >
                   <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
                   <span>En chat: {formatTimer(activeChatSeconds)}</span>
@@ -1060,7 +1346,7 @@ export const SupportChatCircles: React.FC = () => {
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-black transition"
                   >
                     <Phone className="w-3.5 h-3.5" />
-                    <span className="hidden lg:inline">WhatsApp Directo</span>
+                    <span className="hidden 2xl:inline">WhatsApp Directo</span>
                   </a>
                 )}
 
@@ -1642,15 +1928,15 @@ export const SupportChatCircles: React.FC = () => {
         </div>
       )}
 
-      {/* Modal para configurar el Prompt de Instrucciones IA cuando el cliente envía Notas de Voz */}
+      {/* Modal para configurar Prompts de Instrucciones IA por Categoría (Texto + Notas de Voz) */}
       {showAiPromptModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-purple-600" />
                 <h3 className="text-base font-black text-slate-900">
-                  IA para Escuchar y Responder Notas de Voz
+                  IA Automática por Categoría (Texto y Notas de Voz)
                 </h3>
               </div>
               <button
@@ -1660,37 +1946,122 @@ export const SupportChatCircles: React.FC = () => {
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Live OpenAI Status Verification Banner */}
+            <div
+              className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl border ${
+                openAiStatus.checking
+                  ? 'bg-slate-50 border-slate-200 text-slate-700'
+                  : openAiStatus.verified
+                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                  : 'bg-rose-50 border-rose-200 text-rose-900'
+              }`}
+            >
+              <div className="flex items-center gap-2 text-xs font-bold">
+                <span
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    openAiStatus.checking
+                      ? 'bg-amber-400 animate-pulse'
+                      : openAiStatus.verified
+                      ? 'bg-emerald-500'
+                      : 'bg-rose-500'
+                  }`}
+                />
+                <span>
+                  {openAiStatus.checking
+                    ? 'Verificando conexión en vivo con OpenAI...'
+                    : openAiStatus.verified
+                    ? `🟢 OpenAI Conectado (${openAiStatus.model} + Whisper-1 Audio)`
+                    : `🔴 OpenAI Error: ${openAiStatus.error || 'Sin conexión'}`}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => verifyAndLoadAiConfig(true)}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-black text-slate-700 transition"
+              >
+                🔄 Probar Conexión
+              </button>
+            </div>
+
             <p className="text-xs text-slate-600 leading-relaxed">
-              Cuando un cliente envía una nota de voz por WhatsApp, el sistema descarga el audio
-              para que puedas darle <strong>▶️ Play</strong> en el chat, lo transcribe con{' '}
-              <strong>OpenAI Whisper</strong> y responde automáticamente siguiendo estas
-              instrucciones:
+              Cuando un cliente o prospecto escribe en <strong>Texto</strong> o envía una{' '}
+              <strong>Nota de Voz</strong> por WhatsApp, la IA detecta automáticamente si es{' '}
+              <strong>🛠️ Soporte</strong>, <strong>📊 Contabilidad</strong> o{' '}
+              <strong>💰 Ventas / Precios</strong> y le responde siguiendo el prompt de esa área:
             </p>
-            <div className="space-y-3">
+
+            {/* Switches for BOTH Text and Voice Notes */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={aiAutoReplyEnabled}
-                  onChange={(e) => setAiAutoReplyEnabled(e.target.checked)}
+                  checked={aiAutoReplyText}
+                  onChange={(e) => setAiAutoReplyText(e.target.checked)}
                   className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
                 />
-                <span className="text-xs font-bold text-slate-800">
-                  Responder automáticamente con IA cuando entre una nota de voz
+                <span className="text-xs font-black text-slate-800">
+                  💬 Responder a Mensajes de TEXTO
                 </span>
               </label>
 
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={aiAutoReplyAudio}
+                  onChange={(e) => setAiAutoReplyAudio(e.target.checked)}
+                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                />
+                <span className="text-xs font-black text-slate-800">
+                  🎤 Responder a Notas de VOZ (Audio)
+                </span>
+              </label>
+            </div>
+
+            {/* 4 Category Prompt Tabs */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {(
+                  [
+                    { id: 'soporte', label: '🛠️ Soporte Técnico' },
+                    { id: 'contabilidad', label: '📊 Contabilidad / IVA' },
+                    { id: 'ventas', label: '💰 Ventas / Precios' },
+                    { id: 'otros', label: '📦 Otros / General' },
+                  ] as { id: SupportChannelType; label: string }[]
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActivePromptTab(tab.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${
+                      activePromptTab === tab.id
+                        ? 'bg-purple-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-500">
-                  Prompt de Instrucciones para la IA de Soporte
+                  Instrucciones IA para: {SUPPORT_CHANNELS[activePromptTab].label}
                 </label>
                 <textarea
                   rows={5}
-                  value={aiVoicePrompt}
-                  onChange={(e) => setAiVoicePrompt(e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                  value={aiPrompts[activePromptTab]}
+                  onChange={(e) =>
+                    setAiPrompts((prev) => ({
+                      ...prev,
+                      [activePromptTab]: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
                 />
               </div>
             </div>
+
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setShowAiPromptModal(false)}
@@ -1699,24 +2070,49 @@ export const SupportChatCircles: React.FC = () => {
                 Cancelar
               </button>
               <button
+                disabled={savingAiConfig}
                 onClick={async () => {
-                  localStorage.setItem('crm_support_ai_voice_prompt', aiVoicePrompt.trim());
-                  if (activeCircle?.activeTicket?.id) {
-                    await supabase.functions.invoke('evolution-whatsapp-webhook', {
-                      body: {
-                        action: 'save_ai_prompt',
-                        ticket_id: activeCircle.activeTicket.id,
-                        ai_voice_prompt: aiVoicePrompt.trim(),
-                        ai_auto_reply_enabled: aiAutoReplyEnabled,
-                      },
-                    });
+                  setSavingAiConfig(true);
+                  try {
+                    localStorage.setItem('crm_support_ai_prompt_soporte', aiPrompts.soporte.trim());
+                    localStorage.setItem(
+                      'crm_support_ai_prompt_contabilidad',
+                      aiPrompts.contabilidad.trim()
+                    );
+                    localStorage.setItem('crm_support_ai_prompt_ventas', aiPrompts.ventas.trim());
+                    localStorage.setItem('crm_support_ai_prompt_otros', aiPrompts.otros.trim());
+
+                    const { error } = await supabase.functions.invoke(
+                      'evolution-whatsapp-webhook',
+                      {
+                        body: {
+                          action: 'save_ai_config',
+                          ticket_id: activeCircle?.activeTicket?.id || undefined,
+                          auto_reply_text: aiAutoReplyText,
+                          auto_reply_audio: aiAutoReplyAudio,
+                          prompts: {
+                            soporte: aiPrompts.soporte.trim(),
+                            contabilidad: aiPrompts.contabilidad.trim(),
+                            ventas: aiPrompts.ventas.trim(),
+                            otros: aiPrompts.otros.trim(),
+                          },
+                        },
+                      }
+                    );
+                    if (error) throw error;
+                    toast.success(
+                      'Configuración IA guardada (Texto + Voz para Soporte, Contabilidad y Ventas)'
+                    );
+                    setShowAiPromptModal(false);
+                  } catch (e: any) {
+                    toast.error(e?.message || 'Error al guardar configuración IA');
+                  } finally {
+                    setSavingAiConfig(false);
                   }
-                  toast.success('Prompt de IA para Notas de Voz guardado');
-                  setShowAiPromptModal(false);
                 }}
-                className="px-4 py-2 rounded-xl text-xs font-black bg-purple-600 text-white hover:bg-purple-700"
+                className="px-4 py-2 rounded-xl text-xs font-black bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
               >
-                Guardar Instrucciones IA
+                {savingAiConfig ? 'Guardando...' : 'Guardar Instrucciones IA'}
               </button>
             </div>
           </div>

@@ -40,10 +40,24 @@ function isGreetingOrClosingAgreement(text: string): boolean {
   return pureGreeting;
 }
 
-// 2. Detect if a message actually describes a problem, error, bug, or support request
+export type SupportChannelType = 'soporte' | 'contabilidad' | 'ventas' | 'otros';
+
+export const DEFAULT_AI_PROMPTS: Record<SupportChannelType, string> = {
+  soporte:
+    'Eres el Asistente IA de Soporte Técnico de Arias Defense / ERP Facturación Electrónica (DTE Hacienda). Lee o escucha lo que el cliente reportó y respóndele de forma amable, clara y resolutiva en máximo 3 líneas por WhatsApp. Confírmale que entendiste su reporte técnico y pídele captura de pantalla del error o su código de AnyDesk si requiere revisión en su equipo.',
+  contabilidad:
+    'Eres el Asistente IA del Área Contable y Fiscal (Libros de IVA, Planillas, Declaraciones F07/F14, Anexos Hacienda y Retenciones). Lee o escucha la consulta del cliente y respóndele de forma profesional, precisa y amable en máximo 3 líneas por WhatsApp. Si necesita revisión de algún libro, anexo o cuadre contable, pídele el período (mes/año) o captura del reporte para que el especialista contable lo valide.',
+  ventas:
+    'Eres el Asesor Comercial IA de Arias Defense (Sistemas ERP, Facturación Electrónica DTE, Contabilidad, POS e Inventarios). El cliente está consultando por precios, planes, demostración o nuevos productos. Respóndele con entusiasmo, cortesía y enfoque comercial en máximo 3 líneas por WhatsApp: infórmale que contamos con planes adaptados a su volumen de facturación/operación y pregúntale su giro de negocio o cantidad aproximada de documentos mensuales para enviarle su cotización o agendar una demo.',
+  otros:
+    'Eres el Asistente IA de Atención al Cliente de Arias Defense. Lee o escucha el mensaje del cliente y respóndele de forma cortés, clara y servicial en máximo 3 líneas por WhatsApp, confirmando que recibimos su consulta y canalizándola con el área correspondiente.',
+};
+
+// 2. Detect if a message describes a support problem, accounting query, sales/pricing lead, or general inquiry
 function classifyIssueCategory(text: string): {
   category: string;
   shortCategoryTag: string;
+  supportChannel: SupportChannelType;
   isActualSupportProblem: boolean;
   priority: 'low' | 'medium' | 'high' | 'urgent';
 } {
@@ -60,6 +74,100 @@ function classifyIssueCategory(text: string): {
     'producción',
     'error critico',
     'error crítico',
+  ];
+
+  const salesKeywords = [
+    'precio',
+    'precios',
+    'costo',
+    'costos',
+    'cotizacion',
+    'cotización',
+    'cotizar',
+    'cuanto cuesta',
+    'cuánto cuesta',
+    'cuanto vale',
+    'cuánto vale',
+    'planes',
+    'mensualidad',
+    'anualidad',
+    'demo',
+    'demostracion',
+    'demostración',
+    'comprar',
+    'adquirir',
+    'contratar',
+    'licencia',
+    'licencias',
+    'paquete',
+    'paquetes',
+    'tarifa',
+    'tarifas',
+    'implementacion',
+    'implementación',
+    'me interesa el sistema',
+    'informacion del sistema',
+    'información del sistema',
+    'quiero informacion',
+    'quiero información',
+    'venden',
+    'ofrecen',
+    'prospecto',
+  ];
+
+  const accountingKeywords = [
+    'contabilidad',
+    'contable',
+    'contador',
+    'libro de iva',
+    'libros de iva',
+    'libro compras',
+    'libro ventas',
+    'consumidor final',
+    'contribuyente',
+    'declaracion',
+    'declaración',
+    'anexo',
+    'anexos',
+    'f07',
+    'f-07',
+    'f14',
+    'f-14',
+    'f11',
+    'retencion',
+    'retención',
+    'percepcion',
+    'percepción',
+    'planilla',
+    'planillas',
+    'isss',
+    'afp',
+    'renta',
+    'balance general',
+    'estado de resultado',
+    'partida contable',
+    'partidas',
+    'catalogo de cuentas',
+    'catálogo de cuentas',
+    'cierre contable',
+    'conciliacion',
+    'conciliación',
+  ];
+
+  const otherProductKeywords = [
+    'otro producto',
+    'otros productos',
+    'otro servicio',
+    'otros servicios',
+    'catalogo',
+    'catálogo',
+    'horario de atencion',
+    'horario de atención',
+    'ubicacion',
+    'ubicación',
+    'direccion',
+    'dirección',
+    'estado de cuenta',
   ];
 
   const problemIndicators = [
@@ -81,6 +189,8 @@ function classifyIssueCategory(text: string): {
     'no envia',
     'no envía',
     'no cuadra',
+    'no imprime',
+    'impresora',
     'ayuda',
     'ayudarme',
     'apoyo',
@@ -97,7 +207,7 @@ function classifyIssueCategory(text: string): {
     'rechazado',
     'inconveniente',
     'duda',
-    'consulta sobre',
+    'consulta',
     'como hago',
     'cómo hago',
     'factura',
@@ -119,37 +229,64 @@ function classifyIssueCategory(text: string): {
     'login',
     'sincroniza',
     'base de datos',
+    'nota de voz',
+    'imagen enviada',
+    'documento:',
   ];
 
   const isUrgent = urgentKeywords.some((k) => lower.includes(k));
+  const isSales = salesKeywords.some((k) => lower.includes(k));
+  const isAccounting = accountingKeywords.some((k) => lower.includes(k));
+  const isOtherProduct = otherProductKeywords.some((k) => lower.includes(k));
   const hasProblemKeyword = problemIndicators.some((k) => lower.includes(k));
   const isClosingOrGreeting = isGreetingOrClosingAgreement(text);
 
-  const isActualSupportProblem = (isUrgent || hasProblemKeyword) && !isClosingOrGreeting;
+  const isActualSupportProblem =
+    (isUrgent || isSales || isAccounting || isOtherProduct || hasProblemKeyword) &&
+    !isClosingOrGreeting;
 
+  let supportChannel: SupportChannelType = 'soporte';
   let category = 'Soporte General / Consulta';
   let shortCategoryTag = 'Soporte';
 
-  if (
+  if (isSales) {
+    supportChannel = 'ventas';
+    category = 'Ventas / Precios / Cotización';
+    shortCategoryTag = 'Ventas / Precios';
+  } else if (isAccounting) {
+    supportChannel = 'contabilidad';
+    category = 'Contabilidad / IVA / Planillas';
+    shortCategoryTag = 'Contabilidad';
+  } else if (isOtherProduct && !hasProblemKeyword) {
+    supportChannel = 'otros';
+    category = 'Otros Productos / Información General';
+    shortCategoryTag = 'Otros Productos';
+  } else if (
     /dte|hacienda|factura|invalidaci|credito fiscal|crédito fiscal|fe\b|contingencia|sello|firmador/i.test(
       lower
     )
   ) {
+    supportChannel = 'soporte';
     category = 'Facturación Electrónica / DTE / Hacienda';
     shortCategoryTag = 'Facturación DTE';
   } else if (/whatsapp|mensaje|cola|api|envio|envío|notificaci/i.test(lower)) {
+    supportChannel = 'soporte';
     category = 'WhatsApp / Mensajería / API';
     shortCategoryTag = 'WhatsApp API';
   } else if (/login|acceso|usuario|permiso|contrase|rol|sesion|sesión/i.test(lower)) {
+    supportChannel = 'soporte';
     category = 'Accesos / Usuarios / Permisos';
     shortCategoryTag = 'Accesos/Permisos';
   } else if (/reporte|excel|pdf|descarga|filtro|estadistica|dashboard/i.test(lower)) {
+    supportChannel = 'soporte';
     category = 'Reportes / Exportación / Datos';
     shortCategoryTag = 'Reportes';
-  } else if (/calculo|cálculo|monto|iva|total|descuento|planilla|pago|cobro/i.test(lower)) {
+  } else if (/calculo|cálculo|monto|total|descuento|pago|cobro/i.test(lower)) {
+    supportChannel = 'contabilidad';
     category = 'Cálculos / Finanzas / Pagos';
-    shortCategoryTag = 'Cálculos/Pagos';
+    shortCategoryTag = 'Contabilidad';
   } else if (/lento|carga|caido|caído|servidor|base de datos|sql|sincroni/i.test(lower)) {
+    supportChannel = 'soporte';
     category = 'Infraestructura / Base de Datos / Lentitud';
     shortCategoryTag = 'Base de Datos/Server';
   }
@@ -157,9 +294,54 @@ function classifyIssueCategory(text: string): {
   return {
     category,
     shortCategoryTag,
+    supportChannel,
     isActualSupportProblem,
-    priority: isUrgent ? 'urgent' : 'high',
+    priority: isUrgent ? 'urgent' : isSales ? 'high' : 'high',
   };
+}
+
+async function loadSupportAiConfig(supabase: any): Promise<{
+  integrationId: string | null;
+  openAiKey: string;
+  rawSettings: Record<string, any>;
+  autoReplyText: boolean;
+  autoReplyAudio: boolean;
+  prompts: Record<SupportChannelType, string>;
+}> {
+  const { data: openAiInt } = await supabase
+    .from('marketing_integrations')
+    .select('id, settings')
+    .eq('provider', 'openai')
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+
+  const rawSettings = (openAiInt?.settings || {}) as Record<string, any>;
+  const openAiKey = String(rawSettings.apiKey || Deno.env.get('OPENAI_API_KEY') || '').trim();
+  const savedCfg = (rawSettings.support_ai_config || {}) as Record<string, any>;
+
+  return {
+    integrationId: openAiInt?.id || null,
+    openAiKey,
+    rawSettings,
+    autoReplyText: savedCfg.auto_reply_text !== false,
+    autoReplyAudio: savedCfg.auto_reply_audio !== false,
+    prompts: {
+      soporte: String(savedCfg.prompt_soporte || DEFAULT_AI_PROMPTS.soporte).trim(),
+      contabilidad: String(
+        savedCfg.prompt_contabilidad || DEFAULT_AI_PROMPTS.contabilidad
+      ).trim(),
+      ventas: String(savedCfg.prompt_ventas || DEFAULT_AI_PROMPTS.ventas).trim(),
+      otros: String(savedCfg.prompt_otros || DEFAULT_AI_PROMPTS.otros).trim(),
+    },
+  };
+}
+
+function getChannelAiBotLabel(ch: SupportChannelType): string {
+  if (ch === 'contabilidad') return '🤖 IA Contabilidad';
+  if (ch === 'ventas') return '🤖 IA Ventas';
+  if (ch === 'otros') return '🤖 IA Atención';
+  return '🤖 IA Soporte';
 }
 
 function isGenericProblemTitle(title: string): boolean {
@@ -325,28 +507,249 @@ serve(async (req: Request) => {
     const companyIdParam = url.searchParams.get('company_id');
     const queryAction = url.searchParams.get('action') || payload?.action;
 
-    // ─── SAVE CUSTOM AI VOICE/CHAT INSTRUCTIONS PROMPT ────────────────────────
-    if (queryAction === 'save_ai_prompt' && payload?.ticket_id) {
+    // ─── GET / VERIFY GLOBAL AI CONFIG & OPENAI LIVE CONNECTION ───────────────
+    if (queryAction === 'get_ai_config' || queryAction === 'test_openai') {
+      const aiCfg = await loadSupportAiConfig(supabase);
+      let openAiVerified = false;
+      let openAiModel = 'gpt-4o-mini';
+      let openAiError = '';
+
+      if (aiCfg.openAiKey) {
+        try {
+          const pingRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${aiCfg.openAiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              max_tokens: 8,
+              messages: [{ role: 'user', content: 'Responde OK' }],
+            }),
+          });
+          if (pingRes.ok) {
+            const pJson = await pingRes.json();
+            openAiVerified = true;
+            openAiModel = pJson?.model || 'gpt-4o-mini';
+          } else {
+            openAiError = `HTTP ${pingRes.status}`;
+          }
+        } catch (e: any) {
+          openAiError = e?.message || 'Network error';
+        }
+      } else {
+        openAiError = 'No OpenAI API Key found';
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          openai_verified: openAiVerified,
+          openai_model: openAiModel,
+          openai_error: openAiError,
+          auto_reply_text: aiCfg.autoReplyText,
+          auto_reply_audio: aiCfg.autoReplyAudio,
+          prompts: aiCfg.prompts,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ─── SAVE GLOBAL MULTI-CATEGORY AI PROMPTS (SOPORTE, CONTABILIDAD, VENTAS, OTROS) ───
+    if (queryAction === 'save_ai_config' || queryAction === 'save_ai_prompt') {
+      const aiCfg = await loadSupportAiConfig(supabase);
+      const newSupportAiConfig = {
+        auto_reply_text:
+          payload?.auto_reply_text !== undefined
+            ? Boolean(payload.auto_reply_text)
+            : aiCfg.autoReplyText,
+        auto_reply_audio:
+          payload?.auto_reply_audio !== undefined
+            ? Boolean(payload.auto_reply_audio)
+            : payload?.ai_auto_reply_enabled !== undefined
+            ? Boolean(payload.ai_auto_reply_enabled)
+            : aiCfg.autoReplyAudio,
+        prompt_soporte: String(
+          payload?.prompts?.soporte || payload?.ai_voice_prompt || aiCfg.prompts.soporte
+        ).trim(),
+        prompt_contabilidad: String(
+          payload?.prompts?.contabilidad || aiCfg.prompts.contabilidad
+        ).trim(),
+        prompt_ventas: String(payload?.prompts?.ventas || aiCfg.prompts.ventas).trim(),
+        prompt_otros: String(payload?.prompts?.otros || aiCfg.prompts.otros).trim(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (aiCfg.integrationId) {
+        await supabase
+          .from('marketing_integrations')
+          .update({
+            settings: {
+              ...aiCfg.rawSettings,
+              support_ai_config: newSupportAiConfig,
+            },
+          })
+          .eq('id', aiCfg.integrationId);
+      }
+
+      if (payload?.ticket_id) {
+        const { data: tRow } = await supabase
+          .from('tickets')
+          .select('metadata')
+          .eq('id', payload.ticket_id)
+          .maybeSingle();
+        if (tRow) {
+          await supabase
+            .from('tickets')
+            .update({
+              metadata: {
+                ...(tRow.metadata || {}),
+                ai_voice_prompt: newSupportAiConfig.prompt_soporte,
+                ai_auto_reply_enabled: newSupportAiConfig.auto_reply_audio,
+                ai_auto_reply_text_enabled: newSupportAiConfig.auto_reply_text,
+              },
+            })
+            .eq('id', payload.ticket_id);
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ ok: true, config: newSupportAiConfig }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ─── SWITCH TICKET CHANNEL (SOPORTE | CONTABILIDAD | VENTAS | OTROS) ──────
+    if (queryAction === 'set_ticket_channel' && payload?.ticket_id && payload?.support_channel) {
+      const ch = payload.support_channel as SupportChannelType;
       const { data: tRow } = await supabase
         .from('tickets')
         .select('metadata')
         .eq('id', payload.ticket_id)
         .maybeSingle();
+
       if (tRow) {
+        const labelMap: Record<SupportChannelType, string> = {
+          soporte: 'Facturación Electrónica / DTE / Soporte',
+          contabilidad: 'Contabilidad / IVA / Planillas',
+          ventas: 'Ventas / Precios / Cotización',
+          otros: 'Otros Productos / Información General',
+        };
         await supabase
           .from('tickets')
           .update({
+            updated_at: new Date().toISOString(),
             metadata: {
               ...(tRow.metadata || {}),
-              ai_voice_prompt: payload.ai_voice_prompt || '',
-              ai_auto_reply_enabled: payload.ai_auto_reply_enabled !== false,
+              support_channel: ch,
+              ai_category: labelMap[ch] || (tRow.metadata || {}).ai_category,
             },
           })
           .eq('id', payload.ticket_id);
       }
-      return new Response(JSON.stringify({ ok: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+
+      return new Response(
+        JSON.stringify({ ok: true, support_channel: ch }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ─── 1-CLICK PROMOTE WHATSAPP CHAT TO SALES LEAD ("Pasar a Ventas") ───────
+    if (queryAction === 'promote_to_lead' && payload?.ticket_id) {
+      const { data: tRow } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('id', payload.ticket_id)
+        .maybeSingle();
+
+      if (!tRow) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Ticket no encontrado' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const meta = tRow.metadata || {};
+      const cleanPhone = String(payload.phone || meta.whatsapp_phone || '').replace(/\D/g, '');
+      const clientName = String(
+        payload.client_name || tRow.lead_name || meta.whatsapp_push_name || 'Prospecto WhatsApp'
+      )
+        .replace(/\(\+\d+\)/g, '')
+        .trim();
+
+      let existingLeadId: string | null = tRow.lead_id || meta.promoted_lead_id || null;
+      if (!existingLeadId && cleanPhone.length >= 8) {
+        const last8 = cleanPhone.slice(-8);
+        const { data: foundLeads } = await supabase
+          .from('leads')
+          .select('id, name')
+          .eq('company_id', tRow.company_id)
+          .ilike('phone', `%${last8}%`)
+          .limit(1);
+        if (foundLeads && foundLeads.length > 0) {
+          existingLeadId = foundLeads[0].id;
+        }
+      }
+
+      let createdOrLinkedLead: any = null;
+      if (existingLeadId) {
+        const { data: uLead } = await supabase
+          .from('leads')
+          .update({
+            next_action_notes: `[Consulta desde WhatsApp Soporte]: ${
+              meta.last_whatsapp_message || tRow.title || ''
+            }`,
+          })
+          .eq('id', existingLeadId)
+          .select('id, name, phone, status')
+          .maybeSingle();
+        createdOrLinkedLead = uLead || { id: existingLeadId, name: clientName };
+      } else {
+        const { data: newLead, error: leadErr } = await supabase
+          .from('leads')
+          .insert({
+            company_id: tRow.company_id,
+            name: clientName,
+            company_name: clientName,
+            phone: cleanPhone ? `+${cleanPhone}` : null,
+            status: 'Prospecto',
+            priority: 'high',
+            source: 'WhatsApp',
+            next_action_notes: `[Promovido desde Chat WhatsApp]: ${
+              meta.last_whatsapp_message || tRow.title || ''
+            }`,
+          })
+          .select('id, name, phone, status')
+          .single();
+
+        if (leadErr) throw leadErr;
+        createdOrLinkedLead = newLead;
+      }
+
+      await supabase
+        .from('tickets')
+        .update({
+          lead_id: createdOrLinkedLead?.id || null,
+          updated_at: new Date().toISOString(),
+          metadata: {
+            ...meta,
+            support_channel: 'ventas',
+            ai_category: 'Ventas / Precios / Cotización',
+            promoted_lead_id: createdOrLinkedLead?.id || null,
+            promoted_to_sales_at: new Date().toISOString(),
+          },
+        })
+        .eq('id', tRow.id);
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          lead: createdOrLinkedLead,
+          already_existed: Boolean(existingLeadId),
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // ─── PROCESS VOICE NOTE UPLOADED BY GERSON'S LOCAL BRIDGE (Playable + Whisper + AI Reply) ───
@@ -382,23 +785,15 @@ serve(async (req: Request) => {
 
       const publicAudioUrl = `${supabaseUrl}/storage/v1/object/public/lead-documents/${fileName}`;
 
-      // Fetch ticket & OpenAI API key for Whisper transcription + AI auto-reply
+      // Fetch ticket & global AI config for Whisper transcription + category-aware AI auto-reply
       const { data: ticketRow } = await supabase
         .from('tickets')
         .select('*')
         .eq('id', ticketId)
         .maybeSingle();
 
-      const { data: openAiInt } = await supabase
-        .from('marketing_integrations')
-        .select('settings')
-        .eq('provider', 'openai')
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-
-      const openAiKey =
-        openAiInt?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY') || '';
+      const aiCfg = await loadSupportAiConfig(supabase);
+      const openAiKey = aiCfg.openAiKey;
 
       let transcriptText = '';
       if (openAiKey) {
@@ -448,14 +843,26 @@ serve(async (req: Request) => {
         }
       }
 
+      // Re-classify support channel based on what the client said in the voice note!
+      const meta = ticketRow?.metadata || {};
+      const voiceClass = transcriptText
+        ? classifyIssueCategory(transcriptText)
+        : null;
+      const detectedChannel: SupportChannelType =
+        (voiceClass && voiceClass.supportChannel !== 'soporte'
+          ? voiceClass.supportChannel
+          : (meta.support_channel as SupportChannelType)) ||
+        voiceClass?.supportChannel ||
+        'soporte';
+
       // Generate & send automatic AI reply if enabled
       let aiReplySent = false;
       let aiReplyText = '';
-      if (ticketRow && autoReplyFlag && openAiKey) {
-        const meta = ticketRow.metadata || {};
-        const customPrompt =
+      if (ticketRow && autoReplyFlag && aiCfg.autoReplyAudio && openAiKey) {
+        const categoryPrompt =
+          aiCfg.prompts[detectedChannel] ||
           meta.ai_voice_prompt ||
-          'Eres el Asistente IA de Soporte Técnico de Arias Defense / ERP Facturación Electrónica (DTE Hacienda). Escucha lo que el cliente dijo en su nota de voz y respóndele de forma amable, clara y resolutiva en máximo 3 líneas por WhatsApp. Confírmale exactamente que entendiste su reporte y pídele captura de pantalla o código de AnyDesk si requiere revisión técnica.';
+          DEFAULT_AI_PROMPTS.soporte;
 
         try {
           const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -468,12 +875,12 @@ serve(async (req: Request) => {
               model: 'gpt-4o-mini',
               temperature: 0.4,
               messages: [
-                { role: 'system', content: customPrompt },
+                { role: 'system', content: categoryPrompt },
                 {
                   role: 'user',
                   content: transcriptText
                     ? `El cliente (${ticketRow.lead_name || 'Cliente'}) envió una nota de voz diciendo: "${transcriptText}". Redacta la respuesta que se enviará a su WhatsApp.`
-                    : `El cliente (${ticketRow.lead_name || 'Cliente'}) envió una nota de voz de soporte técnico. Redacta una respuesta amable confirmando recepción de su nota de voz y que el equipo técnico ya la está escuchando para apoyarle.`,
+                    : `El cliente (${ticketRow.lead_name || 'Cliente'}) envió una nota de voz. Redacta una respuesta amable confirmando recepción de su nota de voz y que el equipo ya la está escuchando para apoyarle.`,
                 },
               ],
             }),
@@ -492,7 +899,8 @@ serve(async (req: Request) => {
             minute: '2-digit',
             timeZone: 'America/El_Salvador',
           });
-          const aiFormattedLine = `[${nowTimeStr}] 👨‍💻 🤖 IA Soporte: ${aiReplyText}`;
+          const botLabel = getChannelAiBotLabel(detectedChannel);
+          const aiFormattedLine = `[${nowTimeStr}] 👨‍💻 ${botLabel}: ${aiReplyText}`;
 
           await supabase.from('ticket_comments').insert({
             ticket_id: ticketId,
@@ -530,6 +938,8 @@ serve(async (req: Request) => {
               updated_at: new Date().toISOString(),
               metadata: {
                 ...meta,
+                support_channel: detectedChannel,
+                ...(voiceClass ? { ai_category: voiceClass.category } : {}),
                 last_audio_url: publicAudioUrl,
                 last_audio_transcript: transcriptText,
                 last_whatsapp_message: aiReplyText.slice(0, 200),
@@ -541,6 +951,20 @@ serve(async (req: Request) => {
 
           aiReplySent = true;
         }
+      } else if (ticketRow) {
+        await supabase
+          .from('tickets')
+          .update({
+            updated_at: new Date().toISOString(),
+            metadata: {
+              ...meta,
+              support_channel: detectedChannel,
+              ...(voiceClass ? { ai_category: voiceClass.category } : {}),
+              last_audio_url: publicAudioUrl,
+              last_audio_transcript: transcriptText,
+            },
+          })
+          .eq('id', ticketId);
       }
 
       return new Response(
@@ -948,6 +1372,13 @@ serve(async (req: Request) => {
             ]
           : prevAudioJobs;
 
+      const resolvedChannel: SupportChannelType =
+        (!isTeamStaffReply && classification.supportChannel !== 'soporte'
+          ? classification.supportChannel
+          : (currentMeta.support_channel as SupportChannelType)) ||
+        classification.supportChannel ||
+        'soporte';
+
       const shouldUpgradeProblemTitle =
         !isTeamStaffReply &&
         classification.isActualSupportProblem &&
@@ -956,25 +1387,112 @@ serve(async (req: Request) => {
 
       const prevDesc = activeTicket.description || '';
       const newChatLine = `[${nowTimeStr}] ${senderLabel}: ${messageText}`;
-      const updatedDescription = prevDesc.includes('💬 Historial de WhatsApp:')
+      let updatedDescription = prevDesc.includes('💬 Historial de WhatsApp:')
         ? `${prevDesc}\n${newChatLine}`
         : `${prevDesc}\n\n💬 Historial de WhatsApp:\n${newChatLine}`;
+
+      let updatedOutbox: any[] = Array.isArray(currentMeta.pending_whatsapp_outbox)
+        ? currentMeta.pending_whatsapp_outbox
+        : [];
+      let lastWhatsappMsgPreview = messageText.slice(0, 200);
+      let aiTextReplySent = false;
+
+      // Auto-reply with OpenAI GPT-4o-mini for incoming client TEXT messages when enabled!
+      if (
+        !isTeamStaffReply &&
+        !isIncomingAudio &&
+        !isGreetingOrClosingAgreement(messageText) &&
+        currentMeta.ai_auto_reply_text_enabled !== false
+      ) {
+        const aiCfg = await loadSupportAiConfig(supabase);
+        if (aiCfg.autoReplyText && aiCfg.openAiKey) {
+          const categoryPrompt =
+            aiCfg.prompts[resolvedChannel] || DEFAULT_AI_PROMPTS.soporte;
+          try {
+            const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${aiCfg.openAiKey}`,
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                temperature: 0.4,
+                messages: [
+                  { role: 'system', content: categoryPrompt },
+                  {
+                    role: 'user',
+                    content: `El cliente (${clientDisplayName}) escribió por WhatsApp: "${messageText}". Redacta la respuesta breve y directa que se enviará a su WhatsApp.`,
+                  },
+                ],
+              }),
+            });
+            if (gptRes.ok) {
+              const gptJson = await gptRes.json();
+              const aiReplyText = (gptJson?.choices?.[0]?.message?.content || '').trim();
+              if (aiReplyText) {
+                const botLabel = getChannelAiBotLabel(resolvedChannel);
+                const aiLine = `[${nowTimeStr}] 👨‍💻 ${botLabel}: ${aiReplyText}`;
+                await supabase.from('ticket_comments').insert({
+                  ticket_id: activeTicket.id,
+                  company_id: companyId,
+                  author_id: null,
+                  body: aiLine,
+                  is_internal: false,
+                });
+                updatedDescription = `${updatedDescription}\n${aiLine}`;
+                lastWhatsappMsgPreview = aiReplyText.slice(0, 200);
+                const targetJid = remoteJid || currentMeta.whatsapp_jid || cleanPhone;
+                if (targetJid) {
+                  updatedOutbox = [
+                    ...updatedOutbox.slice(-9),
+                    {
+                      id: crypto.randomUUID(),
+                      status: 'pending',
+                      number: targetJid,
+                      text: aiReplyText,
+                      instance:
+                        instanceName === 'arias'
+                          ? 'soporte'
+                          : instanceName || currentMeta.evolution_instance || 'soporte',
+                      apikey:
+                        incomingEvoApiKey ||
+                        currentMeta.evolution_apikey ||
+                        '10C73BF4-D3D9-4CDB-9855-85E346468546',
+                      created_at: new Date().toISOString(),
+                    },
+                  ];
+                  aiTextReplySent = true;
+                }
+              }
+            }
+          } catch (aiErr) {
+            console.error('AI text auto-reply error:', aiErr);
+          }
+        }
+      }
 
       const updatedFields: Record<string, any> = {
         description: updatedDescription,
         updated_at: new Date().toISOString(),
         metadata: {
           ...currentMeta,
-          whatsapp_message_count: msgCount,
-          last_whatsapp_message: messageText.slice(0, 200),
+          support_channel: resolvedChannel,
+          whatsapp_message_count: msgCount + (aiTextReplySent ? 1 : 0),
+          last_whatsapp_message: lastWhatsappMsgPreview,
           last_whatsapp_at: new Date().toISOString(),
           pending_audio_jobs: updatedAudioJobs,
+          pending_whatsapp_outbox: updatedOutbox,
           ...(incomingEvoServerUrl ? { evolution_server_url: incomingEvoServerUrl } : {}),
           ...(incomingEvoApiKey ? { evolution_apikey: incomingEvoApiKey } : {}),
-          evolution_instance: instanceName === 'arias' ? 'soporte' : instanceName || currentMeta.evolution_instance || 'soporte',
-          ai_category: shouldUpgradeProblemTitle
-            ? classification.category
-            : currentMeta.ai_category || classification.category,
+          evolution_instance:
+            instanceName === 'arias'
+              ? 'soporte'
+              : instanceName || currentMeta.evolution_instance || 'soporte',
+          ai_category:
+            shouldUpgradeProblemTitle || classification.supportChannel !== 'soporte'
+              ? classification.category
+              : currentMeta.ai_category || classification.category,
         },
       };
 
@@ -1003,6 +1521,8 @@ serve(async (req: Request) => {
           ok: true,
           action: isResolutionReply ? 'ticket_resolved' : 'message_appended_to_existing_ticket',
           ticket_id: activeTicket.id,
+          support_channel: resolvedChannel,
+          ai_text_reply_sent: aiTextReplySent,
           total_messages_in_ticket: msgCount,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -1044,8 +1564,8 @@ serve(async (req: Request) => {
       );
     }
 
-    // ─── CASE D: Client reports an ACTUAL PROBLEM and has NO open ticket ─────
-    // Create 1 consolidated Ticket in `tickets` ONLY (NEVER in `leads`!)
+    // ─── CASE D: Client reports an ACTUAL PROBLEM / SALES / ACCOUNTING query and has NO open ticket ─────
+    // Create 1 consolidated Ticket in `tickets` ONLY (NEVER in `leads` automatically!)
     const shortTitle =
       messageText.length > 85 ? `${messageText.slice(0, 82).trim()}...` : messageText.trim();
 
@@ -1077,20 +1597,23 @@ serve(async (req: Request) => {
         metadata: {
           source: 'whatsapp_evolution',
           support_phone: '50379718911',
-          evolution_instance: instanceName,
+          evolution_instance: instanceName === 'arias' ? 'soporte' : instanceName || 'soporte',
           ...(incomingEvoServerUrl ? { evolution_server_url: incomingEvoServerUrl } : {}),
           ...(incomingEvoApiKey ? { evolution_apikey: incomingEvoApiKey } : {}),
           whatsapp_jid: remoteJid,
           whatsapp_phone: cleanPhone,
           whatsapp_push_name: pushName,
           is_group: isGroup,
+          support_channel: classification.supportChannel,
           ai_category: classification.category,
           whatsapp_message_count: 1,
+          last_whatsapp_message: messageText.slice(0, 200),
+          last_whatsapp_at: new Date().toISOString(),
           is_recurring_client_issue: Boolean(previousSameCategoryTicket),
           previous_ticket_id: previousSameCategoryTicket?.id || null,
         },
       })
-      .select('id, title')
+      .select('id, title, metadata')
       .single();
 
     if (insertError) {
@@ -1098,12 +1621,117 @@ serve(async (req: Request) => {
     }
 
     if (createdTicket?.id) {
-      await supabase.from('ticket_comments').insert({
-        ticket_id: createdTicket.id,
-        company_id: companyId,
-        body: `[${nowTimeStr}] ${senderLabel} (Reporte Inicial): ${messageText}`,
-        is_internal: false,
-      });
+      const { data: firstComment } = await supabase
+        .from('ticket_comments')
+        .insert({
+          ticket_id: createdTicket.id,
+          company_id: companyId,
+          body: `[${nowTimeStr}] ${senderLabel} (Reporte Inicial): ${messageText}`,
+          is_internal: false,
+        })
+        .select('id')
+        .single();
+
+      // If the very first message of a new ticket is a voice note, queue the audio job immediately!
+      if (isIncomingAudio && firstComment?.id) {
+        await supabase
+          .from('tickets')
+          .update({
+            metadata: {
+              ...(createdTicket.metadata || {}),
+              pending_audio_jobs: [
+                {
+                  id: crypto.randomUUID(),
+                  status: 'pending',
+                  comment_id: firstComment.id,
+                  ticket_id: createdTicket.id,
+                  remote_jid: remoteJid,
+                  message_key: key,
+                  instance: instanceName === 'arias' ? 'soporte' : instanceName || 'soporte',
+                  apikey: incomingEvoApiKey || '10C73BF4-D3D9-4CDB-9855-85E346468546',
+                  auto_reply: true,
+                  created_at: new Date().toISOString(),
+                },
+              ],
+            },
+          })
+          .eq('id', createdTicket.id);
+      } else if (!isIncomingAudio && !isGreetingOrClosingAgreement(messageText)) {
+        // If it's a new incoming TEXT inquiry, auto-reply with OpenAI GPT-4o-mini using its category prompt!
+        const aiCfg = await loadSupportAiConfig(supabase);
+        if (aiCfg.autoReplyText && aiCfg.openAiKey) {
+          const categoryPrompt =
+            aiCfg.prompts[classification.supportChannel] || DEFAULT_AI_PROMPTS.soporte;
+          try {
+            const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${aiCfg.openAiKey}`,
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                temperature: 0.4,
+                messages: [
+                  { role: 'system', content: categoryPrompt },
+                  {
+                    role: 'user',
+                    content: `El cliente (${clientDisplayName}) inició conversación por WhatsApp diciendo: "${messageText}". Redacta la respuesta breve y directa que se enviará a su WhatsApp.`,
+                  },
+                ],
+              }),
+            });
+            if (gptRes.ok) {
+              const gptJson = await gptRes.json();
+              const aiReplyText = (gptJson?.choices?.[0]?.message?.content || '').trim();
+              if (aiReplyText) {
+                const botLabel = getChannelAiBotLabel(classification.supportChannel);
+                const aiLine = `[${nowTimeStr}] 👨‍💻 ${botLabel}: ${aiReplyText}`;
+                await supabase.from('ticket_comments').insert({
+                  ticket_id: createdTicket.id,
+                  company_id: companyId,
+                  author_id: null,
+                  body: aiLine,
+                  is_internal: false,
+                });
+
+                const targetJid = remoteJid || cleanPhone;
+                await supabase
+                  .from('tickets')
+                  .update({
+                    description: `${initialDescription}\n${aiLine}`,
+                    metadata: {
+                      ...(createdTicket.metadata || {}),
+                      last_whatsapp_message: aiReplyText.slice(0, 200),
+                      last_whatsapp_at: new Date().toISOString(),
+                      pending_whatsapp_outbox: targetJid
+                        ? [
+                            {
+                              id: crypto.randomUUID(),
+                              status: 'pending',
+                              number: targetJid,
+                              text: aiReplyText,
+                              instance:
+                                instanceName === 'arias'
+                                  ? 'soporte'
+                                  : instanceName || 'soporte',
+                              apikey:
+                                incomingEvoApiKey ||
+                                '10C73BF4-D3D9-4CDB-9855-85E346468546',
+                              created_at: new Date().toISOString(),
+                            },
+                          ]
+                        : [],
+                    },
+                  })
+                  .eq('id', createdTicket.id);
+              }
+            }
+          } catch (aiErr) {
+            console.error('Initial ticket AI auto-reply error:', aiErr);
+          }
+        }
+      }
     }
 
     return new Response(
@@ -1112,6 +1740,7 @@ serve(async (req: Request) => {
         action: 'ticket_created',
         ticket_id: createdTicket?.id,
         title: createdTicket?.title,
+        support_channel: classification.supportChannel,
         is_recurring: Boolean(previousSameCategoryTicket),
         category: classification.category,
       }),
