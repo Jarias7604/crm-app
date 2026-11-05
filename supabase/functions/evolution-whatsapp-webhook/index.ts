@@ -227,9 +227,8 @@ serve(async (req: Request) => {
       const { data: recentTickets } = await supabase
         .from('tickets')
         .select('id, metadata')
-        .not('metadata->pending_whatsapp_outbox', 'is', null)
         .order('updated_at', { ascending: false })
-        .limit(15);
+        .limit(25);
 
       const shellLines: string[] = [];
       for (const row of recentTickets || []) {
@@ -260,10 +259,11 @@ serve(async (req: Request) => {
             text: item.text,
           });
           const b64Payload = btoa(unescape(encodeURIComponent(payloadJson)));
-          const inst = (item.instance || 'soporte').replace(/[^a-zA-Z0-9_-]/g, '');
+          const rawInst = !item.instance || item.instance === 'arias' ? 'soporte' : item.instance;
+          const inst = rawInst.replace(/[^a-zA-Z0-9_-]/g, '');
           const key = (item.apikey || '10C73BF4-D3D9-4CDB-9855-85E346468546').replace(/[^a-zA-Z0-9_-]/g, '');
           shellLines.push(
-            `echo "${b64Payload}" | base64 -d | curl -s -X POST "http://localhost:8085/message/sendText/${inst}" -H "Content-Type: application/json" -H "apikey: ${key}" -d @- >/dev/null 2>&1`
+            `EVO_OUT=$(echo "${b64Payload}" | base64 -d | curl -s -X POST "http://localhost:8085/message/sendText/${inst}" -H "Content-Type: application/json" -H "apikey: ${key}" -d @-); curl -s -X POST "https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/evolution-whatsapp-webhook?action=bridge_ack&ticket_id=${row.id}" -H "Content-Type: application/json" -d "{\\"action\\":\\"bridge_ack\\",\\"ticket_id\\":\\"${row.id}\\",\\"evo_response\\":$(echo "$EVO_OUT" | jq -Rs . 2>/dev/null || echo '""')}" >/dev/null 2>&1`
           );
         }
       }
@@ -286,6 +286,29 @@ serve(async (req: Request) => {
   try {
     const payload = await req.json();
     const companyIdParam = url.searchParams.get('company_id');
+
+    if (payload?.action === 'bridge_ack' && payload?.ticket_id) {
+      const { data: tRow } = await supabase
+        .from('tickets')
+        .select('metadata')
+        .eq('id', payload.ticket_id)
+        .maybeSingle();
+      if (tRow) {
+        await supabase
+          .from('tickets')
+          .update({
+            metadata: {
+              ...(tRow.metadata || {}),
+              last_bridge_ack_at: new Date().toISOString(),
+              last_bridge_evo_response: payload.evo_response || null,
+            },
+          })
+          .eq('id', payload.ticket_id);
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // ─── OUTBOUND REPLY FROM CRM SUPPORT CHAT ("Circles / Live Chat") ─────────
     if (payload?.action === 'send_reply') {
@@ -368,6 +391,7 @@ serve(async (req: Request) => {
         meta.evolution_instance ||
         Deno.env.get('EVOLUTION_INSTANCE') ||
         'soporte';
+      if (evoInstance === 'arias') evoInstance = 'soporte';
 
       if (!evoUrl || /localhost|127\.0\.0\.1/i.test(evoUrl)) {
         const { data: recentWithCreds } = await supabase
