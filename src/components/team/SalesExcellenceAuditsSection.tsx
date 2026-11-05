@@ -276,6 +276,24 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
         return `DEMO - ${cName} - Notas de Gemini`;
     };
 
+    const handleOpenLeadInCrm = (audit: SalesCallAudit | null | undefined) => {
+        if (!audit) {
+            navigate('/leads');
+            return;
+        }
+        const clientName = resolveClientName(audit);
+        const contactPerson = resolveContactPerson(audit);
+        navigate('/leads', {
+            state: {
+                leadId: audit.lead_id,
+                clientName,
+                contactPerson,
+                fromPerformance: true,
+                _t: Date.now()
+            }
+        });
+    };
+
     // ─── Motor de Diagnóstico Global Agregado por Persona ────────────────────────
     const calculateRepDiagnostic = (targetRep: string, allAudits: SalesCallAudit[]): RepAggregateDiagnostic | null => {
         const cleanTarget = targetRep.toLowerCase().trim();
@@ -1042,10 +1060,10 @@ ${activeDiagnostic.actionRequired}
                                                             type="button"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                navigate('/leads');
+                                                                handleOpenLeadInCrm(audit);
                                                             }}
                                                             className="p-1 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
-                                                            title="Ver este lead en el CRM"
+                                                            title={`Abrir ficha de ${clientTitle} (${contactPerson}) en CRM`}
                                                         >
                                                             <ExternalLink className="w-3.5 h-3.5" />
                                                         </button>
@@ -1267,10 +1285,10 @@ ${activeDiagnostic.actionRequired}
                                         ) : null}
                                         <button
                                             type="button"
-                                            onClick={() => navigate('/leads')}
+                                            onClick={() => handleOpenLeadInCrm(selectedAudit)}
                                             className="w-full mt-1 py-1.5 px-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                                         >
-                                            <span>Abrir Ficha de {resolveClientName(selectedAudit)} en CRM</span>
+                                            <span>Abrir Ficha de {resolveClientName(selectedAudit)} ({resolveContactPerson(selectedAudit)}) en CRM</span>
                                             <ExternalLink className="w-3 h-3" />
                                         </button>
                                     </div>

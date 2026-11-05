@@ -386,7 +386,11 @@ export default function Leads() {
                     setEndDateFilter(ed.length > 10 ? ed.substring(0, 10) : ed);
                 }
 
-                if (state.leadId) {
+                const isUuidFormat = (val: any) =>
+                    typeof val === 'string' &&
+                    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+
+                if (state.leadId && isUuidFormat(state.leadId)) {
                     setFilteredLeadId(state.leadId);
                     if (viewMode === 'kanban') setViewMode('list');
                 }
@@ -431,15 +435,60 @@ export default function Leads() {
                 processedStateRef.current = stateKey;
             }
 
-            // If leads are already loaded OR when they load, handle selection/opening
-            if (state.leadId && leads.length > 0) {
-                const targetLead = leads.find(l => l.id === state.leadId);
+            // If leads are already loaded OR when they load, handle selection/opening for the specific lead
+            if ((state.leadId || state.clientName || state.contactPerson) && leads.length > 0) {
+                const normalizePhonetic = (raw: string | null | undefined): string => {
+                    if (!raw) return '';
+                    return String(raw)
+                        .toLowerCase()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/\(servicios\)/gi, '')
+                        .replace(/\b(s\.?a\.?\s*de\s*c\.?v\.?|s\.?a\.?s\.?\s*de\s*c\.?v\.?|s\.?a\.?|ltda\.?)\b/gi, '')
+                        .replace(/ck/g, 'k')
+                        .replace(/qu/g, 'k')
+                        .replace(/q/g, 'k')
+                        .replace(/[^a-z0-9]/g, '')
+                        .trim();
+                };
+
+                let targetLead = state.leadId ? leads.find(l => l.id === state.leadId) : undefined;
+
+                if (!targetLead && (state.clientName || state.contactPerson)) {
+                    const normClient = normalizePhonetic(state.clientName);
+                    const normContact = normalizePhonetic(state.contactPerson);
+
+                    targetLead = leads.find(l => {
+                        const lComp = normalizePhonetic(l.company_name);
+                        const lName = normalizePhonetic(l.name);
+                        if (normClient && normClient.length >= 3) {
+                            if (lComp === normClient || lName === normClient) return true;
+                            if (lComp.length >= 4 && (lComp.includes(normClient) || normClient.includes(lComp))) return true;
+                            if (lName.length >= 4 && (lName.includes(normClient) || normClient.includes(lName))) return true;
+                        }
+                        if (normContact && normContact.length >= 4) {
+                            if (lName === normContact || lComp === normContact) return true;
+                            if (lName.length >= 4 && (lName.includes(normContact) || normContact.includes(lName))) return true;
+                        }
+                        return false;
+                    });
+                }
+
                 if (targetLead) {
+                    setFilteredLeadId(targetLead.id);
+                    if (viewMode === 'kanban') setViewMode('list');
                     setSelectedLead(targetLead);
                     setIsDetailOpen(true);
                     loadFollowUps(targetLead.id);
 
                     // Clear state to prevent reopening on reload
+                    window.history.replaceState({}, document.title);
+                } else if (state.clientName || state.contactPerson) {
+                    // Fallback if no matching lead exists yet: filter specifically by search term instead of showing all leads
+                    setFilteredLeadId(null);
+                    setPipelineView('all');
+                    setSearchTerm(String(state.clientName || state.contactPerson).replace(/\s*\(Servicios\)\s*/i, '').trim());
+                    if (viewMode === 'kanban') setViewMode('list');
                     window.history.replaceState({}, document.title);
                 }
             }
