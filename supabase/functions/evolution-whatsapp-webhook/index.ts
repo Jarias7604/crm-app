@@ -7,9 +7,47 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-evolution-apikey',
 };
 
+// 1. Detect greetings, courtesy replies, or closing agreements (e.g. "ok, de acuerdo, esta bien...")
+// These must NEVER open a brand-new ticket on their own!
+function isGreetingOrClosingAgreement(text: string): boolean {
+  const clean = (text || '')
+    .toLowerCase()
+    .replace(/[¡!¿?.,;:👍🙏👌✅👋]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (clean.length < 4) return true;
+
+  // Starts with typical agreement/closing phrases ("ok de acuerdo esta bien...", "perfecto gracias...", "entendido vamos a...")
+  const startsWithAgreement =
+    /^(ok|okay|va|dale|de acuerdo|esta bien|está bien|perfecto|excelente|entendido|muchas gracias|gracias|mil gracias|ah ok|ah bueno|listo|ya quedo|ya quedó|si esta bien|sí está bien|bueno)\b/i.test(
+      clean
+    );
+
+  // Unless a message starting with "ok" explicitly says "pero sigue dando error / no funciona"
+  const hasExplicitNewErrorAfterOk =
+    /\b(pero sigue|sigue dando error|no funciono|no funcionó|volvio a fallar|volvió a fallar|otro problema|otro error)\b/i.test(
+      clean
+    );
+
+  if (startsWithAgreement && !hasExplicitNewErrorAfterOk) {
+    return true;
+  }
+
+  // Pure greetings
+  const pureGreeting =
+    /^(hola|buenas|buenos dias|buenos días|buenas tardes|buenas noches|saludos|hey|alo|aló)(\s+(equipo|melvin|gerson|soporte|amigo|amigos|inge|ingeniero|como estan|cómo están))?$/i.test(
+      clean
+    );
+
+  return pureGreeting;
+}
+
+// 2. Detect if a message actually describes a problem, error, bug, or support request
 function classifyIssueCategory(text: string): {
   category: string;
-  isSupportIssue: boolean;
+  shortCategoryTag: string;
+  isActualSupportProblem: boolean;
   priority: 'low' | 'medium' | 'high' | 'urgent';
 } {
   const lower = (text || '').toLowerCase();
@@ -27,39 +65,123 @@ function classifyIssueCategory(text: string): {
     'error crítico',
   ];
 
-  const isUrgent = urgentKeywords.some((k) => lower.includes(k));
+  const problemIndicators = [
+    'error',
+    'problema',
+    'falla',
+    'fallando',
+    'fallo',
+    'falló',
+    'no deja',
+    'no puedo',
+    'no podemos',
+    'no carga',
+    'no sale',
+    'no aparece',
+    'no funciona',
+    'no genera',
+    'no transmite',
+    'no envia',
+    'no envía',
+    'no cuadra',
+    'ayuda',
+    'ayudarme',
+    'apoyo',
+    'soporte',
+    'revisar',
+    'revisen',
+    'arreglar',
+    'corregir',
+    'bug',
+    'lento',
+    'traba',
+    'pegado',
+    'rechaza',
+    'rechazado',
+    'inconveniente',
+    'duda',
+    'consulta sobre',
+    'como hago',
+    'cómo hago',
+    'factura',
+    'dte',
+    'hacienda',
+    'invalidacion',
+    'invalidación',
+    'credito fiscal',
+    'crédito fiscal',
+    'sello',
+    'firmador',
+    'contingencia',
+    'planilla',
+    'calculo',
+    'cálculo',
+    'permiso',
+    'acceso',
+    'contraseña',
+    'login',
+    'sincroniza',
+    'base de datos',
+  ];
 
-  let category = 'Soporte General / Consulta WhatsApp';
+  const isUrgent = urgentKeywords.some((k) => lower.includes(k));
+  const hasProblemKeyword = problemIndicators.some((k) => lower.includes(k));
+  const isClosingOrGreeting = isGreetingOrClosingAgreement(text);
+
+  // It is a real support problem ONLY if it has a problem indicator and is NOT a closing agreement ("ok, de acuerdo, esta bien...")
+  const isActualSupportProblem = (isUrgent || hasProblemKeyword) && !isClosingOrGreeting;
+
+  let category = 'Soporte General / Consulta';
+  let shortCategoryTag = 'Soporte';
+
   if (
     /dte|hacienda|factura|invalidaci|credito fiscal|crédito fiscal|fe\b|contingencia|sello|firmador/i.test(
       lower
     )
   ) {
     category = 'Facturación Electrónica / DTE / Hacienda';
+    shortCategoryTag = 'Facturación DTE';
   } else if (/whatsapp|mensaje|cola|api|envio|envío|notificaci/i.test(lower)) {
     category = 'WhatsApp / Mensajería / API';
+    shortCategoryTag = 'WhatsApp API';
   } else if (/login|acceso|usuario|permiso|contrase|rol|sesion|sesión/i.test(lower)) {
     category = 'Accesos / Usuarios / Permisos';
+    shortCategoryTag = 'Accesos/Permisos';
   } else if (/reporte|excel|pdf|descarga|filtro|estadistica|dashboard/i.test(lower)) {
     category = 'Reportes / Exportación / Datos';
+    shortCategoryTag = 'Reportes';
   } else if (/calculo|cálculo|monto|iva|total|descuento|planilla|pago|cobro/i.test(lower)) {
     category = 'Cálculos / Finanzas / Pagos';
+    shortCategoryTag = 'Cálculos/Pagos';
   } else if (/lento|carga|caido|caído|servidor|base de datos|sql|sincroni/i.test(lower)) {
     category = 'Infraestructura / Base de Datos / Lentitud';
+    shortCategoryTag = 'Base de Datos/Server';
   }
 
-  // Every incoming message to the dedicated support number 50379718911 is treated as support
   return {
     category,
-    isSupportIssue: true,
+    shortCategoryTag,
+    isActualSupportProblem,
     priority: isUrgent ? 'urgent' : 'high',
   };
 }
 
-async function resolveMainCompanyId(supabase: any, companyIdParam: string | null): Promise<string | null> {
+function isGenericProblemTitle(title: string): boolean {
+  const lower = (title || '').toLowerCase();
+  return (
+    lower.length < 32 ||
+    /tengo un problema|necesito ayuda|una consulta|me ayudan|hay un error|no funciona$/i.test(
+      lower
+    )
+  );
+}
+
+async function resolveMainCompanyId(
+  supabase: any,
+  companyIdParam: string | null
+): Promise<string | null> {
   if (companyIdParam) return companyIdParam;
 
-  // 1. Prefer the company that already has active tickets (General / Principal workspace)
   const { data: recentTicket } = await supabase
     .from('tickets')
     .select('company_id')
@@ -70,7 +192,6 @@ async function resolveMainCompanyId(supabase: any, companyIdParam: string | null
 
   if (recentTicket?.company_id) return recentTicket.company_id;
 
-  // 2. Fallback to Melvin / Gerson / Jarias profile company_id
   const { data: mainProf } = await supabase
     .from('profiles')
     .select('company_id')
@@ -81,7 +202,6 @@ async function resolveMainCompanyId(supabase: any, companyIdParam: string | null
 
   if (mainProf?.company_id) return mainProf.company_id;
 
-  // 3. Fallback to first company
   const { data: comp } = await supabase
     .from('companies')
     .select('id')
@@ -121,7 +241,6 @@ serve(async (req: Request) => {
     const eventType = String(payload?.event || payload?.type || 'messages.upsert').toLowerCase();
     const instanceName = payload?.instance || payload?.instanceName || 'soporte';
 
-    // Accept messages.upsert, send.message, or any payload containing message data
     const rawData = payload?.data || payload;
     const msgEntry = Array.isArray(rawData)
       ? rawData[0]
@@ -131,9 +250,9 @@ serve(async (req: Request) => {
 
     const key = msgEntry?.key || payload?.key || {};
     const remoteJid: string =
-      key?.remoteJid || msgEntry?.remoteJid || payload?.remoteJid || payload?. sender || '';
+      key?.remoteJid || msgEntry?.remoteJid || payload?.remoteJid || payload?.sender || '';
 
-    if (remoteJid === 'status@broadcast') {
+    if (!remoteJid || remoteJid === 'status@broadcast') {
       return new Response(
         JSON.stringify({ ok: true, ignored: true, reason: 'Status broadcast ignored' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -142,6 +261,7 @@ serve(async (req: Request) => {
 
     const fromMe: boolean = Boolean(key?.fromMe ?? msgEntry?.fromMe ?? false);
     const participant: string = key?.participant || msgEntry?.participant || '';
+    const remoteJidAlt: string = key?.remoteJidAlt || msgEntry?.remoteJidAlt || '';
     const pushName: string =
       msgEntry?.pushName || payload?.pushName || payload?.sender || 'Cliente WhatsApp';
 
@@ -156,9 +276,11 @@ serve(async (req: Request) => {
       msgObj?.listResponseMessage?.title ||
       msgEntry?.body ||
       msgEntry?.text ||
-      (msgObj?.imageMessage ? '[Imagen enviada por WhatsApp]' : '') ||
-      (msgObj?.audioMessage ? '[Nota de voz enviada por WhatsApp]' : '') ||
-      (msgObj?.documentMessage ? `[Documento: ${msgObj.documentMessage.fileName || 'Archivo'}]` : '') ||
+      (msgObj?.imageMessage ? '[📷 Imagen enviada por WhatsApp]' : '') ||
+      (msgObj?.audioMessage ? '[🎤 Nota de voz enviada por WhatsApp]' : '') ||
+      (msgObj?.documentMessage
+        ? `[📄 Documento: ${msgObj.documentMessage.fileName || 'Archivo'}]`
+        : '') ||
       '';
 
     if (!messageText || messageText.trim().length < 1) {
@@ -174,9 +296,15 @@ serve(async (req: Request) => {
     }
 
     const isGroup = remoteJid.endsWith('@g.us');
-    const cleanPhone = (isGroup ? participant || remoteJid : remoteJid)
+    const isLid = remoteJid.endsWith('@lid') && !remoteJidAlt;
+
+    // Extract real phone number (ignore internal 15-digit @lid identifiers)
+    const rawJidForPhone = remoteJidAlt || (isGroup ? participant : remoteJid);
+    const digitsOnly = rawJidForPhone
       .replace(/@s\.whatsapp\.net|@g\.us|@c\.us|@lid/g, '')
       .replace(/\D/g, '');
+    const isRealPhone = !isLid && digitsOnly.length >= 8 && digitsOnly.length <= 12;
+    const cleanPhone = isRealPhone ? digitsOnly : '';
 
     const companyId = await resolveMainCompanyId(supabase, companyIdParam);
     if (!companyId) {
@@ -188,7 +316,7 @@ serve(async (req: Request) => {
 
     // Match existing Lead or Client by phone or name
     let matchedLead: { id: string; name: string; phone: string | null } | null = null;
-    if (cleanPhone && cleanPhone.length >= 7) {
+    if (cleanPhone && cleanPhone.length >= 8) {
       const last8 = cleanPhone.slice(-8);
       const { data: leadsByPhone } = await supabase
         .from('leads')
@@ -213,23 +341,33 @@ serve(async (req: Request) => {
       }
     }
 
+    // Clean display name (never show internal 15-digit @lid numbers)
     const clientDisplayName =
       matchedLead?.name ||
       (pushName && pushName !== 'Cliente WhatsApp'
-        ? `${pushName} (${cleanPhone ? `+${cleanPhone}` : 'WhatsApp'})`
+        ? cleanPhone
+          ? `${pushName} (+${cleanPhone})`
+          : pushName
         : cleanPhone
         ? `WhatsApp +${cleanPhone}`
         : 'Cliente WhatsApp');
 
     const classification = classifyIssueCategory(messageText);
+    const nowTimeStr = new Date().toLocaleTimeString('es-SV', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'America/El_Salvador',
+    });
+    const senderLabel = fromMe ? '👨‍💻 Equipo Soporte' : `👤 ${pushName || 'Cliente'}`;
 
-    // Also mirror the message into Mensajes (marketing_conversations / marketing_messages) if RPC exists
+    // 1. Always save every message in the CRM Chat Inbox (Mensajes)
     try {
-      if (cleanPhone && !fromMe) {
+      const extChatId = cleanPhone || remoteJid.split('@')[0];
+      if (extChatId && !fromMe) {
         await supabase.rpc('process_incoming_marketing_message', {
           p_company_id: companyId,
           p_channel: 'whatsapp',
-          p_external_id: cleanPhone,
+          p_external_id: extChatId,
           p_sender_name: clientDisplayName,
           p_content: messageText,
           p_metadata: {
@@ -237,8 +375,8 @@ serve(async (req: Request) => {
             support_phone: '50379718911',
             evolution_instance: instanceName,
             whatsapp_jid: remoteJid,
-            phone: `+${cleanPhone}`,
-            chat_id: cleanPhone,
+            phone: cleanPhone ? `+${cleanPhone}` : null,
+            chat_id: extChatId,
           },
         });
       }
@@ -246,22 +384,42 @@ serve(async (req: Request) => {
       console.warn('[evolution-whatsapp-webhook] Non-fatal chat mirror warning:', chatErr);
     }
 
-    // Check if there is already an open/pending ticket for this client or WhatsApp JID
-    const { data: existingTickets } = await supabase
+    // 2. Find if this client ALREADY has an active ticket (or one closed in the last 4 hours)
+    const { data: recentClientTickets } = await supabase
       .from('tickets')
-      .select('id, title, status, metadata, description, lead_id')
+      .select('id, title, status, priority, metadata, description, lead_id, lead_name, resolved_at, created_at')
       .eq('company_id', companyId)
-      .in('status', ['new', 'open', 'pending'])
       .order('created_at', { ascending: false })
-      .limit(60);
+      .limit(80);
 
-    const openForSameClient = (existingTickets || []).find((t: any) => {
+    const matchingClientTickets = (recentClientTickets || []).filter((t: any) => {
       const meta = t.metadata || {};
       if (remoteJid && meta.whatsapp_jid === remoteJid) return true;
-      if (cleanPhone && cleanPhone.length >= 7 && meta.whatsapp_phone === cleanPhone) return true;
+      if (cleanPhone && meta.whatsapp_phone === cleanPhone) return true;
       if (matchedLead?.id && t.lead_id === matchedLead.id) return true;
+      if (
+        pushName &&
+        pushName.length >= 4 &&
+        t.lead_name &&
+        t.lead_name.toLowerCase().includes(pushName.toLowerCase())
+      ) {
+        return true;
+      }
       return false;
     });
+
+    const activeTicket = matchingClientTickets.find((t: any) =>
+      ['new', 'open', 'pending'].includes(t.status)
+    );
+
+    const recentlyClosedTicket = !activeTicket
+      ? matchingClientTickets.find((t: any) => {
+          if (!['resolved', 'closed'].includes(t.status)) return false;
+          const closedTime = new Date(t.resolved_at || t.created_at).getTime();
+          const hoursSinceClosed = (Date.now() - closedTime) / (1000 * 60 * 60);
+          return hoursSinceClosed <= 4;
+        })
+      : null;
 
     const isResolutionReply =
       fromMe &&
@@ -269,42 +427,114 @@ serve(async (req: Request) => {
         messageText
       );
 
-    if (openForSameClient) {
+    // ─── CASE A: Client ALREADY has an open/pending Ticket ───────────────────
+    // Append all 40 messages into THIS SAME TICKET (both in Notas and in Descripción)!
+    if (activeTicket) {
       await supabase.from('ticket_comments').insert({
-        ticket_id: openForSameClient.id,
+        ticket_id: activeTicket.id,
         company_id: companyId,
-        body: `[WhatsApp ${fromMe ? 'Equipo Soporte' : clientDisplayName}]: ${messageText}`,
+        body: `[${nowTimeStr}] ${senderLabel}: ${messageText}`,
         is_internal: false,
       });
 
-      if (isResolutionReply) {
-        await supabase
-          .from('tickets')
-          .update({
-            status: 'resolved',
-            resolved_at: new Date().toISOString(),
-            last_status_change_at: new Date().toISOString(),
-            solution: messageText,
-          })
-          .eq('id', openForSameClient.id);
+      const currentMeta = activeTicket.metadata || {};
+      const msgCount = Number(currentMeta.whatsapp_message_count || 1) + 1;
+
+      const shouldUpgradeProblemTitle =
+        !fromMe &&
+        classification.isActualSupportProblem &&
+        isGenericProblemTitle(activeTicket.title) &&
+        messageText.length >= 15;
+
+      const prevDesc = activeTicket.description || '';
+      const newChatLine = `[${nowTimeStr}] ${senderLabel}: ${messageText}`;
+      const updatedDescription = prevDesc.includes('💬 Historial de WhatsApp:')
+        ? `${prevDesc}\n${newChatLine}`
+        : `${prevDesc}\n\n💬 Historial de WhatsApp:\n${newChatLine}`;
+
+      const updatedFields: Record<string, any> = {
+        description: updatedDescription,
+        updated_at: new Date().toISOString(),
+        metadata: {
+          ...currentMeta,
+          whatsapp_message_count: msgCount,
+          last_whatsapp_message: messageText.slice(0, 200),
+          last_whatsapp_at: new Date().toISOString(),
+          ai_category: shouldUpgradeProblemTitle
+            ? classification.category
+            : currentMeta.ai_category || classification.category,
+        },
+      };
+
+      if (shouldUpgradeProblemTitle) {
+        const cleanSnippet =
+          messageText.length > 85 ? `${messageText.slice(0, 82).trim()}...` : messageText.trim();
+        updatedFields.title = `[WhatsApp · ${classification.shortCategoryTag}] ${clientDisplayName}: ${cleanSnippet}`;
       }
+
+      if (isResolutionReply) {
+        updatedFields.status = 'resolved';
+        updatedFields.resolved_at = new Date().toISOString();
+        updatedFields.last_status_change_at = new Date().toISOString();
+        updatedFields.solution = messageText;
+      }
+
+      await supabase.from('tickets').update(updatedFields).eq('id', activeTicket.id);
 
       return new Response(
         JSON.stringify({
           ok: true,
-          action: isResolutionReply ? 'ticket_resolved' : 'comment_added',
-          ticket_id: openForSameClient.id,
-          company_id: companyId,
+          action: isResolutionReply ? 'ticket_resolved' : 'message_appended_to_existing_ticket',
+          ticket_id: activeTicket.id,
+          total_messages_in_ticket: msgCount,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Create a new Ticket automatically (including test messages or incoming client messages)
-    const isTestMessage = /prueba|test|probando|hola/i.test(messageText);
-    if (!fromMe || isTestMessage) {
+    // ─── CASE B: No open ticket, and message is an agreement/courtesy/greeting ("ok, de acuerdo, esta bien...", "Hola", "Gracias")
+    // NEVER create a new ticket for agreements, greetings, or mid-conversation confirmations!
+    if (!classification.isActualSupportProblem) {
+      if (recentlyClosedTicket) {
+        await supabase.from('ticket_comments').insert({
+          ticket_id: recentlyClosedTicket.id,
+          company_id: companyId,
+          body: `[${nowTimeStr}] ${senderLabel}: ${messageText}`,
+          is_internal: false,
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          ignored: true,
+          action: 'non_problem_message_logged_only_in_chat',
+          reason:
+            'Message is a greeting, agreement ("ok, de acuerdo..."), or casual reply — no duplicate ticket created',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ─── CASE C: Client reports an ACTUAL PROBLEM and has NO open ticket ─────
+    // Create 1 consolidated Ticket for the problem; all subsequent messages will append to it!
+    if (!fromMe) {
       const shortTitle =
         messageText.length > 85 ? `${messageText.slice(0, 82).trim()}...` : messageText.trim();
+
+      const previousSameCategoryTicket = matchingClientTickets.find(
+        (t: any) =>
+          ['resolved', 'closed'].includes(t.status) &&
+          t.metadata?.ai_category === classification.category
+      );
+
+      const initialDescription = [
+        `📌 PROBLEMA REPORTADO (${classification.category}):`,
+        messageText.trim(),
+        ``,
+        `💬 Historial de WhatsApp:`,
+        `[${nowTimeStr}] ${senderLabel}: ${messageText.trim()}`,
+      ].join('\n');
 
       const { data: createdTicket, error: insertError } = await supabase
         .from('tickets')
@@ -312,8 +542,9 @@ serve(async (req: Request) => {
           company_id: companyId,
           lead_id: matchedLead?.id || null,
           lead_name: clientDisplayName,
-          title: `[WhatsApp] ${clientDisplayName}: ${shortTitle}`,
-          description: messageText,
+          parent_ticket_id: previousSameCategoryTicket?.id || null,
+          title: `[WhatsApp · ${classification.shortCategoryTag}] ${clientDisplayName}: ${shortTitle}`,
+          description: initialDescription,
           status: 'open',
           priority: classification.priority,
           metadata: {
@@ -325,6 +556,9 @@ serve(async (req: Request) => {
             whatsapp_push_name: pushName,
             is_group: isGroup,
             ai_category: classification.category,
+            whatsapp_message_count: 1,
+            is_recurring_client_issue: Boolean(previousSameCategoryTicket),
+            previous_ticket_id: previousSameCategoryTicket?.id || null,
           },
         })
         .select('id, title')
@@ -334,13 +568,22 @@ serve(async (req: Request) => {
         throw insertError;
       }
 
+      if (createdTicket?.id) {
+        await supabase.from('ticket_comments').insert({
+          ticket_id: createdTicket.id,
+          company_id: companyId,
+          body: `[${nowTimeStr}] ${senderLabel} (Reporte Inicial): ${messageText}`,
+          is_internal: false,
+        });
+      }
+
       return new Response(
         JSON.stringify({
           ok: true,
           action: 'ticket_created',
           ticket_id: createdTicket?.id,
           title: createdTicket?.title,
-          company_id: companyId,
+          is_recurring: Boolean(previousSameCategoryTicket),
           category: classification.category,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
