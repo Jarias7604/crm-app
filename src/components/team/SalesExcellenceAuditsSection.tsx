@@ -243,17 +243,30 @@ export const SalesExcellenceAuditsSection: React.FC<SalesExcellenceAuditsSection
 
     const resolveClientName = (audit: SalesCallAudit | null | undefined): string => {
         if (!audit) return 'Demostración';
+        if ((audit as any).companyName) return (audit as any).companyName;
         if ((audit as any).clientName) return (audit as any).clientName;
         const id = (audit.id + ' ' + (audit.lead_id || '')).toLowerCase();
-        if (id.includes('luis_escobar')) return 'Luis Escobar';
+        if (id.includes('luis_escobar')) return 'Minisúper Escobar';
         if (id.includes('finca')) return 'Finca Miramar';
         if (id.includes('sanjose')) return 'Distribuidora San José';
         if (id.includes('roble')) return 'Agropecuaria El Roble';
         if (id.includes('canasta')) return 'Supermercados La Canasta';
         if (id.includes('valle')) return 'Comercializadora del Valle';
-        if (id.includes('kervin')) return 'Kervin Roque';
+        if (id.includes('kervin')) return 'Kervin Roque (Servicios)';
         if (id.includes('transporte')) return 'Transportes Express';
         return audit.lead_id || 'Cliente Comercial';
+    };
+
+    const resolveContactPerson = (audit: SalesCallAudit | null | undefined): string => {
+        if (!audit) return 'Contacto Comercial';
+        if ((audit as any).contactPerson) return String((audit as any).contactPerson);
+        const cName = resolveClientName(audit).toLowerCase();
+        if (cName.includes('cartopa')) return 'José Durán';
+        if (cName.includes('kervin')) return 'Kervin Roque';
+        if (cName.includes('escobar')) return 'Luis Escobar';
+        if (cName.includes('transporte')) return 'Encargado Operativo (Sin decisor)';
+        if (cName.includes('finca')) return 'Gerencia Agrícola Miramar';
+        return (audit as any).clientName || 'Contacto del Lead';
     };
 
     const resolveDocumentTitle = (audit: SalesCallAudit | null | undefined): string => {
@@ -905,7 +918,7 @@ ${activeDiagnostic.actionRequired}
                                 <table className="w-full text-left text-xs">
                                     <thead className="sticky top-0 z-10">
                                         <tr className="bg-slate-100/90 text-[10px] font-black uppercase tracking-wider text-slate-600 border-b border-slate-200 backdrop-blur-xs">
-                                            <th className="py-2.5 px-3">Cliente / Título Documento Gemini</th>
+                                            <th className="py-2.5 px-3">Empresa / Con Quién Se Habló / Doc. Gemini</th>
                                             <th className="py-2.5 px-2">Presentador (AE)</th>
                                             <th className="py-2.5 px-2">SDR</th>
                                             <th className="py-2.5 px-2 text-center">Puntaje</th>
@@ -919,6 +932,7 @@ ${activeDiagnostic.actionRequired}
                                             const isSelected = selectedAudit?.id === audit.id;
                                             const badge = getScoreBadge(audit.total_score);
                                             const clientTitle = resolveClientName(audit);
+                                            const contactPerson = resolveContactPerson(audit);
                                             const docTitle = resolveDocumentTitle(audit);
                                             const d = new Date(audit.created_at);
                                             const dateShort = d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
@@ -937,18 +951,23 @@ ${activeDiagnostic.actionRequired}
                                                             : 'hover:bg-slate-50/80'
                                                     }`}
                                                 >
-                                                    {/* Cliente & Título del Documento */}
-                                                    <td className="py-2.5 px-3">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="font-bold text-slate-900 truncate max-w-[160px]">
-                                                                {clientTitle}
+                                                    {/* Empresa, Contacto con quién se habló & Título del Documento */}
+                                                    <td className="py-2.5 px-3 space-y-0.5">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span className="font-bold text-slate-900 truncate max-w-[165px]">
+                                                                🏢 {clientTitle}
                                                             </span>
                                                             <span className="text-[10px] text-slate-400 shrink-0">
                                                                 · {dateShort} {timeShort}
                                                             </span>
                                                         </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50/90 px-1.5 py-0.2 rounded border border-emerald-200">
+                                                                👤 Habló con: <strong>{contactPerson}</strong>
+                                                            </span>
+                                                        </div>
                                                         <p
-                                                            className="text-[10px] text-indigo-700 font-mono truncate max-w-[230px]"
+                                                            className="text-[10px] text-indigo-700 font-mono truncate max-w-[240px]"
                                                             title={docTitle}
                                                         >
                                                             📄 {docTitle}
@@ -1154,27 +1173,71 @@ ${activeDiagnostic.actionRequired}
 
                             {activeCoachingTab === 'single' && selectedAudit && (
                                 <div className="space-y-3 text-xs">
-                                    <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between">
-                                        <div className="min-w-0 pr-2">
+                                    <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 flex items-start justify-between gap-2">
+                                        <div className="min-w-0 pr-2 space-y-0.5">
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                                                Documento Evaluado
+                                                Identificación de la Demo
                                             </span>
                                             <strong className="text-slate-900 font-black text-xs block truncate">
-                                                {selectedAudit.sales_rep_name || 'Diana Morales'} · {resolveClientName(selectedAudit)}
+                                                🏢 Empresa: {resolveClientName(selectedAudit)}
                                             </strong>
+                                            <span className="text-[11px] font-bold text-emerald-700 block truncate">
+                                                👤 Con quién se habló: {resolveContactPerson(selectedAudit)}
+                                            </span>
+                                            <span className="text-[10px] font-bold text-slate-600 block truncate">
+                                                👩‍💼 Presentador (AE): {selectedAudit.sales_rep_name || 'Diana Morales'}
+                                            </span>
                                             <span className="text-[10px] text-indigo-600 font-mono truncate block">
                                                 📄 {resolveDocumentTitle(selectedAudit)}
                                             </span>
                                         </div>
                                         <div className="text-right shrink-0">
                                             <span className="text-sm font-black text-slate-900 block">
-                                                {selectedAudit.total_score} pts
+                                                {selectedAudit.total_score} / 100 pts
                                             </span>
                                             <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-black uppercase border ${getScoreBadge(selectedAudit.total_score).color}`}>
                                                 {getScoreBadge(selectedAudit.total_score).text}
                                             </span>
                                         </div>
                                     </div>
+
+                                    {selectedAudit.rubric_scores && selectedAudit.rubric_scores.length > 0 && (
+                                        <div className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-1.5">
+                                            <div className="flex items-center justify-between border-b border-slate-100 pb-1">
+                                                <span className="text-[9px] font-black uppercase tracking-wider text-slate-600">
+                                                    Desglose Exacto de Puntaje (9 Criterios)
+                                                </span>
+                                                <span className="text-[10px] font-black text-indigo-700">
+                                                    Suma: {selectedAudit.rubric_scores.reduce((acc, c) => acc + c.score, 0)} / 100 pts
+                                                </span>
+                                            </div>
+                                            <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
+                                                {selectedAudit.rubric_scores.map((crit, idx) => (
+                                                    <div key={crit.id || idx} className="text-[10px] py-1 border-b border-slate-50 last:border-0">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="font-bold text-slate-800 truncate">
+                                                                {idx + 1}. {crit.name}
+                                                            </span>
+                                                            <span className={`shrink-0 px-1.5 py-0.2 rounded font-black ${
+                                                                crit.status === 'pass' || crit.score === crit.max_points
+                                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                                    : crit.status === 'coaching' || crit.score > 0
+                                                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                                    : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                            }`}>
+                                                                {crit.score}/{crit.max_points}
+                                                            </span>
+                                                        </div>
+                                                        {crit.evidence_quote && (
+                                                            <p className="text-[9px] text-slate-500 leading-tight mt-0.5 line-clamp-2">
+                                                                {crit.evidence_quote}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div className="p-2.5 rounded-xl bg-slate-900 text-white space-y-1.5 shadow-2xs">
                                         <div className="flex items-center justify-between">

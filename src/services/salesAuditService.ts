@@ -141,8 +141,97 @@ function normalizeClientKey(raw: string): string {
             /\b(demo|demostracion|reunion|cita|presentacion|con|para|de|del|la|el|los|las|arias|erp|crm|lead|general|cliente|prospecto|notas|notes|by|gemini|english|spanish|cst)\b/g,
             ' '
         )
+        .replace(/ck/g, 'k')
+        .replace(/qu/g, 'k')
+        .replace(/q/g, 'k')
         .replace(/[^a-z0-9]/g, '')
         .trim();
+}
+
+function resolveCompanyAndContact(params: {
+    matchedLead?: any | null;
+    rawClientTitle?: string | null;
+    externalAttendee?: { displayName?: string; email?: string } | null;
+    notesText?: string | null;
+    fallbackContact?: string | null;
+}): { companyName: string; contactPerson: string; clientName: string } {
+    const leadCompany = String(params.matchedLead?.company_name || '').trim();
+    const leadPerson = String(params.matchedLead?.name || '').trim();
+    const cbdContact = String(
+        params.matchedLead?.call_bot_data?.nombre_contacto ||
+            params.matchedLead?.call_bot_data?.contacto ||
+            ''
+    ).trim();
+    const rawTitleClean = String(params.rawClientTitle || '').trim();
+    const attendeeName = String(params.externalAttendee?.displayName || '').trim();
+    const attendeeEmail = String(params.externalAttendee?.email || '').trim();
+
+    let companyName = leadCompany || rawTitleClean || leadPerson || 'Cliente Comercial';
+    let contactPerson = '';
+
+    const normCompany = normalizeClientKey(companyName);
+    const normLeadPerson = normalizeClientKey(leadPerson);
+
+    if (leadPerson && normLeadPerson && normLeadPerson !== normCompany) {
+        contactPerson = leadPerson;
+    } else if (cbdContact && normalizeClientKey(cbdContact) !== normCompany) {
+        contactPerson = cbdContact;
+    } else if (attendeeName && normalizeClientKey(attendeeName) !== normCompany) {
+        contactPerson = attendeeName;
+    }
+
+    // Extraer nombre de contacto si viene mencionado en las notas (ej. "Contacto: José Durán", "habló con...")
+    if (!contactPerson && params.notesText) {
+        const contactMatch = params.notesText.match(
+            /(?:contacto|habl[oó]\s+con|atendi[oó]|decisor|interlocutor|propietario|titular)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2})/
+        );
+        if (contactMatch && contactMatch[1]) {
+            contactPerson = contactMatch[1].trim();
+        }
+    }
+
+    // Mapeo verificado para leads conocidos donde el título de Calendar llevaba el nombre de la empresa o del contacto
+    if (normCompany.includes('cartopak') || normLeadPerson.includes('cartopak')) {
+        companyName = 'CartoPack';
+        if (!contactPerson || normalizeClientKey(contactPerson).includes('cartopak')) {
+            contactPerson = 'José Durán';
+        }
+    } else if (normCompany.includes('kervinroke') || normLeadPerson.includes('kervinroke')) {
+        if (!leadCompany || normalizeClientKey(leadCompany).includes('kervinroke')) {
+            companyName = 'Kervin Roque (Servicios)';
+        }
+        if (!contactPerson) {
+            contactPerson = 'Kervin Roque';
+        }
+    } else if (normCompany.includes('luisescobar') || normLeadPerson.includes('luisescobar')) {
+        companyName = leadCompany && !normalizeClientKey(leadCompany).includes('luisescobar') ? leadCompany : 'Minisúper Escobar';
+        if (!contactPerson) contactPerson = 'Luis Escobar';
+    } else if (normCompany.includes('transportesexpres')) {
+        companyName = 'Transportes Express';
+        if (!contactPerson) contactPerson = params.fallbackContact || 'Encargado Operativo (Sin decisor)';
+    } else if (normCompany.includes('fincamiramar')) {
+        companyName = 'Finca Miramar';
+        if (!contactPerson) contactPerson = params.fallbackContact || 'Gerencia Agrícola Miramar';
+    }
+
+    if (!contactPerson && params.fallbackContact) {
+        contactPerson = params.fallbackContact;
+    }
+    if (!contactPerson && leadPerson) {
+        contactPerson = leadPerson;
+    }
+    if (!contactPerson && attendeeEmail) {
+        contactPerson = attendeeEmail;
+    }
+    if (!contactPerson) {
+        contactPerson = 'Por confirmar en ficha del Lead';
+    }
+
+    return {
+        companyName,
+        contactPerson,
+        clientName: companyName
+    };
 }
 
 function getLocalDayKey(isoDate: string): string {
@@ -345,7 +434,8 @@ export const salesAuditService = {
                 lower.includes('gerencia') ||
                 lower.includes('acordó') ||
                 lower.includes('condición') ||
-                lower.includes('escuchar')
+                lower.includes('escuchar') ||
+                isClosedDeal
             ) {
                 scoreObj = 15;
                 statusObj = 'pass';
@@ -355,16 +445,22 @@ export const salesAuditService = {
                 statusObj = 'coaching';
                 quoteObj = 'Se detectó objeción (precio o requerimiento), pero se respondió sin cierre condicionado firme.';
             }
-        } else {
+        } else if (notes.length >= 70) {
             scoreObj = 15;
             statusObj = 'pass';
             quoteObj = 'Sesión sin objeciones bloqueantes documentadas por el cliente.';
+        } else {
+            scoreObj = 8;
+            statusObj = 'coaching';
+            quoteObj = 'Nota de reunión breve; falta detallar qué dudas u objeciones expresó el prospecto.';
         }
 
         // ── 7. Solicitud clara de decisión (10 pts)
         let scoreClosing = 0;
         let quoteClosing = 'Faltó pedir un compromiso explícito o pregunta de avance comercial.';
         let statusClosing: RubricCriterionScore['status'] = 'fail';
+        const isNegotiatingWithValue =
+            crmContext?.leadStatus === 'Negociación' && Number(crmContext?.dealValue || 0) > 0;
         if (
             isClosedDeal ||
             lower.includes('avanzar') ||
@@ -381,6 +477,10 @@ export const salesAuditService = {
             quoteClosing = isClosedDeal
                 ? 'Se solicitó avance comercial y se concretó el cierre del trato.'
                 : 'Se solicitó decisión o avance de forma asertiva y profesional.';
+        } else if (isNegotiatingWithValue) {
+            scoreClosing = 8;
+            statusClosing = 'coaching';
+            quoteClosing = `Se avanzó a Negociación formal en CRM ($${Number(crmContext?.dealValue || 0).toLocaleString()}), pendiente cierre definitivo.`;
         } else {
             scoreClosing = 0;
             statusClosing = 'fail';
@@ -979,6 +1079,7 @@ export const salesAuditService = {
 
         const enrichWithLead = (audit: SalesCallAudit): SalesCallAudit => {
             const matchedLead = findMatchingLead(audit.lead_id, (audit as any).clientName, null);
+            const fallbackContact = (audit as any).contactPerson || null;
             if (matchedLead) {
                 const dealVal = Number(matchedLead.closing_amount) || Number(matchedLead.value) || audit.deal_value || 0;
                 const effectiveStatus = matchedLead.status || audit.lead_status;
@@ -993,9 +1094,16 @@ export const salesAuditService = {
                     .filter(Boolean)
                     .join(' ');
 
+                const { companyName, contactPerson } = resolveCompanyAndContact({
+                    matchedLead,
+                    rawClientTitle: (audit as any).clientName,
+                    notesText: combinedRealNotes,
+                    fallbackContact
+                });
+
                 const evaluated = this.evaluateNotesSync(
                     combinedRealNotes,
-                    (audit as any).clientName || matchedLead.company_name || matchedLead.name,
+                    companyName,
                     audit.sales_rep_name || 'Diana Morales',
                     {
                         hasScheduledFollowUp: hasScheduledFollowUpByLeadId.has(matchedLead.id),
@@ -1007,7 +1115,9 @@ export const salesAuditService = {
                 return {
                     ...audit,
                     lead_id: matchedLead.id || audit.lead_id,
-                    clientName: (audit as any).clientName || matchedLead.company_name || matchedLead.name,
+                    clientName: companyName,
+                    companyName,
+                    contactPerson,
                     lead_status: effectiveStatus,
                     deal_value: dealVal > 0 ? dealVal : audit.deal_value,
                     meeting_notes_raw: combinedRealNotes,
@@ -1017,7 +1127,18 @@ export const salesAuditService = {
                     extracted_data: evaluated.extractedData
                 } as SalesCallAudit;
             }
-            return audit;
+
+            const { companyName, contactPerson } = resolveCompanyAndContact({
+                rawClientTitle: (audit as any).clientName,
+                notesText: audit.meeting_notes_raw,
+                fallbackContact
+            });
+            return {
+                ...audit,
+                clientName: companyName,
+                companyName,
+                contactPerson
+            } as SalesCallAudit;
         };
 
         // ── PASO A: Cargar las demostraciones de Google Drive / Gemini que coincidan con el Título Requerido
@@ -1064,13 +1185,6 @@ export const salesAuditService = {
 
             const matchedLead = findMatchingLead(null, rawClientTitle, externalAttendee?.email || null);
 
-            const clientName =
-                matchedLead?.company_name ||
-                matchedLead?.name ||
-                rawClientTitle ||
-                externalAttendee?.displayName ||
-                'Demostración Google Meet';
-
             const { salesRepName, sdrRepName } = resolveRepAttribution({
                 leadAssignedUserId: matchedLead?.assigned_to,
                 textHint: `${summary} ${description}`,
@@ -1084,7 +1198,12 @@ export const salesAuditService = {
             if (Array.isArray(ev.attachments) && ev.attachments.length > 0) {
                 const docAtt = ev.attachments.find((att: any) => att.fileUrl);
                 if (docAtt?.fileUrl) docUrl = docAtt.fileUrl;
-                if (docAtt?.title) docTitle = String(docAtt.title);
+                if (docAtt?.title) {
+                    const attTitle = String(docAtt.title).trim();
+                    docTitle = /^(notas de gemini|notes by gemini)$/i.test(attTitle)
+                        ? `${summary} - ${attTitle}`
+                        : attTitle;
+                }
             } else {
                 const docMatch = description.match(/https:\/\/docs\.google\.com\/document\/d\/[^\s)>"]+/i);
                 if (docMatch) docUrl = docMatch[0];
@@ -1102,8 +1221,15 @@ export const salesAuditService = {
                 .filter(Boolean)
                 .join(' ');
 
+            const { companyName, contactPerson } = resolveCompanyAndContact({
+                matchedLead,
+                rawClientTitle,
+                externalAttendee,
+                notesText: notesToEvaluate
+            });
+
             const dealValue = matchedLead ? Number(matchedLead.closing_amount) || Number(matchedLead.value) || 0 : 0;
-            const evaluated = this.evaluateNotesSync(notesToEvaluate, clientName, salesRepName, {
+            const evaluated = this.evaluateNotesSync(notesToEvaluate, companyName, salesRepName, {
                 hasScheduledFollowUp: matchedLead?.id ? hasScheduledFollowUpByLeadId.has(matchedLead.id) : false,
                 leadStatus: matchedLead?.status || 'En seguimiento',
                 dealValue
@@ -1112,8 +1238,10 @@ export const salesAuditService = {
             const auditObj: SalesCallAudit = {
                 id: `gcal_${ev.id}`,
                 company_id: companyId,
-                lead_id: matchedLead?.id || `lead_${normalizeClientKey(clientName) || ev.id}`,
-                clientName,
+                lead_id: matchedLead?.id || `lead_${normalizeClientKey(companyName) || ev.id}`,
+                clientName: companyName,
+                companyName,
+                contactPerson,
                 documentTitle: docTitle,
                 lead_status: matchedLead?.status || 'En seguimiento',
                 deal_value: dealValue,
@@ -1129,7 +1257,7 @@ export const salesAuditService = {
                 created_at: startIso
             } as SalesCallAudit;
 
-            const dedupeKey = makeDedupeKey(clientName, startIso, matchedLead?.id);
+            const dedupeKey = makeDedupeKey(companyName, startIso, matchedLead?.id);
             if (!mergedMap.has(dedupeKey)) {
                 mergedMap.set(dedupeKey, auditObj);
             }
@@ -1145,10 +1273,6 @@ export const salesAuditService = {
 
             const joinedLead = Array.isArray(fu.lead) ? fu.lead[0] : fu.lead;
             const matchedLead = joinedLead || findMatchingLead(fu.lead_id, cleanEventClientTitle(firstLineTitle), null);
-            const clientName =
-                matchedLead?.company_name ||
-                matchedLead?.name ||
-                cleanEventClientTitle(firstLineTitle || 'Cliente Comercial');
 
             const { salesRepName, sdrRepName } = resolveRepAttribution({
                 assignedUserId: fu.assigned_to,
@@ -1157,25 +1281,38 @@ export const salesAuditService = {
                 textHint: `${notesStr} ${matchedLead?.next_action_notes || ''}`
             });
 
+            const { companyName, contactPerson } = resolveCompanyAndContact({
+                matchedLead,
+                rawClientTitle: cleanEventClientTitle(firstLineTitle || 'Cliente Comercial'),
+                notesText: `${notesStr} ${matchedLead?.next_action_notes || ''}`
+            });
+
             const fullNotes = [
-                notesStr || `Demostración comercial con ${clientName}`,
+                notesStr || `Demostración comercial con ${companyName}`,
                 matchedLead?.next_action_notes || '',
-                `Demostración y validación de requerimientos de sistema con ${clientName}.`
+                `Demostración y validación de requerimientos de sistema con ${companyName}.`
             ]
                 .filter(Boolean)
                 .join(' · ');
 
-            const evaluated = this.evaluateNotesSync(fullNotes, clientName, salesRepName);
             const dealValue = matchedLead ? Number(matchedLead.closing_amount) || Number(matchedLead.value) || 0 : 0;
+            const effectiveStatus = matchedLead?.status || (fu.completed ? 'Negociación' : 'En seguimiento');
+            const evaluated = this.evaluateNotesSync(fullNotes, companyName, salesRepName, {
+                hasScheduledFollowUp: matchedLead?.id ? hasScheduledFollowUpByLeadId.has(matchedLead.id) : true,
+                leadStatus: effectiveStatus,
+                dealValue
+            });
             const dateIso = fu.date || fu.created_at;
 
             const auditObj: SalesCallAudit = {
                 id: `followup_${fu.id}`,
                 company_id: companyId,
                 lead_id: matchedLead?.id || fu.lead_id || `lead_${fu.id}`,
-                clientName,
+                clientName: companyName,
+                companyName,
+                contactPerson,
                 documentTitle: firstLineTitle,
-                lead_status: matchedLead?.status || (fu.completed ? 'Negociación' : 'En seguimiento'),
+                lead_status: effectiveStatus,
                 deal_value: dealValue,
                 evaluated_user_id: fu.assigned_to || matchedLead?.assigned_to || null,
                 sales_rep_name: salesRepName,
@@ -1190,19 +1327,20 @@ export const salesAuditService = {
                 created_at: dateIso
             } as SalesCallAudit;
 
-            const dedupeKey = makeDedupeKey(clientName, dateIso, matchedLead?.id || fu.lead_id);
+            const dedupeKey = makeDedupeKey(companyName, dateIso, matchedLead?.id || fu.lead_id);
             if (!mergedMap.has(dedupeKey)) {
                 mergedMap.set(dedupeKey, auditObj);
             }
         }
 
         // ── PASO D: Auditorías Explícitas de Gemini (Supabase `sales_call_audits` + LocalStorage manuales)
+        // SIEMPRE re-evalúa con la rúbrica objetiva + notas reales del Lead para evitar puntajes viejos en caché
         const localCustomAudits = this.getCustomLocalAudits(companyId);
         const explicitAudits = [...localCustomAudits, ...dbAudits];
 
         for (const exp of explicitAudits) {
             const matchedLead = findMatchingLead(exp.lead_id, (exp as any).clientName, null);
-            const clientName =
+            const rawClientName =
                 (exp as any).clientName ||
                 matchedLead?.company_name ||
                 matchedLead?.name ||
@@ -1210,7 +1348,7 @@ export const salesAuditService = {
                 'Demostración Auditada';
             const docTitle =
                 (exp as any).documentTitle ||
-                `DEMO - ${clientName} - Notas de Gemini`;
+                `DEMO - ${rawClientName} - Notas de Gemini`;
 
             if (!matchesRequiredDocumentTitle(`${docTitle} ${exp.meeting_notes_raw || ''}`, filterConfig.requiredKeyword, filterConfig.onlyDemosFilter)) {
                 continue;
@@ -1224,11 +1362,11 @@ export const salesAuditService = {
                 ? Number(matchedLead.closing_amount) || Number(matchedLead.value) || exp.deal_value || 0
                 : exp.deal_value || 0;
 
-            const normalizedAudit: SalesCallAudit = {
+            const baseAudit: SalesCallAudit = {
                 ...exp,
                 company_id: exp.company_id || companyId,
                 lead_id: matchedLead?.id || exp.lead_id,
-                clientName,
+                clientName: rawClientName,
                 documentTitle: docTitle,
                 lead_status: matchedLead?.status || exp.lead_status || 'En seguimiento',
                 deal_value: dealValue,
@@ -1236,8 +1374,11 @@ export const salesAuditService = {
                 sdr_rep_name: exp.sdr_rep_name ? canonicalRepName(exp.sdr_rep_name) : null
             } as SalesCallAudit;
 
-            const dedupeKey = makeDedupeKey(clientName, normalizedAudit.created_at, normalizedAudit.lead_id);
-            mergedMap.set(dedupeKey, normalizedAudit);
+            const enrichedAudit = enrichWithLead(baseAudit);
+            const dedupeKey = makeDedupeKey((enrichedAudit as any).clientName || rawClientName, enrichedAudit.created_at, enrichedAudit.lead_id);
+            if (!mergedMap.has(dedupeKey)) {
+                mergedMap.set(dedupeKey, enrichedAudit);
+            }
         }
 
         const finalAudits = Array.from(mergedMap.values()).sort(
@@ -1290,10 +1431,11 @@ export const salesAuditService = {
         try {
             const customKey = `arias_custom_sales_audits_${companyId}`;
             const customList: SalesCallAudit[] = JSON.parse(localStorage.getItem(customKey) || '[]');
-            // Ignorar entradas automáticas previas (gcal_, followup_, booking_, callact_, lead_demo_) para evitar contaminación
+            // Ignorar entradas automáticas o base estáticas previas para evitar contaminación de puntajes en caché
             return customList.filter(item => {
                 const id = String(item.id || '');
                 return (
+                    !id.startsWith('audit_') &&
                     !id.startsWith('gcal_') &&
                     !id.startsWith('followup_') &&
                     !id.startsWith('booking_') &&
@@ -1453,11 +1595,17 @@ export const salesAuditService = {
                 leadStatus: d.lead_status,
                 dealValue: d.deal_value
             });
+            const { companyName, contactPerson } = resolveCompanyAndContact({
+                rawClientTitle: d.clientName,
+                notesText: d.meeting_notes_raw
+            });
             return {
                 id: d.id,
                 company_id: companyId,
                 lead_id: d.lead_id,
-                clientName: d.clientName,
+                clientName: companyName,
+                companyName,
+                contactPerson,
                 documentTitle: d.documentTitle,
                 lead_status: d.lead_status,
                 deal_value: d.deal_value,
