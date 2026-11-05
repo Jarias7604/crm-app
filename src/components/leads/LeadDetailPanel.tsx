@@ -262,6 +262,113 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const selectedLead = lead;
     const setIsDetailOpen = (val: boolean) => { if (!val) onClose(); };
 
+    // ── Cálculo del NEXT TRIGGER (Próxima Reunión / Próximo Seguimiento Agendado) ──
+    const nextTrigger = (() => {
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const endOfToday = startOfToday + 24 * 60 * 60 * 1000 - 1;
+
+        const parseFollowUpDate = (raw?: string | null): Date | null => {
+            if (!raw) return null;
+            const d = new Date(raw.includes('T') ? raw : `${raw}T09:00:00`);
+            return isNaN(d.getTime()) ? null : d;
+        };
+
+        const sortedFollowUps = [...followUps]
+            .filter(f => f && f.date)
+            .sort((a, b) => {
+                const da = parseFollowUpDate(a.date)?.getTime() || 0;
+                const db = parseFollowUpDate(b.date)?.getTime() || 0;
+                return da - db;
+            });
+
+        // 1. Buscar el seguimiento futuro o de hoy más próximo
+        const upcomingFu = sortedFollowUps.find(f => {
+            const dt = parseFollowUpDate(f.date);
+            return dt && dt.getTime() >= startOfToday && !(f as any).completed;
+        });
+
+        // 2. Si no hay futuro en followUps, verificar si selectedLead.next_followup_date es futuro, o tomar el último agendado
+        const leadNextDt = parseFollowUpDate(selectedLead.next_followup_date);
+        const latestScheduledFu = sortedFollowUps.length > 0 ? sortedFollowUps[sortedFollowUps.length - 1] : null;
+        const targetFu: any = upcomingFu || latestScheduledFu;
+
+        let targetDate: Date | null = upcomingFu
+            ? parseFollowUpDate(upcomingFu.date)
+            : (leadNextDt && (!latestScheduledFu || leadNextDt.getTime() >= (parseFollowUpDate(latestScheduledFu.date)?.getTime() || 0))
+                ? leadNextDt
+                : parseFollowUpDate(latestScheduledFu?.date));
+
+        const rawDateStr = upcomingFu?.date || (targetDate === leadNextDt ? selectedLead.next_followup_date : latestScheduledFu?.date) || '';
+        const hasExplicitTime = typeof rawDateStr === 'string' && rawDateStr.includes('T') && !rawDateStr.endsWith('T00:00:00') && !rawDateStr.endsWith('T12:00:00');
+
+        let statusType: 'upcoming' | 'today' | 'overdue' | 'none' = 'none';
+        let statusBadge = 'Sin Próximo Seguimiento Agendado';
+        let relativeLabel = '';
+
+        if (targetDate) {
+            const ts = targetDate.getTime();
+            const diffDays = Math.round((ts - startOfToday) / (24 * 60 * 60 * 1000));
+            if (ts >= startOfToday && ts <= endOfToday) {
+                statusType = 'today';
+                statusBadge = 'PROGRAMADO PARA HOY';
+                relativeLabel = 'Hoy';
+            } else if (ts > endOfToday) {
+                statusType = 'upcoming';
+                statusBadge = 'PRÓXIMA CITA / SEGUIMIENTO AGENDADO';
+                relativeLabel = diffDays === 1 ? 'Mañana' : `En ${diffDays} días`;
+            } else {
+                statusType = 'overdue';
+                statusBadge = 'SEGUIMIENTO VENCIDO · REQUIERE REAGENDAR';
+                const overdueDays = Math.max(1, Math.abs(diffDays));
+                relativeLabel = overdueDays === 1 ? 'Ayer' : `Hace ${overdueDays} días`;
+            }
+        }
+
+        const formattedDate = targetDate
+            ? format(targetDate, "EEE dd 'de' MMM, yyyy", { locale: es })
+            : 'No agendado';
+        const formattedTime = targetDate && hasExplicitTime
+            ? format(targetDate, 'hh:mm a', { locale: es })
+            : null;
+
+        const rawActionType = targetFu?.action_type || 'call';
+        const combinedNotes = String(targetFu?.notes || selectedLead.next_action_notes || callActivities[0]?.notes || '').trim();
+        const isMeetingNote = /reuni[oó]n|demo|meet|zoom|presentaci[oó]n|entrega/i.test(combinedNotes);
+        const actionLabel =
+            rawActionType === 'meeting' || isMeetingNote
+                ? '🎥 Reunión / Compromiso Agendado'
+                : rawActionType === 'whatsapp'
+                ? '💬 Seguimiento por WhatsApp'
+                : rawActionType === 'email'
+                ? '✉️ Seguimiento por Correo'
+                : '📞 Llamada de Seguimiento';
+
+        const assigneeId = targetFu?.assigned_to || selectedLead.next_followup_assignee || selectedLead.assigned_to;
+        const memberMatch = Array.isArray(teamMembers) ? teamMembers.find(m => m?.id === assigneeId) : null;
+        const assigneeName =
+            targetFu?.assigned_profile?.full_name ||
+            targetFu?.profiles?.full_name ||
+            memberMatch?.full_name ||
+            (typeof memberMatch?.email === 'string' ? memberMatch.email.split('@')[0] : null) ||
+            null;
+
+        const meetUrl = targetFu?.meet_link || targetFu?.calendar_html_link || null;
+
+        return {
+            hasTrigger: !!targetDate,
+            statusType,
+            statusBadge,
+            relativeLabel,
+            formattedDate,
+            formattedTime,
+            actionLabel,
+            notes: combinedNotes || 'Sin nota de acuerdo registrada para el próximo contacto.',
+            assigneeName,
+            meetUrl
+        };
+    })();
+
             return (
                 <div className="fixed inset-0 z-[9999] flex justify-end overflow-hidden">
                     <div className="absolute inset-0 bg-black/40 lead-sheet-backdrop" onClick={() => setIsDetailOpen(false)} />
@@ -367,6 +474,54 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         className="text-xs font-medium text-slate-500 border-none hover:bg-slate-50 focus:bg-white focus:ring-1 focus:ring-blue-600 rounded px-1 transition-all bg-transparent placeholder-slate-400 truncate hidden sm:block max-w-[200px]"
                                     />
                                 </div>
+                            </div>
+
+                            {/* Fila 3: Barra de Next Trigger (Próximo Seguimiento / Próxima Reunión) siempre visible */}
+                            <div
+                                onClick={() => setActiveTab('activity')}
+                                className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-all ${
+                                    nextTrigger.statusType === 'upcoming'
+                                        ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900 hover:bg-emerald-100/70'
+                                        : nextTrigger.statusType === 'today'
+                                        ? 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100/70'
+                                        : nextTrigger.statusType === 'overdue'
+                                        ? 'bg-rose-50/80 border-rose-200 text-rose-900 hover:bg-rose-100/70'
+                                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                                }`}
+                                title="Clic para ver el detalle del Próximo Seguimiento (Next Trigger)"
+                            >
+                                <div className="flex items-center gap-2 min-w-0 truncate">
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shrink-0 ${
+                                        nextTrigger.statusType === 'upcoming'
+                                            ? 'bg-emerald-600 text-white'
+                                            : nextTrigger.statusType === 'today'
+                                            ? 'bg-amber-500 text-slate-950'
+                                            : nextTrigger.statusType === 'overdue'
+                                            ? 'bg-rose-600 text-white'
+                                            : 'bg-slate-300 text-slate-800'
+                                    }`}>
+                                        ⚡ Next Trigger
+                                    </span>
+                                    {nextTrigger.hasTrigger ? (
+                                        <span className="font-bold truncate text-[11px]">
+                                            📅 {nextTrigger.formattedDate}{nextTrigger.formattedTime ? ` · ${nextTrigger.formattedTime}` : ''} ({nextTrigger.relativeLabel}) — <span className="font-medium opacity-90">{nextTrigger.actionLabel}</span>
+                                        </span>
+                                    ) : (
+                                        <span className="font-semibold text-[11px] text-slate-500 truncate">
+                                            Sin próxima reunión o seguimiento agendado
+                                        </span>
+                                    )}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsCallLoggerOpen(true);
+                                    }}
+                                    className="shrink-0 px-2 py-0.5 rounded bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200 font-black text-[10px] uppercase tracking-wider shadow-2xs cursor-pointer"
+                                >
+                                    {nextTrigger.hasTrigger ? 'Reprogramar' : '+ Agendar'}
+                                </button>
                             </div>
                         </div>
 
@@ -1164,7 +1319,93 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
 
                             {/* ── TAB 4: TRAZABILIDAD & ACTIVIDAD ── */}
                             {activeTab === 'activity' && (
-                                <div className="space-y-5 animate-in fade-in duration-200">
+                                <div className="space-y-4 animate-in fade-in duration-200">
+                                    {/* ── TARJETA DESTACADA: NEXT TRIGGER (PRÓXIMA REUNIÓN / PRÓXIMO SEGUIMIENTO) ── */}
+                                    <div className={`rounded-xl p-4 border shadow-2xs space-y-2.5 ${
+                                        nextTrigger.statusType === 'upcoming'
+                                            ? 'bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/60 border-emerald-300'
+                                            : nextTrigger.statusType === 'today'
+                                            ? 'bg-gradient-to-br from-amber-50/90 via-white to-orange-50/60 border-amber-300'
+                                            : nextTrigger.statusType === 'overdue'
+                                            ? 'bg-gradient-to-br from-rose-50/90 via-white to-amber-50/40 border-rose-300'
+                                            : 'bg-white border-slate-200'
+                                    }`}>
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
+                                                    nextTrigger.statusType === 'upcoming'
+                                                        ? 'bg-emerald-600 text-white'
+                                                        : nextTrigger.statusType === 'today'
+                                                        ? 'bg-amber-500 text-slate-950'
+                                                        : nextTrigger.statusType === 'overdue'
+                                                        ? 'bg-rose-600 text-white'
+                                                        : 'bg-slate-200 text-slate-700'
+                                                }`}>
+                                                    <Calendar className="w-3 h-3" />
+                                                    <span>⚡ NEXT TRIGGER · {nextTrigger.statusBadge}</span>
+                                                </span>
+                                                {nextTrigger.relativeLabel && (
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${
+                                                        nextTrigger.statusType === 'upcoming'
+                                                            ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                                            : nextTrigger.statusType === 'today'
+                                                            ? 'bg-amber-100 text-amber-900 border-amber-300'
+                                                            : 'bg-rose-100 text-rose-800 border-rose-200'
+                                                    }`}>
+                                                        {nextTrigger.relativeLabel}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-1.5">
+                                                {nextTrigger.meetUrl && (
+                                                    <a
+                                                        href={nextTrigger.meetUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs transition-all"
+                                                    >
+                                                        <ExternalLink className="w-3 h-3" />
+                                                        <span>Abrir Reunión Meet</span>
+                                                    </a>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsCallLoggerOpen(true)}
+                                                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs transition-all cursor-pointer"
+                                                >
+                                                    <Calendar className="w-3 h-3" />
+                                                    <span>{nextTrigger.hasTrigger ? 'Reprogramar / Agendar' : '+ Agendar Próxima Reunión'}</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                                            <div className="p-2.5 rounded-lg bg-white/90 border border-slate-200/80 space-y-0.5">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                                    Cuándo es el Próximo Seguimiento / Reunión
+                                                </span>
+                                                <strong className="text-xs sm:text-sm font-black text-slate-900 block capitalize">
+                                                    📅 {nextTrigger.formattedDate}
+                                                    {nextTrigger.formattedTime ? ` · ⏰ ${nextTrigger.formattedTime}` : ''}
+                                                </strong>
+                                                <span className="text-[11px] font-bold text-indigo-700 block">
+                                                    {nextTrigger.actionLabel}
+                                                    {nextTrigger.assigneeName ? ` · 👤 ${nextTrigger.assigneeName}` : ''}
+                                                </span>
+                                            </div>
+
+                                            <div className="p-2.5 rounded-lg bg-white/90 border border-slate-200/80 space-y-0.5">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                                    Objetivo / Acuerdo para el Próximo Contacto
+                                                </span>
+                                                <p className="text-xs font-semibold text-slate-800 leading-snug line-clamp-2">
+                                                    {nextTrigger.notes}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Filter Chips & Counter Header */}
                                     <div className="bg-white rounded-lg p-3.5 border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-3">
                                         <div className="flex items-center justify-between w-full sm:w-auto gap-3">
@@ -1288,7 +1529,12 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                             if (isActivity) return format(new Date(item.call_date || item.created_at), 'dd MMM, HH:mm', { locale: es });
                                                             if (isMessage) return format(new Date(item.created_at), 'dd MMM, HH:mm', { locale: es });
                                                             if (!item.date) return 'Sin fecha';
-                                                            return format(new Date(`${item.date.split('T')[0]}T12:00:00`), 'dd MMM, yyyy', { locale: es });
+                                                            const rawD = String(item.date);
+                                                            const hasTime = rawD.includes('T') && !rawD.endsWith('T00:00:00') && !rawD.endsWith('T12:00:00');
+                                                            const dt = new Date(rawD.includes('T') ? rawD : `${rawD}T12:00:00`);
+                                                            return hasTime
+                                                                ? `Agendado: ${format(dt, 'dd MMM yyyy · hh:mm a', { locale: es })}`
+                                                                : `Agendado: ${format(dt, 'dd MMM, yyyy', { locale: es })}`;
                                                         } catch { return 'Sin fecha'; }
                                                     })();
 
@@ -1305,11 +1551,19 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                             {/* Timeline dot */}
                                                             <div className={`absolute -left-[28px] top-2 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs z-10 ${dotBg}`} />
 
-                                                            <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-2xs hover:shadow-xs transition-all space-y-2">
+                                                            <div className={`bg-white rounded-xl p-4 border shadow-2xs hover:shadow-xs transition-all space-y-2 ${isFollowUp ? 'border-indigo-200/90 bg-indigo-50/15' : 'border-slate-200/80'}`}>
                                                                 <div className="flex items-center justify-between gap-2">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                                                                            {isActivity ? (actCfg?.label || item.action_type) : isMessage ? `${msgCh?.label} · ${item.direction === 'inbound' ? 'Recibido' : 'Enviado'}` : (followUpAction?.label || 'Seguimiento')}
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                                                                            isFollowUp
+                                                                                ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                                                                : 'bg-slate-100 text-slate-700'
+                                                                        }`}>
+                                                                            {isActivity
+                                                                                ? (actCfg?.label || item.action_type)
+                                                                                : isMessage
+                                                                                ? `${msgCh?.label} · ${item.direction === 'inbound' ? 'Recibido' : 'Enviado'}`
+                                                                                : `📅 Seguimiento Agendado · ${followUpAction?.label || 'Llamada'}`}
                                                                         </span>
                                                                         {outCfg && (
                                                                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${outCfg.bgColor} ${outCfg.color}`}>
@@ -1317,7 +1571,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                                             </span>
                                                                         )}
                                                                     </div>
-                                                                    <span className="text-[10px] font-bold text-slate-400">{itemDate}</span>
+                                                                    <span className={`text-[10px] font-bold ${isFollowUp ? 'text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100' : 'text-slate-400'}`}>
+                                                                        {itemDate}
+                                                                    </span>
                                                                 </div>
 
                                                                 {noteText && (
