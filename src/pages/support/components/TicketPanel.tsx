@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Edit2, Save, RefreshCw, ChevronRight, ChevronDown, UserCheck, MessageSquare, Lock, CalendarDays, Activity, ShieldCheck, CheckCircle2, Send, Search, Trash2, AlertTriangle, Clock, Paperclip, Image, FileVideo, ExternalLink, Microscope, Lightbulb, SearchCode, FileUp, FileBadge2, UploadCloud, Check, Plus } from 'lucide-react';
 import { storageService } from '../../../services/storage';
-import { ticketService, type Ticket, type TicketCategory, type TicketStatus, type TicketPriority, type CompanyAgent, type TicketComment, type TicketLead, type ResolutionAttachment } from '../../../services/tickets';
+import { ticketService, computeTicketAiTimeBenchmark, type Ticket, type TicketCategory, type TicketStatus, type TicketPriority, type CompanyAgent, type TicketComment, type TicketLead, type ResolutionAttachment } from '../../../services/tickets';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -204,6 +204,8 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
         findings: ticket.findings || '',
         root_cause: ticket.root_cause || '',
         solution: ticket.solution || '',
+        actual_hours: ticket.actual_hours !== undefined && ticket.actual_hours !== null ? String(ticket.actual_hours) : '',
+        time_justification: String((ticket.metadata as any)?.time_justification || ''),
     });
     const [resFiles, setResFiles] = useState<File[]>([]);
     const [resUploading, setResUploading] = useState(false);
@@ -226,6 +228,8 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
             findings: ticket.findings || '',
             root_cause: ticket.root_cause || '',
             solution: ticket.solution || '',
+            actual_hours: ticket.actual_hours !== undefined && ticket.actual_hours !== null ? String(ticket.actual_hours) : '',
+            time_justification: String((ticket.metadata as any)?.time_justification || ''),
         });
         setResFiles([]);
         setLeadSearch('');
@@ -234,21 +238,45 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
         setTempAct((ticket.actual_hours ?? 0).toString());
     }, [ticket]);
 
+    const currentCatName = categories.find(c => c.id === ticket.category_id)?.name || '';
+    const parsedActualHours = Number(resForm.actual_hours !== '' ? resForm.actual_hours : (ticket.actual_hours ?? 0));
+    const aiTimeAudit = computeTicketAiTimeBenchmark(
+        ticket.title,
+        ticket.description,
+        currentCatName,
+        ticket.estimated_hours,
+        parsedActualHours
+    );
+
     const hasCompleteResolution = Boolean(
+        parsedActualHours > 0 &&
         (resForm.findings || ticket.findings || '').trim().length >= 5 &&
         (resForm.root_cause || ticket.root_cause || '').trim().length >= 5 &&
-        (resForm.solution || ticket.solution || '').trim().length >= 5
+        (resForm.solution || ticket.solution || '').trim().length >= 5 &&
+        (aiTimeAudit.status !== 'inflated' || (resForm.time_justification || String((ticket.metadata as any)?.time_justification || '')).trim().length >= 5)
     );
 
     async function handleSaveResolution(closeTicketAfterSave = false) {
         if (closeTicketAfterSave) {
+            if (parsedActualHours <= 0) {
+                toast.error(
+                    '⚠️ Nadie puede cerrar un ticket sin tiempo. Ingresa el Tiempo Real Invertido (mayor a 0 horas).'
+                );
+                return;
+            }
             if (
                 resForm.findings.trim().length < 5 ||
                 resForm.root_cause.trim().length < 5 ||
                 resForm.solution.trim().length < 5
             ) {
                 toast.error(
-                    '⚠️ Para cerrar o dar por resuelto el ticket es obligatorio describir: 1) Hallazgos, 2) Causa Raíz y 3) Solución Aplicada (mínimo 5 caracteres cada uno).'
+                    '⚠️ Para cerrar o dar por resuelto el ticket es obligatorio describir: 1) Hallazgos, 2) Causa Raíz y 3) Solución Aplicada.'
+                );
+                return;
+            }
+            if (aiTimeAudit.status === 'inflated' && resForm.time_justification.trim().length < 5) {
+                toast.error(
+                    `⚠️ La IA detectó tiempo inflado (${parsedActualHours}h vs ${aiTimeAudit.expectedHours}h esperadas). Es obligatorio escribir la Justificación de la diferencia de tiempo.`
                 );
                 return;
             }
@@ -269,7 +297,14 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                 findings: resForm.findings.trim() || null,
                 root_cause: resForm.root_cause.trim() || null,
                 solution: resForm.solution.trim() || null,
-                metadata: { ...ticket.metadata, resolution_attachments: newAttachments },
+                actual_hours: parsedActualHours,
+                metadata: {
+                    ...ticket.metadata,
+                    resolution_attachments: newAttachments,
+                    time_justification: resForm.time_justification.trim() || null,
+                    ai_expected_hours: aiTimeAudit.expectedHours,
+                    ai_time_status: aiTimeAudit.status,
+                },
             };
             if (closeTicketAfterSave) {
                 updatePayload.status = 'closed';
@@ -279,12 +314,12 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
             onUpdate(updated);
             setResFiles([]);
             if (closeTicketAfterSave) {
-                toast.success('Reporte de resolución guardado y Ticket CERRADO ✓');
+                toast.success('Tiempo, Resolución y Cierre guardados ✓');
                 setTab('info');
             } else {
                 toast.success('Reporte de resolución guardado ✓');
             }
-        } catch { toast.error('Error al guardar el reporte'); }
+        } catch (err: any) { toast.error(err?.message || 'Error al guardar el reporte'); }
         finally { setResSaving(false); setResUploading(false); }
     }
 
@@ -294,15 +329,28 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
         const currentRootCause = (resForm.root_cause || ticket.root_cause || '').trim();
         const currentSolution = (resForm.solution || ticket.solution || '').trim();
 
-        if (
-            isTryingToCloseOrResolve &&
-            (currentFindings.length < 5 || currentRootCause.length < 5 || currentSolution.length < 5)
-        ) {
-            toast.error(
-                '⚠️ No puedes cerrar ni resolver este ticket sin completar el Reporte de Resolución (Hallazgos, Causa Raíz y Solución Aplicada).'
-            );
-            setTab('resolution');
-            return;
+        if (isTryingToCloseOrResolve) {
+            if (parsedActualHours <= 0) {
+                toast.error(
+                    '⚠️ Nadie puede cerrar un ticket con 0 horas. Registra el Tiempo Real Invertido y la Resolución.'
+                );
+                setTab('resolution');
+                return;
+            }
+            if (currentFindings.length < 5 || currentRootCause.length < 5 || currentSolution.length < 5) {
+                toast.error(
+                    '⚠️ No puedes cerrar ni resolver este ticket sin completar el Reporte de Resolución (Hallazgos, Causa Raíz y Solución Aplicada).'
+                );
+                setTab('resolution');
+                return;
+            }
+            if (aiTimeAudit.status === 'inflated' && resForm.time_justification.trim().length < 5) {
+                toast.error(
+                    `⚠️ El tiempo reportado (${parsedActualHours}h) supera el estándar IA (${aiTimeAudit.expectedHours}h). Justifica la diferencia en la pestaña Resolución.`
+                );
+                setTab('resolution');
+                return;
+            }
         }
 
         setSaving(true);
@@ -318,6 +366,7 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                 findings: currentFindings || null,
                 root_cause: currentRootCause || null,
                 solution: currentSolution || null,
+                actual_hours: parsedActualHours,
             });
             onUpdate(updated); setTab('info'); toast.success('Ticket actualizado ✓');
         } catch (err: any) {
@@ -1145,14 +1194,122 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                                         <FileBadge2 className="w-5 h-5 text-white" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-black text-gray-900">Reporte de Resolución Obligatorio</p>
-                                        <p className="text-[10px] text-violet-600 font-bold">Los 3 campos son obligatorios para poder cerrar o resolver el ticket</p>
+                                        <p className="text-sm font-black text-gray-900">Reporte de Resolución + Tiempo Obligatorio</p>
+                                        <p className="text-[10px] text-violet-600 font-bold">Nadie puede cerrar el ticket sin registrar Tiempo Real (&gt; 0h), Hallazgos, Causa Raíz y Solución</p>
                                     </div>
                                 </div>
                                 <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${hasCompleteResolution ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
                                     {hasCompleteResolution ? '✓ Completo' : '⚠ Requerido para Cerrar'}
                                 </span>
                             </div>
+                        </div>
+
+                        {/* ── 0. Tiempo Real + Auditoría IA de Tiempo (¿Correcto o Inflado?) ── */}
+                        <div className={`rounded-2xl border p-4 space-y-3 transition-all ${
+                            aiTimeAudit.status === 'inflated'
+                                ? 'bg-rose-50/70 border-rose-200'
+                                : aiTimeAudit.status === 'missing_time'
+                                    ? 'bg-amber-50/60 border-amber-200'
+                                    : 'bg-emerald-50/50 border-emerald-200'
+                        }`}>
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <label className="text-[10px] font-black text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                                    0. Tiempo Real Invertido (Horas) *
+                                </label>
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                                    aiTimeAudit.status === 'inflated'
+                                        ? 'bg-rose-100 text-rose-700 border border-rose-300'
+                                        : aiTimeAudit.status === 'missing_time'
+                                            ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                            : 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                                }`}>
+                                    {aiTimeAudit.verdictLabel}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-center">
+                                <div>
+                                    <p className="text-[9px] font-bold text-gray-500 uppercase mb-1">Horas trabajadas *</p>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        min="0.1"
+                                        placeholder="Ej: 0.5"
+                                        value={resForm.actual_hours}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setResForm(p => ({ ...p, actual_hours: val }));
+                                            setForm(p => ({ ...p, actual_hours: val }));
+                                        }}
+                                        className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm font-black text-gray-900 focus:ring-2 focus:ring-indigo-400"
+                                    />
+                                </div>
+                                <div className="bg-white/90 rounded-xl p-2.5 border border-gray-200/80">
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase">🤖 Tiempo Esperado IA</p>
+                                    <p className="text-sm font-black text-indigo-700">{aiTimeAudit.expectedHours}h <span className="text-[10px] font-semibold text-gray-400">(máx {aiTimeAudit.maxReasonableHours}h)</span></p>
+                                    <p className="text-[9px] text-gray-500 truncate">{aiTimeAudit.workTypeLabel}</p>
+                                </div>
+                                <div className="bg-white/90 rounded-xl p-2.5 border border-gray-200/80">
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase">📊 Diferencia vs IA</p>
+                                    <p className={`text-sm font-black ${
+                                        aiTimeAudit.differenceHours > 0.3 ? 'text-rose-600' : aiTimeAudit.differenceHours <= 0 ? 'text-emerald-600' : 'text-gray-800'
+                                    }`}>
+                                        {aiTimeAudit.reportedHours > 0 ? `${aiTimeAudit.differenceHours > 0 ? '+' : ''}${aiTimeAudit.differenceHours}h` : 'Sin registrar'}
+                                    </p>
+                                    <p className="text-[9px] text-gray-500">
+                                        {aiTimeAudit.status === 'inflated' ? '⚠️ Excede rango normal' : aiTimeAudit.reportedHours > 0 ? 'Dentro de parámetro' : 'Obligatorio > 0h'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Quick pick buttons */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[9px] font-bold text-gray-500 mr-1">Selección rápida:</span>
+                                {[
+                                    { label: '12m (0.2h)', val: '0.2' },
+                                    { label: '30m (0.5h)', val: '0.5' },
+                                    { label: '1 hora (1h)', val: '1' },
+                                    { label: '1.5 horas', val: '1.5' },
+                                    { label: '2 horas', val: '2' },
+                                ].map(btn => (
+                                    <button
+                                        key={btn.val}
+                                        type="button"
+                                        onClick={() => {
+                                            setResForm(p => ({ ...p, actual_hours: btn.val }));
+                                            setForm(p => ({ ...p, actual_hours: btn.val }));
+                                        }}
+                                        className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                                            String(resForm.actual_hours) === btn.val
+                                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        {btn.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <p className="text-[10px] text-gray-600 font-medium bg-white/80 px-3 py-2 rounded-lg border border-gray-200/60">
+                                🤖 <strong>Dictamen IA:</strong> {aiTimeAudit.explanation}
+                            </p>
+
+                            {aiTimeAudit.status === 'inflated' && (
+                                <div className="space-y-1 pt-1">
+                                    <label className="flex items-center justify-between text-[10px] font-black text-rose-700 uppercase">
+                                        <span>⚠️ Justificación Obligatoria por Diferencia de Tiempo (+{aiTimeAudit.differenceHours}h sobre IA) *</span>
+                                        <span>{resForm.time_justification.trim().length >= 8 ? '✓ Justificado' : 'Requerido'}</span>
+                                    </label>
+                                    <textarea
+                                        rows={2}
+                                        placeholder="Explica por qué este caso tomó más tiempo del estimado por IA (ej. base de datos corrupta, espera de acceso remoto del cliente, migración manual)..."
+                                        value={resForm.time_justification}
+                                        onChange={e => setResForm(p => ({ ...p, time_justification: e.target.value }))}
+                                        className="w-full px-3 py-2 bg-white border border-rose-300 rounded-xl text-xs font-medium text-gray-800 focus:ring-2 focus:ring-rose-400 resize-none"
+                                    />
+                                </div>
+                            )}
                         </div>
 
                         {/* ── Findings ── */}

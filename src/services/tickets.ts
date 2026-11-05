@@ -102,6 +102,128 @@ export interface TicketStats {
     byDay: { date: string; count: number }[];
 }
 
+export interface AiTimeAuditResult {
+    workTypeKey: 'chat_reply' | 'implementation' | 'support_fix' | 'dev_improvement';
+    workTypeLabel: string;
+    expectedHours: number;
+    maxReasonableHours: number;
+    reportedHours: number;
+    differenceHours: number;
+    status: 'missing_time' | 'fair' | 'inflated' | 'fast';
+    verdictLabel: string;
+    explanation: string;
+}
+
+export function computeTicketAiTimeBenchmark(
+    title: string,
+    description?: string | null,
+    categoryName?: string | null,
+    estimatedHours?: number | null,
+    actualHours?: number | null
+): AiTimeAuditResult {
+    const text = `${title || ''} ${description || ''} ${categoryName || ''}`.toLowerCase();
+    const rep = Number(actualHours || 0);
+    const est = Number(estimatedHours || 0);
+
+    let workTypeKey: AiTimeAuditResult['workTypeKey'] = 'support_fix';
+    let workTypeLabel = '🛠️ Solución de Falla / Soporte Técnico';
+    let expectedHours = 0.5;
+    let maxReasonableHours = 1.0;
+
+    if (
+        /^pregunta\s+frecuente/i.test(title || '') ||
+        /peguntas?\s+frecuentes/i.test(categoryName || '') ||
+        /consulta|duda|responder|whatsapp/i.test(text)
+    ) {
+        workTypeKey = 'chat_reply';
+        workTypeLabel = '💬 Responder Texto / Consulta de Cliente';
+        expectedHours = 0.2; // ~12 min
+        maxReasonableHours = 0.45; // max ~27 min
+    } else if (
+        /^(go\s*live|capacitaci[oó]n|implementaci[oó]n)/i.test(title || '') ||
+        /go\s*live|capacitaci[oó]n|entrenamiento|implementaci[oó]n/i.test(text)
+    ) {
+        workTypeKey = 'implementation';
+        workTypeLabel = '🚀 Implementación / Go-Live / Capacitación';
+        expectedHours = 1.5;
+        maxReasonableHours = 2.5;
+    } else if (
+        /p4\b|mejoras?\s+y\s+ajustes|homologaci[oó]n|redise[ñn]o|ui\/ux|estilado|nuevo\s+m[oó]dulo/i.test(text)
+    ) {
+        workTypeKey = 'dev_improvement';
+        workTypeLabel = '⚙️ Desarrollo / Mejora de Sistema (P4)';
+        expectedHours = est > 0 && est <= 3 ? est : 1.5;
+        maxReasonableHours = Math.max(expectedHours * 1.4, 2.2);
+    } else if (/p1\b|p2\b|error\s+reportado|hacienda|dte|firmador|invalidaci/i.test(text)) {
+        workTypeKey = 'support_fix';
+        workTypeLabel = '🛠️ Solución de Error / Falla Crítica (P1/P2)';
+        expectedHours = 0.8;
+        maxReasonableHours = 1.5;
+    } else {
+        workTypeKey = 'support_fix';
+        workTypeLabel = '🛠️ Soporte Técnico a Cliente (P3)';
+        expectedHours = 0.5;
+        maxReasonableHours = 1.0;
+    }
+
+    const differenceHours = +(rep - expectedHours).toFixed(2);
+
+    if (rep <= 0) {
+        return {
+            workTypeKey,
+            workTypeLabel,
+            expectedHours,
+            maxReasonableHours,
+            reportedHours: 0,
+            differenceHours: -expectedHours,
+            status: 'missing_time',
+            verdictLabel: '❌ Sin Tiempo (0h)',
+            explanation: `No se registró tiempo invertido. IA estima ~${expectedHours}h para este tipo de trabajo.`,
+        };
+    }
+
+    if (rep > maxReasonableHours) {
+        const extra = +(rep - expectedHours).toFixed(2);
+        return {
+            workTypeKey,
+            workTypeLabel,
+            expectedHours,
+            maxReasonableHours,
+            reportedHours: rep,
+            differenceHours,
+            status: 'inflated',
+            verdictLabel: `🚨 Tiempo Inflado (+${extra}h vs IA)`,
+            explanation: `Reportó ${rep}h pero el estándar IA para "${workTypeLabel}" es ${expectedHours}h (máx ${maxReasonableHours}h). Exceso de +${extra}h requiere justificación.`,
+        };
+    }
+
+    if (rep <= expectedHours * 0.7) {
+        return {
+            workTypeKey,
+            workTypeLabel,
+            expectedHours,
+            maxReasonableHours,
+            reportedHours: rep,
+            differenceHours,
+            status: 'fast',
+            verdictLabel: '⚡ Rápido / Eficiente',
+            explanation: `Resuelto en ${rep}h (por debajo del promedio IA de ${expectedHours}h).`,
+        };
+    }
+
+    return {
+        workTypeKey,
+        workTypeLabel,
+        expectedHours,
+        maxReasonableHours,
+        reportedHours: rep,
+        differenceHours,
+        status: 'fair',
+        verdictLabel: '✅ Tiempo Correcto',
+        explanation: `Reportó ${rep}h, alineado con el estándar IA de ${expectedHours}h.`,
+    };
+}
+
 export const ticketService = {
 
     // ─── Agents ─────────────────────────────────────────────────────────────
@@ -235,18 +357,31 @@ export const ticketService = {
             let findingsVal = updates.findings;
             let rootCauseVal = updates.root_cause;
             let solutionVal = updates.solution;
+            let actualHoursVal = updates.actual_hours;
 
-            if (findingsVal === undefined || rootCauseVal === undefined || solutionVal === undefined) {
+            if (
+                findingsVal === undefined ||
+                rootCauseVal === undefined ||
+                solutionVal === undefined ||
+                actualHoursVal === undefined
+            ) {
                 const { data: current } = await supabase
                     .from('tickets')
-                    .select('findings, root_cause, solution')
+                    .select('findings, root_cause, solution, actual_hours')
                     .eq('id', ticketId)
                     .maybeSingle();
                 if (current) {
                     if (findingsVal === undefined) findingsVal = current.findings;
                     if (rootCauseVal === undefined) rootCauseVal = current.root_cause;
                     if (solutionVal === undefined) solutionVal = current.solution;
+                    if (actualHoursVal === undefined) actualHoursVal = current.actual_hours;
                 }
+            }
+
+            if (Number(actualHoursVal || 0) <= 0) {
+                throw new Error(
+                    '⚠️ Nadie puede cerrar un ticket sin registrar el Tiempo Real Invertido (horas > 0) en la pestaña "Resolución".'
+                );
             }
 
             if (
@@ -255,7 +390,7 @@ export const ticketService = {
                 String(solutionVal || '').trim().length < 5
             ) {
                 throw new Error(
-                    'Es obligatorio completar Hallazgos, Causa Raíz y Solución Aplicada en la pestaña "Resolución" antes de cerrar o resolver un ticket.'
+                    '⚠️ Es obligatorio completar Hallazgos, Causa Raíz y Solución Aplicada en la pestaña "Resolución" antes de cerrar o resolver un ticket.'
                 );
             }
         }
