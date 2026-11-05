@@ -243,7 +243,7 @@ export const SupportChatCircles: React.FC = () => {
       const [tks, cats, ags] = await Promise.all([
         ticketService.getTickets(activeCompanyId),
         ticketService.getCategories(activeCompanyId),
-        ticketService.getCompanyAgents(activeCompanyId),
+        ticketService.getAgents(activeCompanyId),
       ]);
       setTickets(tks);
       setCategories(cats);
@@ -621,7 +621,7 @@ export const SupportChatCircles: React.FC = () => {
     setUploadingFile(true);
     try {
       const t = activeCircle.activeTicket;
-      const uploaded = await storageService.uploadTicketAttachment(activeCompanyId, t.id, file);
+      const uploaded = await storageService.uploadTicketAttachment(activeCompanyId, file);
       const meta = (t.metadata || {}) as Record<string, any>;
       const prevAtt = Array.isArray(meta.attachments) ? meta.attachments : [];
       const newAtt = [
@@ -693,7 +693,6 @@ export const SupportChatCircles: React.FC = () => {
       await ticketService.updateTicket(t.id, {
         status: 'resolved',
         resolved_at: new Date().toISOString(),
-        last_status_change_at: new Date().toISOString(),
         actual_hours: hrs,
         findings: resForm.findings.trim(),
         root_cause: resForm.root_cause.trim(),
@@ -1572,3 +1571,4 @@ export const SupportChatCircles: React.FC = () => {
 };
 
 export default SupportChatCircles;
+
