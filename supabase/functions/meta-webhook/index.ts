@@ -126,7 +126,7 @@ function classifySupportIssue(text: string): {
         'cobro', 'pago', 'impresora', 'ticket', 'pendiente', 'arreglar', 'revisar'
     ];
     const isUrgent = urgentKeywords.some((k) => lower.includes(k));
-    const isSupportIssue = isUrgent || supportKeywords.some((k) => lower.includes(k)) || lower.length >= 12;
+    const isSupportIssue = true;
 
     let category = 'Soporte General / Consulta';
     if (/dte|hacienda|factura|invalidaci|credito fiscal|crédito fiscal|fe\b|contingencia/i.test(lower)) {
@@ -161,9 +161,19 @@ async function processSupportWhatsAppMessage(params: {
     instanceName: string;
 }) {
     const { remoteJid, cleanPhone, pushName, messageText, fromMe, isGroup, instanceName } = params;
-    if (!messageText || messageText.trim().length < 2) return { ok: true, ignored: true };
+    if (!messageText || messageText.trim().length < 1) return { ok: true, ignored: true };
 
     let companyId = params.companyId;
+    if (!companyId) {
+        const { data: recentTicket } = await supabase
+            .from('tickets')
+            .select('company_id')
+            .not('company_id', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        companyId = recentTicket?.company_id || null;
+    }
     if (!companyId) {
         const { data: comp } = await supabase
             .from('companies')

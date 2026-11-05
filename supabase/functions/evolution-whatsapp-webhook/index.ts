@@ -3,32 +3,38 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-evolution-apikey',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-evolution-apikey',
 };
 
-// Classification patterns to detect support problems vs general messages
 function classifyIssueCategory(text: string): {
   category: string;
   isSupportIssue: boolean;
   priority: 'low' | 'medium' | 'high' | 'urgent';
 } {
-  const lower = text.toLowerCase();
+  const lower = (text || '').toLowerCase();
 
-  const urgentKeywords = ['urgente', 'caido', 'caído', 'no funciona nada', 'bloqueado', 'no podemos facturar', 'produccion', 'producción', 'error critico', 'error crítico'];
-  const supportKeywords = [
-    'error', 'problema', 'falla', 'fallando', 'no deja', 'no puedo', 'no carga',
-    'no sale', 'no aparece', 'ayuda', 'soporte', 'bug', 'lento', 'traba',
-    'factura', 'dte', 'hacienda', 'invalidacion', 'invalidación', 'correo',
-    'whatsapp', 'mensaje', 'reporte', 'planilla', 'calculo', 'cálculo',
-    'permiso', 'acceso', 'contraseña', 'login', 'sincroniza', 'base de datos',
-    'cobro', 'pago', 'impresora', 'ticket', 'pendiente', 'arreglar', 'revisar'
+  const urgentKeywords = [
+    'urgente',
+    'caido',
+    'caído',
+    'no funciona nada',
+    'bloqueado',
+    'no podemos facturar',
+    'produccion',
+    'producción',
+    'error critico',
+    'error crítico',
   ];
 
-  const isSupportIssue = supportKeywords.some((k) => lower.includes(k)) || urgentKeywords.some((k) => lower.includes(k));
   const isUrgent = urgentKeywords.some((k) => lower.includes(k));
 
-  let category = 'Soporte General / Consulta';
-  if (/dte|hacienda|factura|invalidaci|credito fiscal|crédito fiscal|fe\b|contingencia/i.test(lower)) {
+  let category = 'Soporte General / Consulta WhatsApp';
+  if (
+    /dte|hacienda|factura|invalidaci|credito fiscal|crédito fiscal|fe\b|contingencia|sello|firmador/i.test(
+      lower
+    )
+  ) {
     category = 'Facturación Electrónica / DTE / Hacienda';
   } else if (/whatsapp|mensaje|cola|api|envio|envío|notificaci/i.test(lower)) {
     category = 'WhatsApp / Mensajería / API';
@@ -42,11 +48,48 @@ function classifyIssueCategory(text: string): {
     category = 'Infraestructura / Base de Datos / Lentitud';
   }
 
+  // Every incoming message to the dedicated support number 50379718911 is treated as support
   return {
     category,
-    isSupportIssue,
-    priority: isUrgent ? 'urgent' : isSupportIssue ? 'high' : 'medium',
+    isSupportIssue: true,
+    priority: isUrgent ? 'urgent' : 'high',
   };
+}
+
+async function resolveMainCompanyId(supabase: any, companyIdParam: string | null): Promise<string | null> {
+  if (companyIdParam) return companyIdParam;
+
+  // 1. Prefer the company that already has active tickets (General / Principal workspace)
+  const { data: recentTicket } = await supabase
+    .from('tickets')
+    .select('company_id')
+    .not('company_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (recentTicket?.company_id) return recentTicket.company_id;
+
+  // 2. Fallback to Melvin / Gerson / Jarias profile company_id
+  const { data: mainProf } = await supabase
+    .from('profiles')
+    .select('company_id')
+    .or('email.ilike.%jarias%,full_name.ilike.%Melvin%,full_name.ilike.%Gerson%')
+    .not('company_id', 'is', null)
+    .limit(1)
+    .maybeSingle();
+
+  if (mainProf?.company_id) return mainProf.company_id;
+
+  // 3. Fallback to first company
+  const { data: comp } = await supabase
+    .from('companies')
+    .select('id')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  return comp?.id || null;
 }
 
 serve(async (req: Request) => {
@@ -54,70 +97,88 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  if (req.method === 'GET') {
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        status: 'active',
+        service: 'evolution-whatsapp-webhook (50379718911)',
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabaseUrl = Deno.env.get('CRM_SUPABASE_URL') || Deno.env.get('SUPABASE_URL') || '';
+    const supabaseServiceKey =
+      Deno.env.get('CRM_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const payload = await req.json();
     const url = new URL(req.url);
     const companyIdParam = url.searchParams.get('company_id');
 
-    // Evolution API v1/v2 payload normalization
-    const eventType = payload?.event || payload?.type || 'messages.upsert';
-    const instanceName = payload?.instance || payload?.instanceName || 'arias';
-    const data = payload?.data || payload;
+    const eventType = String(payload?.event || payload?.type || 'messages.upsert').toLowerCase();
+    const instanceName = payload?.instance || payload?.instanceName || 'soporte';
 
-    // Only process incoming/outgoing message upserts
-    if (!String(eventType).toLowerCase().includes('message')) {
+    // Accept messages.upsert, send.message, or any payload containing message data
+    const rawData = payload?.data || payload;
+    const msgEntry = Array.isArray(rawData)
+      ? rawData[0]
+      : Array.isArray(rawData?.messages)
+      ? rawData.messages[0]
+      : rawData;
+
+    const key = msgEntry?.key || payload?.key || {};
+    const remoteJid: string =
+      key?.remoteJid || msgEntry?.remoteJid || payload?.remoteJid || payload?. sender || '';
+
+    if (remoteJid === 'status@broadcast') {
       return new Response(
-        JSON.stringify({ ok: true, ignored: true, reason: `Event ${eventType} ignored` }),
+        JSON.stringify({ ok: true, ignored: true, reason: 'Status broadcast ignored' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const key = data?.key || {};
-    const remoteJid: string = key?.remoteJid || data?.remoteJid || '';
-    const fromMe: boolean = Boolean(key?.fromMe ?? data?.fromMe ?? false);
-    const participant: string = key?.participant || data?.participant || '';
-    const pushName: string = data?.pushName || payload?.sender || 'Cliente WhatsApp';
+    const fromMe: boolean = Boolean(key?.fromMe ?? msgEntry?.fromMe ?? false);
+    const participant: string = key?.participant || msgEntry?.participant || '';
+    const pushName: string =
+      msgEntry?.pushName || payload?.pushName || payload?.sender || 'Cliente WhatsApp';
 
-    // Extract text message from standard/extended/image caption/conversation
-    const msgObj = data?.message || {};
+    const msgObj = msgEntry?.message || payload?.message || {};
     const messageText: string =
       msgObj?.conversation ||
       msgObj?.extendedTextMessage?.text ||
       msgObj?.imageMessage?.caption ||
       msgObj?.videoMessage?.caption ||
       msgObj?.documentMessage?.caption ||
-      data?.body ||
-      data?.text ||
+      msgObj?.buttonsResponseMessage?.selectedDisplayText ||
+      msgObj?.listResponseMessage?.title ||
+      msgEntry?.body ||
+      msgEntry?.text ||
+      (msgObj?.imageMessage ? '[Imagen enviada por WhatsApp]' : '') ||
+      (msgObj?.audioMessage ? '[Nota de voz enviada por WhatsApp]' : '') ||
+      (msgObj?.documentMessage ? `[Documento: ${msgObj.documentMessage.fileName || 'Archivo'}]` : '') ||
       '';
 
-    if (!messageText || messageText.trim().length < 3) {
+    if (!messageText || messageText.trim().length < 1) {
       return new Response(
-        JSON.stringify({ ok: true, ignored: true, reason: 'Empty or non-text message' }),
+        JSON.stringify({
+          ok: true,
+          ignored: true,
+          event: eventType,
+          reason: 'No text or media content in payload',
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const isGroup = remoteJid.endsWith('@g.us');
-    const cleanPhone = (isGroup ? participant : remoteJid)
-      .replace(/@s\.whatsapp\.net|@g\.us|@c\.us/g, '')
+    const cleanPhone = (isGroup ? participant || remoteJid : remoteJid)
+      .replace(/@s\.whatsapp\.net|@g\.us|@c\.us|@lid/g, '')
       .replace(/\D/g, '');
 
-    // Resolve company_id
-    let companyId = companyIdParam;
-    if (!companyId) {
-      const { data: comp } = await supabase
-        .from('companies')
-        .select('id')
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .single();
-      companyId = comp?.id || null;
-    }
-
+    const companyId = await resolveMainCompanyId(supabase, companyIdParam);
     if (!companyId) {
       return new Response(
         JSON.stringify({ ok: false, error: 'No company_id resolved' }),
@@ -125,7 +186,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // Try to match existing Lead by phone or pushName
+    // Match existing Lead or Client by phone or name
     let matchedLead: { id: string; name: string; phone: string | null } | null = null;
     if (cleanPhone && cleanPhone.length >= 7) {
       const last8 = cleanPhone.slice(-8);
@@ -152,33 +213,63 @@ serve(async (req: Request) => {
       }
     }
 
-    const clientDisplayName = matchedLead?.name || pushName || `WhatsApp +${cleanPhone}`;
+    const clientDisplayName =
+      matchedLead?.name ||
+      (pushName && pushName !== 'Cliente WhatsApp'
+        ? `${pushName} (${cleanPhone ? `+${cleanPhone}` : 'WhatsApp'})`
+        : cleanPhone
+        ? `WhatsApp +${cleanPhone}`
+        : 'Cliente WhatsApp');
+
     const classification = classifyIssueCategory(messageText);
 
-    // Check if there is already an open/pending ticket for this client or WhatsApp JID in the last 72h
+    // Also mirror the message into Mensajes (marketing_conversations / marketing_messages) if RPC exists
+    try {
+      if (cleanPhone && !fromMe) {
+        await supabase.rpc('process_incoming_marketing_message', {
+          p_company_id: companyId,
+          p_channel: 'whatsapp',
+          p_external_id: cleanPhone,
+          p_sender_name: clientDisplayName,
+          p_content: messageText,
+          p_metadata: {
+            source: 'whatsapp_evolution_support',
+            support_phone: '50379718911',
+            evolution_instance: instanceName,
+            whatsapp_jid: remoteJid,
+            phone: `+${cleanPhone}`,
+            chat_id: cleanPhone,
+          },
+        });
+      }
+    } catch (chatErr) {
+      console.warn('[evolution-whatsapp-webhook] Non-fatal chat mirror warning:', chatErr);
+    }
+
+    // Check if there is already an open/pending ticket for this client or WhatsApp JID
     const { data: existingTickets } = await supabase
       .from('tickets')
-      .select('id, title, status, metadata, description')
+      .select('id, title, status, metadata, description, lead_id')
       .eq('company_id', companyId)
       .in('status', ['new', 'open', 'pending'])
       .order('created_at', { ascending: false })
-      .limit(40);
+      .limit(60);
 
     const openForSameClient = (existingTickets || []).find((t: any) => {
       const meta = t.metadata || {};
       if (remoteJid && meta.whatsapp_jid === remoteJid) return true;
-      if (cleanPhone && meta.whatsapp_phone === cleanPhone) return true;
+      if (cleanPhone && cleanPhone.length >= 7 && meta.whatsapp_phone === cleanPhone) return true;
       if (matchedLead?.id && t.lead_id === matchedLead.id) return true;
       return false;
     });
 
-    // If message is from technician/support (fromMe) or matches a resolution phrase on an existing open ticket
     const isResolutionReply =
       fromMe &&
-      /listo|resuelto|solucionado|arreglado|ya quedo|ya quedó|corregido|actualizado/i.test(messageText);
+      /listo|resuelto|solucionado|arreglado|ya quedo|ya quedó|corregido|actualizado/i.test(
+        messageText
+      );
 
     if (openForSameClient) {
-      // Append message to ticket_comments and optionally mark resolved if team confirmed fix
       await supabase.from('ticket_comments').insert({
         ticket_id: openForSameClient.id,
         company_id: companyId,
@@ -203,13 +294,15 @@ serve(async (req: Request) => {
           ok: true,
           action: isResolutionReply ? 'ticket_resolved' : 'comment_added',
           ticket_id: openForSameClient.id,
+          company_id: companyId,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // If it's a new incoming support issue from a client, create a ticket automatically
-    if (!fromMe && classification.isSupportIssue) {
+    // Create a new Ticket automatically (including test messages or incoming client messages)
+    const isTestMessage = /prueba|test|probando|hola/i.test(messageText);
+    if (!fromMe || isTestMessage) {
       const shortTitle =
         messageText.length > 85 ? `${messageText.slice(0, 82).trim()}...` : messageText.trim();
 
@@ -225,6 +318,7 @@ serve(async (req: Request) => {
           priority: classification.priority,
           metadata: {
             source: 'whatsapp_evolution',
+            support_phone: '50379718911',
             evolution_instance: instanceName,
             whatsapp_jid: remoteJid,
             whatsapp_phone: cleanPhone,
@@ -233,7 +327,7 @@ serve(async (req: Request) => {
             ai_category: classification.category,
           },
         })
-        .select('id')
+        .select('id, title')
         .single();
 
       if (insertError) {
@@ -245,6 +339,8 @@ serve(async (req: Request) => {
           ok: true,
           action: 'ticket_created',
           ticket_id: createdTicket?.id,
+          title: createdTicket?.title,
+          company_id: companyId,
           category: classification.category,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -252,7 +348,7 @@ serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ ok: true, ignored: true, reason: 'Non-support casual message' }),
+      JSON.stringify({ ok: true, ignored: true, reason: 'Outgoing non-resolution message' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err: any) {
@@ -263,4 +359,3 @@ serve(async (req: Request) => {
     );
   }
 });
-
