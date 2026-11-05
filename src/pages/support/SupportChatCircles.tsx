@@ -199,6 +199,15 @@ export const SupportChatCircles: React.FC = () => {
     instance: localStorage.getItem('crm_evo_instance') || 'soporte',
   }));
 
+  // AI Voice & Auto-Reply Prompt Modal
+  const [showAiPromptModal, setShowAiPromptModal] = useState(false);
+  const [aiAutoReplyEnabled, setAiAutoReplyEnabled] = useState(true);
+  const [aiVoicePrompt, setAiVoicePrompt] = useState(
+    () =>
+      localStorage.getItem('crm_support_ai_voice_prompt') ||
+      'Eres el Asistente IA de Soporte Técnico de Arias Defense / ERP Facturación Electrónica (DTE Hacienda). Escucha lo que el cliente dijo en su nota de voz y respóndele de forma amable, clara y resolutiva en máximo 3 líneas por WhatsApp. Confírmale exactamente que entendiste su reporte y pídele captura de pantalla o código de AnyDesk si requiere revisión técnica.'
+  );
+
   useEffect(() => {
     if (activeCompanyId) {
       loadSupportData();
@@ -449,33 +458,51 @@ export const SupportChatCircles: React.FC = () => {
           const timeStr = lineMatch[1];
           const icon = lineMatch[2] || '';
           const sender = lineMatch[3].trim();
-          const bodyText = lineMatch[4].trim();
+          const rawBodyText = lineMatch[4].trim();
+
+          const audioUrlMatch = rawBodyText.match(/\[AUDIO_URL:([^\]]+)\]/i);
+          const extractedAudioUrl = audioUrlMatch ? audioUrlMatch[1].trim() : undefined;
+          const cleanBodyText = rawBodyText.replace(/\s*\[AUDIO_URL:[^\]]+\]/gi, '').trim();
+
+          const isClientSender =
+            icon === '👤' ||
+            /jimmy arias/i.test(sender) ||
+            sender.toLowerCase() === activeCircle.clientName.toLowerCase();
+
           const isStaff =
-            icon === '👨‍💻' ||
-            Boolean(c.author_id) ||
-            /melvin|gerson|jimmy|soporte|equipo/i.test(sender);
+            !isClientSender &&
+            (icon === '👨‍💻' ||
+              Boolean(c.author_id) ||
+              /melvin|gerson|soporte|equipo|platform owner|simulaci|ia soporte/i.test(sender));
 
           list.push({
             id: c.id,
             senderType: isStaff ? 'staff' : 'client',
             senderName: sender.replace(/\(Reporte Inicial\)/i, '').trim(),
-            text: bodyText,
+            text: cleanBodyText,
             timeLabel: timeStr,
             createdAt: c.created_at,
+            mediaUrl: extractedAudioUrl,
+            mediaType: extractedAudioUrl ? 'audio' : undefined,
           });
         } else {
           const agent = agents.find((a) => a.id === c.author_id);
           const isStaff = Boolean(c.author_id);
+          const audioUrlMatch = raw.match(/\[AUDIO_URL:([^\]]+)\]/i);
+          const extractedAudioUrl = audioUrlMatch ? audioUrlMatch[1].trim() : undefined;
+          const cleanBodyText = raw.replace(/\s*\[AUDIO_URL:[^\]]+\]/gi, '').trim();
           list.push({
             id: c.id,
             senderType: isStaff ? 'staff' : 'client',
             senderName: isStaff ? agent?.full_name || 'Ingeniero Soporte' : activeCircle.clientName,
-            text: raw,
+            text: cleanBodyText,
             timeLabel: new Date(c.created_at).toLocaleTimeString('es-SV', {
               hour: '2-digit',
               minute: '2-digit',
             }),
             createdAt: c.created_at,
+            mediaUrl: extractedAudioUrl,
+            mediaType: extractedAudioUrl ? 'audio' : undefined,
           });
         }
       });
@@ -488,13 +515,19 @@ export const SupportChatCircles: React.FC = () => {
           .match(/^\[([^\]]+)\]\s*(👤|👨‍💻)?\s*([^:]+):\s*([\s\S]+)$/);
         if (lineMatch) {
           foundChatLines = true;
+          const sender = lineMatch[3].trim();
+          const isClientSender =
+            lineMatch[2] === '👤' ||
+            /jimmy arias/i.test(sender) ||
+            sender.toLowerCase() === activeCircle.clientName.toLowerCase();
           const isStaff =
-            lineMatch[2] === '👨‍💻' ||
-            /melvin|gerson|jimmy|soporte|equipo/i.test(lineMatch[3]);
+            !isClientSender &&
+            (lineMatch[2] === '👨‍💻' ||
+              /melvin|gerson|soporte|equipo|platform owner|simulaci|ia soporte/i.test(sender));
           list.push({
             id: `desc-${idx}`,
             senderType: isStaff ? 'staff' : 'client',
-            senderName: lineMatch[3].trim(),
+            senderName: sender,
             text: lineMatch[4].trim(),
             timeLabel: lineMatch[1],
             createdAt: t.created_at,
@@ -776,6 +809,14 @@ export const SupportChatCircles: React.FC = () => {
           <span className="hidden md:inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#EEF0FF] text-indigo-700">
             {profile?.role === 'super_admin' ? 'ADMINISTRATOR' : 'SUPPORT ENGINEER'}
           </span>
+
+          <button
+            onClick={() => setShowAiPromptModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/70 transition"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Prompt IA (Audios)
+          </button>
 
           <button
             onClick={() => navigate('/support/intelligence')}
@@ -1099,6 +1140,17 @@ export const SupportChatCircles: React.FC = () => {
                             </a>
                           )}
 
+                          {b.mediaUrl && b.mediaType === 'audio' && (
+                            <div className="my-1.5">
+                              <audio
+                                src={b.mediaUrl}
+                                controls
+                                preload="metadata"
+                                className="w-72 h-9 rounded-full"
+                              />
+                            </div>
+                          )}
+
                           <p className="text-xs font-medium text-slate-900 whitespace-pre-wrap leading-relaxed">
                             {b.text}
                           </p>
@@ -1114,7 +1166,7 @@ export const SupportChatCircles: React.FC = () => {
                   }
 
                   // 3. Incoming Client Message (Left-aligned clean card)
-                  const isAudio = /\[🎤|nota de voz|audio/i.test(b.text);
+                  const isAudio = Boolean(b.mediaType === 'audio' || /\[🎤|nota de voz|audio/i.test(b.text));
                   return (
                     <div key={b.id} className="flex justify-start">
                       <div className="max-w-md bg-white text-slate-900 rounded-2xl rounded-bl-xs px-4 py-3 shadow-2xs border border-slate-200/80">
@@ -1124,10 +1176,22 @@ export const SupportChatCircles: React.FC = () => {
                           </span>
                           {isAudio && (
                             <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-purple-100 text-purple-800">
-                              🎤 Envió Audio
+                              🎤 Nota de Voz WhatsApp
                             </span>
                           )}
                         </div>
+
+                        {b.mediaUrl && b.mediaType === 'audio' && (
+                          <div className="my-2 bg-purple-50/70 p-2 rounded-xl border border-purple-200/70">
+                            <audio
+                              src={b.mediaUrl}
+                              controls
+                              preload="metadata"
+                              className="w-72 h-9"
+                            />
+                          </div>
+                        )}
+
                         <p className="text-xs font-medium text-slate-800 whitespace-pre-wrap leading-relaxed">
                           {b.text}
                         </p>
@@ -1565,13 +1629,94 @@ export const SupportChatCircles: React.FC = () => {
                 onClick={() => {
                   localStorage.setItem('crm_evo_url', evoConfig.url.trim());
                   localStorage.setItem('crm_evo_key', evoConfig.key.trim());
-                  localStorage.setItem('crm_evo_instance', evoConfig.instance.trim() || 'arias');
+                  localStorage.setItem('crm_evo_instance', evoConfig.instance.trim() || 'soporte');
                   toast.success('Configuración de Evolution API guardada');
                   setShowEvoModal(false);
                 }}
                 className="px-4 py-2 rounded-xl text-xs font-black bg-indigo-600 text-white hover:bg-indigo-700"
               >
                 Guardar Conexión
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para configurar el Prompt de Instrucciones IA cuando el cliente envía Notas de Voz */}
+      {showAiPromptModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                <h3 className="text-base font-black text-slate-900">
+                  IA para Escuchar y Responder Notas de Voz
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowAiPromptModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Cuando un cliente envía una nota de voz por WhatsApp, el sistema descarga el audio
+              para que puedas darle <strong>▶️ Play</strong> en el chat, lo transcribe con{' '}
+              <strong>OpenAI Whisper</strong> y responde automáticamente siguiendo estas
+              instrucciones:
+            </p>
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={aiAutoReplyEnabled}
+                  onChange={(e) => setAiAutoReplyEnabled(e.target.checked)}
+                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                />
+                <span className="text-xs font-bold text-slate-800">
+                  Responder automáticamente con IA cuando entre una nota de voz
+                </span>
+              </label>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500">
+                  Prompt de Instrucciones para la IA de Soporte
+                </label>
+                <textarea
+                  rows={5}
+                  value={aiVoicePrompt}
+                  onChange={(e) => setAiVoicePrompt(e.target.value)}
+                  className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowAiPromptModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  localStorage.setItem('crm_support_ai_voice_prompt', aiVoicePrompt.trim());
+                  if (activeCircle?.activeTicket?.id) {
+                    await supabase.functions.invoke('evolution-whatsapp-webhook', {
+                      body: {
+                        action: 'save_ai_prompt',
+                        ticket_id: activeCircle.activeTicket.id,
+                        ai_voice_prompt: aiVoicePrompt.trim(),
+                        ai_auto_reply_enabled: aiAutoReplyEnabled,
+                      },
+                    });
+                  }
+                  toast.success('Prompt de IA para Notas de Voz guardado');
+                  setShowAiPromptModal(false);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-black bg-purple-600 text-white hover:bg-purple-700"
+              >
+                Guardar Instrucciones IA
               </button>
             </div>
           </div>

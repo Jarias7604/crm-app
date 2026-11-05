@@ -235,9 +235,18 @@ serve(async (req: Request) => {
         const m = row.metadata || {};
         const queue: any[] = Array.isArray(m.pending_whatsapp_outbox) ? m.pending_whatsapp_outbox : [];
         const pendingItems = queue.filter((item) => item && item.status === 'pending');
-        if (pendingItems.length === 0) continue;
+
+        const audioQueue: any[] = Array.isArray(m.pending_audio_jobs) ? m.pending_audio_jobs : [];
+        const pendingAudio = audioQueue.filter((item) => item && item.status === 'pending');
+
+        if (pendingItems.length === 0 && pendingAudio.length === 0) continue;
 
         const updatedQueue = queue.map((item) =>
+          item && item.status === 'pending'
+            ? { ...item, status: 'dispatched', dispatched_at: new Date().toISOString() }
+            : item
+        );
+        const updatedAudioQueue = audioQueue.map((item) =>
           item && item.status === 'pending'
             ? { ...item, status: 'dispatched', dispatched_at: new Date().toISOString() }
             : item
@@ -249,6 +258,7 @@ serve(async (req: Request) => {
             metadata: {
               ...m,
               pending_whatsapp_outbox: updatedQueue.slice(-10),
+              pending_audio_jobs: updatedAudioQueue.slice(-10),
             },
           })
           .eq('id', row.id);
@@ -265,6 +275,33 @@ serve(async (req: Request) => {
           shellLines.push(
             `EVO_OUT=$(echo "${b64Payload}" | base64 -d | curl -s -X POST "http://localhost:8085/message/sendText/${inst}" -H "Content-Type: application/json" -H "apikey: ${key}" -d @-); curl -s -X POST "https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/evolution-whatsapp-webhook?action=bridge_ack&ticket_id=${row.id}" -H "Content-Type: application/json" -d "{\\"action\\":\\"bridge_ack\\",\\"ticket_id\\":\\"${row.id}\\",\\"evo_response\\":$(echo "$EVO_OUT" | jq -Rs . 2>/dev/null || echo '""')}" >/dev/null 2>&1`
           );
+        }
+
+        for (const aJob of pendingAudio) {
+          const rawInst = !aJob.instance || aJob.instance === 'arias' ? 'soporte' : aJob.instance;
+          const inst = rawInst.replace(/[^a-zA-Z0-9_-]/g, '');
+          const key = (aJob.apikey || '10C73BF4-D3D9-4CDB-9855-85E346468546').replace(/[^a-zA-Z0-9_-]/g, '');
+          const uploadUrl = `https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/evolution-whatsapp-webhook?action=upload_voice_note&ticket_id=${row.id}&comment_id=${aJob.comment_id || ''}&auto_reply=${aJob.auto_reply !== false ? '1' : '0'}`;
+
+          if (aJob.message_key?.id) {
+            const mediaReqJson = JSON.stringify({
+              message: { key: aJob.message_key },
+              convertToMp4: false,
+            });
+            const b64MediaReq = btoa(unescape(encodeURIComponent(mediaReqJson)));
+            shellLines.push(
+              `echo "${b64MediaReq}" | base64 -d | curl -s -X POST "http://localhost:8085/chat/getBase64FromMediaMessage/${inst}" -H "Content-Type: application/json" -H "apikey: ${key}" -d @- | curl -s -X POST "${uploadUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1`
+            );
+          } else if (aJob.remote_jid) {
+            // Find the latest audioMessage key from Evolution chat/findMessages and then extract base64
+            const findReqJson = JSON.stringify({
+              where: { key: { remoteJid: aJob.remote_jid } },
+            });
+            const b64FindReq = btoa(unescape(encodeURIComponent(findReqJson)));
+            shellLines.push(
+              `MSG_KEY=$(echo "${b64FindReq}" | base64 -d | curl -s -X POST "http://localhost:8085/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${key}" -d @- | grep -o '{"id":"[^"]*","fromMe":false,"remoteJid":"[^"]*"}' | head -n 1); if [ -n "$MSG_KEY" ]; then curl -s -X POST "http://localhost:8085/chat/getBase64FromMediaMessage/${inst}" -H "Content-Type: application/json" -H "apikey: ${key}" -d "{\\"message\\":{\\"key\\":$MSG_KEY},\\"convertToMp4\\":false}" | curl -s -X POST "${uploadUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1; fi`
+            );
+          }
         }
       }
 
@@ -286,6 +323,237 @@ serve(async (req: Request) => {
   try {
     const payload = await req.json();
     const companyIdParam = url.searchParams.get('company_id');
+    const queryAction = url.searchParams.get('action') || payload?.action;
+
+    // ─── SAVE CUSTOM AI VOICE/CHAT INSTRUCTIONS PROMPT ────────────────────────
+    if (queryAction === 'save_ai_prompt' && payload?.ticket_id) {
+      const { data: tRow } = await supabase
+        .from('tickets')
+        .select('metadata')
+        .eq('id', payload.ticket_id)
+        .maybeSingle();
+      if (tRow) {
+        await supabase
+          .from('tickets')
+          .update({
+            metadata: {
+              ...(tRow.metadata || {}),
+              ai_voice_prompt: payload.ai_voice_prompt || '',
+              ai_auto_reply_enabled: payload.ai_auto_reply_enabled !== false,
+            },
+          })
+          .eq('id', payload.ticket_id);
+      }
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ─── PROCESS VOICE NOTE UPLOADED BY GERSON'S LOCAL BRIDGE (Playable + Whisper + AI Reply) ───
+    if (queryAction === 'upload_voice_note') {
+      const ticketId = url.searchParams.get('ticket_id') || payload?.ticket_id;
+      const commentId = url.searchParams.get('comment_id') || payload?.comment_id;
+      const autoReplyFlag = (url.searchParams.get('auto_reply') || '1') !== '0';
+      const rawBase64: string =
+        payload?.base64 ||
+        payload?.data?.base64 ||
+        payload?.message?.base64 ||
+        '';
+
+      if (!ticketId || !rawBase64) {
+        return new Response(
+          JSON.stringify({ ok: false, error: 'Missing ticket_id or base64 audio' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const cleanBase64 = rawBase64.replace(/^data:[^;]+;base64,/, '').trim();
+      const binaryStr = atob(cleanBase64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+
+      const fileName = `tickets/voice-notes/${ticketId}-${commentId || Date.now()}.ogg`;
+      await supabase.storage.from('lead-documents').upload(fileName, bytes.buffer, {
+        contentType: 'audio/ogg',
+        upsert: true,
+      });
+
+      const publicAudioUrl = `${supabaseUrl}/storage/v1/object/public/lead-documents/${fileName}`;
+
+      // Fetch ticket & OpenAI API key for Whisper transcription + AI auto-reply
+      const { data: ticketRow } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('id', ticketId)
+        .maybeSingle();
+
+      const { data: openAiInt } = await supabase
+        .from('marketing_integrations')
+        .select('settings')
+        .eq('provider', 'openai')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      const openAiKey =
+        openAiInt?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY') || '';
+
+      let transcriptText = '';
+      if (openAiKey) {
+        try {
+          const form = new FormData();
+          const audioBlob = new Blob([bytes], { type: 'audio/ogg' });
+          form.append('file', audioBlob, 'voice.ogg');
+          form.append('model', 'whisper-1');
+          form.append('language', 'es');
+
+          const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${openAiKey}`,
+            },
+            body: form,
+          });
+          if (whisperRes.ok) {
+            const wJson = await whisperRes.json();
+            transcriptText = (wJson?.text || '').trim();
+          }
+        } catch (wErr) {
+          console.error('Whisper error:', wErr);
+        }
+      }
+
+      // Update the comment with [AUDIO_URL:...] and the AI transcription!
+      if (commentId) {
+        const { data: existingComment } = await supabase
+          .from('ticket_comments')
+          .select('body')
+          .eq('id', commentId)
+          .maybeSingle();
+
+        if (existingComment) {
+          const cleanPrevBody = (existingComment.body || '')
+            .replace(/👨‍💻\s*Jimmy Arias:/i, '👤 Jimmy Arias:')
+            .replace(/\s*\[AUDIO_URL:[^\]]+\]/g, '');
+          const updatedBody = transcriptText
+            ? `${cleanPrevBody} [AUDIO_URL:${publicAudioUrl}]\n📝 Transcripción IA: "${transcriptText}"`
+            : `${cleanPrevBody} [AUDIO_URL:${publicAudioUrl}]`;
+
+          await supabase
+            .from('ticket_comments')
+            .update({ body: updatedBody, author_id: null })
+            .eq('id', commentId);
+        }
+      }
+
+      // Generate & send automatic AI reply if enabled
+      let aiReplySent = false;
+      let aiReplyText = '';
+      if (ticketRow && autoReplyFlag && openAiKey) {
+        const meta = ticketRow.metadata || {};
+        const customPrompt =
+          meta.ai_voice_prompt ||
+          'Eres el Asistente IA de Soporte Técnico de Arias Defense / ERP Facturación Electrónica (DTE Hacienda). Escucha lo que el cliente dijo en su nota de voz y respóndele de forma amable, clara y resolutiva en máximo 3 líneas por WhatsApp. Confírmale exactamente que entendiste su reporte y pídele captura de pantalla o código de AnyDesk si requiere revisión técnica.';
+
+        try {
+          const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${openAiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              temperature: 0.4,
+              messages: [
+                { role: 'system', content: customPrompt },
+                {
+                  role: 'user',
+                  content: transcriptText
+                    ? `El cliente (${ticketRow.lead_name || 'Cliente'}) envió una nota de voz diciendo: "${transcriptText}". Redacta la respuesta que se enviará a su WhatsApp.`
+                    : `El cliente (${ticketRow.lead_name || 'Cliente'}) envió una nota de voz de soporte técnico. Redacta una respuesta amable confirmando recepción de su nota de voz y que el equipo técnico ya la está escuchando para apoyarle.`,
+                },
+              ],
+            }),
+          });
+          if (gptRes.ok) {
+            const gptJson = await gptRes.json();
+            aiReplyText = (gptJson?.choices?.[0]?.message?.content || '').trim();
+          }
+        } catch (gErr) {
+          console.error('GPT auto-reply error:', gErr);
+        }
+
+        if (aiReplyText) {
+          const nowTimeStr = new Date().toLocaleTimeString('es-SV', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'America/El_Salvador',
+          });
+          const aiFormattedLine = `[${nowTimeStr}] 👨‍💻 🤖 IA Soporte: ${aiReplyText}`;
+
+          await supabase.from('ticket_comments').insert({
+            ticket_id: ticketId,
+            company_id: ticketRow.company_id,
+            author_id: null,
+            body: aiFormattedLine,
+            is_internal: false,
+          });
+
+          const targetJid = meta.whatsapp_jid || meta.whatsapp_phone || '';
+          const prevOutbox: any[] = Array.isArray(meta.pending_whatsapp_outbox)
+            ? meta.pending_whatsapp_outbox
+            : [];
+          const updatedOutbox = targetJid
+            ? [
+                ...prevOutbox.slice(-9),
+                {
+                  id: crypto.randomUUID(),
+                  status: 'pending',
+                  number: targetJid,
+                  text: aiReplyText,
+                  instance:
+                    !meta.evolution_instance || meta.evolution_instance === 'arias'
+                      ? 'soporte'
+                      : meta.evolution_instance,
+                  apikey: meta.evolution_apikey || '10C73BF4-D3D9-4CDB-9855-85E346468546',
+                  created_at: new Date().toISOString(),
+                },
+              ]
+            : prevOutbox;
+
+          await supabase
+            .from('tickets')
+            .update({
+              updated_at: new Date().toISOString(),
+              metadata: {
+                ...meta,
+                last_audio_url: publicAudioUrl,
+                last_audio_transcript: transcriptText,
+                last_whatsapp_message: aiReplyText.slice(0, 200),
+                last_whatsapp_at: new Date().toISOString(),
+                pending_whatsapp_outbox: updatedOutbox,
+              },
+            })
+            .eq('id', ticketId);
+
+          aiReplySent = true;
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          audio_url: publicAudioUrl,
+          transcript: transcriptText,
+          ai_reply_sent: aiReplySent,
+          ai_reply_text: aiReplyText,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (payload?.action === 'bridge_ack' && payload?.ticket_id) {
       const { data: tRow } = await supabase
@@ -547,7 +815,6 @@ serve(async (req: Request) => {
       const fullName = (p.full_name || '').toLowerCase().trim();
       const senderLower = (pushName || '').toLowerCase().trim();
       if (!fullName || !senderLower || senderLower === 'cliente whatsapp') return false;
-      if (fullName === senderLower) return true;
       if (
         (senderLower.includes('gerson') && fullName.includes('gerson')) ||
         (senderLower.includes('melvin') && fullName.includes('melvin'))
@@ -558,6 +825,7 @@ serve(async (req: Request) => {
     });
 
     const isTeamStaffReply = fromMe || Boolean(matchedTechProfile);
+    const isIncomingAudio = Boolean(msgObj?.audioMessage) && !fromMe;
 
     // ⚠️ IMPORTANT: NEVER call process_incoming_marketing_message and NEVER insert into `leads`!
     // We ONLY read `leads` (read-only) to see if the phone belongs to an existing client name.
@@ -644,16 +912,41 @@ serve(async (req: Request) => {
     // ─── CASE A: Client/Group ALREADY has an open/pending Ticket ──────────────
     // Append all 40 messages into THIS SAME TICKET (both in Notas and in Descripción)!
     if (activeTicket) {
-      await supabase.from('ticket_comments').insert({
-        ticket_id: activeTicket.id,
-        company_id: companyId,
-        author_id: matchedTechProfile?.id || null,
-        body: `[${nowTimeStr}] ${senderLabel}: ${messageText}`,
-        is_internal: false,
-      });
+      const { data: insertedComment } = await supabase
+        .from('ticket_comments')
+        .insert({
+          ticket_id: activeTicket.id,
+          company_id: companyId,
+          author_id: matchedTechProfile?.id || null,
+          body: `[${nowTimeStr}] ${senderLabel}: ${messageText}`,
+          is_internal: false,
+        })
+        .select('id')
+        .single();
 
       const currentMeta = activeTicket.metadata || {};
       const msgCount = Number(currentMeta.whatsapp_message_count || 1) + 1;
+      const prevAudioJobs: any[] = Array.isArray(currentMeta.pending_audio_jobs)
+        ? currentMeta.pending_audio_jobs
+        : [];
+      const updatedAudioJobs =
+        isIncomingAudio && insertedComment?.id
+          ? [
+              ...prevAudioJobs.slice(-9),
+              {
+                id: crypto.randomUUID(),
+                status: 'pending',
+                comment_id: insertedComment.id,
+                ticket_id: activeTicket.id,
+                remote_jid: remoteJid,
+                message_key: key,
+                instance: instanceName === 'arias' ? 'soporte' : instanceName || 'soporte',
+                apikey: incomingEvoApiKey || '10C73BF4-D3D9-4CDB-9855-85E346468546',
+                auto_reply: currentMeta.ai_auto_reply_enabled !== false,
+                created_at: new Date().toISOString(),
+              },
+            ]
+          : prevAudioJobs;
 
       const shouldUpgradeProblemTitle =
         !isTeamStaffReply &&
@@ -675,9 +968,10 @@ serve(async (req: Request) => {
           whatsapp_message_count: msgCount,
           last_whatsapp_message: messageText.slice(0, 200),
           last_whatsapp_at: new Date().toISOString(),
+          pending_audio_jobs: updatedAudioJobs,
           ...(incomingEvoServerUrl ? { evolution_server_url: incomingEvoServerUrl } : {}),
           ...(incomingEvoApiKey ? { evolution_apikey: incomingEvoApiKey } : {}),
-          evolution_instance: instanceName || currentMeta.evolution_instance || 'arias',
+          evolution_instance: instanceName === 'arias' ? 'soporte' : instanceName || currentMeta.evolution_instance || 'soporte',
           ai_category: shouldUpgradeProblemTitle
             ? classification.category
             : currentMeta.ai_category || classification.category,
