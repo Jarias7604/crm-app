@@ -165,9 +165,9 @@ export const SupportChatCircles: React.FC = () => {
   const [comments, setComments] = useState<TicketComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
 
-  // Filters in left Circles column
+  // Filters in left Circles column (default to WhatsApp chats so it's clean!)
   const [searchQuery, setSearchQuery] = useState('');
-  const [circleFilter, setCircleFilter] = useState<'all' | 'waiting' | 'whatsapp' | 'p1'>('all');
+  const [circleFilter, setCircleFilter] = useState<'all' | 'waiting' | 'whatsapp' | 'p1'>('whatsapp');
 
   // Message input & sending state
   const [messageInput, setMessageInput] = useState('');
@@ -191,12 +191,12 @@ export const SupportChatCircles: React.FC = () => {
     time_justification: '',
   });
 
-  // Evolution API Direct Settings Modal (optional override)
+  // Evolution API Direct Settings Modal (pre-filled with Gerson's instance & API key)
   const [showEvoModal, setShowEvoModal] = useState(false);
   const [evoConfig, setEvoConfig] = useState(() => ({
     url: localStorage.getItem('crm_evo_url') || '',
-    key: localStorage.getItem('crm_evo_key') || '',
-    instance: localStorage.getItem('crm_evo_instance') || 'arias',
+    key: localStorage.getItem('crm_evo_key') || '10C73BF4-D3D9-4CDB-9855-85E346468546',
+    instance: localStorage.getItem('crm_evo_instance') || 'soporte',
   }));
 
   useEffect(() => {
@@ -600,9 +600,12 @@ export const SupportChatCircles: React.FC = () => {
       }
 
       if (data?.whatsapp_delivered) {
-        toast.success('Mensaje enviado al WhatsApp del cliente ✓✓');
+        toast.success('Mensaje enviado directo al WhatsApp del cliente ✓✓');
       } else {
-        toast.success('Respuesta registrada en el chat y ticket ✓✓');
+        toast.error(
+          'Guardado en CRM. Nota: Evolution de Gerson está en localhost:8085 (sin URL pública). Haz clic en ⚙️ arriba para poner la IP/URL pública de Evolution.',
+          { duration: 6000 }
+        );
       }
 
       loadSupportData(true);

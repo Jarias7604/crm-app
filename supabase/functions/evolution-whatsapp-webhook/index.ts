@@ -309,34 +309,40 @@ serve(async (req: Request) => {
         custom_evolution_key ||
         meta.evolution_apikey ||
         Deno.env.get('EVOLUTION_API_KEY') ||
-        '';
+        '10C73BF4-D3D9-4CDB-9855-85E346468546';
       let evoInstance =
         custom_evolution_instance ||
         meta.evolution_instance ||
         Deno.env.get('EVOLUTION_INSTANCE') ||
-        'arias';
+        'soporte';
 
-      if (!evoUrl || !evoKey) {
+      if (!evoUrl || /localhost|127\.0\.0\.1/i.test(evoUrl)) {
         const { data: recentWithCreds } = await supabase
           .from('tickets')
           .select('metadata')
           .eq('company_id', ticketRow.company_id)
           .not('metadata->evolution_server_url', 'is', null)
           .order('updated_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (recentWithCreds?.metadata) {
-          evoUrl = evoUrl || recentWithCreds.metadata.evolution_server_url || '';
-          evoKey = evoKey || recentWithCreds.metadata.evolution_apikey || '';
-          evoInstance = evoInstance || recentWithCreds.metadata.evolution_instance || 'arias';
+          .limit(10);
+        for (const row of recentWithCreds || []) {
+          const m = row.metadata || {};
+          if (m.evolution_public_url && !/localhost|127\.0\.0\.1/i.test(m.evolution_public_url)) {
+            evoUrl = m.evolution_public_url;
+            break;
+          }
+          if (m.evolution_server_url && !/localhost|127\.0\.0\.1/i.test(m.evolution_server_url)) {
+            evoUrl = m.evolution_server_url;
+            break;
+          }
         }
       }
 
       const targetNumberOrJid = meta.whatsapp_jid || meta.whatsapp_phone || '';
       let whatsappDelivered = false;
       let whatsappDeliveryNote = '';
+      const isLocalhostUrl = !evoUrl || /localhost|127\.0\.0\.1/i.test(evoUrl);
 
-      if (evoUrl && evoKey && targetNumberOrJid) {
+      if (evoUrl && !isLocalhostUrl && evoKey && targetNumberOrJid) {
         try {
           const cleanBaseUrl = evoUrl.replace(/\/+$/, '');
           const sendEndpoint = `${cleanBaseUrl}/message/sendText/${encodeURIComponent(evoInstance)}`;
@@ -359,6 +365,8 @@ serve(async (req: Request) => {
         } catch (e: any) {
           whatsappDeliveryNote = e?.message || 'Evolution connection error';
         }
+      } else if (isLocalhostUrl) {
+        whatsappDeliveryNote = 'LOCALHOST_URL';
       }
 
       const updatedMeta = {
@@ -370,7 +378,7 @@ serve(async (req: Request) => {
         last_staff_reply_by: author_name || 'Soporte',
         staff_text_reply_count: prevReplies,
         text_reply_minutes: prevReplyMins,
-        ...(custom_evolution_url ? { evolution_server_url: custom_evolution_url } : {}),
+        ...(custom_evolution_url ? { evolution_server_url: custom_evolution_url, evolution_public_url: custom_evolution_url } : {}),
         ...(custom_evolution_key ? { evolution_apikey: custom_evolution_key } : {}),
         ...(custom_evolution_instance ? { evolution_instance: custom_evolution_instance } : {}),
       };
@@ -399,13 +407,22 @@ serve(async (req: Request) => {
     }
 
     const eventType = String(payload?.event || payload?.type || 'messages.upsert').toLowerCase();
-    const instanceName = payload?.instance || payload?.instanceName || 'arias';
-    const incomingEvoServerUrl = payload?.server_url || payload?.serverUrl || '';
+    const instanceName = payload?.instance || payload?.instanceName || 'soporte';
+    const rawEvoServerUrl = payload?.server_url || payload?.serverUrl || '';
+    const callerPublicIp =
+      req.headers.get('cf-connecting-ip') ||
+      req.headers.get('x-real-ip') ||
+      (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
+      '';
+    const incomingEvoServerUrl =
+      /localhost|127\.0\.0\.1/i.test(rawEvoServerUrl) && callerPublicIp
+        ? rawEvoServerUrl.replace(/localhost|127\.0\.0\.1/i, callerPublicIp)
+        : rawEvoServerUrl;
     const incomingEvoApiKey =
       payload?.apikey ||
       req.headers.get('apikey') ||
       req.headers.get('x-evolution-apikey') ||
-      '';
+      '10C73BF4-D3D9-4CDB-9855-85E346468546';
 
     const rawData = payload?.data || payload;
     const msgEntry = Array.isArray(rawData)
