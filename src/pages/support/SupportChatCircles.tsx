@@ -281,10 +281,11 @@ export const SupportChatCircles: React.FC = () => {
   }));
 
   // Multi-Category AI Auto-Responder (BOTH Text & Audio + OpenAI Live Verification)
+  // Default OFF (false) so AI only classifies & transcribes unless explicitly enabled by admin
   const [showAiPromptModal, setShowAiPromptModal] = useState(false);
   const [activePromptTab, setActivePromptTab] = useState<SupportChannelType>('soporte');
-  const [aiAutoReplyText, setAiAutoReplyText] = useState(true);
-  const [aiAutoReplyAudio, setAiAutoReplyAudio] = useState(true);
+  const [aiAutoReplyText, setAiAutoReplyText] = useState(false);
+  const [aiAutoReplyAudio, setAiAutoReplyAudio] = useState(false);
   const [aiPrompts, setAiPrompts] = useState<Record<SupportChannelType, string>>(() => ({
     soporte: localStorage.getItem('crm_support_ai_prompt_soporte') || DEFAULT_PROMPTS.soporte,
     contabilidad:

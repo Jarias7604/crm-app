@@ -324,8 +324,8 @@ async function loadSupportAiConfig(supabase: any): Promise<{
     integrationId: openAiInt?.id || null,
     openAiKey,
     rawSettings,
-    autoReplyText: savedCfg.auto_reply_text !== false,
-    autoReplyAudio: savedCfg.auto_reply_audio !== false,
+    autoReplyText: Boolean(savedCfg.auto_reply_text === true),
+    autoReplyAudio: Boolean(savedCfg.auto_reply_audio === true),
     prompts: {
       soporte: String(savedCfg.prompt_soporte || DEFAULT_AI_PROMPTS.soporte).trim(),
       contabilidad: String(
