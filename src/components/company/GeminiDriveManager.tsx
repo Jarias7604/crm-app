@@ -107,8 +107,8 @@ const INITIAL_REAL_DEMOS: DetectedDemo[] = [
         dateStr: '26 oct 2026, 14:39 CST',
         fileUrl: 'https://drive.google.com/drive/activity',
         status: 'audited',
-        auditScore: 90,
-        rawSnippet: 'Apertura con agenda estructurada, preguntas abiertas de diagnóstico sobre operación actual, cotizaciones y facturación, validación con decisor y cierre de contrato ($1,200).'
+        auditScore: 73,
+        rawSnippet: 'Evaluación de requerimientos para empresa de servicios, cotizaciones y seguimiento de clientes.'
     },
     {
         id: 'drive_demo_arias_1400',
