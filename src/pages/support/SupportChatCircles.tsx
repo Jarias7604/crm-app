@@ -107,22 +107,34 @@ const DEFAULT_PROMPTS: Record<SupportChannelType, string> = {
 
 function detectTicketSupportChannel(t: Ticket): SupportChannelType {
   const meta = (t.metadata || {}) as Record<string, any>;
+  const combined = `${t.title || ''} ${t.description || ''} ${meta.ai_category || ''}`.toLowerCase();
+
+  // If it clearly describes a DTE / Hacienda / technical error, it's always Soporte unless manually promoted to lead
+  if (
+    !meta.promoted_lead_id &&
+    /dte|hacienda|desconfigurado|no imprime|error al emitir|rechazado|contingencia|invalidaci|firmador/i.test(
+      combined
+    )
+  ) {
+    return 'soporte';
+  }
+
   if (
     meta.support_channel &&
     ['soporte', 'contabilidad', 'ventas', 'otros'].includes(meta.support_channel)
   ) {
     return meta.support_channel as SupportChannelType;
   }
-  const combined = `${t.title || ''} ${t.description || ''} ${meta.ai_category || ''}`.toLowerCase();
+
   if (
-    /precio|costo|cotizaci|cuanto cuesta|cuánto cuesta|cuanto vale|mensualidad|demo\b|demostraci|comprar|adquirir|licencia|ventas/i.test(
+    /cuanto cuesta|cuánto cuesta|cuanto vale|cuánto vale|precio del sistema|precios de|cotizaci[oó]n|mensualidad|quiero comprar|contratar|me interesa el sistema|demo del sistema/i.test(
       combined
     )
   ) {
     return 'ventas';
   }
   if (
-    /contabilidad|contable|libro de iva|libros de iva|declaraci|anexo|f07|f14|retenci|planilla|balance general|partida contable/i.test(
+    /contabilidad|contable|libro de iva|libros de iva|declaraci[oó]n|anexo|f07|f14|retenci[oó]n|planilla|balance general|partida contable/i.test(
       combined
     )
   ) {
@@ -243,11 +255,11 @@ export const SupportChatCircles: React.FC = () => {
   const [comments, setComments] = useState<TicketComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
 
-  // Filters in left Circles column (default to WhatsApp chats so it's clean!)
+  // Filters in left Circles column (ONLY real WhatsApp chats)
   const [searchQuery, setSearchQuery] = useState('');
   const [circleFilter, setCircleFilter] = useState<
-    'whatsapp' | 'soporte' | 'contabilidad' | 'ventas' | 'otros' | 'waiting' | 'all'
-  >('whatsapp');
+    'all' | 'waiting' | 'ventas' | 'soporte' | 'contabilidad'
+  >('all');
 
   // Message input & sending state
   const [messageInput, setMessageInput] = useState('');
@@ -260,8 +272,8 @@ export const SupportChatCircles: React.FC = () => {
   // Live timer measuring how many seconds/minutes the tech spends on this chat
   const [activeChatSeconds, setActiveChatSeconds] = useState(0);
 
-  // Right Control Mini-Module state
-  const [showRightPanel, setShowRightPanel] = useState(true);
+  // Right Control Drawer state (Closed by default for clean Photo 4 layout!)
+  const [showRightPanel, setShowRightPanel] = useState(false);
   const [showHistoryAccordion, setShowHistoryAccordion] = useState(false);
   const [savingResolution, setSavingResolution] = useState(false);
   const [resForm, setResForm] = useState({
@@ -420,6 +432,15 @@ export const SupportChatCircles: React.FC = () => {
       if (/^\s*jornada\s+(melvin|gerson)/i.test(t.title || '')) return;
 
       const meta = (t.metadata || {}) as Record<string, any>;
+      const isWaTicket =
+        meta.source === 'whatsapp_evolution' ||
+        Boolean(meta.whatsapp_phone) ||
+        Boolean(meta.whatsapp_jid) ||
+        /\[whatsapp/i.test(t.title || '');
+
+      // ONLY include real WhatsApp conversations in Circles (never dump the 440 manual ERP tickets here!)
+      if (!isWaTicket) return;
+
       const clientName = extractClientFromTicket(t);
       const key = meta.whatsapp_phone || meta.whatsapp_jid || clientName;
 
@@ -528,11 +549,9 @@ export const SupportChatCircles: React.FC = () => {
   const filteredCircles = useMemo(() => {
     return circles.filter((c) => {
       if (circleFilter === 'waiting' && !c.unreadOrWaitingReply) return false;
-      if (circleFilter === 'whatsapp' && !c.isWhatsApp) return false;
       if (circleFilter === 'soporte' && c.supportChannel !== 'soporte') return false;
       if (circleFilter === 'contabilidad' && c.supportChannel !== 'contabilidad') return false;
       if (circleFilter === 'ventas' && c.supportChannel !== 'ventas') return false;
-      if (circleFilter === 'otros' && c.supportChannel !== 'otros') return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -1010,68 +1029,29 @@ export const SupportChatCircles: React.FC = () => {
             </strong>{' '}
             👋
           </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#EEF0FF] text-indigo-700 border border-indigo-200/60">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#EEF0FF] text-indigo-700">
             <Phone className="w-3 h-3 text-indigo-600" />
-            WhatsApp Soporte: +503 7971-8911
+            +503 7971-8911
           </span>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <span
-            onClick={() => verifyAndLoadAiConfig(true)}
-            title="Haz clic para probar en vivo la conexión con OpenAI GPT-4o-mini y Whisper"
-            className={`hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black cursor-pointer border transition ${
-              openAiStatus.checking
-                ? 'bg-slate-100 text-slate-600 border-slate-200'
-                : openAiStatus.verified
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-            }`}
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                openAiStatus.checking
-                  ? 'bg-amber-400 animate-pulse'
-                  : openAiStatus.verified
-                  ? 'bg-emerald-500'
-                  : 'bg-rose-500'
-              }`}
-            />
-            {openAiStatus.checking
-              ? 'Verificando OpenAI...'
-              : openAiStatus.verified
-              ? 'OpenAI Activo (Texto + Voz)'
-              : 'OpenAI Desconectado'}
+          <span className="hidden md:inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#EEF0FF] text-indigo-700">
+            {profile?.role === 'super_admin' ? 'ADMINISTRATOR' : 'SUPPORT'}
           </span>
 
           <button
             onClick={() => setShowAiPromptModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/70 transition"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#EEF0FF] text-indigo-700 hover:bg-indigo-100 transition"
           >
-            <Sparkles className="w-3.5 h-3.5" />
-            Prompt IA (Texto y Voz)
-          </button>
-
-          <button
-            onClick={() => navigate('/support/intelligence')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200/60 transition"
-          >
-            <Brain className="w-3.5 h-3.5" />
-            Inteligencia IA
-          </button>
-
-          <button
-            onClick={() => navigate('/support/tickets')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
-          >
-            <TicketIcon className="w-3.5 h-3.5" />
-            Tablero Tickets
+            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+            <span>IA</span>
           </button>
 
           <button
             onClick={() => setShowEvoModal(true)}
-            title="Configurar envío directo Evolution API"
-            className="p-2 rounded-full text-slate-500 hover:bg-slate-100 transition"
+            title="Configuración WhatsApp"
+            className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
           >
             <Settings className="w-4 h-4" />
           </button>
@@ -1088,24 +1068,18 @@ export const SupportChatCircles: React.FC = () => {
       </header>
 
       {/* =====================================================================
-          2. THREE-COLUMN WORKSPACE:
-             [ LEFT: CIRCLES ] + [ CENTER: LIVE CHAT ] + [ RIGHT: MINI-MODULE ]
+          2. CLEAN WORKSPACE (EXACT PHOTO 4 LAYOUT: LEFT CIRCLES + WIDE CHAT)
          ===================================================================== */}
       <div className="flex-1 flex overflow-hidden">
-        {/* ── LEFT COLUMN: CIRCLES / CLIENTES (Exact style from screenshot) ── */}
-        <aside className="w-80 bg-white border-r border-slate-200/80 flex flex-col shrink-0">
-          {/* Circles Title + Plus button */}
+        {/* ── LEFT COLUMN: CIRCLES (Clean, spacious, only real WhatsApp chats) ── */}
+        <aside className="w-80 bg-white border-r border-slate-200/70 flex flex-col shrink-0">
+          {/* Circles Title + Refresh button (Exact match to Photo 4) */}
           <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">Circles</h2>
-              <p className="text-[11px] font-semibold text-slate-400">
-                {filteredCircles.length} canales de clientes activos
-              </p>
-            </div>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">Circles</h2>
             <button
               onClick={() => loadSupportData()}
-              title="Actualizar chats en vivo"
-              className="w-9 h-9 rounded-full bg-[#EEF0FF] hover:bg-indigo-100 text-indigo-600 flex items-center justify-center transition shadow-2xs"
+              title="Actualizar chats"
+              className="w-9 h-9 rounded-xl bg-[#EEF0FF] hover:bg-indigo-100 text-indigo-600 flex items-center justify-center transition"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -1119,42 +1093,46 @@ export const SupportChatCircles: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search circles / empresas..."
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200/80 rounded-full text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                placeholder="Search circles..."
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50/80 border border-slate-200/70 rounded-full text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
 
-            {/* Category Filter Mini-Pills (Soporte | Contabilidad | Ventas | Otros) */}
-            <div className="flex items-center gap-1 mt-2.5 flex-wrap">
+            {/* Clean, minimal filter pills for WhatsApp Chats ONLY */}
+            <div className="flex items-center gap-1.5 mt-3 overflow-x-auto pb-0.5 no-scrollbar">
               {[
-                { id: 'whatsapp', label: `💬 WhatsApp (${channelCounts.whatsapp})` },
-                { id: 'soporte', label: `🛠️ Soporte (${channelCounts.soporte})` },
-                { id: 'contabilidad', label: `📊 Contabilidad (${channelCounts.contabilidad})` },
-                { id: 'ventas', label: `💰 Ventas (${channelCounts.ventas})` },
-                { id: 'otros', label: `📦 Otros (${channelCounts.otros})` },
-                { id: 'waiting', label: `🔴 Sin Responder (${channelCounts.waiting})` },
                 { id: 'all', label: `Todos (${channelCounts.all})` },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setCircleFilter(tab.id as any)}
-                  className={`px-2.5 py-1 rounded-full text-[10px] font-black whitespace-nowrap transition ${
-                    circleFilter === tab.id
-                      ? 'bg-indigo-600 text-white shadow-2xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+                { id: 'waiting', label: `Nuevos (${channelCounts.waiting})`, isAlert: channelCounts.waiting > 0 },
+                { id: 'ventas', label: `Leads (${channelCounts.ventas})` },
+                { id: 'soporte', label: `Soporte (${channelCounts.soporte})` },
+                { id: 'contabilidad', label: `Contabilidad (${channelCounts.contabilidad})` },
+              ].map((tab) => {
+                const active = circleFilter === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setCircleFilter(tab.id as any)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition flex items-center gap-1 ${
+                      active
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
+                    }`}
+                  >
+                    {tab.isAlert && !active && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                    )}
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Circles List */}
+          {/* Circles List (Clean 2-line rows like Photo 4) */}
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
             {filteredCircles.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-400 font-semibold">
-                No se encontraron chats en esta categoría.
+              <div className="p-8 text-center text-xs text-slate-400 font-medium">
+                No hay conversaciones en esta vista.
               </div>
             ) : (
               filteredCircles.map((circle) => {
@@ -1163,32 +1141,26 @@ export const SupportChatCircles: React.FC = () => {
                   hour: '2-digit',
                   minute: '2-digit',
                 });
-                const chBadge = SUPPORT_CHANNELS[circle.supportChannel] || SUPPORT_CHANNELS.soporte;
+                const isSalesLead = circle.supportChannel === 'ventas' || Boolean(circle.promotedLeadId);
 
                 return (
                   <button
                     key={circle.circleId}
                     type="button"
                     onClick={() => setSelectedCircleId(circle.circleId)}
-                    className={`w-full text-left px-4 py-3.5 flex items-start gap-3 transition relative ${
-                      isSelected ? 'bg-[#EEF0FF]/90' : 'hover:bg-slate-50'
+                    className={`w-full text-left px-4 py-3.5 flex items-center gap-3.5 transition relative ${
+                      isSelected ? 'bg-[#EEF0FF]/80' : 'hover:bg-slate-50/80'
                     }`}
                   >
-                    {isSelected && (
-                      <div className="w-1 h-full bg-indigo-600 absolute left-0 top-0" />
-                    )}
-
-                    {/* Avatar */}
+                    {/* Avatar (Exact size & clean look from Photo 4) */}
                     <div className="relative shrink-0">
                       <div
-                        className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-xs text-white shadow-xs ${
-                          circle.supportChannel === 'ventas'
-                            ? 'bg-gradient-to-br from-emerald-600 to-teal-600'
+                        className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-xs text-white ${
+                          isSalesLead
+                            ? 'bg-emerald-600'
                             : circle.supportChannel === 'contabilidad'
-                            ? 'bg-gradient-to-br from-sky-600 to-blue-600'
-                            : circle.isWhatsApp
-                            ? 'bg-gradient-to-br from-indigo-600 to-violet-600'
-                            : 'bg-slate-700'
+                            ? 'bg-sky-600'
+                            : 'bg-indigo-600'
                         }`}
                       >
                         {circle.clientName
@@ -1199,50 +1171,46 @@ export const SupportChatCircles: React.FC = () => {
                           .toUpperCase()}
                       </div>
                       {circle.unreadOrWaitingReply && (
-                        <span className="w-3 h-3 rounded-full bg-rose-500 border-2 border-white absolute -top-0.5 -right-0.5 animate-pulse" />
+                        <span className="w-3 h-3 rounded-full bg-rose-500 border-2 border-white absolute -top-0.5 -right-0.5" />
                       )}
                     </div>
 
-                    {/* Text Preview */}
+                    {/* Clean 2-Line Text Preview (Like "JOVENES" in Photo 4) */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-black text-slate-900 uppercase tracking-tight truncate">
-                          {circle.clientName}
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-400 shrink-0">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs font-black text-slate-900 uppercase tracking-tight truncate">
+                            {circle.clientName}
+                          </span>
+                          {circle.unreadOrWaitingReply && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-500 text-white shrink-0">
+                              NUEVO
+                            </span>
+                          )}
+                          {isSalesLead && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 shrink-0">
+                              LEAD
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-semibold text-slate-400 shrink-0">
                           {timeStr}
                         </span>
                       </div>
 
-                      <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                        <strong className="text-slate-700 font-semibold">
-                          {circle.lastMessageSender}:
-                        </strong>{' '}
-                        {circle.lastMessageText}
-                      </p>
-
-                      {/* Bottom mini badges */}
-                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[9px] font-black border ${chBadge.badgeBg} ${chBadge.badgeText}`}
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        <p
+                          className={`text-xs truncate ${
+                            circle.unreadOrWaitingReply
+                              ? 'text-slate-900 font-bold'
+                              : 'text-slate-500 font-normal'
+                          }`}
                         >
-                          {chBadge.shortLabel}
-                        </span>
-
-                        <span
-                          className="px-1.5 py-0.5 rounded text-[9px] font-black text-white"
-                          style={{ backgroundColor: circle.categoryColor }}
-                        >
-                          {circle.categoryCode}
-                        </span>
-
-                        <span className="text-[10px] font-bold text-slate-500 truncate">
-                          👨‍💻 {circle.assignedTechName.split(' ')[0]}
-                        </span>
-
-                        {circle.promotedLeadId && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-800">
-                            ✓ Lead Ventas
+                          {circle.lastMessageSender}: {circle.lastMessageText}
+                        </p>
+                        {circle.supportChannel !== 'soporte' && !isSalesLead && (
+                          <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded shrink-0">
+                            Contab.
                           </span>
                         )}
                       </div>
@@ -1254,13 +1222,13 @@ export const SupportChatCircles: React.FC = () => {
           </div>
         </aside>
 
-        {/* ── CENTER COLUMN: THE LIVE CHAT (Exact soft lavender bubbles & layout) ── */}
+        {/* ── CENTER COLUMN: THE LIVE CHAT (Exact wide, clean Photo 4 style) ── */}
         {activeCircle ? (
           <main className="flex-1 flex flex-col bg-[#F3F4F8] overflow-hidden">
-            {/* Active Circle Header */}
-            <div className="h-16 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between shrink-0">
+            {/* Active Circle Header (Clean like "JOVENES / 0 members" in Photo 4) */}
+            <div className="h-16 bg-white border-b border-slate-200/70 px-6 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0">
                   {activeCircle.clientName
                     .split(' ')
                     .map((w) => w[0])
@@ -1269,95 +1237,60 @@ export const SupportChatCircles: React.FC = () => {
                     .toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight truncate">
-                      {activeCircle.clientName}
-                    </h3>
-                    <span
-                      className="px-2 py-0.5 rounded-full text-[10px] font-black text-white"
-                      style={{ backgroundColor: activeCircle.categoryColor }}
-                    >
-                      {activeCircle.categoryName}
-                    </span>
-
-                    {/* 1-Click Channel Category Switcher */}
-                    <select
-                      value={activeCircle.supportChannel}
-                      onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
-                      title="Cambiar categoría de esta conversación (Soporte, Contabilidad, Ventas u Otros)"
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border cursor-pointer focus:outline-none ${
-                        SUPPORT_CHANNELS[activeCircle.supportChannel]?.badgeBg
-                      } ${SUPPORT_CHANNELS[activeCircle.supportChannel]?.badgeText}`}
-                    >
-                      <option value="soporte">🛠️ Área: Soporte Técnico</option>
-                      <option value="contabilidad">📊 Área: Contabilidad / IVA</option>
-                      <option value="ventas">💰 Área: Ventas / Precios</option>
-                      <option value="otros">📦 Área: Otros Productos</option>
-                    </select>
-                  </div>
-                  <p className="text-[11px] font-semibold text-slate-400">
-                    {activeCircle.phone ? `+${activeCircle.phone} · ` : ''}
-                    {activeCircle.allClientTickets.length} tickets en su historial · Atiende:{' '}
-                    <strong className="text-indigo-600">{activeCircle.assignedTechName}</strong>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight truncate">
+                    {activeCircle.clientName}
+                  </h3>
+                  <p className="text-[11px] font-medium text-slate-400 truncate">
+                    {activeCircle.phone ? `+${activeCircle.phone}` : 'WhatsApp'} ·{' '}
+                    {activeCircle.assignedTechName}
                   </p>
                 </div>
               </div>
 
-              {/* Right controls in Chat Header */}
+              {/* Clean, minimal right controls in Chat Header */}
               <div className="flex items-center gap-2">
-                {/* 1-Click Promote to Sales Lead Button */}
+                {/* Subtle Category Selector */}
+                <select
+                  value={activeCircle.supportChannel}
+                  onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-700 cursor-pointer focus:outline-none transition"
+                >
+                  <option value="soporte">🛠️ Soporte</option>
+                  <option value="contabilidad">📊 Contabilidad</option>
+                  <option value="ventas">💰 Lead Ventas</option>
+                  <option value="otros">📦 Otros</option>
+                </select>
+
+                {/* Subtle Promote to Lead button */}
                 <button
                   type="button"
                   disabled={promotingLead}
                   onClick={handlePromoteToLead}
-                  title="Crear Prospecto en el módulo de Leads / Ventas con 1 clic"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black border transition ${
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                     activeCircle.promotedLeadId
-                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300 hover:bg-emerald-200'
-                      : activeCircle.supportChannel === 'ventas'
-                      ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-xs animate-pulse'
-                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-[#EEF0FF] hover:bg-indigo-100 text-indigo-700'
                   }`}
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>
                     {promotingLead
-                      ? 'Creando Lead...'
+                      ? 'Guardando...'
                       : activeCircle.promotedLeadId
-                      ? '✓ En Ventas (Ver Lead)'
-                      : 'Pasar a Ventas (Lead)'}
+                      ? 'En Leads'
+                      : 'Crear Lead'}
                   </span>
                 </button>
 
-                {/* Live Chat Session Timer */}
-                <div
-                  title="Tiempo activo del técnico en este chat"
-                  className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-black"
-                >
-                  <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
-                  <span>En chat: {formatTimer(activeChatSeconds)}</span>
-                </div>
-
-                {/* Direct WhatsApp Web fallback link if phone exists */}
-                {activeCircle.phone && (
-                  <a
-                    href={`https://wa.me/${activeCircle.phone}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-black transition"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    <span className="hidden 2xl:inline">WhatsApp Directo</span>
-                  </a>
-                )}
-
+                {/* Toggle Ticket Resolution Drawer (Icon button like Photo 4's right button) */}
                 <button
                   type="button"
                   onClick={() => setShowRightPanel(!showRightPanel)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition ${
+                  title="Abrir panel para cerrar ticket o asignar técnico"
+                  className={`w-10 h-9 rounded-xl flex items-center justify-center transition ${
                     showRightPanel
-                      ? 'bg-[#EEF0FF] text-indigo-700'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-[#EEF0FF] text-indigo-600 hover:bg-indigo-100'
                   }`}
                 >
                   {showRightPanel ? (
@@ -1365,56 +1298,52 @@ export const SupportChatCircles: React.FC = () => {
                   ) : (
                     <PanelRightOpen className="w-4 h-4" />
                   )}
-                  <span className="hidden md:inline">Control & IA</span>
                 </button>
               </div>
             </div>
 
-            {/* Chat Messages Stream */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+            {/* Chat Messages Stream (Spacious & clean like Photo 4) */}
+            <div className="flex-1 overflow-y-auto px-8 py-6 space-y-4">
+              {/* "Today" Pill at the top (Exact match to Photo 4) */}
+              <div className="flex justify-center mb-2">
+                <span className="px-3.5 py-1 rounded-full bg-white text-[11px] font-bold text-slate-600 shadow-2xs">
+                  Today
+                </span>
+              </div>
+
               {loadingComments ? (
-                <div className="text-center py-12 text-xs font-bold text-slate-400">
-                  Cargando mensajes del chat...
+                <div className="text-center py-12 text-xs font-medium text-slate-400">
+                  Cargando mensajes...
                 </div>
               ) : (
                 chatBubbles.map((b) => {
-                  // 1. Center Announcement Card (Exact style of "🔔 Announcement from..." in screenshot!)
+                  // 1. Center Announcement Card (Exact clean 2-line style from Photo 4!)
                   if (b.senderType === 'announcement') {
                     return (
                       <div key={b.id} className="flex justify-center my-2">
-                        <div className="max-w-md w-full bg-[#E6E9FF]/90 border border-indigo-200/80 rounded-2xl px-4 py-3 shadow-2xs">
-                          <div className="flex items-center gap-1.5 text-[11px] font-black text-indigo-600">
+                        <div className="max-w-sm w-full bg-[#E6E9FF] rounded-2xl px-4 py-3 shadow-2xs">
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600">
                             <Bell className="w-3.5 h-3.5" />
-                            <span>Ticket Automático IA · {b.senderName}</span>
+                            <span>Announcement · {b.senderName}</span>
                           </div>
-                          <p className="text-xs font-bold text-slate-800 mt-1 leading-snug">
+                          <p className="text-xs font-medium text-slate-800 mt-1 leading-snug">
                             {b.text}
                           </p>
-                          {b.isRecurringAlert && (
-                            <p className="text-[10px] font-black text-rose-600 mt-1.5 bg-rose-50 px-2 py-0.5 rounded-md inline-block border border-rose-200">
-                              🔄 Atención: Este cliente tiene {activeCircle.allClientTickets.length}{' '}
-                              reportes registrados. ¡Asegúrate de resolverlo a la 1ª vez!
-                            </p>
-                          )}
                         </div>
                       </div>
                     );
                   }
 
-                  // 2. Outgoing Staff Message (Right-aligned soft lavender bubble with green ✓✓ like screenshot!)
+                  // 2. Outgoing Staff Message (Right-aligned soft lavender bubble with green ✓✓ like Photo 4!)
                   if (b.senderType === 'staff') {
                     return (
                       <div key={b.id} className="flex justify-end">
-                        <div className="max-w-md bg-[#DFE3FF] text-slate-900 rounded-2xl rounded-br-xs px-4 py-2.5 shadow-2xs border border-indigo-200/50">
-                          <p className="text-[10px] font-black text-indigo-700 mb-0.5">
-                            👨‍💻 {b.senderName}
-                          </p>
-
+                        <div className="max-w-md bg-[#DFE3FF] text-slate-900 rounded-2xl rounded-br-xs px-4 py-2.5 shadow-2xs">
                           {b.mediaUrl && b.mediaType === 'video' && (
                             <video
                               src={b.mediaUrl}
                               controls
-                              className="w-64 rounded-xl mb-2 border border-indigo-200"
+                              className="w-64 rounded-xl mb-2"
                             />
                           )}
                           {b.mediaUrl && b.mediaType === 'image' && (
@@ -1422,7 +1351,7 @@ export const SupportChatCircles: React.FC = () => {
                               <img
                                 src={b.mediaUrl}
                                 alt={b.mediaName || 'Imagen'}
-                                className="w-64 rounded-xl mb-2 object-cover border border-indigo-200"
+                                className="w-64 rounded-xl mb-2 object-cover"
                               />
                             </a>
                           )}
@@ -1442,7 +1371,7 @@ export const SupportChatCircles: React.FC = () => {
                             {b.text}
                           </p>
                           <div className="flex items-center justify-end gap-1 mt-1">
-                            <span className="text-[10px] font-semibold text-slate-500">
+                            <span className="text-[10px] font-medium text-slate-500">
                               {b.timeLabel}
                             </span>
                             <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
@@ -1453,23 +1382,15 @@ export const SupportChatCircles: React.FC = () => {
                   }
 
                   // 3. Incoming Client Message (Left-aligned clean card)
-                  const isAudio = Boolean(b.mediaType === 'audio' || /\[🎤|nota de voz|audio/i.test(b.text));
                   return (
                     <div key={b.id} className="flex justify-start">
-                      <div className="max-w-md bg-white text-slate-900 rounded-2xl rounded-bl-xs px-4 py-3 shadow-2xs border border-slate-200/80">
-                        <div className="flex items-center justify-between gap-3 mb-1">
-                          <span className="text-[11px] font-black text-indigo-600">
-                            👤 {b.senderName}
-                          </span>
-                          {isAudio && (
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-purple-100 text-purple-800">
-                              🎤 Nota de Voz WhatsApp
-                            </span>
-                          )}
-                        </div>
+                      <div className="max-w-md bg-white text-slate-900 rounded-2xl rounded-bl-xs px-4 py-3 shadow-2xs">
+                        <p className="text-[11px] font-bold text-indigo-600 mb-0.5">
+                          {b.senderName}
+                        </p>
 
                         {b.mediaUrl && b.mediaType === 'audio' && (
-                          <div className="my-2 bg-purple-50/70 p-2 rounded-xl border border-purple-200/70">
+                          <div className="my-2">
                             <audio
                               src={b.mediaUrl}
                               controls
@@ -1483,7 +1404,7 @@ export const SupportChatCircles: React.FC = () => {
                           {b.text}
                         </p>
                         <div className="flex items-center justify-end mt-1">
-                          <span className="text-[10px] font-semibold text-slate-400">
+                          <span className="text-[10px] font-medium text-slate-400">
                             {b.timeLabel}
                           </span>
                         </div>
@@ -1495,25 +1416,8 @@ export const SupportChatCircles: React.FC = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* 1-Click Quick Support Replies Bar */}
-            <div className="px-5 py-2 bg-white/80 border-t border-slate-200/60 flex items-center gap-1.5 overflow-x-auto">
-              <span className="text-[10px] font-black uppercase text-slate-400 shrink-0 mr-1">
-                ⚡ Respuesta Rápida:
-              </span>
-              {SUPPORT_QUICK_REPLIES.map((qr) => (
-                <button
-                  key={qr.label}
-                  type="button"
-                  onClick={() => setMessageInput(qr.text)}
-                  className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#EEF0FF] hover:bg-indigo-100 text-indigo-700 whitespace-nowrap transition"
-                >
-                  {qr.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Bottom Message Bar (Exact pill style from screenshot: + [ Message... ] 📷 🎤) */}
-            <div className="bg-white px-5 py-3 border-t border-slate-200/80 flex items-center gap-3">
+            {/* Bottom Message Bar (Exact match to Photo 4: + [ Message... ] 📷 ➤) */}
+            <div className="bg-white px-5 py-3 border-t border-slate-200/70 flex items-center gap-3">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1525,7 +1429,7 @@ export const SupportChatCircles: React.FC = () => {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingFile}
-                title="Adjuntar captura de pantalla o video"
+                title="Adjuntar imagen o archivo"
                 className="w-8 h-8 rounded-full text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0"
               >
                 <Plus className="w-5 h-5" />
@@ -1542,8 +1446,8 @@ export const SupportChatCircles: React.FC = () => {
                       handleSendReply();
                     }
                   }}
-                  placeholder={`Escribe una respuesta para ${activeCircle.clientName}...`}
-                  className="w-full px-4 py-2.5 bg-[#F3F4F8] border border-slate-200/90 rounded-full text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                  placeholder="Message..."
+                  className="w-full px-4 py-2.5 bg-[#F3F4F8] border border-slate-200/80 rounded-full text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
 
@@ -1561,10 +1465,9 @@ export const SupportChatCircles: React.FC = () => {
                 type="button"
                 disabled={!messageInput.trim() || sendingMessage}
                 onClick={() => handleSendReply()}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-black shadow-sm transition"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-bold transition"
               >
                 <Send className="w-3.5 h-3.5" />
-                <span>Enviar</span>
               </button>
             </div>
           </main>
