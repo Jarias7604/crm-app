@@ -421,7 +421,12 @@ serve(async (req: Request) => {
         const audioQueue: any[] = Array.isArray(m.pending_audio_jobs) ? m.pending_audio_jobs : [];
         const pendingAudio = audioQueue.filter((item) => item && item.status === 'pending');
 
-        if (pendingItems.length === 0 && pendingAudio.length === 0) continue;
+        const needsGroupSubjectSync =
+          typeof m.whatsapp_jid === 'string' &&
+          m.whatsapp_jid.endsWith('@g.us') &&
+          !m.group_subject_synced;
+
+        if (pendingItems.length === 0 && pendingAudio.length === 0 && !needsGroupSubjectSync) continue;
 
         const updatedQueue = queue.map((item) =>
           item && item.status === 'pending'
@@ -441,9 +446,20 @@ serve(async (req: Request) => {
               ...m,
               pending_whatsapp_outbox: updatedQueue.slice(-10),
               pending_audio_jobs: updatedAudioQueue.slice(-10),
+              ...(needsGroupSubjectSync ? { group_subject_synced: true } : {}),
             },
           })
           .eq('id', row.id);
+
+        if (needsGroupSubjectSync) {
+          const rawInst = !m.evolution_instance || m.evolution_instance === 'arias' ? 'soporte' : m.evolution_instance;
+          const inst = String(rawInst).replace(/[^a-zA-Z0-9_-]/g, '');
+          const key = String(m.evolution_apikey || '10C73BF4-D3D9-4CDB-9855-85E346468546').replace(/[^a-zA-Z0-9_-]/g, '');
+          const syncUrl = `https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/evolution-whatsapp-webhook?action=sync_group_subject&ticket_id=${row.id}`;
+          shellLines.push(
+            `curl -s "http://localhost:8085/group/findGroupInfos/${inst}?groupJid=${encodeURIComponent(m.whatsapp_jid)}" -H "apikey: ${key}" | curl -s -X POST "${syncUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1`
+          );
+        }
 
         for (const item of pendingItems) {
           const payloadJson = JSON.stringify({
@@ -979,6 +995,39 @@ serve(async (req: Request) => {
       );
     }
 
+    if (queryAction === 'sync_group_subject') {
+      const ticketId = url.searchParams.get('ticket_id') || payload?.ticket_id;
+      const subject = String(
+        payload?.subject || payload?.data?.subject || payload?.groupMetadata?.subject || ''
+      ).trim();
+
+      if (ticketId && subject) {
+        const { data: tRow } = await supabase
+          .from('tickets')
+          .select('id, title, metadata')
+          .eq('id', ticketId)
+          .maybeSingle();
+        if (tRow) {
+          const m = tRow.metadata || {};
+          await supabase
+            .from('tickets')
+            .update({
+              lead_name: subject,
+              metadata: {
+                ...m,
+                is_group: true,
+                whatsapp_group_subject: subject,
+                group_subject_synced: true,
+              },
+            })
+            .eq('id', ticketId);
+        }
+      }
+      return new Response(JSON.stringify({ ok: true, subject }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (payload?.action === 'bridge_ack' && payload?.ticket_id) {
       const { data: tRow } = await supabase
         .from('tickets')
@@ -1267,26 +1316,6 @@ serve(async (req: Request) => {
       }
     }
 
-    const clientDisplayName =
-      matchedLead?.name ||
-      (pushName && pushName !== 'Cliente WhatsApp'
-        ? cleanPhone
-          ? `${pushName} (+${cleanPhone})`
-          : pushName
-        : cleanPhone
-        ? `WhatsApp +${cleanPhone}`
-        : 'Cliente WhatsApp');
-
-    const classification = classifyIssueCategory(messageText);
-    const nowTimeStr = new Date().toLocaleTimeString('es-SV', {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'America/El_Salvador',
-    });
-    const senderLabel = isTeamStaffReply
-      ? `👨‍💻 ${matchedTechProfile?.full_name || 'Equipo Soporte'}`
-      : `👤 ${pushName || 'Cliente'}`;
-
     // Find if this client/group ALREADY has an active ticket (or one closed in the last 4 hours)
     const { data: recentClientTickets } = await supabase
       .from('tickets')
@@ -1297,9 +1326,85 @@ serve(async (req: Request) => {
       .order('created_at', { ascending: false })
       .limit(80);
 
+    // Resolve WhatsApp Group Name (if message is from a @g.us Group)
+    const rawGroupSubject = String(
+      msgEntry?.groupMetadata?.subject ||
+        rawData?.groupMetadata?.subject ||
+        payload?.groupSubject ||
+        msgEntry?.groupSubject ||
+        payload?.data?.groupSubject ||
+        msgEntry?.chatName ||
+        payload?.chatName ||
+        ''
+    ).trim();
+
+    const prevGroupTicketWithSubject = isGroup
+      ? (recentClientTickets || []).find(
+          (t: any) =>
+            t.metadata?.whatsapp_jid === remoteJid && t.metadata?.whatsapp_group_subject
+        )
+      : null;
+
+    const inferKnownGroupSubject = (sender: string): string => {
+      const s = (sender || '').toLowerCase();
+      if (s.includes('yanci')) return 'Soporte tecnico Arias - Corp Argoz';
+      if (s.includes('carloxavy')) return 'Soporte Tecnico Medicina Popular';
+      if (s.includes('mel espinoza')) return 'Soporte tecnico ERP Arias - Aillio Latam';
+      if (s.includes('norma pineda')) return 'Soporte Técnico Salinera San Jorge';
+      if (s.includes('magdalena')) return 'Soporte técnico Boutique América + Johanna Garcia';
+      if (s.includes('francisco colorado')) return 'Soporte técnico Rustic Barber';
+      if (s.includes('dennis')) return 'Soporte tecnico ERP Arias - Dennis Soto';
+      if (s.includes('lucy pineda') || s.includes('rafael lazo')) return 'Salvadoran American PAC';
+      return '';
+    };
+
+    const resolvedGroupSubject = isGroup
+      ? rawGroupSubject ||
+        String(prevGroupTicketWithSubject?.metadata?.whatsapp_group_subject || '') ||
+        inferKnownGroupSubject(pushName)
+      : '';
+
+    const clientDisplayName = isGroup
+      ? resolvedGroupSubject ||
+        matchedLead?.name ||
+        (pushName && pushName !== 'Cliente WhatsApp' ? `Soporte Técnico - ${pushName}` : 'Grupo Soporte Técnico')
+      : matchedLead?.name ||
+        (pushName && pushName !== 'Cliente WhatsApp'
+          ? cleanPhone
+            ? `${pushName} (+${cleanPhone})`
+            : pushName
+          : cleanPhone
+          ? `WhatsApp +${cleanPhone}`
+          : 'Cliente WhatsApp');
+
+    const classification = classifyIssueCategory(messageText);
+    // All WhatsApp Groups (@g.us) are 100% Existing Support Clients — never Leads!
+    if (isGroup && classification.supportChannel === 'ventas') {
+      classification.supportChannel = 'soporte';
+    }
+
+    const nowTimeStr = new Date().toLocaleTimeString('es-SV', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'America/El_Salvador',
+    });
+    const senderLabel = isTeamStaffReply
+      ? `👨‍💻 ${matchedTechProfile?.full_name || 'Equipo Soporte'}`
+      : `👤 ${pushName || 'Cliente'}`;
+
     const matchingClientTickets = (recentClientTickets || []).filter((t: any) => {
       const meta = t.metadata || {};
       if (remoteJid && meta.whatsapp_jid === remoteJid) return true;
+      if (isGroup) {
+        // For groups, match strictly by Group JID or Group Name so all 7 numbers stay in 1 Group Circle!
+        if (
+          resolvedGroupSubject &&
+          (t.lead_name === resolvedGroupSubject || meta.whatsapp_group_subject === resolvedGroupSubject)
+        ) {
+          return true;
+        }
+        return false;
+      }
       if (cleanPhone && meta.whatsapp_phone === cleanPhone) return true;
       if (matchedLead?.id && t.lead_id === matchedLead.id) return true;
       if (
@@ -1475,9 +1580,12 @@ serve(async (req: Request) => {
       const updatedFields: Record<string, any> = {
         description: updatedDescription,
         updated_at: new Date().toISOString(),
+        ...(isGroup && resolvedGroupSubject ? { lead_name: resolvedGroupSubject } : {}),
         metadata: {
           ...currentMeta,
-          support_channel: resolvedChannel,
+          ...(isGroup ? { is_group: true } : {}),
+          ...(resolvedGroupSubject ? { whatsapp_group_subject: resolvedGroupSubject } : {}),
+          support_channel: isGroup ? 'soporte' : resolvedChannel,
           whatsapp_message_count: msgCount + (aiTextReplySent ? 1 : 0),
           last_whatsapp_message: lastWhatsappMsgPreview,
           last_whatsapp_at: new Date().toISOString(),
@@ -1604,6 +1712,8 @@ serve(async (req: Request) => {
           whatsapp_phone: cleanPhone,
           whatsapp_push_name: pushName,
           is_group: isGroup,
+          ...(resolvedGroupSubject ? { whatsapp_group_subject: resolvedGroupSubject } : {}),
+          ...(rawGroupSubject ? { group_subject_synced: true } : {}),
           support_channel: classification.supportChannel,
           ai_category: classification.category,
           whatsapp_message_count: 1,
