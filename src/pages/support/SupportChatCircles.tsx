@@ -274,6 +274,37 @@ export const SupportChatCircles: React.FC = () => {
 
   // Right Control Drawer state (Closed by default for clean Photo 4 layout!)
   const [showRightPanel, setShowRightPanel] = useState(false);
+
+  // Resizable Left "Circles" Column Width (Drag the vertical divider line like WhatsApp Desktop!)
+  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('crm_circles_left_width'));
+    return saved >= 260 && saved <= 750 ? saved : 380;
+  });
+  const [isResizingLeft, setIsResizingLeft] = useState(false);
+  const resizeStartXRef = useRef<number>(0);
+  const resizeStartWidthRef = useRef<number>(380);
+
+  useEffect(() => {
+    if (!isResizingLeft) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - resizeStartXRef.current;
+      const nextWidth = Math.min(720, Math.max(260, resizeStartWidthRef.current + delta));
+      setLeftPanelWidth(nextWidth);
+      localStorage.setItem('crm_circles_left_width', String(nextWidth));
+    };
+    const handleMouseUp = () => {
+      setIsResizingLeft(false);
+      document.body.style.cursor = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.body.style.cursor = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizingLeft]);
   const [showHistoryAccordion, setShowHistoryAccordion] = useState(false);
   const [savingResolution, setSavingResolution] = useState(false);
   const [resForm, setResForm] = useState({
@@ -1134,8 +1165,11 @@ export const SupportChatCircles: React.FC = () => {
           2. CLEAN WORKSPACE (EXACT PHOTO 4 LAYOUT: LEFT CIRCLES + WIDE CHAT)
          ===================================================================== */}
       <div className="flex-1 flex overflow-hidden">
-        {/* ── LEFT COLUMN: CIRCLES (Clean, spacious, all chats accessible) ── */}
-        <aside className="w-80 bg-white border-r border-slate-200/70 flex flex-col shrink-0">
+        {/* ── LEFT COLUMN: CIRCLES (Resizable width like WhatsApp Desktop!) ── */}
+        <aside
+          style={{ width: `${leftPanelWidth}px` }}
+          className="bg-white flex flex-col shrink-0 relative"
+        >
           {/* Circles Title + Refresh button (Exact match to Photo 4) */}
           <div className="px-5 pt-5 pb-3 flex items-center justify-between">
             <div>
@@ -1320,6 +1354,35 @@ export const SupportChatCircles: React.FC = () => {
             )}
           </div>
         </aside>
+
+        {/* ── DRAGGABLE VERTICAL RESIZER LINE (Grab & pull left/right like WhatsApp Desktop!) ── */}
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            resizeStartXRef.current = e.clientX;
+            resizeStartWidthRef.current = leftPanelWidth;
+            setIsResizingLeft(true);
+          }}
+          onDoubleClick={() => {
+            const next = leftPanelWidth < 480 ? 520 : 360;
+            setLeftPanelWidth(next);
+            localStorage.setItem('crm_circles_left_width', String(next));
+          }}
+          title="Arrastra hacia la derecha o izquierda para abrir o cerrar la lista de chats (doble clic para expandir)"
+          className={`w-1.5 shrink-0 cursor-col-resize relative group transition-colors flex items-center justify-center z-20 ${
+            isResizingLeft
+              ? 'bg-indigo-600'
+              : 'bg-slate-200/80 hover:bg-indigo-500'
+          }`}
+        >
+          <div
+            className={`w-1 h-10 rounded-full transition-all ${
+              isResizingLeft
+                ? 'bg-white scale-y-125'
+                : 'bg-slate-400/60 group-hover:bg-white'
+            }`}
+          />
+        </div>
 
         {/* ── CENTER COLUMN: THE LIVE CHAT (Exact wide, clean Photo 4 style) ── */}
         {activeCircle ? (
