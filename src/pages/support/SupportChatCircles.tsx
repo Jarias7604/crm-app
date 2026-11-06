@@ -179,6 +179,7 @@ interface SupportCircle {
   isExistingClient: boolean;
   supportChannel: SupportChannelType;
   promotedLeadId: string | null;
+  existingLeadStatus?: string | null;
   activeTicket: Ticket;
   allClientTickets: Ticket[];
   unreadOrWaitingReply: boolean;
@@ -563,7 +564,7 @@ export const SupportChatCircles: React.FC = () => {
     const agentMap = new Map<string, string>();
     agents.forEach((a) => agentMap.set(a.id, a.full_name || a.email));
 
-    // Build lookup sets from the real ~210 clients in `clients` table
+    // Build lookup sets strictly from the real ~210 clients in `clients` table + closed/won leads
     const realClientNamesLower = new Set<string>();
     const realClientPhonesLast8 = new Set<string>();
     realClients.forEach((c) => {
@@ -573,23 +574,65 @@ export const SupportChatCircles: React.FC = () => {
       const digits = String(c.telefono || '').replace(/\D/g, '');
       if (digits.length >= 8) realClientPhonesLast8.add(digits.slice(-8));
     });
+
+    // Separate CRM Leads into: (A) Closed Won Clients vs (B) Open Prospects/Leads in CRM
+    const crmProspectsById = new Map<string, TicketLead>();
+    const crmProspectsByPhoneLast8 = new Map<string, TicketLead>();
+    const crmProspectsByNameLower = new Map<string, TicketLead>();
+
     companyLeads.forEach((l) => {
-      if (l.name) realClientNamesLower.add(l.name.trim().toLowerCase());
+      const isClosedClient =
+        Boolean(l.es_cliente) ||
+        /^(cliente|cerrado|ganado|won|activo)$/i.test(String(l.status || '').trim());
+      const cleanName = (l.name || '').trim().toLowerCase();
       const digits = String(l.phone || '').replace(/\D/g, '');
-      if (digits.length >= 8) realClientPhonesLast8.add(digits.slice(-8));
+
+      if (isClosedClient) {
+        if (cleanName) realClientNamesLower.add(cleanName);
+        if (digits.length >= 8) realClientPhonesLast8.add(digits.slice(-8));
+      } else {
+        crmProspectsById.set(l.id, l);
+        if (digits.length >= 8) crmProspectsByPhoneLast8.set(digits.slice(-8), l);
+        if (cleanName) crmProspectsByNameLower.set(cleanName, l);
+      }
     });
 
     const matchesRealClientDatabase = (name: string, phoneDigits: string): boolean => {
-      const n = (name || '').trim().toLowerCase();
+      const n = (name || '').replace(/\(\+[\d\s-]+\)/g, '').trim().toLowerCase();
+      if (phoneDigits && phoneDigits.length >= 8 && realClientPhonesLast8.has(phoneDigits.slice(-8))) {
+        return true;
+      }
       if (!n) return false;
       if (realClientNamesLower.has(n)) return true;
       for (const rc of realClientNamesLower) {
         if (rc.length >= 4 && (n.includes(rc) || rc.includes(n))) return true;
       }
-      if (phoneDigits && phoneDigits.length >= 8 && realClientPhonesLast8.has(phoneDigits.slice(-8))) {
-        return true;
-      }
       return false;
+    };
+
+    const findMatchingCrmProspect = (
+      leadId: string | null | undefined,
+      name: string,
+      phoneDigits: string
+    ): TicketLead | null => {
+      if (leadId && crmProspectsById.has(leadId)) {
+        return crmProspectsById.get(leadId)!;
+      }
+      if (phoneDigits && phoneDigits.length >= 8) {
+        const byPhone = crmProspectsByPhoneLast8.get(phoneDigits.slice(-8));
+        if (byPhone) return byPhone;
+      }
+      const cleanName = (name || '').replace(/\(\+[\d\s-]+\)/g, '').trim().toLowerCase();
+      if (!cleanName) return null;
+      if (crmProspectsByNameLower.has(cleanName)) {
+        return crmProspectsByNameLower.get(cleanName)!;
+      }
+      for (const [k, leadObj] of crmProspectsByNameLower.entries()) {
+        if (k.length >= 5 && (cleanName.includes(k) || k.includes(cleanName))) {
+          return leadObj;
+        }
+      }
+      return null;
     };
 
     const groupMap = new Map<string, Ticket[]>();
@@ -722,22 +765,35 @@ export const SupportChatCircles: React.FC = () => {
 
       // Exact Business Rule:
       // 1. Every WhatsApp Group (@g.us or "Soporte Técnico...") is 100% an Existing Client.
-      // 2. Every non-WhatsApp support ticket or client matched in the ~210 realClients/companyLeads is 100% an Existing Client.
-      // 3. ONLY an individual 1-on-1 WhatsApp chat from an unknown contact (not in groups, not in clients) is a New Lead!
+      // 2. Every contact matched in the ~210 realClients (or closed/won leads) is 100% an Existing Client.
+      // 3. Any contact that is NOT in realClients and is either a 1-on-1 WhatsApp chat or an open Prospect in `leads` is a Lead!
       const inRealClients = matchesRealClientDatabase(clientName, phone);
-      const isExistingClient =
-        isGroup ||
-        !isWhatsApp ||
-        inRealClients ||
-        sorted.length > 1 ||
-        Boolean(assignedTechId);
+      const matchedCrmProspect =
+        !isGroup && !inRealClients
+          ? findMatchingCrmProspect(
+              activeTicket.lead_id || String(meta.promoted_lead_id || ''),
+              clientName,
+              phone
+            )
+          : null;
 
-      // Keep each client unified in 1 place: existing clients stay in 'soporte', new 1-on-1 prospects in 'ventas'
+      const isExplicitSalesLead =
+        !isGroup &&
+        !inRealClients &&
+        (Boolean(matchedCrmProspect) ||
+          meta.support_channel === 'ventas' ||
+          meta.is_existing_client === false ||
+          (isWhatsApp && !assignedTechId));
+
+      const isExistingClient = !isExplicitSalesLead;
+
+      // Keep each client unified in 1 place: existing clients stay in 'soporte', prospects/leads in 'ventas'
       const supportChannel: SupportChannelType = isExistingClient ? 'soporte' : 'ventas';
 
       const promotedLeadId = !isExistingClient
-        ? String(activeTicket.lead_id || meta.promoted_lead_id || '') || null
+        ? matchedCrmProspect?.id || String(activeTicket.lead_id || meta.promoted_lead_id || '') || null
         : null;
+      const existingLeadStatus = !isExistingClient ? matchedCrmProspect?.status || null : null;
 
       list.push({
         circleId: key,
@@ -749,6 +805,7 @@ export const SupportChatCircles: React.FC = () => {
         isExistingClient,
         supportChannel,
         promotedLeadId,
+        existingLeadStatus,
         activeTicket,
         allClientTickets: sorted,
         unreadOrWaitingReply,
@@ -1504,10 +1561,23 @@ export const SupportChatCircles: React.FC = () => {
                               Grupo
                             </span>
                           ) : isSalesLead ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
-                              <UserPlus className="w-2.5 h-2.5" />
-                              Lead
-                            </span>
+                            circle.promotedLeadId ? (
+                              <span
+                                title={`Ya existe en Leads CRM (${circle.existingLeadStatus || 'Prospecto'})`}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-sky-100 text-sky-800 shrink-0"
+                              >
+                                <UserCheck className="w-2.5 h-2.5" />
+                                Lead en CRM
+                              </span>
+                            ) : (
+                              <span
+                                title="Prospecto nuevo por WhatsApp (aún no agregado al CRM)"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 shrink-0"
+                              >
+                                <UserPlus className="w-2.5 h-2.5" />
+                                Lead Nuevo
+                              </span>
+                            )
                           ) : (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-indigo-50 text-indigo-700 shrink-0">
                               <Building2 className="w-2.5 h-2.5" />
@@ -1611,10 +1681,15 @@ export const SupportChatCircles: React.FC = () => {
                         <Building2 className="w-3 h-3" />
                         Cliente Activo ({activeCircle.allClientTickets.length} tickets)
                       </span>
+                    ) : activeCircle.promotedLeadId ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200/70 shrink-0">
+                        <UserCheck className="w-3 h-3" />
+                        Lead en CRM ({activeCircle.existingLeadStatus || 'Registrado'})
+                      </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
                         <UserPlus className="w-3 h-3" />
-                        Lead Nuevo / Prospecto
+                        Lead Nuevo (No en CRM)
                       </span>
                     )}
                   </div>
@@ -1645,7 +1720,7 @@ export const SupportChatCircles: React.FC = () => {
                   </select>
                 </div>
 
-                {/* ONLY show "Pasar a Ventas (Lead)" when it's a New Prospect / Lead */}
+                {/* Show "Ya existe en CRM (Ver Lead)" if already in Leads, or "+ Agregar Lead al CRM" if brand new */}
                 {!activeCircle.isExistingClient && (
                   <button
                     type="button"
@@ -1653,12 +1728,12 @@ export const SupportChatCircles: React.FC = () => {
                     onClick={handlePromoteToLead}
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                       activeCircle.promotedLeadId
-                        ? 'bg-emerald-100 text-emerald-800'
+                        ? 'bg-sky-100 hover:bg-sky-200/80 text-sky-800 border border-sky-200'
                         : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
                     }`}
                   >
                     {activeCircle.promotedLeadId ? (
-                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <UserCheck className="w-3.5 h-3.5" />
                     ) : (
                       <UserPlus className="w-3.5 h-3.5" />
                     )}
@@ -1666,8 +1741,8 @@ export const SupportChatCircles: React.FC = () => {
                       {promotingLead
                         ? 'Guardando...'
                         : activeCircle.promotedLeadId
-                        ? 'En Leads'
-                        : 'Pasar a Ventas (Lead)'}
+                        ? 'Ya en CRM (Ver Lead)'
+                        : '+ Agregar Lead al CRM'}
                     </span>
                   </button>
                 )}

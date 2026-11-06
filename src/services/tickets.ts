@@ -16,6 +16,8 @@ export interface TicketLead {
     name: string;
     email: string | null;
     phone: string | null;
+    status?: string | null;
+    es_cliente?: boolean | null;
 }
 
 export interface TicketCategory {
@@ -253,7 +255,7 @@ export const ticketService = {
     async getLeads(companyId: string): Promise<TicketLead[]> {
         const { data, error } = await supabase
             .from('leads')
-            .select('id, name, email, phone')
+            .select('id, name, email, phone, status, es_cliente')
             .eq('company_id', companyId)
             .order('name');
         if (error) throw error;
