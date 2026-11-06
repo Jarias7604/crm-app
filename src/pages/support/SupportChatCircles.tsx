@@ -217,7 +217,7 @@ const SUPPORT_QUICK_REPLIES = [
 // Detect internal developer/system task titles that are NOT clients and should NOT be shown as fake people in Circles
 function isInternalDevOrSystemTaskTitle(rawTitle: string): boolean {
   const clean = stripEmojis(rawTitle || '').toLowerCase();
-  return /^(importaci[oó]n de proveedores|estandarizar dise[ñn]o|actualizar precios de mayoreo|importar precios por mayoreo|ajustes de estilos|estilos cotizacion|cotizaciones:\s*(personas|quitar)|cotizaciones\s+2\s*hours|revisi[oó]n de cambios normativa|apertura de gaveta de dinero|faq erp\b|nota de remisi[oó]n\b|factura de exportaci[oó]n\b|pos\s*1\b|jornada\s+(melvin|gerson)|comunicado oficial)/i.test(
+  return /^(importaci[oó]n de proveedores|estandarizar dise[ñn]o|actualizar precios de mayoreo|importar precios por mayoreo|ajustes de estilos|estilos cotizacion|cotizaciones:\s*(personas|quitar)|cotizaciones\s+2\s*hours|revisi[oó]n de cambios normativa|apertura de gaveta de dinero|faq erp\b|nota de remisi[oó]n\b|factura de exportaci[oó]n\b|pos\s*1\b|jornada\s+(melvin|gerson)|comunicado oficial|libro de iva para mantenimientos)/i.test(
     clean
   );
 }
@@ -296,7 +296,7 @@ function extractClientFromTicket(t: Ticket): string {
   }
 
   const colonMatch = (t.title || '').match(
-    /^(?:soporte\s+t[eé]cnico|error\s+reportado|capacitaci[oó]n(?:\s+presencial)?|pregunta\s+frecuente|go\s*live|solicitud(?:\s+de\s+cliente)?)\s*:\s*([^-\n(|]+)/i
+    /^(?:soporte\s+t[eé]cnico|error(?:\s+en\s+json)?\s+reportado|capacitaci[oó]n(?:\s+presencial)?|pregunta\s+frecuente|go\s*live|solicitud(?:\s+de\s+cliente)?)\s*:\s*([^-\n(|]+)/i
   );
   if (colonMatch && colonMatch[1]) {
     return normalizeCircleClientName(colonMatch[1].trim());
@@ -599,13 +599,15 @@ export const SupportChatCircles: React.FC = () => {
 
     const matchesRealClientDatabase = (name: string, phoneDigits: string): boolean => {
       const n = (name || '').replace(/\(\+[\d\s-]+\)/g, '').trim().toLowerCase();
-      if (phoneDigits && phoneDigits.length >= 8 && realClientPhonesLast8.has(phoneDigits.slice(-8))) {
-        return true;
+      // When a contact has a phone number (e.g. WhatsApp 1-on-1), match strictly by the last 8 digits of the phone!
+      // Never use short-name substring matching ("alva" matching "salvador") when a phone number is present!
+      if (phoneDigits && phoneDigits.length >= 8) {
+        return realClientPhonesLast8.has(phoneDigits.slice(-8));
       }
       if (!n) return false;
       if (realClientNamesLower.has(n)) return true;
       for (const rc of realClientNamesLower) {
-        if (rc.length >= 4 && (n.includes(rc) || rc.includes(n))) return true;
+        if (n.length >= 10 && rc.length >= 10 && (n.includes(rc) || rc.includes(n))) return true;
       }
       return false;
     };
@@ -618,9 +620,9 @@ export const SupportChatCircles: React.FC = () => {
       if (leadId && crmProspectsById.has(leadId)) {
         return crmProspectsById.get(leadId)!;
       }
+      // If contact has a phone number, match strictly by phone so "Alva" never matches "Salvador"
       if (phoneDigits && phoneDigits.length >= 8) {
-        const byPhone = crmProspectsByPhoneLast8.get(phoneDigits.slice(-8));
-        if (byPhone) return byPhone;
+        return crmProspectsByPhoneLast8.get(phoneDigits.slice(-8)) || null;
       }
       const cleanName = (name || '').replace(/\(\+[\d\s-]+\)/g, '').trim().toLowerCase();
       if (!cleanName) return null;
@@ -628,7 +630,7 @@ export const SupportChatCircles: React.FC = () => {
         return crmProspectsByNameLower.get(cleanName)!;
       }
       for (const [k, leadObj] of crmProspectsByNameLower.entries()) {
-        if (k.length >= 5 && (cleanName.includes(k) || k.includes(cleanName))) {
+        if (cleanName.length >= 10 && k.length >= 10 && (cleanName.includes(k) || k.includes(cleanName))) {
           return leadObj;
         }
       }
@@ -767,7 +769,13 @@ export const SupportChatCircles: React.FC = () => {
       // 1. Every WhatsApp Group (@g.us or "Soporte Técnico...") is 100% an Existing Client.
       // 2. Every contact matched in the ~210 realClients (or closed/won leads) is 100% an Existing Client.
       // 3. Any contact that is NOT in realClients and is either a 1-on-1 WhatsApp chat or an open Prospect in `leads` is a Lead!
-      const inRealClients = matchesRealClientDatabase(clientName, phone);
+      const isMarkedAsNewLead =
+        !isGroup &&
+        (meta.is_existing_client === false ||
+          meta.support_channel === 'ventas' ||
+          /nuevo lead/i.test(activeTicket.title || ''));
+
+      const inRealClients = !isMarkedAsNewLead && matchesRealClientDatabase(clientName, phone);
       const matchedCrmProspect =
         !isGroup && !inRealClients
           ? findMatchingCrmProspect(
@@ -780,9 +788,8 @@ export const SupportChatCircles: React.FC = () => {
       const isExplicitSalesLead =
         !isGroup &&
         !inRealClients &&
-        (Boolean(matchedCrmProspect) ||
-          meta.support_channel === 'ventas' ||
-          meta.is_existing_client === false ||
+        (isMarkedAsNewLead ||
+          Boolean(matchedCrmProspect) ||
           (isWhatsApp && !assignedTechId));
 
       const isExistingClient = !isExplicitSalesLead;
