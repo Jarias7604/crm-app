@@ -597,6 +597,23 @@ export const SupportChatCircles: React.FC = () => {
       }
     });
 
+    // Any participant of a WhatsApp Support Group (@g.us) is ALSO an Existing Client, never a New Lead
+    tickets.forEach((t) => {
+      const m = (t.metadata || {}) as Record<string, any>;
+      const isGrp =
+        Boolean(resolveWhatsAppGroupSubject(t)) ||
+        Boolean(m.is_group) ||
+        String(m.whatsapp_jid || '').endsWith('@g.us');
+      if (isGrp) {
+        const p = String(m.whatsapp_phone || '').replace(/\D/g, '');
+        if (p.length >= 8) realClientPhonesLast8.add(p.slice(-8));
+        const pushN = String(m.whatsapp_push_name || '').trim().toLowerCase();
+        if (pushN && pushN.length >= 4 && !/^\d+$/.test(pushN) && pushN !== 'cliente whatsapp') {
+          realClientNamesLower.add(pushN);
+        }
+      }
+    });
+
     const matchesRealClientDatabase = (name: string, phoneDigits: string): boolean => {
       const n = (name || '').replace(/\(\+[\d\s-]+\)/g, '').trim().toLowerCase();
       // When a contact has a phone number (e.g. WhatsApp 1-on-1), match strictly by the last 8 digits of the phone!

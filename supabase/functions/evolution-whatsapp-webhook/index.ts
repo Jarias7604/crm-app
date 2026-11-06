@@ -1416,13 +1416,40 @@ serve(async (req: Request) => {
           ? `WhatsApp +${cleanPhone}`
           : 'Cliente WhatsApp');
 
+    // Check if 1-on-1 sender is actually a member/participant of an existing WhatsApp Support Group (@g.us)
+    const isGroupParticipantIn1on1 =
+      !isGroup &&
+      (Boolean(inferKnownGroupSubject(pushName)) ||
+        (recentClientTickets || []).some((t: any) => {
+          const m = t.metadata || {};
+          if (!m.is_group && !String(m.whatsapp_jid || '').endsWith('@g.us')) return false;
+          if (
+            cleanPhone &&
+            cleanPhone.length >= 8 &&
+            String(m.whatsapp_phone || '')
+              .replace(/\D/g, '')
+              .slice(-8) === cleanPhone.slice(-8)
+          ) {
+            return true;
+          }
+          if (
+            pushName &&
+            pushName.length >= 4 &&
+            pushName !== 'Cliente WhatsApp' &&
+            String(m.whatsapp_push_name || '').trim().toLowerCase() === pushName.trim().toLowerCase()
+          ) {
+            return true;
+          }
+          return false;
+        }));
+
     const classification = classifyIssueCategory(messageText);
-    const isExistingClientContact = isGroup || Boolean(matchedClient);
-    // All WhatsApp Groups (@g.us) and contacts in the ~210 `clients` table are 100% Existing Support Clients!
-    // All 1-on-1 individual WhatsApp chats (`!isGroup`) NOT in `clients` are New Leads (`ventas`)!
-    if (isGroup && classification.supportChannel === 'ventas') {
+    const isExistingClientContact = isGroup || Boolean(matchedClient) || isGroupParticipantIn1on1;
+    // All WhatsApp Groups (@g.us), group participants, and contacts in the ~210 `clients` table are 100% Existing Support Clients!
+    // All 1-on-1 individual WhatsApp chats (`!isGroup`) NOT in `clients` and NOT in any Support Group are New Leads (`ventas`)!
+    if (isExistingClientContact && classification.supportChannel === 'ventas') {
       classification.supportChannel = 'soporte';
-    } else if (!isGroup && !matchedClient) {
+    } else if (!isExistingClientContact) {
       classification.supportChannel = 'ventas';
       classification.category = 'Ventas / Precios / Nuevo Lead';
       classification.shortCategoryTag = 'Nuevo Lead';
