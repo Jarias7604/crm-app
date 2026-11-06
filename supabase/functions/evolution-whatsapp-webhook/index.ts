@@ -1301,16 +1301,28 @@ serve(async (req: Request) => {
     const isIncomingAudio = Boolean(msgObj?.audioMessage) && !fromMe;
 
     // ⚠️ IMPORTANT: NEVER call process_incoming_marketing_message and NEVER insert into `leads`!
-    // We ONLY read `leads` (read-only) to see if the phone belongs to an existing client name.
+    // We ONLY read `clients` and `leads` (read-only) to see if the phone belongs to an existing client.
     let matchedLead: { id: string; name: string; phone: string | null } | null = null;
+    let matchedClient: { id: string; name: string; company_name: string | null; phone: string | null } | null = null;
     if (!isTeamStaffReply && cleanPhone && cleanPhone.length >= 8) {
       const last8 = cleanPhone.slice(-8);
-      const { data: leadsByPhone } = await supabase
-        .from('leads')
-        .select('id, name, phone')
-        .eq('company_id', companyId)
-        .ilike('phone', `%${last8}%`)
-        .limit(1);
+      const [{ data: clientsByPhone }, { data: leadsByPhone }] = await Promise.all([
+        supabase
+          .from('clients')
+          .select('id, name, company_name, phone')
+          .eq('company_id', companyId)
+          .ilike('phone', `%${last8}%`)
+          .limit(1),
+        supabase
+          .from('leads')
+          .select('id, name, phone')
+          .eq('company_id', companyId)
+          .ilike('phone', `%${last8}%`)
+          .limit(1),
+      ]);
+      if (clientsByPhone && clientsByPhone.length > 0) {
+        matchedClient = clientsByPhone[0];
+      }
       if (leadsByPhone && leadsByPhone.length > 0) {
         matchedLead = leadsByPhone[0];
       }
@@ -1378,9 +1390,15 @@ serve(async (req: Request) => {
           : 'Cliente WhatsApp');
 
     const classification = classifyIssueCategory(messageText);
-    // All WhatsApp Groups (@g.us) are 100% Existing Support Clients — never Leads!
+    const isExistingClientContact = isGroup || Boolean(matchedClient);
+    // All WhatsApp Groups (@g.us) and contacts in the ~210 `clients` table are 100% Existing Support Clients!
+    // All 1-on-1 individual WhatsApp chats (`!isGroup`) NOT in `clients` are New Leads (`ventas`)!
     if (isGroup && classification.supportChannel === 'ventas') {
       classification.supportChannel = 'soporte';
+    } else if (!isGroup && !matchedClient) {
+      classification.supportChannel = 'ventas';
+      classification.category = 'Ventas / Precios / Nuevo Lead';
+      classification.shortCategoryTag = 'Nuevo Lead';
     }
 
     const nowTimeStr = new Date().toLocaleTimeString('es-SV', {
@@ -1650,29 +1668,32 @@ serve(async (req: Request) => {
       );
     }
 
-    // ─── CASE C: Message is an agreement/courtesy/greeting ("ok, de acuerdo, esta bien...", "Hola", "Gracias")
-    if (!classification.isActualSupportProblem) {
-      if (recentlyClosedTicket) {
-        await supabase.from('ticket_comments').insert({
-          ticket_id: recentlyClosedTicket.id,
-          company_id: companyId,
-          body: `[${nowTimeStr}] ${senderLabel}: ${messageText}`,
-          is_internal: false,
-        });
-      }
+    // ─── CASE C: Only ignore closing agreements ("ok, de acuerdo, gracias") when a recently closed ticket exists!
+    // NEVER ignore a new 1-on-1 lead (`!isGroup`) or a contact with no previous tickets (`matchingClientTickets.length === 0`)!
+    if (
+      !classification.isActualSupportProblem &&
+      isGreetingOrClosingAgreement(messageText) &&
+      recentlyClosedTicket
+    ) {
+      await supabase.from('ticket_comments').insert({
+        ticket_id: recentlyClosedTicket.id,
+        company_id: companyId,
+        body: `[${nowTimeStr}] ${senderLabel}: ${messageText}`,
+        is_internal: false,
+      });
 
       return new Response(
         JSON.stringify({
           ok: true,
           ignored: true,
           action: 'non_problem_message_ignored',
-          reason: 'Greeting or agreement reply — no ticket or lead created',
+          reason: 'Closing courtesy reply appended to recently closed ticket',
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // ─── CASE D: Client reports an ACTUAL PROBLEM / SALES / ACCOUNTING query and has NO open ticket ─────
+    // ─── CASE D: Client or New Lead writes and has NO open ticket ─────
     // Create 1 consolidated Ticket in `tickets` ONLY (NEVER in `leads` automatically!)
     const shortTitle =
       messageText.length > 85 ? `${messageText.slice(0, 82).trim()}...` : messageText.trim();
@@ -1712,6 +1733,7 @@ serve(async (req: Request) => {
           whatsapp_phone: cleanPhone,
           whatsapp_push_name: pushName,
           is_group: isGroup,
+          is_existing_client: isExistingClientContact,
           ...(resolvedGroupSubject ? { whatsapp_group_subject: resolvedGroupSubject } : {}),
           ...(rawGroupSubject ? { group_subject_synced: true } : {}),
           support_channel: classification.supportChannel,
