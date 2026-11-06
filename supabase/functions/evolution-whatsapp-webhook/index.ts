@@ -1226,25 +1226,52 @@ serve(async (req: Request) => {
 
     const fromMe: boolean = Boolean(key?.fromMe ?? msgEntry?.fromMe ?? false);
     const participant: string = key?.participant || msgEntry?.participant || '';
-    const remoteJidAlt: string = key?.remoteJidAlt || msgEntry?.remoteJidAlt || '';
+    const remoteJidAlt: string =
+      key?.remoteJidAlt ||
+      key?.senderPn ||
+      msgEntry?.remoteJidAlt ||
+      msgEntry?.senderPn ||
+      payload?.senderPn ||
+      '';
     const pushName: string =
       msgEntry?.pushName || payload?.pushName || payload?.sender || 'Cliente WhatsApp';
 
-    const msgObj = msgEntry?.message || payload?.message || {};
+    // Unwrap ephemeralMessage (Mensajes Temporales 24h), viewOnceMessage, deviceSentMessage, etc.
+    const rawMsgObj = msgEntry?.message || payload?.message || {};
+    const msgObj =
+      rawMsgObj?.ephemeralMessage?.message ||
+      rawMsgObj?.viewOnceMessage?.message ||
+      rawMsgObj?.viewOnceMessageV2?.message ||
+      rawMsgObj?.viewOnceMessageV2Extension?.message ||
+      rawMsgObj?.documentWithCaptionMessage?.message ||
+      rawMsgObj?.deviceSentMessage?.message ||
+      rawMsgObj?.editedMessage?.message?.protocolMessage?.editedMessage ||
+      rawMsgObj;
+
+    const extTextObj = msgObj?.extendedTextMessage || rawMsgObj?.extendedTextMessage || {};
     const messageText: string =
       msgObj?.conversation ||
-      msgObj?.extendedTextMessage?.text ||
+      extTextObj?.text ||
+      extTextObj?.matchedText ||
+      extTextObj?.canonicalUrl ||
+      extTextObj?.title ||
       msgObj?.imageMessage?.caption ||
       msgObj?.videoMessage?.caption ||
       msgObj?.documentMessage?.caption ||
       msgObj?.buttonsResponseMessage?.selectedDisplayText ||
       msgObj?.listResponseMessage?.title ||
+      msgObj?.templateButtonReplyMessage?.selectedDisplayText ||
+      msgObj?.interactiveResponseMessage?.body?.text ||
       msgEntry?.body ||
       msgEntry?.text ||
-      (msgObj?.imageMessage ? '[📷 Imagen enviada por WhatsApp]' : '') ||
-      (msgObj?.audioMessage ? '[🎤 Nota de voz enviada por WhatsApp]' : '') ||
+      (msgObj?.imageMessage ? '[Imagen enviada por WhatsApp]' : '') ||
+      (msgObj?.audioMessage ? '[Nota de voz enviada por WhatsApp]' : '') ||
+      (msgObj?.videoMessage ? '[Video enviado por WhatsApp]' : '') ||
+      (msgObj?.stickerMessage ? '[Sticker enviado por WhatsApp]' : '') ||
+      (msgObj?.contactMessage || msgObj?.contactsArrayMessage ? '[Contacto enviado por WhatsApp]' : '') ||
+      (msgObj?.locationMessage ? '[Ubicacion enviada por WhatsApp]' : '') ||
       (msgObj?.documentMessage
-        ? `[📄 Documento: ${msgObj.documentMessage.fileName || 'Archivo'}]`
+        ? `[Documento: ${msgObj.documentMessage.fileName || 'Archivo'}]`
         : '') ||
       '';
 
