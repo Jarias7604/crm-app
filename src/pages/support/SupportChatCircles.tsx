@@ -109,10 +109,9 @@ function detectTicketSupportChannel(t: Ticket): SupportChannelType {
   const meta = (t.metadata || {}) as Record<string, any>;
   const combined = `${t.title || ''} ${t.description || ''} ${meta.ai_category || ''}`.toLowerCase();
 
-  // If it clearly describes a DTE / Hacienda / technical error, it's always Soporte unless manually promoted to lead
+  // If it clearly describes a DTE / Hacienda / technical error, it's ALWAYS Soporte (existing client)
   if (
-    !meta.promoted_lead_id &&
-    /dte|hacienda|desconfigurado|no imprime|error al emitir|rechazado|contingencia|invalidaci|firmador/i.test(
+    /dte|hacienda|desconfigurado|no imprime|error al emitir|rechazado|contingencia|invalidaci|firmador|previsualizaci|gaveta|anydesk/i.test(
       combined
     )
   ) {
@@ -152,6 +151,7 @@ interface SupportCircle {
   phone: string;
   whatsappJid: string;
   isWhatsApp: boolean;
+  isExistingClient: boolean;
   supportChannel: SupportChannelType;
   promotedLeadId: string | null;
   activeTicket: Ticket;
@@ -244,8 +244,8 @@ function detectShortCategory(catName: string, title: string): { code: string; na
 
 export const SupportChatCircles: React.FC = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
-  const activeCompanyId = profile?.company_id;
+  const { profile, simulatedCompanyId } = useAuth();
+  const activeCompanyId = simulatedCompanyId || profile?.company_id;
 
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -255,10 +255,10 @@ export const SupportChatCircles: React.FC = () => {
   const [comments, setComments] = useState<TicketComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
 
-  // Filters in left Circles column (ONLY real WhatsApp chats)
+  // Filters in left Circles column (default to 'all' with WhatsApp & Unanswered at the very top)
   const [searchQuery, setSearchQuery] = useState('');
   const [circleFilter, setCircleFilter] = useState<
-    'all' | 'waiting' | 'ventas' | 'soporte' | 'contabilidad'
+    'all' | 'whatsapp' | 'waiting' | 'ventas' | 'soporte' | 'contabilidad'
   >('all');
 
   // Message input & sending state
@@ -417,7 +417,7 @@ export const SupportChatCircles: React.FC = () => {
     }
   };
 
-  // Build "Circles" (1 Circle per Client / WhatsApp Thread)
+  // Build "Circles" (1 Circle per Client / WhatsApp Thread — all clients preserved!)
   const circles = useMemo<SupportCircle[]>(() => {
     const catMap = new Map<string, TicketCategory>();
     categories.forEach((c) => catMap.set(c.id, c));
@@ -432,17 +432,11 @@ export const SupportChatCircles: React.FC = () => {
       if (/^\s*jornada\s+(melvin|gerson)/i.test(t.title || '')) return;
 
       const meta = (t.metadata || {}) as Record<string, any>;
-      const isWaTicket =
-        meta.source === 'whatsapp_evolution' ||
-        Boolean(meta.whatsapp_phone) ||
-        Boolean(meta.whatsapp_jid) ||
-        /\[whatsapp/i.test(t.title || '');
-
-      // ONLY include real WhatsApp conversations in Circles (never dump the 440 manual ERP tickets here!)
-      if (!isWaTicket) return;
-
       const clientName = extractClientFromTicket(t);
-      const key = meta.whatsapp_phone || meta.whatsapp_jid || clientName;
+      const key =
+        clientName !== 'Cliente Soporte'
+          ? clientName
+          : String(meta.whatsapp_phone || meta.whatsapp_jid || t.id);
 
       if (!groupMap.has(key)) groupMap.set(key, []);
       groupMap.get(key)!.push(t);
@@ -452,17 +446,42 @@ export const SupportChatCircles: React.FC = () => {
 
     groupMap.forEach((clientTickets, key) => {
       const sorted = [...clientTickets].sort(
-        (a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()
+        (a, b) =>
+          new Date(b.updated_at || b.created_at).getTime() -
+          new Date(a.updated_at || a.created_at).getTime()
       );
-      // Prefer an open/pending ticket as the activeTicket, or most recent
+
+      // Check if ANY ticket for this client came via WhatsApp
+      const waTicket = sorted.find((t) => {
+        const m = (t.metadata || {}) as Record<string, any>;
+        return (
+          m.source === 'whatsapp_evolution' ||
+          Boolean(m.whatsapp_phone) ||
+          Boolean(m.whatsapp_jid) ||
+          /\[whatsapp/i.test(t.title || '')
+        );
+      });
+      const isWhatsApp = Boolean(waTicket);
+
+      // Prefer an open WhatsApp ticket first, then any WhatsApp ticket, then open ticket, then most recent
       const activeTicket =
-        sorted.find((t) => ['new', 'open', 'pending'].includes(t.status)) || sorted[0];
+        sorted.find((t) => {
+          const m = (t.metadata || {}) as Record<string, any>;
+          const isWa =
+            m.source === 'whatsapp_evolution' ||
+            Boolean(m.whatsapp_phone) ||
+            Boolean(m.whatsapp_jid) ||
+            /\[whatsapp/i.test(t.title || '');
+          return isWa && ['new', 'open', 'pending'].includes(t.status);
+        }) ||
+        waTicket ||
+        sorted.find((t) => ['new', 'open', 'pending'].includes(t.status)) ||
+        sorted[0];
 
       const meta = (activeTicket.metadata || {}) as Record<string, any>;
-      const isWhatsApp =
-        meta.source === 'whatsapp_evolution' || /\[whatsapp/i.test(activeTicket.title || '');
-      const phone = String(meta.whatsapp_phone || '').replace(/\D/g, '');
-      const whatsappJid = String(meta.whatsapp_jid || '');
+      const waMeta = ((waTicket?.metadata || meta) as Record<string, any>) || {};
+      const phone = String(meta.whatsapp_phone || waMeta.whatsapp_phone || '').replace(/\D/g, '');
+      const whatsappJid = String(meta.whatsapp_jid || waMeta.whatsapp_jid || '');
       const clientName = extractClientFromTicket(activeTicket);
 
       const catObj = activeTicket.category_id ? catMap.get(activeTicket.category_id) : undefined;
@@ -496,8 +515,36 @@ export const SupportChatCircles: React.FC = () => {
       const isOpen = ['new', 'open', 'pending'].includes(activeTicket.status);
       const lastWasClient = !lastChatLine || lastChatLine.includes('👤');
       const unreadOrWaitingReply = isOpen && lastWasClient;
-      const supportChannel = detectTicketSupportChannel(activeTicket);
-      const promotedLeadId = String(activeTicket.lead_id || meta.promoted_lead_id || '') || null;
+
+      // Smart automatic recognition: Existing Client vs. New Lead/Prospect
+      const combinedText = `${activeTicket.title || ''} ${activeTicket.description || ''} ${clientName}`.toLowerCase();
+      const hasExistingSystemIssue =
+        /dte|hacienda|factura|facturaci|desconfigurado|no imprime|impresora|contingencia|invalidaci|firmador|anexo|f07|f14|libro de iva|retenci|planilla|gaveta|corte de caja|anydesk|erp|sistema/i.test(
+          combinedText
+        );
+      const isKnownClientName =
+        /yanci|walter|jimmy|arg[oó]z|argos|carret[oó]n|econ[oó]mica|medicina popular|conta\s*ohs|salinera|moda [ií]ntima|volea|kinder|ferreter[ií]a/i.test(
+          clientName
+        );
+
+      const isExistingClient =
+        !isWhatsApp ||
+        sorted.length > 1 ||
+        Boolean(assignedTechId) ||
+        hasExistingSystemIssue ||
+        isKnownClientName;
+
+      let supportChannel = detectTicketSupportChannel(activeTicket);
+      // If a brand-new unknown WhatsApp contact writes for the first time (not an existing client),
+      // classify them under 'ventas' (Posible Lead / Nuevo Contacto) unless already in contabilidad
+      if (!isExistingClient && isWhatsApp && supportChannel === 'soporte') {
+        supportChannel = 'ventas';
+      }
+
+      const promotedLeadId =
+        !isExistingClient || supportChannel === 'ventas'
+          ? String(activeTicket.lead_id || meta.promoted_lead_id || '') || null
+          : null;
 
       list.push({
         circleId: key,
@@ -505,6 +552,7 @@ export const SupportChatCircles: React.FC = () => {
         phone,
         whatsappJid,
         isWhatsApp,
+        isExistingClient,
         supportChannel,
         promotedLeadId,
         activeTicket,
@@ -523,7 +571,7 @@ export const SupportChatCircles: React.FC = () => {
       });
     });
 
-    // Sort: WhatsApp active chats first, then open waiting reply, then most recent
+    // Sort: WhatsApp active chats first, then open waiting reply (NUEVO), then most recent
     return list.sort((a, b) => {
       if (a.isWhatsApp !== b.isWhatsApp) return a.isWhatsApp ? -1 : 1;
       if (a.unreadOrWaitingReply !== b.unreadOrWaitingReply)
@@ -536,10 +584,9 @@ export const SupportChatCircles: React.FC = () => {
     const waCircles = circles.filter((c) => c.isWhatsApp);
     return {
       whatsapp: waCircles.length,
-      soporte: circles.filter((c) => c.supportChannel === 'soporte').length,
+      soporte: circles.filter((c) => c.isExistingClient && c.supportChannel === 'soporte').length,
       contabilidad: circles.filter((c) => c.supportChannel === 'contabilidad').length,
-      ventas: circles.filter((c) => c.supportChannel === 'ventas').length,
-      otros: circles.filter((c) => c.supportChannel === 'otros').length,
+      ventas: circles.filter((c) => !c.isExistingClient || c.supportChannel === 'ventas').length,
       waiting: circles.filter((c) => c.unreadOrWaitingReply).length,
       all: circles.length,
     };
@@ -549,9 +596,12 @@ export const SupportChatCircles: React.FC = () => {
   const filteredCircles = useMemo(() => {
     return circles.filter((c) => {
       if (circleFilter === 'waiting' && !c.unreadOrWaitingReply) return false;
-      if (circleFilter === 'soporte' && c.supportChannel !== 'soporte') return false;
+      if (circleFilter === 'whatsapp' && !c.isWhatsApp) return false;
+      if (circleFilter === 'soporte' && !(c.isExistingClient && c.supportChannel === 'soporte'))
+        return false;
       if (circleFilter === 'contabilidad' && c.supportChannel !== 'contabilidad') return false;
-      if (circleFilter === 'ventas' && c.supportChannel !== 'ventas') return false;
+      if (circleFilter === 'ventas' && !(!c.isExistingClient || c.supportChannel === 'ventas'))
+        return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -799,6 +849,19 @@ export const SupportChatCircles: React.FC = () => {
     };
     setComments((prev) => [...prev, optimisticComment]);
 
+    // Immediately mark this ticket as answered in local state so it switches from BOLD to non-bold right away
+    setTickets((prev) =>
+      prev.map((tk) =>
+        tk.id === t.id
+          ? {
+              ...tk,
+              description: `${tk.description || ''}\n[${nowTimeStr}] 👨‍💻 ${authorName}: ${textToSend}`,
+              updated_at: new Date().toISOString(),
+            }
+          : tk
+      )
+    );
+
     if (!resForm.actual_hours || Number(resForm.actual_hours) <= 0) {
       setResForm((p) => ({ ...p, actual_hours: '0.2' }));
     }
@@ -1009,7 +1072,7 @@ export const SupportChatCircles: React.FC = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-0px)] flex flex-col bg-[#F5F6FA] overflow-hidden select-none">
+    <div className="h-screen flex-1 flex flex-col bg-[#F5F6FA] overflow-hidden select-none">
       {/* =====================================================================
           1. TOP HEADER BAR (EXACT CLEAN AESTHETIC FROM SCREENSHOT)
          ===================================================================== */}
@@ -1071,11 +1134,16 @@ export const SupportChatCircles: React.FC = () => {
           2. CLEAN WORKSPACE (EXACT PHOTO 4 LAYOUT: LEFT CIRCLES + WIDE CHAT)
          ===================================================================== */}
       <div className="flex-1 flex overflow-hidden">
-        {/* ── LEFT COLUMN: CIRCLES (Clean, spacious, only real WhatsApp chats) ── */}
+        {/* ── LEFT COLUMN: CIRCLES (Clean, spacious, all chats accessible) ── */}
         <aside className="w-80 bg-white border-r border-slate-200/70 flex flex-col shrink-0">
           {/* Circles Title + Refresh button (Exact match to Photo 4) */}
           <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">Circles</h2>
+            <div>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">Circles</h2>
+              <p className="text-[11px] font-medium text-slate-400">
+                {filteredCircles.length} conversaciones
+              </p>
+            </div>
             <button
               onClick={() => loadSupportData()}
               title="Actualizar chats"
@@ -1093,26 +1161,31 @@ export const SupportChatCircles: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search circles..."
+                placeholder="Buscar cliente, teléfono o mensaje..."
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50/80 border border-slate-200/70 rounded-full text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
 
-            {/* Clean, minimal filter pills for WhatsApp Chats ONLY */}
-            <div className="flex items-center gap-1.5 mt-3 overflow-x-auto pb-0.5 no-scrollbar">
+            {/* Clean filter pills: Todos | WhatsApp | Sin Contestar | Clientes | Leads | Contabilidad */}
+            <div className="flex items-center gap-1.5 mt-3 flex-wrap">
               {[
                 { id: 'all', label: `Todos (${channelCounts.all})` },
-                { id: 'waiting', label: `Nuevos (${channelCounts.waiting})`, isAlert: channelCounts.waiting > 0 },
-                { id: 'ventas', label: `Leads (${channelCounts.ventas})` },
-                { id: 'soporte', label: `Soporte (${channelCounts.soporte})` },
-                { id: 'contabilidad', label: `Contabilidad (${channelCounts.contabilidad})` },
+                { id: 'whatsapp', label: `💬 WhatsApp (${channelCounts.whatsapp})` },
+                {
+                  id: 'waiting',
+                  label: `Sin Contestar (${channelCounts.waiting})`,
+                  isAlert: channelCounts.waiting > 0,
+                },
+                { id: 'ventas', label: `🆕 Leads (${channelCounts.ventas})` },
+                { id: 'soporte', label: `🏢 Clientes (${channelCounts.soporte})` },
+                { id: 'contabilidad', label: `📊 Contabilidad (${channelCounts.contabilidad})` },
               ].map((tab) => {
                 const active = circleFilter === tab.id;
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setCircleFilter(tab.id as any)}
-                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition flex items-center gap-1 ${
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition flex items-center gap-1 ${
                       active
                         ? 'bg-indigo-600 text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
@@ -1128,7 +1201,7 @@ export const SupportChatCircles: React.FC = () => {
             </div>
           </div>
 
-          {/* Circles List (Clean 2-line rows like Photo 4) */}
+          {/* Circles List (BOLD for unanswered, NON-BOLD for answered) */}
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
             {filteredCircles.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-400 font-medium">
@@ -1141,7 +1214,11 @@ export const SupportChatCircles: React.FC = () => {
                   hour: '2-digit',
                   minute: '2-digit',
                 });
-                const isSalesLead = circle.supportChannel === 'ventas' || Boolean(circle.promotedLeadId);
+                const isSalesLead =
+                  !circle.isExistingClient ||
+                  circle.supportChannel === 'ventas' ||
+                  Boolean(circle.promotedLeadId);
+                const isUnread = circle.unreadOrWaitingReply;
 
                 return (
                   <button
@@ -1149,13 +1226,19 @@ export const SupportChatCircles: React.FC = () => {
                     type="button"
                     onClick={() => setSelectedCircleId(circle.circleId)}
                     className={`w-full text-left px-4 py-3.5 flex items-center gap-3.5 transition relative ${
-                      isSelected ? 'bg-[#EEF0FF]/80' : 'hover:bg-slate-50/80'
+                      isSelected
+                        ? 'bg-[#EEF0FF]/90'
+                        : isUnread
+                        ? 'bg-white hover:bg-slate-50'
+                        : 'bg-slate-50/30 hover:bg-slate-50/80'
                     }`}
                   >
                     {/* Avatar (Exact size & clean look from Photo 4) */}
                     <div className="relative shrink-0">
                       <div
-                        className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-xs text-white ${
+                        className={`w-11 h-11 rounded-full flex items-center justify-center text-xs text-white ${
+                          isUnread ? 'font-black' : 'font-normal opacity-80'
+                        } ${
                           isSalesLead
                             ? 'bg-emerald-600'
                             : circle.supportChannel === 'contabilidad'
@@ -1170,30 +1253,46 @@ export const SupportChatCircles: React.FC = () => {
                           .slice(0, 2)
                           .toUpperCase()}
                       </div>
-                      {circle.unreadOrWaitingReply && (
+                      {isUnread && (
                         <span className="w-3 h-3 rounded-full bg-rose-500 border-2 border-white absolute -top-0.5 -right-0.5" />
                       )}
                     </div>
 
-                    {/* Clean 2-Line Text Preview (Like "JOVENES" in Photo 4) */}
+                    {/* Clean 2-Line Text Preview: BOLD when unanswered, NON-BOLD when already answered */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-xs font-black text-slate-900 uppercase tracking-tight truncate">
+                          <span
+                            className={`text-xs uppercase tracking-tight truncate ${
+                              isUnread
+                                ? 'font-black text-slate-950'
+                                : 'font-normal text-slate-500'
+                            }`}
+                          >
                             {circle.clientName}
                           </span>
-                          {circle.unreadOrWaitingReply && (
+                          {isUnread && (
                             <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-500 text-white shrink-0">
                               NUEVO
                             </span>
                           )}
-                          {isSalesLead && (
-                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800 shrink-0">
+                          {isSalesLead ? (
+                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 shrink-0">
                               LEAD
                             </span>
-                          )}
+                          ) : circle.isWhatsApp ? (
+                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-indigo-50 text-indigo-700 shrink-0">
+                              Cliente
+                            </span>
+                          ) : null}
                         </div>
-                        <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                        <span
+                          className={`text-[10px] shrink-0 ${
+                            isUnread
+                              ? 'font-extrabold text-indigo-600'
+                              : 'font-normal text-slate-400'
+                          }`}
+                        >
                           {timeStr}
                         </span>
                       </div>
@@ -1201,15 +1300,15 @@ export const SupportChatCircles: React.FC = () => {
                       <div className="flex items-center justify-between gap-2 mt-0.5">
                         <p
                           className={`text-xs truncate ${
-                            circle.unreadOrWaitingReply
+                            isUnread
                               ? 'text-slate-900 font-bold'
-                              : 'text-slate-500 font-normal'
+                              : 'text-slate-400 font-normal'
                           }`}
                         >
                           {circle.lastMessageSender}: {circle.lastMessageText}
                         </p>
-                        {circle.supportChannel !== 'soporte' && !isSalesLead && (
-                          <span className="text-[9px] font-bold text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded shrink-0">
+                        {circle.supportChannel === 'contabilidad' && (
+                          <span className="text-[9px] font-medium text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded shrink-0">
                             Contab.
                           </span>
                         )}
@@ -1228,7 +1327,13 @@ export const SupportChatCircles: React.FC = () => {
             {/* Active Circle Header (Clean like "JOVENES / 0 members" in Photo 4) */}
             <div className="h-16 bg-white border-b border-slate-200/70 px-6 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-full bg-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0">
+                <div
+                  className={`w-10 h-10 rounded-full text-white font-black text-xs flex items-center justify-center shrink-0 ${
+                    !activeCircle.isExistingClient || activeCircle.supportChannel === 'ventas'
+                      ? 'bg-emerald-600'
+                      : 'bg-indigo-600'
+                  }`}
+                >
                   {activeCircle.clientName
                     .split(' ')
                     .map((w) => w[0])
@@ -1237,11 +1342,22 @@ export const SupportChatCircles: React.FC = () => {
                     .toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight truncate">
-                    {activeCircle.clientName}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight truncate">
+                      {activeCircle.clientName}
+                    </h3>
+                    {activeCircle.isExistingClient && activeCircle.supportChannel !== 'ventas' ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 shrink-0">
+                        🏢 Cliente Activo ({activeCircle.allClientTickets.length} tickets)
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
+                        🆕 Posible Lead / Prospecto
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] font-medium text-slate-400 truncate">
-                    {activeCircle.phone ? `+${activeCircle.phone}` : 'WhatsApp'} ·{' '}
+                    {activeCircle.phone ? `+${activeCircle.phone}` : 'Canal Soporte'} · Atiende:{' '}
                     {activeCircle.assignedTechName}
                   </p>
                 </div>
@@ -1255,32 +1371,34 @@ export const SupportChatCircles: React.FC = () => {
                   onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
                   className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-700 cursor-pointer focus:outline-none transition"
                 >
-                  <option value="soporte">🛠️ Soporte</option>
-                  <option value="contabilidad">📊 Contabilidad</option>
-                  <option value="ventas">💰 Lead Ventas</option>
+                  <option value="soporte">🛠️ Soporte (Cliente)</option>
+                  <option value="contabilidad">📊 Contabilidad (Cliente)</option>
+                  <option value="ventas">💰 Lead Ventas (Prospecto)</option>
                   <option value="otros">📦 Otros</option>
                 </select>
 
-                {/* Subtle Promote to Lead button */}
-                <button
-                  type="button"
-                  disabled={promotingLead}
-                  onClick={handlePromoteToLead}
-                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                    activeCircle.promotedLeadId
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-[#EEF0FF] hover:bg-indigo-100 text-indigo-700'
-                  }`}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>
-                    {promotingLead
-                      ? 'Guardando...'
-                      : activeCircle.promotedLeadId
-                      ? 'En Leads'
-                      : 'Crear Lead'}
-                  </span>
-                </button>
+                {/* ONLY show "+ Crear Lead" when it's a New Prospect / Lead (never on existing clients like Yanci!) */}
+                {(!activeCircle.isExistingClient || activeCircle.supportChannel === 'ventas') && (
+                  <button
+                    type="button"
+                    disabled={promotingLead}
+                    onClick={handlePromoteToLead}
+                    className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                      activeCircle.promotedLeadId
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
+                    }`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>
+                      {promotingLead
+                        ? 'Guardando...'
+                        : activeCircle.promotedLeadId
+                        ? 'En Leads ✓'
+                        : 'Pasar a Ventas (Lead)'}
+                    </span>
+                  </button>
+                )}
 
                 {/* Toggle Ticket Resolution Drawer (Icon button like Photo 4's right button) */}
                 <button
@@ -1489,11 +1607,10 @@ export const SupportChatCircles: React.FC = () => {
                   📋 Mini-Módulo de Control & IA
                 </span>
                 <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                    ['resolved', 'closed'].includes(activeCircle.activeTicket.status)
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${['resolved', 'closed'].includes(activeCircle.activeTicket.status)
                       ? 'bg-emerald-100 text-emerald-800'
                       : 'bg-amber-100 text-amber-900'
-                  }`}
+                    }`}
                 >
                   {['resolved', 'closed'].includes(activeCircle.activeTicket.status)
                     ? '✓ Resuelto'
@@ -1532,26 +1649,24 @@ export const SupportChatCircles: React.FC = () => {
               {/* 2. Auditor IA de Tiempo (Obligatorio > 0h para cerrar) */}
               {aiTimeAudit && (
                 <div
-                  className={`rounded-2xl p-3.5 border space-y-2.5 ${
-                    aiTimeAudit.status === 'inflated'
+                  className={`rounded-2xl p-3.5 border space-y-2.5 ${aiTimeAudit.status === 'inflated'
                       ? 'bg-rose-50/70 border-rose-200'
                       : aiTimeAudit.status === 'missing_time'
-                      ? 'bg-amber-50/60 border-amber-200'
-                      : 'bg-emerald-50/60 border-emerald-200'
-                  }`}
+                        ? 'bg-amber-50/60 border-amber-200'
+                        : 'bg-emerald-50/60 border-emerald-200'
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase text-slate-800">
                       ⏱️ 2. Tiempo Real vs. IA *
                     </span>
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                        aiTimeAudit.status === 'inflated'
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-black ${aiTimeAudit.status === 'inflated'
                           ? 'bg-rose-100 text-rose-800'
                           : aiTimeAudit.status === 'missing_time'
-                          ? 'bg-amber-100 text-amber-900'
-                          : 'bg-emerald-100 text-emerald-800'
-                      }`}
+                            ? 'bg-amber-100 text-amber-900'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
                     >
                       {aiTimeAudit.verdictLabel}
                     </span>
@@ -1606,11 +1721,10 @@ export const SupportChatCircles: React.FC = () => {
                         key={b.val}
                         type="button"
                         onClick={() => setResForm((p) => ({ ...p, actual_hours: b.val }))}
-                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition ${
-                          resForm.actual_hours === b.val
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition ${resForm.actual_hours === b.val
                             ? 'bg-indigo-600 text-white border-indigo-600'
                             : 'bg-white text-slate-600 border-slate-200'
-                        }`}
+                          }`}
                       >
                         {b.label}
                       </button>
@@ -1853,30 +1967,28 @@ export const SupportChatCircles: React.FC = () => {
 
             {/* Live OpenAI Status Verification Banner */}
             <div
-              className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl border ${
-                openAiStatus.checking
+              className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl border ${openAiStatus.checking
                   ? 'bg-slate-50 border-slate-200 text-slate-700'
                   : openAiStatus.verified
-                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
-                  : 'bg-rose-50 border-rose-200 text-rose-900'
-              }`}
+                    ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                    : 'bg-rose-50 border-rose-200 text-rose-900'
+                }`}
             >
               <div className="flex items-center gap-2 text-xs font-bold">
                 <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    openAiStatus.checking
+                  className={`w-2.5 h-2.5 rounded-full ${openAiStatus.checking
                       ? 'bg-amber-400 animate-pulse'
                       : openAiStatus.verified
-                      ? 'bg-emerald-500'
-                      : 'bg-rose-500'
-                  }`}
+                        ? 'bg-emerald-500'
+                        : 'bg-rose-500'
+                    }`}
                 />
                 <span>
                   {openAiStatus.checking
                     ? 'Verificando conexión en vivo con OpenAI...'
                     : openAiStatus.verified
-                    ? `🟢 OpenAI Conectado (${openAiStatus.model} + Whisper-1 Audio)`
-                    : `🔴 OpenAI Error: ${openAiStatus.error || 'Sin conexión'}`}
+                      ? `🟢 OpenAI Conectado (${openAiStatus.model} + Whisper-1 Audio)`
+                      : `🔴 OpenAI Error: ${openAiStatus.error || 'Sin conexión'}`}
                 </span>
               </div>
               <button
@@ -1937,11 +2049,10 @@ export const SupportChatCircles: React.FC = () => {
                     key={tab.id}
                     type="button"
                     onClick={() => setActivePromptTab(tab.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${
-                      activePromptTab === tab.id
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${activePromptTab === tab.id
                         ? 'bg-purple-600 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>

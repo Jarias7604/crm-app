@@ -20,7 +20,7 @@ export default function DashboardLayout() {
     // Check if we are in an immersive page (no global header or container padding/max-width)
     // NOTE: Only ChatHub needs the locked h-screen/overflow-hidden layout.
     // CotizacionDetalle has its own sticky header and needs free scroll — do NOT include it here.
-    const isImmersiveView = location.pathname === '/marketing/chat';
+    const isImmersiveView = location.pathname === '/marketing/chat' || location.pathname === '/support/chat';
     const isFullWidthView = location.pathname.startsWith('/marketing/campaign') || location.pathname.startsWith('/marketing/email');
 
     // Initialize session timeout
