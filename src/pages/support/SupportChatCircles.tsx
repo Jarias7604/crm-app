@@ -53,6 +53,8 @@ import {
   Zap,
   MoreHorizontal,
   Calendar,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
@@ -575,6 +577,9 @@ export const SupportChatCircles: React.FC = () => {
   const [pendingQuoteId, setPendingQuoteId] = useState<string | null>(() => (location.state as any)?.newWaQuoteId || null);
   const [sendingQuotePdfId, setSendingQuotePdfId] = useState<string | null>(null);
   const [myBookingSlug, setMyBookingSlug] = useState<string>('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState<string>('');
+  const [savingCommentEdit, setSavingCommentEdit] = useState<boolean>(false);
 
   // Handle return from CotizadorPro with active chat & newly generated quote
   useEffect(() => {
@@ -596,22 +601,28 @@ export const SupportChatCircles: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
+        const rawName =
+          profile.full_name && !/^platform\s*owner$/i.test(profile.full_name.trim())
+            ? profile.full_name.trim()
+            : 'Jimmy Arias';
+        const cleanSlug = `${bookingService.slugify(rawName)}-${profile.id.slice(0, 4)}`;
         const existing = await bookingService.getMyBookingLink();
         if (cancelled) return;
-        if (existing?.slug) {
+        if (existing?.slug && !existing.slug.startsWith('platform-owner')) {
           setMyBookingSlug(existing.slug);
           return;
         }
-        const defaultSlug = `${bookingService.slugify(profile.full_name || 'asesoria')}-${profile.id.slice(0, 4)}`;
-        const created = await bookingService.upsertBookingLink({
-          slug: defaultSlug,
+        const saved = await bookingService.upsertBookingLink({
+          ...(existing?.id ? { id: existing.id } : {}),
+          slug: cleanSlug,
+          display_name: rawName,
           title: 'Revisión de Propuesta Comercial',
           description: 'Sesión breve para revisar los detalles de su cotización y resolver cualquier consulta.',
           duration_minutes: 30,
           is_active: true,
         });
-        if (!cancelled && created?.slug) {
-          setMyBookingSlug(created.slug);
+        if (!cancelled && saved?.slug) {
+          setMyBookingSlug(saved.slug);
         }
       } catch {
         // Fallback if offline or table unavailable
@@ -1440,8 +1451,9 @@ export const SupportChatCircles: React.FC = () => {
       const media = mediaByComment.get(c.id);
       const ob = outboxByComment.get(c.id);
       // Media placeholders are redundant once the file itself is shown.
-      if (media && /^\[(Imagen|Video|Sticker|Nota de voz)[^\]]*\]$/i.test(body)) body = '';
-      if (media && media.message_type === 'document' && /^\[Documento: [^\]]*\]$/i.test(body)) body = '';
+      if (media) {
+        body = body.replace(/^\[(?:Imagen|Video|Sticker|Nota de voz|Documento|Archivo)[^\]]*\]\s*/i, '').trim();
+      }
 
       items.push({
         id: c.id,
@@ -1716,6 +1728,104 @@ export const SupportChatCircles: React.FC = () => {
       handleSaveInternalNote();
     } else {
       handleSendReply();
+    }
+  };
+
+  const canModifyComment = (b: ChatItem) =>
+    (b.kind === 'staff' || b.kind === 'system') &&
+    !b.id.startsWith('temp-') &&
+    !b.id.startsWith('desc-') &&
+    !b.id.startsWith('att-') &&
+    !b.id.startsWith('ticket-');
+
+  const handleStartEditComment = (b: ChatItem) => {
+    setEditingCommentId(b.id);
+    setEditingCommentText(b.text || '');
+  };
+
+  const handleSaveEditedComment = async (b: ChatItem, resendToWhatsApp = false) => {
+    const trimmed = editingCommentText.trim();
+    if (!trimmed || !activeCircle) return;
+    setSavingCommentEdit(true);
+    try {
+      const existingRow = comments.find((c) => c.id === b.id);
+      let newBody = trimmed;
+      if (b.kind === 'staff') {
+        const timePart = fmtTime(b.createdAt);
+        const sender = b.senderName || profile?.full_name || 'Equipo';
+        newBody = `[${timePart}] 👨‍💻 ${sender}: ${trimmed}`;
+      } else if (b.kind === 'system') {
+        newBody = trimmed.toLowerCase().startsWith('nota interna')
+          ? trimmed
+          : `Nota interna (${profile?.full_name || 'Equipo'}): ${trimmed}`;
+      }
+      if (existingRow) {
+        const { error } = await supabase
+          .from('ticket_comments')
+          .update({ body: newBody, updated_at: new Date().toISOString() })
+          .eq('id', b.id);
+        if (error) throw error;
+        setComments((prev) => prev.map((c) => (c.id === b.id ? { ...c, body: newBody } : c)));
+      }
+      // If this was the latest comment on the active ticket, refresh the sidebar preview too
+      const isLast = chatItems[chatItems.length - 1]?.id === b.id;
+      if (isLast && b.kind === 'staff') {
+        const meta = (activeCircle.activeTicket.metadata || {}) as Record<string, any>;
+        await supabase
+          .from('tickets')
+          .update({
+            metadata: {
+              ...meta,
+              last_message_preview: trimmed.slice(0, 140),
+            },
+          })
+          .eq('id', activeCircle.activeTicket.id);
+      }
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      if (resendToWhatsApp && b.kind === 'staff') {
+        await handleSendReply(trimmed);
+        toast.success('Mensaje actualizado y reenviado por WhatsApp');
+      } else {
+        toast.success('Mensaje actualizado');
+        loadSupportData(true);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudo editar el mensaje');
+    } finally {
+      setSavingCommentEdit(false);
+    }
+  };
+
+  const handleDeleteComment = async (b: ChatItem) => {
+    if (!activeCircle) return;
+    try {
+      const { error } = await supabase.from('ticket_comments').delete().eq('id', b.id);
+      if (error) throw error;
+      const nextComments = comments.filter((c) => c.id !== b.id);
+      setComments(nextComments);
+
+      // Update sidebar preview if the deleted message was the latest one
+      const remainingItems = chatItems.filter((item) => item.id !== b.id && (item.kind === 'staff' || item.kind === 'client'));
+      const newLast = remainingItems[remainingItems.length - 1];
+      if (newLast) {
+        const meta = (activeCircle.activeTicket.metadata || {}) as Record<string, any>;
+        await supabase
+          .from('tickets')
+          .update({
+            metadata: {
+              ...meta,
+              last_message_preview: (newLast.text || '[Archivo adjunto]').slice(0, 140),
+              last_message_from: newLast.kind === 'staff' ? 'staff' : 'client',
+              last_message_sender: newLast.senderName,
+            },
+          })
+          .eq('id', activeCircle.activeTicket.id);
+      }
+      toast.success('Mensaje eliminado del chat');
+      loadSupportData(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudo eliminar el mensaje');
     }
   };
 
@@ -3214,28 +3324,135 @@ export const SupportChatCircles: React.FC = () => {
                     );
                   }
                   if (b.kind === 'system') {
+                    const isEditing = editingCommentId === b.id;
                     return (
                       <React.Fragment key={b.id}>
                         {daySep}
-                        <div className="flex justify-center">
-                          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-900">
-                            <StickyNote className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                            {b.text}
-                            <span className="text-amber-600 font-normal">· {fmtTime(b.createdAt)}</span>
-                          </span>
+                        <div className="flex justify-center group/msg">
+                          {isEditing ? (
+                            <div className="max-w-lg w-full bg-amber-50 border border-amber-300 rounded-2xl p-3 space-y-2 shadow-xs">
+                              <textarea
+                                rows={2}
+                                value={editingCommentText}
+                                onChange={(e) => setEditingCommentText(e.target.value)}
+                                className="w-full px-3 py-2 rounded-xl bg-white border border-amber-200 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
+                              />
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingCommentId(null)}
+                                  className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-600 hover:bg-amber-100/60 transition"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={savingCommentEdit || !editingCommentText.trim()}
+                                  onClick={() => handleSaveEditedComment(b, false)}
+                                  className="px-3 py-1 rounded-lg text-[11px] font-bold bg-amber-600 hover:bg-amber-700 text-white disabled:opacity-50 transition"
+                                >
+                                  Guardar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-900">
+                              <StickyNote className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              {b.text}
+                              <span className="text-amber-600 font-normal">· {fmtTime(b.createdAt)}</span>
+                              {canModifyComment(b) && (
+                                <span className="inline-flex items-center gap-1 ml-1 opacity-0 group-hover/msg:opacity-100 transition-opacity">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEditComment(b)}
+                                    title="Editar nota"
+                                    className="p-0.5 rounded hover:bg-amber-200/60 text-amber-700"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteComment(b)}
+                                    title="Eliminar nota"
+                                    className="p-0.5 rounded hover:bg-rose-100 text-rose-600"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              )}
+                            </span>
+                          )}
                         </div>
                       </React.Fragment>
                     );
                   }
                   if (b.kind === 'staff') {
+                    const isEditing = editingCommentId === b.id;
                     return (
                       <React.Fragment key={b.id}>
                         {daySep}
-                        <div className="flex justify-end">
+                        <div className="flex justify-end items-start gap-1.5 group/msg">
+                          {canModifyComment(b) && !isEditing && (
+                            <div className="opacity-0 group-hover/msg:opacity-100 transition-opacity flex items-center gap-1 bg-white border border-slate-200/90 rounded-xl px-1.5 py-1 shadow-2xs self-center">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditComment(b)}
+                                title="Editar mensaje"
+                                className="p-1 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteComment(b)}
+                                title="Eliminar mensaje"
+                                className="p-1 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                           <div className="max-w-lg bg-[#DFE3FF] text-slate-900 rounded-2xl rounded-br-xs px-4 py-3 shadow-2xs">
                             <p className="text-xs font-bold text-indigo-700/85 mb-0.5">{b.senderName}</p>
                             {renderMedia(b)}
-                            {b.text && <p className="text-[13.5px] font-medium text-slate-900 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
+                            {isEditing ? (
+                              <div className="mt-1.5 space-y-2 min-w-[280px] sm:min-w-[360px]">
+                                <textarea
+                                  rows={4}
+                                  value={editingCommentText}
+                                  onChange={(e) => setEditingCommentText(e.target.value)}
+                                  className="w-full px-3 py-2 rounded-xl bg-white border border-indigo-200 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
+                                />
+                                <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingCommentId(null)}
+                                    className="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-slate-600 text-[11px] font-semibold transition"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={savingCommentEdit || !editingCommentText.trim()}
+                                    onClick={() => handleSaveEditedComment(b, false)}
+                                    className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-[11px] font-bold disabled:opacity-50 transition"
+                                  >
+                                    Guardar en chat
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={savingCommentEdit || !editingCommentText.trim()}
+                                    onClick={() => handleSaveEditedComment(b, true)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold disabled:opacity-50 transition"
+                                  >
+                                    <Send className="w-3 h-3" />
+                                    Guardar y reenviar a WhatsApp
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              b.text && <p className="text-[13.5px] font-medium text-slate-900 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>
+                            )}
                             <div className="flex items-center justify-end gap-1 mt-1">
                               <span className="text-[11px] font-medium text-slate-500">{b.id.startsWith('temp-') ? 'enviando…' : fmtTime(b.createdAt)}</span>
                               {b.delivery === 'sent' ? (
