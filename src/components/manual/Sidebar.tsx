@@ -10,7 +10,10 @@ import {
   Calendar,
   Bell,
   Webhook,
-  HelpCircle 
+  HelpCircle,
+  MessageSquare,
+  Sparkles,
+  Cpu
 } from 'lucide-react';
 
 const sections = [
@@ -24,7 +27,10 @@ const sections = [
   { id: '7-calendario-y-gestion-de-citas', label: 'Calendario y Citas', icon: Calendar },
   { id: '8-notificaciones-de-equipo-telegram', label: 'Notificaciones (Telegram)', icon: Bell },
   { id: '9-webhooks-e-integraciones-meta-ads', label: 'Integraciones (Webhooks)', icon: Webhook },
-  { id: '10-preguntas-frecuentes-faq', label: 'FAQ & Glosario', icon: HelpCircle },
+  { id: '10-lead-scoring-ai-inteligencia-artificial-de-calificacion', label: 'Lead Scoring AI', icon: Sparkles },
+  { id: '11-cockpit-del-agente-ai-centro-de-mando-autonomo', label: 'Cockpit Agente AI', icon: Cpu },
+  { id: '12-service-hub-centro-de-operaciones-y-ventas-whatsapp', label: 'Chat WhatsApp & Roles', icon: MessageSquare },
+  { id: '13-preguntas-frecuentes-faq', label: 'FAQ & Glosario', icon: HelpCircle },
 ];
 
 export default function Sidebar() {

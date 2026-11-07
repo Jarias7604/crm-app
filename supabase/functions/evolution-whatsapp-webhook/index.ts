@@ -816,14 +816,24 @@ async function getCaller(req: Request, supabase: any, supabaseUrl: string): Prom
   const uid = userData.user.id;
   const { data: prof } = await supabase
     .from('profiles')
-    .select('id, full_name, email, role, custom_role_id, company_id, is_active, is_platform_owner')
+    .select('id, full_name, email, role, custom_role_id, company_id, is_active, is_platform_owner, permissions')
     .eq('id', uid)
     .maybeSingle();
   if (!prof || prof.is_active === false) return null;
   const role = String(prof.role || '');
+  const p = (prof.permissions && typeof prof.permissions === 'object' ? prof.permissions : {}) as Record<string, any>;
+  const explicitMode = String(p.wa_access_mode || '');
   let scopes: string[] = [];
-  if (prof.is_platform_owner === true || role === 'super_admin' || role === 'company_admin') {
+  if (prof.is_platform_owner === true || role === 'super_admin' || role === 'company_admin' || explicitMode === 'admin_all') {
     scopes = ['all'];
+  } else if (explicitMode === 'soporte_team' || explicitMode === 'soporte_assigned') {
+    scopes = ['soporte'];
+  } else if (explicitMode === 'ventas_pool' || explicitMode === 'ventas_assigned') {
+    scopes = ['leads'];
+  } else if (explicitMode === 'both') {
+    scopes = ['soporte', 'leads'];
+  } else if (explicitMode === 'none') {
+    scopes = [];
   } else if (prof.custom_role_id) {
     const { data: rp } = await supabase
       .from('role_permissions')
@@ -954,7 +964,7 @@ serve(async (req: Request) => {
     const uiActions = [
       'get_ai_config', 'test_openai', 'save_ai_config', 'save_ai_prompt', 'set_ticket_channel',
       'promote_to_lead', 'classify_contact', 'send_reply', 'send_media', 'retry_media', 'bridge_status',
-      'rescope_now', 'request_history_import',
+      'rescope_now', 'request_history_import', 'get_wa_team_access', 'set_wa_user_access',
     ];
     if (uiActions.includes(action)) {
       const caller = await getCaller(req, supabase, supabaseUrl);
@@ -969,6 +979,12 @@ serve(async (req: Request) => {
         case 'save_ai_prompt':
           if (!caller.isAdmin) return json({ ok: false, error: 'Solo un administrador puede cambiar la IA' }, 403);
           return await handleSaveAiConfig(supabase, payload);
+        case 'get_wa_team_access':
+          if (!caller.isAdmin) return json({ ok: false, error: 'Solo un administrador puede ver accesos del equipo' }, 403);
+          return await handleGetWaTeamAccess(supabase, caller, payload);
+        case 'set_wa_user_access':
+          if (!caller.isAdmin) return json({ ok: false, error: 'Solo un administrador puede cambiar accesos del equipo' }, 403);
+          return await handleSetWaUserAccess(supabase, caller, payload);
         case 'set_ticket_channel':
           return await handleSetChannel(supabase, caller, payload);
         case 'promote_to_lead':
@@ -2148,6 +2164,100 @@ async function handleSaveAiConfig(supabase: any, payload: any): Promise<Response
   return json({ ok: true, config: cfg });
 }
 
+async function handleGetWaTeamAccess(supabase: any, caller: Caller, payload: any): Promise<Response> {
+  const companyId = String(payload?.company_id || caller.companyId || '');
+  if (!companyId) return json({ ok: false, error: 'Missing company_id' }, 400);
+
+  const [{ data: profs }, { data: roles }, { data: rolePerms }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, full_name, email, role, custom_role_id, status, is_active, is_platform_owner, permissions')
+      .eq('company_id', companyId)
+      .order('full_name', { ascending: true }),
+    supabase.from('custom_roles').select('id, name, base_role').eq('company_id', companyId),
+    supabase
+      .from('role_permissions')
+      .select('role_id, permission_key, is_enabled')
+      .eq('is_enabled', true)
+      .in('permission_key', ['wa_chat_all', 'wa_chat_soporte', 'wa_chat_leads']),
+  ]);
+
+  const roleNameMap = new Map<string, string>();
+  for (const r of roles || []) roleNameMap.set(r.id, r.name);
+
+  const rolePermMap = new Map<string, Set<string>>();
+  for (const rp of rolePerms || []) {
+    if (!rolePermMap.has(rp.role_id)) rolePermMap.set(rp.role_id, new Set());
+    rolePermMap.get(rp.role_id)!.add(rp.permission_key);
+  }
+
+  const members = (profs || [])
+    .filter((p: any) => p.is_active !== false && p.status !== 'inactive')
+    .map((p: any) => {
+      const isSystemAdmin = p.is_platform_owner === true || p.role === 'super_admin' || p.role === 'company_admin';
+      const perms = (p.permissions && typeof p.permissions === 'object' ? p.permissions : {}) as Record<string, any>;
+      const explicitMode = String(perms.wa_access_mode || '');
+      let mode = explicitMode;
+      if (!mode) {
+        if (isSystemAdmin) mode = 'admin_all';
+        else {
+          const rPerms = p.custom_role_id ? rolePermMap.get(p.custom_role_id) : undefined;
+          const hasAll = Boolean(perms.wa_chat_all) || Boolean(rPerms?.has('wa_chat_all'));
+          const hasSoporte = Boolean(perms.wa_chat_soporte) || Boolean(rPerms?.has('wa_chat_soporte'));
+          const hasLeads = Boolean(perms.wa_chat_leads) || Boolean(rPerms?.has('wa_chat_leads'));
+          if (hasAll) mode = 'admin_all';
+          else if (hasSoporte && !hasLeads) mode = perms.wa_soporte_assigned_only ? 'soporte_assigned' : 'soporte_team';
+          else if (hasLeads && !hasSoporte) mode = perms.wa_leads_assigned_only ? 'ventas_assigned' : 'ventas_pool';
+          else if (hasSoporte && hasLeads) mode = 'admin_all';
+          else mode = 'none';
+        }
+      }
+      return {
+        id: p.id,
+        full_name: p.full_name || p.email || 'Usuario',
+        email: p.email || '',
+        role: p.role || 'sales_agent',
+        role_label: p.custom_role_id ? roleNameMap.get(p.custom_role_id) || p.role : p.role,
+        is_system_admin: isSystemAdmin,
+        access_mode: mode,
+      };
+    });
+
+  return json({ ok: true, members });
+}
+
+async function handleSetWaUserAccess(supabase: any, caller: Caller, payload: any): Promise<Response> {
+  const targetUserId = String(payload?.target_user_id || '');
+  const mode = String(payload?.access_mode || '');
+  const validModes = ['admin_all', 'soporte_team', 'soporte_assigned', 'ventas_pool', 'ventas_assigned', 'none'];
+  if (!targetUserId || !validModes.includes(mode)) {
+    return json({ ok: false, error: 'Datos de acceso inválidos' }, 400);
+  }
+
+  const { data: targetProf } = await supabase
+    .from('profiles')
+    .select('id, company_id, custom_role_id, permissions')
+    .eq('id', targetUserId)
+    .maybeSingle();
+  if (!targetProf) return json({ ok: false, error: 'Usuario no encontrado' }, 404);
+
+  const curPerms = (targetProf.permissions && typeof targetProf.permissions === 'object' ? targetProf.permissions : {}) as Record<string, any>;
+  const nextPerms: Record<string, any> = {
+    ...curPerms,
+    wa_access_mode: mode,
+    wa_chat_all: mode === 'admin_all',
+    wa_chat_soporte: mode === 'admin_all' || mode === 'soporte_team' || mode === 'soporte_assigned',
+    wa_chat_leads: mode === 'admin_all' || mode === 'ventas_pool' || mode === 'ventas_assigned',
+    wa_soporte_assigned_only: mode === 'soporte_assigned',
+    wa_leads_assigned_only: mode === 'ventas_assigned',
+  };
+
+  const { error } = await supabase.from('profiles').update({ permissions: nextPerms }).eq('id', targetUserId);
+  if (error) return json({ ok: false, error: error.message }, 500);
+
+  return json({ ok: true, target_user_id: targetUserId, access_mode: mode });
+}
+
 async function handleSetChannel(supabase: any, caller: Caller, payload: any): Promise<Response> {
   const ticketId = String(payload?.ticket_id || '');
   const ch = String(payload?.support_channel || '') as SupportChannelType;
@@ -2263,12 +2373,13 @@ async function handleClassify(supabase: any, caller: Caller, payload: any): Prom
           .limit(25);
         existing = (data || []).find((l: any) => last8(l.phone) === l8) || null;
       }
+      const targetOwnerId = caller.isAdmin && payload?.assign_to ? String(payload.assign_to) : caller.userId;
       if (existing) {
         leadId = existing.id;
         leadName = existing.name;
-        if (!existing.assigned_to) {
+        if (!existing.assigned_to || (caller.isAdmin && payload?.assign_to)) {
           // assigned_at is maintained by the trg_lead_assignment trigger.
-          await supabase.from('leads').update({ assigned_to: caller.userId }).eq('id', existing.id);
+          await supabase.from('leads').update({ assigned_to: targetOwnerId }).eq('id', existing.id);
         }
       } else {
         const name = String(payload?.lead_name || pushName || `WhatsApp +${phone}`).replace(/\(\+\d+\)/g, '').trim();
@@ -2281,7 +2392,7 @@ async function handleClassify(supabase: any, caller: Caller, payload: any): Prom
             status: 'Prospecto',
             priority: 'medium',
             source: 'WhatsApp',
-            assigned_to: caller.isAdmin && payload?.assign_to ? payload.assign_to : caller.userId,
+            assigned_to: targetOwnerId,
             next_action_notes: `[Desde Chat WhatsApp Soporte] ${String(meta.last_whatsapp_message || '').slice(0, 300)}`,
           })
           .select('id, name')
@@ -2349,7 +2460,7 @@ async function handleClassify(supabase: any, caller: Caller, payload: any): Prom
   if (leadId) {
     ticketUpdate.lead_id = leadId;
     ticketUpdate.lead_name = leadName;
-    ticketUpdate.assigned_to = t.assigned_to || caller.userId;
+    ticketUpdate.assigned_to = (caller.isAdmin && payload?.assign_to ? String(payload.assign_to) : null) || t.assigned_to || caller.userId;
   }
   if (clientName) ticketUpdate.lead_name = clientName;
   await supabase.from('tickets').update(ticketUpdate).eq('id', ticketId);

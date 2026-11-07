@@ -232,6 +232,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         setUser(null);
                         await supabase.auth.signOut();
                         window.location.href = '/login?paused=true';
+                        return;
+                    }
+                    if (newRow?.permissions && typeof newRow.permissions === 'object') {
+                        const wp = newRow.permissions as Record<string, any>;
+                        if (wp.wa_access_mode !== undefined) {
+                            setProfile(prev => prev ? {
+                                ...prev,
+                                permissions: {
+                                    ...(prev.permissions || {}),
+                                    wa_access_mode: wp.wa_access_mode,
+                                    wa_chat_all: Boolean(wp.wa_chat_all),
+                                    wa_chat_soporte: Boolean(wp.wa_chat_soporte),
+                                    wa_chat_leads: Boolean(wp.wa_chat_leads),
+                                    wa_soporte_assigned_only: Boolean(wp.wa_soporte_assigned_only),
+                                    wa_leads_assigned_only: Boolean(wp.wa_leads_assigned_only),
+                                }
+                            } : prev);
+                        }
                     }
                 }
             )
@@ -445,6 +463,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     console.error('[AuthProvider] Error applying company license intersection:', e);
                     // On error: keep activePerms as-is (fail open for non-admin, not fail closed)
                 }
+            }
+
+            // Preserve explicit per-user WhatsApp access profile configured by Admin
+            const rawUserPerms = (data?.permissions && typeof data.permissions === 'object')
+                ? (data.permissions as Record<string, any>)
+                : {};
+            if (rawUserPerms.wa_access_mode) {
+                (activePerms as any).wa_access_mode = rawUserPerms.wa_access_mode;
+                activePerms.wa_chat_all = Boolean(rawUserPerms.wa_chat_all);
+                activePerms.wa_chat_soporte = Boolean(rawUserPerms.wa_chat_soporte);
+                activePerms.wa_chat_leads = Boolean(rawUserPerms.wa_chat_leads);
+                (activePerms as any).wa_soporte_assigned_only = Boolean(rawUserPerms.wa_soporte_assigned_only);
+                (activePerms as any).wa_leads_assigned_only = Boolean(rawUserPerms.wa_leads_assigned_only);
             }
 
             let finalProfile = { ...data, permissions: activePerms } as Profile;

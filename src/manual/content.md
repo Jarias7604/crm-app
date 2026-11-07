@@ -521,19 +521,112 @@ Este botón también corre automáticamente cada 4 horas en el servidor — no n
 
 ---
 
-## 12. Preguntas Frecuentes (FAQ)
+## 12. Service Hub — Centro de Operaciones y Ventas WhatsApp
+
+### Descripción General
+El módulo **Chat WhatsApp** (`/support/chat`) dentro del **Service Hub** unifica en una sola pantalla de alta velocidad tanto la **Atención de Soporte Técnico** (grupos de clientes y clientes individuales) como la **Captación y Cotización de Nuevos Leads Comerciales**, manteniendo ambas áreas estrictamente separadas según el rol de cada colaborador.
+
+> **Acceso directo:** Menú lateral → **Service Hub → Chat WhatsApp** (`/support/chat`)
+
+---
+
+### 🛡️ Control de Accesos por Área (Admin · Técnicos · Vendedores)
+
+Desde el botón **"Accesos"** ubicado en la esquina superior derecha del Chat WhatsApp, el **Administrador** puede definir en **1 solo clic** qué conversaciones y alertas ve cada miembro del equipo (protegido tanto en pantalla como en la base de datos mediante políticas RLS):
+
+| Perfil de Acceso | ¿Qué pestañas y chats puede ver? | ¿Qué tiene bloqueado? | ¿Cuándo suena su campana 🔔? |
+|------------------|----------------------------------|-----------------------|------------------------------|
+| **🛡️ Administrador (Ve Todo)** | `Todos`, `Sin contestar`, `Soporte`, `Leads nuevos · por tomar`, `Leads` (de todos los vendedores), `Equipo` y `Spam` | Nada — control total, reclasificación y configuración de IA | En cualquier mensaje entrante de Soporte o Ventas (con filtro por área) |
+| **🔧 Técnico — Equipo Soporte** | Únicamente la bandeja **`Soporte`** (grupos de WhatsApp de clientes y chats 1-a-1 de clientes) y `Otros tickets` | **0% acceso a Ventas**: no ve `Leads nuevos`, ni `Leads`, ni `Equipo` | **Solo** cuando escribe un cliente o grupo de **Soporte** |
+| **🔧🔒 Técnico — Solo Asignados** | Únicamente los chats de **`Soporte`** donde él sea el técnico asignado (`Atiende: Su Nombre`) | No ve chats de soporte de otros técnicos ni nada de Ventas/Leads | **Solo** cuando escriben en un caso de Soporte asignado a él |
+| **💼 Vendedor — Cola Nueva + Mis Leads** | **`Leads nuevos · por tomar`** (números nuevos pidiendo precios/información) + **`Mis leads`** (solo sus propios prospectos) | **No puede ver** los leads de otros vendedores ni los grupos/chats de `Soporte` | **Solo** cuando entra un Lead nuevo por tomar o responde uno de **sus propios Leads** |
+| **💼🔒 Vendedor — Solo Leads Asignados** | Únicamente **`Mis leads`** que el Administrador le haya asignado directamente | No ve la bolsa común `Leads nuevos · por tomar`, ni leads de otros, ni `Soporte` | **Solo** cuando le escribe uno de sus propios Leads asignados |
+| **🚫 Sin acceso a WhatsApp** | Ninguno (pantalla de acceso restringido) | Todo el módulo de Chat WhatsApp | Nunca |
+
+> **Simulador Rápido de Vista para el Admin:** Dentro del mismo modal **"Accesos"**, el Administrador cuenta con los botones **"Vista Admin (Todo)"**, **"Probar como Técnico"** y **"Probar como Vendedor"** para verificar al instante cómo ve la pantalla cada rol sin necesidad de cerrar sesión.
+
+---
+
+### 🔔 Centro de Alertas y Alarma Sonora Inteligente
+
+Para garantizar que ningún cliente de soporte ni prospecto de ventas se quede esperando respuesta:
+
+1. **Campana Interactiva (`Alertas`)**:
+   - Se ilumina en **rojo** y vibra cuando entra un mensaje nuevo o cuando hay conversaciones urgentes (`> 15 min` sin contestar) o `Leads nuevos por tomar`.
+   - Al hacer clic en la campana se despliega el **Centro de Alertas WhatsApp** dividido en:
+     - **Leads nuevos por tomar / cotizar**
+     - **Urgentes > 15 min sin contestar**
+     - **En espera reciente (< 15 min)**
+   - Los Administradores disponen además de un filtro rápido dentro de la campana (**Todo** · **Ventas / Leads** · **Soporte Técnico**).
+2. **Alarma Sonora Garantizada (Web Audio API)**:
+   - Incluye un botón de altavoz en la cabecera para activar/silenciar el sonido y el botón **"Probar alarma"** dentro de la campana para verificar el volumen del equipo en cualquier momento.
+   - Emite un doble tono prioritario cuando entra un **Nuevo Lead** y un timbre claro cuando escribe un cliente activo.
+3. **Aviso en Escritorio y Pestaña del Navegador**:
+   - Permite activar **Notificaciones de Escritorio de Windows/Mac** incluso si el navegador está minimizado, y muestra en vivo el contador `(N) Sin contestar · Arias CRM` en la pestaña del navegador.
+
+---
+
+### ⏱️ Semáforo SLA de Tiempo de Espera y Sub-Filtros Operativos
+
+Cada conversación que tiene el último mensaje enviado por el cliente muestra automáticamente cuánto tiempo lleva esperando respuesta:
+
+- 🟢 **Verde (`1m – 4m`)**: En tiempo óptimo de respuesta.
+- 🟡 **Ámbar (`5m – 14m`)**: Atención recomendada pronto.
+- 🔴 **Rojo (`>= 15m`)**: Urgente — requiere respuesta inmediata.
+
+Debajo de las pestañas principales tienes la barra de **Sub-filtros rápidos**:
+- **`Todos`** · **`Míos (N)`** · **`Sin asignar (N)`** · **`Urgentes >15m (N)`** (ordena automáticamente primero al cliente que lleva más minutos esperando).
+- Cuando estás en la pestaña **`Soporte`**, aparece además el selector de área (**Todas las áreas** · **Soporte / Operaciones** · **Contabilidad / Finanzas** · **Otros**).
+
+---
+
+### 💼 Flujo Comercial en 1 Clic: Tomar Lead, Cotizar y Enviar Propuesta
+
+Cuando un número desconocido escribe preguntando por precios, planes o información:
+
+1. **Clasificación Automática en `Leads nuevos · por tomar`**:
+   - Si el número no pertenece a ningún grupo de soporte ni está registrado en Clientes, entra en `Leads nuevos · por tomar`.
+2. **Botón Anti-Choque `"Tomar Lead (asignado a mí)"`**:
+   - El primer vendedor que hace clic en **"Tomar Lead (asignado a mí)"** (o en **"Cotizar"**) reclama el número de forma atómica: el sistema crea el Lead en el CRM asignado a ese vendedor y **desaparece al instante de la bandeja de los demás vendedores**, evitando que dos asesores le escriban al mismo prospecto.
+   - Si eres **Administrador**, tienes además el selector **"Asignar directo a vendedor..."** para delegar el lead nuevo a cualquier asesor en un clic.
+3. **Cotización y Propuestas desde el Chat**:
+   - **Botón `Cotizar`**: Abre el constructor de cotizaciones (`/cotizaciones/nueva-pro`) con los datos del prospecto ya precargados.
+   - **Menú `Propuestas (N)`**: Lista las cotizaciones existentes del prospecto con su monto y el botón **"Pasar al chat"** para insertar el enlace público de la propuesta formal en 1 clic.
+   - **Selector de Etapa en Vivo**: Cambia la etapa del Lead (`Prospecto`, `Calificado`, `Propuesta Enviada`, `Negociación`, `Cerrado`, etc.) sin salir de la conversación.
+
+---
+
+### ⚡ Plantillas Rápidas Multi-Industria y Notas Internas de Equipo
+
+En la barra inferior donde escribes los mensajes cuentas con 3 herramientas de productividad diseñadas para cualquier giro de negocio del SaaS:
+
+1. **Modo `WhatsApp (Cliente)` vs `Nota interna (Equipo)`**:
+   - Al cambiar al botón ámbar **`Nota interna`**, el cuadro de texto se vuelve amarillo y todo lo que escribas se guarda como un **comentario privado interno del equipo** dentro del historial del chat (con fecha y autor), **sin enviarse nunca al WhatsApp del cliente**. Ideal para dejar indicaciones entre técnicos, contadores, vendedores y administradores.
+2. **Respuestas Rápidas en 1 Clic + Botón `+ Plantillas`**:
+   - Muestra botones rápidos adaptados automáticamente según el chat sea de **Ventas** (`Saludo + Giro`, `Pedir datos cotización`, `Agendar Demo`, `Seguimiento propuesta`) o de **Soporte** (`En revisión`, `Pedir captura / detalle`, `Acceso remoto`, `Confirmar solución`).
+   - Con el botón **`+ Plantillas`**, cada empresa puede crear y guardar sus propias plantillas personalizadas para su industria.
+
+---
+
+## 13. Preguntas Frecuentes (FAQ)
 
 ### ¿Cómo agrego un nuevo lead manualmente?
 Ve a **Leads → Nuevo Lead**, completa el formulario con nombre, teléfono, fuente y etapa inicial, y haz clic en **Guardar**. El sistema le asignará un AI Score automáticamente.
+
+### ¿Cómo configuro que los técnicos solo vean Soporte y los vendedores solo vean Ventas en WhatsApp?
+Entra a **Service Hub → Chat WhatsApp** y haz clic en el botón negro **"Accesos"** arriba a la derecha (visible para Administradores). Ahí verás la lista de todo tu equipo y podrás elegir en 1 clic para cada persona si es **Técnico — Equipo Soporte**, **Técnico — Solo Asignados**, **Vendedor — Cola Nueva + Mis Leads**, **Vendedor — Solo Leads Asignados** o **Administrador (Ve Todo)**.
+
+### ¿Cómo pruebo que la alarma de WhatsApp suene en mi computadora?
+En **Service Hub → Chat WhatsApp**, haz clic en el botón **"Alertas"** (campana) arriba a la derecha y presiona el botón azul **"Probar alarma"**. Asegúrate también de tener marcada la casilla **"Sonido al recibir mensajes"**.
 
 ### ¿Cómo restablezco mi contraseña?
 En la pantalla de inicio de sesión, haz clic en **¿Olvidaste tu contraseña? Entra con código mágico**. Recibirás un enlace de recuperación en tu correo registrado.
 
 ### ¿Cómo asigno un lead a otro agente?
-Abre el detalle del lead y en el campo **Asignado a**, selecciona el agente deseado del menú desplegable. El sistema notificará automáticamente al agente vía Telegram.
+Abre el detalle del lead (o el selector de vendedor en la cabecera del Chat WhatsApp) y selecciona el agente deseado del menú desplegable.
 
 ### ¿Cómo genero una cotización desde un lead?
-Dentro del detalle del lead, haz clic en **Crear Cotización**. El motor de cotizaciones se abrirá con los datos del lead precargados.
+Dentro del detalle del lead o directamente desde el botón **"Cotizar"** en la cabecera del Chat WhatsApp. El motor de cotizaciones se abrirá con los datos del lead precargados.
 
 ### ¿Cómo configuro las etapas del pipeline o revierto un Lead?
 Ve a **Admin → Pipeline** y arrastra las etapas para reordenarlas, edita sus nombres y marca hitos importantes. En el Tablero visual, los agentes también pueden utilizar el botón **"Revertir"** para regresar un Lead a la etapa anterior si hubo equivocaciones o re-negociaciones.
@@ -546,4 +639,4 @@ Es el **AI Lead Score**. Indica qué tan probable es que el lead cierre. 🔥 = 
 
 ---
 
-*Arias CRM Professional — Documentación v5.1 — Actualizada Junio 2026*
+*Arias CRM Professional — Documentación v5.2 — Actualizada Noviembre 2026*

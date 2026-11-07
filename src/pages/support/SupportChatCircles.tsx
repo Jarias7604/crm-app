@@ -69,7 +69,9 @@ import {
   getWaScope,
   isWhatsappTicket,
   WA_SCOPE_LABELS,
+  WA_ACCESS_MODE_OPTIONS,
   type WaScope,
+  type WaAccessMode,
 } from '../../lib/whatsappScopes';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -358,6 +360,16 @@ interface LeadQuoteSummary {
   created_at: string;
 }
 
+interface TeamWaAccessMember {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  role_label: string;
+  is_system_admin: boolean;
+  access_mode: WaAccessMode;
+}
+
 type OwnerSubFilter = 'all' | 'mine' | 'unassigned' | 'urgent';
 
 interface WaMessageRow {
@@ -417,7 +429,15 @@ export const SupportChatCircles: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { profile, simulatedCompanyId } = useAuth();
   const activeCompanyId = simulatedCompanyId || profile?.company_id;
-  const scopes = useMemo(() => getWaViewerScopes(profile as any), [profile]);
+  const isRealAdmin = Boolean(
+    profile?.is_platform_owner === true ||
+      profile?.role === 'super_admin' ||
+      profile?.role === 'company_admin' ||
+      (profile?.permissions as any)?.wa_chat_all === true ||
+      (profile?.permissions as any)?.wa_access_mode === 'admin_all'
+  );
+  const [adminPreviewMode, setAdminPreviewMode] = useState<WaAccessMode | null>(null);
+  const scopes = useMemo(() => getWaViewerScopes(profile as any, adminPreviewMode), [profile, adminPreviewMode]);
 
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -488,10 +508,17 @@ export const SupportChatCircles: React.FC = () => {
     });
   };
   const [showAlertsPopover, setShowAlertsPopover] = useState(false);
+  const [alertAreaFilter, setAlertAreaFilter] = useState<'all' | 'ventas' | 'soporte'>('all');
   const [bellRinging, setBellRinging] = useState(false);
   const [slaTick, setSlaTick] = useState(0);
   const prevLastMsgRef = useRef<Record<string, string>>({});
   const initialLoadedRef = useRef(false);
+
+  // Team WhatsApp Access & Role Control Modal (Admin)
+  const [showTeamAccessModal, setShowTeamAccessModal] = useState(false);
+  const [teamAccessList, setTeamAccessList] = useState<TeamWaAccessMember[]>([]);
+  const [loadingTeamAccess, setLoadingTeamAccess] = useState(false);
+  const [savingUserAccessId, setSavingUserAccessId] = useState<string | null>(null);
 
   // Quotes & Lead management inside chat
   const [leadQuotes, setLeadQuotes] = useState<LeadQuoteSummary[]>([]);
@@ -785,6 +812,27 @@ export const SupportChatCircles: React.FC = () => {
         ? Math.max(1, Math.floor((Date.now() - new Date(lastMessageAt).getTime()) / 60000))
         : 0;
 
+      // Strict per-role scope & alert isolation (enforced both here and in DB RLS):
+      // - Técnicos only see 'soporte' (never sales leads or unclassified pool).
+      // - Vendedores only see 'por_clasificar' (if leadsPool) and their own 'lead' (never support or other vendors' leads).
+      // - Admins ('all') see everything.
+      if (!scopes.all) {
+        if (scope === 'interno' || scope === 'spam') return;
+        if (scope === 'soporte') {
+          if (!scopes.soporte) return;
+          if (scopes.soporteAssignedOnly && assignedTechId !== profile?.id) return;
+        }
+        if (scope === 'por_clasificar') {
+          if (!scopes.leads || !scopes.leadsPool) return;
+        }
+        if (scope === 'lead') {
+          if (!scopes.leads) return;
+          // In live session, vendor only sees leads assigned to them.
+          // (If Admin is previewing 'ventas_pool'/'ventas_assigned', show leads assigned to Admin or all if none assigned to Admin so preview is informative)
+          if (!adminPreviewMode && assignedTechId !== profile?.id && leadOwnerId !== profile?.id) return;
+        }
+      }
+
       list.push({
         circleId: key,
         clientName,
@@ -820,7 +868,7 @@ export const SupportChatCircles: React.FC = () => {
       return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickets, categories, agents, realClients, companyLeads, scopes.soporte, slaTick]);
+  }, [tickets, categories, agents, realClients, companyLeads, scopes, profile?.id, adminPreviewMode, slaTick]);
 
   const isUnread = (c: SupportCircle) => c.unreadOrWaitingReply && readCirclesMap[c.circleId] !== c.lastMessageAt;
   const isMine = (c: SupportCircle) =>
@@ -958,7 +1006,9 @@ export const SupportChatCircles: React.FC = () => {
     ];
     if (scopes.soporte) tabs.push({ id: 'soporte', label: `Soporte (${counts.soporte})`, icon: Building2 });
     if (scopes.leads) {
-      tabs.push({ id: 'por_clasificar', label: `Leads nuevos · por tomar (${counts.por_clasificar})`, icon: HelpCircle, alert: counts.por_clasificar > 0 });
+      if (scopes.leadsPool) {
+        tabs.push({ id: 'por_clasificar', label: `Leads nuevos · por tomar (${counts.por_clasificar})`, icon: HelpCircle, alert: counts.por_clasificar > 0 });
+      }
       tabs.push({ id: 'lead', label: `${scopes.all ? 'Leads' : 'Mis leads'} (${counts.lead})`, icon: UserPlus });
     }
     if (scopes.all) {
@@ -1611,7 +1661,16 @@ export const SupportChatCircles: React.FC = () => {
   }, [activeCircle, customQuickReplies]);
 
   const alertCircles = useMemo(() => {
-    const wa = circles.filter((c) => c.isWhatsApp && c.scope !== 'spam');
+    const wa = circles.filter((c) => {
+      if (!c.isWhatsApp || c.scope === 'spam') return false;
+      if (scopes.all && alertAreaFilter === 'ventas') {
+        return c.scope === 'por_clasificar' || c.scope === 'lead';
+      }
+      if (scopes.all && alertAreaFilter === 'soporte') {
+        return c.scope === 'soporte';
+      }
+      return true;
+    });
     const urgent = wa
       .filter((c) => c.unreadOrWaitingReply && c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60)
       .sort((a, b) => b.waitMinutes - a.waitMinutes);
@@ -1620,7 +1679,40 @@ export const SupportChatCircles: React.FC = () => {
       .filter((c) => c.unreadOrWaitingReply && c.waitMinutes < 15 && c.scope !== 'por_clasificar')
       .sort((a, b) => b.waitMinutes - a.waitMinutes);
     return { urgent, newLeads, waitingRecent, total: urgent.length + newLeads.length + waitingRecent.length };
-  }, [circles]);
+  }, [circles, scopes.all, alertAreaFilter]);
+
+  const openTeamAccessModal = async () => {
+    setShowTeamAccessModal(true);
+    setLoadingTeamAccess(true);
+    try {
+      const res = await invoke({ action: 'get_wa_team_access', company_id: activeCompanyId });
+      setTeamAccessList((res?.members || []) as TeamWaAccessMember[]);
+    } catch (e: any) {
+      toast.error(e?.message || 'Error al cargar accesos del equipo');
+    } finally {
+      setLoadingTeamAccess(false);
+    }
+  };
+
+  const handleChangeUserWaAccess = async (targetUserId: string, nextMode: WaAccessMode) => {
+    setSavingUserAccessId(targetUserId);
+    try {
+      await invoke({
+        action: 'set_wa_user_access',
+        target_user_id: targetUserId,
+        access_mode: nextMode,
+      });
+      setTeamAccessList((prev) =>
+        prev.map((m) => (m.id === targetUserId ? { ...m, access_mode: nextMode } : m))
+      );
+      const opt = WA_ACCESS_MODE_OPTIONS.find((o) => o.mode === nextMode);
+      toast.success(`Acceso actualizado: ${opt?.shortLabel || nextMode}`);
+    } catch (e: any) {
+      toast.error(e?.message || 'No se pudo actualizar el acceso');
+    } finally {
+      setSavingUserAccessId(null);
+    }
+  };
 
   const handleCompleteAndCloseTicket = async (notifyClient: boolean) => {
     if (!activeCircle || !aiTimeAudit) return;
@@ -1974,6 +2066,32 @@ export const SupportChatCircles: React.FC = () => {
                   )}
                 </div>
 
+                {scopes.all && (
+                  <div className="px-4 py-2 bg-white border-b border-slate-100 flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold text-slate-400 mr-1">Filtrar área:</span>
+                    {(
+                      [
+                        { id: 'all', label: 'Todo' },
+                        { id: 'ventas', label: 'Ventas / Leads' },
+                        { id: 'soporte', label: 'Soporte Técnico' },
+                      ] as const
+                    ).map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setAlertAreaFilter(f.id)}
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black transition ${
+                          alertAreaFilter === f.id
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
                   {alertCircles.total === 0 ? (
                     <div className="p-6 text-center space-y-1">
@@ -2091,11 +2209,37 @@ export const SupportChatCircles: React.FC = () => {
             )}
           </div>
 
-          <span className="hidden md:inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#EEF0FF] text-indigo-700">
-            {roleChip}
-          </span>
-          {scopes.all && (
+          {adminPreviewMode ? (
+            <button
+              type="button"
+              onClick={() => {
+                setAdminPreviewMode(null);
+                setCircleFilter('all');
+                toast.success('Volviste a la vista completa de Administrador');
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-amber-500 text-white hover:bg-amber-600 transition shadow-xs"
+              title="Salir de la vista previa y volver a ver todo como Admin"
+            >
+              <span>
+                Vista previa: {WA_ACCESS_MODE_OPTIONS.find((o) => o.mode === adminPreviewMode)?.shortLabel} (Salir ✕)
+              </span>
+            </button>
+          ) : (
+            <span className="hidden md:inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#EEF0FF] text-indigo-700">
+              {roleChip}
+            </span>
+          )}
+          {isRealAdmin && (
             <>
+              <button
+                type="button"
+                onClick={openTeamAccessModal}
+                title="Configurar qué ven los Técnicos, los Vendedores y los Administradores"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black bg-slate-900 text-white hover:bg-slate-800 transition shadow-xs"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Accesos</span>
+              </button>
               <button
                 onClick={() => setShowAiPromptModal(true)}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#EEF0FF] text-indigo-700 hover:bg-indigo-100 transition"
@@ -2630,11 +2774,32 @@ export const SupportChatCircles: React.FC = () => {
                       type="button"
                       disabled={classifying}
                       onClick={() => classify('lead')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs disabled:opacity-50"
                     >
-                      {classifying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
-                      Crear lead (asignado a mí)
+                      {classifying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
+                      Tomar Lead (asignado a mí)
                     </button>
+                    {scopes.all && agents.length > 0 && (
+                      <select
+                        disabled={classifying}
+                        defaultValue=""
+                        onChange={(e) => {
+                          const targetAgentId = e.target.value;
+                          if (!targetAgentId) return;
+                          classify('lead', { assign_to: targetAgentId });
+                        }}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50 cursor-pointer focus:outline-none disabled:opacity-50"
+                      >
+                        <option value="" disabled>
+                          Asignar directo a vendedor...
+                        </option>
+                        {agents.map((ag) => (
+                          <option key={ag.id} value={ag.id}>
+                            {ag.full_name || ag.email}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                     {scopes.all && (
                       <button
                         type="button"
@@ -3448,6 +3613,178 @@ export const SupportChatCircles: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Team WhatsApp Access & Role Control Modal (Admin) ── */}
+      {showTeamAccessModal && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
+          onClick={() => setShowTeamAccessModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-indigo-600" />
+                  <h3 className="text-base font-black text-slate-900">
+                    Control de Accesos WhatsApp por Área (Admin · Técnicos · Ventas)
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Define en 1 clic qué bandeja, chats y alertas puede ver cada miembro de tu equipo (protegido también por base de datos RLS).
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTeamAccessModal(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Visual Guide of the 3 Core Profiles */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-xs">
+              <div className="bg-white p-2.5 rounded-xl border border-indigo-100 space-y-1">
+                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800">
+                  Administradores
+                </span>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  Ven <strong>Todo</strong>: Soporte, Leads nuevos, todos los Leads de todos los vendedores, Equipo, Spam e IA.
+                </p>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-sky-100 space-y-1">
+                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-100 text-sky-800">
+                  Técnicos (Soporte)
+                </span>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  Solo ven <strong>Soporte</strong> (grupos y clientes). <strong>0% acceso a Ventas/Leads</strong>; su campana solo suena por Soporte.
+                </p>
+              </div>
+              <div className="bg-white p-2.5 rounded-xl border border-emerald-100 space-y-1">
+                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                  Vendedores (Ventas)
+                </span>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  Solo ven <strong>Leads nuevos · por tomar</strong> y <strong>Mis leads</strong>. No ven los leads de otro vendedor ni Soporte.
+                </p>
+              </div>
+            </div>
+
+            {/* 1-Click Preview Mode for Admin */}
+            <div className="flex items-center justify-between gap-2 flex-wrap bg-[#EEF0FF]/70 px-3.5 py-2.5 rounded-2xl border border-indigo-200/70">
+              <div className="text-xs">
+                <span className="font-black text-indigo-950">Simulador rápido de vista:</span>{' '}
+                <span className="text-indigo-800 font-medium">Comprueba cómo ve la pantalla cada perfil sin cerrar sesión.</span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {(
+                  [
+                    { mode: null, label: 'Vista Admin (Todo)' },
+                    { mode: 'soporte_team' as WaAccessMode, label: 'Probar como Técnico' },
+                    { mode: 'ventas_pool' as WaAccessMode, label: 'Probar como Vendedor' },
+                  ]
+                ).map((p) => {
+                  const active = adminPreviewMode === p.mode;
+                  return (
+                    <button
+                      key={String(p.mode)}
+                      type="button"
+                      onClick={() => {
+                        setAdminPreviewMode(p.mode);
+                        if (p.mode === 'soporte_team') setCircleFilter('soporte');
+                        else if (p.mode === 'ventas_pool') setCircleFilter('por_clasificar');
+                        else setCircleFilter('all');
+                        toast.success(`Vista cambiada a: ${p.label}`);
+                      }}
+                      className={`px-2.5 py-1 rounded-xl text-[11px] font-black transition ${
+                        active
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-white text-indigo-800 border border-indigo-200 hover:bg-indigo-50'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Team Member Access Table */}
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl">
+              {loadingTeamAccess ? (
+                <div className="p-8 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                  <span>Cargando miembros del equipo...</span>
+                </div>
+              ) : teamAccessList.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400">No se encontraron usuarios activos en la empresa.</div>
+              ) : (
+                teamAccessList.map((member) => {
+                  const currentOpt =
+                    WA_ACCESS_MODE_OPTIONS.find((o) => o.mode === member.access_mode) || WA_ACCESS_MODE_OPTIONS[0];
+                  const isSaving = savingUserAccessId === member.id;
+                  return (
+                    <div key={member.id} className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-50/70">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-slate-900 text-white font-black text-xs flex items-center justify-center shrink-0">
+                          {initials(member.full_name)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs font-black text-slate-900 truncate">{member.full_name}</p>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${currentOpt.badgeColor}`}>
+                              {currentOpt.shortLabel}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate">
+                            {member.email} · Rol base: <span className="font-semibold text-slate-700">{member.role_label}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />}
+                        {member.is_system_admin ? (
+                          <span className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-black">
+                            Administrador del Sistema (Ve Todo)
+                          </span>
+                        ) : (
+                          <select
+                            disabled={isSaving}
+                            value={member.access_mode}
+                            onChange={(e) => handleChangeUserWaAccess(member.id, e.target.value as WaAccessMode)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-300 text-slate-800 hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer disabled:opacity-50"
+                          >
+                            {WA_ACCESS_MODE_OPTIONS.map((opt) => (
+                              <option key={opt.mode} value={opt.mode}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500">
+              <span>Los cambios se aplican en tiempo real sin necesidad de que el usuario cierre sesión.</span>
+              <button
+                type="button"
+                onClick={() => setShowTeamAccessModal(false)}
+                className="px-4 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition"
+              >
+                Listo
+              </button>
             </div>
           </div>
         </div>
