@@ -49,6 +49,9 @@ import {
   Receipt,
   Flame,
   User,
+  Filter,
+  Zap,
+  MoreHorizontal,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
@@ -313,11 +316,11 @@ function detectShortCategory(catName: string, title: string): { code: string; na
 }
 
 const SCOPE_STYLE: Record<WaScope, { avatar: string; chip: string; icon: React.ElementType }> = {
-  soporte: { avatar: 'bg-indigo-600', chip: 'bg-indigo-50 text-indigo-700 border-indigo-200/60', icon: Building2 },
-  por_clasificar: { avatar: 'bg-amber-500', chip: 'bg-amber-50 text-amber-800 border-amber-200', icon: HelpCircle },
-  lead: { avatar: 'bg-emerald-600', chip: 'bg-emerald-50 text-emerald-700 border-emerald-200/70', icon: UserPlus },
-  interno: { avatar: 'bg-slate-500', chip: 'bg-slate-100 text-slate-700 border-slate-200', icon: ShieldCheck },
-  spam: { avatar: 'bg-rose-400', chip: 'bg-rose-50 text-rose-700 border-rose-200', icon: Ban },
+  soporte: { avatar: 'bg-slate-100 text-slate-700', chip: 'bg-slate-100 text-slate-600 border-slate-200/80', icon: Building2 },
+  por_clasificar: { avatar: 'bg-amber-50 text-amber-700', chip: 'bg-amber-50 text-amber-800 border-amber-200/80', icon: HelpCircle },
+  lead: { avatar: 'bg-indigo-50 text-indigo-700', chip: 'bg-slate-100 text-slate-600 border-slate-200/80', icon: UserPlus },
+  interno: { avatar: 'bg-slate-100 text-slate-600', chip: 'bg-slate-100 text-slate-600 border-slate-200/80', icon: ShieldCheck },
+  spam: { avatar: 'bg-rose-50 text-rose-600', chip: 'bg-rose-50 text-rose-700 border-rose-200/80', icon: Ban },
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -492,6 +495,8 @@ export const SupportChatCircles: React.FC = () => {
   const [showClientPicker, setShowClientPicker] = useState(false);
   const [clientPickerQuery, setClientPickerQuery] = useState('');
   const [showReclassifyMenu, setShowReclassifyMenu] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [showQuickRepliesPopover, setShowQuickRepliesPopover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -1904,66 +1909,21 @@ export const SupportChatCircles: React.FC = () => {
 
   return (
     <div className="h-screen flex-1 flex flex-col bg-[#F5F6FA] overflow-hidden">
-      {/* ── TOP HEADER ── */}
-      <header className="h-14 bg-white border-b border-slate-200/80 px-5 flex items-center justify-between shrink-0 z-30 relative">
-        <div className="flex items-center gap-3 min-w-0">
+      {/* ── TOP HEADER (100% Light & Vector Clean) ── */}
+      <header className="h-13 bg-white border-b border-slate-200/80 px-5 flex items-center justify-between shrink-0 z-30 relative">
+        <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-2">
-            <div className="w-1 h-5 rounded-full bg-indigo-600" />
-            <span className="text-sm font-black text-slate-900 tracking-tight">Chat WhatsApp</span>
+            <div className="w-1 h-4 rounded-full bg-indigo-600" />
+            <span className="text-sm font-bold text-slate-900 tracking-tight">Chat WhatsApp</span>
           </div>
           <span className="text-slate-300 hidden sm:inline">|</span>
-          <span className="text-xs font-medium text-slate-600 hidden sm:inline truncate">
-            {greetingTime()}, <strong className="font-black text-slate-900">{profile?.full_name?.split(' ')[0] || ''}</strong>
+          <span className="text-xs text-slate-500 hidden sm:inline truncate">
+            {greetingTime()}, <strong className="font-bold text-slate-800">{profile?.full_name?.split(' ')[0] || ''}</strong>
           </span>
-          <span className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#EEF0FF] text-indigo-700">
+          <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200/70">
             <Phone className="w-3 h-3 text-indigo-600" />
             +503 7971-8911
           </span>
-
-          {/* Executive Live Pulse KPIs */}
-          <div className="hidden xl:flex items-center gap-1.5 ml-2">
-            <button
-              type="button"
-              onClick={() => {
-                setCircleFilter('waiting');
-                setOwnerFilter('all');
-              }}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold border transition ${
-                counts.waiting > 0
-                  ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                  : 'bg-slate-50 text-slate-500 border-slate-200/70 hover:bg-slate-100'
-              }`}
-            >
-              <Clock className="w-3 h-3" />
-              <span>Sin contestar: {counts.waiting}</span>
-            </button>
-            {counts.slaCritical > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCircleFilter('all');
-                  setOwnerFilter('urgent');
-                }}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-xs hover:bg-rose-700 animate-pulse transition"
-              >
-                <Flame className="w-3 h-3" />
-                <span>Urgentes &gt;15m: {counts.slaCritical}</span>
-              </button>
-            )}
-            {scopes.leads && counts.por_clasificar > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCircleFilter('por_clasificar');
-                  setOwnerFilter('all');
-                }}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition"
-              >
-                <UserPlus className="w-3 h-3 text-amber-600" />
-                <span>Leads por tomar: {counts.por_clasificar}</span>
-              </button>
-            )}
-          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -1972,11 +1932,9 @@ export const SupportChatCircles: React.FC = () => {
             type="button"
             onClick={toggleSound}
             title={soundEnabled ? 'Alarma sonora activada (clic para silenciar)' : 'Alarma silenciada (clic para activar y probar)'}
-            className={`p-2 rounded-full transition ${
-              soundEnabled ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
-            }`}
+            className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-600 transition"
           >
-            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-indigo-600" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
           </button>
 
           {/* Interactive Alert Bell & Notification Center */}
@@ -1985,26 +1943,20 @@ export const SupportChatCircles: React.FC = () => {
               type="button"
               onClick={() => setShowAlertsPopover((v) => !v)}
               title="Centro de Alertas y Seguimiento"
-              className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black transition ${
-                alertCircles.urgent.length > 0 || alertCircles.newLeads.length > 0 || bellRinging
-                  ? 'bg-rose-600 text-white shadow-sm hover:bg-rose-700'
-                  : alertCircles.total > 0
-                  ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+              className="relative inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 text-xs font-semibold transition"
             >
               {alertCircles.total > 0 || bellRinging ? (
-                <BellRing className={`w-3.5 h-3.5 ${bellRinging ? 'animate-bounce' : ''}`} />
+                <BellRing className={`w-3.5 h-3.5 text-indigo-600 ${bellRinging ? 'animate-bounce' : ''}`} />
               ) : (
-                <Bell className="w-3.5 h-3.5" />
+                <Bell className="w-3.5 h-3.5 text-slate-500" />
               )}
               <span>Alertas</span>
               {alertCircles.total > 0 && (
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold border ${
                     alertCircles.urgent.length > 0 || alertCircles.newLeads.length > 0
-                      ? 'bg-white text-rose-700'
-                      : 'bg-amber-600 text-white'
+                      ? 'bg-rose-50 text-rose-600 border-rose-200'
+                      : 'bg-indigo-50 text-indigo-700 border-indigo-200'
                   }`}
                 >
                   {alertCircles.total}
@@ -2013,11 +1965,11 @@ export const SupportChatCircles: React.FC = () => {
             </button>
 
             {showAlertsPopover && (
-              <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-slate-200 rounded-3xl shadow-2xl z-50 overflow-hidden">
-                <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between">
+              <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                <div className="px-4 py-3 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <BellRing className="w-4 h-4 text-amber-400" />
-                    <span className="text-xs font-black tracking-tight">Centro de Alertas WhatsApp</span>
+                    <BellRing className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs font-bold text-slate-900 tracking-tight">Centro de Alertas WhatsApp</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -2027,14 +1979,14 @@ export const SupportChatCircles: React.FC = () => {
                         if (ok) toast.success('Alarma sonora verificada correctamente');
                         else toast.error('El navegador bloqueó el audio; haz clic e intenta de nuevo');
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[10px] font-black text-white transition"
+                      className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 text-[10px] font-bold text-indigo-700 transition"
                     >
                       Probar alarma
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowAlertsPopover(false)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-white"
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -2217,15 +2169,16 @@ export const SupportChatCircles: React.FC = () => {
                 setCircleFilter('all');
                 toast.success('Volviste a la vista completa de Administrador');
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-amber-500 text-white hover:bg-amber-600 transition shadow-xs"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition"
               title="Salir de la vista previa y volver a ver todo como Admin"
             >
               <span>
-                Vista previa: {WA_ACCESS_MODE_OPTIONS.find((o) => o.mode === adminPreviewMode)?.shortLabel} (Salir ✕)
+                Vista previa: {WA_ACCESS_MODE_OPTIONS.find((o) => o.mode === adminPreviewMode)?.shortLabel}
               </span>
+              <X className="w-3 h-3" />
             </button>
           ) : (
-            <span className="hidden md:inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#EEF0FF] text-indigo-700">
+            <span className="hidden md:inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200/70">
               {roleChip}
             </span>
           )}
@@ -2235,14 +2188,14 @@ export const SupportChatCircles: React.FC = () => {
                 type="button"
                 onClick={openTeamAccessModal}
                 title="Configurar qué ven los Técnicos, los Vendedores y los Administradores"
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black bg-slate-900 text-white hover:bg-slate-800 transition shadow-xs"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
                 <span>Accesos</span>
               </button>
               <button
                 onClick={() => setShowAiPromptModal(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#EEF0FF] text-indigo-700 hover:bg-indigo-100 transition"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-700 border border-indigo-200/60 transition"
               >
                 <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                 <span>IA</span>
@@ -2250,52 +2203,124 @@ export const SupportChatCircles: React.FC = () => {
               <button
                 onClick={openBridgeStatus}
                 title="Estado de la conexión WhatsApp"
-                className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 transition"
               >
-                <Settings className="w-4 h-4" />
+                <Settings className="w-3.5 h-3.5" />
               </button>
             </>
           )}
-          <div className="w-8 h-8 rounded-full bg-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-sm">
+          <div className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold text-xs flex items-center justify-center">
             {initials(profile?.full_name || 'AD')}
           </div>
         </div>
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* ── LEFT: chat list ── */}
+        {/* ── LEFT: chat list (Clean, Airy, Uncluttered) ── */}
         <aside style={{ width: `${leftPanelWidth}px` }} className="bg-white flex flex-col shrink-0 relative">
-          <div className="px-5 pt-4 pb-2 flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">Chats</h2>
-              <p className="text-[11px] font-medium text-slate-400">{filteredCircles.length} conversaciones</p>
-            </div>
-            <button
-              onClick={() => loadSupportData()}
-              title="Actualizar chats"
-              className="w-9 h-9 rounded-xl bg-[#EEF0FF] hover:bg-indigo-100 text-indigo-600 flex items-center justify-center transition"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
+          <div className="px-4 pt-3 pb-2 border-b border-slate-100 space-y-2 relative">
+            <div className="flex items-center gap-1.5">
+              <div className="relative flex-1">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar cliente, grupo o teléfono..."
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
 
-          <div className="px-4 pb-2.5">
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar grupo, cliente, teléfono, vendedor o mensaje..."
-                className="w-full pl-10 pr-4 py-2 bg-slate-50/80 border border-slate-200/70 rounded-full text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              />
+              {circleFilter !== 'tickets' && (
+                <button
+                  type="button"
+                  onClick={() => setShowFilterMenu((v) => !v)}
+                  className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
+                    ownerFilter !== 'all' || channelFilter !== 'all'
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
+                  }`}
+                >
+                  <Filter className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Filtros</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                </button>
+              )}
+
+              <button
+                onClick={() => loadSupportData()}
+                title={`Actualizar (${filteredCircles.length} conversaciones)`}
+                className="p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 flex items-center justify-center transition shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
+              </button>
             </div>
 
-            {/* Primary scope tabs */}
-            <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+            {/* Clean Filter Dropdown Menu */}
+            {showFilterMenu && circleFilter !== 'tickets' && (
+              <div className="absolute right-4 top-12 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl p-1.5 z-30 space-y-1 text-xs">
+                <div className="px-2.5 py-1 text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+                  <span>Filtrar conversaciones</span>
+                  <button type="button" onClick={() => setShowFilterMenu(false)} className="text-slate-400 hover:text-slate-600">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+                {(
+                  [
+                    { id: 'all', label: 'Todas las conversaciones', count: counts.all },
+                    { id: 'mine', label: 'Asignadas a mí', count: counts.mine },
+                    { id: 'unassigned', label: 'Sin asignar', count: counts.unassigned },
+                    { id: 'urgent', label: 'Espera > 15 min', count: counts.slaCritical, urgent: true },
+                  ] as { id: OwnerSubFilter; label: string; count: number; urgent?: boolean }[]
+                ).map((sf) => {
+                  const active = ownerFilter === sf.id;
+                  return (
+                    <button
+                      key={sf.id}
+                      type="button"
+                      onClick={() => {
+                        setOwnerFilter(sf.id);
+                        setShowFilterMenu(false);
+                      }}
+                      className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition ${
+                        active
+                          ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                          : sf.urgent && sf.count > 0
+                          ? 'text-rose-600 hover:bg-rose-50/60 font-medium'
+                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <span>{sf.label}</span>
+                      <span className="text-slate-400">{sf.count}</span>
+                    </button>
+                  );
+                })}
+
+                {circleFilter === 'soporte' && (
+                  <div className="pt-1.5 mt-1 border-t border-slate-100 px-2 pb-1 space-y-1">
+                    <span className="text-[11px] font-semibold text-slate-400">Área de soporte</span>
+                    <select
+                      value={channelFilter}
+                      onChange={(e) => {
+                        setChannelFilter(e.target.value as 'all' | SupportChannelType);
+                        setShowFilterMenu(false);
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-xl text-xs font-medium bg-slate-50 text-slate-700 border border-slate-200 focus:outline-none"
+                    >
+                      <option value="all">Todas las áreas</option>
+                      <option value="soporte">Soporte / Operaciones</option>
+                      <option value="contabilidad">Contabilidad / Finanzas</option>
+                      <option value="otros">Otros</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Single clean row of primary scope tabs */}
+            <div className="flex items-center gap-1 pt-0.5 overflow-x-auto no-scrollbar">
               {filterTabs.map((tab) => {
                 const active = circleFilter === tab.id;
-                const IconComp = tab.icon;
                 return (
                   <button
                     key={tab.id}
@@ -2303,63 +2328,18 @@ export const SupportChatCircles: React.FC = () => {
                       setCircleFilter(tab.id);
                       if (tab.id !== 'soporte') setChannelFilter('all');
                     }}
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition inline-flex items-center gap-1.5 ${
-                      active ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
+                    className={`px-2.5 py-1 rounded-lg text-xs whitespace-nowrap transition inline-flex items-center gap-1.5 ${
+                      active
+                        ? 'bg-indigo-50 text-indigo-700 font-bold'
+                        : 'text-slate-600 hover:bg-slate-50 font-medium'
                     }`}
                   >
-                    {tab.alert && !active ? <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> : <IconComp className="w-3 h-3 shrink-0" />}
+                    {tab.alert && !active && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />}
                     <span>{tab.label}</span>
                   </button>
                 );
               })}
             </div>
-
-            {/* Secondary sub-filters: Owner & SLA urgency */}
-            {circleFilter !== 'tickets' && (
-              <div className="flex items-center gap-1 mt-2 pt-2 border-t border-slate-100 flex-wrap">
-                {(
-                  [
-                    { id: 'all', label: 'Todos' },
-                    { id: 'mine', label: `Míos (${counts.mine})` },
-                    { id: 'unassigned', label: `Sin asignar (${counts.unassigned})` },
-                    { id: 'urgent', label: `Urgentes >15m (${counts.slaCritical})`, hot: counts.slaCritical > 0 },
-                  ] as { id: OwnerSubFilter; label: string; hot?: boolean }[]
-                ).map((sf) => {
-                  const active = ownerFilter === sf.id;
-                  return (
-                    <button
-                      key={sf.id}
-                      type="button"
-                      onClick={() => setOwnerFilter(sf.id)}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition ${
-                        active
-                          ? sf.id === 'urgent'
-                            ? 'bg-rose-600 text-white'
-                            : 'bg-slate-900 text-white'
-                          : sf.hot
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
-                          : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                      }`}
-                    >
-                      {sf.label}
-                    </button>
-                  );
-                })}
-
-                {circleFilter === 'soporte' && (
-                  <select
-                    value={channelFilter}
-                    onChange={(e) => setChannelFilter(e.target.value as 'all' | SupportChannelType)}
-                    className="ml-auto px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 focus:outline-none"
-                  >
-                    <option value="all">Todas las áreas</option>
-                    <option value="soporte">Soporte / Operaciones</option>
-                    <option value="contabilidad">Contabilidad / Finanzas</option>
-                    <option value="otros">Otros</option>
-                  </select>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
@@ -2371,19 +2351,19 @@ export const SupportChatCircles: React.FC = () => {
               filteredCircles.map((circle) => {
                 const isSelected = activeCircle?.circleId === circle.circleId;
                 const unread = isUnread(circle);
-                const ownerLabel =
-                  circle.scope === 'lead' || circle.scope === 'por_clasificar'
-                    ? circle.leadOwnerName
-                    : circle.assignedTechId
-                    ? circle.assignedTechName
-                    : null;
-                const showSla = circle.unreadOrWaitingReply && circle.waitMinutes > 0 && circle.waitMinutes <= 24 * 60;
-                const slaStyle =
-                  circle.waitMinutes >= 15
-                    ? 'bg-rose-100 text-rose-800 border-rose-200 font-black'
-                    : circle.waitMinutes >= 5
-                    ? 'bg-amber-50 text-amber-800 border-amber-200 font-bold'
-                    : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold';
+                const isOverdue = circle.unreadOrWaitingReply && circle.waitMinutes >= 15 && circle.waitMinutes <= 24 * 60;
+                const shortType =
+                  circle.scope === 'soporte'
+                    ? circle.isGroup
+                      ? 'Grupo'
+                      : 'Cliente'
+                    : circle.scope === 'por_clasificar'
+                    ? 'Por tomar'
+                    : circle.scope === 'lead'
+                    ? 'Lead'
+                    : circle.scope === 'interno'
+                    ? 'Equipo'
+                    : 'Spam';
 
                 return (
                   <button
@@ -2393,60 +2373,48 @@ export const SupportChatCircles: React.FC = () => {
                       markCircleAsRead(circle.circleId, circle.lastMessageAt);
                       setSelectedCircleId(circle.circleId);
                     }}
-                    className={`w-full text-left px-4 py-3 flex items-center gap-3.5 transition relative ${
-                      isSelected ? 'bg-[#EEF0FF]/90' : unread ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/30 hover:bg-slate-50/80'
+                    className={`w-full text-left px-3.5 py-2.5 flex items-center gap-3 transition relative ${
+                      isSelected
+                        ? 'bg-indigo-50/50 border-l-2 border-indigo-600'
+                        : 'bg-white hover:bg-slate-50/80'
                     }`}
                   >
                     <div className="relative shrink-0">
                       <div
-                        className={`w-11 h-11 rounded-full flex items-center justify-center text-xs text-white ${
-                          unread ? 'font-black' : 'font-normal opacity-80'
-                        } ${SCOPE_STYLE[circle.scope].avatar}`}
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${
+                          isSelected || unread ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'
+                        }`}
                       >
-                        {circle.isGroup ? <Users className="w-5 h-5 text-white" /> : initials(circle.clientName)}
+                        {circle.isGroup ? <Users className="w-4 h-4" /> : initials(circle.clientName)}
                       </div>
-                      {unread && <span className="w-3 h-3 rounded-full bg-rose-500 border-2 border-white absolute -top-0.5 -right-0.5" />}
+                      {unread && <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 border-2 border-white absolute -top-0.5 -right-0.5" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`text-xs uppercase tracking-tight truncate ${unread ? 'font-black text-slate-950' : 'font-normal text-slate-500'}`}>
+                          <span className={`text-xs truncate ${unread ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>
                             {circle.clientName}
                           </span>
-                          <ScopeChip circle={circle} compact />
-                          {circle.memberOfGroups.length > 0 && !circle.isGroup && (
-                            <span title={`Miembro de: ${circle.memberOfGroups.map((g) => g.subject).join(', ')}`} className="shrink-0">
-                              <Users className="w-3 h-3 text-indigo-500" />
-                            </span>
-                          )}
+                          <span className="text-[11px] text-slate-400 shrink-0">· {shortType}</span>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          {showSla && (
+                          {isOverdue && (
                             <span
                               title={`Esperando respuesta hace ${formatWaitDuration(circle.waitMinutes)}`}
-                              className={`px-1.5 py-0.5 rounded-full border text-[9px] inline-flex items-center gap-0.5 ${slaStyle}`}
+                              className="px-1.5 py-0.2 rounded bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-semibold inline-flex items-center gap-0.5"
                             >
                               <Clock className="w-2.5 h-2.5" />
                               {formatWaitDuration(circle.waitMinutes)}
                             </span>
                           )}
-                          <span className={`text-[10px] ${unread ? 'font-extrabold text-indigo-600' : 'font-normal text-slate-400'}`}>
+                          <span className={`text-[11px] ${unread ? 'font-semibold text-indigo-600' : 'text-slate-400'}`}>
                             {listTimeLabel(circle.lastMessageAt)}
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between gap-2 mt-0.5">
-                        <p className={`text-xs truncate ${unread ? 'text-slate-900 font-bold' : 'text-slate-400 font-normal'}`}>
-                          {circle.lastMessageSender}: {circle.lastMessageText}
-                        </p>
-                        {ownerLabel ? (
-                          <span className="text-[9px] font-semibold text-slate-400 shrink-0 truncate max-w-[90px]">
-                            {ownerLabel.split(' ')[0]}
-                          </span>
-                        ) : !circle.isGroup && circle.scope !== 'interno' && circle.scope !== 'spam' ? (
-                          <span className="text-[9px] font-bold text-amber-600 shrink-0">Sin asignar</span>
-                        ) : null}
-                      </div>
+                      <p className={`text-xs truncate mt-0.5 ${unread ? 'text-slate-700 font-medium' : 'text-slate-400 font-normal'}`}>
+                        {circle.lastMessageSender}: {circle.lastMessageText}
+                      </p>
                     </div>
                   </button>
                 );
@@ -2479,26 +2447,18 @@ export const SupportChatCircles: React.FC = () => {
         {/* ── CENTER: chat ── */}
         {activeCircle ? (
           <main className="flex-1 flex flex-col bg-[#F3F4F8] overflow-hidden min-w-0">
-            {/* Chat header */}
+            {/* Chat header (Clean, Uncluttered, 100% Vector Icons) */}
             <div className="bg-white border-b border-slate-200/70 px-6 py-2.5 flex items-center justify-between gap-3 shrink-0 min-h-16">
               <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-10 h-10 rounded-full text-white font-black text-xs flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
-                  {activeCircle.isGroup ? <Users className="w-5 h-5 text-white" /> : initials(activeCircle.clientName)}
+                <div className={`w-10 h-10 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
+                  {activeCircle.isGroup ? <Users className="w-4 h-4" /> : initials(activeCircle.clientName)}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight truncate max-w-[280px]">{activeCircle.clientName}</h3>
+                    <h3 className="text-sm font-bold text-slate-900 tracking-tight truncate max-w-[280px]">{activeCircle.clientName}</h3>
                     <ScopeChip circle={activeCircle} />
-                    {activeCircle.unreadOrWaitingReply && activeCircle.waitMinutes > 0 && activeCircle.waitMinutes <= 24 * 60 && (
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border ${
-                          activeCircle.waitMinutes >= 15
-                            ? 'bg-rose-50 text-rose-700 border-rose-200'
-                            : activeCircle.waitMinutes >= 5
-                            ? 'bg-amber-50 text-amber-800 border-amber-200'
-                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        }`}
-                      >
+                    {activeCircle.unreadOrWaitingReply && activeCircle.waitMinutes >= 15 && activeCircle.waitMinutes <= 24 * 60 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200/80">
                         <Clock className="w-2.5 h-2.5" />
                         Espera: {formatWaitDuration(activeCircle.waitMinutes)}
                       </span>
@@ -2520,8 +2480,8 @@ export const SupportChatCircles: React.FC = () => {
                   </p>
                   {!activeCircle.isGroup && activeCircle.memberOfGroups.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                      <Users className="w-3 h-3 text-indigo-500" />
-                      <span className="text-[10px] font-bold text-indigo-700">Este número es del grupo:</span>
+                      <Users className="w-3 h-3 text-slate-400" />
+                      <span className="text-[10px] font-semibold text-slate-500">Grupos:</span>
                       {activeCircle.memberOfGroups.slice(0, 3).map((g) => {
                         const groupCircleId = `wa:${g.jid}`;
                         const exists = circles.some((c) => c.circleId === groupCircleId);
@@ -2531,7 +2491,7 @@ export const SupportChatCircles: React.FC = () => {
                             type="button"
                             disabled={!exists}
                             onClick={() => exists && setSelectedCircleId(groupCircleId)}
-                            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60 hover:bg-indigo-100 disabled:opacity-70 disabled:cursor-default"
+                            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-70 disabled:cursor-default transition"
                           >
                             {g.subject || 'Grupo'}
                             {exists && <ExternalLink className="w-2.5 h-2.5 inline ml-1" />}
@@ -2543,16 +2503,16 @@ export const SupportChatCircles: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+              <div className="flex items-center gap-2 shrink-0">
                 {/* Support area selector + quick tech assignment */}
                 {activeCircle.scope === 'soporte' && activeCircle.isWhatsApp && (
                   <>
                     <div className="relative flex items-center">
-                      <Wrench className="w-3.5 h-3.5 text-slate-500 absolute left-3 pointer-events-none" />
+                      <Wrench className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
                       <select
                         value={activeCircle.supportChannel}
                         onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
-                        className="pl-8 pr-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-700 cursor-pointer focus:outline-none transition"
+                        className="pl-8 pr-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 cursor-pointer focus:outline-none transition"
                       >
                         <option value="soporte">Soporte / Operaciones</option>
                         <option value="contabilidad">Contabilidad / Finanzas</option>
@@ -2563,7 +2523,7 @@ export const SupportChatCircles: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleAssignTech(profile.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition"
                       >
                         <UserCheck className="w-3.5 h-3.5" />
                         Tomar caso
@@ -2583,27 +2543,11 @@ export const SupportChatCircles: React.FC = () => {
                           value={activeCircle.leadStatus || 'Prospecto'}
                           onChange={(e) => handleUpdateLeadStatus(e.target.value)}
                           title="Etapa comercial del Lead"
-                          className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 cursor-pointer focus:outline-none transition"
+                          className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 cursor-pointer focus:outline-none transition"
                         >
                           {LEAD_STATUS_OPTIONS.map((st) => (
                             <option key={st} value={st}>
                               Etapa: {st}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      {scopes.all && activeCircle.scope === 'lead' && (
-                        <select
-                          value={activeCircle.leadOwnerId || activeCircle.assignedTechId || ''}
-                          onChange={(e) => handleAssignLeadOwner(e.target.value)}
-                          title="Vendedor asignado"
-                          className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-700 cursor-pointer focus:outline-none transition max-w-[150px]"
-                        >
-                          <option value="">Sin vendedor</option>
-                          {agents.map((ag) => (
-                            <option key={ag.id} value={ag.id}>
-                              {ag.full_name || ag.email}
                             </option>
                           ))}
                         </select>
@@ -2614,7 +2558,7 @@ export const SupportChatCircles: React.FC = () => {
                         type="button"
                         disabled={creatingQuote || classifying}
                         onClick={handleOpenQuoteBuilder}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition disabled:opacity-50"
                       >
                         {creatingQuote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Receipt className="w-3.5 h-3.5" />}
                         <span>Cotizar</span>
@@ -2626,16 +2570,16 @@ export const SupportChatCircles: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setShowQuotesPopover((v) => !v)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-200 transition"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
                           >
-                            <FileText className="w-3.5 h-3.5" />
+                            <FileText className="w-3.5 h-3.5 text-slate-500" />
                             <span>Propuestas ({leadQuotes.length})</span>
-                            <ChevronDown className="w-3 h-3" />
+                            <ChevronDown className="w-3 h-3 text-slate-400" />
                           </button>
                           {showQuotesPopover && (
-                            <div className="absolute right-0 top-full mt-1.5 w-80 bg-white border border-slate-200 rounded-2xl shadow-2xl z-40 p-2 space-y-1.5">
+                            <div className="absolute right-0 top-full mt-1.5 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-2 space-y-1.5">
                               <div className="px-2 py-1 flex items-center justify-between">
-                                <span className="text-[10px] font-black uppercase text-slate-500">Cotizaciones del prospecto</span>
+                                <span className="text-[10px] font-bold uppercase text-slate-400">Cotizaciones del prospecto</span>
                                 <button onClick={() => setShowQuotesPopover(false)} className="text-slate-400 hover:text-slate-600">
                                   <X className="w-3.5 h-3.5" />
                                 </button>
@@ -2646,8 +2590,8 @@ export const SupportChatCircles: React.FC = () => {
                                 return (
                                   <div key={q.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-2">
                                     <div className="flex items-center justify-between gap-2">
-                                      <span className="text-xs font-black text-slate-900 truncate">{q.plan_nombre}</span>
-                                      <span className="text-xs font-black text-indigo-700 shrink-0">${amount.toLocaleString()}</span>
+                                      <span className="text-xs font-bold text-slate-900 truncate">{q.plan_nombre}</span>
+                                      <span className="text-xs font-bold text-indigo-700 shrink-0">${amount.toLocaleString()}</span>
                                     </div>
                                     <div className="flex items-center justify-between gap-1.5">
                                       <button
@@ -2659,7 +2603,7 @@ export const SupportChatCircles: React.FC = () => {
                                           );
                                           setShowQuotesPopover(false);
                                         }}
-                                        className="flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black transition"
+                                        className="flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold transition"
                                       >
                                         <Send className="w-3 h-3" />
                                         Pasar al chat
@@ -2667,7 +2611,7 @@ export const SupportChatCircles: React.FC = () => {
                                       <button
                                         type="button"
                                         onClick={() => navigate(`/cotizaciones/${q.id}`)}
-                                        className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[10px] font-bold transition"
+                                        className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[10px] font-semibold transition"
                                       >
                                         Abrir
                                       </button>
@@ -2682,55 +2626,86 @@ export const SupportChatCircles: React.FC = () => {
                     </>
                   )}
 
-                {activeCircle.leadId && (activeCircle.scope === 'lead' || activeCircle.scope === 'spam') && (
-                  <button
-                    type="button"
-                    onClick={() => navigate('/leads', { state: { leadId: activeCircle.leadId, _t: Date.now() } })}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition"
-                  >
-                    <User className="w-3.5 h-3.5" />
-                    Ficha Lead
-                  </button>
-                )}
-
-                {canClassify && activeCircle.scope !== 'por_clasificar' && (
+                {/* Unified More Options Popover (Ficha Lead, Vendedor Assignment, Clasificación) */}
+                {(canClassify || activeCircle.leadId) && activeCircle.scope !== 'por_clasificar' && (
                   <div className="relative">
                     <button
                       type="button"
                       onClick={() => setShowReclassifyMenu((v) => !v)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-700 transition"
+                      title="Más opciones y clasificación"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
                     >
-                      <Tag className="w-3.5 h-3.5" />
-                      Clasificación
-                      <ChevronDown className="w-3 h-3" />
+                      <MoreHorizontal className="w-4 h-4 text-slate-500" />
                     </button>
                     {showReclassifyMenu && (
-                      <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl z-30 p-1.5">
-                        {(
-                          [
-                            { t: 'cliente', label: 'Es cliente (Soporte)', icon: Building2, show: activeCircle.scope !== 'soporte' },
-                            { t: 'lead', label: 'Es lead (Ventas)', icon: UserPlus, show: activeCircle.scope !== 'lead' },
-                            { t: 'interno', label: 'Es del equipo', icon: ShieldCheck, show: scopes.all && activeCircle.scope !== 'interno' },
-                            { t: 'spam', label: 'Spam / bloquear', icon: Ban, show: activeCircle.scope !== 'spam' },
-                            { t: 'por_clasificar', label: 'Deshacer (Lead nuevo por tomar)', icon: HelpCircle, show: scopes.all },
-                          ] as const
-                        )
-                          .filter((o) => o.show)
-                          .map((o) => {
-                            const I = o.icon;
-                            return (
-                              <button
-                                key={o.t}
-                                type="button"
-                                disabled={classifying}
-                                onClick={() => (o.t === 'cliente' ? (setShowClientPicker(true), setShowReclassifyMenu(false)) : classify(o.t))}
-                                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 text-left"
-                              >
-                                <I className="w-3.5 h-3.5 text-slate-500" />
-                                {o.label}
-                              </button>
-                            );
-                          })}
+                      <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl z-30 p-2 space-y-1">
+                        {activeCircle.leadId && (activeCircle.scope === 'lead' || activeCircle.scope === 'spam') && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowReclassifyMenu(false);
+                              navigate('/leads', { state: { leadId: activeCircle.leadId, _t: Date.now() } });
+                            }}
+                            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-indigo-700 hover:bg-indigo-50 text-left"
+                          >
+                            <User className="w-3.5 h-3.5 text-indigo-600" />
+                            Abrir Ficha del Lead
+                          </button>
+                        )}
+
+                        {scopes.all && activeCircle.scope === 'lead' && (
+                          <div className="px-3 py-2 border-y border-slate-100 space-y-1">
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Vendedor asignado</span>
+                            <select
+                              value={activeCircle.leadOwnerId || activeCircle.assignedTechId || ''}
+                              onChange={(e) => {
+                                handleAssignLeadOwner(e.target.value);
+                                setShowReclassifyMenu(false);
+                              }}
+                              className="w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-50 border border-slate-200 text-slate-700 focus:outline-none"
+                            >
+                              <option value="">Sin vendedor</option>
+                              {agents.map((ag) => (
+                                <option key={ag.id} value={ag.id}>
+                                  {ag.full_name || ag.email}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {canClassify && (
+                          <>
+                            <div className="px-3 pt-1.5 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                              Clasificación del contacto
+                            </div>
+                            {(
+                              [
+                                { t: 'cliente', label: 'Es cliente (Soporte)', icon: Building2, show: activeCircle.scope !== 'soporte' },
+                                { t: 'lead', label: 'Es lead (Ventas)', icon: UserPlus, show: activeCircle.scope !== 'lead' },
+                                { t: 'interno', label: 'Es del equipo', icon: ShieldCheck, show: scopes.all && activeCircle.scope !== 'interno' },
+                                { t: 'spam', label: 'Spam / bloquear', icon: Ban, show: activeCircle.scope !== 'spam' },
+                                { t: 'por_clasificar', label: 'Deshacer (Por clasificar)', icon: HelpCircle, show: scopes.all },
+                              ] as const
+                            )
+                              .filter((o) => o.show)
+                              .map((o) => {
+                                const I = o.icon;
+                                return (
+                                  <button
+                                    key={o.t}
+                                    type="button"
+                                    disabled={classifying}
+                                    onClick={() => (o.t === 'cliente' ? (setShowClientPicker(true), setShowReclassifyMenu(false)) : classify(o.t))}
+                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 text-left"
+                                  >
+                                    <I className="w-3.5 h-3.5 text-slate-400" />
+                                    {o.label}
+                                  </button>
+                                );
+                              })}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2741,8 +2716,10 @@ export const SupportChatCircles: React.FC = () => {
                     type="button"
                     onClick={() => setShowRightPanel(!showRightPanel)}
                     title="Panel del ticket: asignar técnico, tiempo y cierre"
-                    className={`w-10 h-9 rounded-xl flex items-center justify-center transition ${
-                      showRightPanel ? 'bg-indigo-600 text-white' : 'bg-[#EEF0FF] text-indigo-600 hover:bg-indigo-100'
+                    className={`w-9 h-8 rounded-xl flex items-center justify-center border transition ${
+                      showRightPanel
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
                     }`}
                   >
                     {showRightPanel ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
@@ -2925,41 +2902,10 @@ export const SupportChatCircles: React.FC = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Universal SaaS Quick replies (Support + Sales + Customizable per company) */}
-            {canSend && composerMode === 'whatsapp' && (
-              <div className="bg-white/80 px-5 pt-2 pb-1 flex items-center gap-1.5 overflow-x-auto border-t border-slate-100">
-                <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 shrink-0 mr-1">
-                  {activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'Ventas:' : 'Respuestas:'}
-                </span>
-                {activeQuickReplies.map((q) => (
-                  <button
-                    key={q.id}
-                    type="button"
-                    onClick={() => setMessageInput(q.text)}
-                    className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 whitespace-nowrap transition"
-                  >
-                    {q.label}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewQrScope(activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'ventas' : 'soporte');
-                    setShowQuickReplyModal(true);
-                  }}
-                  title="Personalizar respuestas rápidas de tu empresa"
-                  className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#EEF0FF] text-indigo-700 hover:bg-indigo-100 whitespace-nowrap inline-flex items-center gap-1 shrink-0 transition"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Plantillas</span>
-                </button>
-              </div>
-            )}
-
-            {/* Composer (WhatsApp message vs Internal Team Note) */}
+            {/* Single-Row Clean Composer (WhatsApp message vs Internal Team Note + Floating Plantillas Popover) */}
             {canSend ? (
               <div
-                className={`px-5 py-3 border-t flex items-end gap-2.5 transition-colors ${
+                className={`px-5 py-3 border-t flex items-end gap-2 transition-colors relative ${
                   composerMode === 'internal' ? 'bg-amber-50/70 border-amber-200' : 'bg-white border-slate-200/70'
                 }`}
               >
@@ -2976,10 +2922,68 @@ export const SupportChatCircles: React.FC = () => {
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingFile}
                     title="Enviar imagen, documento o archivo"
-                    className="w-9 h-9 rounded-full text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0 disabled:opacity-50"
+                    className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0 disabled:opacity-50"
                   >
-                    {uploadingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                    {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   </button>
+                )}
+
+                {/* Floating Quick Replies Popover Button (Replaces permanent horizontal bar) */}
+                {composerMode === 'whatsapp' && (
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickRepliesPopover((v) => !v)}
+                      title="Respuestas rápidas y plantillas"
+                      className={`px-2.5 py-2 rounded-xl text-[11px] font-semibold inline-flex items-center gap-1.5 border transition ${
+                        showQuickRepliesPopover
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
+                      }`}
+                    >
+                      <Zap className="w-3.5 h-3.5 text-indigo-600" />
+                      <span className="hidden sm:inline">Plantillas</span>
+                    </button>
+                    {showQuickRepliesPopover && (
+                      <div className="absolute left-0 bottom-full mb-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-2 space-y-1">
+                        <div className="px-2.5 py-1.5 flex items-center justify-between border-b border-slate-100">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            {activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar'
+                              ? 'Plantillas de Ventas'
+                              : 'Plantillas de Soporte'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowQuickRepliesPopover(false);
+                              setNewQrScope(activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'ventas' : 'soporte');
+                              setShowQuickReplyModal(true);
+                            }}
+                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-0.5"
+                          >
+                            <Plus className="w-3 h-3" />
+                            Personalizar
+                          </button>
+                        </div>
+                        <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
+                          {activeQuickReplies.map((q) => (
+                            <button
+                              key={q.id}
+                              type="button"
+                              onClick={() => {
+                                setMessageInput(q.text);
+                                setShowQuickRepliesPopover(false);
+                              }}
+                              className="w-full px-2.5 py-2 rounded-xl text-left hover:bg-slate-50 transition"
+                            >
+                              <p className="text-xs font-semibold text-slate-800">{q.label}</p>
+                              <p className="text-[11px] text-slate-400 truncate mt-0.5">{q.text}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {/* Mode switcher: WhatsApp vs Nota Interna */}
@@ -2991,10 +2995,10 @@ export const SupportChatCircles: React.FC = () => {
                       ? 'Modo Nota Interna activo (el cliente NO recibe este mensaje). Clic para volver a WhatsApp.'
                       : 'Cambiar a Nota Interna para dejar instrucciones al equipo dentro del chat'
                   }
-                  className={`px-2.5 py-2 rounded-2xl text-[10px] font-black inline-flex items-center gap-1 shrink-0 border transition ${
+                  className={`px-2.5 py-2 rounded-xl text-[11px] font-semibold inline-flex items-center gap-1.5 shrink-0 border transition ${
                     composerMode === 'internal'
-                      ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
-                      : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200'
+                      ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
+                      : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200'
                   }`}
                 >
                   <StickyNote className="w-3.5 h-3.5" />
@@ -3016,17 +3020,17 @@ export const SupportChatCircles: React.FC = () => {
                       ? 'Escribe una nota interna para el equipo (NO se envía al WhatsApp del cliente)…'
                       : 'Escribe un mensaje a WhatsApp… (Shift+Enter = nueva línea)'
                   }
-                  className={`flex-1 resize-none max-h-32 px-4 py-2.5 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 transition ${
+                  className={`flex-1 resize-none max-h-32 px-4 py-2 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 transition ${
                     composerMode === 'internal'
                       ? 'bg-white border-2 border-amber-300 text-amber-950 placeholder:text-amber-700/60 focus:ring-amber-500/20'
-                      : 'bg-[#F3F4F8] border border-slate-200/80 text-slate-800 placeholder:text-slate-400 focus:ring-indigo-500/20'
+                      : 'bg-slate-50 border border-slate-200/80 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-indigo-500/20'
                   }`}
                 />
                 <button
                   type="button"
                   disabled={!messageInput.trim() || sendingMessage}
                   onClick={handleComposerSubmit}
-                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full disabled:opacity-40 text-white text-xs font-bold transition ${
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl disabled:opacity-40 text-white text-xs font-bold transition ${
                     composerMode === 'internal' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'
                   }`}
                 >
@@ -3583,7 +3587,7 @@ export const SupportChatCircles: React.FC = () => {
                   setNewQrText('');
                   toast.success('Plantilla agregada');
                 }}
-                className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-black transition"
+                className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-bold transition"
               >
                 Guardar plantilla
               </button>
@@ -3733,7 +3737,7 @@ export const SupportChatCircles: React.FC = () => {
                   return (
                     <div key={member.id} className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-50/70">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-slate-900 text-white font-black text-xs flex items-center justify-center shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/70 font-bold text-xs flex items-center justify-center shrink-0">
                           {initials(member.full_name)}
                         </div>
                         <div className="min-w-0">
@@ -3781,7 +3785,7 @@ export const SupportChatCircles: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowTeamAccessModal(false)}
-                className="px-4 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition"
+                className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition"
               >
                 Listo
               </button>
