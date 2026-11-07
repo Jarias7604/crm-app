@@ -274,7 +274,7 @@ interface WaGroupRow {
   client_id: string | null;
 }
 
-type CircleFilter = 'all' | 'waiting' | 'soporte' | 'por_clasificar' | 'lead' | 'interno' | 'spam';
+type CircleFilter = 'all' | 'waiting' | 'soporte' | 'por_clasificar' | 'lead' | 'interno' | 'spam' | 'tickets';
 
 // Parse "[10:42 a. m.] 👤 Nombre: texto" chat lines written by the webhook.
 function parseChatLine(raw: string): { icon: string; sender: string; text: string } | null {
@@ -616,10 +616,13 @@ export const SupportChatCircles: React.FC = () => {
   const isUnread = (c: SupportCircle) => c.unreadOrWaitingReply && readCirclesMap[c.circleId] !== c.lastMessageAt;
 
   const counts = useMemo(() => {
-    const by = (s: WaScope) => circles.filter((c) => c.scope === s).length;
+    // WhatsApp conversations only; old Service Hub tickets live in their own tab.
+    const wa = circles.filter((c) => c.isWhatsApp);
+    const by = (s: WaScope) => wa.filter((c) => c.scope === s).length;
     return {
-      all: circles.filter((c) => c.scope !== 'spam').length,
-      waiting: circles.filter((c) => c.scope !== 'spam' && isUnread(c)).length,
+      all: wa.filter((c) => c.scope !== 'spam').length,
+      waiting: wa.filter((c) => c.scope !== 'spam' && isUnread(c)).length,
+      tickets: circles.filter((c) => !c.isWhatsApp).length,
       soporte: by('soporte'),
       por_clasificar: by('por_clasificar'),
       lead: by('lead'),
@@ -643,15 +646,23 @@ export const SupportChatCircles: React.FC = () => {
       tabs.push({ id: 'interno', label: `Equipo (${counts.interno})`, icon: ShieldCheck });
       tabs.push({ id: 'spam', label: `Spam (${counts.spam})`, icon: Ban });
     }
+    if (scopes.soporte && counts.tickets > 0) {
+      tabs.push({ id: 'tickets', label: `Otros tickets (${counts.tickets})`, icon: FileText });
+    }
     return tabs;
   }, [counts, scopes]);
 
   const filteredCircles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return circles.filter((c) => {
+      if (circleFilter === 'tickets') {
+        if (c.isWhatsApp) return false;
+      } else if (!c.isWhatsApp) {
+        return false;
+      }
       if (circleFilter === 'all' && c.scope === 'spam') return false;
       if (circleFilter === 'waiting' && (c.scope === 'spam' || !isUnread(c))) return false;
-      if (!['all', 'waiting'].includes(circleFilter) && c.scope !== circleFilter) return false;
+      if (!['all', 'waiting', 'tickets'].includes(circleFilter) && c.scope !== circleFilter) return false;
       if (q) {
         return (
           c.clientName.toLowerCase().includes(q) ||
@@ -874,6 +885,48 @@ export const SupportChatCircles: React.FC = () => {
         delivery: ob?.status,
         deliveryError: ob?.error,
       });
+    });
+
+    // Tickets without comments (created in Tickets / Service Hub, or old WhatsApp rows):
+    // show their description so the conversation is never empty.
+    const ticketsWithComments = new Set(comments.map((c) => c.ticket_id));
+    activeCircle.allClientTickets.slice(0, 25).forEach((t) => {
+      if (ticketsWithComments.has(t.id)) return;
+      const desc = String(t.description || '').trim();
+      if (showTicketMarkers) {
+        items.push({
+          id: `ticket-${t.id}`,
+          kind: 'ticket',
+          senderName: `Ticket #${t.id.slice(0, 8).toUpperCase()}`,
+          text: stripEmojis(t.title || '').replace(/^\[WhatsApp · [^\]]*\]\s*/, ''),
+          createdAt: t.created_at,
+          ticketId: t.id,
+        });
+      }
+      if (!desc) return;
+      const chatLines = desc.split('\n').map((l) => l.trim()).filter((l) => parseChatLine(l) && /👤|👨‍💻/.test(l));
+      if (chatLines.length > 0) {
+        chatLines.forEach((l, i) => {
+          const p = parseChatLine(l)!;
+          items.push({
+            id: `desc-${t.id}-${i}`,
+            kind: p.icon === '👨‍💻' ? 'staff' : 'client',
+            senderName: stripEmojis(p.sender.replace(/\(Reporte Inicial\)/i, '')),
+            text: stripEmojis(p.text),
+            createdAt: new Date(new Date(t.created_at).getTime() + i).toISOString(),
+            ticketId: t.id,
+          });
+        });
+      } else {
+        items.push({
+          id: `desc-${t.id}`,
+          kind: 'client',
+          senderName: activeCircle.clientName,
+          text: stripEmojis(desc),
+          createdAt: new Date(new Date(t.created_at).getTime() + 1).toISOString(),
+          ticketId: t.id,
+        });
+      }
     });
 
     // Legacy attachments stored on the ticket (before media was tracked per message).
@@ -1766,7 +1819,16 @@ export const SupportChatCircles: React.FC = () => {
               </div>
             ) : (
               <div className="bg-white px-5 py-3 border-t border-slate-200/70 text-center text-[11px] font-semibold text-slate-400">
-                {activeCircle.scope === 'spam' ? 'Este número está marcado como spam.' : 'Este ticket no es de WhatsApp; respóndelo desde Tickets.'}
+                {activeCircle.scope === 'spam' ? (
+                  'Este número está marcado como spam.'
+                ) : (
+                  <>
+                    Este ticket no vino por WhatsApp.{' '}
+                    <button type="button" onClick={() => navigate('/support/tickets')} className="text-indigo-600 font-bold underline">
+                      Gestionarlo en Tickets
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </main>

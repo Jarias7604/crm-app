@@ -13,12 +13,14 @@ export interface WaViewerScopes {
 
 interface ProfileLike {
     role?: string | null;
+    is_platform_owner?: boolean | null;
     permissions?: Record<string, boolean | undefined> | null;
 }
 
 export function getWaViewerScopes(profile: ProfileLike | null | undefined): WaViewerScopes {
     if (!profile) return { all: false, soporte: false, leads: false, any: false };
-    const isAdmin = profile.role === 'super_admin' || profile.role === 'company_admin';
+    // Platform owners see everything regardless of the role they are simulating.
+    const isAdmin = profile.is_platform_owner === true || profile.role === 'super_admin' || profile.role === 'company_admin';
     const p = profile.permissions || {};
     const all = isAdmin || p.wa_chat_all === true;
     const soporte = all || p.wa_chat_soporte === true;

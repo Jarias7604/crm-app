@@ -580,6 +580,10 @@ async function resolveScope(
     } else if (lead.status === 'Erróneo') {
       info.scope = 'spam';
       info.reason = `${reasonPrefix}_erroneo`;
+    } else if (!lead.assigned_to) {
+      // A lead nobody owns: put it where salespeople can take it.
+      info.scope = 'por_clasificar';
+      info.reason = `${reasonPrefix}_sin_vendedor`;
     } else {
       info.scope = 'lead';
       info.reason = reasonPrefix;
@@ -740,13 +744,13 @@ async function getCaller(req: Request, supabase: any, supabaseUrl: string): Prom
   const uid = userData.user.id;
   const { data: prof } = await supabase
     .from('profiles')
-    .select('id, full_name, email, role, custom_role_id, company_id, is_active')
+    .select('id, full_name, email, role, custom_role_id, company_id, is_active, is_platform_owner')
     .eq('id', uid)
     .maybeSingle();
   if (!prof || prof.is_active === false) return null;
   const role = String(prof.role || '');
   let scopes: string[] = [];
-  if (role === 'super_admin' || role === 'company_admin') {
+  if (prof.is_platform_owner === true || role === 'super_admin' || role === 'company_admin') {
     scopes = ['all'];
   } else if (prof.custom_role_id) {
     const { data: rp } = await supabase
