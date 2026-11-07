@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Search,
   Plus,
@@ -52,10 +52,14 @@ import {
   Filter,
   Zap,
   MoreHorizontal,
+  Calendar,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../auth/AuthProvider';
+import { cotizacionesService } from '../../services/cotizaciones';
+import { pdfService } from '../../services/pdfService';
+import { bookingService } from '../../services/bookingService';
 import {
   ticketService,
   computeTicketAiTimeBenchmark,
@@ -429,6 +433,7 @@ function parseChatLine(raw: string): { icon: string; sender: string; text: strin
 
 export const SupportChatCircles: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { profile, simulatedCompanyId } = useAuth();
   const activeCompanyId = simulatedCompanyId || profile?.company_id;
@@ -450,6 +455,8 @@ export const SupportChatCircles: React.FC = () => {
   const [companyLeads, setCompanyLeads] = useState<TicketLead[]>([]);
   const [waGroups, setWaGroups] = useState<WaGroupRow[]>([]);
   const [selectedCircleId, setSelectedCircleId] = useState<string | null>(() => {
+    const stateCircleId = (location.state as any)?.waCircleId;
+    if (stateCircleId) return String(stateCircleId);
     const jid = searchParams.get('jid');
     return jid ? `wa:${jid}` : null;
   });
@@ -565,6 +572,55 @@ export const SupportChatCircles: React.FC = () => {
   const [leadQuotes, setLeadQuotes] = useState<LeadQuoteSummary[]>([]);
   const [showQuotesPopover, setShowQuotesPopover] = useState(false);
   const [creatingQuote, setCreatingQuote] = useState(false);
+  const [pendingQuoteId, setPendingQuoteId] = useState<string | null>(() => (location.state as any)?.newWaQuoteId || null);
+  const [sendingQuotePdfId, setSendingQuotePdfId] = useState<string | null>(null);
+  const [myBookingSlug, setMyBookingSlug] = useState<string>('');
+
+  // Handle return from CotizadorPro with active chat & newly generated quote
+  useEffect(() => {
+    const st = (location.state || {}) as { waCircleId?: string; newWaQuoteId?: string };
+    if (st.waCircleId) {
+      setSelectedCircleId(st.waCircleId);
+    }
+    if (st.newWaQuoteId) {
+      setPendingQuoteId(st.newWaQuoteId);
+    }
+    if (st.waCircleId || st.newWaQuoteId) {
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
+
+  // Load or auto-provision the salesperson's booking link slug (/book/:slug)
+  useEffect(() => {
+    if (!profile?.id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const existing = await bookingService.getMyBookingLink();
+        if (cancelled) return;
+        if (existing?.slug) {
+          setMyBookingSlug(existing.slug);
+          return;
+        }
+        const defaultSlug = `${bookingService.slugify(profile.full_name || 'asesoria')}-${profile.id.slice(0, 4)}`;
+        const created = await bookingService.upsertBookingLink({
+          slug: defaultSlug,
+          title: 'Revisión de Propuesta Comercial',
+          description: 'Sesión breve para revisar los detalles de su cotización y resolver cualquier consulta.',
+          duration_minutes: 30,
+          is_active: true,
+        });
+        if (!cancelled && created?.slug) {
+          setMyBookingSlug(created.slug);
+        }
+      } catch {
+        // Fallback if offline or table unavailable
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id, profile?.full_name]);
 
   // Customizable SaaS Quick Replies per company
   const [customQuickReplies, setCustomQuickReplies] = useState<QuickReplyTemplate[]>([]);
@@ -1150,7 +1206,7 @@ export const SupportChatCircles: React.FC = () => {
     }
     const leadId = activeCircle.leadId;
     const l8 = activeCircle.phone.slice(-8);
-    if (!leadId && l8.length < 8) {
+    if (!leadId && l8.length < 8 && !pendingQuoteId) {
       setLeadQuotes([]);
       return;
     }
@@ -1165,14 +1221,27 @@ export const SupportChatCircles: React.FC = () => {
           .limit(20);
         if (leadId) {
           q = q.eq('lead_id', leadId);
-        } else {
+        } else if (l8.length >= 4) {
           q = q.like('telefono_cliente', `%${l8.slice(-4)}%`);
         }
         const { data } = await q;
         if (cancelled) return;
-        const list = ((data || []) as any[]).filter(
-          (row) => (leadId && row.lead_id === leadId) || (l8.length >= 8 && String(row.telefono_cliente || '').replace(/\D/g, '').endsWith(l8))
+        let list = ((data || []) as any[]).filter(
+          (row) =>
+            (leadId && row.lead_id === leadId) ||
+            (l8.length >= 8 && String(row.telefono_cliente || '').replace(/\D/g, '').endsWith(l8)) ||
+            (pendingQuoteId && row.id === pendingQuoteId)
         );
+        if (pendingQuoteId && !list.some((r) => r.id === pendingQuoteId)) {
+          const { data: singleQuote } = await supabase
+            .from('cotizaciones')
+            .select('id, plan_nombre, total_anual, total_mensual, estado, created_at, lead_id, telefono_cliente')
+            .eq('id', pendingQuoteId)
+            .maybeSingle();
+          if (singleQuote) {
+            list = [singleQuote, ...list];
+          }
+        }
         setLeadQuotes(
           list.slice(0, 8).map((r) => ({
             id: r.id,
@@ -1190,7 +1259,7 @@ export const SupportChatCircles: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeCircle?.circleId, activeCircle?.leadId, activeCircle?.phone, activeCompanyId]);
+  }, [activeCircle?.circleId, activeCircle?.leadId, activeCircle?.phone, activeCompanyId, pendingQuoteId]);
 
   // ── Thread loading: every ticket of this chat, in real WhatsApp order ─────
   const threadTicketIds = useMemo(
@@ -1708,6 +1777,9 @@ export const SupportChatCircles: React.FC = () => {
       }
       navigate('/cotizaciones/nueva-pro', {
         state: {
+          fromWaChat: true,
+          waCircleId: activeCircle.circleId,
+          waTicketId: activeCircle.activeTicket.id,
           lead: {
             id: leadId,
             name: leadName,
@@ -1720,6 +1792,90 @@ export const SupportChatCircles: React.FC = () => {
       setCreatingQuote(false);
     }
   };
+
+  const buildQuoteWhatsAppText = useCallback(
+    (q: LeadQuoteSummary, clientName: string, includeMeeting = true) => {
+      const publicUrl = `${window.location.origin}/propuesta/${q.id}`;
+      const bookingUrl = myBookingSlug ? `${window.location.origin}/book/${myBookingSlug}` : '';
+      const cleanName =
+        clientName && !clientName.startsWith('+') && !/^(contacto whatsapp|cliente whatsapp)$/i.test(clientName.trim())
+          ? ` ${clientName.trim()}`
+          : '';
+      const lines = [
+        `Hola${cleanName}, le comparto nuestra propuesta comercial (${q.plan_nombre}).`,
+        '',
+        `Enlace para revisar, aprobar y firmar en línea:`,
+        publicUrl,
+      ];
+      if (includeMeeting && bookingUrl) {
+        lines.push(
+          '',
+          `Si desea que la revisemos juntos y resolver cualquier consulta, puede agendar una breve reunión aquí:`,
+          bookingUrl
+        );
+      }
+      return lines.join('\n');
+    },
+    [myBookingSlug]
+  );
+
+  const handleSendQuotePdfToWhatsApp = async (q: LeadQuoteSummary, includeLinksInCaption = true) => {
+    if (!activeCircle || !canSend) return;
+    setSendingQuotePdfId(q.id);
+    const toastId = `wa-quote-pdf-${q.id}`;
+    toast.loading('Generando y enviando propuesta PDF…', { id: toastId });
+    try {
+      const fullQuote = await cotizacionesService.getCotizacion(q.id);
+      const pdfBlob = await pdfService.generateQuotePDFBlob(fullQuote as any);
+      const t = activeCircle.activeTicket;
+      const safePlan = (q.plan_nombre || 'Propuesta').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 45);
+      const fileName = `Propuesta_${safePlan}.pdf`;
+      const path = `outgoing/${t.company_id}/${t.id}/${crypto.randomUUID()}-${fileName}`;
+
+      const { error: upErr } = await supabase.storage
+        .from('whatsapp-media')
+        .upload(path, pdfBlob, { contentType: 'application/pdf', upsert: false });
+      if (upErr) throw upErr;
+
+      const caption = includeLinksInCaption
+        ? buildQuoteWhatsAppText(q, activeCircle.clientName, true)
+        : `Propuesta comercial · ${q.plan_nombre}`;
+
+      await invoke({
+        action: 'send_media',
+        ticket_id: t.id,
+        storage_path: path,
+        file_name: fileName,
+        mime: 'application/pdf',
+        size: pdfBlob.size,
+        caption,
+      });
+
+      markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt);
+      if (activeCircle.leadId && activeCompanyId) {
+        await supabase
+          .from('leads')
+          .update({ status: 'Propuesta Enviada' })
+          .eq('id', activeCircle.leadId)
+          .eq('company_id', activeCompanyId);
+      }
+
+      if (pendingQuoteId === q.id) setPendingQuoteId(null);
+      setShowQuotesPopover(false);
+      toast.success('Propuesta PDF y enlaces enviados al WhatsApp del cliente', { id: toastId });
+      loadThread(false);
+      loadSupportData(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al enviar propuesta PDF', { id: toastId });
+    } finally {
+      setSendingQuotePdfId(null);
+    }
+  };
+
+  const pendingQuote = useMemo(
+    () => (pendingQuoteId ? leadQuotes.find((q) => q.id === pendingQuoteId) || leadQuotes[0] || null : null),
+    [pendingQuoteId, leadQuotes]
+  );
 
   const activeQuickReplies = useMemo(() => {
     if (!activeCircle) return [];
@@ -2784,48 +2940,62 @@ export const SupportChatCircles: React.FC = () => {
                             <ChevronDown className="w-3 h-3 text-slate-400" />
                           </button>
                           {showQuotesPopover && (
-                            <div className="absolute right-0 top-full mt-1.5 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-2 space-y-1.5">
-                              <div className="px-2 py-1 flex items-center justify-between">
-                                <span className="text-[10px] font-bold uppercase text-slate-400">Cotizaciones del prospecto</span>
+                            <div className="absolute right-0 top-full mt-1.5 w-88 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-2.5 space-y-2">
+                              <div className="px-2 py-1 flex items-center justify-between border-b border-slate-100">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                  Propuestas del contacto
+                                </span>
                                 <button onClick={() => setShowQuotesPopover(false)} className="text-slate-400 hover:text-slate-600">
                                   <X className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                              {leadQuotes.map((q) => {
-                                const publicUrl = `${window.location.origin}/propuesta/${q.id}`;
-                                const amount = q.total_anual || q.total_mensual || 0;
-                                return (
-                                  <div key={q.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="text-xs font-bold text-slate-900 truncate">{q.plan_nombre}</span>
-                                      <span className="text-xs font-bold text-indigo-700 shrink-0">${amount.toLocaleString()}</span>
+                              <div className="max-h-72 overflow-y-auto space-y-1.5">
+                                {leadQuotes.map((q) => {
+                                  const amount = q.total_anual || q.total_mensual || 0;
+                                  const isSendingThis = sendingQuotePdfId === q.id;
+                                  return (
+                                    <div key={q.id} className="p-2.5 rounded-xl bg-[#F4F6FA] border border-slate-200/80 space-y-2">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-xs font-bold text-slate-900 truncate">{q.plan_nombre}</span>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                          <span className="text-xs font-bold text-indigo-700">${amount.toLocaleString()}</span>
+                                          <button
+                                            type="button"
+                                            onClick={() => navigate(`/cotizaciones/${q.id}`)}
+                                            title="Ver detalle de cotización"
+                                            className="p-1 rounded-md bg-white border border-slate-200/80 text-slate-500 hover:text-indigo-600 transition"
+                                          >
+                                            <ExternalLink className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          disabled={isSendingThis}
+                                          onClick={() => handleSendQuotePdfToWhatsApp(q, true)}
+                                          className="flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[11px] font-semibold transition"
+                                        >
+                                          {isSendingThis ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
+                                          <span>Enviar PDF + Firma y Reunión</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setComposerMode('whatsapp');
+                                            setMessageInput(buildQuoteWhatsAppText(q, activeCircle.clientName, true));
+                                            setShowQuotesPopover(false);
+                                          }}
+                                          title="Colocar enlaces de firma y reunión en el cuadro de texto para editar antes de enviar"
+                                          className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200/90 hover:bg-slate-100 text-slate-700 text-[11px] font-semibold transition shrink-0"
+                                        >
+                                          Pasar texto
+                                        </button>
+                                      </div>
                                     </div>
-                                    <div className="flex items-center justify-between gap-1.5">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setComposerMode('whatsapp');
-                                          setMessageInput(
-                                            `Hola ${activeCircle.clientName}, le comparto nuestra propuesta comercial formal para su revisión: ${publicUrl}`
-                                          );
-                                          setShowQuotesPopover(false);
-                                        }}
-                                        className="flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold transition"
-                                      >
-                                        <Send className="w-3 h-3" />
-                                        Pasar al chat
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => navigate(`/cotizaciones/${q.id}`)}
-                                        className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[10px] font-semibold transition"
-                                      >
-                                        Abrir
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                                  );
+                                })}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -3108,6 +3278,63 @@ export const SupportChatCircles: React.FC = () => {
               )}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Clean, single-line bar when returning from CotizadorPro with a newly generated quote */}
+            {canSend && pendingQuote && (
+              <div className="bg-[#EEF0FF] border-t border-indigo-200/80 px-5 py-2 flex items-center justify-between gap-3 flex-wrap shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-white border border-indigo-200/80 flex items-center justify-center text-indigo-600 shrink-0">
+                    <Receipt className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-900 truncate">
+                      Propuesta lista: {pendingQuote.plan_nombre}{' '}
+                      <span className="text-indigo-700">
+                        (${(pendingQuote.total_anual || pendingQuote.total_mensual || 0).toLocaleString()})
+                      </span>
+                    </p>
+                    <p className="text-[11px] font-medium text-slate-500 truncate">
+                      Incluye PDF oficial, enlace de aprobación con firma digital y agenda de reunión
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    disabled={sendingQuotePdfId === pendingQuote.id}
+                    onClick={() => handleSendQuotePdfToWhatsApp(pendingQuote, true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold shadow-2xs transition"
+                  >
+                    {sendingQuotePdfId === pendingQuote.id ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    <span>Enviar PDF + Firma y Reunión</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComposerMode('whatsapp');
+                      setMessageInput(buildQuoteWhatsAppText(pendingQuote, activeCircle.clientName, true));
+                      setPendingQuoteId(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-indigo-200/90 hover:bg-indigo-50/50 text-slate-700 text-xs font-semibold transition"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Editar texto en chat</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingQuoteId(null)}
+                    title="Ocultar barra"
+                    className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60 flex items-center justify-center transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Single-Row Clean Composer (WhatsApp message vs Internal Team Note + Floating Plantillas Popover) */}
             {canSend ? (

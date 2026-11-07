@@ -748,7 +748,25 @@ export default function CotizadorPro() {
                 toast.success('✅ Cotización creada exitosamente');
             }
 
-            if (location.state?.fromChat) {
+            if (location.state?.fromWaChat) {
+                try {
+                    if (formData.lead_id) {
+                        await supabase
+                            .from('leads')
+                            .update({ status: 'Cotizado' })
+                            .eq('id', formData.lead_id);
+                    }
+                } catch {
+                    // soft update
+                }
+                navigate('/support/chat', {
+                    state: {
+                        waCircleId: location.state.waCircleId,
+                        newWaQuoteId: result.id,
+                    },
+                    replace: true,
+                });
+            } else if (location.state?.fromChat) {
                 try {
                     toast.loading('Generando PDF oficial...', { id: 'pdf-gen' });
                     const pdfUrl = await pdfService.generateAndUploadQuotePDF(result);
@@ -799,9 +817,26 @@ export default function CotizadorPro() {
         <>
             <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-32 sm:pb-6">
                 {/* Header — compact on mobile */}
-                <div>
-                    <h1 className="text-lg sm:text-2xl font-extrabold text-[#4449AA]">📋 Nueva Cotización</h1>
-                    <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Sistema de cotización profesional — Servicios, Productos y Paquetes</p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h1 className="text-lg sm:text-2xl font-extrabold text-[#4449AA]">📋 Nueva Cotización</h1>
+                        <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Sistema de cotización profesional — Servicios, Productos y Paquetes</p>
+                    </div>
+                    {location.state?.fromWaChat && (
+                        <button
+                            type="button"
+                            onClick={() =>
+                                navigate('/support/chat', {
+                                    state: { waCircleId: location.state.waCircleId },
+                                    replace: true,
+                                })
+                            }
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#EEF0FF] hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>Volver al chat de WhatsApp{formData.cliente_nombre ? ` · ${formData.cliente_nombre}` : ''}</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* ── Indicador de Pasos: Progressive Compact ── */}
@@ -2115,7 +2150,7 @@ export default function CotizadorPro() {
                         ) : (
                             <Button onClick={handleGenerar} className="bg-green-600 hover:bg-green-700 text-white">
                                 <FileText className="w-4 h-4 mr-2" />
-                                Generar Cotización
+                                {location.state?.fromWaChat ? 'Generar y volver al chat de WhatsApp' : 'Generar Cotización'}
                             </Button>
                         )}
                     </div>
@@ -2274,7 +2309,7 @@ export default function CotizadorPro() {
                             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-green-600 text-white font-bold text-sm shadow-md shadow-green-600/30 active:scale-95 transition-all"
                         >
                             <Receipt className="w-4 h-4 flex-shrink-0" />
-                            Generar Cotización
+                            {location.state?.fromWaChat ? 'Generar y volver al chat' : 'Generar Cotización'}
                         </button>
                     )}
                 </div>

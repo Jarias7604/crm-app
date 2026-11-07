@@ -21,11 +21,11 @@ type PlanForPDF = {
 };
 
 export const pdfService = {
-    async generateAndUploadQuotePDF(
+    async generateQuotePDFBlob(
         cotizacion: CotizacionData,
         clientSelectedPlan?: PlanForPDF | null,
         allPlansForComparison?: PlanForPDF[]
-    ): Promise<string> {
+    ): Promise<Blob> {
         try {
         const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
             const pageWidth = doc.internal.pageSize.getWidth();
@@ -45,11 +45,15 @@ export const pdfService = {
                 WHITE: [255, 255, 255]
             };
 
+            const publicPropuestaUrl = cotizacion?.id
+                ? `${window.location.origin}/propuesta/${cotizacion.id}`
+                : window.location.href;
+
             // Load assets in parallel (original)
             const [logoData, avatarData, qrData] = await imageCache.loadImagesParallel([
                 cotizacion.company?.logo_url || '',
                 cotizacion.creator?.avatar_url || '',
-                `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(window.location.href)}`
+                `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(publicPropuestaUrl)}`
             ]);
 
             // ── Etiquetas dinámicas por empresa ───────────────────────────────────
@@ -1171,8 +1175,21 @@ export const pdfService = {
                 drawFooter(doc.getNumberOfPages());
             }
 
-            // Save & Return
-            const pdfBlob = doc.output('blob');
+            // Save & Return Blob
+            return doc.output('blob');
+        } catch (err: any) {
+            console.error('PDF Generation failed:', err);
+            throw err;
+        }
+    },
+
+    async generateAndUploadQuotePDF(
+        cotizacion: CotizacionData,
+        clientSelectedPlan?: PlanForPDF | null,
+        allPlansForComparison?: PlanForPDF[]
+    ): Promise<string> {
+        try {
+            const pdfBlob = await this.generateQuotePDFBlob(cotizacion, clientSelectedPlan, allPlansForComparison);
 
             // ── BYPASS UPLOAD IF NO SESSION (CLIENT/ANONYMOUS VIEW) ──
             // Anonymous clients on public pages do not have storage upload permissions.
