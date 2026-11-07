@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { isSupportTicket } from '../lib/whatsappScopes';
 
 export type TicketStatus = 'new' | 'open' | 'pending' | 'resolved' | 'closed';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -18,6 +19,7 @@ export interface TicketLead {
     phone: string | null;
     status?: string | null;
     es_cliente?: boolean | null;
+    assigned_to?: string | null;
 }
 
 export interface TicketCategory {
@@ -255,7 +257,7 @@ export const ticketService = {
     async getLeads(companyId: string): Promise<TicketLead[]> {
         const { data, error } = await supabase
             .from('leads')
-            .select('id, name, email, phone, status, es_cliente')
+            .select('id, name, email, phone, status, es_cliente, assigned_to')
             .eq('company_id', companyId)
             .order('name');
         if (error) throw error;
@@ -303,7 +305,14 @@ export const ticketService = {
     // ─── Tickets ────────────────────────────────────────────────────────────
     async getTickets(
         companyId: string,
-        filters?: { status?: TicketStatus[]; categoryId?: string; assignedTo?: string }
+        filters?: {
+            status?: TicketStatus[];
+            categoryId?: string;
+            assignedTo?: string;
+            // WhatsApp chats of leads / unknown numbers / team / spam are conversations,
+            // not support tickets. Only the Support Chat screen asks for them.
+            includeNonSupportWhatsapp?: boolean;
+        }
     ): Promise<Ticket[]> {
         // NOTE: We avoid PostgREST relationship join syntax (lead:leads, profiles!fkey)
         // because those require a registered FK in the schema cache which may be absent
@@ -326,8 +335,13 @@ export const ticketService = {
         const { data, error } = await query.order('created_at', { ascending: false });
         if (error) throw error;
 
+        const rows = (data || []) as Record<string, unknown>[];
+        const visible = filters?.includeNonSupportWhatsapp
+            ? rows
+            : rows.filter((t) => isSupportTicket(t as { metadata?: Record<string, unknown> | null }));
+
         // Build lead object from the lead_name snapshot (always available, no RLS issues)
-        return (data || []).map((t: Record<string, unknown>) => ({
+        return visible.map((t: Record<string, unknown>) => ({
             ...t,
             lead: t.lead_name ? { name: t.lead_name as string, email: null } : undefined,
         })) as Ticket[];
@@ -418,7 +432,14 @@ export const ticketService = {
             .select('*')
             .single();
 
-        if (error) throw error;
+        if (error) {
+            if (String(error.message || '').includes('uq_wa_open_ticket_per_chat')) {
+                throw new Error(
+                    'Este chat de WhatsApp ya tiene un ticket abierto. Ciérralo primero o continúa en el ticket abierto.'
+                );
+            }
+            throw error;
+        }
         const t = data as Record<string, unknown>;
         return {
             ...t,
@@ -471,12 +492,13 @@ export const ticketService = {
     async getStats(companyId: string): Promise<TicketStats> {
         const { data, error } = await supabase
             .from('tickets')
-            .select('status, priority, created_at, resolved_at, last_status_change_at, category_id')
+            .select('status, priority, created_at, resolved_at, last_status_change_at, category_id, metadata')
             .eq('company_id', companyId);
 
         if (error) throw error;
 
-        const all = data || [];
+        // Lead / unclassified WhatsApp chats are not support tickets.
+        const all = (data || []).filter((t: { metadata?: Record<string, unknown> | null }) => isSupportTicket(t));
         const todayStr = new Date().toISOString().split('T')[0];
 
         // Avg resolution time

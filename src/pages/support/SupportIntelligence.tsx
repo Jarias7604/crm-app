@@ -26,6 +26,7 @@ import {
   type TicketLead,
 } from '../../services/tickets';
 import { TicketPanel } from './components/TicketPanel';
+import { isSupportTicket } from '../../lib/whatsappScopes';
 
 type WorkBucket = 'text_reply' | 'implementation' | 'troubleshooting' | 'development';
 
@@ -401,7 +402,8 @@ export const SupportIntelligence: React.FC = () => {
       const profs = (profsRes.data || []) as CompanyAgent[];
       const leads = (leadsRes.data || []) as TicketLead[];
       const cats = (catsRes.data || []) as TicketCategory[];
-      const rawTickets = (ticketsRes.data || []) as Ticket[];
+      // Lead / unclassified WhatsApp chats are sales conversations, not support work.
+      const rawTickets = ((ticketsRes.data || []) as Ticket[]).filter((t) => isSupportTicket(t));
       const projects = projectsRes.data || [];
 
       setAgentsList(profs);

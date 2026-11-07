@@ -323,10 +323,12 @@ function App() {
                   {/* Support Routes */}
                   <Route element={<FeatureProtectedRoute feature="tickets" />}>
                     <Route path="/support/tickets" element={<Tickets />} />
-                    <Route path="/support/chat" element={<SupportChatCircles />} />
                     <Route path="/support/intelligence" element={<SupportIntelligence />} />
                     <Route path="/support/atrasados" element={<OverdueTickets />} />
                   </Route>
+                  {/* WhatsApp chat: techs (Soporte) and sales (Leads) — access is decided per
+                      conversation by wa_chat_* permissions + RLS, so it is not gated by 'tickets'. */}
+                  <Route path="/support/chat" element={<SupportChatCircles />} />
                   <Route path="/onboarding" element={<OnboardingWizard />} />
                 </Route>
               </Route>

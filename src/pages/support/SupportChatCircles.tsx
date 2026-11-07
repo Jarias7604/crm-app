@@ -1,30 +1,24 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
   Plus,
   Send,
-  Camera,
   Mic,
   CheckCheck,
+  Check,
   Bell,
   Clock,
   CheckCircle2,
   AlertTriangle,
   UserCheck,
   Sparkles,
-  Brain,
-  Ticket as TicketIcon,
   ChevronRight,
   ChevronDown,
   Phone,
-  Video,
   PanelRightClose,
   PanelRightOpen,
-  Paperclip,
   RefreshCw,
-  ShieldAlert,
-  ExternalLink,
   Settings,
   X,
   MessageSquare,
@@ -39,6 +33,15 @@ import {
   FolderOpen,
   Bot,
   FileText,
+  Download,
+  Ban,
+  HelpCircle,
+  ShieldCheck,
+  Tag,
+  ExternalLink,
+  Loader2,
+  ImageOff,
+  Paperclip,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
@@ -54,68 +57,80 @@ import {
 } from '../../services/tickets';
 import { clientsService } from '../../services/clients';
 import type { Client } from '../../types/clients';
-import { storageService } from '../../services/storage';
+import {
+  getWaViewerScopes,
+  getWaScope,
+  isWhatsappTicket,
+  WA_SCOPE_LABELS,
+  type WaScope,
+} from '../../lib/whatsappScopes';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // Strip all emoji characters so UI uses 100% vector icons only
 function stripEmojis(text: string): string {
   return (text || '')
-    .replace(
-      /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{2702}-\u{27B0}]/gu,
-      ''
-    )
-    .replace(/\s+/g, ' ')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{2702}-\u{27B0}]/gu, '')
+    .replace(/[ \t]+/g, ' ')
     .trim();
 }
 
-interface ParsedChatBubble {
-  id: string;
-  senderType: 'client' | 'staff' | 'announcement';
-  senderName: string;
-  text: string;
-  timeLabel: string;
-  createdAt: string;
-  mediaUrl?: string;
-  mediaType?: 'image' | 'video' | 'file' | 'audio';
-  mediaName?: string;
-  ticketTitle?: string;
-  aiCategory?: string;
-  isRecurringAlert?: boolean;
+const TZ = 'America/El_Salvador';
+
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+}
+
+function dayKey(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ });
+}
+
+function dayLabel(iso: string): string {
+  const k = dayKey(iso);
+  const today = dayKey(new Date().toISOString());
+  const yesterday = dayKey(new Date(Date.now() - 86400000).toISOString());
+  if (k === today) return 'Hoy';
+  if (k === yesterday) return 'Ayer';
+  return new Date(iso).toLocaleDateString('es-SV', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: k.slice(0, 4) === today.slice(0, 4) ? undefined : 'numeric',
+    timeZone: TZ,
+  });
+}
+
+function listTimeLabel(iso: string): string {
+  return dayKey(iso) === dayKey(new Date().toISOString()) ? fmtTime(iso) : dayLabel(iso);
+}
+
+function initials(name: string): string {
+  return (
+    stripEmojis(name)
+      .replace(/\(\+?[\d\s-]+\)/g, '')
+      .split(' ')
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || '?'
+  );
+}
+
+function formatBytes(n?: number | null): string {
+  if (!n) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
 export type SupportChannelType = 'soporte' | 'contabilidad' | 'ventas' | 'otros';
 
-export const SUPPORT_CHANNELS: Record<
-  SupportChannelType,
-  { id: SupportChannelType; label: string; shortLabel: string; badgeBg: string; badgeText: string }
-> = {
-  soporte: {
-    id: 'soporte',
-    label: 'Soporte Técnico',
-    shortLabel: 'Soporte',
-    badgeBg: 'bg-indigo-100 border-indigo-200',
-    badgeText: 'text-indigo-800',
-  },
-  contabilidad: {
-    id: 'contabilidad',
-    label: 'Contabilidad / IVA',
-    shortLabel: 'Contabilidad',
-    badgeBg: 'bg-sky-100 border-sky-200',
-    badgeText: 'text-sky-800',
-  },
-  ventas: {
-    id: 'ventas',
-    label: 'Ventas / Precios',
-    shortLabel: 'Ventas / Precios',
-    badgeBg: 'bg-emerald-100 border-emerald-200',
-    badgeText: 'text-emerald-800',
-  },
-  otros: {
-    id: 'otros',
-    label: 'Otros / General',
-    shortLabel: 'Otros',
-    badgeBg: 'bg-slate-100 border-slate-200',
-    badgeText: 'text-slate-700',
-  },
+const SUPPORT_CHANNEL_LABELS: Record<SupportChannelType, string> = {
+  soporte: 'Soporte Técnico',
+  contabilidad: 'Contabilidad / IVA',
+  ventas: 'Ventas / Precios',
+  otros: 'Otros / General',
 };
 
 const DEFAULT_PROMPTS: Record<SupportChannelType, string> = {
@@ -128,72 +143,6 @@ const DEFAULT_PROMPTS: Record<SupportChannelType, string> = {
   otros:
     'Eres el Asistente IA de Atención al Cliente de Arias Defense. Lee o escucha el mensaje del cliente y respóndele de forma cortés, clara y servicial en máximo 3 líneas por WhatsApp, confirmando que recibimos su consulta y canalizándola con el área correspondiente.',
 };
-
-function detectTicketSupportChannel(t: Ticket): SupportChannelType {
-  const meta = (t.metadata || {}) as Record<string, any>;
-  const combined = `${t.title || ''} ${t.description || ''} ${meta.ai_category || ''}`.toLowerCase();
-
-  // If it clearly describes a DTE / Hacienda / technical error, it's ALWAYS Soporte (existing client)
-  if (
-    /dte|hacienda|desconfigurado|no imprime|error al emitir|rechazado|contingencia|invalidaci|firmador|previsualizaci|gaveta|anydesk/i.test(
-      combined
-    )
-  ) {
-    return 'soporte';
-  }
-
-  if (
-    meta.support_channel &&
-    ['soporte', 'contabilidad', 'ventas', 'otros'].includes(meta.support_channel)
-  ) {
-    return meta.support_channel as SupportChannelType;
-  }
-
-  if (
-    /cuanto cuesta|cuánto cuesta|cuanto vale|cuánto vale|precio del sistema|precios de|cotizaci[oó]n|mensualidad|quiero comprar|contratar|me interesa el sistema|demo del sistema/i.test(
-      combined
-    )
-  ) {
-    return 'ventas';
-  }
-  if (
-    /contabilidad|contable|libro de iva|libros de iva|declaraci[oó]n|anexo|f07|f14|retenci[oó]n|planilla|balance general|partida contable/i.test(
-      combined
-    )
-  ) {
-    return 'contabilidad';
-  }
-  if (/otro producto|otros productos|información general|catalogo|catálogo/i.test(combined)) {
-    return 'otros';
-  }
-  return 'soporte';
-}
-
-interface SupportCircle {
-  circleId: string;
-  clientName: string;
-  phone: string;
-  whatsappJid: string;
-  isWhatsApp: boolean;
-  isGroup: boolean;
-  isExistingClient: boolean;
-  supportChannel: SupportChannelType;
-  promotedLeadId: string | null;
-  existingLeadStatus?: string | null;
-  activeTicket: Ticket;
-  allClientTickets: Ticket[];
-  unreadOrWaitingReply: boolean;
-  lastMessageText: string;
-  lastMessageSender: string;
-  lastMessageAt: string;
-  assignedTechId: string | null;
-  assignedTechName: string;
-  categoryCode: string;
-  categoryName: string;
-  categoryColor: string;
-  totalMessagesCount: number;
-  repeatTicketsCount: number;
-}
 
 const SUPPORT_QUICK_REPLIES = [
   {
@@ -214,7 +163,7 @@ const SUPPORT_QUICK_REPLIES = [
   },
 ];
 
-// Detect internal developer/system task titles that are NOT clients and should NOT be shown as fake people in Circles
+// Internal developer/system task titles that are NOT clients (legacy non-WhatsApp tickets).
 function isInternalDevOrSystemTaskTitle(rawTitle: string): boolean {
   const clean = stripEmojis(rawTitle || '').toLowerCase();
   return /^(importaci[oó]n de proveedores|estandarizar dise[ñn]o|actualizar precios de mayoreo|importar precios por mayoreo|ajustes de estilos|estilos cotizacion|cotizaciones:\s*(personas|quitar)|cotizaciones\s+2\s*hours|revisi[oó]n de cambios normativa|apertura de gaveta de dinero|faq erp\b|nota de remisi[oó]n\b|factura de exportaci[oó]n\b|pos\s*1\b|jornada\s+(melvin|gerson)|comunicado oficial|libro de iva para mantenimientos)/i.test(
@@ -222,87 +171,16 @@ function isInternalDevOrSystemTaskTitle(rawTitle: string): boolean {
   );
 }
 
-// Resolve WhatsApp Group Name ("Soporte tecnico Arias - Corp Argoz", "Soporte Tecnico Medicina Popular", etc.)
-function resolveWhatsAppGroupSubject(t: Ticket): string | null {
-  const meta = (t.metadata || {}) as Record<string, any>;
-  if (meta.whatsapp_group_subject && String(meta.whatsapp_group_subject).trim().length > 1) {
-    return stripEmojis(String(meta.whatsapp_group_subject).trim());
-  }
-  const jid = String(meta.whatsapp_jid || '');
-  const isGroup = Boolean(meta.is_group) || jid.endsWith('@g.us');
-  const combined = `${t.lead_name || ''} ${meta.whatsapp_push_name || ''} ${t.title || ''}`.toLowerCase();
-
-  if (combined.includes('yanci') || /arg[oó]z|argos/i.test(combined)) {
-    return 'Soporte tecnico Arias - Corp Argoz';
-  }
-  if (combined.includes('carloxavy') || /medicina\s+popular/i.test(combined)) {
-    return 'Soporte Tecnico Medicina Popular';
-  }
-  if (combined.includes('mel espinoza') || /aillio/i.test(combined)) {
-    return 'Soporte tecnico ERP Arias - Aillio Latam';
-  }
-  if (combined.includes('norma pineda') || /salinera\s+san\s+jorge/i.test(combined)) {
-    return 'Soporte Técnico Salinera San Jorge';
-  }
-  if (combined.includes('magdalena') || /boutique\s+am[eé]rica/i.test(combined)) {
-    return 'Soporte técnico Boutique América + Johanna Garcia';
-  }
-  if (combined.includes('francisco colorado') || /rustic\s+barber/i.test(combined)) {
-    return 'Soporte técnico Rustic Barber';
-  }
-  if (combined.includes('dennis soto') || /dennis\s+soto/i.test(combined)) {
-    return 'Soporte tecnico ERP Arias - Dennis Soto';
-  }
-  if (/la\s+econ[oó]mica/i.test(combined)) {
-    return 'Soporte Tecnico Arias La Economica';
-  }
-  if (/distribuidora\s+granadino/i.test(combined)) {
-    return 'Soporte técnico Distribuidora Granadino';
-  }
-  if (combined.includes('lucy pineda') || combined.includes('rafael lazo') || /salvadoran\s+american/i.test(combined)) {
-    return 'Salvadoran American PAC';
-  }
-  if (isGroup && t.lead_name && /^soporte\s+t[eé]cnico/i.test(t.lead_name)) {
-    return stripEmojis(t.lead_name);
-  }
-  return null;
-}
-
-function normalizeCircleClientName(raw: string): string {
-  const clean = stripEmojis(raw || '').replace(/\s+/g, ' ').trim();
-  if (!clean) return 'Cliente Soporte';
-  if (/arg[oó]z|argos/i.test(clean) && !/^soporte/i.test(clean)) return 'Soporte tecnico Arias - Corp Argoz';
-  if (/don\s+carret[oó]n/i.test(clean)) return 'Don Carretón';
-  if (/la\s+econ[oó]mica/i.test(clean) && !/^soporte/i.test(clean)) return 'Soporte Tecnico Arias La Economica';
-  if (/medicina\s+popular/i.test(clean) && !/^soporte/i.test(clean)) return 'Soporte Tecnico Medicina Popular';
-  if (/conta\s*ohs/i.test(clean)) return 'Conta OHS';
-  if (/salinera\s+san\s+jorge/i.test(clean) && !/^soporte/i.test(clean)) return 'Soporte Técnico Salinera San Jorge';
-  if (/moda\s+[ií]ntima/i.test(clean)) return 'Moda Íntima';
-  if (/udp\s+volea/i.test(clean)) return 'UDP Volea';
-  return clean;
-}
-
-function extractClientFromTicket(t: Ticket): string {
-  const groupSubject = resolveWhatsAppGroupSubject(t);
-  if (groupSubject) return groupSubject;
-
+// Client name for legacy (non-WhatsApp) support tickets.
+function extractLegacyClientName(t: Ticket): string {
   if (t.lead_name && t.lead_name.trim().length > 1) {
-    return normalizeCircleClientName(t.lead_name.replace(/\(\+\d+\)/g, '').trim());
+    return stripEmojis(t.lead_name.replace(/\(\+\d+\)/g, '').trim());
   }
-
-  const waMatch = (t.title || '').match(/\[WhatsApp[^\]]*\]\s*([^:(]+?)(?:\s*\(\+\d+\))?\s*:/i);
-  if (waMatch && waMatch[1]) {
-    return normalizeCircleClientName(waMatch[1].trim());
-  }
-
   const colonMatch = (t.title || '').match(
     /^(?:soporte\s+t[eé]cnico|error(?:\s+en\s+json)?\s+reportado|capacitaci[oó]n(?:\s+presencial)?|pregunta\s+frecuente|go\s*live|solicitud(?:\s+de\s+cliente)?)\s*:\s*([^-\n(|]+)/i
   );
-  if (colonMatch && colonMatch[1]) {
-    return normalizeCircleClientName(colonMatch[1].trim());
-  }
-
-  return normalizeCircleClientName(t.title || 'Cliente Soporte');
+  if (colonMatch && colonMatch[1]) return stripEmojis(colonMatch[1].trim());
+  return stripEmojis(t.title || 'Cliente Soporte');
 }
 
 function detectShortCategory(catName: string, title: string): { code: string; name: string; color: string } {
@@ -313,19 +191,106 @@ function detectShortCategory(catName: string, title: string): { code: string; na
   if (text.startsWith('p2') || /error\s+reportado/i.test(text)) {
     return { code: 'P2', name: catName || 'P2 - Errores Sistema', color: '#F97316' };
   }
-  if (text.startsWith('p4')) {
-    return { code: 'P4', name: catName || 'P4 - Mejoras', color: '#3B82F6' };
-  }
-  if (/pegunta|pregunta\s+frecuente/i.test(text)) {
-    return { code: 'FAQ', name: 'Preguntas Frecuentes', color: '#10B981' };
-  }
+  if (text.startsWith('p4')) return { code: 'P4', name: catName || 'P4 - Mejoras', color: '#3B82F6' };
+  if (/pegunta|pregunta\s+frecuente/i.test(text)) return { code: 'FAQ', name: 'Preguntas Frecuentes', color: '#10B981' };
   return { code: 'P3', name: catName || 'P3 - Soporte Técnico', color: '#F59E0B' };
 }
 
+const SCOPE_STYLE: Record<WaScope, { avatar: string; chip: string; icon: React.ElementType }> = {
+  soporte: { avatar: 'bg-indigo-600', chip: 'bg-indigo-50 text-indigo-700 border-indigo-200/60', icon: Building2 },
+  por_clasificar: { avatar: 'bg-amber-500', chip: 'bg-amber-50 text-amber-800 border-amber-200', icon: HelpCircle },
+  lead: { avatar: 'bg-emerald-600', chip: 'bg-emerald-50 text-emerald-700 border-emerald-200/70', icon: UserPlus },
+  interno: { avatar: 'bg-slate-500', chip: 'bg-slate-100 text-slate-700 border-slate-200', icon: ShieldCheck },
+  spam: { avatar: 'bg-rose-400', chip: 'bg-rose-50 text-rose-700 border-rose-200', icon: Ban },
+};
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface SupportCircle {
+  circleId: string;
+  clientName: string;
+  pushName: string;
+  phone: string;
+  whatsappJid: string;
+  isWhatsApp: boolean;
+  isGroup: boolean;
+  scope: WaScope;
+  scopeReason: string;
+  memberOfGroups: { jid: string; subject: string | null }[];
+  leadId: string | null;
+  leadStatus: string | null;
+  leadOwnerName: string | null;
+  activeTicket: Ticket;
+  allClientTickets: Ticket[];
+  unreadOrWaitingReply: boolean;
+  lastMessageText: string;
+  lastMessageSender: string;
+  lastMessageAt: string;
+  assignedTechId: string | null;
+  assignedTechName: string;
+  categoryCode: string;
+  categoryName: string;
+  supportChannel: SupportChannelType;
+}
+
+interface WaMessageRow {
+  id: string;
+  ticket_id: string;
+  comment_id: string | null;
+  message_type: string;
+  media_status: 'none' | 'pending' | 'requested' | 'ready' | 'failed';
+  media_path: string | null;
+  media_mime: string | null;
+  media_filename: string | null;
+  media_size: number | null;
+  media_error: string | null;
+  from_me: boolean;
+}
+
+interface OutboxRow {
+  id: string;
+  comment_id: string | null;
+  status: 'pending' | 'dispatched' | 'sent' | 'error';
+  error: string | null;
+}
+
+interface ChatItem {
+  id: string;
+  kind: 'client' | 'staff' | 'system' | 'ticket';
+  senderName: string;
+  text: string;
+  transcript?: string;
+  createdAt: string;
+  ticketId: string;
+  media?: WaMessageRow & { url?: string };
+  legacyMedia?: { url: string; type: 'image' | 'video' | 'file' | 'audio'; name?: string };
+  delivery?: OutboxRow['status'];
+  deliveryError?: string | null;
+}
+
+interface WaGroupRow {
+  group_jid: string;
+  subject: string | null;
+  client_id: string | null;
+}
+
+type CircleFilter = 'all' | 'waiting' | 'soporte' | 'por_clasificar' | 'lead' | 'interno' | 'spam';
+
+// Parse "[10:42 a. m.] 👤 Nombre: texto" chat lines written by the webhook.
+function parseChatLine(raw: string): { icon: string; sender: string; text: string } | null {
+  const m = raw.match(/^\[([^\]]+)\]\s*(👤|👨‍💻)?\s*([^:\n]+):\s*([\s\S]*)$/);
+  if (!m) return null;
+  return { icon: m[2] || '', sender: m[3].trim(), text: m[4] };
+}
+
+// =============================================================================
+
 export const SupportChatCircles: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { profile, simulatedCompanyId } = useAuth();
   const activeCompanyId = simulatedCompanyId || profile?.company_id;
+  const scopes = useMemo(() => getWaViewerScopes(profile as any), [profile]);
 
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -333,11 +298,19 @@ export const SupportChatCircles: React.FC = () => {
   const [agents, setAgents] = useState<CompanyAgent[]>([]);
   const [realClients, setRealClients] = useState<Client[]>([]);
   const [companyLeads, setCompanyLeads] = useState<TicketLead[]>([]);
-  const [selectedCircleId, setSelectedCircleId] = useState<string | null>(null);
+  const [waGroups, setWaGroups] = useState<WaGroupRow[]>([]);
+  const [selectedCircleId, setSelectedCircleId] = useState<string | null>(() => {
+    const jid = searchParams.get('jid');
+    return jid ? `wa:${jid}` : null;
+  });
+
+  // Thread (all tickets of the selected chat)
   const [comments, setComments] = useState<TicketComment[]>([]);
+  const [waMessages, setWaMessages] = useState<WaMessageRow[]>([]);
+  const [outboxRows, setOutboxRows] = useState<OutboxRow[]>([]);
+  const [mediaUrls, setMediaUrls] = useState<Record<string, string>>({});
   const [loadingComments, setLoadingComments] = useState(false);
 
-  // Track which Circle's lastMessageAt has already been opened/read so BOLD turns off immediately on click!
   const [readCirclesMap, setReadCirclesMap] = useState<Record<string, string>>(() => {
     try {
       return JSON.parse(localStorage.getItem('crm_circles_read_map') || '{}');
@@ -345,7 +318,6 @@ export const SupportChatCircles: React.FC = () => {
       return {};
     }
   });
-
   const markCircleAsRead = (circleId: string, lastMessageAt: string) => {
     setReadCirclesMap((prev) => {
       if (prev[circleId] === lastMessageAt) return prev;
@@ -359,27 +331,24 @@ export const SupportChatCircles: React.FC = () => {
     });
   };
 
-  // Unified, clean 4-tab filter in left Circles column
   const [searchQuery, setSearchQuery] = useState('');
-  const [circleFilter, setCircleFilter] = useState<
-    'all' | 'soporte' | 'ventas' | 'waiting'
-  >('all');
+  const defaultFilter: CircleFilter = scopes.all ? 'all' : scopes.soporte && !scopes.leads ? 'soporte' : scopes.leads && !scopes.soporte ? 'por_clasificar' : 'all';
+  const [circleFilter, setCircleFilter] = useState<CircleFilter>(defaultFilter);
 
-  // Message input & sending state
   const [messageInput, setMessageInput] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
-  const [promotingLead, setPromotingLead] = useState(false);
+  const [classifying, setClassifying] = useState(false);
+  const [showClientPicker, setShowClientPicker] = useState(false);
+  const [clientPickerQuery, setClientPickerQuery] = useState('');
+  const [showReclassifyMenu, setShowReclassifyMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Live timer measuring how many seconds/minutes the tech spends on this chat
   const [activeChatSeconds, setActiveChatSeconds] = useState(0);
-
-  // Right Control Drawer state (Closed by default for clean Photo 4 layout!)
   const [showRightPanel, setShowRightPanel] = useState(false);
 
-  // Resizable Left "Circles" Column Width (Drag the vertical divider line like WhatsApp Desktop!)
+  // Resizable left column
   const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem('crm_circles_left_width'));
     return saved >= 260 && saved <= 750 ? saved : 380;
@@ -387,7 +356,6 @@ export const SupportChatCircles: React.FC = () => {
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const resizeStartXRef = useRef<number>(0);
   const resizeStartWidthRef = useRef<number>(380);
-
   useEffect(() => {
     if (!isResizingLeft) return;
     const handleMouseMove = (e: MouseEvent) => {
@@ -409,6 +377,7 @@ export const SupportChatCircles: React.FC = () => {
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizingLeft]);
+
   const [showHistoryAccordion, setShowHistoryAccordion] = useState(false);
   const [savingResolution, setSavingResolution] = useState(false);
   const [resForm, setResForm] = useState({
@@ -419,496 +388,356 @@ export const SupportChatCircles: React.FC = () => {
     time_justification: '',
   });
 
-  // Evolution API Direct Settings Modal (pre-filled with Gerson's instance & API key)
-  const [showEvoModal, setShowEvoModal] = useState(false);
-  const [evoConfig, setEvoConfig] = useState(() => ({
-    url: localStorage.getItem('crm_evo_url') || '',
-    key: localStorage.getItem('crm_evo_key') || '10C73BF4-D3D9-4CDB-9855-85E346468546',
-    instance: localStorage.getItem('crm_evo_instance') || 'soporte',
-  }));
+  // WhatsApp connection status (admin)
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [bridgeStatus, setBridgeStatus] = useState<Record<string, any> | null>(null);
 
-  // Multi-Category AI Auto-Responder (BOTH Text & Audio + OpenAI Live Verification)
-  // Default OFF (false) so AI only classifies & transcribes unless explicitly enabled by admin
+  // AI auto-responder settings (admin)
   const [showAiPromptModal, setShowAiPromptModal] = useState(false);
   const [activePromptTab, setActivePromptTab] = useState<SupportChannelType>('soporte');
   const [aiAutoReplyText, setAiAutoReplyText] = useState(false);
   const [aiAutoReplyAudio, setAiAutoReplyAudio] = useState(false);
-  const [aiPrompts, setAiPrompts] = useState<Record<SupportChannelType, string>>(() => ({
-    soporte: localStorage.getItem('crm_support_ai_prompt_soporte') || DEFAULT_PROMPTS.soporte,
-    contabilidad:
-      localStorage.getItem('crm_support_ai_prompt_contabilidad') || DEFAULT_PROMPTS.contabilidad,
-    ventas: localStorage.getItem('crm_support_ai_prompt_ventas') || DEFAULT_PROMPTS.ventas,
-    otros: localStorage.getItem('crm_support_ai_prompt_otros') || DEFAULT_PROMPTS.otros,
-  }));
-  const [openAiStatus, setOpenAiStatus] = useState<{
-    checking: boolean;
-    verified: boolean;
-    model: string;
-    error: string;
-  }>({
-    checking: true,
-    verified: false,
-    model: 'gpt-4o-mini',
-    error: '',
-  });
+  const [aiPrompts, setAiPrompts] = useState<Record<SupportChannelType, string>>({ ...DEFAULT_PROMPTS });
+  const [openAiStatus, setOpenAiStatus] = useState({ checking: true, verified: false, model: 'gpt-4o-mini', error: '' });
   const [savingAiConfig, setSavingAiConfig] = useState(false);
+
+  const invoke = async (body: Record<string, unknown>) => {
+    const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', { body });
+    if (error) {
+      // supabase-js wraps non-2xx responses; surface the server's message.
+      let msg = error.message;
+      try {
+        const ctx = (error as any).context;
+        if (ctx && typeof ctx.json === 'function') {
+          const j = await ctx.json();
+          if (j?.error) msg = j.error;
+        }
+      } catch {
+        // keep generic message
+      }
+      throw new Error(msg);
+    }
+    if (data && data.ok === false) throw new Error(data.error || 'Error');
+    return data;
+  };
 
   const verifyAndLoadAiConfig = async (showToast = false) => {
     setOpenAiStatus((p) => ({ ...p, checking: true }));
     try {
-      const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
-        body: { action: 'get_ai_config' },
-      });
-      if (error) throw error;
-      if (data) {
-        setOpenAiStatus({
-          checking: false,
-          verified: Boolean(data.openai_verified),
-          model: data.openai_model || 'gpt-4o-mini',
-          error: data.openai_error || '',
-        });
-        if (typeof data.auto_reply_text === 'boolean') setAiAutoReplyText(data.auto_reply_text);
-        if (typeof data.auto_reply_audio === 'boolean') setAiAutoReplyAudio(data.auto_reply_audio);
-        if (data.prompts) {
-          setAiPrompts({
-            soporte: data.prompts.soporte || DEFAULT_PROMPTS.soporte,
-            contabilidad: data.prompts.contabilidad || DEFAULT_PROMPTS.contabilidad,
-            ventas: data.prompts.ventas || DEFAULT_PROMPTS.ventas,
-            otros: data.prompts.otros || DEFAULT_PROMPTS.otros,
-          });
-        }
-        if (showToast) {
-          if (data.openai_verified) {
-            toast.success(`OpenAI Conectado y Verificado (${data.openai_model || 'gpt-4o-mini'} + Whisper)`);
-          } else {
-            toast.error(`OpenAI no respondió: ${data.openai_error || 'Verificar API Key'}`);
-          }
-        }
-      }
-    } catch (e: any) {
+      const data = await invoke({ action: 'get_ai_config' });
       setOpenAiStatus({
         checking: false,
-        verified: false,
-        model: 'gpt-4o-mini',
-        error: e?.message || 'Error al verificar',
+        verified: Boolean(data.openai_verified),
+        model: data.openai_model || 'gpt-4o-mini',
+        error: data.openai_error || '',
       });
+      if (typeof data.auto_reply_text === 'boolean') setAiAutoReplyText(data.auto_reply_text);
+      if (typeof data.auto_reply_audio === 'boolean') setAiAutoReplyAudio(data.auto_reply_audio);
+      if (data.prompts) {
+        setAiPrompts({
+          soporte: data.prompts.soporte || DEFAULT_PROMPTS.soporte,
+          contabilidad: data.prompts.contabilidad || DEFAULT_PROMPTS.contabilidad,
+          ventas: data.prompts.ventas || DEFAULT_PROMPTS.ventas,
+          otros: data.prompts.otros || DEFAULT_PROMPTS.otros,
+        });
+      }
+      if (showToast) {
+        if (data.openai_verified) toast.success(`OpenAI conectado (${data.openai_model || 'gpt-4o-mini'} + Whisper)`);
+        else toast.error(`OpenAI no respondió: ${data.openai_error || 'Verificar API Key'}`);
+      }
+    } catch (e: any) {
+      setOpenAiStatus({ checking: false, verified: false, model: 'gpt-4o-mini', error: e?.message || 'Error al verificar' });
     }
   };
 
+  // ── Data loading ──────────────────────────────────────────────────────────
+  const loadSupportData = useCallback(
+    async (silent = false) => {
+      if (!activeCompanyId) return;
+      if (!silent) setLoading(true);
+      try {
+        const [tks, cats, ags, cls, lds, grps] = await Promise.all([
+          ticketService.getTickets(activeCompanyId, { includeNonSupportWhatsapp: true }),
+          ticketService.getCategories(activeCompanyId).catch(() => [] as TicketCategory[]),
+          ticketService.getAgents(activeCompanyId).catch(() => [] as CompanyAgent[]),
+          clientsService.getAll({ companyId: activeCompanyId }).catch(() => [] as Client[]),
+          ticketService.getLeads(activeCompanyId).catch(() => [] as TicketLead[]),
+          supabase
+            .from('whatsapp_groups')
+            .select('group_jid, subject, client_id')
+            .eq('company_id', activeCompanyId)
+            .then((r) => (r.data || []) as WaGroupRow[]),
+        ]);
+        setTickets(tks);
+        setCategories(cats);
+        setAgents(ags);
+        setRealClients(cls);
+        setCompanyLeads(lds);
+        setWaGroups(grps);
+      } catch (err) {
+        console.error('[SupportChatCircles] Error loading:', err);
+        if (!silent) toast.error('No se pudieron cargar los chats');
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [activeCompanyId]
+  );
+
   useEffect(() => {
-    if (activeCompanyId) {
+    if (activeCompanyId && scopes.any) {
       loadSupportData();
-      verifyAndLoadAiConfig(false);
+      if (scopes.all) verifyAndLoadAiConfig(false);
     }
-  }, [activeCompanyId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCompanyId, scopes.any]);
 
-  // Realtime subscription to tickets & ticket_comments so new WhatsApp messages pop in live!
-  useEffect(() => {
-    if (!activeCompanyId) return;
-    const channel = supabase
-      .channel('support_circles_realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tickets' },
-        () => {
-          loadSupportData(true);
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'ticket_comments' },
-        (payload: any) => {
-          const newComment = payload.new as TicketComment;
-          setComments((prev) => {
-            if (prev.some((c) => c.id === newComment.id)) return prev;
-            return [...prev, newComment];
-          });
-          loadSupportData(true);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [activeCompanyId]);
-
-  const loadSupportData = async (silent = false) => {
-    if (!activeCompanyId) return;
-    if (!silent) setLoading(true);
-    try {
-      const [tks, cats, ags, cls, lds] = await Promise.all([
-        ticketService.getTickets(activeCompanyId),
-        ticketService.getCategories(activeCompanyId),
-        ticketService.getAgents(activeCompanyId),
-        clientsService.getAll({ companyId: activeCompanyId }).catch(() => [] as Client[]),
-        ticketService.getLeads(activeCompanyId).catch(() => [] as TicketLead[]),
-      ]);
-      setTickets(tks);
-      setCategories(cats);
-      setAgents(ags);
-      setRealClients(cls);
-      setCompanyLeads(lds);
-    } catch (err) {
-      console.error('[SupportChatCircles] Error loading:', err);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
-
-  // Build "Circles" (1 Circle per WhatsApp Group or Real Client — zero internal dev tasks!)
+  // ── Circles (one per WhatsApp chat; legacy tickets grouped by client) ─────
   const circles = useMemo<SupportCircle[]>(() => {
     const catMap = new Map<string, TicketCategory>();
     categories.forEach((c) => catMap.set(c.id, c));
-
     const agentMap = new Map<string, string>();
     agents.forEach((a) => agentMap.set(a.id, a.full_name || a.email));
-
-    // Build lookup sets strictly from the real ~210 clients in `clients` table + closed/won leads
-    const realClientNamesLower = new Set<string>();
-    const realClientPhonesLast8 = new Set<string>();
-    realClients.forEach((c) => {
-      if (c.nombre) realClientNamesLower.add(c.nombre.trim().toLowerCase());
-      if (c.company_name_lead) realClientNamesLower.add(c.company_name_lead.trim().toLowerCase());
-      if (c.contacto) realClientNamesLower.add(c.contacto.trim().toLowerCase());
-      const digits = String(c.telefono || '').replace(/\D/g, '');
-      if (digits.length >= 8) realClientPhonesLast8.add(digits.slice(-8));
-    });
-
-    // Separate CRM Leads into: (A) Closed Won Clients vs (B) Open Prospects/Leads in CRM
-    const crmProspectsById = new Map<string, TicketLead>();
-    const crmProspectsByPhoneLast8 = new Map<string, TicketLead>();
-    const crmProspectsByNameLower = new Map<string, TicketLead>();
-
-    companyLeads.forEach((l) => {
-      const isClosedClient =
-        Boolean(l.es_cliente) ||
-        /^(cliente|cerrado|ganado|won|activo)$/i.test(String(l.status || '').trim());
-      const cleanName = (l.name || '').trim().toLowerCase();
-      const digits = String(l.phone || '').replace(/\D/g, '');
-
-      if (isClosedClient) {
-        if (cleanName) realClientNamesLower.add(cleanName);
-        if (digits.length >= 8) realClientPhonesLast8.add(digits.slice(-8));
-      } else {
-        crmProspectsById.set(l.id, l);
-        if (digits.length >= 8) crmProspectsByPhoneLast8.set(digits.slice(-8), l);
-        if (cleanName) crmProspectsByNameLower.set(cleanName, l);
-      }
-    });
-
-    // Any participant of a WhatsApp Support Group (@g.us) is ALSO an Existing Client, never a New Lead
-    tickets.forEach((t) => {
-      const m = (t.metadata || {}) as Record<string, any>;
-      const isGrp =
-        Boolean(resolveWhatsAppGroupSubject(t)) ||
-        Boolean(m.is_group) ||
-        String(m.whatsapp_jid || '').endsWith('@g.us');
-      if (isGrp) {
-        const p = String(m.whatsapp_phone || '').replace(/\D/g, '');
-        if (p.length >= 8) realClientPhonesLast8.add(p.slice(-8));
-        const pushN = String(m.whatsapp_push_name || '').trim().toLowerCase();
-        if (pushN && pushN.length >= 4 && !/^\d+$/.test(pushN) && pushN !== 'cliente whatsapp') {
-          realClientNamesLower.add(pushN);
-        }
-      }
-    });
-
-    const matchesRealClientDatabase = (name: string, phoneDigits: string): boolean => {
-      const n = (name || '').replace(/\(\+[\d\s-]+\)/g, '').trim().toLowerCase();
-      // When a contact has a phone number (e.g. WhatsApp 1-on-1), match strictly by the last 8 digits of the phone!
-      // Never use short-name substring matching ("alva" matching "salvador") when a phone number is present!
-      if (phoneDigits && phoneDigits.length >= 8) {
-        return realClientPhonesLast8.has(phoneDigits.slice(-8));
-      }
-      if (!n) return false;
-      if (realClientNamesLower.has(n)) return true;
-      for (const rc of realClientNamesLower) {
-        if (n.length >= 10 && rc.length >= 10 && (n.includes(rc) || rc.includes(n))) return true;
-      }
-      return false;
-    };
-
-    const findMatchingCrmProspect = (
-      leadId: string | null | undefined,
-      name: string,
-      phoneDigits: string
-    ): TicketLead | null => {
-      if (leadId && crmProspectsById.has(leadId)) {
-        return crmProspectsById.get(leadId)!;
-      }
-      // If contact has a phone number, match strictly by phone so "Alva" never matches "Salvador"
-      if (phoneDigits && phoneDigits.length >= 8) {
-        return crmProspectsByPhoneLast8.get(phoneDigits.slice(-8)) || null;
-      }
-      const cleanName = (name || '').replace(/\(\+[\d\s-]+\)/g, '').trim().toLowerCase();
-      if (!cleanName) return null;
-      if (crmProspectsByNameLower.has(cleanName)) {
-        return crmProspectsByNameLower.get(cleanName)!;
-      }
-      for (const [k, leadObj] of crmProspectsByNameLower.entries()) {
-        if (cleanName.length >= 10 && k.length >= 10 && (cleanName.includes(k) || k.includes(cleanName))) {
-          return leadObj;
-        }
-      }
-      return null;
-    };
+    const leadMap = new Map<string, TicketLead & { assigned_to?: string | null }>();
+    companyLeads.forEach((l) => leadMap.set(l.id, l as any));
+    const clientNames = new Set(realClients.map((c) => (c.nombre || '').trim().toLowerCase()).filter(Boolean));
 
     const groupMap = new Map<string, Ticket[]>();
-
     tickets.forEach((t) => {
-      // Skip shift wrapper logs and internal dev/system tasks (e.g. "Importación de Proveedores", "Ajustes de estilos", "Comunicado Hacienda")
       if (isInternalDevOrSystemTaskTitle(t.title || '')) return;
-
       const meta = (t.metadata || {}) as Record<string, any>;
-      const isWaTicket =
-        meta.source === 'whatsapp_evolution' ||
-        Boolean(meta.whatsapp_phone) ||
-        Boolean(meta.whatsapp_jid) ||
-        /\[whatsapp/i.test(t.title || '');
-
-      const groupSubject = resolveWhatsAppGroupSubject(t);
-      const clientName = groupSubject || extractClientFromTicket(t);
-
-      // Filter out internal developer/system tickets that are NOT WhatsApp and NOT a real client
-      if (!isWaTicket && !groupSubject) {
-        if (isInternalDevOrSystemTaskTitle(clientName)) return;
-
+      if (meta.merged_into) return;
+      let key: string;
+      if (isWhatsappTicket(t)) {
+        key = `wa:${meta.whatsapp_jid || meta.whatsapp_phone || t.id}`;
+      } else {
+        // Legacy support tickets (not WhatsApp): only for people who handle support.
+        if (!scopes.soporte) return;
+        const clientName = extractLegacyClientName(t);
         const hasExplicitClientColon =
           /^(?:soporte\s+t[eé]cnico|error\s+reportado|capacitaci[oó]n(?:\s+presencial)?|pregunta\s+frecuente|go\s*live|solicitud(?:\s+de\s+cliente)?)\s*:/i.test(
             t.title || ''
           );
         const hasLeadRef = Boolean(t.lead_id) || Boolean(t.lead_name && t.lead_name.trim().length > 1);
-        const inClientDb = matchesRealClientDatabase(clientName, '');
-
-        // If it's just a long task sentence (> 38 chars) and not in the real client database, skip it!
+        const inClientDb = clientNames.has(clientName.toLowerCase());
+        if (isInternalDevOrSystemTaskTitle(clientName)) return;
         if (clientName.length > 38 && !inClientDb) return;
         if (!hasExplicitClientColon && !hasLeadRef && !inClientDb) return;
+        key = `client:${clientName.toLowerCase()}`;
       }
-
-      // Group all messages from the same WhatsApp Group (@g.us or Group Subject) into 1 single Circle!
-      const rawJid = String(meta.whatsapp_jid || '');
-      const key = groupSubject
-        ? groupSubject
-        : rawJid.endsWith('@g.us')
-        ? rawJid
-        : clientName !== 'Cliente Soporte'
-        ? clientName
-        : String(meta.whatsapp_phone || rawJid || t.id);
-
       if (!groupMap.has(key)) groupMap.set(key, []);
       groupMap.get(key)!.push(t);
     });
 
     const list: SupportCircle[] = [];
-
     groupMap.forEach((clientTickets, key) => {
       const sorted = [...clientTickets].sort(
-        (a, b) =>
-          new Date(b.updated_at || b.created_at).getTime() -
-          new Date(a.updated_at || a.created_at).getTime()
+        (a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()
       );
+      const isWa = key.startsWith('wa:');
+      const activeTicket = sorted.find((t) => ['new', 'open', 'pending'].includes(t.status)) || sorted[0];
+      const latest = sorted[0];
+      const meta = (latest.metadata || {}) as Record<string, any>;
+      const activeMeta = (activeTicket.metadata || {}) as Record<string, any>;
 
-      // Check if ANY ticket for this client came via WhatsApp
-      const waTicket = sorted.find((t) => {
-        const m = (t.metadata || {}) as Record<string, any>;
-        return (
-          m.source === 'whatsapp_evolution' ||
-          Boolean(m.whatsapp_phone) ||
-          Boolean(m.whatsapp_jid) ||
-          /\[whatsapp/i.test(t.title || '')
-        );
-      });
-      const isWhatsApp = Boolean(waTicket);
+      const scope: WaScope = isWa ? getWaScope(latest) : 'soporte';
+      const isGroup = isWa && (Boolean(meta.is_group) || String(meta.whatsapp_jid || '').endsWith('@g.us'));
+      const phone = String(meta.whatsapp_phone || '').replace(/\D/g, '');
+      const leadId = (activeTicket.lead_id || latest.lead_id || null) as string | null;
+      const lead = leadId ? leadMap.get(leadId) : undefined;
 
-      // Prefer an open WhatsApp ticket first, then any WhatsApp ticket, then open ticket, then most recent
-      const activeTicket =
-        sorted.find((t) => {
-          const m = (t.metadata || {}) as Record<string, any>;
-          const isWa =
-            m.source === 'whatsapp_evolution' ||
-            Boolean(m.whatsapp_phone) ||
-            Boolean(m.whatsapp_jid) ||
-            /\[whatsapp/i.test(t.title || '');
-          return isWa && ['new', 'open', 'pending'].includes(t.status);
-        }) ||
-        waTicket ||
-        sorted.find((t) => ['new', 'open', 'pending'].includes(t.status)) ||
-        sorted[0];
+      const clientName = isWa
+        ? stripEmojis(
+            String(
+              (isGroup ? meta.whatsapp_group_subject : '') ||
+                latest.lead_name ||
+                meta.whatsapp_push_name ||
+                (phone ? `+${phone}` : 'WhatsApp')
+            )
+          )
+        : extractLegacyClientName(activeTicket);
 
-      const meta = (activeTicket.metadata || {}) as Record<string, any>;
-      const waMeta = ((waTicket?.metadata || meta) as Record<string, any>) || {};
-      const phone = String(meta.whatsapp_phone || waMeta.whatsapp_phone || '').replace(/\D/g, '');
-      const whatsappJid = String(meta.whatsapp_jid || waMeta.whatsapp_jid || '');
-      const groupSubject =
-        resolveWhatsAppGroupSubject(activeTicket) ||
-        (waTicket ? resolveWhatsAppGroupSubject(waTicket) : null);
-      const clientName = groupSubject || extractClientFromTicket(activeTicket);
-      const isGroup =
-        Boolean(groupSubject) ||
-        Boolean(meta.is_group || waMeta.is_group) ||
-        whatsappJid.endsWith('@g.us') ||
-        /^soporte\s+t[eé]cnico/i.test(clientName);
-
-      const catObj = activeTicket.category_id ? catMap.get(activeTicket.category_id) : undefined;
-      const catInfo = detectShortCategory(catObj?.name || '', activeTicket.title || '');
-
-      const assignedTechId = activeTicket.assigned_to || null;
-      const assignedTechName =
-        (assignedTechId && agentMap.get(assignedTechId)) ||
-        activeTicket.assigned_profile?.full_name ||
-        'Sin asignar';
-
-      // Extract last message from description or metadata
-      const descLines = (activeTicket.description || '')
+      // Last message preview & unread state
+      const descLines = String(latest.description || '')
         .split('\n')
         .map((l) => l.trim())
         .filter(Boolean);
-      const lastChatLine = [...descLines]
-        .reverse()
-        .find((l) => l.startsWith('[') && (l.includes('👤') || l.includes('👨‍💻')));
-
+      const lastChatLine = [...descLines].reverse().find((l) => l.startsWith('[') && (l.includes('👤') || l.includes('👨‍💻')));
       let lastMessageSender = stripEmojis(String(meta.whatsapp_push_name || clientName));
-      let lastMessageText = stripEmojis(String(meta.last_whatsapp_message || activeTicket.title || ''));
-      if (lastChatLine) {
-        const m = lastChatLine.match(/^\[[^\]]+\]\s*([^:]+):\s*(.+)$/);
-        if (m) {
-          lastMessageSender = stripEmojis(m[1]);
-          lastMessageText = stripEmojis(m[2]);
-        }
+      let lastMessageText = stripEmojis(String(meta.last_whatsapp_message || latest.title || ''));
+      const parsed = lastChatLine ? parseChatLine(lastChatLine) : null;
+      if (parsed) {
+        lastMessageSender = stripEmojis(parsed.sender);
+        lastMessageText = stripEmojis(parsed.text);
       }
-
+      const lastFrom: string = meta.last_message_from || (parsed ? (parsed.icon === '👨‍💻' ? 'staff' : 'client') : 'client');
       const isOpen = ['new', 'open', 'pending'].includes(activeTicket.status);
-      const lastWasClient = !lastChatLine || lastChatLine.includes('👤');
-      const unreadOrWaitingReply = isOpen && lastWasClient;
+      const unreadOrWaitingReply = lastFrom === 'client' && (scope !== 'soporte' || isOpen);
 
-      // Exact Business Rule:
-      // 1. Every WhatsApp Group (@g.us or "Soporte Técnico...") is 100% an Existing Client.
-      // 2. Every contact matched in the ~210 realClients (or closed/won leads) is 100% an Existing Client.
-      // 3. Any contact that is NOT in realClients and is either a 1-on-1 WhatsApp chat or an open Prospect in `leads` is a Lead!
-      const isMarkedAsNewLead =
-        !isGroup &&
-        (meta.is_existing_client === false ||
-          meta.support_channel === 'ventas' ||
-          /nuevo lead/i.test(activeTicket.title || ''));
-
-      const inRealClients = !isMarkedAsNewLead && matchesRealClientDatabase(clientName, phone);
-      const matchedCrmProspect =
-        !isGroup && !inRealClients
-          ? findMatchingCrmProspect(
-              activeTicket.lead_id || String(meta.promoted_lead_id || ''),
-              clientName,
-              phone
-            )
-          : null;
-
-      const isExplicitSalesLead =
-        !isGroup &&
-        !inRealClients &&
-        (isMarkedAsNewLead ||
-          Boolean(matchedCrmProspect) ||
-          (isWhatsApp && !assignedTechId));
-
-      const isExistingClient = !isExplicitSalesLead;
-
-      // Keep each client unified in 1 place: existing clients stay in 'soporte', prospects/leads in 'ventas'
-      const supportChannel: SupportChannelType = isExistingClient ? 'soporte' : 'ventas';
-
-      const promotedLeadId = !isExistingClient
-        ? matchedCrmProspect?.id || String(activeTicket.lead_id || meta.promoted_lead_id || '') || null
-        : null;
-      const existingLeadStatus = !isExistingClient ? matchedCrmProspect?.status || null : null;
+      const catObj = activeTicket.category_id ? catMap.get(activeTicket.category_id) : undefined;
+      const catInfo = detectShortCategory(catObj?.name || '', activeTicket.title || '');
+      const assignedTechId = activeTicket.assigned_to || null;
+      const ch = String(activeMeta.support_channel || 'soporte') as SupportChannelType;
 
       list.push({
         circleId: key,
         clientName,
+        pushName: stripEmojis(String(meta.whatsapp_push_name || '')),
         phone,
-        whatsappJid,
-        isWhatsApp,
+        whatsappJid: String(meta.whatsapp_jid || ''),
+        isWhatsApp: isWa,
         isGroup,
-        isExistingClient,
-        supportChannel,
-        promotedLeadId,
-        existingLeadStatus,
+        scope,
+        scopeReason: String(meta.wa_scope_reason || ''),
+        memberOfGroups: Array.isArray(meta.member_of_groups) ? meta.member_of_groups : [],
+        leadId,
+        leadStatus: lead?.status || null,
+        leadOwnerName: lead && (lead as any).assigned_to ? agentMap.get((lead as any).assigned_to) || null : null,
         activeTicket,
         allClientTickets: sorted,
         unreadOrWaitingReply,
         lastMessageText,
         lastMessageSender,
-        lastMessageAt: activeTicket.updated_at || activeTicket.created_at,
+        lastMessageAt: String(meta.last_whatsapp_at || latest.updated_at || latest.created_at),
         assignedTechId,
-        assignedTechName,
+        assignedTechName: (assignedTechId && agentMap.get(assignedTechId)) || 'Sin asignar',
         categoryCode: catInfo.code,
         categoryName: catInfo.name,
-        categoryColor: catInfo.color,
-        totalMessagesCount: Number(meta.whatsapp_message_count || sorted.length),
-        repeatTicketsCount: Math.max(0, sorted.length - 1),
+        supportChannel: ['soporte', 'contabilidad', 'otros'].includes(ch) ? ch : 'soporte',
       });
     });
 
-    // Sort: WhatsApp Groups & Chats first, then unread, then most recent
     return list.sort((a, b) => {
       if (a.isWhatsApp !== b.isWhatsApp) return a.isWhatsApp ? -1 : 1;
-      if (a.unreadOrWaitingReply !== b.unreadOrWaitingReply)
-        return a.unreadOrWaitingReply ? -1 : 1;
       return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
     });
-  }, [tickets, categories, agents, realClients, companyLeads]);
+  }, [tickets, categories, agents, realClients, companyLeads, scopes.soporte]);
 
-  const channelCounts = useMemo(() => {
+  const isUnread = (c: SupportCircle) => c.unreadOrWaitingReply && readCirclesMap[c.circleId] !== c.lastMessageAt;
+
+  const counts = useMemo(() => {
+    const by = (s: WaScope) => circles.filter((c) => c.scope === s).length;
     return {
-      all: circles.length,
-      soporte: circles.filter((c) => c.isExistingClient).length,
-      ventas: circles.filter((c) => !c.isExistingClient).length,
-      waiting: circles.filter(
-        (c) => c.unreadOrWaitingReply && readCirclesMap[c.circleId] !== c.lastMessageAt
-      ).length,
+      all: circles.filter((c) => c.scope !== 'spam').length,
+      waiting: circles.filter((c) => c.scope !== 'spam' && isUnread(c)).length,
+      soporte: by('soporte'),
+      por_clasificar: by('por_clasificar'),
+      lead: by('lead'),
+      interno: by('interno'),
+      spam: by('spam'),
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [circles, readCirclesMap]);
 
-  // Filtered Circles in left sidebar
+  const filterTabs = useMemo(() => {
+    const tabs: { id: CircleFilter; label: string; icon: React.ElementType; alert?: boolean }[] = [
+      { id: 'all', label: `Todos (${counts.all})`, icon: MessageSquare },
+      { id: 'waiting', label: `Sin contestar (${counts.waiting})`, icon: Clock, alert: counts.waiting > 0 },
+    ];
+    if (scopes.soporte) tabs.push({ id: 'soporte', label: `Soporte (${counts.soporte})`, icon: Building2 });
+    if (scopes.leads) {
+      tabs.push({ id: 'por_clasificar', label: `Por clasificar (${counts.por_clasificar})`, icon: HelpCircle, alert: counts.por_clasificar > 0 });
+      tabs.push({ id: 'lead', label: `${scopes.all ? 'Leads' : 'Mis leads'} (${counts.lead})`, icon: UserPlus });
+    }
+    if (scopes.all) {
+      tabs.push({ id: 'interno', label: `Equipo (${counts.interno})`, icon: ShieldCheck });
+      tabs.push({ id: 'spam', label: `Spam (${counts.spam})`, icon: Ban });
+    }
+    return tabs;
+  }, [counts, scopes]);
+
   const filteredCircles = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return circles.filter((c) => {
-      if (circleFilter === 'waiting') {
-        const isUnread = c.unreadOrWaitingReply && readCirclesMap[c.circleId] !== c.lastMessageAt;
-        if (!isUnread) return false;
-      }
-      if (circleFilter === 'soporte' && !c.isExistingClient) return false;
-      if (circleFilter === 'ventas' && c.isExistingClient) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+      if (circleFilter === 'all' && c.scope === 'spam') return false;
+      if (circleFilter === 'waiting' && (c.scope === 'spam' || !isUnread(c))) return false;
+      if (!['all', 'waiting'].includes(circleFilter) && c.scope !== circleFilter) return false;
+      if (q) {
         return (
           c.clientName.toLowerCase().includes(q) ||
-          c.phone.toLowerCase().includes(q) ||
+          c.pushName.toLowerCase().includes(q) ||
+          c.phone.includes(q.replace(/\D/g, '') || '§') ||
           c.lastMessageText.toLowerCase().includes(q) ||
-          c.lastMessageSender.toLowerCase().includes(q) ||
           c.assignedTechName.toLowerCase().includes(q)
         );
       }
       return true;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [circles, circleFilter, searchQuery, readCirclesMap]);
 
-  // Auto-select first circle
   useEffect(() => {
-    if (!selectedCircleId && filteredCircles.length > 0) {
-      setSelectedCircleId(filteredCircles[0].circleId);
-    }
+    if (!selectedCircleId && filteredCircles.length > 0) setSelectedCircleId(filteredCircles[0].circleId);
   }, [filteredCircles, selectedCircleId]);
 
   const activeCircle = useMemo(
-    () => circles.find((c) => c.circleId === selectedCircleId) || circles[0] || null,
+    () => circles.find((c) => c.circleId === selectedCircleId) || null,
     [circles, selectedCircleId]
   );
 
-  // Immediately remove BOLD as soon as a Circle is opened/selected!
   useEffect(() => {
-    if (activeCircle) {
-      markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt);
-    }
+    if (activeCircle) markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt);
   }, [activeCircle?.circleId, activeCircle?.lastMessageAt]);
 
-  // Load ticket_comments and reset resolution form when activeCircle changes
+  // ── Thread loading: every ticket of this chat, in real WhatsApp order ─────
+  const threadTicketIds = useMemo(
+    () => (activeCircle ? activeCircle.allClientTickets.slice(0, 25).map((t) => t.id) : []),
+    [activeCircle?.circleId, activeCircle?.allClientTickets.length]
+  );
+  const threadKey = threadTicketIds.join(',');
+
+  const loadThread = useCallback(
+    async (showSpinner = false) => {
+      if (threadTicketIds.length === 0) {
+        setComments([]);
+        setWaMessages([]);
+        setOutboxRows([]);
+        return;
+      }
+      if (showSpinner) setLoadingComments(true);
+      try {
+        const [cRes, mRes, oRes] = await Promise.all([
+          supabase
+            .from('ticket_comments')
+            .select('*')
+            .in('ticket_id', threadTicketIds)
+            .order('created_at', { ascending: true })
+            .limit(1500),
+          supabase
+            .from('whatsapp_messages')
+            .select('id, ticket_id, comment_id, message_type, media_status, media_path, media_mime, media_filename, media_size, media_error, from_me')
+            .in('ticket_id', threadTicketIds)
+            .neq('media_status', 'none'),
+          supabase
+            .from('whatsapp_outbox')
+            .select('id, comment_id, status, error')
+            .in('ticket_id', threadTicketIds),
+        ]);
+        const msgs = (mRes.data || []) as WaMessageRow[];
+        setComments((cRes.data || []) as TicketComment[]);
+        setWaMessages(msgs);
+        setOutboxRows((oRes.data || []) as OutboxRow[]);
+
+        const paths = msgs.filter((m) => m.media_status === 'ready' && m.media_path).map((m) => m.media_path as string);
+        const missing = paths.filter((p) => !mediaUrls[p]);
+        if (missing.length > 0) {
+          const { data: signed } = await supabase.storage.from('whatsapp-media').createSignedUrls(missing, 60 * 60 * 6);
+          const next: Record<string, string> = {};
+          (signed || []).forEach((s) => {
+            if (s.path && s.signedUrl) next[s.path] = s.signedUrl;
+          });
+          if (Object.keys(next).length > 0) setMediaUrls((prev) => ({ ...prev, ...next }));
+        }
+      } catch (e) {
+        console.error('[SupportChatCircles] thread load error', e);
+      } finally {
+        if (showSpinner) setLoadingComments(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [threadKey]
+  );
+
   useEffect(() => {
     if (!activeCircle) return;
     const t = activeCircle.activeTicket;
@@ -921,371 +750,309 @@ export const SupportChatCircles: React.FC = () => {
       time_justification: String(meta.time_justification || ''),
     });
     setActiveChatSeconds(0);
-
-    setLoadingComments(true);
-    ticketService
-      .getComments(t.id)
-      .then((data) => setComments(data || []))
-      .catch(() => setComments([]))
-      .finally(() => setLoadingComments(false));
+    setShowReclassifyMenu(false);
+    setShowClientPicker(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCircle?.activeTicket.id]);
 
-  // Live timer tick every second while viewing this chat
   useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveChatSeconds((s) => s + 1);
-    }, 1000);
+    loadThread(true);
+  }, [loadThread]);
+
+  useEffect(() => {
+    const interval = setInterval(() => setActiveChatSeconds((s) => s + 1), 1000);
     return () => clearInterval(interval);
   }, [activeCircle?.activeTicket.id]);
 
-  // Build visual chat bubbles (Announcement banner + parsed WhatsApp lines + comments + attachments)
-  const chatBubbles = useMemo<ParsedChatBubble[]>(() => {
+  // ── Realtime (debounced) ──────────────────────────────────────────────────
+  const threadIdsRef = useRef<string[]>([]);
+  threadIdsRef.current = threadTicketIds;
+  const listTimer = useRef<number | null>(null);
+  const threadTimer = useRef<number | null>(null);
+  const loadThreadRef = useRef(loadThread);
+  loadThreadRef.current = loadThread;
+
+  useEffect(() => {
+    if (!activeCompanyId || !scopes.any) return;
+    const scheduleList = () => {
+      if (listTimer.current) window.clearTimeout(listTimer.current);
+      listTimer.current = window.setTimeout(() => loadSupportData(true), 700);
+    };
+    const scheduleThread = (ticketId?: string) => {
+      if (ticketId && !threadIdsRef.current.includes(ticketId)) return;
+      if (threadTimer.current) window.clearTimeout(threadTimer.current);
+      threadTimer.current = window.setTimeout(() => loadThreadRef.current(false), 400);
+    };
+    const filter = `company_id=eq.${activeCompanyId}`;
+    const channel = supabase
+      .channel(`support_circles_${activeCompanyId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets', filter }, scheduleList)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_comments', filter }, (p: any) => {
+        scheduleThread(p.new?.ticket_id || p.old?.ticket_id);
+        scheduleList();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_messages', filter }, (p: any) =>
+        scheduleThread(p.new?.ticket_id)
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_outbox', filter }, (p: any) =>
+        scheduleThread(p.new?.ticket_id)
+      )
+      .subscribe();
+    return () => {
+      if (listTimer.current) window.clearTimeout(listTimer.current);
+      if (threadTimer.current) window.clearTimeout(threadTimer.current);
+      supabase.removeChannel(channel);
+    };
+  }, [activeCompanyId, scopes.any, loadSupportData]);
+
+  // ── Chat items ────────────────────────────────────────────────────────────
+  const chatItems = useMemo<ChatItem[]>(() => {
     if (!activeCircle) return [];
-    const t = activeCircle.activeTicket;
-    const meta = (t.metadata || {}) as Record<string, any>;
-    const list: ParsedChatBubble[] = [];
+    const mediaByComment = new Map<string, WaMessageRow>();
+    waMessages.forEach((m) => m.comment_id && mediaByComment.set(m.comment_id, m));
+    const outboxByComment = new Map<string, OutboxRow>();
+    outboxRows.forEach((o) => o.comment_id && outboxByComment.set(o.comment_id, o));
+    const ticketById = new Map(activeCircle.allClientTickets.map((t) => [t.id, t]));
 
-    // 1. System Announcement Card
-    list.push({
-      id: `ann-${t.id}`,
-      senderType: 'announcement',
-      senderName: `Ticket #${t.id.slice(0, 8).toUpperCase()} · ${stripEmojis(activeCircle.categoryName)}`,
-      text: stripEmojis(t.title),
-      timeLabel: new Date(t.created_at).toLocaleTimeString('es-SV', {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      createdAt: t.created_at,
-      aiCategory: stripEmojis(String(meta.ai_category || activeCircle.categoryName)),
-      isRecurringAlert: activeCircle.repeatTicketsCount > 0,
-    });
+    const items: ChatItem[] = [];
+    let lastTicketId = '';
+    const showTicketMarkers = activeCircle.scope === 'soporte';
 
-    // 2. If comments exist, parse them into bubbles; otherwise parse lines from description
-    if (comments.length > 0) {
-      comments.forEach((c) => {
-        const raw = (c.body || '').trim();
-        const lineMatch = raw.match(/^\[([^\]]+)\]\s*(👤|👨‍💻)?\s*([^:]+):\s*([\s\S]+)$/);
-        if (lineMatch) {
-          const timeStr = lineMatch[1];
-          const icon = lineMatch[2] || '';
-          const sender = stripEmojis(lineMatch[3].trim());
-          const rawBodyText = lineMatch[4].trim();
-
-          const audioUrlMatch = rawBodyText.match(/\[AUDIO_URL:([^\]]+)\]/i);
-          const extractedAudioUrl = audioUrlMatch ? audioUrlMatch[1].trim() : undefined;
-          const cleanBodyText = stripEmojis(
-            rawBodyText.replace(/\s*\[AUDIO_URL:[^\]]+\]/gi, '').trim()
-          );
-
-          const isClientSender =
-            icon === '👤' ||
-            /jimmy arias/i.test(sender) ||
-            sender.toLowerCase() === activeCircle.clientName.toLowerCase();
-
-          const isStaff =
-            !isClientSender &&
-            (icon === '👨‍💻' ||
-              Boolean(c.author_id) ||
-              /melvin|gerson|soporte|equipo|platform owner|simulaci|ia soporte|ia /i.test(sender));
-
-          list.push({
-            id: c.id,
-            senderType: isStaff ? 'staff' : 'client',
-            senderName: stripEmojis(sender.replace(/\(Reporte Inicial\)/i, '').trim()),
-            text: cleanBodyText,
-            timeLabel: timeStr,
+    comments.forEach((c) => {
+      if (showTicketMarkers && c.ticket_id !== lastTicketId) {
+        const t = ticketById.get(c.ticket_id);
+        if (t) {
+          items.push({
+            id: `ticket-${t.id}`,
+            kind: 'ticket',
+            senderName: `Ticket #${t.id.slice(0, 8).toUpperCase()}`,
+            text: stripEmojis(t.title || '').replace(/^\[WhatsApp · [^\]]*\]\s*/, ''),
             createdAt: c.created_at,
-            mediaUrl: extractedAudioUrl,
-            mediaType: extractedAudioUrl ? 'audio' : undefined,
-          });
-        } else {
-          const agent = agents.find((a) => a.id === c.author_id);
-          const isStaff = Boolean(c.author_id);
-          const audioUrlMatch = raw.match(/\[AUDIO_URL:([^\]]+)\]/i);
-          const extractedAudioUrl = audioUrlMatch ? audioUrlMatch[1].trim() : undefined;
-          const cleanBodyText = stripEmojis(
-            raw.replace(/\s*\[AUDIO_URL:[^\]]+\]/gi, '').trim()
-          );
-          list.push({
-            id: c.id,
-            senderType: isStaff ? 'staff' : 'client',
-            senderName: stripEmojis(
-              isStaff ? agent?.full_name || 'Ingeniero Soporte' : activeCircle.clientName
-            ),
-            text: cleanBodyText,
-            timeLabel: new Date(c.created_at).toLocaleTimeString('es-SV', {
-              hour: '2-digit',
-              minute: '2-digit',
-            }),
-            createdAt: c.created_at,
-            mediaUrl: extractedAudioUrl,
-            mediaType: extractedAudioUrl ? 'audio' : undefined,
+            ticketId: t.id,
           });
         }
-      });
-    } else if (t.description) {
-      const lines = t.description.split('\n');
-      let foundChatLines = false;
-      lines.forEach((line, idx) => {
-        const lineMatch = line
-          .trim()
-          .match(/^\[([^\]]+)\]\s*(👤|👨‍💻)?\s*([^:]+):\s*([\s\S]+)$/);
-        if (lineMatch) {
-          foundChatLines = true;
-          const sender = stripEmojis(lineMatch[3].trim());
-          const isClientSender =
-            lineMatch[2] === '👤' ||
-            /jimmy arias/i.test(sender) ||
-            sender.toLowerCase() === activeCircle.clientName.toLowerCase();
-          const isStaff =
-            !isClientSender &&
-            (lineMatch[2] === '👨‍💻' ||
-              /melvin|gerson|soporte|equipo|platform owner|simulaci|ia soporte|ia /i.test(sender));
-          list.push({
-            id: `desc-${idx}`,
-            senderType: isStaff ? 'staff' : 'client',
-            senderName: sender,
-            text: stripEmojis(lineMatch[4].trim()),
-            timeLabel: lineMatch[1],
-            createdAt: t.created_at,
-          });
-        }
-      });
-
-      if (!foundChatLines && t.description.trim()) {
-        list.push({
-          id: `desc-main`,
-          senderType: 'client',
-          senderName: stripEmojis(activeCircle.clientName),
-          text: stripEmojis(t.description.trim()),
-          timeLabel: new Date(t.created_at).toLocaleTimeString('es-SV', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          createdAt: t.created_at,
-        });
       }
-    }
+      lastTicketId = c.ticket_id;
 
-    // 3. Append any media attachments from ticket metadata.attachments
-    const attachments = Array.isArray(meta.attachments) ? meta.attachments : [];
-    attachments.forEach((att: any, i: number) => {
-      const isVideo = String(att.type || '').startsWith('video/');
-      const isImage = String(att.type || '').startsWith('image/');
-      list.push({
-        id: `att-${i}`,
-        senderType: 'staff',
-        senderName: stripEmojis(activeCircle.assignedTechName || 'Soporte'),
-        text: stripEmojis(att.name || 'Archivo adjunto'),
-        timeLabel: new Date(att.uploaded_at || t.updated_at || t.created_at).toLocaleTimeString(
-          'es-SV',
-          { hour: '2-digit', minute: '2-digit' }
-        ),
-        createdAt: att.uploaded_at || t.updated_at || t.created_at,
-        mediaUrl: att.url,
-        mediaType: isVideo ? 'video' : isImage ? 'image' : 'file',
-        mediaName: att.name,
+      const raw = String(c.body || '').trim();
+      if (c.is_internal) {
+        items.push({ id: c.id, kind: 'system', senderName: '', text: stripEmojis(raw), createdAt: c.created_at, ticketId: c.ticket_id });
+        return;
+      }
+      const parsed = parseChatLine(raw);
+      let body = parsed ? parsed.text : raw;
+      let transcript: string | undefined;
+      const tIdx = body.indexOf('📝 Transcripción IA:');
+      if (tIdx >= 0) {
+        transcript = body.slice(tIdx + '📝 Transcripción IA:'.length).trim().replace(/^"|"$/g, '');
+        body = body.slice(0, tIdx).trim();
+      }
+      const audioUrlMatch = body.match(/\[AUDIO_URL:([^\]]+)\]/i);
+      body = body.replace(/\s*\[AUDIO_URL:[^\]]+\]/gi, '').trim();
+
+      const isStaff = parsed ? parsed.icon === '👨‍💻' || (!parsed.icon && Boolean(c.author_id)) : Boolean(c.author_id);
+      const agentName = c.author_id ? agents.find((a) => a.id === c.author_id)?.full_name : undefined;
+      const senderName = stripEmojis(
+        (parsed?.sender || agentName || (isStaff ? 'Equipo' : activeCircle.clientName)).replace(/\(Reporte Inicial\)/i, '')
+      );
+      const media = mediaByComment.get(c.id);
+      const ob = outboxByComment.get(c.id);
+      // Media placeholders are redundant once the file itself is shown.
+      if (media && /^\[(Imagen|Video|Sticker|Nota de voz)[^\]]*\]$/i.test(body)) body = '';
+      if (media && media.message_type === 'document' && /^\[Documento: [^\]]*\]$/i.test(body)) body = '';
+
+      items.push({
+        id: c.id,
+        kind: isStaff ? 'staff' : 'client',
+        senderName,
+        text: stripEmojis(body),
+        transcript,
+        createdAt: c.created_at,
+        ticketId: c.ticket_id,
+        media: media ? { ...media, url: media.media_path ? mediaUrls[media.media_path] : undefined } : undefined,
+        legacyMedia: audioUrlMatch ? { url: audioUrlMatch[1], type: 'audio' } : undefined,
+        delivery: ob?.status,
+        deliveryError: ob?.error,
       });
     });
 
-    return list;
-  }, [activeCircle, comments, agents]);
+    // Legacy attachments stored on the ticket (before media was tracked per message).
+    activeCircle.allClientTickets.forEach((t) => {
+      const att = Array.isArray((t.metadata as any)?.attachments) ? ((t.metadata as any).attachments as any[]) : [];
+      att.forEach((a, i) => {
+        const type = String(a.type || '');
+        items.push({
+          id: `att-${t.id}-${i}`,
+          kind: 'staff',
+          senderName: 'Equipo',
+          text: '',
+          createdAt: a.uploaded_at || t.updated_at || t.created_at,
+          ticketId: t.id,
+          legacyMedia: { url: a.url, type: type.startsWith('video/') ? 'video' : type.startsWith('image/') ? 'image' : 'file', name: a.name },
+        });
+      });
+    });
+
+    return items.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }, [activeCircle, comments, waMessages, outboxRows, mediaUrls, agents]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatBubbles.length, activeCircle?.circleId]);
+  }, [chatItems.length, activeCircle?.circleId]);
 
-  // AI Time Audit for the Right Control Panel
   const aiTimeAudit = useMemo(() => {
     if (!activeCircle) return null;
     const t = activeCircle.activeTicket;
-    return computeTicketAiTimeBenchmark(
-      t.title || '',
-      t.description || '',
-      activeCircle.categoryName,
-      Number(resForm.actual_hours) || 0
-    );
+    return computeTicketAiTimeBenchmark(t.title || '', t.description || '', activeCircle.categoryName, Number(resForm.actual_hours) || 0);
   }, [activeCircle, resForm.actual_hours]);
 
-  // Send Reply from the Chat Input Bar (Instant Optimistic UI + 1s WhatsApp Bridge Delivery)
+  // ── Actions ───────────────────────────────────────────────────────────────
+  const canSend = activeCircle && activeCircle.isWhatsApp && activeCircle.scope !== 'spam';
+  const canClassify = Boolean(
+    activeCircle &&
+      activeCircle.isWhatsApp &&
+      !activeCircle.isGroup &&
+      (scopes.all || (scopes.leads && (activeCircle.scope === 'por_clasificar' || (activeCircle.scope === 'lead' && activeCircle.activeTicket.assigned_to === profile?.id))))
+  );
+
   const handleSendReply = async (customText?: string) => {
     const textToSend = (customText ?? messageInput).trim();
-    if (!textToSend || !activeCircle || !activeCompanyId) return;
-
+    if (!textToSend || !activeCircle || !activeCompanyId || !canSend) return;
     const t = activeCircle.activeTicket;
-    const rawAuthor = profile?.full_name || profile?.email || 'Ingeniero Soporte';
-    const authorName = /simulaci/i.test(rawAuthor) ? 'Soporte Técnico' : rawAuthor;
-    const responseMinutes = Math.max(1, Math.round(activeChatSeconds / 60));
-
-    // 1. Instant optimistic clear & bubble so the button NEVER feels stuck
     if (!customText) setMessageInput('');
-    const nowTimeStr = new Date().toLocaleTimeString('es-SV', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const optimisticId = `temp-${Date.now()}`;
-    const optimisticComment: TicketComment = {
-      id: optimisticId,
+    const optimistic: TicketComment = {
+      id: `temp-${Date.now()}`,
       ticket_id: t.id,
       company_id: activeCompanyId,
       author_id: profile?.id || null,
-      body: `[${nowTimeStr}] ${authorName}: ${textToSend}`,
+      body: `[--] 👨‍💻 ${profile?.full_name || 'Equipo'}: ${textToSend}`,
       is_internal: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setComments((prev) => [...prev, optimisticComment]);
-
-    // Immediately mark this ticket as answered in local state so it switches from BOLD to non-bold right away
-    setTickets((prev) =>
-      prev.map((tk) =>
-        tk.id === t.id
-          ? {
-              ...tk,
-              description: `${tk.description || ''}\n[${nowTimeStr}] ${authorName}: ${textToSend}`,
-              updated_at: new Date().toISOString(),
-            }
-          : tk
-      )
-    );
-
-    if (!resForm.actual_hours || Number(resForm.actual_hours) <= 0) {
+    setComments((prev) => [...prev, optimistic]);
+    if (activeCircle.scope === 'soporte' && (!resForm.actual_hours || Number(resForm.actual_hours) <= 0)) {
       setResForm((p) => ({ ...p, actual_hours: '0.2' }));
     }
-
     setSendingMessage(true);
     try {
-      const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
-        body: {
-          action: 'send_reply',
-          ticket_id: t.id,
-          company_id: activeCompanyId,
-          author_id: profile?.id || null,
-          author_name: authorName,
-          message_text: textToSend,
-          response_minutes: responseMinutes,
-          custom_evolution_url: evoConfig.url || undefined,
-          custom_evolution_key: evoConfig.key || undefined,
-          custom_evolution_instance: evoConfig.instance || undefined,
-        },
+      const data = await invoke({
+        action: 'send_reply',
+        ticket_id: t.id,
+        message_text: textToSend,
+        response_minutes: Math.max(1, Math.round(activeChatSeconds / 60)),
       });
-
-      if (error) throw error;
-
-      if (data?.comment) {
-        setComments((prev) =>
-          prev.map((c) => (c.id === optimisticId ? data.comment : c))
-        );
-      }
-
-      toast.success('Mensaje enviado directo al WhatsApp del cliente');
+      setComments((prev) => prev.map((c) => (c.id === optimistic.id ? (data.comment as TicketComment) : c)));
+      loadThread(false);
       loadSupportData(true);
     } catch (err: any) {
-      console.error('Error sending reply:', err);
+      setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
+      if (!customText) setMessageInput(textToSend);
       toast.error(err?.message || 'Error al enviar mensaje');
     } finally {
       setSendingMessage(false);
     }
   };
 
-  // Upload image/video attachment directly from the bottom bar
   const handleUploadAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !activeCircle || !activeCompanyId) return;
+    if (!file || !activeCircle || !canSend) return;
+    if (file.size > 45 * 1024 * 1024) {
+      toast.error('El archivo es muy grande (máximo 45 MB)');
+      return;
+    }
     setUploadingFile(true);
     try {
       const t = activeCircle.activeTicket;
-      const uploaded = await storageService.uploadTicketAttachment(activeCompanyId, file);
-      const meta = (t.metadata || {}) as Record<string, any>;
-      const prevAtt = Array.isArray(meta.attachments) ? meta.attachments : [];
-      const newAtt = [
-        ...prevAtt,
-        {
-          name: file.name,
-          url: uploaded.url,
-          type: file.type,
-          size: file.size,
-          uploaded_at: new Date().toISOString(),
-        },
-      ];
-      await ticketService.updateTicket(t.id, {
-        metadata: { ...meta, attachments: newAtt },
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+      const path = `outgoing/${t.company_id}/${t.id}/${crypto.randomUUID()}-${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from('whatsapp-media')
+        .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+      if (upErr) throw upErr;
+      await invoke({
+        action: 'send_media',
+        ticket_id: t.id,
+        storage_path: path,
+        file_name: file.name,
+        mime: file.type || 'application/octet-stream',
+        size: file.size,
+        caption: messageInput.trim(),
       });
-      await handleSendReply(`Archivo adjunto enviado: ${file.name}`);
-      toast.success('Imagen / archivo adjuntado al chat');
+      setMessageInput('');
+      toast.success('Archivo enviado');
+      loadThread(false);
+      loadSupportData(true);
     } catch (err: any) {
-      toast.error(err?.message || 'Error al subir archivo');
+      toast.error(err?.message || 'Error al enviar archivo');
     } finally {
       setUploadingFile(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  // Assign Technician with 1 click
+  const handleRetryMedia = async (rowId: string) => {
+    try {
+      await invoke({ action: 'retry_media', wa_message_row_id: rowId });
+      toast.success('Reintentando descarga…');
+      loadThread(false);
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudo reintentar');
+    }
+  };
+
   const handleAssignTech = async (techId: string) => {
     if (!activeCircle) return;
     try {
-      await ticketService.updateTicket(activeCircle.activeTicket.id, {
-        assigned_to: techId || null,
-      });
-      toast.success('Ingeniero asignado al chat');
+      await ticketService.updateTicket(activeCircle.activeTicket.id, { assigned_to: techId || null });
+      toast.success('Responsable asignado');
       loadSupportData(true);
     } catch (err: any) {
       toast.error(err?.message || 'Error al asignar');
     }
   };
 
-  // Switch Channel Category (Soporte | Contabilidad | Ventas | Otros) with 1 click
   const handleSwitchChannel = async (newChannel: SupportChannelType) => {
     if (!activeCircle) return;
     try {
-      const { error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
-        body: {
-          action: 'set_ticket_channel',
-          ticket_id: activeCircle.activeTicket.id,
-          support_channel: newChannel,
-        },
-      });
-      if (error) throw error;
-      toast.success(`Canal cambiado a ${SUPPORT_CHANNELS[newChannel].label}`);
+      await invoke({ action: 'set_ticket_channel', ticket_id: activeCircle.activeTicket.id, support_channel: newChannel });
+      toast.success(`Categoría: ${SUPPORT_CHANNEL_LABELS[newChannel]}`);
       loadSupportData(true);
     } catch (err: any) {
       toast.error(err?.message || 'Error al cambiar categoría');
     }
   };
 
-  // 1-Click Promote WhatsApp Chat to Sales Lead ("Pasar a Ventas")
-  const handlePromoteToLead = async () => {
+  const classify = async (
+    type: 'cliente' | 'lead' | 'interno' | 'spam' | 'por_clasificar',
+    extra: Record<string, unknown> = {}
+  ) => {
     if (!activeCircle) return;
-    if (activeCircle.promotedLeadId) {
-      navigate('/leads');
-      return;
-    }
-    setPromotingLead(true);
+    setClassifying(true);
     try {
-      const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
-        body: {
-          action: 'promote_to_lead',
-          ticket_id: activeCircle.activeTicket.id,
-          client_name: activeCircle.clientName,
-          phone: activeCircle.phone,
-        },
-      });
-      if (error) throw error;
+      const data = await invoke({ action: 'classify_contact', ticket_id: activeCircle.activeTicket.id, contact_type: type, ...extra });
+      const labels: Record<string, string> = {
+        cliente: 'Cliente (Soporte)',
+        lead: 'Lead de Ventas',
+        interno: 'Equipo interno',
+        spam: 'Spam',
+        por_clasificar: 'Por clasificar',
+      };
       toast.success(
-        data?.already_existed
-          ? `Vinculado con Lead existente en Ventas (${activeCircle.clientName})`
-          : `Prospecto creado en Ventas (Leads) para ${activeCircle.clientName}`
+        type === 'lead' && data?.lead?.name ? `Lead creado y asignado: ${data.lead.name}` : `Clasificado como ${labels[type]}`
       );
-      loadSupportData(true);
+      setShowClientPicker(false);
+      setShowReclassifyMenu(false);
+      await loadSupportData(true);
+      loadThread(false);
     } catch (err: any) {
-      toast.error(err?.message || 'Error al crear Lead en Ventas');
+      toast.error(err?.message || 'No se pudo clasificar');
+      loadSupportData(true);
     } finally {
-      setPromotingLead(false);
+      setClassifying(false);
     }
   };
 
-  // Save Resolution + Time + Optionally Close & Notify Client
   const handleCompleteAndCloseTicket = async (notifyClient: boolean) => {
     if (!activeCircle || !aiTimeAudit) return;
     const hrs = Number(resForm.actual_hours) || 0;
@@ -1293,23 +1060,14 @@ export const SupportChatCircles: React.FC = () => {
       toast.error('Nadie puede cerrar un ticket sin poner el Tiempo Real (> 0 horas).');
       return;
     }
-    if (
-      resForm.findings.trim().length < 5 ||
-      resForm.root_cause.trim().length < 5 ||
-      resForm.solution.trim().length < 5
-    ) {
-      toast.error(
-        'Debes completar Hallazgos, Causa Raíz y Solución antes de cerrar el ticket.'
-      );
+    if (resForm.findings.trim().length < 5 || resForm.root_cause.trim().length < 5 || resForm.solution.trim().length < 5) {
+      toast.error('Debes completar Hallazgos, Causa Raíz y Solución antes de cerrar el ticket.');
       return;
     }
     if (aiTimeAudit.status === 'inflated' && resForm.time_justification.trim().length < 8) {
-      toast.error(
-        `La IA detectó tiempo inflado (+${aiTimeAudit.differenceHours}h sobre lo esperado). Escribe la justificación.`
-      );
+      toast.error(`La IA detectó tiempo inflado (+${aiTimeAudit.differenceHours}h sobre lo esperado). Escribe la justificación.`);
       return;
     }
-
     setSavingResolution(true);
     try {
       const t = activeCircle.activeTicket;
@@ -1329,11 +1087,8 @@ export const SupportChatCircles: React.FC = () => {
           chat_session_seconds: activeChatSeconds,
         },
       });
-
       if (notifyClient) {
-        await handleSendReply(
-          `Su caso ha sido resuelto (${resForm.solution.trim()}). Quedamos atentos a su confirmación.`
-        );
+        await handleSendReply(`Su caso ha sido resuelto (${resForm.solution.trim()}). Quedamos atentos a su confirmación.`);
       } else {
         toast.success('Ticket resuelto y auditado con éxito');
       }
@@ -1345,12 +1100,17 @@ export const SupportChatCircles: React.FC = () => {
     }
   };
 
-  const formatTimer = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}m ${s < 10 ? '0' : ''}${s}s`;
+  const openBridgeStatus = async () => {
+    setShowStatusModal(true);
+    setBridgeStatus(null);
+    try {
+      setBridgeStatus(await invoke({ action: 'bridge_status' }));
+    } catch (e: any) {
+      setBridgeStatus({ ok: false, error: e?.message });
+    }
   };
 
+  const formatTimer = (sec: number) => `${Math.floor(sec / 60)}m ${sec % 60 < 10 ? '0' : ''}${sec % 60}s`;
   const greetingTime = () => {
     const hr = new Date().getHours();
     if (hr < 12) return 'Buenos días';
@@ -1358,80 +1118,181 @@ export const SupportChatCircles: React.FC = () => {
     return 'Buenas noches';
   };
 
+  const pickerOptions = useMemo(() => {
+    const q = clientPickerQuery.trim().toLowerCase();
+    const groups = waGroups
+      .filter((g) => g.subject)
+      .map((g) => ({ key: `g:${g.group_jid}`, label: g.subject as string, sub: 'Grupo de WhatsApp', group_jid: g.group_jid, client_id: g.client_id }));
+    const cls = realClients.map((c) => ({ key: `c:${c.id}`, label: c.nombre, sub: c.contacto || c.telefono || 'Cliente', group_jid: null as string | null, client_id: c.id }));
+    return [...groups, ...cls].filter((o) => !q || o.label.toLowerCase().includes(q) || String(o.sub).toLowerCase().includes(q)).slice(0, 40);
+  }, [clientPickerQuery, waGroups, realClients]);
+
+  // ── Render helpers ────────────────────────────────────────────────────────
+  const ScopeChip: React.FC<{ circle: SupportCircle; compact?: boolean }> = ({ circle, compact }) => {
+    const st = SCOPE_STYLE[circle.scope];
+    const Icon = circle.isGroup ? Users : st.icon;
+    let label: string = WA_SCOPE_LABELS[circle.scope];
+    if (circle.scope === 'soporte') label = circle.isGroup ? 'Grupo' : circle.isWhatsApp ? 'Cliente' : 'Ticket';
+    if (circle.scope === 'lead' && circle.leadStatus && !compact) label = `Lead · ${circle.leadStatus}`;
+    return (
+      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-bold shrink-0 ${st.chip}`}>
+        <Icon className="w-2.5 h-2.5" />
+        {label}
+      </span>
+    );
+  };
+
+  const renderMedia = (item: ChatItem) => {
+    const m = item.media;
+    if (m) {
+      if (m.media_status === 'pending' || m.media_status === 'requested') {
+        return (
+          <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-2 my-1">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            Descargando {m.message_type === 'image' ? 'imagen' : m.message_type === 'audio' ? 'nota de voz' : m.message_type === 'video' ? 'video' : 'archivo'}…
+          </div>
+        );
+      }
+      if (m.media_status === 'failed') {
+        return (
+          <div className="flex items-center gap-2 text-[11px] text-rose-700 bg-rose-50 rounded-xl px-3 py-2 my-1">
+            <ImageOff className="w-3.5 h-3.5" />
+            <span>No se pudo descargar el archivo</span>
+            <button type="button" onClick={() => handleRetryMedia(m.id)} className="ml-auto font-bold underline">
+              Reintentar
+            </button>
+          </div>
+        );
+      }
+      if (!m.url) {
+        return <div className="w-56 h-32 rounded-xl bg-slate-100 animate-pulse my-1" />;
+      }
+      if (m.message_type === 'image' || m.message_type === 'sticker' || (m.media_mime || '').startsWith('image/')) {
+        return (
+          <a href={m.url} target="_blank" rel="noopener noreferrer" className="block my-1">
+            <img
+              src={m.url}
+              alt={m.media_filename || 'Imagen'}
+              className={`${m.message_type === 'sticker' ? 'w-28 h-28 object-contain' : 'max-w-xs max-h-80 object-cover'} rounded-xl`}
+              loading="lazy"
+            />
+          </a>
+        );
+      }
+      if (m.message_type === 'video' || (m.media_mime || '').startsWith('video/')) {
+        return <video src={m.url} controls className="max-w-xs rounded-xl my-1" />;
+      }
+      if (m.message_type === 'audio' || (m.media_mime || '').startsWith('audio/')) {
+        return <audio src={m.url} controls preload="metadata" className="w-72 h-9 my-1" />;
+      }
+      return (
+        <a
+          href={m.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          download={m.media_filename || undefined}
+          className="flex items-center gap-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 my-1 transition"
+        >
+          <FileText className="w-8 h-8 text-indigo-500 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-slate-800 truncate max-w-[220px]">{m.media_filename || 'Documento'}</p>
+            <p className="text-[10px] text-slate-500">{[m.media_mime?.split('/')[1]?.toUpperCase(), formatBytes(m.media_size)].filter(Boolean).join(' · ')}</p>
+          </div>
+          <Download className="w-4 h-4 text-slate-500 ml-auto shrink-0" />
+        </a>
+      );
+    }
+    const lm = item.legacyMedia;
+    if (lm) {
+      if (lm.type === 'audio') return <audio src={lm.url} controls preload="metadata" className="w-72 h-9 my-1" />;
+      if (lm.type === 'image')
+        return (
+          <a href={lm.url} target="_blank" rel="noopener noreferrer" className="block my-1">
+            <img src={lm.url} alt={lm.name || 'Imagen'} className="max-w-xs rounded-xl" />
+          </a>
+        );
+      if (lm.type === 'video') return <video src={lm.url} controls className="max-w-xs rounded-xl my-1" />;
+      return (
+        <a href={lm.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-xs font-bold text-indigo-700 underline my-1">
+          <Paperclip className="w-3.5 h-3.5" />
+          {lm.name || 'Archivo adjunto'}
+        </a>
+      );
+    }
+    return null;
+  };
+
+  // ── Access guard ──────────────────────────────────────────────────────────
+  if (profile && !scopes.any) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-[#F5F6FA] p-8">
+        <div className="bg-white rounded-3xl p-8 max-w-md text-center shadow-sm border border-slate-200">
+          <ShieldCheck className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+          <h2 className="text-lg font-black text-slate-900">Sin acceso al Chat WhatsApp</h2>
+          <p className="text-sm text-slate-600 mt-2">
+            Pide a un administrador que active en tu rol el permiso <strong>Chat WhatsApp: Clientes de Soporte</strong> o{' '}
+            <strong>Chat WhatsApp: Leads</strong> (Equipo → Roles).
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const roleChip = scopes.all ? 'ADMIN' : scopes.soporte && scopes.leads ? 'SOPORTE + VENTAS' : scopes.soporte ? 'SOPORTE' : 'VENTAS';
+
   return (
-    <div className="h-screen flex-1 flex flex-col bg-[#F5F6FA] overflow-hidden select-none">
-      {/* =====================================================================
-          1. TOP HEADER BAR (100% VECTOR ICONS, ZERO EMOJIS)
-         ===================================================================== */}
+    <div className="h-screen flex-1 flex flex-col bg-[#F5F6FA] overflow-hidden">
+      {/* ── TOP HEADER ── */}
       <header className="h-14 bg-white border-b border-slate-200/80 px-5 flex items-center justify-between shrink-0 z-20">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="flex items-center gap-2">
             <div className="w-1 h-5 rounded-full bg-indigo-600" />
-            <span className="text-sm font-black text-slate-900 tracking-tight">
-              Support Chat
-            </span>
+            <span className="text-sm font-black text-slate-900 tracking-tight">Chat WhatsApp</span>
           </div>
-          <span className="text-slate-300">|</span>
-          <span className="text-xs font-medium text-slate-600 hidden sm:inline">
-            {greetingTime()},{' '}
-            <strong className="font-black text-slate-900">
-              {profile?.full_name?.split(' ')[0] || 'Admin'}
-            </strong>
+          <span className="text-slate-300 hidden sm:inline">|</span>
+          <span className="text-xs font-medium text-slate-600 hidden sm:inline truncate">
+            {greetingTime()}, <strong className="font-black text-slate-900">{profile?.full_name?.split(' ')[0] || ''}</strong>
           </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#EEF0FF] text-indigo-700">
+          <span className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#EEF0FF] text-indigo-700">
             <Phone className="w-3 h-3 text-indigo-600" />
             +503 7971-8911
           </span>
         </div>
-
         <div className="flex items-center gap-2.5">
           <span className="hidden md:inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#EEF0FF] text-indigo-700">
-            {profile?.role === 'super_admin' ? 'ADMINISTRATOR' : 'SUPPORT'}
+            {roleChip}
           </span>
-
-          <button
-            onClick={() => setShowAiPromptModal(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#EEF0FF] text-indigo-700 hover:bg-indigo-100 transition"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-            <span>IA</span>
-          </button>
-
-          <button
-            onClick={() => setShowEvoModal(true)}
-            title="Configuración WhatsApp"
-            className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-
+          {scopes.all && (
+            <>
+              <button
+                onClick={() => setShowAiPromptModal(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#EEF0FF] text-indigo-700 hover:bg-indigo-100 transition"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                <span>IA</span>
+              </button>
+              <button
+                onClick={openBridgeStatus}
+                title="Estado de la conexión WhatsApp"
+                className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </>
+          )}
           <div className="w-8 h-8 rounded-full bg-indigo-600 text-white font-black text-xs flex items-center justify-center shadow-sm">
-            {(profile?.full_name || 'AD')
-              .split(' ')
-              .map((w) => w[0])
-              .join('')
-              .slice(0, 2)
-              .toUpperCase()}
+            {initials(profile?.full_name || 'AD')}
           </div>
         </div>
       </header>
 
-      {/* =====================================================================
-          2. CLEAN WORKSPACE (LEFT CIRCLES + RESIZABLE DIVIDER + WIDE CHAT)
-         ===================================================================== */}
       <div className="flex-1 flex overflow-hidden">
-        {/* ── LEFT COLUMN: CIRCLES (Resizable width like WhatsApp Desktop!) ── */}
-        <aside
-          style={{ width: `${leftPanelWidth}px` }}
-          className="bg-white flex flex-col shrink-0 relative"
-        >
-          {/* Circles Title + Refresh button */}
+        {/* ── LEFT: chat list ── */}
+        <aside style={{ width: `${leftPanelWidth}px` }} className="bg-white flex flex-col shrink-0 relative">
           <div className="px-5 pt-5 pb-3 flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">Circles</h2>
-              <p className="text-[11px] font-medium text-slate-400">
-                {filteredCircles.length} conversaciones activas
-              </p>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">Chats</h2>
+              <p className="text-[11px] font-medium text-slate-400">{filteredCircles.length} conversaciones</p>
             </div>
             <button
               onClick={() => loadSupportData()}
@@ -1442,7 +1303,6 @@ export const SupportChatCircles: React.FC = () => {
             </button>
           </div>
 
-          {/* Search input */}
           <div className="px-4 pb-3">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -1454,49 +1314,19 @@ export const SupportChatCircles: React.FC = () => {
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50/80 border border-slate-200/70 rounded-full text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
-
-            {/* Clean, Unified Filter Pills (100% Vector Icons, No Emojis, No Scattering) */}
             <div className="flex items-center gap-1.5 mt-3 flex-wrap">
-              {[
-                {
-                  id: 'all',
-                  label: `Todos (${channelCounts.all})`,
-                  icon: MessageSquare,
-                },
-                {
-                  id: 'waiting',
-                  label: `Sin Contestar (${channelCounts.waiting})`,
-                  icon: Clock,
-                  isAlert: channelCounts.waiting > 0,
-                },
-                {
-                  id: 'soporte',
-                  label: `Clientes Soporte (${channelCounts.soporte})`,
-                  icon: Building2,
-                },
-                {
-                  id: 'ventas',
-                  label: `Leads Nuevos (${channelCounts.ventas})`,
-                  icon: UserPlus,
-                },
-              ].map((tab) => {
+              {filterTabs.map((tab) => {
                 const active = circleFilter === tab.id;
                 const IconComp = tab.icon;
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setCircleFilter(tab.id as any)}
+                    onClick={() => setCircleFilter(tab.id)}
                     className={`px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition inline-flex items-center gap-1.5 ${
-                      active
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
+                      active ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
                     }`}
                   >
-                    {tab.isAlert && !active ? (
-                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                    ) : (
-                      <IconComp className="w-3 h-3 shrink-0" />
-                    )}
+                    {tab.alert && !active ? <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> : <IconComp className="w-3 h-3 shrink-0" />}
                     <span>{tab.label}</span>
                   </button>
                 );
@@ -1504,24 +1334,15 @@ export const SupportChatCircles: React.FC = () => {
             </div>
           </div>
 
-          {/* Circles List (BOLD for unread/unanswered, immediately NON-BOLD when opened/answered) */}
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-            {filteredCircles.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-400 font-medium">
-                No hay conversaciones en esta vista.
-              </div>
+            {loading && circles.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400 font-medium">Cargando chats…</div>
+            ) : filteredCircles.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400 font-medium">No hay conversaciones en esta vista.</div>
             ) : (
               filteredCircles.map((circle) => {
                 const isSelected = activeCircle?.circleId === circle.circleId;
-                const timeStr = new Date(circle.lastMessageAt).toLocaleTimeString('es-SV', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                });
-                const isSalesLead = !circle.isExistingClient;
-                const isUnread =
-                  circle.unreadOrWaitingReply &&
-                  readCirclesMap[circle.circleId] !== circle.lastMessageAt;
-
+                const unread = isUnread(circle);
                 return (
                   <button
                     key={circle.circleId}
@@ -1531,106 +1352,39 @@ export const SupportChatCircles: React.FC = () => {
                       setSelectedCircleId(circle.circleId);
                     }}
                     className={`w-full text-left px-4 py-3.5 flex items-center gap-3.5 transition relative ${
-                      isSelected
-                        ? 'bg-[#EEF0FF]/90'
-                        : isUnread
-                        ? 'bg-white hover:bg-slate-50'
-                        : 'bg-slate-50/30 hover:bg-slate-50/80'
+                      isSelected ? 'bg-[#EEF0FF]/90' : unread ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/30 hover:bg-slate-50/80'
                     }`}
                   >
-                    {/* Avatar (Shows Group Vector Icon for WhatsApp Groups, Initials for 1-on-1) */}
                     <div className="relative shrink-0">
                       <div
                         className={`w-11 h-11 rounded-full flex items-center justify-center text-xs text-white ${
-                          isUnread ? 'font-black' : 'font-normal opacity-80'
-                        } ${isSalesLead ? 'bg-emerald-600' : 'bg-indigo-600'}`}
+                          unread ? 'font-black' : 'font-normal opacity-80'
+                        } ${SCOPE_STYLE[circle.scope].avatar}`}
                       >
-                        {circle.isGroup ? (
-                          <Users className="w-5 h-5 text-white" />
-                        ) : (
-                          circle.clientName
-                            .split(' ')
-                            .map((w) => w[0])
-                            .join('')
-                            .slice(0, 2)
-                            .toUpperCase()
-                        )}
+                        {circle.isGroup ? <Users className="w-5 h-5 text-white" /> : initials(circle.clientName)}
                       </div>
-                      {isUnread && (
-                        <span className="w-3 h-3 rounded-full bg-rose-500 border-2 border-white absolute -top-0.5 -right-0.5" />
-                      )}
+                      {unread && <span className="w-3 h-3 rounded-full bg-rose-500 border-2 border-white absolute -top-0.5 -right-0.5" />}
                     </div>
-
-                    {/* Clean 2-Line Text Preview: BOLD when unread, NON-BOLD immediately when opened or answered */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span
-                            className={`text-xs uppercase tracking-tight truncate ${
-                              isUnread
-                                ? 'font-black text-slate-950'
-                                : 'font-normal text-slate-500'
-                            }`}
-                          >
+                          <span className={`text-xs uppercase tracking-tight truncate ${unread ? 'font-black text-slate-950' : 'font-normal text-slate-500'}`}>
                             {circle.clientName}
                           </span>
-                          {isUnread && (
-                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-500 text-white shrink-0">
-                              NUEVO
-                            </span>
-                          )}
-                          {circle.isGroup ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-indigo-50 text-indigo-700 shrink-0">
-                              <Users className="w-2.5 h-2.5" />
-                              Grupo
-                            </span>
-                          ) : isSalesLead ? (
-                            circle.promotedLeadId ? (
-                              <span
-                                title={`Ya existe en Leads CRM (${circle.existingLeadStatus || 'Prospecto'})`}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-sky-100 text-sky-800 shrink-0"
-                              >
-                                <UserCheck className="w-2.5 h-2.5" />
-                                Lead en CRM
-                              </span>
-                            ) : (
-                              <span
-                                title="Prospecto nuevo por WhatsApp (aún no agregado al CRM)"
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800 shrink-0"
-                              >
-                                <UserPlus className="w-2.5 h-2.5" />
-                                Lead Nuevo
-                              </span>
-                            )
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-indigo-50 text-indigo-700 shrink-0">
-                              <Building2 className="w-2.5 h-2.5" />
-                              Cliente
+                          <ScopeChip circle={circle} compact />
+                          {circle.memberOfGroups.length > 0 && !circle.isGroup && (
+                            <span title={`Miembro de: ${circle.memberOfGroups.map((g) => g.subject).join(', ')}`} className="shrink-0">
+                              <Users className="w-3 h-3 text-indigo-500" />
                             </span>
                           )}
                         </div>
-                        <span
-                          className={`text-[10px] shrink-0 ${
-                            isUnread
-                              ? 'font-extrabold text-indigo-600'
-                              : 'font-normal text-slate-400'
-                          }`}
-                        >
-                          {timeStr}
+                        <span className={`text-[10px] shrink-0 ${unread ? 'font-extrabold text-indigo-600' : 'font-normal text-slate-400'}`}>
+                          {listTimeLabel(circle.lastMessageAt)}
                         </span>
                       </div>
-
-                      <div className="flex items-center justify-between gap-2 mt-0.5">
-                        <p
-                          className={`text-xs truncate ${
-                            isUnread
-                              ? 'text-slate-900 font-bold'
-                              : 'text-slate-400 font-normal'
-                          }`}
-                        >
-                          {circle.lastMessageSender}: {circle.lastMessageText}
-                        </p>
-                      </div>
+                      <p className={`text-xs truncate mt-0.5 ${unread ? 'text-slate-900 font-bold' : 'text-slate-400 font-normal'}`}>
+                        {circle.lastMessageSender}: {circle.lastMessageText}
+                      </p>
                     </div>
                   </button>
                 );
@@ -1639,7 +1393,7 @@ export const SupportChatCircles: React.FC = () => {
           </div>
         </aside>
 
-        {/* ── DRAGGABLE VERTICAL RESIZER LINE (Grab & pull left/right like WhatsApp Desktop!) ── */}
+        {/* ── Resizer ── */}
         <div
           onMouseDown={(e) => {
             e.preventDefault();
@@ -1652,280 +1406,344 @@ export const SupportChatCircles: React.FC = () => {
             setLeftPanelWidth(next);
             localStorage.setItem('crm_circles_left_width', String(next));
           }}
-          title="Arrastra hacia la derecha o izquierda para abrir o cerrar la lista de chats (doble clic para expandir)"
+          title="Arrastra para cambiar el ancho de la lista (doble clic para expandir)"
           className={`w-1.5 shrink-0 cursor-col-resize relative group transition-colors flex items-center justify-center z-20 ${
-            isResizingLeft
-              ? 'bg-indigo-600'
-              : 'bg-slate-200/80 hover:bg-indigo-500'
+            isResizingLeft ? 'bg-indigo-600' : 'bg-slate-200/80 hover:bg-indigo-500'
           }`}
         >
-          <div
-            className={`w-1 h-10 rounded-full transition-all ${
-              isResizingLeft
-                ? 'bg-white scale-y-125'
-                : 'bg-slate-400/60 group-hover:bg-white'
-            }`}
-          />
+          <div className={`w-1 h-10 rounded-full transition-all ${isResizingLeft ? 'bg-white scale-y-125' : 'bg-slate-400/60 group-hover:bg-white'}`} />
         </div>
 
-        {/* ── CENTER COLUMN: THE LIVE CHAT ── */}
+        {/* ── CENTER: chat ── */}
         {activeCircle ? (
-          <main className="flex-1 flex flex-col bg-[#F3F4F8] overflow-hidden">
-            {/* Active Circle Header */}
-            <div className="h-16 bg-white border-b border-slate-200/70 px-6 flex items-center justify-between shrink-0">
+          <main className="flex-1 flex flex-col bg-[#F3F4F8] overflow-hidden min-w-0">
+            {/* Chat header */}
+            <div className="bg-white border-b border-slate-200/70 px-6 py-2.5 flex items-center justify-between gap-3 shrink-0 min-h-16">
               <div className="flex items-center gap-3 min-w-0">
-                <div
-                  className={`w-10 h-10 rounded-full text-white font-black text-xs flex items-center justify-center shrink-0 ${
-                    !activeCircle.isExistingClient ? 'bg-emerald-600' : 'bg-indigo-600'
-                  }`}
-                >
-                  {activeCircle.isGroup ? (
-                    <Users className="w-5 h-5 text-white" />
-                  ) : (
-                    activeCircle.clientName
-                      .split(' ')
-                      .map((w) => w[0])
-                      .join('')
-                      .slice(0, 2)
-                      .toUpperCase()
-                  )}
+                <div className={`w-10 h-10 rounded-full text-white font-black text-xs flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
+                  {activeCircle.isGroup ? <Users className="w-5 h-5 text-white" /> : initials(activeCircle.clientName)}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight truncate">
-                      {activeCircle.clientName}
-                    </h3>
-                    {activeCircle.isGroup ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 shrink-0">
-                        <Users className="w-3 h-3" />
-                        Grupo de Soporte (Cliente Activo)
-                      </span>
-                    ) : activeCircle.isExistingClient ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 shrink-0">
-                        <Building2 className="w-3 h-3" />
-                        Cliente Activo ({activeCircle.allClientTickets.length} tickets)
-                      </span>
-                    ) : activeCircle.promotedLeadId ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200/70 shrink-0">
-                        <UserCheck className="w-3 h-3" />
-                        Lead en CRM ({activeCircle.existingLeadStatus || 'Registrado'})
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
-                        <UserPlus className="w-3 h-3" />
-                        Lead Nuevo (No en CRM)
-                      </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight truncate max-w-[280px]">{activeCircle.clientName}</h3>
+                    <ScopeChip circle={activeCircle} />
+                    {activeCircle.scope === 'lead' && activeCircle.leadOwnerName && (
+                      <span className="text-[10px] font-semibold text-slate-500">Vendedor: {activeCircle.leadOwnerName}</span>
                     )}
                   </div>
                   <p className="text-[11px] font-medium text-slate-400 truncate">
                     {activeCircle.isGroup
-                      ? 'Grupo WhatsApp Soporte'
-                      : activeCircle.phone
-                      ? `+${activeCircle.phone}`
-                      : 'Canal Soporte'}{' '}
-                    · Atiende: {activeCircle.assignedTechName}
+                      ? 'Grupo de WhatsApp'
+                      : [
+                          activeCircle.phone ? `+${activeCircle.phone}` : null,
+                          activeCircle.pushName && activeCircle.pushName.toLowerCase() !== activeCircle.clientName.toLowerCase()
+                            ? `WhatsApp: ${activeCircle.pushName}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                    {activeCircle.scope === 'soporte' ? ` · Atiende: ${activeCircle.assignedTechName}` : ''}
                   </p>
+                  {!activeCircle.isGroup && activeCircle.memberOfGroups.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                      <Users className="w-3 h-3 text-indigo-500" />
+                      <span className="text-[10px] font-bold text-indigo-700">Este número es del grupo:</span>
+                      {activeCircle.memberOfGroups.slice(0, 3).map((g) => {
+                        const groupCircleId = `wa:${g.jid}`;
+                        const exists = circles.some((c) => c.circleId === groupCircleId);
+                        return (
+                          <button
+                            key={g.jid}
+                            type="button"
+                            disabled={!exists}
+                            onClick={() => exists && setSelectedCircleId(groupCircleId)}
+                            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60 hover:bg-indigo-100 disabled:opacity-70 disabled:cursor-default"
+                          >
+                            {g.subject || 'Grupo'}
+                            {exists && <ExternalLink className="w-2.5 h-2.5 inline ml-1" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Clean, minimal right controls in Chat Header (Vector Icons Only) */}
-              <div className="flex items-center gap-2">
-                <div className="relative flex items-center">
-                  <Wrench className="w-3.5 h-3.5 text-slate-500 absolute left-3 pointer-events-none" />
-                  <select
-                    value={activeCircle.supportChannel}
-                    onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
-                    className="pl-8 pr-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-700 cursor-pointer focus:outline-none transition"
-                  >
-                    <option value="soporte">Soporte (Cliente)</option>
-                    <option value="contabilidad">Contabilidad (Cliente)</option>
-                    <option value="ventas">Lead Ventas (Prospecto)</option>
-                    <option value="otros">Otros</option>
-                  </select>
-                </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {activeCircle.scope === 'soporte' && activeCircle.isWhatsApp && (
+                  <div className="relative flex items-center">
+                    <Wrench className="w-3.5 h-3.5 text-slate-500 absolute left-3 pointer-events-none" />
+                    <select
+                      value={activeCircle.supportChannel}
+                      onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
+                      className="pl-8 pr-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-700 cursor-pointer focus:outline-none transition"
+                    >
+                      <option value="soporte">Soporte técnico</option>
+                      <option value="contabilidad">Contabilidad</option>
+                      <option value="otros">Otros</option>
+                    </select>
+                  </div>
+                )}
 
-                {/* Show "Ya existe en CRM (Ver Lead)" if already in Leads, or "+ Agregar Lead al CRM" if brand new */}
-                {!activeCircle.isExistingClient && (
+                {activeCircle.leadId && (activeCircle.scope === 'lead' || activeCircle.scope === 'spam') && (
                   <button
                     type="button"
-                    disabled={promotingLead}
-                    onClick={handlePromoteToLead}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                      activeCircle.promotedLeadId
-                        ? 'bg-sky-100 hover:bg-sky-200/80 text-sky-800 border border-sky-200'
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs'
-                    }`}
+                    onClick={() => navigate('/leads', { state: { leadId: activeCircle.leadId, _t: Date.now() } })}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition"
                   >
-                    {activeCircle.promotedLeadId ? (
-                      <UserCheck className="w-3.5 h-3.5" />
-                    ) : (
-                      <UserPlus className="w-3.5 h-3.5" />
-                    )}
-                    <span>
-                      {promotingLead
-                        ? 'Guardando...'
-                        : activeCircle.promotedLeadId
-                        ? 'Ya en CRM (Ver Lead)'
-                        : '+ Agregar Lead al CRM'}
-                    </span>
+                    <UserCheck className="w-3.5 h-3.5" />
+                    Abrir ficha del lead
                   </button>
                 )}
 
-                {/* Toggle Ticket Resolution Drawer */}
-                <button
-                  type="button"
-                  onClick={() => setShowRightPanel(!showRightPanel)}
-                  title="Abrir panel para cerrar ticket o asignar técnico"
-                  className={`w-10 h-9 rounded-xl flex items-center justify-center transition ${
-                    showRightPanel
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-[#EEF0FF] text-indigo-600 hover:bg-indigo-100'
-                  }`}
-                >
-                  {showRightPanel ? (
-                    <PanelRightClose className="w-4 h-4" />
-                  ) : (
-                    <PanelRightOpen className="w-4 h-4" />
-                  )}
-                </button>
+                {canClassify && activeCircle.scope !== 'por_clasificar' && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowReclassifyMenu((v) => !v)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-700 transition"
+                    >
+                      <Tag className="w-3.5 h-3.5" />
+                      Clasificación
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                    {showReclassifyMenu && (
+                      <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl z-30 p-1.5">
+                        {(
+                          [
+                            { t: 'cliente', label: 'Es cliente (Soporte)', icon: Building2, show: activeCircle.scope !== 'soporte' },
+                            { t: 'lead', label: 'Es lead (Ventas)', icon: UserPlus, show: activeCircle.scope !== 'lead' },
+                            { t: 'interno', label: 'Es del equipo', icon: ShieldCheck, show: scopes.all && activeCircle.scope !== 'interno' },
+                            { t: 'spam', label: 'Spam / bloquear', icon: Ban, show: activeCircle.scope !== 'spam' },
+                            { t: 'por_clasificar', label: 'Deshacer (Por clasificar)', icon: HelpCircle, show: scopes.all },
+                          ] as const
+                        )
+                          .filter((o) => o.show)
+                          .map((o) => {
+                            const I = o.icon;
+                            return (
+                              <button
+                                key={o.t}
+                                type="button"
+                                disabled={classifying}
+                                onClick={() => (o.t === 'cliente' ? (setShowClientPicker(true), setShowReclassifyMenu(false)) : classify(o.t))}
+                                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-100 text-left"
+                              >
+                                <I className="w-3.5 h-3.5 text-slate-500" />
+                                {o.label}
+                              </button>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeCircle.scope === 'soporte' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowRightPanel(!showRightPanel)}
+                    title="Panel del ticket: asignar técnico, tiempo y cierre"
+                    className={`w-10 h-9 rounded-xl flex items-center justify-center transition ${
+                      showRightPanel ? 'bg-indigo-600 text-white' : 'bg-[#EEF0FF] text-indigo-600 hover:bg-indigo-100'
+                    }`}
+                  >
+                    {showRightPanel ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Chat Messages Stream */}
-            <div className="flex-1 overflow-y-auto px-8 py-6 space-y-4">
-              <div className="flex justify-center mb-2">
-                <span className="px-3.5 py-1 rounded-full bg-white text-[11px] font-bold text-slate-600 shadow-2xs">
-                  Today
-                </span>
-              </div>
-
-              {loadingComments ? (
-                <div className="text-center py-12 text-xs font-medium text-slate-400">
-                  Cargando mensajes...
+            {/* Classification card for unknown numbers */}
+            {activeCircle.scope === 'por_clasificar' && (
+              <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center gap-3 flex-wrap shrink-0">
+                <HelpCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="mr-auto">
+                  <p className="text-xs font-black text-amber-900">Número nuevo — ¿quién es?</p>
+                  <p className="text-[11px] text-amber-800">Clasifícalo una vez y el sistema lo recordará para siempre.</p>
                 </div>
+                {canClassify ? (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      disabled={classifying}
+                      onClick={() => setShowClientPicker(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+                    >
+                      <Building2 className="w-3.5 h-3.5" />
+                      Es cliente
+                    </button>
+                    <button
+                      type="button"
+                      disabled={classifying}
+                      onClick={() => classify('lead')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {classifying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+                      Crear lead (asignado a mí)
+                    </button>
+                    {scopes.all && (
+                      <button
+                        type="button"
+                        disabled={classifying}
+                        onClick={() => classify('interno')}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        Es del equipo
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={classifying}
+                      onClick={() => classify('spam')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      <Ban className="w-3.5 h-3.5" />
+                      Spam
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-[11px] font-semibold text-amber-800">Un vendedor o administrador debe clasificarlo.</span>
+                )}
+              </div>
+            )}
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-8 py-6 space-y-3">
+              {loadingComments ? (
+                <div className="text-center py-12 text-xs font-medium text-slate-400">Cargando mensajes…</div>
+              ) : chatItems.length === 0 ? (
+                <div className="text-center py-12 text-xs font-medium text-slate-400">Sin mensajes todavía.</div>
               ) : (
-                chatBubbles.map((b) => {
-                  // 1. Center Announcement Card
-                  if (b.senderType === 'announcement') {
-                    return (
-                      <div key={b.id} className="flex justify-center my-2">
-                        <div className="max-w-sm w-full bg-[#E6E9FF] rounded-2xl px-4 py-3 shadow-2xs">
-                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600">
-                            <Bell className="w-3.5 h-3.5" />
-                            <span>Announcement · {b.senderName}</span>
-                          </div>
-                          <p className="text-xs font-medium text-slate-800 mt-1 leading-snug">
-                            {b.text}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  }
+                chatItems.map((b, idx) => {
+                  const prev = chatItems[idx - 1];
+                  const showDay = !prev || dayKey(prev.createdAt) !== dayKey(b.createdAt);
+                  const daySep = showDay ? (
+                    <div key={`day-${b.id}`} className="flex justify-center my-3">
+                      <span className="px-3.5 py-1 rounded-full bg-white text-[11px] font-bold text-slate-600 shadow-2xs capitalize">{dayLabel(b.createdAt)}</span>
+                    </div>
+                  ) : null;
 
-                  // 2. Outgoing Staff Message (Right-aligned soft lavender bubble with green CheckCheck)
-                  if (b.senderType === 'staff') {
+                  if (b.kind === 'ticket') {
                     return (
-                      <div key={b.id} className="flex justify-end">
-                        <div className="max-w-md bg-[#DFE3FF] text-slate-900 rounded-2xl rounded-br-xs px-4 py-2.5 shadow-2xs">
-                          {b.mediaUrl && b.mediaType === 'video' && (
-                            <video
-                              src={b.mediaUrl}
-                              controls
-                              className="w-64 rounded-xl mb-2"
-                            />
-                          )}
-                          {b.mediaUrl && b.mediaType === 'image' && (
-                            <a href={b.mediaUrl} target="_blank" rel="noopener noreferrer">
-                              <img
-                                src={b.mediaUrl}
-                                alt={b.mediaName || 'Imagen'}
-                                className="w-64 rounded-xl mb-2 object-cover"
-                              />
-                            </a>
-                          )}
-
-                          {b.mediaUrl && b.mediaType === 'audio' && (
-                            <div className="my-1.5">
-                              <audio
-                                src={b.mediaUrl}
-                                controls
-                                preload="metadata"
-                                className="w-72 h-9 rounded-full"
-                              />
+                      <React.Fragment key={b.id}>
+                        {daySep}
+                        <div className="flex justify-center my-2">
+                          <div className="max-w-md w-full bg-[#E6E9FF] rounded-2xl px-4 py-2.5">
+                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600">
+                              <Bell className="w-3.5 h-3.5" />
+                              <span>{b.senderName}</span>
                             </div>
-                          )}
-
-                          <p className="text-xs font-medium text-slate-900 whitespace-pre-wrap leading-relaxed">
-                            {b.text}
-                          </p>
-                          <div className="flex items-center justify-end gap-1 mt-1">
-                            <span className="text-[10px] font-medium text-slate-500">
-                              {b.timeLabel}
-                            </span>
-                            <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
+                            <p className="text-xs font-medium text-slate-800 mt-0.5 leading-snug line-clamp-2">{b.text}</p>
                           </div>
                         </div>
-                      </div>
+                      </React.Fragment>
                     );
                   }
-
-                  // 3. Incoming Client Message (Left-aligned clean card showing Sender inside the Group/Chat)
-                  return (
-                    <div key={b.id} className="flex justify-start">
-                      <div className="max-w-md bg-white text-slate-900 rounded-2xl rounded-bl-xs px-4 py-3 shadow-2xs">
-                        <p className="text-[11px] font-bold text-indigo-600 mb-0.5">
-                          {b.senderName}
-                        </p>
-
-                        {b.mediaUrl && b.mediaType === 'audio' && (
-                          <div className="my-2">
-                            <audio
-                              src={b.mediaUrl}
-                              controls
-                              preload="metadata"
-                              className="w-72 h-9"
-                            />
-                          </div>
-                        )}
-
-                        <p className="text-xs font-medium text-slate-800 whitespace-pre-wrap leading-relaxed">
-                          {b.text}
-                        </p>
-                        <div className="flex items-center justify-end mt-1">
-                          <span className="text-[10px] font-medium text-slate-400">
-                            {b.timeLabel}
+                  if (b.kind === 'system') {
+                    return (
+                      <React.Fragment key={b.id}>
+                        {daySep}
+                        <div className="flex justify-center">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-900">
+                            <Tag className="w-3 h-3" />
+                            {b.text}
+                            <span className="text-amber-600 font-normal">· {fmtTime(b.createdAt)}</span>
                           </span>
                         </div>
+                      </React.Fragment>
+                    );
+                  }
+                  if (b.kind === 'staff') {
+                    return (
+                      <React.Fragment key={b.id}>
+                        {daySep}
+                        <div className="flex justify-end">
+                          <div className="max-w-md bg-[#DFE3FF] text-slate-900 rounded-2xl rounded-br-xs px-4 py-2.5 shadow-2xs">
+                            <p className="text-[10px] font-bold text-indigo-700/80 mb-0.5">{b.senderName}</p>
+                            {renderMedia(b)}
+                            {b.text && <p className="text-xs font-medium text-slate-900 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
+                            <div className="flex items-center justify-end gap-1 mt-1">
+                              <span className="text-[10px] font-medium text-slate-500">{b.id.startsWith('temp-') ? 'enviando…' : fmtTime(b.createdAt)}</span>
+                              {b.delivery === 'sent' ? (
+                                <CheckCheck className="w-3.5 h-3.5 text-emerald-500" aria-label="Entregado a WhatsApp" />
+                              ) : b.delivery === 'error' ? (
+                                <span title={b.deliveryError || 'No se pudo enviar'} className="inline-flex items-center gap-0.5 text-[10px] font-bold text-rose-600">
+                                  <AlertTriangle className="w-3 h-3" /> No enviado
+                                </span>
+                              ) : b.delivery ? (
+                                <Check className="w-3.5 h-3.5 text-slate-400" aria-label="En cola de envío" />
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </React.Fragment>
+                    );
+                  }
+                  return (
+                    <React.Fragment key={b.id}>
+                      {daySep}
+                      <div className="flex justify-start">
+                        <div className="max-w-md bg-white text-slate-900 rounded-2xl rounded-bl-xs px-4 py-2.5 shadow-2xs">
+                          <p className="text-[11px] font-bold text-indigo-600 mb-0.5">{b.senderName}</p>
+                          {renderMedia(b)}
+                          {b.text && <p className="text-xs font-medium text-slate-800 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
+                          {b.transcript && (
+                            <p className="mt-1.5 text-[11px] text-slate-600 bg-slate-50 rounded-lg px-2 py-1 italic">
+                              <Mic className="w-3 h-3 inline mr-1 text-indigo-500" />
+                              {b.transcript}
+                            </p>
+                          )}
+                          <div className="flex items-center justify-end mt-1">
+                            <span className="text-[10px] font-medium text-slate-400">{fmtTime(b.createdAt)}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </React.Fragment>
                   );
                 })
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Bottom Message Bar */}
-            <div className="bg-white px-5 py-3 border-t border-slate-200/70 flex items-center gap-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/*,application/pdf"
-                onChange={handleUploadAttachment}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingFile}
-                title="Adjuntar imagen o archivo"
-                className="w-8 h-8 rounded-full text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
+            {/* Quick replies (support) */}
+            {activeCircle.scope === 'soporte' && canSend && (
+              <div className="bg-white/70 px-5 pt-2 flex items-center gap-1.5 overflow-x-auto">
+                {SUPPORT_QUICK_REPLIES.map((q) => (
+                  <button
+                    key={q.label}
+                    type="button"
+                    onClick={() => setMessageInput(q.text)}
+                    className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap"
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-              <div className="flex-1 relative">
+            {/* Composer */}
+            {canSend ? (
+              <div className="bg-white px-5 py-3 border-t border-slate-200/70 flex items-end gap-3">
                 <input
-                  type="text"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+                  onChange={handleUploadAttachment}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingFile}
+                  title="Enviar imagen, documento o archivo"
+                  className="w-9 h-9 rounded-full text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0 disabled:opacity-50"
+                >
+                  {uploadingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                </button>
+                <textarea
+                  rows={1}
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -1934,83 +1752,64 @@ export const SupportChatCircles: React.FC = () => {
                       handleSendReply();
                     }
                   }}
-                  placeholder="Message..."
-                  className="w-full px-4 py-2.5 bg-[#F3F4F8] border border-slate-200/80 rounded-full text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  placeholder="Escribe un mensaje… (Shift+Enter = nueva línea)"
+                  className="flex-1 resize-none max-h-32 px-4 py-2.5 bg-[#F3F4F8] border border-slate-200/80 rounded-2xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
+                <button
+                  type="button"
+                  disabled={!messageInput.trim() || sendingMessage}
+                  onClick={() => handleSendReply()}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-bold transition"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingFile}
-                title="Subir imagen"
-                className="p-2 rounded-full text-slate-500 hover:bg-slate-100 transition"
-              >
-                <Camera className="w-4 h-4" />
-              </button>
-
-              <button
-                type="button"
-                disabled={!messageInput.trim() || sendingMessage}
-                onClick={() => handleSendReply()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-bold transition"
-              >
-                <Send className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            ) : (
+              <div className="bg-white px-5 py-3 border-t border-slate-200/70 text-center text-[11px] font-semibold text-slate-400">
+                {activeCircle.scope === 'spam' ? 'Este número está marcado como spam.' : 'Este ticket no es de WhatsApp; respóndelo desde Tickets.'}
+              </div>
+            )}
           </main>
         ) : (
           <main className="flex-1 flex items-center justify-center bg-[#F3F4F8] text-slate-400 text-sm font-bold">
-            Selecciona un cliente en la columna izquierda ("Circles") para ver su chat.
+            Selecciona un chat de la lista para verlo.
           </main>
         )}
 
-        {/* =====================================================================
-            3. RIGHT MINI-MODULE: CONTROL DEL TICKET, TIEMPO OBLIGATORIO & IA (100% VECTOR ICONS)
-           ===================================================================== */}
-        {activeCircle && showRightPanel && (
+        {/* ── RIGHT: ticket control (support only) ── */}
+        {activeCircle && showRightPanel && activeCircle.scope === 'soporte' && (
           <aside className="w-96 bg-white border-l border-slate-200/80 flex flex-col overflow-y-auto shrink-0">
-            {/* Header del Mini-Módulo */}
             <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-[#EEF0FF]/70 to-white">
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-indigo-700">
                   <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                  Mini-Módulo de Control & IA
+                  Control del ticket
                 </span>
                 <span
                   className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                    ['resolved', 'closed'].includes(activeCircle.activeTicket.status)
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-900'
+                    ['resolved', 'closed'].includes(activeCircle.activeTicket.status) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'
                   }`}
                 >
                   {['resolved', 'closed'].includes(activeCircle.activeTicket.status) ? (
                     <>
-                      <CheckCircle2 className="w-3 h-3" />
-                      Resuelto
+                      <CheckCircle2 className="w-3 h-3" /> Resuelto
                     </>
                   ) : (
                     <>
-                      <Clock className="w-3 h-3" />
-                      Abierto
+                      <Clock className="w-3 h-3" /> Abierto · {formatTimer(activeChatSeconds)}
                     </>
                   )}
                 </span>
               </div>
-              <h4 className="text-sm font-black text-slate-900 mt-1">
-                Ticket #{activeCircle.activeTicket.id.slice(0, 8).toUpperCase()}
-              </h4>
-              <p className="text-[11px] text-slate-500 font-medium line-clamp-2 mt-0.5">
-                {stripEmojis(activeCircle.activeTicket.title)}
-              </p>
+              <h4 className="text-sm font-black text-slate-900 mt-1">Ticket #{activeCircle.activeTicket.id.slice(0, 8).toUpperCase()}</h4>
+              <p className="text-[11px] text-slate-500 font-medium line-clamp-2 mt-0.5">{stripEmojis(activeCircle.activeTicket.title)}</p>
             </div>
 
             <div className="p-4 space-y-4 flex-1">
-              {/* 1. Asignación Rápida de Técnico */}
               <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-1.5">
                   <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
-                  1. Ingeniero Responsable
+                  1. Ingeniero responsable
                 </label>
                 <select
                   value={activeCircle.assignedTechId || ''}
@@ -2026,7 +1825,6 @@ export const SupportChatCircles: React.FC = () => {
                 </select>
               </div>
 
-              {/* 2. Auditor IA de Tiempo (Obligatorio > 0h para cerrar) */}
               {aiTimeAudit && (
                 <div
                   className={`rounded-2xl p-3.5 border space-y-2.5 ${
@@ -2040,7 +1838,7 @@ export const SupportChatCircles: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase text-slate-800">
                       <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                      2. Tiempo Real vs. IA *
+                      2. Tiempo real vs. IA *
                     </span>
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
@@ -2054,21 +1852,16 @@ export const SupportChatCircles: React.FC = () => {
                       {stripEmojis(aiTimeAudit.verdictLabel)}
                     </span>
                   </div>
-
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-[9px] font-bold text-slate-500 uppercase">
-                        Horas Trabajadas *
-                      </p>
+                      <p className="text-[9px] font-bold text-slate-500 uppercase">Horas trabajadas *</p>
                       <input
                         type="number"
                         step="0.1"
                         min="0.1"
                         placeholder="Ej: 0.5"
                         value={resForm.actual_hours}
-                        onChange={(e) =>
-                          setResForm((p) => ({ ...p, actual_hours: e.target.value }))
-                        }
+                        onChange={(e) => setResForm((p) => ({ ...p, actual_hours: e.target.value }))}
                         className="mt-0.5 w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-900"
                       />
                     </div>
@@ -2078,10 +1871,7 @@ export const SupportChatCircles: React.FC = () => {
                         Esperado IA
                       </p>
                       <p className="text-xs font-black text-indigo-700">
-                        {aiTimeAudit.expectedHours}h{' '}
-                        <span className="text-[10px] text-slate-400">
-                          (máx {aiTimeAudit.maxReasonableHours}h)
-                        </span>
+                        {aiTimeAudit.expectedHours}h <span className="text-[10px] text-slate-400">(máx {aiTimeAudit.maxReasonableHours}h)</span>
                       </p>
                       <p className="text-[9px] font-bold text-slate-500">
                         Dif:{' '}
@@ -2091,8 +1881,6 @@ export const SupportChatCircles: React.FC = () => {
                       </p>
                     </div>
                   </div>
-
-                  {/* Quick Time Pills */}
                   <div className="flex items-center gap-1 flex-wrap">
                     {[
                       { label: '12m (0.2h)', val: '0.2' },
@@ -2106,16 +1894,13 @@ export const SupportChatCircles: React.FC = () => {
                         type="button"
                         onClick={() => setResForm((p) => ({ ...p, actual_hours: b.val }))}
                         className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition ${
-                          resForm.actual_hours === b.val
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'bg-white text-slate-600 border-slate-200'
+                          resForm.actual_hours === b.val ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'
                         }`}
                       >
                         {b.label}
                       </button>
                     ))}
                   </div>
-
                   {aiTimeAudit.status === 'inflated' && (
                     <div>
                       <label className="inline-flex items-center gap-1 text-[9px] font-black text-rose-700 uppercase">
@@ -2125,9 +1910,7 @@ export const SupportChatCircles: React.FC = () => {
                       <textarea
                         rows={2}
                         value={resForm.time_justification}
-                        onChange={(e) =>
-                          setResForm((p) => ({ ...p, time_justification: e.target.value }))
-                        }
+                        onChange={(e) => setResForm((p) => ({ ...p, time_justification: e.target.value }))}
                         placeholder="Explica por qué tomó más tiempo que el estimado IA..."
                         className="mt-1 w-full px-2.5 py-1.5 bg-white border border-rose-300 rounded-xl text-[11px] font-medium"
                       />
@@ -2136,52 +1919,29 @@ export const SupportChatCircles: React.FC = () => {
                 </div>
               )}
 
-              {/* 3. Reporte de Resolución Obligatorio (Hallazgos, Causa Raíz, Solución) */}
               <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2.5">
                 <p className="text-[10px] font-black uppercase text-slate-700 flex items-center gap-1.5">
                   <FileBadge2 className="w-3.5 h-3.5 text-violet-600" />
-                  3. Resolución Obligatoria (A la 1ª vez)
+                  3. Resolución obligatoria
                 </p>
-
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase">
-                    Hallazgos (¿Qué encontraste?) *
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={resForm.findings}
-                    onChange={(e) => setResForm((p) => ({ ...p, findings: e.target.value }))}
-                    placeholder="Síntoma o error verificado..."
-                    className="mt-0.5 w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-[11px]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase">
-                    Causa Raíz (¿Por qué ocurrió?) *
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={resForm.root_cause}
-                    onChange={(e) => setResForm((p) => ({ ...p, root_cause: e.target.value }))}
-                    placeholder="Causa técnica raíz..."
-                    className="mt-0.5 w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-[11px]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase">
-                    Solución Definitiva (Para que no regrese) *
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={resForm.solution}
-                    onChange={(e) => setResForm((p) => ({ ...p, solution: e.target.value }))}
-                    placeholder="Qué se corrigió exactamente..."
-                    className="mt-0.5 w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-[11px]"
-                  />
-                </div>
-
+                {(
+                  [
+                    { k: 'findings', label: 'Hallazgos (¿Qué encontraste?) *', ph: 'Síntoma o error verificado...' },
+                    { k: 'root_cause', label: 'Causa raíz (¿Por qué ocurrió?) *', ph: 'Causa técnica raíz...' },
+                    { k: 'solution', label: 'Solución definitiva *', ph: 'Qué se corrigió exactamente...' },
+                  ] as const
+                ).map((f) => (
+                  <div key={f.k}>
+                    <label className="text-[9px] font-black text-slate-500 uppercase">{f.label}</label>
+                    <textarea
+                      rows={2}
+                      value={resForm[f.k]}
+                      onChange={(e) => setResForm((p) => ({ ...p, [f.k]: e.target.value }))}
+                      placeholder={f.ph}
+                      className="mt-0.5 w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-[11px]"
+                    />
+                  </div>
+                ))}
                 <div className="pt-1 space-y-1.5">
                   <button
                     type="button"
@@ -2190,11 +1950,7 @@ export const SupportChatCircles: React.FC = () => {
                     className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-black shadow-sm transition inline-flex items-center justify-center gap-1.5"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>
-                      {savingResolution
-                        ? 'Guardando...'
-                        : 'Cerrar Ticket y Avisar por WhatsApp'}
-                    </span>
+                    <span>{savingResolution ? 'Guardando...' : 'Cerrar ticket y avisar por WhatsApp'}</span>
                   </button>
                   <button
                     type="button"
@@ -2202,12 +1958,11 @@ export const SupportChatCircles: React.FC = () => {
                     onClick={() => handleCompleteAndCloseTicket(false)}
                     className="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[11px] font-bold transition"
                   >
-                    Guardar y Cerrar (Sin enviar mensaje)
+                    Guardar y cerrar (sin enviar mensaje)
                   </button>
                 </div>
               </div>
 
-              {/* 4. Acordeón de Historial de este Cliente */}
               <div className="rounded-2xl border border-slate-200 overflow-hidden">
                 <button
                   type="button"
@@ -2216,35 +1971,23 @@ export const SupportChatCircles: React.FC = () => {
                 >
                   <span className="inline-flex items-center gap-1.5">
                     <FolderOpen className="w-3.5 h-3.5 text-indigo-600" />
-                    Historial de {activeCircle.clientName} (
-                    {activeCircle.allClientTickets.length})
+                    Historial ({activeCircle.allClientTickets.length})
                   </span>
-                  {showHistoryAccordion ? (
-                    <ChevronDown className="w-4 h-4 text-slate-500" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-slate-500" />
-                  )}
+                  {showHistoryAccordion ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-500" />}
                 </button>
                 {showHistoryAccordion && (
                   <div className="divide-y divide-slate-100 bg-white max-h-60 overflow-y-auto">
                     {activeCircle.allClientTickets.map((ht) => (
                       <div key={ht.id} className="p-3 text-[11px] space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="font-black text-slate-800">
-                            #{ht.id.slice(0, 6).toUpperCase()}
-                          </span>
+                          <span className="font-black text-slate-800">#{ht.id.slice(0, 6).toUpperCase()}</span>
                           <span className="text-[10px] text-slate-400">
-                            {new Date(ht.created_at).toLocaleDateString('es-SV')} ·{' '}
-                            {Number(ht.actual_hours || 0)}h
+                            {new Date(ht.created_at).toLocaleDateString('es-SV')} · {Number(ht.actual_hours || 0)}h
                           </span>
                         </div>
-                        <p className="text-slate-700 font-semibold line-clamp-2">
-                          {stripEmojis(ht.title)}
-                        </p>
+                        <p className="text-slate-700 font-semibold line-clamp-2">{stripEmojis(ht.title)}</p>
                         {ht.solution && (
-                          <p className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                            Solución: {stripEmojis(ht.solution)}
-                          </p>
+                          <p className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Solución: {stripEmojis(ht.solution)}</p>
                         )}
                       </div>
                     ))}
@@ -2256,108 +1999,131 @@ export const SupportChatCircles: React.FC = () => {
         )}
       </div>
 
-      {/* Modal opcional para configurar URL y API Key de Evolution API si desean envío directo */}
-      {showEvoModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      {/* ── "Es cliente" picker ── */}
+      {showClientPicker && activeCircle && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4" onClick={() => setShowClientPicker(false)}>
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-slate-900">
-                Conexión de Envío Evolution API
-              </h3>
-              <button
-                onClick={() => setShowEvoModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
-              >
+              <h3 className="text-base font-black text-slate-900">¿De qué cliente es este número?</h3>
+              <button onClick={() => setShowClientPicker(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <p className="text-xs text-slate-600">
-              El webhook detecta automáticamente el servidor Evolution cuando entra un mensaje. Si
-              quieres fijar manualmente la URL y API Key de Gerson para respuestas salientes,
-              puedes guardarlas aquí:
+              {activeCircle.pushName ? `"${activeCircle.pushName}" ` : ''}
+              {activeCircle.phone ? `+${activeCircle.phone}` : ''} pasará a <strong>Soporte</strong>.
             </p>
-            <div className="space-y-3">
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500">
-                  URL del Servidor Evolution API
-                </label>
-                <input
-                  type="text"
-                  placeholder="https://evolution.tudominio.com"
-                  value={evoConfig.url}
-                  onChange={(e) => setEvoConfig((p) => ({ ...p, url: e.target.value }))}
-                  className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500">
-                  Instance Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="arias"
-                  value={evoConfig.instance}
-                  onChange={(e) => setEvoConfig((p) => ({ ...p, instance: e.target.value }))}
-                  className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500">
-                  Global / Instance API Key
-                </label>
-                <input
-                  type="password"
-                  placeholder="API Key de Evolution..."
-                  value={evoConfig.key}
-                  onChange={(e) => setEvoConfig((p) => ({ ...p, key: e.target.value }))}
-                  className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-xs"
-                />
-              </div>
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                autoFocus
+                value={clientPickerQuery}
+                onChange={(e) => setClientPickerQuery(e.target.value)}
+                placeholder="Buscar grupo o cliente…"
+                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs"
+              />
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setShowEvoModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  localStorage.setItem('crm_evo_url', evoConfig.url.trim());
-                  localStorage.setItem('crm_evo_key', evoConfig.key.trim());
-                  localStorage.setItem('crm_evo_instance', evoConfig.instance.trim() || 'soporte');
-                  toast.success('Configuración de Evolution API guardada');
-                  setShowEvoModal(false);
-                }}
-                className="px-4 py-2 rounded-xl text-xs font-black bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                Guardar Conexión
-              </button>
+            <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-2xl">
+              {pickerOptions.map((o) => (
+                <button
+                  key={o.key}
+                  type="button"
+                  disabled={classifying}
+                  onClick={() => classify('cliente', { client_id: o.client_id || undefined, group_jid: o.group_jid || undefined })}
+                  className="w-full text-left px-3 py-2.5 hover:bg-indigo-50 flex items-center gap-2"
+                >
+                  {o.group_jid ? <Users className="w-4 h-4 text-indigo-500 shrink-0" /> : <Building2 className="w-4 h-4 text-slate-400 shrink-0" />}
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-slate-800 truncate">{o.label}</p>
+                    <p className="text-[10px] text-slate-500 truncate">{o.sub}</p>
+                  </div>
+                </button>
+              ))}
+              {pickerOptions.length === 0 && <p className="p-4 text-center text-xs text-slate-400">Sin resultados</p>}
             </div>
+            <button
+              type="button"
+              disabled={classifying}
+              onClick={() => classify('cliente')}
+              className="w-full py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700"
+            >
+              Es cliente, pero no está en la lista
+            </button>
           </div>
         </div>
       )}
 
-      {/* Modal para configurar Prompts de Instrucciones IA por Categoría (100% Vector Icons) */}
+      {/* ── WhatsApp connection status (admin) ── */}
+      {showStatusModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4" onClick={() => setShowStatusModal(false)}>
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black text-slate-900">Estado de la conexión WhatsApp</h3>
+              <button onClick={() => setShowStatusModal(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {!bridgeStatus ? (
+              <p className="text-xs text-slate-500">Consultando…</p>
+            ) : bridgeStatus.ok === false ? (
+              <p className="text-xs text-rose-700">{bridgeStatus.error}</p>
+            ) : (
+              (() => {
+                const ago = (iso?: string | null) => {
+                  if (!iso) return 'nunca';
+                  const s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+                  if (s < 90) return `hace ${s}s`;
+                  if (s < 5400) return `hace ${Math.round(s / 60)} min`;
+                  return new Date(iso).toLocaleString('es-SV');
+                };
+                const pollOk = bridgeStatus.bridge_last_poll && Date.now() - new Date(bridgeStatus.bridge_last_poll).getTime() < 2 * 60 * 1000;
+                const rows: [string, React.ReactNode][] = [
+                  [
+                    'Servidor Evolution (puente)',
+                    <span className={pollOk ? 'text-emerald-700' : 'text-rose-700'}>
+                      {pollOk ? 'Conectado' : 'Sin señal'} · {ago(bridgeStatus.bridge_last_poll)}
+                    </span>,
+                  ],
+                  ['Último envío confirmado', ago(bridgeStatus.bridge_last_ack)],
+                  ['Mensajes en cola', String(bridgeStatus.outbox_pending)],
+                  ['Envíos con error (24h)', String(bridgeStatus.outbox_errors_24h)],
+                  ['Archivos descargándose', String(bridgeStatus.media_pending)],
+                  ['Archivos con error', String(bridgeStatus.media_failed)],
+                  ['Grupos sincronizados', `${bridgeStatus.groups_count} · ${ago(bridgeStatus.groups_synced_at)}`],
+                  ['Clave Evolution configurada', bridgeStatus.evolution_key_configured ? 'Sí' : 'No'],
+                ];
+                return (
+                  <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl">
+                    {rows.map(([k, v]) => (
+                      <div key={k} className="flex items-center justify-between px-3.5 py-2 text-xs">
+                        <span className="text-slate-500 font-medium">{k}</span>
+                        <span className="font-bold text-slate-800">{v}</span>
+                      </div>
+                    ))}
+                    {bridgeStatus.bridge_last_error && (
+                      <p className="px-3.5 py-2 text-[11px] text-rose-700 break-all">Último error: {bridgeStatus.bridge_last_error}</p>
+                    )}
+                  </div>
+                );
+              })()
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── AI prompts (admin) ── */}
       {showAiPromptModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-purple-600" />
-                <h3 className="text-base font-black text-slate-900">
-                  IA por Categoría (Texto y Notas de Voz)
-                </h3>
+                <h3 className="text-base font-black text-slate-900">IA por categoría (texto y notas de voz)</h3>
               </div>
-              <button
-                onClick={() => setShowAiPromptModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
-              >
+              <button onClick={() => setShowAiPromptModal(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
                 <X className="w-4 h-4" />
               </button>
             </div>
-
-            {/* Live OpenAI Status Verification Banner */}
             <div
               className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl border ${
                 openAiStatus.checking
@@ -2368,21 +2134,13 @@ export const SupportChatCircles: React.FC = () => {
               }`}
             >
               <div className="flex items-center gap-2 text-xs font-bold">
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    openAiStatus.checking
-                      ? 'bg-amber-400 animate-pulse'
-                      : openAiStatus.verified
-                      ? 'bg-emerald-500'
-                      : 'bg-rose-500'
-                  }`}
-                />
+                <span className={`w-2.5 h-2.5 rounded-full ${openAiStatus.checking ? 'bg-amber-400 animate-pulse' : openAiStatus.verified ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                 <span>
                   {openAiStatus.checking
-                    ? 'Verificando conexión en vivo con OpenAI...'
+                    ? 'Verificando conexión con OpenAI...'
                     : openAiStatus.verified
-                    ? `OpenAI Conectado (${openAiStatus.model} + Whisper-1 Audio)`
-                    : `OpenAI Error: ${openAiStatus.error || 'Sin conexión'}`}
+                    ? `OpenAI conectado (${openAiStatus.model} + Whisper)`
+                    : `OpenAI error: ${openAiStatus.error || 'Sin conexión'}`}
                 </span>
               </div>
               <button
@@ -2391,56 +2149,34 @@ export const SupportChatCircles: React.FC = () => {
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-black text-slate-700 transition"
               >
                 <RefreshCw className="w-3 h-3" />
-                <span>Probar Conexión</span>
+                Probar
               </button>
             </div>
-
             <p className="text-xs text-slate-600 leading-relaxed">
-              Cuando un cliente o prospecto escribe en <strong>Texto</strong> o envía una{' '}
-              <strong>Nota de Voz</strong> por WhatsApp, la IA clasifica si corresponde a{' '}
-              <strong>Soporte</strong>, <strong>Contabilidad</strong> o{' '}
-              <strong>Ventas / Precios</strong> siguiendo las instrucciones de cada área:
+              Las notas de voz siempre se transcriben. Las respuestas automáticas están <strong>apagadas</strong> salvo que las actives aquí; nunca se
+              responde a Equipo ni a Spam.
             </p>
-
-            {/* Switches for BOTH Text and Voice Notes */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={aiAutoReplyText}
-                  onChange={(e) => setAiAutoReplyText(e.target.checked)}
-                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                />
+                <input type="checkbox" checked={aiAutoReplyText} onChange={(e) => setAiAutoReplyText(e.target.checked)} className="rounded border-slate-300 text-purple-600" />
                 <MessageSquare className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <span className="text-xs font-black text-slate-800">
-                  Responder a Mensajes de TEXTO
-                </span>
+                <span className="text-xs font-black text-slate-800">Responder mensajes de texto</span>
               </label>
-
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={aiAutoReplyAudio}
-                  onChange={(e) => setAiAutoReplyAudio(e.target.checked)}
-                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                />
+                <input type="checkbox" checked={aiAutoReplyAudio} onChange={(e) => setAiAutoReplyAudio(e.target.checked)} className="rounded border-slate-300 text-purple-600" />
                 <Mic className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <span className="text-xs font-black text-slate-800">
-                  Responder a Notas de VOZ (Audio)
-                </span>
+                <span className="text-xs font-black text-slate-800">Responder notas de voz</span>
               </label>
             </div>
-
-            {/* 4 Category Prompt Tabs (Vector Icons Only) */}
             <div className="space-y-2.5">
               <div className="flex items-center gap-1.5 flex-wrap">
                 {(
                   [
-                    { id: 'soporte', label: 'Soporte Técnico', icon: Wrench },
+                    { id: 'soporte', label: 'Soporte técnico', icon: Wrench },
                     { id: 'contabilidad', label: 'Contabilidad / IVA', icon: Calculator },
-                    { id: 'ventas', label: 'Ventas / Precios', icon: DollarSign },
-                    { id: 'otros', label: 'Otros / General', icon: Package },
-                  ] as { id: SupportChannelType; label: string; icon: any }[]
+                    { id: 'ventas', label: 'Ventas / Leads', icon: DollarSign },
+                    { id: 'otros', label: 'Otros', icon: Package },
+                  ] as { id: SupportChannelType; label: string; icon: React.ElementType }[]
                 ).map((tab) => {
                   const TabIcon = tab.icon;
                   return (
@@ -2449,9 +2185,7 @@ export const SupportChatCircles: React.FC = () => {
                       type="button"
                       onClick={() => setActivePromptTab(tab.id)}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition ${
-                        activePromptTab === tab.id
-                          ? 'bg-purple-600 text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        activePromptTab === tab.id ? 'bg-purple-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
                       <TabIcon className="w-3.5 h-3.5" />
@@ -2460,30 +2194,15 @@ export const SupportChatCircles: React.FC = () => {
                   );
                 })}
               </div>
-
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500">
-                  Instrucciones IA para: {SUPPORT_CHANNELS[activePromptTab].label}
-                </label>
-                <textarea
-                  rows={5}
-                  value={aiPrompts[activePromptTab]}
-                  onChange={(e) =>
-                    setAiPrompts((prev) => ({
-                      ...prev,
-                      [activePromptTab]: e.target.value,
-                    }))
-                  }
-                  className="mt-1 w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
-                />
-              </div>
+              <textarea
+                rows={5}
+                value={aiPrompts[activePromptTab]}
+                onChange={(e) => setAiPrompts((prev) => ({ ...prev, [activePromptTab]: e.target.value }))}
+                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+              />
             </div>
-
             <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setShowAiPromptModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
-              >
+              <button onClick={() => setShowAiPromptModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100">
                 Cancelar
               </button>
               <button
@@ -2491,35 +2210,18 @@ export const SupportChatCircles: React.FC = () => {
                 onClick={async () => {
                   setSavingAiConfig(true);
                   try {
-                    localStorage.setItem('crm_support_ai_prompt_soporte', aiPrompts.soporte.trim());
-                    localStorage.setItem(
-                      'crm_support_ai_prompt_contabilidad',
-                      aiPrompts.contabilidad.trim()
-                    );
-                    localStorage.setItem('crm_support_ai_prompt_ventas', aiPrompts.ventas.trim());
-                    localStorage.setItem('crm_support_ai_prompt_otros', aiPrompts.otros.trim());
-
-                    const { error } = await supabase.functions.invoke(
-                      'evolution-whatsapp-webhook',
-                      {
-                        body: {
-                          action: 'save_ai_config',
-                          ticket_id: activeCircle?.activeTicket?.id || undefined,
-                          auto_reply_text: aiAutoReplyText,
-                          auto_reply_audio: aiAutoReplyAudio,
-                          prompts: {
-                            soporte: aiPrompts.soporte.trim(),
-                            contabilidad: aiPrompts.contabilidad.trim(),
-                            ventas: aiPrompts.ventas.trim(),
-                            otros: aiPrompts.otros.trim(),
-                          },
-                        },
-                      }
-                    );
-                    if (error) throw error;
-                    toast.success(
-                      'Configuración IA guardada (Texto + Voz para Soporte, Contabilidad y Ventas)'
-                    );
+                    await invoke({
+                      action: 'save_ai_config',
+                      auto_reply_text: aiAutoReplyText,
+                      auto_reply_audio: aiAutoReplyAudio,
+                      prompts: {
+                        soporte: aiPrompts.soporte.trim(),
+                        contabilidad: aiPrompts.contabilidad.trim(),
+                        ventas: aiPrompts.ventas.trim(),
+                        otros: aiPrompts.otros.trim(),
+                      },
+                    });
+                    toast.success('Configuración IA guardada');
                     setShowAiPromptModal(false);
                   } catch (e: any) {
                     toast.error(e?.message || 'Error al guardar configuración IA');
@@ -2529,7 +2231,7 @@ export const SupportChatCircles: React.FC = () => {
                 }}
                 className="px-4 py-2 rounded-xl text-xs font-black bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
               >
-                {savingAiConfig ? 'Guardando...' : 'Guardar Instrucciones IA'}
+                {savingAiConfig ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
           </div>
@@ -2540,4 +2242,3 @@ export const SupportChatCircles: React.FC = () => {
 };
 
 export default SupportChatCircles;
-

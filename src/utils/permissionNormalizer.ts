@@ -116,6 +116,9 @@ export function isPermissionAllowedByCompanyLicense(
     if (lowerKey.startsWith('quotes.') && companyLicense.includes('quotes')) return true;
     if (lowerKey.startsWith('clientes.') && companyLicense.includes('leads')) return true;
     if (lowerKey.startsWith('mkt_') && companyLicense.includes('marketing')) return true;
+    // WhatsApp Soporte chat: support (tickets) or sales (leads) license.
+    if (lowerKey.startsWith('wa_chat_') &&
+        (companyLicense.includes('tickets') || companyLicense.includes('leads') || companyLicense.includes('chat'))) return true;
     if ((lowerKey.startsWith('proyectos.') || lowerKey.startsWith('projects.')) &&
         (companyLicense.includes('proyectos') || companyLicense.includes('projects'))) return true;
     if ((lowerKey.startsWith('facturas.') || lowerKey.startsWith('invoices.')) &&

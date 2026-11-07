@@ -28,6 +28,7 @@ import { ContractShareModal } from '../contracts/ContractShareModal';
 import { contractPdfService } from '../../services/contractPdfService';
 import { QuickActionLogger } from '../QuickCallLogger';
 import { SectionErrorBoundary } from '../ui/SectionErrorBoundary';
+import { LeadWhatsappThread } from './LeadWhatsappThread';
 import toast from 'react-hot-toast';
 
 import { Input } from '../ui/Input';
@@ -1320,6 +1321,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                             {/* ── TAB 4: TRAZABILIDAD & ACTIVIDAD ── */}
                             {activeTab === 'activity' && (
                                 <div className="space-y-4 animate-in fade-in duration-200">
+                                    {/* ── Conversación del lead en el WhatsApp de Soporte (si existe) ── */}
+                                    <LeadWhatsappThread leadId={lead.id} navigate={navigate} />
+
                                     {/* ── TARJETA DESTACADA: NEXT TRIGGER (PRÓXIMA REUNIÓN / PRÓXIMO SEGUIMIENTO) ── */}
                                     <div className={`rounded-xl p-4 border shadow-2xs space-y-2.5 ${
                                         nextTrigger.statusType === 'upcoming'
