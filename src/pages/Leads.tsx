@@ -7,6 +7,7 @@ import { LeadDetailPanel } from '../components/leads/LeadDetailPanel';
 import { StatusBadge } from '../components/leads/StatusBadge';
 import { PriorityBadge } from '../components/leads/PriorityBadge';
 import { BulkAssignModal } from '../components/leads/BulkAssignModal';
+import { WhatsAppReactivationModal } from '../components/leads/WhatsAppReactivationModal';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -147,6 +148,8 @@ export default function Leads() {
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('list');
     const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
     const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
+    const [inactivityFilter, setInactivityFilter] = useState<'all' | 'never' | '15d' | '30d' | '60d' | '90d'>('all');
+    const [isWaReactivationOpen, setIsWaReactivationOpen] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: keyof Lead | 'value'; direction: 'asc' | 'desc' } | null>(null);
 
     // All available columns with labels
@@ -755,12 +758,32 @@ export default function Leads() {
                 if (hasBeenContacted) return false;
             }
 
+            // Filter by WhatsApp Reactivation inactivity (must have valid phone & active prospect stage)
+            if (inactivityFilter !== 'all') {
+                if (['Cerrado', 'Cliente', 'Perdido', 'Erróneo'].includes(lead.status)) return false;
+                const phoneDigits = String(lead.phone || '').replace(/\D/g, '');
+                if (phoneDigits.length < 8) return false;
+
+                if (inactivityFilter === 'never') {
+                    const hasFollowUp = Boolean(lead.last_follow_up_at);
+                    if (hasFollowUp) return false;
+                } else {
+                    const daysMap: Record<string, number> = { '15d': 15, '30d': 30, '60d': 60, '90d': 90 };
+                    const minDays = daysMap[inactivityFilter] || 15;
+                    const refIso = lead.last_follow_up_at || lead.created_at;
+                    const daysElapsed = refIso
+                        ? Math.floor((Date.now() - new Date(refIso).getTime()) / (1000 * 60 * 60 * 24))
+                        : 999;
+                    if (daysElapsed < minDays) return false;
+                }
+            }
+
             return true;
         });
 
         // Apply pipeline intelligence filter on top of standard filters
         return applyPipelineFilter(base, pipelineFilter, profile?.company_id);
-    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, industryFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, uncontactedOnly, pipelineFilter, pipelineView]);
+    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, industryFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, uncontactedOnly, inactivityFilter, pipelineFilter, pipelineView]);
 
     // Leads that have passed ALL filters EXCEPT the pipeline chip filter.
     // Used so chip counters respect the active date/status/priority filters.
@@ -1692,66 +1715,126 @@ export default function Leads() {
                     </button>
                 </div>
             )}
-            {/* ── Pipeline Segment Toggle Banner ─────────────────────────────────── */}
-            {statusFilter === 'all' && !filteredLeadId && !filteredLeadIds && (
-                <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-2xl px-3 py-2 shadow-sm overflow-x-auto no-scrollbar scrollbar-none max-w-full">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mr-1 hidden sm:block shrink-0">Vista:</span>
-                    <button
-                        onClick={() => { setPipelineView('active'); }}
-                        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
-                            pipelineView === 'active'
-                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
-                                : 'text-gray-500 hover:bg-gray-50'
-                        }`}
-                    >
-                        🎯 <span>Pipeline Activo</span>
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${
-                            pipelineView === 'active' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-600'
-                        }`}>
-                            {leads.filter(l => {
-                                if (!canViewAllLeads && l.assigned_to !== profile?.id) return false;
-                                if (assignedFilter !== 'all') {
-                                    if (Array.isArray(assignedFilter)) { if (!assignedFilter.includes(l.assigned_to ?? '')) return false; }
-                                    else if (assignedFilter === 'unassigned') { if (l.assigned_to) return false; }
-                                    else if (l.assigned_to !== assignedFilter) return false;
-                                }
-                                return !(BACKGROUND_STATUSES as readonly string[]).includes(l.status) && l.status !== 'Erróneo' && l.status !== 'Perdido';
-                            }).length}
+            {/* ── Pipeline Segment Toggle & WhatsApp Reactivation Filter Bar ── */}
+            {!filteredLeadId && !filteredLeadIds && (
+                <div className="flex flex-wrap items-center justify-between gap-2 bg-white border border-gray-100 rounded-2xl px-3.5 py-2 shadow-sm">
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                        {statusFilter === 'all' && (
+                            <>
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 hidden sm:block shrink-0">Vista:</span>
+                                <button
+                                    onClick={() => { setPipelineView('active'); }}
+                                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all ${
+                                        pipelineView === 'active'
+                                            ? 'bg-indigo-600 text-white shadow-xs'
+                                            : 'text-slate-600 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <span>Pipeline Activo</span>
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                        pipelineView === 'active' ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'
+                                    }`}>
+                                        {leads.filter(l => {
+                                            if (!canViewAllLeads && l.assigned_to !== profile?.id) return false;
+                                            if (assignedFilter !== 'all') {
+                                                if (Array.isArray(assignedFilter)) { if (!assignedFilter.includes(l.assigned_to ?? '')) return false; }
+                                                else if (assignedFilter === 'unassigned') { if (l.assigned_to) return false; }
+                                                else if (l.assigned_to !== assignedFilter) return false;
+                                            }
+                                            return !(BACKGROUND_STATUSES as readonly string[]).includes(l.status) && l.status !== 'Erróneo' && l.status !== 'Perdido';
+                                        }).length}
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={() => { setPipelineView('pool'); }}
+                                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all ${
+                                        pipelineView === 'pool'
+                                            ? 'bg-amber-600 text-white shadow-xs'
+                                            : 'text-slate-600 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <span>Pool de Campañas</span>
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                        pipelineView === 'pool' ? 'bg-white/20 text-white' : 'bg-amber-50 text-amber-700'
+                                    }`}>
+                                        {leads.filter(l => {
+                                            if (!canViewAllLeads && l.assigned_to !== profile?.id) return false;
+                                            if (assignedFilter !== 'all') {
+                                                if (Array.isArray(assignedFilter)) { if (!assignedFilter.includes(l.assigned_to ?? '')) return false; }
+                                                else if (assignedFilter === 'unassigned') { if (l.assigned_to) return false; }
+                                                else if (l.assigned_to !== assignedFilter) return false;
+                                            }
+                                            return (BACKGROUND_STATUSES as readonly string[]).includes(l.status);
+                                        }).length}
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={() => { setPipelineView('all'); }}
+                                    className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all ${
+                                        pipelineView === 'all'
+                                            ? 'bg-slate-800 text-white shadow-xs'
+                                            : 'text-slate-600 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <span>Todos</span>
+                                </button>
+                                <div className="w-px h-5 bg-slate-200 mx-1 hidden sm:block" />
+                            </>
+                        )}
+
+                        {/* Inactivity Filter for WhatsApp Reactivation */}
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-0.5 shrink-0 flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3 text-indigo-600" />
+                            Sin respuesta:
                         </span>
-                    </button>
-                    <button
-                        onClick={() => { setPipelineView('pool'); }}
-                        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
-                            pipelineView === 'pool'
-                                ? 'bg-orange-500 text-white shadow-md shadow-orange-200'
-                                : 'text-gray-500 hover:bg-gray-50'
-                        }`}
-                    >
-                        📦 <span>Pool de Campañas</span>
-                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black ${
-                            pipelineView === 'pool' ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-600'
-                        }`}>
-                            {leads.filter(l => {
-                                if (!canViewAllLeads && l.assigned_to !== profile?.id) return false;
-                                if (assignedFilter !== 'all') {
-                                    if (Array.isArray(assignedFilter)) { if (!assignedFilter.includes(l.assigned_to ?? '')) return false; }
-                                    else if (assignedFilter === 'unassigned') { if (l.assigned_to) return false; }
-                                    else if (l.assigned_to !== assignedFilter) return false;
+                        {(
+                            [
+                                { id: 'all', label: 'Todos' },
+                                { id: 'never', label: 'Sin seguimiento' },
+                                { id: '15d', label: '+15 días' },
+                                { id: '30d', label: '+30 días' },
+                                { id: '60d', label: '+60 días' },
+                                { id: '90d', label: '+90 días' },
+                            ] as const
+                        ).map((opt) => (
+                            <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => {
+                                    setInactivityFilter(opt.id);
+                                    setSelectedLeadIds([]);
+                                }}
+                                className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                                    inactivityFilter === opt.id
+                                        ? 'bg-[#EEF0FF] text-indigo-700 border border-indigo-200 font-bold'
+                                        : 'text-slate-500 hover:bg-slate-50'
+                                }`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Quick 1-click Reactivation Batch Trigger when filtering inactive leads */}
+                    {inactivityFilter !== 'all' && filteredLeads.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (selectedLeadIds.length === 0) {
+                                    setSelectedLeadIds(filteredLeads.slice(0, 30).map((l) => l.id));
                                 }
-                                return (BACKGROUND_STATUSES as readonly string[]).includes(l.status);
-                            }).length}
-                        </span>
-                    </button>
-                    <button
-                        onClick={() => { setPipelineView('all'); }}
-                        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black transition-all ${
-                            pipelineView === 'all'
-                                ? 'bg-gray-700 text-white shadow-md shadow-gray-200'
-                                : 'text-gray-500 hover:bg-gray-50'
-                        }`}
-                    >
-                        👁 <span className="hidden sm:inline">Todos</span>
-                    </button>
+                                setIsWaReactivationOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-2xs transition shrink-0"
+                        >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>
+                                {selectedLeadIds.length > 0
+                                    ? `Reactivar por WhatsApp (${selectedLeadIds.length})`
+                                    : `Reactivar lote por WhatsApp (${Math.min(30, filteredLeads.length)})`}
+                            </span>
+                        </button>
+                    )}
                 </div>
             )}
 {/* VIEW SELECTOR & MAIN CONTENT - Mobile Cards (only for Grid mode) */}
@@ -2206,6 +2289,16 @@ export default function Leads() {
                                         >
                                             <User className="w-3.5 h-3.5 shrink-0" />
                                             Asignar agente
+                                        </button>
+
+                                        {/* PRIMARY WHATSAPP REACTIVATION: Send to Chat WhatsApp */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsWaReactivationOpen(true)}
+                                            className="flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 px-4 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm whitespace-nowrap"
+                                        >
+                                            <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                                            Reactivar por WhatsApp
                                         </button>
 
                                         {/* SECONDARY: Preparar Mensaje — icon only + tooltip */}
@@ -2929,6 +3022,35 @@ export default function Leads() {
                     onSuccess={() => {
                         setSelectedLeadIds([]);
                         loadLeads();
+                    }}
+                />
+            )}
+
+            {/* ── WHATSAPP REACTIVATION MODAL ──────────────────────────── */}
+            {isWaReactivationOpen && profile?.id && (
+                <WhatsAppReactivationModal
+                    isOpen={isWaReactivationOpen}
+                    onClose={() => setIsWaReactivationOpen(false)}
+                    selectedLeads={leads.filter((l) => selectedLeadIds.includes(l.id))}
+                    companyId={activeCompanyId}
+                    currentUser={{
+                        id: profile.id,
+                        full_name: profile.full_name,
+                        email: profile.email,
+                    }}
+                    defaultCampaignName={
+                        inactivityFilter === 'never'
+                            ? 'Reactivación Sin Seguimiento'
+                            : inactivityFilter !== 'all'
+                            ? `Reactivación +${inactivityFilter.replace('d', ' días')}`
+                            : 'Reactivación WhatsApp'
+                    }
+                    onCompleted={() => {
+                        loadLeads();
+                    }}
+                    onGoToWhatsAppChat={() => {
+                        setIsWaReactivationOpen(false);
+                        navigate('/support/chat?filter=reactivados');
                     }}
                 />
             )}

@@ -358,6 +358,9 @@ interface SupportCircle {
   categoryCode: string;
   categoryName: string;
   supportChannel: SupportChannelType;
+  isReactivation: boolean;
+  reactivationCampaign: string | null;
+  reactivationReplied: boolean;
 }
 
 interface LeadQuoteSummary {
@@ -422,7 +425,7 @@ interface WaGroupRow {
   client_id: string | null;
 }
 
-type CircleFilter = 'all' | 'waiting' | 'soporte' | 'por_clasificar' | 'lead' | 'interno' | 'spam' | 'tickets';
+type CircleFilter = 'all' | 'waiting' | 'soporte' | 'por_clasificar' | 'lead' | 'reactivados' | 'interno' | 'spam' | 'tickets';
 
 // Parse "[10:42 a. m.] 👤 Nombre: texto" chat lines written by the webhook.
 function parseChatLine(raw: string): { icon: string; sender: string; text: string } | null {
@@ -527,7 +530,16 @@ export const SupportChatCircles: React.FC = () => {
   };
 
   const [searchQuery, setSearchQuery] = useState('');
-  const defaultFilter: CircleFilter = scopes.all ? 'all' : scopes.soporte && !scopes.leads ? 'soporte' : scopes.leads && !scopes.soporte ? 'por_clasificar' : 'all';
+  const defaultFilter: CircleFilter =
+    searchParams.get('filter') === 'reactivados'
+      ? 'reactivados'
+      : scopes.all
+      ? 'all'
+      : scopes.soporte && !scopes.leads
+      ? 'soporte'
+      : scopes.leads && !scopes.soporte
+      ? 'por_clasificar'
+      : 'all';
   const [circleFilter, setCircleFilter] = useState<CircleFilter>(defaultFilter);
   const [ownerFilter, setOwnerFilter] = useState<OwnerSubFilter>('all');
   const [channelFilter, setChannelFilter] = useState<'all' | SupportChannelType>('all');
@@ -955,6 +967,13 @@ export const SupportChatCircles: React.FC = () => {
       const waitMinutes = unreadOrWaitingReply
         ? Math.max(1, Math.floor((Date.now() - new Date(lastMessageAt).getTime()) / 60000))
         : 0;
+      const isReactivation = Boolean(meta.wa_reactivation || activeMeta.wa_reactivation);
+      const reactivationCampaign = String(meta.wa_reactivation_campaign || activeMeta.wa_reactivation_campaign || '').trim() || null;
+      const reactivationSentAt = String(meta.wa_reactivation_sent_at || activeMeta.wa_reactivation_sent_at || '').trim() || null;
+      const reactivationReplied =
+        isReactivation &&
+        (lastFrom === 'client' ||
+          Boolean(reactivationSentAt && new Date(lastMessageAt).getTime() > new Date(reactivationSentAt).getTime() + 2000 && lastFrom === 'client'));
 
       // Strict per-role scope & alert isolation (enforced both here and in DB RLS):
       // - Técnicos only see 'soporte' (never sales leads or unclassified pool).
@@ -1004,6 +1023,9 @@ export const SupportChatCircles: React.FC = () => {
         categoryCode: catInfo.code,
         categoryName: catInfo.name,
         supportChannel: ['soporte', 'contabilidad', 'otros'].includes(ch) ? ch : 'soporte',
+        isReactivation,
+        reactivationCampaign,
+        reactivationReplied,
       });
     });
 
@@ -1027,6 +1049,8 @@ export const SupportChatCircles: React.FC = () => {
     const slaCritical = waitingList.filter((c) => c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60).length;
     const mine = wa.filter((c) => isMine(c)).length;
     const unassigned = wa.filter((c) => isUnassigned(c)).length;
+    const reactivatedTotal = wa.filter((c) => c.isReactivation).length;
+    const reactivatedReplied = wa.filter((c) => c.reactivationReplied).length;
     return {
       all: wa.length,
       waiting: waitingList.length,
@@ -1034,6 +1058,8 @@ export const SupportChatCircles: React.FC = () => {
       slaCritical,
       mine,
       unassigned,
+      reactivatedTotal,
+      reactivatedReplied,
       tickets: circles.filter((c) => !c.isWhatsApp).length,
       soporte: by('soporte'),
       por_clasificar: by('por_clasificar'),
@@ -1154,6 +1180,14 @@ export const SupportChatCircles: React.FC = () => {
         tabs.push({ id: 'por_clasificar', label: `Por tomar (${counts.por_clasificar})`, icon: HelpCircle, alert: counts.por_clasificar > 0 });
       }
       tabs.push({ id: 'lead', label: `${scopes.all ? 'Leads' : 'Mis leads'} (${counts.lead})`, icon: UserPlus });
+      if (counts.reactivatedTotal > 0 || circleFilter === 'reactivados') {
+        tabs.push({
+          id: 'reactivados',
+          label: `Reactivados (${counts.reactivatedReplied}/${counts.reactivatedTotal})`,
+          icon: Sparkles,
+          alert: counts.reactivatedReplied > 0,
+        });
+      }
     }
     if (circleFilter === 'interno') tabs.push({ id: 'interno', label: `Equipo (${counts.interno})`, icon: ShieldCheck });
     if (circleFilter === 'spam') tabs.push({ id: 'spam', label: `Spam (${counts.spam})`, icon: Ban });
@@ -1171,7 +1205,8 @@ export const SupportChatCircles: React.FC = () => {
       }
       if (circleFilter === 'all' && c.scope === 'spam') return false;
       if (circleFilter === 'waiting' && (c.scope === 'spam' || !c.unreadOrWaitingReply)) return false;
-      if (!['all', 'waiting', 'tickets'].includes(circleFilter) && c.scope !== circleFilter) return false;
+      if (circleFilter === 'reactivados' && !c.isReactivation) return false;
+      if (!['all', 'waiting', 'reactivados', 'tickets'].includes(circleFilter) && c.scope !== circleFilter) return false;
 
       if (ownerFilter === 'mine' && !isMine(c)) return false;
       if (ownerFilter === 'unassigned' && !isUnassigned(c)) return false;
@@ -1186,12 +1221,19 @@ export const SupportChatCircles: React.FC = () => {
           c.phone.includes(q.replace(/\D/g, '') || '§') ||
           c.lastMessageText.toLowerCase().includes(q) ||
           c.assignedTechName.toLowerCase().includes(q) ||
-          (c.leadOwnerName || '').toLowerCase().includes(q)
+          (c.leadOwnerName || '').toLowerCase().includes(q) ||
+          (c.reactivationCampaign || '').toLowerCase().includes(q)
         );
       }
       return true;
     });
 
+    if (circleFilter === 'reactivados') {
+      return [...res].sort((a, b) => {
+        if (a.reactivationReplied !== b.reactivationReplied) return a.reactivationReplied ? -1 : 1;
+        return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+      });
+    }
     if (circleFilter === 'waiting' || ownerFilter === 'urgent') {
       return [...res].sort((a, b) => b.waitMinutes - a.waitMinutes);
     }
@@ -2697,6 +2739,15 @@ export const SupportChatCircles: React.FC = () => {
                     <div className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Otras bandejas</div>
                     {(
                       [
+                        ...(counts.reactivatedTotal > 0
+                          ? [
+                              {
+                                id: 'reactivados' as CircleFilter,
+                                label: `Reactivados WhatsApp (${counts.reactivatedReplied}/${counts.reactivatedTotal})`,
+                                count: counts.reactivatedTotal,
+                              },
+                            ]
+                          : []),
                         { id: 'interno' as CircleFilter, label: 'Equipo interno', count: counts.interno },
                         { id: 'spam' as CircleFilter, label: 'Spam / bloqueados', count: counts.spam },
                         ...(counts.tickets > 0 ? [{ id: 'tickets' as CircleFilter, label: 'Otros tickets (no WhatsApp)', count: counts.tickets }] : []),
@@ -2773,6 +2824,17 @@ export const SupportChatCircles: React.FC = () => {
                 );
               })}
             </div>
+
+            {circleFilter === 'reactivados' && counts.reactivatedTotal > 0 && (
+              <div className="mt-1 px-2.5 py-1.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between gap-2 text-[11px]">
+                <span className="font-semibold text-emerald-800">
+                  Enviados: <b>{counts.reactivatedTotal}</b> · Respondieron: <b>{counts.reactivatedReplied}</b>
+                </span>
+                <span className="px-1.5 py-0.5 rounded-md bg-white text-emerald-700 font-bold border border-emerald-200/70">
+                  {Math.round((counts.reactivatedReplied / Math.max(1, counts.reactivatedTotal)) * 100)}% respuesta
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
@@ -2851,6 +2913,18 @@ export const SupportChatCircles: React.FC = () => {
                             {circle.clientName}
                           </span>
                           <span className="text-xs text-slate-400 shrink-0">· {shortType}</span>
+                          {circle.isReactivation && (
+                            <span
+                              title={circle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
+                              className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
+                                circle.reactivationReplied
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+                                  : 'bg-indigo-50/70 text-indigo-600'
+                              }`}
+                            >
+                              {circle.reactivationReplied ? 'Respondió reactivación' : 'Reactivación'}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {isOverdue && (
@@ -2919,6 +2993,19 @@ export const SupportChatCircles: React.FC = () => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-[15px] font-bold text-slate-900 tracking-tight truncate max-w-[300px]">{activeCircle.clientName}</h3>
                     <ScopeChip circle={activeCircle} />
+                    {activeCircle.isReactivation && (
+                      <span
+                        title={activeCircle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border ${
+                          activeCircle.reactivationReplied
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                            : 'bg-indigo-50/70 text-indigo-700 border-indigo-200/80'
+                        }`}
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        <span>{activeCircle.reactivationReplied ? 'Respondió reactivación' : 'Reactivación WhatsApp'}</span>
+                      </span>
+                    )}
                     {activeCircle.unreadOrWaitingReply && activeCircle.waitMinutes >= 15 && activeCircle.waitMinutes <= 24 * 60 && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200/80">
                         <Clock className="w-3 h-3" />
