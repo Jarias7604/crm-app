@@ -8,6 +8,9 @@ import {
   CheckCheck,
   Check,
   Bell,
+  BellRing,
+  Volume2,
+  VolumeX,
   Clock,
   CheckCircle2,
   AlertTriangle,
@@ -42,6 +45,10 @@ import {
   Loader2,
   ImageOff,
   Paperclip,
+  StickyNote,
+  Receipt,
+  Flame,
+  User,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
@@ -127,41 +134,148 @@ function formatBytes(n?: number | null): string {
 export type SupportChannelType = 'soporte' | 'contabilidad' | 'ventas' | 'otros';
 
 const SUPPORT_CHANNEL_LABELS: Record<SupportChannelType, string> = {
-  soporte: 'Soporte Técnico',
-  contabilidad: 'Contabilidad / IVA',
-  ventas: 'Ventas / Precios',
+  soporte: 'Soporte / Operaciones',
+  contabilidad: 'Contabilidad / Finanzas',
+  ventas: 'Ventas / Cotizaciones',
   otros: 'Otros / General',
 };
 
 const DEFAULT_PROMPTS: Record<SupportChannelType, string> = {
   soporte:
-    'Eres el Asistente IA de Soporte Técnico de Arias Defense / ERP Facturación Electrónica (DTE Hacienda). Lee o escucha lo que el cliente reportó y respóndele de forma amable, clara y resolutiva en máximo 3 líneas por WhatsApp. Confírmale que entendiste su reporte técnico y pídele captura de pantalla del error o su código de AnyDesk si requiere revisión en su equipo.',
+    'Eres el Asistente IA de Soporte y Operaciones de nuestra empresa. Lee o escucha lo que el cliente reportó y respóndele de forma amable, clara y resolutiva en máximo 3 líneas por WhatsApp. Confírmale que entendiste su solicitud y pídele captura de pantalla, foto o detalle adicional si requiere revisión.',
   contabilidad:
-    'Eres el Asistente IA del Área Contable y Fiscal (Libros de IVA, Planillas, Declaraciones F07/F14, Anexos Hacienda y Retenciones). Lee o escucha la consulta del cliente y respóndele de forma profesional, precisa y amable en máximo 3 líneas por WhatsApp. Si necesita revisión de algún libro, anexo o cuadre contable, pídele el período (mes/año) o captura del reporte para que el especialista contable lo valide.',
+    'Eres el Asistente IA del Área Contable, Facturación y Finanzas. Lee o escucha la consulta del cliente y respóndele de forma profesional, precisa y amable en máximo 3 líneas por WhatsApp. Si necesita revisión de algún estado de cuenta, factura o reporte, pídele el período o comprobante para validarlo.',
   ventas:
-    'Eres el Asesor Comercial IA de Arias Defense (Sistemas ERP, Facturación Electrónica DTE, Contabilidad, POS e Inventarios). El cliente está consultando por precios, planes, demostración o nuevos productos. Respóndele con entusiasmo, cortesía y enfoque comercial en máximo 3 líneas por WhatsApp: infórmale que contamos con planes adaptados a su volumen de facturación/operación y pregúntale su giro de negocio o cantidad aproximada de documentos mensuales para enviarle su cotización o agendar una demo.',
+    'Eres el Asesor Comercial IA de nuestra empresa. El prospecto está consultando por precios, planes, catálogo o cotización. Respóndele con entusiasmo, cortesía y enfoque comercial en máximo 3 líneas por WhatsApp: infórmale que contamos con opciones adaptadas a su necesidad y pregúntale su giro o requerimiento principal para enviarle su cotización formal o agendar una demostración.',
   otros:
-    'Eres el Asistente IA de Atención al Cliente de Arias Defense. Lee o escucha el mensaje del cliente y respóndele de forma cortés, clara y servicial en máximo 3 líneas por WhatsApp, confirmando que recibimos su consulta y canalizándola con el área correspondiente.',
+    'Eres el Asistente IA de Atención al Cliente. Lee o escucha el mensaje del cliente y respóndele de forma cortés, clara y servicial en máximo 3 líneas por WhatsApp, confirmando que recibimos su consulta y canalizándola con el especialista correspondiente.',
 };
 
-const SUPPORT_QUICK_REPLIES = [
+export interface QuickReplyTemplate {
+  id: string;
+  scope: 'soporte' | 'ventas';
+  label: string;
+  text: string;
+}
+
+const DEFAULT_SUPPORT_QUICK_REPLIES: QuickReplyTemplate[] = [
   {
+    id: 'sup-rev',
+    scope: 'soporte',
     label: 'En revisión',
-    text: 'Hola, hemos recibido su reporte en Soporte Técnico. Nuestro ingeniero ya está revisando su caso y le daremos respuesta en breve.',
+    text: 'Hola, hemos recibido su mensaje. Nuestro especialista ya está revisando su caso y le daremos respuesta en breve.',
   },
   {
-    label: 'Pedir Texto + Captura',
-    text: 'Estimado cliente, para resolver su inconveniente lo más rápido posible, ¿nos podría enviar por favor el detalle en TEXTO ESCRITO acompañado de una CAPTURA DE PANTALLA del error?',
+    id: 'sup-cap',
+    scope: 'soporte',
+    label: 'Pedir detalle / captura',
+    text: 'Estimado cliente, para ayudarle lo más rápido posible, ¿nos podría compartir por favor el detalle por escrito acompañado de una captura de pantalla o foto?',
   },
   {
-    label: 'Validar Solución DTE',
-    text: '¡Listo! Ya aplicamos la corrección correspondiente en el sistema. ¿Nos confirma por favor si ya le permite emitir y transmitir su DTE sin inconvenientes?',
+    id: 'sup-ok',
+    scope: 'soporte',
+    label: 'Confirmar solución',
+    text: '¡Listo! Ya aplicamos la solución correspondiente a su solicitud. ¿Nos confirma por favor si ya todo le funciona correctamente?',
   },
   {
-    label: 'Solicitar AnyDesk',
-    text: 'Para revisar directamente en su equipo, ¿nos podría compartir por favor su código de conexión remota (AnyDesk) y confirmar cuando esté disponible?',
+    id: 'sup-rem',
+    scope: 'soporte',
+    label: 'Asistencia remota / llamada',
+    text: 'Para asistirle directamente, ¿nos confirma por favor en qué horario está disponible o nos comparte su acceso remoto?',
   },
 ];
+
+const DEFAULT_SALES_QUICK_REPLIES: QuickReplyTemplate[] = [
+  {
+    id: 'sal-welcome',
+    scope: 'ventas',
+    label: 'Saludo comercial',
+    text: '¡Hola! Muchas gracias por escribirnos. Con gusto le asesoramos con información y precios. ¿Para qué tipo de negocio o necesidad busca la solución?',
+  },
+  {
+    id: 'sal-quote-data',
+    scope: 'ventas',
+    label: 'Pedir datos para cotizar',
+    text: 'Con mucho gusto le preparamos su cotización formal ahora mismo. ¿Me confirma por favor su nombre o empresa, correo electrónico y el requerimiento o volumen aproximado?',
+  },
+  {
+    id: 'sal-demo',
+    scope: 'ventas',
+    label: 'Agendar demo / llamada',
+    text: '¿Le gustaría que agendemos una breve llamada o demostración de 15 minutos hoy o mañana para mostrarle cómo funciona y resolver todas sus dudas?',
+  },
+  {
+    id: 'sal-followup',
+    scope: 'ventas',
+    label: 'Seguimiento de propuesta',
+    text: 'Hola, le escribo para saber si pudo revisar la cotización que le compartimos y si tiene alguna consulta o ajuste que desee que revisemos.',
+  },
+];
+
+const LEAD_STATUS_OPTIONS = ['Prospecto', 'Contactado', 'Cotizado', 'En Negociación', 'Cerrado', 'Erróneo'] as const;
+
+// Web Audio API synthesizer — zero external audio files, works across all modern browsers.
+let sharedAudioCtx: AudioContext | null = null;
+function getUnlockedAudioCtx(): AudioContext | null {
+  try {
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return null;
+    if (!sharedAudioCtx) sharedAudioCtx = new Ctx();
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {});
+    }
+    return sharedAudioCtx;
+  } catch {
+    return null;
+  }
+}
+
+export function playWaAlertSound(kind: 'message' | 'urgent' | 'test' = 'message'): boolean {
+  const ctx = getUnlockedAudioCtx();
+  if (!ctx) return false;
+  try {
+    const now = ctx.currentTime;
+    const notes =
+      kind === 'urgent' || kind === 'test'
+        ? [
+            { freq: 659.25, start: 0, dur: 0.14, gain: 0.28 },
+            { freq: 880.0, start: 0.15, dur: 0.14, gain: 0.3 },
+            { freq: 1046.5, start: 0.3, dur: 0.2, gain: 0.32 },
+            { freq: 880.0, start: 0.55, dur: 0.14, gain: 0.28 },
+            { freq: 1174.66, start: 0.7, dur: 0.28, gain: 0.34 },
+          ]
+        : [
+            { freq: 587.33, start: 0, dur: 0.15, gain: 0.24 },
+            { freq: 880.0, start: 0.16, dur: 0.24, gain: 0.26 },
+          ];
+    notes.forEach((n) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(n.freq, now + n.start);
+      g.gain.setValueAtTime(0.0001, now + n.start);
+      g.gain.exponentialRampToValueAtTime(n.gain, now + n.start + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
+      osc.connect(g);
+      g.connect(ctx.destination);
+      osc.start(now + n.start);
+      osc.stop(now + n.start + n.dur + 0.02);
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function formatWaitDuration(mins: number): string {
+  if (mins <= 1) return '1m';
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (h < 24) return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  return `${d}d`;
+}
 
 // Internal developer/system task titles that are NOT clients (legacy non-WhatsApp tickets).
 function isInternalDevOrSystemTaskTitle(rawTitle: string): boolean {
@@ -185,15 +299,15 @@ function extractLegacyClientName(t: Ticket): string {
 
 function detectShortCategory(catName: string, title: string): { code: string; name: string; color: string } {
   const text = `${catName} ${title}`.toLowerCase();
-  if (text.startsWith('p1') || /hacienda|dte|factura\s+electr/i.test(text)) {
-    return { code: 'P1', name: catName || 'P1 - Hacienda / DTE', color: '#EF4444' };
+  if (text.startsWith('p1') || /urgente|cr[ií]tico|hacienda|dte|factura\s+electr/i.test(text)) {
+    return { code: 'P1', name: catName || 'P1 - Prioridad Alta', color: '#EF4444' };
   }
   if (text.startsWith('p2') || /error\s+reportado/i.test(text)) {
-    return { code: 'P2', name: catName || 'P2 - Errores Sistema', color: '#F97316' };
+    return { code: 'P2', name: catName || 'P2 - Incidencia', color: '#F97316' };
   }
   if (text.startsWith('p4')) return { code: 'P4', name: catName || 'P4 - Mejoras', color: '#3B82F6' };
   if (/pegunta|pregunta\s+frecuente/i.test(text)) return { code: 'FAQ', name: 'Preguntas Frecuentes', color: '#10B981' };
-  return { code: 'P3', name: catName || 'P3 - Soporte Técnico', color: '#F59E0B' };
+  return { code: 'P3', name: catName || 'P3 - Soporte General', color: '#F59E0B' };
 }
 
 const SCOPE_STYLE: Record<WaScope, { avatar: string; chip: string; icon: React.ElementType }> = {
@@ -219,10 +333,12 @@ interface SupportCircle {
   memberOfGroups: { jid: string; subject: string | null }[];
   leadId: string | null;
   leadStatus: string | null;
+  leadOwnerId: string | null;
   leadOwnerName: string | null;
   activeTicket: Ticket;
   allClientTickets: Ticket[];
   unreadOrWaitingReply: boolean;
+  waitMinutes: number;
   lastMessageText: string;
   lastMessageSender: string;
   lastMessageAt: string;
@@ -232,6 +348,17 @@ interface SupportCircle {
   categoryName: string;
   supportChannel: SupportChannelType;
 }
+
+interface LeadQuoteSummary {
+  id: string;
+  plan_nombre: string;
+  total_anual: number;
+  total_mensual: number;
+  estado: string;
+  created_at: string;
+}
+
+type OwnerSubFilter = 'all' | 'mine' | 'unassigned' | 'urgent';
 
 interface WaMessageRow {
   id: string;
@@ -334,8 +461,11 @@ export const SupportChatCircles: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const defaultFilter: CircleFilter = scopes.all ? 'all' : scopes.soporte && !scopes.leads ? 'soporte' : scopes.leads && !scopes.soporte ? 'por_clasificar' : 'all';
   const [circleFilter, setCircleFilter] = useState<CircleFilter>(defaultFilter);
+  const [ownerFilter, setOwnerFilter] = useState<OwnerSubFilter>('all');
+  const [channelFilter, setChannelFilter] = useState<'all' | SupportChannelType>('all');
 
   const [messageInput, setMessageInput] = useState('');
+  const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal'>('whatsapp');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [classifying, setClassifying] = useState(false);
@@ -344,6 +474,77 @@ export const SupportChatCircles: React.FC = () => {
   const [showReclassifyMenu, setShowReclassifyMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Alarm & Notification Center (Bell)
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('crm_wa_sound_enabled') !== 'false';
+  });
+  const toggleSound = () => {
+    setSoundEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem('crm_wa_sound_enabled', String(next));
+      if (next) playWaAlertSound('test');
+      return next;
+    });
+  };
+  const [showAlertsPopover, setShowAlertsPopover] = useState(false);
+  const [bellRinging, setBellRinging] = useState(false);
+  const [slaTick, setSlaTick] = useState(0);
+  const prevLastMsgRef = useRef<Record<string, string>>({});
+  const initialLoadedRef = useRef(false);
+
+  // Quotes & Lead management inside chat
+  const [leadQuotes, setLeadQuotes] = useState<LeadQuoteSummary[]>([]);
+  const [showQuotesPopover, setShowQuotesPopover] = useState(false);
+  const [creatingQuote, setCreatingQuote] = useState(false);
+
+  // Customizable SaaS Quick Replies per company
+  const [customQuickReplies, setCustomQuickReplies] = useState<QuickReplyTemplate[]>([]);
+  const [showQuickReplyModal, setShowQuickReplyModal] = useState(false);
+  const [newQrLabel, setNewQrLabel] = useState('');
+  const [newQrText, setNewQrText] = useState('');
+  const [newQrScope, setNewQrScope] = useState<'soporte' | 'ventas'>('ventas');
+
+  useEffect(() => {
+    if (!activeCompanyId) return;
+    try {
+      const saved = localStorage.getItem(`crm_wa_quick_replies_${activeCompanyId}`);
+      if (saved) setCustomQuickReplies(JSON.parse(saved));
+      else setCustomQuickReplies([]);
+    } catch {
+      setCustomQuickReplies([]);
+    }
+  }, [activeCompanyId]);
+
+  const saveCustomQuickReplies = (next: QuickReplyTemplate[]) => {
+    setCustomQuickReplies(next);
+    if (activeCompanyId) {
+      try {
+        localStorage.setItem(`crm_wa_quick_replies_${activeCompanyId}`, JSON.stringify(next));
+      } catch {
+        // ignore quota errors
+      }
+    }
+  };
+
+  // Unlock Web Audio on first user interaction so alarms always sound
+  useEffect(() => {
+    const unlock = () => {
+      getUnlockedAudioCtx();
+    };
+    window.addEventListener('click', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  // Tick every 30s to keep SLA wait minutes fresh
+  useEffect(() => {
+    const t = window.setInterval(() => setSlaTick((x) => x + 1), 30000);
+    return () => window.clearInterval(t);
+  }, []);
 
   const [activeChatSeconds, setActiveChatSeconds] = useState(0);
   const [showRightPanel, setShowRightPanel] = useState(false);
@@ -577,7 +778,12 @@ export const SupportChatCircles: React.FC = () => {
       const catObj = activeTicket.category_id ? catMap.get(activeTicket.category_id) : undefined;
       const catInfo = detectShortCategory(catObj?.name || '', activeTicket.title || '');
       const assignedTechId = activeTicket.assigned_to || null;
+      const leadOwnerId = (lead && (lead as any).assigned_to) || null;
       const ch = String(activeMeta.support_channel || 'soporte') as SupportChannelType;
+      const lastMessageAt = String(meta.last_whatsapp_at || latest.updated_at || latest.created_at);
+      const waitMinutes = unreadOrWaitingReply
+        ? Math.max(1, Math.floor((Date.now() - new Date(lastMessageAt).getTime()) / 60000))
+        : 0;
 
       list.push({
         circleId: key,
@@ -592,13 +798,15 @@ export const SupportChatCircles: React.FC = () => {
         memberOfGroups: Array.isArray(meta.member_of_groups) ? meta.member_of_groups : [],
         leadId,
         leadStatus: lead?.status || null,
-        leadOwnerName: lead && (lead as any).assigned_to ? agentMap.get((lead as any).assigned_to) || null : null,
+        leadOwnerId,
+        leadOwnerName: leadOwnerId ? agentMap.get(leadOwnerId) || null : null,
         activeTicket,
         allClientTickets: sorted,
         unreadOrWaitingReply,
+        waitMinutes,
         lastMessageText,
         lastMessageSender,
-        lastMessageAt: String(meta.last_whatsapp_at || latest.updated_at || latest.created_at),
+        lastMessageAt,
         assignedTechId,
         assignedTechName: (assignedTechId && agentMap.get(assignedTechId)) || 'Sin asignar',
         categoryCode: catInfo.code,
@@ -611,17 +819,29 @@ export const SupportChatCircles: React.FC = () => {
       if (a.isWhatsApp !== b.isWhatsApp) return a.isWhatsApp ? -1 : 1;
       return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
     });
-  }, [tickets, categories, agents, realClients, companyLeads, scopes.soporte]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickets, categories, agents, realClients, companyLeads, scopes.soporte, slaTick]);
 
   const isUnread = (c: SupportCircle) => c.unreadOrWaitingReply && readCirclesMap[c.circleId] !== c.lastMessageAt;
+  const isMine = (c: SupportCircle) =>
+    Boolean(profile?.id && (c.assignedTechId === profile.id || c.leadOwnerId === profile.id));
+  const isUnassigned = (c: SupportCircle) => !c.isGroup && !c.assignedTechId && !c.leadOwnerId && c.scope !== 'interno' && c.scope !== 'spam';
 
   const counts = useMemo(() => {
     // WhatsApp conversations only; old Service Hub tickets live in their own tab.
-    const wa = circles.filter((c) => c.isWhatsApp);
-    const by = (s: WaScope) => wa.filter((c) => c.scope === s).length;
+    const wa = circles.filter((c) => c.isWhatsApp && c.scope !== 'spam');
+    const by = (s: WaScope) => circles.filter((c) => c.isWhatsApp && c.scope === s).length;
+    const waitingList = wa.filter((c) => isUnread(c) || c.unreadOrWaitingReply);
+    const slaCritical = waitingList.filter((c) => c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60).length;
+    const mine = wa.filter((c) => isMine(c)).length;
+    const unassigned = wa.filter((c) => isUnassigned(c)).length;
     return {
-      all: wa.filter((c) => c.scope !== 'spam').length,
-      waiting: wa.filter((c) => c.scope !== 'spam' && isUnread(c)).length,
+      all: wa.length,
+      waiting: wa.filter((c) => isUnread(c)).length,
+      waitingTotal: waitingList.length,
+      slaCritical,
+      mine,
+      unassigned,
       tickets: circles.filter((c) => !c.isWhatsApp).length,
       soporte: by('soporte'),
       por_clasificar: by('por_clasificar'),
@@ -630,7 +850,106 @@ export const SupportChatCircles: React.FC = () => {
       spam: by('spam'),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [circles, readCirclesMap]);
+  }, [circles, readCirclesMap, profile?.id]);
+
+  // Real-time sound + desktop notification + bell shake when new incoming message arrives
+  useEffect(() => {
+    const waCircles = circles.filter((c) => c.isWhatsApp && c.scope !== 'spam');
+    if (waCircles.length === 0) return;
+
+    if (!initialLoadedRef.current) {
+      const initMap: Record<string, string> = {};
+      waCircles.forEach((c) => {
+        initMap[c.circleId] = c.lastMessageAt;
+      });
+      prevLastMsgRef.current = initMap;
+      initialLoadedRef.current = true;
+      return;
+    }
+
+    let triggeredAlert: SupportCircle | null = null;
+    const nextMap: Record<string, string> = { ...prevLastMsgRef.current };
+    for (const c of waCircles) {
+      const prevAt = prevLastMsgRef.current[c.circleId];
+      if ((!prevAt || new Date(c.lastMessageAt).getTime() > new Date(prevAt).getTime()) && c.unreadOrWaitingReply) {
+        if (!triggeredAlert) triggeredAlert = c;
+      }
+      nextMap[c.circleId] = c.lastMessageAt;
+    }
+    prevLastMsgRef.current = nextMap;
+
+    if (triggeredAlert) {
+      const isUrgentScope = triggeredAlert.scope === 'por_clasificar' || triggeredAlert.scope === 'lead';
+      if (soundEnabled) {
+        playWaAlertSound(isUrgentScope ? 'urgent' : 'message');
+      }
+      setBellRinging(true);
+      window.setTimeout(() => setBellRinging(false), 6000);
+
+      const alertCircle = triggeredAlert;
+      toast.custom(
+        (t) => (
+          <div
+            className={`${
+              t.visible ? 'animate-enter' : 'animate-leave'
+            } max-w-sm w-full bg-white shadow-2xl rounded-2xl pointer-events-auto flex items-center gap-3 p-3.5 border-2 border-indigo-500`}
+          >
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-black text-xs shrink-0 ${SCOPE_STYLE[alertCircle.scope].avatar}`}>
+              <BellRing className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-black text-slate-900 truncate">
+                {alertCircle.scope === 'por_clasificar' ? 'Nuevo Lead por WhatsApp' : `Mensaje: ${alertCircle.clientName}`}
+              </p>
+              <p className="text-[11px] font-medium text-slate-600 truncate mt-0.5">{alertCircle.lastMessageText}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCircleId(alertCircle.circleId);
+                toast.dismiss(t.id);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black shrink-0"
+            >
+              Ver
+            </button>
+          </div>
+        ),
+        { duration: 6000 }
+      );
+
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
+        try {
+          const n = new Notification(
+            alertCircle.scope === 'por_clasificar'
+              ? `Nuevo Lead WhatsApp: ${alertCircle.clientName}`
+              : `WhatsApp · ${alertCircle.clientName}`,
+            { body: `${alertCircle.lastMessageSender}: ${alertCircle.lastMessageText}` }
+          );
+          n.onclick = () => {
+            window.focus();
+            setSelectedCircleId(alertCircle.circleId);
+          };
+        } catch {
+          // ignore desktop notification errors
+        }
+      }
+    }
+  }, [circles, soundEnabled]);
+
+  // Browser tab title badge so agents/admins see pending messages even on another tab
+  useEffect(() => {
+    const baseTitle = 'Arias CRM · Chat WhatsApp';
+    const alertTotal = counts.waiting + counts.por_clasificar;
+    if (alertTotal > 0) {
+      document.title = `(${alertTotal}) Sin contestar · ${baseTitle}`;
+    } else {
+      document.title = baseTitle;
+    }
+    return () => {
+      document.title = 'Arias CRM';
+    };
+  }, [counts.waiting, counts.por_clasificar]);
 
   const filterTabs = useMemo(() => {
     const tabs: { id: CircleFilter; label: string; icon: React.ElementType; alert?: boolean }[] = [
@@ -654,7 +973,7 @@ export const SupportChatCircles: React.FC = () => {
 
   const filteredCircles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return circles.filter((c) => {
+    const res = circles.filter((c) => {
       if (circleFilter === 'tickets') {
         if (c.isWhatsApp) return false;
       } else if (!c.isWhatsApp) {
@@ -663,19 +982,32 @@ export const SupportChatCircles: React.FC = () => {
       if (circleFilter === 'all' && c.scope === 'spam') return false;
       if (circleFilter === 'waiting' && (c.scope === 'spam' || !isUnread(c))) return false;
       if (!['all', 'waiting', 'tickets'].includes(circleFilter) && c.scope !== circleFilter) return false;
+
+      if (ownerFilter === 'mine' && !isMine(c)) return false;
+      if (ownerFilter === 'unassigned' && !isUnassigned(c)) return false;
+      if (ownerFilter === 'urgent' && !(c.unreadOrWaitingReply && c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60)) return false;
+
+      if (circleFilter === 'soporte' && channelFilter !== 'all' && c.supportChannel !== channelFilter) return false;
+
       if (q) {
         return (
           c.clientName.toLowerCase().includes(q) ||
           c.pushName.toLowerCase().includes(q) ||
           c.phone.includes(q.replace(/\D/g, '') || '§') ||
           c.lastMessageText.toLowerCase().includes(q) ||
-          c.assignedTechName.toLowerCase().includes(q)
+          c.assignedTechName.toLowerCase().includes(q) ||
+          (c.leadOwnerName || '').toLowerCase().includes(q)
         );
       }
       return true;
     });
+
+    if (circleFilter === 'waiting' || ownerFilter === 'urgent') {
+      return [...res].sort((a, b) => b.waitMinutes - a.waitMinutes);
+    }
+    return res;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [circles, circleFilter, searchQuery, readCirclesMap]);
+  }, [circles, circleFilter, ownerFilter, channelFilter, searchQuery, readCirclesMap, profile?.id]);
 
   useEffect(() => {
     if (!selectedCircleId && filteredCircles.length > 0) setSelectedCircleId(filteredCircles[0].circleId);
@@ -689,6 +1021,57 @@ export const SupportChatCircles: React.FC = () => {
   useEffect(() => {
     if (activeCircle) markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt);
   }, [activeCircle?.circleId, activeCircle?.lastMessageAt]);
+
+  // Load quotes (cotizaciones) for the active lead / phone so sales can send proposal links in 1 click
+  useEffect(() => {
+    setShowQuotesPopover(false);
+    if (!activeCircle || !activeCompanyId || activeCircle.isGroup || !activeCircle.isWhatsApp) {
+      setLeadQuotes([]);
+      return;
+    }
+    const leadId = activeCircle.leadId;
+    const l8 = activeCircle.phone.slice(-8);
+    if (!leadId && l8.length < 8) {
+      setLeadQuotes([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        let q = supabase
+          .from('cotizaciones')
+          .select('id, plan_nombre, total_anual, total_mensual, estado, created_at, lead_id, telefono_cliente')
+          .eq('company_id', activeCompanyId)
+          .order('created_at', { ascending: false })
+          .limit(20);
+        if (leadId) {
+          q = q.eq('lead_id', leadId);
+        } else {
+          q = q.like('telefono_cliente', `%${l8.slice(-4)}%`);
+        }
+        const { data } = await q;
+        if (cancelled) return;
+        const list = ((data || []) as any[]).filter(
+          (row) => (leadId && row.lead_id === leadId) || (l8.length >= 8 && String(row.telefono_cliente || '').replace(/\D/g, '').endsWith(l8))
+        );
+        setLeadQuotes(
+          list.slice(0, 8).map((r) => ({
+            id: r.id,
+            plan_nombre: r.plan_nombre || 'Cotización',
+            total_anual: Number(r.total_anual || 0),
+            total_mensual: Number(r.total_mensual || 0),
+            estado: r.estado || 'borrador',
+            created_at: r.created_at,
+          }))
+        );
+      } catch {
+        if (!cancelled) setLeadQuotes([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCircle?.circleId, activeCircle?.leadId, activeCircle?.phone, activeCompanyId]);
 
   // ── Thread loading: every ticket of this chat, in real WhatsApp order ─────
   const threadTicketIds = useMemo(
@@ -1098,13 +1481,146 @@ export const SupportChatCircles: React.FC = () => {
       setShowReclassifyMenu(false);
       await loadSupportData(true);
       loadThread(false);
+      return data;
     } catch (err: any) {
       toast.error(err?.message || 'No se pudo clasificar');
       loadSupportData(true);
+      return null;
     } finally {
       setClassifying(false);
     }
   };
+
+  const handleSaveInternalNote = async () => {
+    const text = messageInput.trim();
+    if (!text || !activeCircle || !activeCompanyId) return;
+    const t = activeCircle.activeTicket;
+    setMessageInput('');
+    setSendingMessage(true);
+    try {
+      const noteBody = `Nota interna (${profile?.full_name || 'Equipo'}): ${text}`;
+      const { data: inserted, error } = await supabase
+        .from('ticket_comments')
+        .insert({
+          ticket_id: t.id,
+          company_id: activeCompanyId,
+          author_id: profile?.id || null,
+          body: noteBody,
+          is_internal: true,
+        })
+        .select('*')
+        .single();
+      if (error) throw error;
+      if (inserted) setComments((prev) => [...prev, inserted as TicketComment]);
+      toast.success('Nota interna guardada en el chat');
+      setComposerMode('whatsapp');
+    } catch (err: any) {
+      setMessageInput(text);
+      toast.error(err?.message || 'No se pudo guardar la nota interna');
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
+  const handleComposerSubmit = () => {
+    if (composerMode === 'internal') {
+      handleSaveInternalNote();
+    } else {
+      handleSendReply();
+    }
+  };
+
+  const handleUpdateLeadStatus = async (newStatus: string) => {
+    if (!activeCircle?.leadId || !activeCompanyId) return;
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ status: newStatus })
+        .eq('id', activeCircle.leadId)
+        .eq('company_id', activeCompanyId);
+      if (error) throw error;
+      await supabase.from('ticket_comments').insert({
+        ticket_id: activeCircle.activeTicket.id,
+        company_id: activeCompanyId,
+        author_id: profile?.id || null,
+        body: `${profile?.full_name || 'Equipo'} actualizó etapa del lead a: ${newStatus}`,
+        is_internal: true,
+      });
+      toast.success(`Etapa del lead: ${newStatus}`);
+      loadSupportData(true);
+      loadThread(false);
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudo actualizar la etapa');
+    }
+  };
+
+  const handleAssignLeadOwner = async (ownerId: string) => {
+    if (!activeCircle || !activeCompanyId) return;
+    try {
+      if (activeCircle.leadId) {
+        const { error } = await supabase
+          .from('leads')
+          .update({ assigned_to: ownerId || null })
+          .eq('id', activeCircle.leadId)
+          .eq('company_id', activeCompanyId);
+        if (error) throw error;
+      }
+      await ticketService.updateTicket(activeCircle.activeTicket.id, { assigned_to: ownerId || null });
+      toast.success('Responsable comercial actualizado');
+      loadSupportData(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al asignar vendedor');
+    }
+  };
+
+  const handleOpenQuoteBuilder = async () => {
+    if (!activeCircle) return;
+    setCreatingQuote(true);
+    try {
+      let leadId = activeCircle.leadId;
+      let leadName = activeCircle.clientName;
+      if (!leadId && activeCircle.scope === 'por_clasificar') {
+        const res = await classify('lead');
+        if (res?.lead?.id) {
+          leadId = res.lead.id;
+          leadName = res.lead.name || leadName;
+        }
+      }
+      navigate('/cotizaciones/nueva-pro', {
+        state: {
+          lead: {
+            id: leadId,
+            name: leadName,
+            company_name: leadName,
+            phone: activeCircle.phone ? `+${activeCircle.phone}` : '',
+          },
+        },
+      });
+    } finally {
+      setCreatingQuote(false);
+    }
+  };
+
+  const activeQuickReplies = useMemo(() => {
+    if (!activeCircle) return [];
+    const isSalesScope = activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar';
+    const targetScope: 'soporte' | 'ventas' = isSalesScope ? 'ventas' : 'soporte';
+    const base = isSalesScope ? DEFAULT_SALES_QUICK_REPLIES : DEFAULT_SUPPORT_QUICK_REPLIES;
+    const custom = customQuickReplies.filter((q) => q.scope === targetScope);
+    return [...base, ...custom];
+  }, [activeCircle, customQuickReplies]);
+
+  const alertCircles = useMemo(() => {
+    const wa = circles.filter((c) => c.isWhatsApp && c.scope !== 'spam');
+    const urgent = wa
+      .filter((c) => c.unreadOrWaitingReply && c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60)
+      .sort((a, b) => b.waitMinutes - a.waitMinutes);
+    const newLeads = wa.filter((c) => c.scope === 'por_clasificar');
+    const waitingRecent = wa
+      .filter((c) => c.unreadOrWaitingReply && c.waitMinutes < 15 && c.scope !== 'por_clasificar')
+      .sort((a, b) => b.waitMinutes - a.waitMinutes);
+    return { urgent, newLeads, waitingRecent, total: urgent.length + newLeads.length + waitingRecent.length };
+  }, [circles]);
 
   const handleCompleteAndCloseTicket = async (notifyClient: boolean) => {
     if (!activeCircle || !aiTimeAudit) return;
@@ -1297,7 +1813,7 @@ export const SupportChatCircles: React.FC = () => {
   return (
     <div className="h-screen flex-1 flex flex-col bg-[#F5F6FA] overflow-hidden">
       {/* ── TOP HEADER ── */}
-      <header className="h-14 bg-white border-b border-slate-200/80 px-5 flex items-center justify-between shrink-0 z-20">
+      <header className="h-14 bg-white border-b border-slate-200/80 px-5 flex items-center justify-between shrink-0 z-30 relative">
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex items-center gap-2">
             <div className="w-1 h-5 rounded-full bg-indigo-600" />
@@ -1311,8 +1827,270 @@ export const SupportChatCircles: React.FC = () => {
             <Phone className="w-3 h-3 text-indigo-600" />
             +503 7971-8911
           </span>
+
+          {/* Executive Live Pulse KPIs */}
+          <div className="hidden xl:flex items-center gap-1.5 ml-2">
+            <button
+              type="button"
+              onClick={() => {
+                setCircleFilter('waiting');
+                setOwnerFilter('all');
+              }}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold border transition ${
+                counts.waiting > 0
+                  ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                  : 'bg-slate-50 text-slate-500 border-slate-200/70 hover:bg-slate-100'
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              <span>Sin contestar: {counts.waiting}</span>
+            </button>
+            {counts.slaCritical > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCircleFilter('all');
+                  setOwnerFilter('urgent');
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-xs hover:bg-rose-700 animate-pulse transition"
+              >
+                <Flame className="w-3 h-3" />
+                <span>Urgentes &gt;15m: {counts.slaCritical}</span>
+              </button>
+            )}
+            {scopes.leads && counts.por_clasificar > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCircleFilter('por_clasificar');
+                  setOwnerFilter('all');
+                }}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition"
+              >
+                <UserPlus className="w-3 h-3 text-amber-600" />
+                <span>Leads por tomar: {counts.por_clasificar}</span>
+              </button>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2.5">
+
+        <div className="flex items-center gap-2">
+          {/* Quick sound toggle */}
+          <button
+            type="button"
+            onClick={toggleSound}
+            title={soundEnabled ? 'Alarma sonora activada (clic para silenciar)' : 'Alarma silenciada (clic para activar y probar)'}
+            className={`p-2 rounded-full transition ${
+              soundEnabled ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+            }`}
+          >
+            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          </button>
+
+          {/* Interactive Alert Bell & Notification Center */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowAlertsPopover((v) => !v)}
+              title="Centro de Alertas y Seguimiento"
+              className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black transition ${
+                alertCircles.urgent.length > 0 || alertCircles.newLeads.length > 0 || bellRinging
+                  ? 'bg-rose-600 text-white shadow-sm hover:bg-rose-700'
+                  : alertCircles.total > 0
+                  ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {alertCircles.total > 0 || bellRinging ? (
+                <BellRing className={`w-3.5 h-3.5 ${bellRinging ? 'animate-bounce' : ''}`} />
+              ) : (
+                <Bell className="w-3.5 h-3.5" />
+              )}
+              <span>Alertas</span>
+              {alertCircles.total > 0 && (
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    alertCircles.urgent.length > 0 || alertCircles.newLeads.length > 0
+                      ? 'bg-white text-rose-700'
+                      : 'bg-amber-600 text-white'
+                  }`}
+                >
+                  {alertCircles.total}
+                </span>
+              )}
+            </button>
+
+            {showAlertsPopover && (
+              <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-slate-200 rounded-3xl shadow-2xl z-50 overflow-hidden">
+                <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BellRing className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-black tracking-tight">Centro de Alertas WhatsApp</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ok = playWaAlertSound('test');
+                        if (ok) toast.success('Alarma sonora verificada correctamente');
+                        else toast.error('El navegador bloqueó el audio; haz clic e intenta de nuevo');
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[10px] font-black text-white transition"
+                    >
+                      Probar alarma
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAlertsPopover(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between gap-2 text-[11px]">
+                  <label className="flex items-center gap-2 font-bold text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={soundEnabled}
+                      onChange={toggleSound}
+                      className="rounded border-slate-300 text-indigo-600"
+                    />
+                    <span>Sonido al recibir mensajes</span>
+                  </label>
+                  {typeof Notification !== 'undefined' && Notification.permission !== 'granted' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        Notification.requestPermission().then((p) => {
+                          if (p === 'granted') toast.success('Alertas de escritorio activadas');
+                        });
+                      }}
+                      className="text-[10px] font-black text-indigo-600 hover:underline"
+                    >
+                      Activar aviso en escritorio
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
+                  {alertCircles.total === 0 ? (
+                    <div className="p-6 text-center space-y-1">
+                      <CheckCircle2 className="w-7 h-7 text-emerald-500 mx-auto" />
+                      <p className="text-xs font-black text-slate-800">Todo al día</p>
+                      <p className="text-[11px] text-slate-500">No hay chats ni leads esperando respuesta.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {alertCircles.newLeads.length > 0 && (
+                        <div className="p-2.5 bg-amber-50/50">
+                          <p className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-wider text-amber-800 flex items-center gap-1">
+                            <UserPlus className="w-3 h-3" />
+                            Leads nuevos por tomar / cotizar ({alertCircles.newLeads.length})
+                          </p>
+                          <div className="space-y-1">
+                            {alertCircles.newLeads.slice(0, 6).map((c) => (
+                              <button
+                                key={c.circleId}
+                                type="button"
+                                onClick={() => {
+                                  setCircleFilter('por_clasificar');
+                                  setOwnerFilter('all');
+                                  setSelectedCircleId(c.circleId);
+                                  setShowAlertsPopover(false);
+                                }}
+                                className="w-full text-left px-2.5 py-2 rounded-xl bg-white hover:bg-amber-100/60 border border-amber-200/70 flex items-center justify-between gap-2 transition"
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-xs font-black text-slate-900 truncate">{c.clientName}</p>
+                                  <p className="text-[11px] text-slate-600 truncate">{c.lastMessageText}</p>
+                                </div>
+                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black shrink-0">
+                                  {c.waitMinutes > 0 ? formatWaitDuration(c.waitMinutes) : listTimeLabel(c.lastMessageAt)}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {alertCircles.urgent.length > 0 && (
+                        <div className="p-2.5 bg-rose-50/40">
+                          <p className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-wider text-rose-700 flex items-center gap-1">
+                            <Flame className="w-3 h-3" />
+                            Urgentes &gt; 15 min sin contestar ({alertCircles.urgent.length})
+                          </p>
+                          <div className="space-y-1">
+                            {alertCircles.urgent.slice(0, 8).map((c) => (
+                              <button
+                                key={c.circleId}
+                                type="button"
+                                onClick={() => {
+                                  setCircleFilter('all');
+                                  setOwnerFilter('all');
+                                  setSelectedCircleId(c.circleId);
+                                  setShowAlertsPopover(false);
+                                }}
+                                className="w-full text-left px-2.5 py-2 rounded-xl bg-white hover:bg-rose-50 border border-rose-200/80 flex items-center justify-between gap-2 transition"
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-xs font-black text-slate-900 truncate">{c.clientName}</p>
+                                    <ScopeChip circle={c} compact />
+                                  </div>
+                                  <p className="text-[11px] text-slate-600 truncate">{c.lastMessageText}</p>
+                                </div>
+                                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-black shrink-0">
+                                  {formatWaitDuration(c.waitMinutes)}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {alertCircles.waitingRecent.length > 0 && (
+                        <div className="p-2.5">
+                          <p className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            En espera reciente ({alertCircles.waitingRecent.length})
+                          </p>
+                          <div className="space-y-1">
+                            {alertCircles.waitingRecent.slice(0, 6).map((c) => (
+                              <button
+                                key={c.circleId}
+                                type="button"
+                                onClick={() => {
+                                  setCircleFilter('all');
+                                  setOwnerFilter('all');
+                                  setSelectedCircleId(c.circleId);
+                                  setShowAlertsPopover(false);
+                                }}
+                                className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-slate-50 flex items-center justify-between gap-2 transition"
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-xs font-bold text-slate-900 truncate">{c.clientName}</p>
+                                    <ScopeChip circle={c} compact />
+                                  </div>
+                                  <p className="text-[11px] text-slate-500 truncate">{c.lastMessageText}</p>
+                                </div>
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold shrink-0">
+                                  {formatWaitDuration(c.waitMinutes)}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <span className="hidden md:inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#EEF0FF] text-indigo-700">
             {roleChip}
           </span>
@@ -1343,7 +2121,7 @@ export const SupportChatCircles: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* ── LEFT: chat list ── */}
         <aside style={{ width: `${leftPanelWidth}px` }} className="bg-white flex flex-col shrink-0 relative">
-          <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+          <div className="px-5 pt-4 pb-2 flex items-center justify-between">
             <div>
               <h2 className="text-xl font-black text-slate-900 tracking-tight">Chats</h2>
               <p className="text-[11px] font-medium text-slate-400">{filteredCircles.length} conversaciones</p>
@@ -1357,25 +2135,30 @@ export const SupportChatCircles: React.FC = () => {
             </button>
           </div>
 
-          <div className="px-4 pb-3">
+          <div className="px-4 pb-2.5">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar grupo, cliente, teléfono o mensaje..."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50/80 border border-slate-200/70 rounded-full text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                placeholder="Buscar grupo, cliente, teléfono, vendedor o mensaje..."
+                className="w-full pl-10 pr-4 py-2 bg-slate-50/80 border border-slate-200/70 rounded-full text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
-            <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+
+            {/* Primary scope tabs */}
+            <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
               {filterTabs.map((tab) => {
                 const active = circleFilter === tab.id;
                 const IconComp = tab.icon;
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setCircleFilter(tab.id)}
+                    onClick={() => {
+                      setCircleFilter(tab.id);
+                      if (tab.id !== 'soporte') setChannelFilter('all');
+                    }}
                     className={`px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition inline-flex items-center gap-1.5 ${
                       active ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'
                     }`}
@@ -1386,6 +2169,53 @@ export const SupportChatCircles: React.FC = () => {
                 );
               })}
             </div>
+
+            {/* Secondary sub-filters: Owner & SLA urgency */}
+            {circleFilter !== 'tickets' && (
+              <div className="flex items-center gap-1 mt-2 pt-2 border-t border-slate-100 flex-wrap">
+                {(
+                  [
+                    { id: 'all', label: 'Todos' },
+                    { id: 'mine', label: `Míos (${counts.mine})` },
+                    { id: 'unassigned', label: `Sin asignar (${counts.unassigned})` },
+                    { id: 'urgent', label: `Urgentes >15m (${counts.slaCritical})`, hot: counts.slaCritical > 0 },
+                  ] as { id: OwnerSubFilter; label: string; hot?: boolean }[]
+                ).map((sf) => {
+                  const active = ownerFilter === sf.id;
+                  return (
+                    <button
+                      key={sf.id}
+                      type="button"
+                      onClick={() => setOwnerFilter(sf.id)}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition ${
+                        active
+                          ? sf.id === 'urgent'
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-slate-900 text-white'
+                          : sf.hot
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                          : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                      }`}
+                    >
+                      {sf.label}
+                    </button>
+                  );
+                })}
+
+                {circleFilter === 'soporte' && (
+                  <select
+                    value={channelFilter}
+                    onChange={(e) => setChannelFilter(e.target.value as 'all' | SupportChannelType)}
+                    className="ml-auto px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/60 focus:outline-none"
+                  >
+                    <option value="all">Todas las áreas</option>
+                    <option value="soporte">Soporte / Operaciones</option>
+                    <option value="contabilidad">Contabilidad / Finanzas</option>
+                    <option value="otros">Otros</option>
+                  </select>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
@@ -1397,6 +2227,20 @@ export const SupportChatCircles: React.FC = () => {
               filteredCircles.map((circle) => {
                 const isSelected = activeCircle?.circleId === circle.circleId;
                 const unread = isUnread(circle);
+                const ownerLabel =
+                  circle.scope === 'lead' || circle.scope === 'por_clasificar'
+                    ? circle.leadOwnerName
+                    : circle.assignedTechId
+                    ? circle.assignedTechName
+                    : null;
+                const showSla = circle.unreadOrWaitingReply && circle.waitMinutes > 0 && circle.waitMinutes <= 24 * 60;
+                const slaStyle =
+                  circle.waitMinutes >= 15
+                    ? 'bg-rose-100 text-rose-800 border-rose-200 font-black'
+                    : circle.waitMinutes >= 5
+                    ? 'bg-amber-50 text-amber-800 border-amber-200 font-bold'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold';
+
                 return (
                   <button
                     key={circle.circleId}
@@ -1405,7 +2249,7 @@ export const SupportChatCircles: React.FC = () => {
                       markCircleAsRead(circle.circleId, circle.lastMessageAt);
                       setSelectedCircleId(circle.circleId);
                     }}
-                    className={`w-full text-left px-4 py-3.5 flex items-center gap-3.5 transition relative ${
+                    className={`w-full text-left px-4 py-3 flex items-center gap-3.5 transition relative ${
                       isSelected ? 'bg-[#EEF0FF]/90' : unread ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/30 hover:bg-slate-50/80'
                     }`}
                   >
@@ -1432,13 +2276,33 @@ export const SupportChatCircles: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <span className={`text-[10px] shrink-0 ${unread ? 'font-extrabold text-indigo-600' : 'font-normal text-slate-400'}`}>
-                          {listTimeLabel(circle.lastMessageAt)}
-                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {showSla && (
+                            <span
+                              title={`Esperando respuesta hace ${formatWaitDuration(circle.waitMinutes)}`}
+                              className={`px-1.5 py-0.5 rounded-full border text-[9px] inline-flex items-center gap-0.5 ${slaStyle}`}
+                            >
+                              <Clock className="w-2.5 h-2.5" />
+                              {formatWaitDuration(circle.waitMinutes)}
+                            </span>
+                          )}
+                          <span className={`text-[10px] ${unread ? 'font-extrabold text-indigo-600' : 'font-normal text-slate-400'}`}>
+                            {listTimeLabel(circle.lastMessageAt)}
+                          </span>
+                        </div>
                       </div>
-                      <p className={`text-xs truncate mt-0.5 ${unread ? 'text-slate-900 font-bold' : 'text-slate-400 font-normal'}`}>
-                        {circle.lastMessageSender}: {circle.lastMessageText}
-                      </p>
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        <p className={`text-xs truncate ${unread ? 'text-slate-900 font-bold' : 'text-slate-400 font-normal'}`}>
+                          {circle.lastMessageSender}: {circle.lastMessageText}
+                        </p>
+                        {ownerLabel ? (
+                          <span className="text-[9px] font-semibold text-slate-400 shrink-0 truncate max-w-[90px]">
+                            {ownerLabel.split(' ')[0]}
+                          </span>
+                        ) : !circle.isGroup && circle.scope !== 'interno' && circle.scope !== 'spam' ? (
+                          <span className="text-[9px] font-bold text-amber-600 shrink-0">Sin asignar</span>
+                        ) : null}
+                      </div>
                     </div>
                   </button>
                 );
@@ -1481,8 +2345,19 @@ export const SupportChatCircles: React.FC = () => {
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight truncate max-w-[280px]">{activeCircle.clientName}</h3>
                     <ScopeChip circle={activeCircle} />
-                    {activeCircle.scope === 'lead' && activeCircle.leadOwnerName && (
-                      <span className="text-[10px] font-semibold text-slate-500">Vendedor: {activeCircle.leadOwnerName}</span>
+                    {activeCircle.unreadOrWaitingReply && activeCircle.waitMinutes > 0 && activeCircle.waitMinutes <= 24 * 60 && (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                          activeCircle.waitMinutes >= 15
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : activeCircle.waitMinutes >= 5
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}
+                      >
+                        <Clock className="w-2.5 h-2.5" />
+                        Espera: {formatWaitDuration(activeCircle.waitMinutes)}
+                      </span>
                     )}
                   </div>
                   <p className="text-[11px] font-medium text-slate-400 truncate">
@@ -1497,6 +2372,7 @@ export const SupportChatCircles: React.FC = () => {
                           .filter(Boolean)
                           .join(' · ')}
                     {activeCircle.scope === 'soporte' ? ` · Atiende: ${activeCircle.assignedTechName}` : ''}
+                    {activeCircle.scope === 'lead' ? ` · Vendedor: ${activeCircle.leadOwnerName || 'Sin asignar'}` : ''}
                   </p>
                   {!activeCircle.isGroup && activeCircle.memberOfGroups.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
@@ -1523,21 +2399,144 @@ export const SupportChatCircles: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                {/* Support area selector + quick tech assignment */}
                 {activeCircle.scope === 'soporte' && activeCircle.isWhatsApp && (
-                  <div className="relative flex items-center">
-                    <Wrench className="w-3.5 h-3.5 text-slate-500 absolute left-3 pointer-events-none" />
-                    <select
-                      value={activeCircle.supportChannel}
-                      onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
-                      className="pl-8 pr-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-700 cursor-pointer focus:outline-none transition"
-                    >
-                      <option value="soporte">Soporte técnico</option>
-                      <option value="contabilidad">Contabilidad</option>
-                      <option value="otros">Otros</option>
-                    </select>
-                  </div>
+                  <>
+                    <div className="relative flex items-center">
+                      <Wrench className="w-3.5 h-3.5 text-slate-500 absolute left-3 pointer-events-none" />
+                      <select
+                        value={activeCircle.supportChannel}
+                        onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
+                        className="pl-8 pr-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-700 cursor-pointer focus:outline-none transition"
+                      >
+                        <option value="soporte">Soporte / Operaciones</option>
+                        <option value="contabilidad">Contabilidad / Finanzas</option>
+                        <option value="otros">Otros</option>
+                      </select>
+                    </div>
+                    {!activeCircle.assignedTechId && profile?.id && (
+                      <button
+                        type="button"
+                        onClick={() => handleAssignTech(profile.id)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        Tomar caso
+                      </button>
+                    )}
+                  </>
                 )}
+
+                {/* Commercial Lead & Quote controls (Sales & Multi-Industry SaaS) */}
+                {!activeCircle.isGroup &&
+                  activeCircle.isWhatsApp &&
+                  (activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar') &&
+                  (scopes.all || scopes.leads) && (
+                    <>
+                      {activeCircle.leadId && (
+                        <select
+                          value={activeCircle.leadStatus || 'Prospecto'}
+                          onChange={(e) => handleUpdateLeadStatus(e.target.value)}
+                          title="Etapa comercial del Lead"
+                          className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 cursor-pointer focus:outline-none transition"
+                        >
+                          {LEAD_STATUS_OPTIONS.map((st) => (
+                            <option key={st} value={st}>
+                              Etapa: {st}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      {scopes.all && activeCircle.scope === 'lead' && (
+                        <select
+                          value={activeCircle.leadOwnerId || activeCircle.assignedTechId || ''}
+                          onChange={(e) => handleAssignLeadOwner(e.target.value)}
+                          title="Vendedor asignado"
+                          className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/70 text-slate-700 cursor-pointer focus:outline-none transition max-w-[150px]"
+                        >
+                          <option value="">Sin vendedor</option>
+                          {agents.map((ag) => (
+                            <option key={ag.id} value={ag.id}>
+                              {ag.full_name || ag.email}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* 1-Click Quote Builder */}
+                      <button
+                        type="button"
+                        disabled={creatingQuote || classifying}
+                        onClick={handleOpenQuoteBuilder}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition disabled:opacity-50"
+                      >
+                        {creatingQuote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Receipt className="w-3.5 h-3.5" />}
+                        <span>Cotizar</span>
+                      </button>
+
+                      {/* Existing quotes dropdown with 1-click send to WhatsApp */}
+                      {leadQuotes.length > 0 && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowQuotesPopover((v) => !v)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-200 transition"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>Propuestas ({leadQuotes.length})</span>
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                          {showQuotesPopover && (
+                            <div className="absolute right-0 top-full mt-1.5 w-80 bg-white border border-slate-200 rounded-2xl shadow-2xl z-40 p-2 space-y-1.5">
+                              <div className="px-2 py-1 flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase text-slate-500">Cotizaciones del prospecto</span>
+                                <button onClick={() => setShowQuotesPopover(false)} className="text-slate-400 hover:text-slate-600">
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              {leadQuotes.map((q) => {
+                                const publicUrl = `${window.location.origin}/propuesta/${q.id}`;
+                                const amount = q.total_anual || q.total_mensual || 0;
+                                return (
+                                  <div key={q.id} className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-xs font-black text-slate-900 truncate">{q.plan_nombre}</span>
+                                      <span className="text-xs font-black text-indigo-700 shrink-0">${amount.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setComposerMode('whatsapp');
+                                          setMessageInput(
+                                            `Hola ${activeCircle.clientName}, le comparto nuestra propuesta comercial formal para su revisión: ${publicUrl}`
+                                          );
+                                          setShowQuotesPopover(false);
+                                        }}
+                                        className="flex-1 inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black transition"
+                                      >
+                                        <Send className="w-3 h-3" />
+                                        Pasar al chat
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => navigate(`/cotizaciones/${q.id}`)}
+                                        className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-[10px] font-bold transition"
+                                      >
+                                        Abrir
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
 
                 {activeCircle.leadId && (activeCircle.scope === 'lead' || activeCircle.scope === 'spam') && (
                   <button
@@ -1545,8 +2544,8 @@ export const SupportChatCircles: React.FC = () => {
                     onClick={() => navigate('/leads', { state: { leadId: activeCircle.leadId, _t: Date.now() } })}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition"
                   >
-                    <UserCheck className="w-3.5 h-3.5" />
-                    Abrir ficha del lead
+                    <User className="w-3.5 h-3.5" />
+                    Ficha Lead
                   </button>
                 )}
 
@@ -1701,7 +2700,7 @@ export const SupportChatCircles: React.FC = () => {
                         {daySep}
                         <div className="flex justify-center">
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-900">
-                            <Tag className="w-3 h-3" />
+                            <StickyNote className="w-3 h-3 text-amber-600 shrink-0" />
                             {b.text}
                             <span className="text-amber-600 font-normal">· {fmtTime(b.createdAt)}</span>
                           </span>
@@ -1761,25 +2760,44 @@ export const SupportChatCircles: React.FC = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Quick replies (support) */}
-            {activeCircle.scope === 'soporte' && canSend && (
-              <div className="bg-white/70 px-5 pt-2 flex items-center gap-1.5 overflow-x-auto">
-                {SUPPORT_QUICK_REPLIES.map((q) => (
+            {/* Universal SaaS Quick replies (Support + Sales + Customizable per company) */}
+            {canSend && composerMode === 'whatsapp' && (
+              <div className="bg-white/80 px-5 pt-2 pb-1 flex items-center gap-1.5 overflow-x-auto border-t border-slate-100">
+                <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 shrink-0 mr-1">
+                  {activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'Ventas:' : 'Respuestas:'}
+                </span>
+                {activeQuickReplies.map((q) => (
                   <button
-                    key={q.label}
+                    key={q.id}
                     type="button"
                     onClick={() => setMessageInput(q.text)}
-                    className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 whitespace-nowrap"
+                    className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 whitespace-nowrap transition"
                   >
                     {q.label}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewQrScope(activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'ventas' : 'soporte');
+                    setShowQuickReplyModal(true);
+                  }}
+                  title="Personalizar respuestas rápidas de tu empresa"
+                  className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#EEF0FF] text-indigo-700 hover:bg-indigo-100 whitespace-nowrap inline-flex items-center gap-1 shrink-0 transition"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Plantillas</span>
+                </button>
               </div>
             )}
 
-            {/* Composer */}
+            {/* Composer (WhatsApp message vs Internal Team Note) */}
             {canSend ? (
-              <div className="bg-white px-5 py-3 border-t border-slate-200/70 flex items-end gap-3">
+              <div
+                className={`px-5 py-3 border-t flex items-end gap-2.5 transition-colors ${
+                  composerMode === 'internal' ? 'bg-amber-50/70 border-amber-200' : 'bg-white border-slate-200/70'
+                }`}
+              >
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1787,15 +2805,37 @@ export const SupportChatCircles: React.FC = () => {
                   onChange={handleUploadAttachment}
                   className="hidden"
                 />
+                {composerMode === 'whatsapp' && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingFile}
+                    title="Enviar imagen, documento o archivo"
+                    className="w-9 h-9 rounded-full text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0 disabled:opacity-50"
+                  >
+                    {uploadingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                  </button>
+                )}
+
+                {/* Mode switcher: WhatsApp vs Nota Interna */}
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingFile}
-                  title="Enviar imagen, documento o archivo"
-                  className="w-9 h-9 rounded-full text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0 disabled:opacity-50"
+                  onClick={() => setComposerMode((m) => (m === 'whatsapp' ? 'internal' : 'whatsapp'))}
+                  title={
+                    composerMode === 'internal'
+                      ? 'Modo Nota Interna activo (el cliente NO recibe este mensaje). Clic para volver a WhatsApp.'
+                      : 'Cambiar a Nota Interna para dejar instrucciones al equipo dentro del chat'
+                  }
+                  className={`px-2.5 py-2 rounded-2xl text-[10px] font-black inline-flex items-center gap-1 shrink-0 border transition ${
+                    composerMode === 'internal'
+                      ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                      : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200'
+                  }`}
                 >
-                  {uploadingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                  <StickyNote className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{composerMode === 'internal' ? 'Nota interna' : 'Nota'}</span>
                 </button>
+
                 <textarea
                   rows={1}
                   value={messageInput}
@@ -1803,19 +2843,30 @@ export const SupportChatCircles: React.FC = () => {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSendReply();
+                      handleComposerSubmit();
                     }
                   }}
-                  placeholder="Escribe un mensaje… (Shift+Enter = nueva línea)"
-                  className="flex-1 resize-none max-h-32 px-4 py-2.5 bg-[#F3F4F8] border border-slate-200/80 rounded-2xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  placeholder={
+                    composerMode === 'internal'
+                      ? 'Escribe una nota interna para el equipo (NO se envía al WhatsApp del cliente)…'
+                      : 'Escribe un mensaje a WhatsApp… (Shift+Enter = nueva línea)'
+                  }
+                  className={`flex-1 resize-none max-h-32 px-4 py-2.5 rounded-2xl text-xs font-medium focus:outline-none focus:ring-2 transition ${
+                    composerMode === 'internal'
+                      ? 'bg-white border-2 border-amber-300 text-amber-950 placeholder:text-amber-700/60 focus:ring-amber-500/20'
+                      : 'bg-[#F3F4F8] border border-slate-200/80 text-slate-800 placeholder:text-slate-400 focus:ring-indigo-500/20'
+                  }`}
                 />
                 <button
                   type="button"
                   disabled={!messageInput.trim() || sendingMessage}
-                  onClick={() => handleSendReply()}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-bold transition"
+                  onClick={handleComposerSubmit}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full disabled:opacity-40 text-white text-xs font-bold transition ${
+                    composerMode === 'internal' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'
+                  }`}
                 >
-                  <Send className="w-3.5 h-3.5" />
+                  {composerMode === 'internal' ? <StickyNote className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                  {composerMode === 'internal' && <span className="hidden sm:inline">Guardar nota</span>}
                 </button>
               </div>
             ) : (
@@ -2296,6 +3347,107 @@ export const SupportChatCircles: React.FC = () => {
               >
                 {savingAiConfig ? 'Guardando...' : 'Guardar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Customizable Quick Replies Modal (SaaS Multi-Industry) ── */}
+      {showQuickReplyModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4" onClick={() => setShowQuickReplyModal(false)}>
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-black text-slate-900">Plantillas de Respuesta Rápida</h3>
+                <p className="text-xs text-slate-500">Adapta las respuestas en 1 clic al giro de tu empresa (Ventas y Soporte).</p>
+              </div>
+              <button onClick={() => setShowQuickReplyModal(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setNewQrScope('ventas')}
+                className={`flex-1 py-2 rounded-xl text-xs font-black transition ${
+                  newQrScope === 'ventas' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Ventas / Leads
+              </button>
+              <button
+                type="button"
+                onClick={() => setNewQrScope('soporte')}
+                className={`flex-1 py-2 rounded-xl text-xs font-black transition ${
+                  newQrScope === 'soporte' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Soporte / Clientes
+              </button>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2.5">
+              <p className="text-[10px] font-black uppercase text-slate-500">Nueva plantilla ({newQrScope === 'ventas' ? 'Ventas' : 'Soporte'})</p>
+              <input
+                type="text"
+                value={newQrLabel}
+                onChange={(e) => setNewQrLabel(e.target.value)}
+                placeholder="Título corto del botón (ej. Enviar Catálogo, Pedir Requisitos)"
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+              />
+              <textarea
+                rows={3}
+                value={newQrText}
+                onChange={(e) => setNewQrText(e.target.value)}
+                placeholder="Texto completo que se escribirá en el chat al hacer clic..."
+                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800"
+              />
+              <button
+                type="button"
+                disabled={!newQrLabel.trim() || !newQrText.trim()}
+                onClick={() => {
+                  const item: QuickReplyTemplate = {
+                    id: `custom-${Date.now()}`,
+                    scope: newQrScope,
+                    label: newQrLabel.trim(),
+                    text: newQrText.trim(),
+                  };
+                  saveCustomQuickReplies([...customQuickReplies, item]);
+                  setNewQrLabel('');
+                  setNewQrText('');
+                  toast.success('Plantilla agregada');
+                }}
+                className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-black transition"
+              >
+                Guardar plantilla
+              </button>
+            </div>
+
+            <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-2xl">
+              {[
+                ...(newQrScope === 'ventas' ? DEFAULT_SALES_QUICK_REPLIES : DEFAULT_SUPPORT_QUICK_REPLIES),
+                ...customQuickReplies.filter((q) => q.scope === newQrScope),
+              ].map((q) => {
+                const isCustom = q.id.startsWith('custom-');
+                return (
+                  <div key={q.id} className="px-3.5 py-2.5 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-xs font-black text-slate-900">{q.label}</span>
+                      <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{q.text}</p>
+                    </div>
+                    {isCustom && (
+                      <button
+                        type="button"
+                        onClick={() => saveCustomQuickReplies(customQuickReplies.filter((x) => x.id !== q.id))}
+                        className="text-[10px] font-bold text-rose-600 hover:underline shrink-0"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

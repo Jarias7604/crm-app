@@ -1084,9 +1084,11 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
   const team = await loadTeam(supabase, companyId);
 
   // Who is speaking?
+  // In 1-on-1 chats, only fromMe (sent by +503 7971-8911) is the outgoing side; messages sent from
+  // the contact's phone (even when the contact is a team member testing) are incoming.
   const senderL8 = last8(senderPhone);
-  const staffByName = matchStaffByName(team, pushName);
-  const staffByPhone = senderL8 ? team.internoPhones.get(senderL8) : undefined;
+  const staffByName = isGroup ? matchStaffByName(team, pushName) : null;
+  const staffByPhone = isGroup && senderL8 ? team.internoPhones.get(senderL8) : undefined;
   let isStaff = fromMe || Boolean(staffByName) || Boolean(staffByPhone);
   let staffStrong = isStaff;
   const staffProfileId: string | null = staffByName?.id || staffByPhone?.profileId || null;
@@ -1637,7 +1639,7 @@ async function handleBridgeSh(supabase: any, selfUrl: string): Promise<Response>
       const inst = shellSafe(normalizeInstance(m.evolution_instance || instance));
       const syncUrl = `${selfUrl}?action=sync_group_subject&ticket_id=${shellSafe(row.id)}`;
       lines.push(
-        `curl -s "${evo}/group/findGroupInfos/${inst}?groupJid=${encodeURIComponent(m.whatsapp_jid).replace(/[^a-zA-Z0-9%._-]/g, '')}" -H "apikey: ${safeKey}" | curl -s -X POST "${syncUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1`
+        `(curl -s "${evo}/group/findGroupInfos/${inst}?groupJid=${encodeURIComponent(m.whatsapp_jid).replace(/[^a-zA-Z0-9%._-]/g, '')}" -H "apikey: ${safeKey}" | curl -s -X POST "${syncUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
       );
     }
     await supabase
@@ -1692,7 +1694,7 @@ async function handleBridgeSh(supabase: any, selfUrl: string): Promise<Response>
     );
   }
 
-  // 2. Media downloads (images, documents, audio, video). Retries stale requests.
+  // 2. Media downloads (images, documents, audio, video). Run in background (&) so they never block outbox polling.
   const staleBefore = new Date(now.getTime() - MEDIA_RETRY_AFTER_MS).toISOString();
   const { data: mediaJobs } = await supabase
     .from('whatsapp_messages')
@@ -1701,17 +1703,17 @@ async function handleBridgeSh(supabase: any, selfUrl: string): Promise<Response>
     .lt('media_attempts', MEDIA_MAX_ATTEMPTS)
     .gte('created_at', new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString())
     .order('created_at', { ascending: true })
-    .limit(15);
+    .limit(6);
   let mediaQueued = 0;
   for (const job of mediaJobs || []) {
-    if (mediaQueued >= 8) break;
+    if (mediaQueued >= 3) break;
     if (job.media_status === 'requested' && job.media_requested_at && job.media_requested_at > staleBefore) continue;
     if (!job.raw_message) continue;
     const inst = shellSafe(instance);
     const upUrl = `${selfUrl}?action=upload_media&wamsg=${shellSafe(job.id)}`;
     const b64 = b64Utf8(JSON.stringify({ message: job.raw_message, convertToMp4: false }));
     lines.push(
-      `echo "${b64}" | base64 -d | curl -s -X POST "${evo}/chat/getBase64FromMediaMessage/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | curl -s -X POST "${upUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1`
+      `(echo "${b64}" | base64 -d | curl -s -X POST "${evo}/chat/getBase64FromMediaMessage/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | curl -s -X POST "${upUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
     );
     await supabase
       .from('whatsapp_messages')
@@ -1733,24 +1735,20 @@ async function handleBridgeSh(supabase: any, selfUrl: string): Promise<Response>
   if (now.getTime() - lastReq > GROUP_SYNC_EVERY_MS || gs.force === true) {
     const inst = shellSafe(instance);
     lines.push(
-      `curl -s "${evo}/group/fetchAllGroups/${inst}?getParticipants=true" -H "apikey: ${safeKey}" | curl -s -X POST "${selfUrl}?action=sync_all_groups" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1`
+      `(curl -s "${evo}/group/fetchAllGroups/${inst}?getParticipants=true" -H "apikey: ${safeKey}" | curl -s -X POST "${selfUrl}?action=sync_all_groups" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
     );
     await setBridgeState(supabase, 'groups_sync', { ...gs, requested_at: now.toISOString(), force: false });
   }
 
-  // 4. Re-check every chat's classification (every 10 min) so it follows CRM changes
-  //    (lead status, new clients, new group members) without waiting for a new message.
+  // 4. Periodic re-check of chat classifications (every 10 min) so chats follow CRM changes.
   const rs = await getBridgeState(supabase, 'rescope');
   if (!rs.at || now.getTime() - new Date(rs.at).getTime() > 10 * 60 * 1000) {
     await setBridgeState(supabase, 'rescope', { at: now.toISOString() });
     const cid = await resolveMainCompanyId(supabase, null);
     if (cid) {
-      try {
-        const r = await rescopeChats(supabase, cid);
-        await setBridgeState(supabase, 'rescope', { at: now.toISOString(), checked: r.checked, changed: r.changed.slice(0, 50) });
-      } catch (e) {
-        console.error('[wa] rescope error', e);
-      }
+      rescopeChats(supabase, cid)
+        .then((r) => setBridgeState(supabase, 'rescope', { at: now.toISOString(), checked: r.checked, changed: r.changed.slice(0, 50) }))
+        .catch((e) => console.error('[wa] rescope error', e));
     }
   }
 
@@ -1795,7 +1793,7 @@ async function handleBridgeSh(supabase: any, selfUrl: string): Promise<Response>
         const body = b64Utf8(JSON.stringify({ where: { key: { remoteJid: hi.queue[i].q } }, page, offset: 50 }));
         const impUrl = `${selfUrl}?action=import_history&i=${i}&token=${shellSafe(hi.token)}`;
         lines.push(
-          `echo "${body}" | base64 -d | curl -s -X POST "${evo}/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | curl -s -X POST "${impUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1`
+          `(echo "${body}" | base64 -d | curl -s -X POST "${evo}/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | curl -s -X POST "${impUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
         );
       }
     }
@@ -2013,7 +2011,7 @@ async function handleImportHistory(supabase: any, url: URL, payload: any): Promi
     }
 
     if (!commentId) {
-      const staff = fromMe ? null : matchStaffByName(team, pushName);
+      const staff = fromMe || !isGroup ? null : matchStaffByName(team, pushName);
       const senderLabel = fromMe || staff ? `👨‍💻 ${staff?.full_name || 'Equipo Soporte'}` : `👤 ${pushName || 'Cliente'}`;
       const text = caption ? `${placeholder} ${caption}` : placeholder;
       const { data: c } = await supabase
