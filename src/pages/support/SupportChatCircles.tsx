@@ -1742,7 +1742,7 @@ export const SupportChatCircles: React.FC = () => {
       return true;
     });
     const urgent = wa
-      .filter((c) => c.unreadOrWaitingReply && c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60)
+      .filter((c) => c.unreadOrWaitingReply && c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60 && c.scope !== 'por_clasificar')
       .sort((a, b) => b.waitMinutes - a.waitMinutes);
     const newLeads = wa.filter((c) => c.scope === 'por_clasificar');
     const waitingRecent = wa
@@ -2030,11 +2030,11 @@ export const SupportChatCircles: React.FC = () => {
             </button>
 
             {showAlertsPopover && (
-              <div className="absolute right-0 top-full mt-2 w-96 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
-                <div className="px-4 py-3 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between">
+              <div className="absolute right-0 top-full mt-2 w-[480px] max-w-[92vw] bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+                <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <BellRing className="w-4 h-4 text-indigo-600" />
-                    <span className="text-xs font-bold text-slate-900 tracking-tight">Centro de Alertas WhatsApp</span>
+                    <Bell className="w-4 h-4 text-indigo-600" />
+                    <span className="text-[13.5px] font-bold text-slate-900 tracking-tight">Centro de Alertas WhatsApp</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -2044,22 +2044,22 @@ export const SupportChatCircles: React.FC = () => {
                         if (ok) toast.success('Alarma sonora verificada correctamente');
                         else toast.error('El navegador bloqueó el audio; haz clic e intenta de nuevo');
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 text-[10px] font-bold text-indigo-700 transition"
+                      className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-xs font-semibold text-slate-700 transition"
                     >
-                      Probar alarma
+                      Probar sonido
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowAlertsPopover(false)}
                       className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between gap-2 text-[11px]">
-                  <label className="flex items-center gap-2 font-bold text-slate-700 cursor-pointer">
+                <div className="px-4 py-2 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between gap-2 text-xs">
+                  <label className="flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={soundEnabled}
@@ -2076,7 +2076,7 @@ export const SupportChatCircles: React.FC = () => {
                           if (p === 'granted') toast.success('Alertas de escritorio activadas');
                         });
                       }}
-                      className="text-[10px] font-black text-indigo-600 hover:underline"
+                      className="text-xs font-semibold text-indigo-600 hover:underline"
                     >
                       Activar aviso en escritorio
                     </button>
@@ -2084,8 +2084,8 @@ export const SupportChatCircles: React.FC = () => {
                 </div>
 
                 {scopes.all && (
-                  <div className="px-4 py-2 bg-white border-b border-slate-100 flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold text-slate-400 mr-1">Filtrar área:</span>
+                  <div className="px-4 py-2 bg-white border-b border-slate-100 flex items-center gap-1">
+                    <span className="text-xs font-medium text-slate-400 mr-1.5">Área:</span>
                     {(
                       [
                         { id: 'all', label: 'Todo' },
@@ -2097,10 +2097,10 @@ export const SupportChatCircles: React.FC = () => {
                         key={f.id}
                         type="button"
                         onClick={() => setAlertAreaFilter(f.id)}
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black transition ${
+                        className={`px-2.5 py-1 rounded-lg text-xs transition ${
                           alertAreaFilter === f.id
-                            ? 'bg-indigo-600 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-indigo-50 text-indigo-700 font-bold'
+                            : 'text-slate-600 hover:bg-slate-50 font-medium'
                         }`}
                       >
                         {f.label}
@@ -2109,41 +2109,53 @@ export const SupportChatCircles: React.FC = () => {
                   </div>
                 )}
 
-                <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
+                <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-100 bg-white">
                   {alertCircles.total === 0 ? (
-                    <div className="p-6 text-center space-y-1">
-                      <CheckCircle2 className="w-7 h-7 text-emerald-500 mx-auto" />
-                      <p className="text-xs font-black text-slate-800">Todo al día</p>
-                      <p className="text-[11px] text-slate-500">No hay chats ni leads esperando respuesta.</p>
+                    <div className="p-8 text-center space-y-1">
+                      <CheckCircle2 className="w-6 h-6 text-slate-400 mx-auto" />
+                      <p className="text-[13px] font-bold text-slate-800">Todo al día</p>
+                      <p className="text-xs text-slate-400">No hay conversaciones ni leads pendientes de respuesta.</p>
                     </div>
                   ) : (
                     <>
                       {alertCircles.newLeads.length > 0 && (
-                        <div className="p-2.5 bg-amber-50/50">
-                          <p className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-wider text-amber-800 flex items-center gap-1">
-                            <UserPlus className="w-3 h-3" />
-                            Leads nuevos por tomar / cotizar ({alertCircles.newLeads.length})
-                          </p>
-                          <div className="space-y-1">
+                        <div>
+                          <div className="px-4 py-2 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                              <UserPlus className="w-3.5 h-3.5 text-indigo-600" />
+                              Leads nuevos por tomar ({alertCircles.newLeads.length})
+                            </span>
+                          </div>
+                          <div className="divide-y divide-slate-100">
                             {alertCircles.newLeads.slice(0, 6).map((c) => (
                               <button
                                 key={c.circleId}
                                 type="button"
                                 onClick={() => {
-                                  setCircleFilter('por_clasificar');
+                                  setSearchQuery('');
                                   setOwnerFilter('all');
+                                  setChannelFilter('all');
+                                  setCircleFilter('por_clasificar');
                                   setSelectedCircleId(c.circleId);
                                   setShowAlertsPopover(false);
                                 }}
-                                className="w-full text-left px-2.5 py-2 rounded-xl bg-white hover:bg-amber-100/60 border border-amber-200/70 flex items-center justify-between gap-2 transition"
+                                className="w-full text-left px-4 py-2.5 bg-white hover:bg-slate-50 flex items-center gap-3 transition"
                               >
-                                <div className="min-w-0">
-                                  <p className="text-xs font-black text-slate-900 truncate">{c.clientName}</p>
-                                  <p className="text-[11px] text-slate-600 truncate">{c.lastMessageText}</p>
+                                <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 font-semibold text-xs flex items-center justify-center shrink-0">
+                                  {initials(c.clientName)}
                                 </div>
-                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black shrink-0">
-                                  {c.waitMinutes > 0 ? formatWaitDuration(c.waitMinutes) : listTimeLabel(c.lastMessageAt)}
-                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="text-[13.5px] font-semibold text-slate-900 truncate">{c.clientName}</span>
+                                      <span className="text-xs text-slate-400 shrink-0">· Por tomar</span>
+                                    </div>
+                                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 text-[11px] font-semibold shrink-0">
+                                      {c.waitMinutes > 0 ? formatWaitDuration(c.waitMinutes) : listTimeLabel(c.lastMessageAt)}
+                                    </span>
+                                  </div>
+                                  <p className="text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
+                                </div>
                               </button>
                             ))}
                           </div>
@@ -2151,71 +2163,107 @@ export const SupportChatCircles: React.FC = () => {
                       )}
 
                       {alertCircles.urgent.length > 0 && (
-                        <div className="p-2.5 bg-rose-50/40">
-                          <p className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-wider text-rose-700 flex items-center gap-1">
-                            <Flame className="w-3 h-3" />
-                            Urgentes &gt; 15 min sin contestar ({alertCircles.urgent.length})
-                          </p>
-                          <div className="space-y-1">
-                            {alertCircles.urgent.slice(0, 8).map((c) => (
-                              <button
-                                key={c.circleId}
-                                type="button"
-                                onClick={() => {
-                                  setCircleFilter('all');
-                                  setOwnerFilter('all');
-                                  setSelectedCircleId(c.circleId);
-                                  setShowAlertsPopover(false);
-                                }}
-                                className="w-full text-left px-2.5 py-2 rounded-xl bg-white hover:bg-rose-50 border border-rose-200/80 flex items-center justify-between gap-2 transition"
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <p className="text-xs font-black text-slate-900 truncate">{c.clientName}</p>
-                                    <ScopeChip circle={c} compact />
-                                  </div>
-                                  <p className="text-[11px] text-slate-600 truncate">{c.lastMessageText}</p>
+                        <div>
+                          <div className="px-4 py-2 bg-slate-50/70 border-y border-slate-100 flex items-center justify-between">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-rose-500" />
+                              Espera mayor a 15 min ({alertCircles.urgent.length})
+                            </span>
+                          </div>
+                          <div className="divide-y divide-slate-100">
+                            {alertCircles.urgent.slice(0, 8).map((c) => {
+                              const shortType = c.scope === 'soporte' ? (c.isGroup ? 'Grupo' : 'Cliente') : 'Lead';
+                              return (
+                                <div
+                                  key={c.circleId}
+                                  className="px-4 py-2.5 bg-white hover:bg-slate-50 flex items-center gap-3 transition"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSearchQuery('');
+                                      setOwnerFilter('all');
+                                      setChannelFilter('all');
+                                      setCircleFilter('all');
+                                      setSelectedCircleId(c.circleId);
+                                      setShowAlertsPopover(false);
+                                    }}
+                                    className="flex-1 min-w-0 text-left flex items-center gap-3"
+                                  >
+                                    <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 font-semibold text-xs flex items-center justify-center shrink-0">
+                                      {c.isGroup ? <Users className="w-4 h-4" /> : initials(c.clientName)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                          <span className="text-[13.5px] font-semibold text-slate-900 truncate">{c.clientName}</span>
+                                          <span className="text-xs text-slate-400 shrink-0">· {shortType}</span>
+                                        </div>
+                                        <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200/80 text-[11px] font-semibold shrink-0">
+                                          {formatWaitDuration(c.waitMinutes)}
+                                        </span>
+                                      </div>
+                                      <p className="text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
+                                    </div>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMarkCircleAttended(c)}
+                                    title="Marcar como ya atendido"
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-200/70 transition shrink-0"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
                                 </div>
-                                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-black shrink-0">
-                                  {formatWaitDuration(c.waitMinutes)}
-                                </span>
-                              </button>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
 
                       {alertCircles.waitingRecent.length > 0 && (
-                        <div className="p-2.5">
-                          <p className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            En espera reciente ({alertCircles.waitingRecent.length})
-                          </p>
-                          <div className="space-y-1">
-                            {alertCircles.waitingRecent.slice(0, 6).map((c) => (
-                              <button
-                                key={c.circleId}
-                                type="button"
-                                onClick={() => {
-                                  setCircleFilter('all');
-                                  setOwnerFilter('all');
-                                  setSelectedCircleId(c.circleId);
-                                  setShowAlertsPopover(false);
-                                }}
-                                className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-slate-50 flex items-center justify-between gap-2 transition"
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
-                                    <p className="text-xs font-bold text-slate-900 truncate">{c.clientName}</p>
-                                    <ScopeChip circle={c} compact />
+                        <div>
+                          <div className="px-4 py-2 bg-slate-50/70 border-y border-slate-100 flex items-center justify-between">
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5 text-slate-400" />
+                              En espera reciente ({alertCircles.waitingRecent.length})
+                            </span>
+                          </div>
+                          <div className="divide-y divide-slate-100">
+                            {alertCircles.waitingRecent.slice(0, 6).map((c) => {
+                              const shortType = c.scope === 'soporte' ? (c.isGroup ? 'Grupo' : 'Cliente') : 'Lead';
+                              return (
+                                <button
+                                  key={c.circleId}
+                                  type="button"
+                                  onClick={() => {
+                                    setSearchQuery('');
+                                    setOwnerFilter('all');
+                                    setChannelFilter('all');
+                                    setCircleFilter('all');
+                                    setSelectedCircleId(c.circleId);
+                                    setShowAlertsPopover(false);
+                                  }}
+                                  className="w-full text-left px-4 py-2.5 bg-white hover:bg-slate-50 flex items-center gap-3 transition"
+                                >
+                                  <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 font-semibold text-xs flex items-center justify-center shrink-0">
+                                    {c.isGroup ? <Users className="w-4 h-4" /> : initials(c.clientName)}
                                   </div>
-                                  <p className="text-[11px] text-slate-500 truncate">{c.lastMessageText}</p>
-                                </div>
-                                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold shrink-0">
-                                  {formatWaitDuration(c.waitMinutes)}
-                                </span>
-                              </button>
-                            ))}
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="text-[13.5px] font-semibold text-slate-900 truncate">{c.clientName}</span>
+                                        <span className="text-xs text-slate-400 shrink-0">· {shortType}</span>
+                                      </div>
+                                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 text-[11px] font-semibold shrink-0">
+                                        {formatWaitDuration(c.waitMinutes)}
+                                      </span>
+                                    </div>
+                                    <p className="text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
+                                  </div>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
