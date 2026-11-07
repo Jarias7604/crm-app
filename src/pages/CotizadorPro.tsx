@@ -8,6 +8,7 @@ import { leadsService } from '../services/leads';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { cotizacionesService } from '../services/cotizaciones';
+import { supabase } from '../services/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
 import { pdfService } from '../services/pdfService';
