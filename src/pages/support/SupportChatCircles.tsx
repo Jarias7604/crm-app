@@ -1073,10 +1073,6 @@ export const SupportChatCircles: React.FC = () => {
     [circles, selectedCircleId]
   );
 
-  useEffect(() => {
-    if (activeCircle) markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt);
-  }, [activeCircle?.circleId, activeCircle?.lastMessageAt]);
-
   // Load quotes (cotizaciones) for the active lead / phone so sales can send proposal links in 1 click
   useEffect(() => {
     setShowQuotesPopover(false);
@@ -1409,6 +1405,7 @@ export const SupportChatCircles: React.FC = () => {
   const handleSendReply = async (customText?: string) => {
     const textToSend = (customText ?? messageInput).trim();
     if (!textToSend || !activeCircle || !activeCompanyId || !canSend) return;
+    markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt);
     const t = activeCircle.activeTicket;
     if (!customText) setMessageInput('');
     const optimistic: TicketComment = {
@@ -2373,16 +2370,22 @@ export const SupportChatCircles: React.FC = () => {
                       markCircleAsRead(circle.circleId, circle.lastMessageAt);
                       setSelectedCircleId(circle.circleId);
                     }}
-                    className={`w-full text-left px-3.5 py-2.5 flex items-center gap-3 transition relative ${
+                    className={`w-full text-left px-3.5 py-2.5 flex items-center gap-3 transition relative border-l-[3px] ${
                       isSelected
-                        ? 'bg-indigo-50/50 border-l-2 border-indigo-600'
-                        : 'bg-white hover:bg-slate-50/80'
+                        ? 'bg-indigo-50/80 border-l-indigo-600'
+                        : unread
+                        ? 'bg-[#F5F7FF] hover:bg-indigo-50/60 border-l-indigo-500'
+                        : 'bg-white hover:bg-slate-50/80 border-l-transparent'
                     }`}
                   >
                     <div className="relative shrink-0">
                       <div
-                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold ${
-                          isSelected || unread ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'
+                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs ${
+                          unread
+                            ? 'bg-indigo-100 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
+                            : isSelected
+                            ? 'bg-indigo-100 text-indigo-700 font-semibold'
+                            : 'bg-slate-100 text-slate-500 font-semibold'
                         }`}
                       >
                         {circle.isGroup ? <Users className="w-4 h-4" /> : initials(circle.clientName)}
@@ -2392,7 +2395,7 @@ export const SupportChatCircles: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`text-xs truncate ${unread ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>
+                          <span className={`text-xs truncate ${unread ? 'font-extrabold text-slate-950' : 'font-medium text-slate-600'}`}>
                             {circle.clientName}
                           </span>
                           <span className="text-[11px] text-slate-400 shrink-0">· {shortType}</span>
@@ -2407,14 +2410,21 @@ export const SupportChatCircles: React.FC = () => {
                               {formatWaitDuration(circle.waitMinutes)}
                             </span>
                           )}
-                          <span className={`text-[11px] ${unread ? 'font-semibold text-indigo-600' : 'text-slate-400'}`}>
+                          <span className={`text-[11px] ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
                             {listTimeLabel(circle.lastMessageAt)}
                           </span>
                         </div>
                       </div>
-                      <p className={`text-xs truncate mt-0.5 ${unread ? 'text-slate-700 font-medium' : 'text-slate-400 font-normal'}`}>
-                        {circle.lastMessageSender}: {circle.lastMessageText}
-                      </p>
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        <p className={`text-xs truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
+                          {circle.lastMessageSender}: {circle.lastMessageText}
+                        </p>
+                        {unread && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-bold leading-none shrink-0">
+                            Nuevo
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </button>
                 );
