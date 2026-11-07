@@ -853,7 +853,8 @@ export const SupportChatCircles: React.FC = () => {
       const isOpen = ['new', 'open', 'pending'].includes(activeTicket.status);
       const lastMessageAt = String(meta.last_whatsapp_at || latest.updated_at || latest.created_at);
 
-      // Detect short polite closing messages ("Muchas gracias", "Ok", "Está bien", etc.) so they don't trigger false red SLA alarms
+      // Detect polite closing messages ("Muchas gracias", "Gracias por resolverme el problema", "Ok", "Está bien", etc.)
+      // and internal team chats so they don't trigger false red SLA alarms
       const normMsg = lastMessageText
         .toLowerCase()
         .replace(/[¡!¿?.,;:👍🙏👌✅🙌😊🤝]+/g, '')
@@ -861,17 +862,23 @@ export const SupportChatCircles: React.FC = () => {
       const isCourtesyClosing =
         scope !== 'por_clasificar' &&
         normMsg.length > 0 &&
-        normMsg.length <= 42 &&
-        /^(ok|okay|okey|si|sí|gracias|muchas gracias|mil gracias|perfecto|esta bien|está bien|entendido|de acuerdo|listo|excelente|bueno|va|dale|super|súper|gracias muy amable|muchas gracias muy amable|ok gracias|ok muchas gracias|perfecto gracias|esta bien gracias|está bien gracias|listo gracias)$/i.test(
+        normMsg.length <= 65 &&
+        (/^(ok|okay|okey|si|sí|gracias|muchas gracias|mil gracias|perfecto|esta bien|está bien|entendido|de acuerdo|listo|excelente|bueno|va|dale|super|súper|gracias muy amable|muchas gracias muy amable|ok gracias|ok muchas gracias|perfecto gracias|esta bien gracias|está bien gracias|listo gracias)$/i.test(
           normMsg
-        );
+        ) ||
+          /^(muchas\s+gracias|mil\s+gracias|gracias)\s+(por\s+|muy\s+amable|amigo|equipo|ingeniero|lic)/i.test(normMsg));
 
       const attendedAt = String(meta.wa_attended_at || activeMeta.wa_attended_at || '');
       const isManuallyAttended =
         Boolean(attendedAt && attendedAt >= lastMessageAt) || dismissedWaitingMap[key] === lastMessageAt;
 
       const unreadOrWaitingReply =
-        lastFrom === 'client' && !isManuallyAttended && !isCourtesyClosing && (scope !== 'soporte' || isOpen);
+        lastFrom === 'client' &&
+        scope !== 'interno' &&
+        scope !== 'spam' &&
+        !isManuallyAttended &&
+        !isCourtesyClosing &&
+        (scope !== 'soporte' || isOpen);
 
       const catObj = activeTicket.category_id ? catMap.get(activeTicket.category_id) : undefined;
       const catInfo = detectShortCategory(catObj?.name || '', activeTicket.title || '');
@@ -949,13 +956,13 @@ export const SupportChatCircles: React.FC = () => {
     // WhatsApp conversations only; old Service Hub tickets live in their own tab.
     const wa = circles.filter((c) => c.isWhatsApp && c.scope !== 'spam');
     const by = (s: WaScope) => circles.filter((c) => c.isWhatsApp && c.scope === s).length;
-    const waitingList = wa.filter((c) => isUnread(c) || c.unreadOrWaitingReply);
+    const waitingList = wa.filter((c) => c.unreadOrWaitingReply);
     const slaCritical = waitingList.filter((c) => c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60).length;
     const mine = wa.filter((c) => isMine(c)).length;
     const unassigned = wa.filter((c) => isUnassigned(c)).length;
     return {
       all: wa.length,
-      waiting: wa.filter((c) => isUnread(c)).length,
+      waiting: waitingList.length,
       waitingTotal: waitingList.length,
       slaCritical,
       mine,
@@ -1081,15 +1088,11 @@ export const SupportChatCircles: React.FC = () => {
       }
       tabs.push({ id: 'lead', label: `${scopes.all ? 'Leads' : 'Mis leads'} (${counts.lead})`, icon: UserPlus });
     }
-    if (scopes.all) {
-      tabs.push({ id: 'interno', label: `Equipo (${counts.interno})`, icon: ShieldCheck });
-      tabs.push({ id: 'spam', label: `Spam (${counts.spam})`, icon: Ban });
-    }
-    if (scopes.soporte && counts.tickets > 0) {
-      tabs.push({ id: 'tickets', label: `Tickets (${counts.tickets})`, icon: FileText });
-    }
+    if (circleFilter === 'interno') tabs.push({ id: 'interno', label: `Equipo (${counts.interno})`, icon: ShieldCheck });
+    if (circleFilter === 'spam') tabs.push({ id: 'spam', label: `Spam (${counts.spam})`, icon: Ban });
+    if (circleFilter === 'tickets') tabs.push({ id: 'tickets', label: `Tickets (${counts.tickets})`, icon: FileText });
     return tabs;
-  }, [counts, scopes]);
+  }, [counts, scopes, circleFilter]);
 
   const filteredCircles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -1100,7 +1103,7 @@ export const SupportChatCircles: React.FC = () => {
         return false;
       }
       if (circleFilter === 'all' && c.scope === 'spam') return false;
-      if (circleFilter === 'waiting' && (c.scope === 'spam' || !isUnread(c))) return false;
+      if (circleFilter === 'waiting' && (c.scope === 'spam' || !c.unreadOrWaitingReply)) return false;
       if (!['all', 'waiting', 'tickets'].includes(circleFilter) && c.scope !== circleFilter) return false;
 
       if (ownerFilter === 'mine' && !isMine(c)) return false;
@@ -2289,25 +2292,33 @@ export const SupportChatCircles: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Buscar cliente, grupo o teléfono..."
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-[13px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-[13px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    title="Limpiar búsqueda"
+                    className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 absolute right-2 top-1/2 -translate-y-1/2 transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
-              {circleFilter !== 'tickets' && (
-                <button
-                  type="button"
-                  onClick={() => setShowFilterMenu((v) => !v)}
-                  className={`px-3 py-2 rounded-xl border text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
-                    ownerFilter !== 'all' || channelFilter !== 'all'
-                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                      : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
-                  }`}
-                >
-                  <Filter className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Filtros</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowFilterMenu((v) => !v)}
+                className={`px-3 py-2 rounded-xl border text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
+                  ownerFilter !== 'all' || channelFilter !== 'all' || ['interno', 'spam', 'tickets'].includes(circleFilter)
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
+                }`}
+              >
+                <Filter className="w-3.5 h-3.5 text-slate-500" />
+                <span>Filtros</span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
 
               <button
                 onClick={() => loadSupportData()}
@@ -2319,8 +2330,8 @@ export const SupportChatCircles: React.FC = () => {
             </div>
 
             {/* Clean Filter Dropdown Menu */}
-            {showFilterMenu && circleFilter !== 'tickets' && (
-              <div className="absolute right-4 top-12 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl p-1.5 z-30 space-y-1 text-xs">
+            {showFilterMenu && (
+              <div className="absolute right-4 top-12 w-60 bg-white border border-slate-200 rounded-2xl shadow-xl p-1.5 z-30 space-y-1 text-xs">
                 <div className="px-2.5 py-1 text-[11px] font-semibold text-slate-400 flex items-center justify-between">
                   <span>Filtrar conversaciones</span>
                   <button type="button" onClick={() => setShowFilterMenu(false)} className="text-slate-400 hover:text-slate-600">
@@ -2335,12 +2346,13 @@ export const SupportChatCircles: React.FC = () => {
                     { id: 'urgent', label: 'Espera > 15 min', count: counts.slaCritical, urgent: true },
                   ] as { id: OwnerSubFilter; label: string; count: number; urgent?: boolean }[]
                 ).map((sf) => {
-                  const active = ownerFilter === sf.id;
+                  const active = ownerFilter === sf.id && !['interno', 'spam', 'tickets'].includes(circleFilter);
                   return (
                     <button
                       key={sf.id}
                       type="button"
                       onClick={() => {
+                        if (['interno', 'spam', 'tickets'].includes(circleFilter)) setCircleFilter('all');
                         setOwnerFilter(sf.id);
                         setShowFilterMenu(false);
                       }}
@@ -2357,6 +2369,40 @@ export const SupportChatCircles: React.FC = () => {
                     </button>
                   );
                 })}
+
+                {scopes.all && (
+                  <div className="pt-1.5 mt-1 border-t border-slate-100 space-y-0.5">
+                    <div className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Otras bandejas</div>
+                    {(
+                      [
+                        { id: 'interno' as CircleFilter, label: 'Equipo interno', count: counts.interno },
+                        { id: 'spam' as CircleFilter, label: 'Spam / bloqueados', count: counts.spam },
+                        ...(counts.tickets > 0 ? [{ id: 'tickets' as CircleFilter, label: 'Otros tickets (no WhatsApp)', count: counts.tickets }] : []),
+                      ]
+                    ).map((sec) => {
+                      const active = circleFilter === sec.id;
+                      return (
+                        <button
+                          key={sec.id}
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery('');
+                            setOwnerFilter('all');
+                            setChannelFilter('all');
+                            setCircleFilter(sec.id);
+                            setShowFilterMenu(false);
+                          }}
+                          className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition ${
+                            active ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700 hover:bg-slate-50 font-medium'
+                          }`}
+                        >
+                          <span>{sec.label}</span>
+                          <span className="text-slate-400">{sec.count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {circleFilter === 'soporte' && (
                   <div className="pt-1.5 mt-1 border-t border-slate-100 px-2 pb-1 space-y-1">
@@ -2379,18 +2425,21 @@ export const SupportChatCircles: React.FC = () => {
               </div>
             )}
 
-            {/* Single clean row of primary scope tabs */}
-            <div className="flex items-center gap-1 pt-0.5 overflow-x-auto no-scrollbar">
+            {/* Single clean row of primary scope tabs (no horizontal scrollbar, resets stuck search/subfilters on switch) */}
+            <div className="flex items-center gap-1 pt-0.5 flex-wrap">
               {filterTabs.map((tab) => {
                 const active = circleFilter === tab.id;
                 return (
                   <button
                     key={tab.id}
+                    type="button"
                     onClick={() => {
+                      setSearchQuery('');
+                      setOwnerFilter('all');
+                      setChannelFilter('all');
                       setCircleFilter(tab.id);
-                      if (tab.id !== 'soporte') setChannelFilter('all');
                     }}
-                    className={`px-2.5 py-1.5 rounded-lg text-[12.5px] whitespace-nowrap transition inline-flex items-center gap-1.5 ${
+                    className={`px-2.5 py-1 rounded-lg text-xs whitespace-nowrap transition inline-flex items-center gap-1.5 ${
                       active
                         ? 'bg-indigo-50 text-indigo-700 font-bold'
                         : 'text-slate-600 hover:bg-slate-50 font-medium'
@@ -2408,7 +2457,23 @@ export const SupportChatCircles: React.FC = () => {
             {loading && circles.length === 0 ? (
               <div className="p-8 text-center text-[13px] text-slate-400 font-medium">Cargando chats…</div>
             ) : filteredCircles.length === 0 ? (
-              <div className="p-8 text-center text-[13px] text-slate-400 font-medium">No hay conversaciones en esta vista.</div>
+              <div className="p-8 text-center space-y-2.5">
+                <p className="text-[13px] text-slate-400 font-medium">No hay conversaciones en esta vista.</p>
+                {(searchQuery || ownerFilter !== 'all' || channelFilter !== 'all') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setOwnerFilter('all');
+                      setChannelFilter('all');
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Limpiar búsqueda y filtros</span>
+                  </button>
+                )}
+              </div>
             ) : (
               filteredCircles.map((circle) => {
                 const isSelected = activeCircle?.circleId === circle.circleId;
