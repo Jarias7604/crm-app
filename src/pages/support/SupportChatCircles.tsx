@@ -481,6 +481,42 @@ export const SupportChatCircles: React.FC = () => {
     });
   };
 
+  const [dismissedWaitingMap, setDismissedWaitingMap] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('crm_wa_dismissed_waiting') || '{}');
+    } catch {
+      return {};
+    }
+  });
+  const handleMarkCircleAttended = async (circle: SupportCircle) => {
+    markCircleAsRead(circle.circleId, circle.lastMessageAt);
+    setDismissedWaitingMap((prev) => {
+      const next = { ...prev, [circle.circleId]: circle.lastMessageAt };
+      try {
+        localStorage.setItem('crm_wa_dismissed_waiting', JSON.stringify(next));
+      } catch {
+        // ignore storage quota errors
+      }
+      return next;
+    });
+    try {
+      const currentMeta = (circle.activeTicket.metadata || {}) as Record<string, any>;
+      await supabase
+        .from('tickets')
+        .update({
+          metadata: {
+            ...currentMeta,
+            wa_attended_at: circle.lastMessageAt,
+          },
+        })
+        .eq('id', circle.activeTicket.id);
+      toast.success('Conversación marcada como atendida');
+      loadSupportData(true);
+    } catch {
+      toast.success('Marcado como atendido');
+    }
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const defaultFilter: CircleFilter = scopes.all ? 'all' : scopes.soporte && !scopes.leads ? 'soporte' : scopes.leads && !scopes.soporte ? 'por_clasificar' : 'all';
   const [circleFilter, setCircleFilter] = useState<CircleFilter>(defaultFilter);
@@ -584,7 +620,7 @@ export const SupportChatCircles: React.FC = () => {
   // Resizable left column
   const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem('crm_circles_left_width'));
-    return saved >= 260 && saved <= 750 ? saved : 380;
+    return saved >= 260 && saved <= 750 ? saved : 400;
   });
   const [isResizingLeft, setIsResizingLeft] = useState(false);
   const resizeStartXRef = useRef<number>(0);
@@ -779,13 +815,23 @@ export const SupportChatCircles: React.FC = () => {
       const leadId = (activeTicket.lead_id || latest.lead_id || null) as string | null;
       const lead = leadId ? leadMap.get(leadId) : undefined;
 
+      const sanitizeWaName = (raw?: string | null): string => {
+        const cleaned = stripEmojis(String(raw || '')).trim();
+        if (!cleaned) return '';
+        if (/^(voc[eê]|you|t[uú])$/i.test(cleaned)) return '';
+        return cleaned;
+      };
+
+      const cleanPushName = sanitizeWaName(meta.whatsapp_push_name);
+      const cleanLeadName = sanitizeWaName(latest.lead_name);
+
       const clientName = isWa
         ? stripEmojis(
             String(
               (isGroup ? meta.whatsapp_group_subject : '') ||
-                latest.lead_name ||
-                meta.whatsapp_push_name ||
-                (phone ? `+${phone}` : 'WhatsApp')
+                cleanLeadName ||
+                cleanPushName ||
+                (phone ? `+${phone}` : 'Contacto WhatsApp')
             )
           )
         : extractLegacyClientName(activeTicket);
@@ -796,23 +842,42 @@ export const SupportChatCircles: React.FC = () => {
         .map((l) => l.trim())
         .filter(Boolean);
       const lastChatLine = [...descLines].reverse().find((l) => l.startsWith('[') && (l.includes('👤') || l.includes('👨‍💻')));
-      let lastMessageSender = stripEmojis(String(meta.whatsapp_push_name || clientName));
+      let lastMessageSender = cleanPushName || clientName;
       let lastMessageText = stripEmojis(String(meta.last_whatsapp_message || latest.title || ''));
       const parsed = lastChatLine ? parseChatLine(lastChatLine) : null;
       if (parsed) {
-        lastMessageSender = stripEmojis(parsed.sender);
+        lastMessageSender = sanitizeWaName(parsed.sender) || clientName;
         lastMessageText = stripEmojis(parsed.text);
       }
       const lastFrom: string = meta.last_message_from || (parsed ? (parsed.icon === '👨‍💻' ? 'staff' : 'client') : 'client');
       const isOpen = ['new', 'open', 'pending'].includes(activeTicket.status);
-      const unreadOrWaitingReply = lastFrom === 'client' && (scope !== 'soporte' || isOpen);
+      const lastMessageAt = String(meta.last_whatsapp_at || latest.updated_at || latest.created_at);
+
+      // Detect short polite closing messages ("Muchas gracias", "Ok", "Está bien", etc.) so they don't trigger false red SLA alarms
+      const normMsg = lastMessageText
+        .toLowerCase()
+        .replace(/[¡!¿?.,;:👍🙏👌✅🙌😊🤝]+/g, '')
+        .trim();
+      const isCourtesyClosing =
+        scope !== 'por_clasificar' &&
+        normMsg.length > 0 &&
+        normMsg.length <= 42 &&
+        /^(ok|okay|okey|si|sí|gracias|muchas gracias|mil gracias|perfecto|esta bien|está bien|entendido|de acuerdo|listo|excelente|bueno|va|dale|super|súper|gracias muy amable|muchas gracias muy amable|ok gracias|ok muchas gracias|perfecto gracias|esta bien gracias|está bien gracias|listo gracias)$/i.test(
+          normMsg
+        );
+
+      const attendedAt = String(meta.wa_attended_at || activeMeta.wa_attended_at || '');
+      const isManuallyAttended =
+        Boolean(attendedAt && attendedAt >= lastMessageAt) || dismissedWaitingMap[key] === lastMessageAt;
+
+      const unreadOrWaitingReply =
+        lastFrom === 'client' && !isManuallyAttended && !isCourtesyClosing && (scope !== 'soporte' || isOpen);
 
       const catObj = activeTicket.category_id ? catMap.get(activeTicket.category_id) : undefined;
       const catInfo = detectShortCategory(catObj?.name || '', activeTicket.title || '');
       const assignedTechId = activeTicket.assigned_to || null;
       const leadOwnerId = (lead && (lead as any).assigned_to) || null;
       const ch = String(activeMeta.support_channel || 'soporte') as SupportChannelType;
-      const lastMessageAt = String(meta.last_whatsapp_at || latest.updated_at || latest.created_at);
       const waitMinutes = unreadOrWaitingReply
         ? Math.max(1, Math.floor((Date.now() - new Date(lastMessageAt).getTime()) / 60000))
         : 0;
@@ -841,7 +906,7 @@ export const SupportChatCircles: React.FC = () => {
       list.push({
         circleId: key,
         clientName,
-        pushName: stripEmojis(String(meta.whatsapp_push_name || '')),
+        pushName: cleanPushName,
         phone,
         whatsappJid: String(meta.whatsapp_jid || ''),
         isWhatsApp: isWa,
@@ -873,7 +938,7 @@ export const SupportChatCircles: React.FC = () => {
       return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickets, categories, agents, realClients, companyLeads, scopes, profile?.id, adminPreviewMode, slaTick]);
+  }, [tickets, categories, agents, realClients, companyLeads, scopes, profile?.id, adminPreviewMode, slaTick, dismissedWaitingMap]);
 
   const isUnread = (c: SupportCircle) => c.unreadOrWaitingReply && readCirclesMap[c.circleId] !== c.lastMessageAt;
   const isMine = (c: SupportCircle) =>
@@ -1012,7 +1077,7 @@ export const SupportChatCircles: React.FC = () => {
     if (scopes.soporte) tabs.push({ id: 'soporte', label: `Soporte (${counts.soporte})`, icon: Building2 });
     if (scopes.leads) {
       if (scopes.leadsPool) {
-        tabs.push({ id: 'por_clasificar', label: `Leads nuevos · por tomar (${counts.por_clasificar})`, icon: HelpCircle, alert: counts.por_clasificar > 0 });
+        tabs.push({ id: 'por_clasificar', label: `Por tomar (${counts.por_clasificar})`, icon: HelpCircle, alert: counts.por_clasificar > 0 });
       }
       tabs.push({ id: 'lead', label: `${scopes.all ? 'Leads' : 'Mis leads'} (${counts.lead})`, icon: UserPlus });
     }
@@ -1021,7 +1086,7 @@ export const SupportChatCircles: React.FC = () => {
       tabs.push({ id: 'spam', label: `Spam (${counts.spam})`, icon: Ban });
     }
     if (scopes.soporte && counts.tickets > 0) {
-      tabs.push({ id: 'tickets', label: `Otros tickets (${counts.tickets})`, icon: FileText });
+      tabs.push({ id: 'tickets', label: `Tickets (${counts.tickets})`, icon: FileText });
     }
     return tabs;
   }, [counts, scopes]);
@@ -2218,13 +2283,13 @@ export const SupportChatCircles: React.FC = () => {
           <div className="px-4 pt-3 pb-2 border-b border-slate-100 space-y-2 relative">
             <div className="flex items-center gap-1.5">
               <div className="relative flex-1">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Buscar cliente, grupo o teléfono..."
-                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-[13px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
               </div>
 
@@ -2232,7 +2297,7 @@ export const SupportChatCircles: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowFilterMenu((v) => !v)}
-                  className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
+                  className={`px-3 py-2 rounded-xl border text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
                     ownerFilter !== 'all' || channelFilter !== 'all'
                       ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                       : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
@@ -2247,9 +2312,9 @@ export const SupportChatCircles: React.FC = () => {
               <button
                 onClick={() => loadSupportData()}
                 title={`Actualizar (${filteredCircles.length} conversaciones)`}
-                className="p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 flex items-center justify-center transition shrink-0"
+                className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 flex items-center justify-center transition shrink-0"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
               </button>
             </div>
 
@@ -2325,7 +2390,7 @@ export const SupportChatCircles: React.FC = () => {
                       setCircleFilter(tab.id);
                       if (tab.id !== 'soporte') setChannelFilter('all');
                     }}
-                    className={`px-2.5 py-1 rounded-lg text-xs whitespace-nowrap transition inline-flex items-center gap-1.5 ${
+                    className={`px-2.5 py-1.5 rounded-lg text-[12.5px] whitespace-nowrap transition inline-flex items-center gap-1.5 ${
                       active
                         ? 'bg-indigo-50 text-indigo-700 font-bold'
                         : 'text-slate-600 hover:bg-slate-50 font-medium'
@@ -2341,9 +2406,9 @@ export const SupportChatCircles: React.FC = () => {
 
           <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
             {loading && circles.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-400 font-medium">Cargando chats…</div>
+              <div className="p-8 text-center text-[13px] text-slate-400 font-medium">Cargando chats…</div>
             ) : filteredCircles.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-400 font-medium">No hay conversaciones en esta vista.</div>
+              <div className="p-8 text-center text-[13px] text-slate-400 font-medium">No hay conversaciones en esta vista.</div>
             ) : (
               filteredCircles.map((circle) => {
                 const isSelected = activeCircle?.circleId === circle.circleId;
@@ -2370,7 +2435,7 @@ export const SupportChatCircles: React.FC = () => {
                       markCircleAsRead(circle.circleId, circle.lastMessageAt);
                       setSelectedCircleId(circle.circleId);
                     }}
-                    className={`w-full text-left px-3.5 py-2.5 flex items-center gap-3 transition relative border-l-[3px] ${
+                    className={`w-full text-left px-4 py-3 flex items-center gap-3 transition relative border-l-[3px] ${
                       isSelected
                         ? 'bg-indigo-50/80 border-l-indigo-600'
                         : unread
@@ -2380,7 +2445,7 @@ export const SupportChatCircles: React.FC = () => {
                   >
                     <div className="relative shrink-0">
                       <div
-                        className={`w-9 h-9 rounded-full flex items-center justify-center text-xs ${
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] ${
                           unread
                             ? 'bg-indigo-100 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
                             : isSelected
@@ -2395,32 +2460,32 @@ export const SupportChatCircles: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`text-xs truncate ${unread ? 'font-extrabold text-slate-950' : 'font-medium text-slate-600'}`}>
+                          <span className={`text-[13.5px] truncate ${unread ? 'font-extrabold text-slate-950' : 'font-semibold text-slate-700'}`}>
                             {circle.clientName}
                           </span>
-                          <span className="text-[11px] text-slate-400 shrink-0">· {shortType}</span>
+                          <span className="text-xs text-slate-400 shrink-0">· {shortType}</span>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           {isOverdue && (
                             <span
                               title={`Esperando respuesta hace ${formatWaitDuration(circle.waitMinutes)}`}
-                              className="px-1.5 py-0.2 rounded bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-semibold inline-flex items-center gap-0.5"
+                              className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-semibold inline-flex items-center gap-0.5"
                             >
                               <Clock className="w-2.5 h-2.5" />
                               {formatWaitDuration(circle.waitMinutes)}
                             </span>
                           )}
-                          <span className={`text-[11px] ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
+                          <span className={`text-xs ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
                             {listTimeLabel(circle.lastMessageAt)}
                           </span>
                         </div>
                       </div>
                       <div className="flex items-center justify-between gap-2 mt-0.5">
-                        <p className={`text-xs truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
+                        <p className={`text-[12.5px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
                           {circle.lastMessageSender}: {circle.lastMessageText}
                         </p>
                         {unread && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[9px] font-bold leading-none shrink-0">
+                          <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold leading-none shrink-0">
                             Nuevo
                           </span>
                         )}
@@ -2460,21 +2525,32 @@ export const SupportChatCircles: React.FC = () => {
             {/* Chat header (Clean, Uncluttered, 100% Vector Icons) */}
             <div className="bg-white border-b border-slate-200/70 px-6 py-2.5 flex items-center justify-between gap-3 shrink-0 min-h-16">
               <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-10 h-10 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
+                <div className={`w-10 h-10 rounded-full font-bold text-[13px] flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
                   {activeCircle.isGroup ? <Users className="w-4 h-4" /> : initials(activeCircle.clientName)}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-sm font-bold text-slate-900 tracking-tight truncate max-w-[280px]">{activeCircle.clientName}</h3>
+                    <h3 className="text-[15px] font-bold text-slate-900 tracking-tight truncate max-w-[300px]">{activeCircle.clientName}</h3>
                     <ScopeChip circle={activeCircle} />
                     {activeCircle.unreadOrWaitingReply && activeCircle.waitMinutes >= 15 && activeCircle.waitMinutes <= 24 * 60 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200/80">
-                        <Clock className="w-2.5 h-2.5" />
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200/80">
+                        <Clock className="w-3 h-3" />
                         Espera: {formatWaitDuration(activeCircle.waitMinutes)}
                       </span>
                     )}
+                    {activeCircle.unreadOrWaitingReply && (
+                      <button
+                        type="button"
+                        onClick={() => handleMarkCircleAttended(activeCircle)}
+                        title="Marcar conversación como ya atendida (quita la alerta de espera)"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 transition"
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>Marcar atendido</span>
+                      </button>
+                    )}
                   </div>
-                  <p className="text-[11px] font-medium text-slate-400 truncate">
+                  <p className="text-xs font-medium text-slate-400 truncate mt-0.5">
                     {activeCircle.isGroup
                       ? 'Grupo de WhatsApp'
                       : [
@@ -2491,7 +2567,7 @@ export const SupportChatCircles: React.FC = () => {
                   {!activeCircle.isGroup && activeCircle.memberOfGroups.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                       <Users className="w-3 h-3 text-slate-400" />
-                      <span className="text-[10px] font-semibold text-slate-500">Grupos:</span>
+                      <span className="text-[11px] font-semibold text-slate-500">Grupos:</span>
                       {activeCircle.memberOfGroups.slice(0, 3).map((g) => {
                         const groupCircleId = `wa:${g.jid}`;
                         const exists = circles.some((c) => c.circleId === groupCircleId);
@@ -2501,7 +2577,7 @@ export const SupportChatCircles: React.FC = () => {
                             type="button"
                             disabled={!exists}
                             onClick={() => exists && setSelectedCircleId(groupCircleId)}
-                            className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-70 disabled:cursor-default transition"
+                            className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-70 disabled:cursor-default transition"
                           >
                             {g.subject || 'Grupo'}
                             {exists && <ExternalLink className="w-2.5 h-2.5 inline ml-1" />}
@@ -2817,16 +2893,16 @@ export const SupportChatCircles: React.FC = () => {
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-8 py-6 space-y-3">
               {loadingComments ? (
-                <div className="text-center py-12 text-xs font-medium text-slate-400">Cargando mensajes…</div>
+                <div className="text-center py-12 text-[13px] font-medium text-slate-400">Cargando mensajes…</div>
               ) : chatItems.length === 0 ? (
-                <div className="text-center py-12 text-xs font-medium text-slate-400">Sin mensajes todavía.</div>
+                <div className="text-center py-12 text-[13px] font-medium text-slate-400">Sin mensajes todavía.</div>
               ) : (
                 chatItems.map((b, idx) => {
                   const prev = chatItems[idx - 1];
                   const showDay = !prev || dayKey(prev.createdAt) !== dayKey(b.createdAt);
                   const daySep = showDay ? (
                     <div key={`day-${b.id}`} className="flex justify-center my-3">
-                      <span className="px-3.5 py-1 rounded-full bg-white text-[11px] font-bold text-slate-600 shadow-2xs capitalize">{dayLabel(b.createdAt)}</span>
+                      <span className="px-4 py-1 rounded-full bg-white text-xs font-bold text-slate-600 shadow-2xs capitalize">{dayLabel(b.createdAt)}</span>
                     </div>
                   ) : null;
 
@@ -2835,12 +2911,12 @@ export const SupportChatCircles: React.FC = () => {
                       <React.Fragment key={b.id}>
                         {daySep}
                         <div className="flex justify-center my-2">
-                          <div className="max-w-md w-full bg-[#E6E9FF] rounded-2xl px-4 py-2.5">
-                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600">
+                          <div className="max-w-lg w-full bg-[#E6E9FF] rounded-2xl px-4 py-2.5">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-600">
                               <Bell className="w-3.5 h-3.5" />
                               <span>{b.senderName}</span>
                             </div>
-                            <p className="text-xs font-medium text-slate-800 mt-0.5 leading-snug line-clamp-2">{b.text}</p>
+                            <p className="text-[13px] font-medium text-slate-800 mt-0.5 leading-snug line-clamp-2">{b.text}</p>
                           </div>
                         </div>
                       </React.Fragment>
@@ -2851,8 +2927,8 @@ export const SupportChatCircles: React.FC = () => {
                       <React.Fragment key={b.id}>
                         {daySep}
                         <div className="flex justify-center">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-900">
-                            <StickyNote className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-xs font-semibold text-amber-900">
+                            <StickyNote className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                             {b.text}
                             <span className="text-amber-600 font-normal">· {fmtTime(b.createdAt)}</span>
                           </span>
@@ -2865,16 +2941,16 @@ export const SupportChatCircles: React.FC = () => {
                       <React.Fragment key={b.id}>
                         {daySep}
                         <div className="flex justify-end">
-                          <div className="max-w-md bg-[#DFE3FF] text-slate-900 rounded-2xl rounded-br-xs px-4 py-2.5 shadow-2xs">
-                            <p className="text-[10px] font-bold text-indigo-700/80 mb-0.5">{b.senderName}</p>
+                          <div className="max-w-lg bg-[#DFE3FF] text-slate-900 rounded-2xl rounded-br-xs px-4 py-3 shadow-2xs">
+                            <p className="text-xs font-bold text-indigo-700/85 mb-0.5">{b.senderName}</p>
                             {renderMedia(b)}
-                            {b.text && <p className="text-xs font-medium text-slate-900 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
+                            {b.text && <p className="text-[13.5px] font-medium text-slate-900 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
                             <div className="flex items-center justify-end gap-1 mt-1">
-                              <span className="text-[10px] font-medium text-slate-500">{b.id.startsWith('temp-') ? 'enviando…' : fmtTime(b.createdAt)}</span>
+                              <span className="text-[11px] font-medium text-slate-500">{b.id.startsWith('temp-') ? 'enviando…' : fmtTime(b.createdAt)}</span>
                               {b.delivery === 'sent' ? (
                                 <CheckCheck className="w-3.5 h-3.5 text-emerald-500" aria-label="Entregado a WhatsApp" />
                               ) : b.delivery === 'error' ? (
-                                <span title={b.deliveryError || 'No se pudo enviar'} className="inline-flex items-center gap-0.5 text-[10px] font-bold text-rose-600">
+                                <span title={b.deliveryError || 'No se pudo enviar'} className="inline-flex items-center gap-0.5 text-[11px] font-bold text-rose-600">
                                   <AlertTriangle className="w-3 h-3" /> No enviado
                                 </span>
                               ) : b.delivery ? (
@@ -2890,18 +2966,18 @@ export const SupportChatCircles: React.FC = () => {
                     <React.Fragment key={b.id}>
                       {daySep}
                       <div className="flex justify-start">
-                        <div className="max-w-md bg-white text-slate-900 rounded-2xl rounded-bl-xs px-4 py-2.5 shadow-2xs">
-                          <p className="text-[11px] font-bold text-indigo-600 mb-0.5">{b.senderName}</p>
+                        <div className="max-w-lg bg-white text-slate-900 rounded-2xl rounded-bl-xs px-4 py-3 shadow-2xs">
+                          <p className="text-xs font-bold text-indigo-600 mb-0.5">{b.senderName}</p>
                           {renderMedia(b)}
-                          {b.text && <p className="text-xs font-medium text-slate-800 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
+                          {b.text && <p className="text-[13.5px] font-medium text-slate-800 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
                           {b.transcript && (
-                            <p className="mt-1.5 text-[11px] text-slate-600 bg-slate-50 rounded-lg px-2 py-1 italic">
-                              <Mic className="w-3 h-3 inline mr-1 text-indigo-500" />
+                            <p className="mt-1.5 text-xs text-slate-600 bg-slate-50 rounded-lg px-2.5 py-1.5 italic">
+                              <Mic className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />
                               {b.transcript}
                             </p>
                           )}
                           <div className="flex items-center justify-end mt-1">
-                            <span className="text-[10px] font-medium text-slate-400">{fmtTime(b.createdAt)}</span>
+                            <span className="text-[11px] font-medium text-slate-400">{fmtTime(b.createdAt)}</span>
                           </div>
                         </div>
                       </div>
@@ -2932,7 +3008,7 @@ export const SupportChatCircles: React.FC = () => {
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploadingFile}
                     title="Enviar imagen, documento o archivo"
-                    className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0 disabled:opacity-50"
+                    className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0 disabled:opacity-50"
                   >
                     {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   </button>
@@ -2945,7 +3021,7 @@ export const SupportChatCircles: React.FC = () => {
                       type="button"
                       onClick={() => setShowQuickRepliesPopover((v) => !v)}
                       title="Respuestas rápidas y plantillas"
-                      className={`px-2.5 py-2 rounded-xl text-[11px] font-semibold inline-flex items-center gap-1.5 border transition ${
+                      className={`px-3 py-2.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border transition ${
                         showQuickRepliesPopover
                           ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                           : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
@@ -2955,9 +3031,9 @@ export const SupportChatCircles: React.FC = () => {
                       <span className="hidden sm:inline">Plantillas</span>
                     </button>
                     {showQuickRepliesPopover && (
-                      <div className="absolute left-0 bottom-full mb-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-2 space-y-1">
+                      <div className="absolute left-0 bottom-full mb-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-2 space-y-1">
                         <div className="px-2.5 py-1.5 flex items-center justify-between border-b border-slate-100">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                             {activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar'
                               ? 'Plantillas de Ventas'
                               : 'Plantillas de Soporte'}
@@ -2969,13 +3045,13 @@ export const SupportChatCircles: React.FC = () => {
                               setNewQrScope(activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'ventas' : 'soporte');
                               setShowQuickReplyModal(true);
                             }}
-                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-0.5"
+                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-0.5"
                           >
                             <Plus className="w-3 h-3" />
                             Personalizar
                           </button>
                         </div>
-                        <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
+                        <div className="max-h-64 overflow-y-auto divide-y divide-slate-50">
                           {activeQuickReplies.map((q) => (
                             <button
                               key={q.id}
@@ -2984,10 +3060,10 @@ export const SupportChatCircles: React.FC = () => {
                                 setMessageInput(q.text);
                                 setShowQuickRepliesPopover(false);
                               }}
-                              className="w-full px-2.5 py-2 rounded-xl text-left hover:bg-slate-50 transition"
+                              className="w-full px-3 py-2 rounded-xl text-left hover:bg-slate-50 transition"
                             >
-                              <p className="text-xs font-semibold text-slate-800">{q.label}</p>
-                              <p className="text-[11px] text-slate-400 truncate mt-0.5">{q.text}</p>
+                              <p className="text-[13px] font-semibold text-slate-800">{q.label}</p>
+                              <p className="text-xs text-slate-400 truncate mt-0.5">{q.text}</p>
                             </button>
                           ))}
                         </div>
@@ -3005,7 +3081,7 @@ export const SupportChatCircles: React.FC = () => {
                       ? 'Modo Nota Interna activo (el cliente NO recibe este mensaje). Clic para volver a WhatsApp.'
                       : 'Cambiar a Nota Interna para dejar instrucciones al equipo dentro del chat'
                   }
-                  className={`px-2.5 py-2 rounded-xl text-[11px] font-semibold inline-flex items-center gap-1.5 shrink-0 border transition ${
+                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 border transition ${
                     composerMode === 'internal'
                       ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
                       : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200'
@@ -3030,7 +3106,7 @@ export const SupportChatCircles: React.FC = () => {
                       ? 'Escribe una nota interna para el equipo (NO se envía al WhatsApp del cliente)…'
                       : 'Escribe un mensaje a WhatsApp… (Shift+Enter = nueva línea)'
                   }
-                  className={`flex-1 resize-none max-h-32 px-4 py-2 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 transition ${
+                  className={`flex-1 resize-none max-h-32 px-4 py-2.5 rounded-xl text-[13.5px] font-medium focus:outline-none focus:ring-2 transition ${
                     composerMode === 'internal'
                       ? 'bg-white border-2 border-amber-300 text-amber-950 placeholder:text-amber-700/60 focus:ring-amber-500/20'
                       : 'bg-slate-50 border border-slate-200/80 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-indigo-500/20'
@@ -3040,11 +3116,11 @@ export const SupportChatCircles: React.FC = () => {
                   type="button"
                   disabled={!messageInput.trim() || sendingMessage}
                   onClick={handleComposerSubmit}
-                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl disabled:opacity-40 text-white text-xs font-bold transition ${
+                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl disabled:opacity-40 text-white text-xs font-bold transition ${
                     composerMode === 'internal' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'
                   }`}
                 >
-                  {composerMode === 'internal' ? <StickyNote className="w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                  {composerMode === 'internal' ? <StickyNote className="w-4 h-4" /> : <Send className="w-4 h-4" />}
                   {composerMode === 'internal' && <span className="hidden sm:inline">Guardar nota</span>}
                 </button>
               </div>
