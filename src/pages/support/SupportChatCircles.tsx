@@ -2030,155 +2030,218 @@ export const SupportChatCircles: React.FC = () => {
             </button>
 
             {showAlertsPopover && (
-              <div className="absolute right-0 top-full mt-2 w-[480px] max-w-[92vw] bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden">
-                <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Bell className="w-4 h-4 text-indigo-600" />
-                    <span className="text-[13.5px] font-bold text-slate-900 tracking-tight">Centro de Alertas WhatsApp</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const ok = playWaAlertSound('test');
-                        if (ok) toast.success('Alarma sonora verificada correctamente');
-                        else toast.error('El navegador bloqueó el audio; haz clic e intenta de nuevo');
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-xs font-semibold text-slate-700 transition"
-                    >
-                      Probar sonido
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowAlertsPopover(false)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="px-4 py-2 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between gap-2 text-xs">
-                  <label className="flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={soundEnabled}
-                      onChange={toggleSound}
-                      className="rounded border-slate-300 text-indigo-600"
-                    />
-                    <span>Sonido al recibir mensajes</span>
-                  </label>
-                  {typeof Notification !== 'undefined' && Notification.permission !== 'granted' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        Notification.requestPermission().then((p) => {
-                          if (p === 'granted') toast.success('Alertas de escritorio activadas');
-                        });
-                      }}
-                      className="text-xs font-semibold text-indigo-600 hover:underline"
-                    >
-                      Activar aviso en escritorio
-                    </button>
-                  )}
-                </div>
-
-                {scopes.all && (
-                  <div className="px-4 py-2 bg-white border-b border-slate-100 flex items-center gap-1">
-                    <span className="text-xs font-medium text-slate-400 mr-1.5">Área:</span>
-                    {(
-                      [
-                        { id: 'all', label: 'Todo' },
-                        { id: 'ventas', label: 'Ventas / Leads' },
-                        { id: 'soporte', label: 'Soporte Técnico' },
-                      ] as const
-                    ).map((f) => (
-                      <button
-                        key={f.id}
-                        type="button"
-                        onClick={() => setAlertAreaFilter(f.id)}
-                        className={`px-2.5 py-1 rounded-lg text-xs transition ${
-                          alertAreaFilter === f.id
-                            ? 'bg-indigo-50 text-indigo-700 font-bold'
-                            : 'text-slate-600 hover:bg-slate-50 font-medium'
-                        }`}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-100 bg-white">
-                  {alertCircles.total === 0 ? (
-                    <div className="p-8 text-center space-y-1">
-                      <CheckCircle2 className="w-6 h-6 text-slate-400 mx-auto" />
-                      <p className="text-[13px] font-bold text-slate-800">Todo al día</p>
-                      <p className="text-xs text-slate-400">No hay conversaciones ni leads pendientes de respuesta.</p>
+              <>
+                <div
+                  className="fixed inset-0 bg-slate-900/15 backdrop-blur-[1px] z-40"
+                  onClick={() => setShowAlertsPopover(false)}
+                />
+                <div className="absolute right-0 top-full mt-2 w-[480px] max-w-[92vw] bg-[#F4F6FA] border-2 border-indigo-200/90 ring-1 ring-slate-900/10 rounded-2xl shadow-[0_24px_60px_rgba(15,23,42,0.24)] z-50 overflow-hidden">
+                  <div className="px-4 py-3 bg-[#EEF0FF] border-b border-indigo-200/80 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-2xs">
+                        <Bell className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-[13.5px] font-bold text-indigo-950 tracking-tight">Centro de Alertas WhatsApp</span>
                     </div>
-                  ) : (
-                    <>
-                      {alertCircles.newLeads.length > 0 && (
-                        <div>
-                          <div className="px-4 py-2 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                              <UserPlus className="w-3.5 h-3.5 text-indigo-600" />
-                              Leads nuevos por tomar ({alertCircles.newLeads.length})
-                            </span>
-                          </div>
-                          <div className="divide-y divide-slate-100">
-                            {alertCircles.newLeads.slice(0, 6).map((c) => (
-                              <button
-                                key={c.circleId}
-                                type="button"
-                                onClick={() => {
-                                  setSearchQuery('');
-                                  setOwnerFilter('all');
-                                  setChannelFilter('all');
-                                  setCircleFilter('por_clasificar');
-                                  setSelectedCircleId(c.circleId);
-                                  setShowAlertsPopover(false);
-                                }}
-                                className="w-full text-left px-4 py-2.5 bg-white hover:bg-slate-50 flex items-center gap-3 transition"
-                              >
-                                <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 font-semibold text-xs flex items-center justify-center shrink-0">
-                                  {initials(c.clientName)}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                      <span className="text-[13.5px] font-semibold text-slate-900 truncate">{c.clientName}</span>
-                                      <span className="text-xs text-slate-400 shrink-0">· Por tomar</span>
-                                    </div>
-                                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 text-[11px] font-semibold shrink-0">
-                                      {c.waitMinutes > 0 ? formatWaitDuration(c.waitMinutes) : listTimeLabel(c.lastMessageAt)}
-                                    </span>
-                                  </div>
-                                  <p className="text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const ok = playWaAlertSound('test');
+                          if (ok) toast.success('Alarma sonora verificada correctamente');
+                          else toast.error('El navegador bloqueó el audio; haz clic e intenta de nuevo');
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-indigo-50 border border-indigo-200 text-xs font-semibold text-indigo-700 shadow-2xs transition"
+                      >
+                        Probar sonido
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAlertsPopover(false)}
+                        className="p-1 rounded-lg text-indigo-700/70 hover:text-indigo-950 hover:bg-indigo-100/70"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
 
-                      {alertCircles.urgent.length > 0 && (
-                        <div>
-                          <div className="px-4 py-2 bg-slate-50/70 border-y border-slate-100 flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5 text-rose-500" />
-                              Espera mayor a 15 min ({alertCircles.urgent.length})
-                            </span>
-                          </div>
-                          <div className="divide-y divide-slate-100">
-                            {alertCircles.urgent.slice(0, 8).map((c) => {
-                              const shortType = c.scope === 'soporte' ? (c.isGroup ? 'Grupo' : 'Cliente') : 'Lead';
-                              return (
-                                <div
+                  <div className="px-4 py-2 bg-white border-b border-slate-200/80 flex items-center justify-between gap-2 text-xs">
+                    <label className="flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={soundEnabled}
+                        onChange={toggleSound}
+                        className="rounded border-slate-300 text-indigo-600"
+                      />
+                      <span>Sonido al recibir mensajes</span>
+                    </label>
+                    {typeof Notification !== 'undefined' && Notification.permission !== 'granted' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          Notification.requestPermission().then((p) => {
+                            if (p === 'granted') toast.success('Alertas de escritorio activadas');
+                          });
+                        }}
+                        className="text-xs font-semibold text-indigo-600 hover:underline"
+                      >
+                        Activar aviso en escritorio
+                      </button>
+                    )}
+                  </div>
+
+                  {scopes.all && (
+                    <div className="px-4 py-2 bg-white border-b border-slate-200/80 flex items-center gap-1">
+                      <span className="text-xs font-medium text-slate-400 mr-1.5">Área:</span>
+                      {(
+                        [
+                          { id: 'all', label: 'Todo' },
+                          { id: 'ventas', label: 'Ventas / Leads' },
+                          { id: 'soporte', label: 'Soporte Técnico' },
+                        ] as const
+                      ).map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setAlertAreaFilter(f.id)}
+                          className={`px-2.5 py-1 rounded-lg text-xs transition ${
+                            alertAreaFilter === f.id
+                              ? 'bg-indigo-50 text-indigo-700 font-bold'
+                              : 'text-slate-600 hover:bg-slate-50 font-medium'
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="max-h-[420px] overflow-y-auto p-3 space-y-3 bg-[#F4F6FA]">
+                    {alertCircles.total === 0 ? (
+                      <div className="p-8 bg-white rounded-xl border border-slate-200/80 text-center space-y-1">
+                        <CheckCircle2 className="w-6 h-6 text-slate-400 mx-auto" />
+                        <p className="text-[13px] font-bold text-slate-800">Todo al día</p>
+                        <p className="text-xs text-slate-400">No hay conversaciones ni leads pendientes de respuesta.</p>
+                      </div>
+                    ) : (
+                      <>
+                        {alertCircles.newLeads.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="px-1 flex items-center justify-between">
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                <UserPlus className="w-3.5 h-3.5 text-indigo-600" />
+                                Leads nuevos por tomar ({alertCircles.newLeads.length})
+                              </span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {alertCircles.newLeads.slice(0, 6).map((c) => (
+                                <button
                                   key={c.circleId}
-                                  className="px-4 py-2.5 bg-white hover:bg-slate-50 flex items-center gap-3 transition"
+                                  type="button"
+                                  onClick={() => {
+                                    setSearchQuery('');
+                                    setOwnerFilter('all');
+                                    setChannelFilter('all');
+                                    setCircleFilter('por_clasificar');
+                                    setSelectedCircleId(c.circleId);
+                                    setShowAlertsPopover(false);
+                                  }}
+                                  className="w-full text-left px-3.5 py-2.5 bg-white hover:bg-indigo-50/40 rounded-xl border border-slate-200/90 hover:border-indigo-300 shadow-2xs flex items-center gap-3 transition"
                                 >
+                                  <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 font-semibold text-xs flex items-center justify-center shrink-0">
+                                    {initials(c.clientName)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="text-[13.5px] font-semibold text-slate-900 truncate">{c.clientName}</span>
+                                        <span className="text-xs text-slate-400 shrink-0">· Por tomar</span>
+                                      </div>
+                                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 text-[11px] font-semibold shrink-0">
+                                        {c.waitMinutes > 0 ? formatWaitDuration(c.waitMinutes) : listTimeLabel(c.lastMessageAt)}
+                                      </span>
+                                    </div>
+                                    <p className="text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {alertCircles.urgent.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="px-1 flex items-center justify-between">
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-rose-500" />
+                                Espera mayor a 15 min ({alertCircles.urgent.length})
+                              </span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {alertCircles.urgent.slice(0, 8).map((c) => {
+                                const shortType = c.scope === 'soporte' ? (c.isGroup ? 'Grupo' : 'Cliente') : 'Lead';
+                                return (
+                                  <div
+                                    key={c.circleId}
+                                    className="px-3.5 py-2.5 bg-white hover:bg-indigo-50/40 rounded-xl border border-slate-200/90 hover:border-indigo-300 shadow-2xs flex items-center gap-3 transition"
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setSearchQuery('');
+                                        setOwnerFilter('all');
+                                        setChannelFilter('all');
+                                        setCircleFilter('all');
+                                        setSelectedCircleId(c.circleId);
+                                        setShowAlertsPopover(false);
+                                      }}
+                                      className="flex-1 min-w-0 text-left flex items-center gap-3"
+                                    >
+                                      <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 font-semibold text-xs flex items-center justify-center shrink-0">
+                                        {c.isGroup ? <Users className="w-4 h-4" /> : initials(c.clientName)}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="text-[13.5px] font-semibold text-slate-900 truncate">{c.clientName}</span>
+                                            <span className="text-xs text-slate-400 shrink-0">· {shortType}</span>
+                                          </div>
+                                          <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200/80 text-[11px] font-semibold shrink-0">
+                                            {formatWaitDuration(c.waitMinutes)}
+                                          </span>
+                                        </div>
+                                        <p className="text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
+                                      </div>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMarkCircleAttended(c)}
+                                      title="Marcar como ya atendido"
+                                      className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-200/70 transition shrink-0"
+                                    >
+                                      <Check className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {alertCircles.waitingRecent.length > 0 && (
+                          <div className="space-y-1.5">
+                            <div className="px-1 flex items-center justify-between">
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                En espera reciente ({alertCircles.waitingRecent.length})
+                              </span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {alertCircles.waitingRecent.slice(0, 6).map((c) => {
+                                const shortType = c.scope === 'soporte' ? (c.isGroup ? 'Grupo' : 'Cliente') : 'Lead';
+                                return (
                                   <button
+                                    key={c.circleId}
                                     type="button"
                                     onClick={() => {
                                       setSearchQuery('');
@@ -2188,7 +2251,7 @@ export const SupportChatCircles: React.FC = () => {
                                       setSelectedCircleId(c.circleId);
                                       setShowAlertsPopover(false);
                                     }}
-                                    className="flex-1 min-w-0 text-left flex items-center gap-3"
+                                    className="w-full text-left px-3.5 py-2.5 bg-white hover:bg-indigo-50/40 rounded-xl border border-slate-200/90 hover:border-indigo-300 shadow-2xs flex items-center gap-3 transition"
                                   >
                                     <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 font-semibold text-xs flex items-center justify-center shrink-0">
                                       {c.isGroup ? <Users className="w-4 h-4" /> : initials(c.clientName)}
@@ -2199,78 +2262,23 @@ export const SupportChatCircles: React.FC = () => {
                                           <span className="text-[13.5px] font-semibold text-slate-900 truncate">{c.clientName}</span>
                                           <span className="text-xs text-slate-400 shrink-0">· {shortType}</span>
                                         </div>
-                                        <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200/80 text-[11px] font-semibold shrink-0">
+                                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 text-[11px] font-semibold shrink-0">
                                           {formatWaitDuration(c.waitMinutes)}
                                         </span>
                                       </div>
                                       <p className="text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
                                     </div>
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleMarkCircleAttended(c)}
-                                    title="Marcar como ya atendido"
-                                    className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 border border-transparent hover:border-emerald-200/70 transition shrink-0"
-                                  >
-                                    <Check className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )}
-
-                      {alertCircles.waitingRecent.length > 0 && (
-                        <div>
-                          <div className="px-4 py-2 bg-slate-50/70 border-y border-slate-100 flex items-center justify-between">
-                            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5 text-slate-400" />
-                              En espera reciente ({alertCircles.waitingRecent.length})
-                            </span>
-                          </div>
-                          <div className="divide-y divide-slate-100">
-                            {alertCircles.waitingRecent.slice(0, 6).map((c) => {
-                              const shortType = c.scope === 'soporte' ? (c.isGroup ? 'Grupo' : 'Cliente') : 'Lead';
-                              return (
-                                <button
-                                  key={c.circleId}
-                                  type="button"
-                                  onClick={() => {
-                                    setSearchQuery('');
-                                    setOwnerFilter('all');
-                                    setChannelFilter('all');
-                                    setCircleFilter('all');
-                                    setSelectedCircleId(c.circleId);
-                                    setShowAlertsPopover(false);
-                                  }}
-                                  className="w-full text-left px-4 py-2.5 bg-white hover:bg-slate-50 flex items-center gap-3 transition"
-                                >
-                                  <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 font-semibold text-xs flex items-center justify-center shrink-0">
-                                    {c.isGroup ? <Users className="w-4 h-4" /> : initials(c.clientName)}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-1.5 min-w-0">
-                                        <span className="text-[13.5px] font-semibold text-slate-900 truncate">{c.clientName}</span>
-                                        <span className="text-xs text-slate-400 shrink-0">· {shortType}</span>
-                                      </div>
-                                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 text-[11px] font-semibold shrink-0">
-                                        {formatWaitDuration(c.waitMinutes)}
-                                      </span>
-                                    </div>
-                                    <p className="text-[12.5px] text-slate-500 truncate mt-0.5">{c.lastMessageText}</p>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
 
