@@ -639,7 +639,7 @@ export const SupportChatCircles: React.FC = () => {
     ];
     if (scopes.soporte) tabs.push({ id: 'soporte', label: `Soporte (${counts.soporte})`, icon: Building2 });
     if (scopes.leads) {
-      tabs.push({ id: 'por_clasificar', label: `Por clasificar (${counts.por_clasificar})`, icon: HelpCircle, alert: counts.por_clasificar > 0 });
+      tabs.push({ id: 'por_clasificar', label: `Leads nuevos · por tomar (${counts.por_clasificar})`, icon: HelpCircle, alert: counts.por_clasificar > 0 });
       tabs.push({ id: 'lead', label: `${scopes.all ? 'Leads' : 'Mis leads'} (${counts.lead})`, icon: UserPlus });
     }
     if (scopes.all) {
@@ -1089,7 +1089,7 @@ export const SupportChatCircles: React.FC = () => {
         lead: 'Lead de Ventas',
         interno: 'Equipo interno',
         spam: 'Spam',
-        por_clasificar: 'Por clasificar',
+        por_clasificar: 'Lead nuevo (por tomar)',
       };
       toast.success(
         type === 'lead' && data?.lead?.name ? `Lead creado y asignado: ${data.lead.name}` : `Clasificado como ${labels[type]}`
@@ -1187,6 +1187,7 @@ export const SupportChatCircles: React.FC = () => {
     let label: string = WA_SCOPE_LABELS[circle.scope];
     if (circle.scope === 'soporte') label = circle.isGroup ? 'Grupo' : circle.isWhatsApp ? 'Cliente' : 'Ticket';
     if (circle.scope === 'lead' && circle.leadStatus && !compact) label = `Lead · ${circle.leadStatus}`;
+    if (circle.scope === 'spam' && circle.leadStatus) label = `Spam · Lead ${circle.leadStatus}`;
     return (
       <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-bold shrink-0 ${st.chip}`}>
         <Icon className="w-2.5 h-2.5" />
@@ -1568,7 +1569,7 @@ export const SupportChatCircles: React.FC = () => {
                             { t: 'lead', label: 'Es lead (Ventas)', icon: UserPlus, show: activeCircle.scope !== 'lead' },
                             { t: 'interno', label: 'Es del equipo', icon: ShieldCheck, show: scopes.all && activeCircle.scope !== 'interno' },
                             { t: 'spam', label: 'Spam / bloquear', icon: Ban, show: activeCircle.scope !== 'spam' },
-                            { t: 'por_clasificar', label: 'Deshacer (Por clasificar)', icon: HelpCircle, show: scopes.all },
+                            { t: 'por_clasificar', label: 'Deshacer (Lead nuevo por tomar)', icon: HelpCircle, show: scopes.all },
                           ] as const
                         )
                           .filter((o) => o.show)

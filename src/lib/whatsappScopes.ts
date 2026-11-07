@@ -53,7 +53,7 @@ export function isSupportTicket(t: TicketLike): boolean {
 
 export const WA_SCOPE_LABELS: Record<WaScope, string> = {
     soporte: 'Soporte',
-    por_clasificar: 'Por clasificar',
+    por_clasificar: 'Lead nuevo (por tomar)',
     lead: 'Lead',
     interno: 'Equipo',
     spam: 'Spam',

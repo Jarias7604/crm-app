@@ -556,18 +556,32 @@ async function resolveScope(
   }
 
   // Lead lookup (used by manual 'lead' rows and by automatic detection).
+  // Phones are stored with any formatting ("+503 6836-1482"), so we pre-filter by the
+  // last 4 digits (always contiguous) and then compare the exact last 8 digits.
   const loadLead = async (leadId: string | null) => {
     let q = supabase
       .from('leads')
       .select('id, name, status, es_cliente, assigned_to, phone')
       .eq('company_id', companyId);
     if (leadId) q = q.eq('id', leadId);
-    else if (l8) q = q.like('phone', `%${l8.slice(0, 4)}%`).order('created_at', { ascending: false }).limit(25);
+    else if (l8) q = q.like('phone', `%${l8.slice(-4)}%`).order('created_at', { ascending: false }).limit(1000);
     else return null;
     const { data } = await q;
     const rows = (data || []) as any[];
     return leadId ? rows[0] || null : rows.find((r) => last8(r.phone) === l8) || null;
   };
+
+  const loadClient = async () => {
+    if (!l8) return null;
+    const { data: cls } = await supabase
+      .from('clients')
+      .select('id, nombre, telefono')
+      .eq('company_id', companyId)
+      .like('telefono', `%${l8.slice(-4)}%`)
+      .limit(1000);
+    return (cls || []).find((c: any) => last8(c.telefono) === l8) || null;
+  };
+  const groupClientId = groups.find((g) => g.client_id)?.client_id || null;
 
   const applyLead = (lead: any, info: ScopeInfo, reasonPrefix: string): ScopeInfo => {
     info.leadId = lead.id;
@@ -595,6 +609,10 @@ async function resolveScope(
     base.clientId = manual.client_id || null;
     base.profileId = manual.profile_id || null;
     if (manual.contact_type === 'lead') {
+      // Business rule: anyone who belongs to a client support group is a client, never a lead.
+      if (groups.length > 0) {
+        return { ...base, scope: 'soporte', reason: 'miembro_grupo', clientId: base.clientId || groupClientId };
+      }
       const lead = await loadLead(manual.lead_id || null);
       if (lead) return applyLead(lead, base, 'manual_lead');
       return { ...base, scope: 'lead', reason: 'manual_lead' };
@@ -603,38 +621,92 @@ async function resolveScope(
     return { ...base, scope: map[manual.contact_type] || 'por_clasificar', reason: `manual_${manual.contact_type}` };
   }
 
-  // 2. Our own team.
+  // 2. Our own team (phone registered on a user profile).
   if (l8 && team.internoPhones.has(l8)) {
     return { ...base, scope: 'interno', reason: 'equipo', profileId: team.internoPhones.get(l8)!.profileId };
   }
+
+  // 3. Phone registered in Clientes (checked before the "many groups" staff heuristic so an
+  //    accountant who serves several clients is never mistaken for our own staff).
+  const client = await loadClient();
+  if (client) {
+    return {
+      ...base,
+      scope: 'soporte',
+      reason: groups.length > 0 ? 'cliente_crm_y_grupo' : 'cliente_crm',
+      clientId: client.id,
+      clientName: client.nombre,
+    };
+  }
+
+  // 4. Present in a large share of all client groups => our own staff.
   if (groups.length >= STAFF_GROUP_MIN && groups.length >= (await staffGroupThreshold(supabase, companyId))) {
     return { ...base, scope: 'interno', reason: 'equipo_en_grupos' };
   }
 
-  // 3. Member of a client support group.
+  // 5. Member of a client support group => client (never a lead).
   if (groups.length > 0) {
-    return { ...base, scope: 'soporte', reason: 'miembro_grupo', clientId: groups.find((g) => g.client_id)?.client_id || null };
+    return { ...base, scope: 'soporte', reason: 'miembro_grupo', clientId: groupClientId };
   }
 
-  // 4. Phone registered in Clientes.
-  if (l8) {
-    const { data: cls } = await supabase
-      .from('clients')
-      .select('id, nombre, telefono')
-      .eq('company_id', companyId)
-      .like('telefono', `%${l8.slice(-4)}%`)
-      .limit(50);
-    const client = (cls || []).find((c: any) => last8(c.telefono) === l8);
-    if (client) {
-      return { ...base, scope: 'soporte', reason: 'cliente_crm', clientId: client.id, clientName: client.nombre };
-    }
-  }
-
-  // 5. Lead in the CRM.
+  // 6. Lead in the CRM.
   const lead = await loadLead(null);
   if (lead) return applyLead(lead, base, 'lead_crm');
 
+  // 7. Unknown number => "Leads nuevos (por tomar)".
   return base;
+}
+
+// Re-run the classification on existing 1-on-1 chats (after a group sync, or periodically)
+// so a chat never stays in the wrong tab because it was classified with older data
+// (e.g. before the group participants were loaded, or before a lead status changed).
+async function rescopeChats(supabase: any, companyId: string): Promise<{ checked: number; changed: any[] }> {
+  const { data: rows } = await supabase
+    .from('tickets')
+    .select('id, lead_id, status, updated_at, metadata')
+    .eq('company_id', companyId)
+    .eq('metadata->>source', 'whatsapp_evolution')
+    .order('updated_at', { ascending: false })
+    .limit(1500);
+  const team = await loadTeam(supabase, companyId);
+  const latestByJid = new Map<string, any[]>();
+  for (const t of rows || []) {
+    const m = t.metadata || {};
+    if (m.merged_into || m.is_group === true || String(m.whatsapp_jid || '').endsWith('@g.us')) continue;
+    const jid = String(m.whatsapp_jid || '');
+    if (!jid) continue;
+    if (!latestByJid.has(jid)) latestByJid.set(jid, []);
+    latestByJid.get(jid)!.push(t);
+  }
+  const changed: any[] = [];
+  for (const [jid, list] of latestByJid.entries()) {
+    const m0 = list[0].metadata || {};
+    const phone = digits(m0.whatsapp_phone || jidPhone(jid));
+    const lid = String(m0.whatsapp_lid || jidLid(jid) || '');
+    if (!phone && !lid) continue;
+    const info = await resolveScope(supabase, companyId, team, phone, lid);
+    for (const t of list) {
+      const m = t.metadata || {};
+      const sameScope = m.wa_scope === info.scope && m.wa_scope_reason === info.reason;
+      const needsLead = !t.lead_id && info.leadId && ['lead', 'spam', 'por_clasificar'].includes(info.scope);
+      if (sameScope && !needsLead) continue;
+      const patch: Record<string, any> = {
+        metadata: {
+          ...cleanMeta(m),
+          wa_scope: info.scope,
+          wa_scope_reason: info.reason,
+          is_existing_client: info.scope === 'soporte',
+          member_of_groups: info.memberOfGroups,
+          support_channel: info.scope === 'soporte' ? (m.support_channel && m.support_channel !== 'ventas' ? m.support_channel : 'soporte') : 'ventas',
+          ...(info.clientId ? { client_id: info.clientId } : {}),
+        },
+      };
+      if (needsLead) patch.lead_id = info.leadId;
+      await supabase.from('tickets').update(patch).eq('id', t.id);
+      if (t === list[0]) changed.push({ jid, from: m.wa_scope || null, to: info.scope, reason: info.reason });
+    }
+  }
+  return { checked: latestByJid.size, changed };
 }
 
 // ─── Message parsing ─────────────────────────────────────────────────────────
@@ -876,11 +948,13 @@ serve(async (req: Request) => {
     if (action === 'upload_media') return await handleUploadMedia(supabase, url, payload);
     if (action === 'sync_group_subject') return await handleSyncGroup(supabase, url, payload);
     if (action === 'sync_all_groups') return await handleSyncAllGroups(supabase, url, payload);
+    if (action === 'import_history') return await handleImportHistory(supabase, url, payload);
 
     // ── Actions from the CRM UI (require a logged-in user) ──
     const uiActions = [
       'get_ai_config', 'test_openai', 'save_ai_config', 'save_ai_prompt', 'set_ticket_channel',
       'promote_to_lead', 'classify_contact', 'send_reply', 'send_media', 'retry_media', 'bridge_status',
+      'rescope_now', 'request_history_import',
     ];
     if (uiActions.includes(action)) {
       const caller = await getCaller(req, supabase, supabaseUrl);
@@ -909,6 +983,17 @@ serve(async (req: Request) => {
           return await handleRetryMedia(supabase, caller, payload);
         case 'bridge_status':
           return await handleBridgeStatus(supabase);
+        case 'rescope_now': {
+          if (!caller.isAdmin) return json({ ok: false, error: 'Solo un administrador' }, 403);
+          const cid = await resolveMainCompanyId(supabase, url.searchParams.get('company_id'));
+          if (!cid) return json({ ok: false, error: 'No company' }, 400);
+          return json({ ok: true, ...(await rescopeChats(supabase, cid)) });
+        }
+        case 'request_history_import': {
+          if (!caller.isAdmin) return json({ ok: false, error: 'Solo un administrador' }, 403);
+          await setBridgeState(supabase, 'history_import', { status: 'requested', requested_at: new Date().toISOString() });
+          return json({ ok: true });
+        }
       }
     }
 
@@ -1445,9 +1530,11 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
   // Voice notes: transcription (+ optional AI voice reply).
   const { data: row } = await supabase
     .from('whatsapp_messages')
-    .select('id, company_id, ticket_id, comment_id, message_type, from_me')
+    .select('id, company_id, ticket_id, comment_id, message_type, from_me, message_ts')
     .eq('id', waMsgId)
     .maybeSingle();
+  // Historical media (imported from the chat history) never triggers an automatic reply.
+  const isRecentMsg = !row?.message_ts || Date.now() - new Date(row.message_ts).getTime() < 15 * 60 * 1000;
   if (row?.message_type === 'audio' && !row.from_me && stored.bytes) {
     const aiCfg = await loadSupportAiConfig(supabase);
     if (aiCfg.openAiKey) {
@@ -1462,7 +1549,7 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
       const { data: t } = await supabase.from('tickets').select('*').eq('id', row.ticket_id).maybeSingle();
       const meta = cleanMeta(t?.metadata || {});
       const scope = String(meta.wa_scope || 'soporte') as WaScope;
-      if (t && aiCfg.autoReplyAudio && meta.ai_auto_reply_enabled !== false && ['soporte', 'lead', 'por_clasificar'].includes(scope)) {
+      if (t && isRecentMsg && aiCfg.autoReplyAudio && meta.ai_auto_reply_enabled !== false && ['soporte', 'lead', 'por_clasificar'].includes(scope)) {
         const ch: SupportChannelType = scope === 'soporte' ? (meta.support_channel as SupportChannelType) || 'soporte' : 'ventas';
         const reply = await askOpenAi(
           aiCfg.openAiKey,
@@ -1617,7 +1704,7 @@ async function handleBridgeSh(supabase: any, selfUrl: string): Promise<Response>
     .limit(15);
   let mediaQueued = 0;
   for (const job of mediaJobs || []) {
-    if (mediaQueued >= 4) break;
+    if (mediaQueued >= 8) break;
     if (job.media_status === 'requested' && job.media_requested_at && job.media_requested_at > staleBefore) continue;
     if (!job.raw_message) continue;
     const inst = shellSafe(instance);
@@ -1649,6 +1736,75 @@ async function handleBridgeSh(supabase: any, selfUrl: string): Promise<Response>
       `curl -s "${evo}/group/fetchAllGroups/${inst}?getParticipants=true" -H "apikey: ${safeKey}" | curl -s -X POST "${selfUrl}?action=sync_all_groups" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1`
     );
     await setBridgeState(supabase, 'groups_sync', { ...gs, requested_at: now.toISOString(), force: false });
+  }
+
+  // 4. Re-check every chat's classification (every 10 min) so it follows CRM changes
+  //    (lead status, new clients, new group members) without waiting for a new message.
+  const rs = await getBridgeState(supabase, 'rescope');
+  if (!rs.at || now.getTime() - new Date(rs.at).getTime() > 10 * 60 * 1000) {
+    await setBridgeState(supabase, 'rescope', { at: now.toISOString() });
+    const cid = await resolveMainCompanyId(supabase, null);
+    if (cid) {
+      try {
+        const r = await rescopeChats(supabase, cid);
+        await setBridgeState(supabase, 'rescope', { at: now.toISOString(), checked: r.checked, changed: r.changed.slice(0, 50) });
+      } catch (e) {
+        console.error('[wa] rescope error', e);
+      }
+    }
+  }
+
+  // 5. One-time import of photos / documents / audio / video from the chat history
+  //    (messages received before media was tracked). Runs automatically once, a few chats per poll.
+  let hi = await getBridgeState(supabase, 'history_import');
+  const histCid = !hi.status || hi.status === 'requested' ? await resolveMainCompanyId(supabase, null) : null;
+  if (histCid) {
+    const cid = histCid;
+    const since = new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: chats } = await supabase
+      .from('tickets')
+      .select('metadata, updated_at')
+      .eq('company_id', cid)
+      .eq('metadata->>source', 'whatsapp_evolution')
+      .gte('updated_at', since)
+      .order('updated_at', { ascending: false })
+      .limit(2000);
+    const queue: { q: string; t: string }[] = [];
+    const seen = new Set<string>();
+    for (const c of chats || []) {
+      const m = c.metadata || {};
+      const tj = String(m.whatsapp_jid || '');
+      if (!tj || m.merged_into) continue;
+      const evoJids = [tj];
+      if (m.whatsapp_lid && !tj.endsWith('@g.us')) evoJids.push(`${digits(m.whatsapp_lid)}@lid`);
+      for (const q of evoJids) {
+        if (seen.has(q)) continue;
+        seen.add(q);
+        queue.push({ q, t: tj });
+      }
+    }
+    hi = { status: 'running', token: crypto.randomUUID().replace(/-/g, ''), queue, next: 0, started_at: now.toISOString() };
+    await setBridgeState(supabase, 'history_import', hi);
+  }
+  if (hi.status === 'running' && Array.isArray(hi.queue)) {
+    const inst = shellSafe(instance);
+    const batch = 3;
+    const start = Number(hi.next || 0);
+    for (let i = start; i < Math.min(start + batch, hi.queue.length); i++) {
+      for (let page = 1; page <= 3; page++) {
+        const body = b64Utf8(JSON.stringify({ where: { key: { remoteJid: hi.queue[i].q } }, page, offset: 50 }));
+        const impUrl = `${selfUrl}?action=import_history&i=${i}&token=${shellSafe(hi.token)}`;
+        lines.push(
+          `echo "${body}" | base64 -d | curl -s -X POST "${evo}/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | curl -s -X POST "${impUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1`
+        );
+      }
+    }
+    const next = start + batch;
+    await setBridgeState(supabase, 'history_import', {
+      ...hi,
+      next,
+      ...(next >= hi.queue.length ? { status: 'done', finished_at: now.toISOString() } : {}),
+    });
   }
 
   return new Response(lines.length > 0 ? lines.join('\n') + '\n' : '# idle\n', {
@@ -1761,7 +1917,144 @@ async function handleSyncAllGroups(supabase: any, url: URL, payload: any): Promi
     groups: n,
     last_error: null,
   });
-  return json({ ok: true, groups: n });
+  // Group membership changed => re-check every 1-on-1 chat (a group member is never a lead).
+  let rescoped: any = null;
+  try {
+    rescoped = await rescopeChats(supabase, companyId);
+    await setBridgeState(supabase, 'rescope', { at: new Date().toISOString(), checked: rescoped.checked, changed: rescoped.changed.slice(0, 50) });
+  } catch (e) {
+    console.error('[wa] rescope after group sync error', e);
+  }
+  return json({ ok: true, groups: n, rescoped: rescoped?.changed?.length || 0 });
+}
+
+// Import media (photos, documents, audio, video) from a chat's history in Evolution.
+// Only media messages are imported: text history already exists as chat lines.
+// Each media message is linked to its existing placeholder line ("[Imagen enviada…]")
+// when found; otherwise a new chat line is added at the original time.
+async function handleImportHistory(supabase: any, url: URL, payload: any): Promise<Response> {
+  const hi = await getBridgeState(supabase, 'history_import');
+  const token = shellSafe(url.searchParams.get('token') || '');
+  if (!hi.token || token !== hi.token) return json({ ok: false, error: 'invalid token' }, 401);
+  const idx = Number(url.searchParams.get('i'));
+  const item = Array.isArray(hi.queue) ? hi.queue[idx] : null;
+  if (!item) return json({ ok: false, error: 'unknown chat' }, 400);
+  const records: any[] = payload?.messages?.records || payload?.records || (Array.isArray(payload) ? payload : []);
+  if (records.length === 0) return json({ ok: true, imported: 0 });
+
+  const companyId = await resolveMainCompanyId(supabase, url.searchParams.get('company_id'));
+  if (!companyId) return json({ ok: false, error: 'No company' }, 400);
+  const ticketJid: string = item.t;
+  const isGroup = ticketJid.endsWith('@g.us');
+
+  const { data: tks } = await supabase
+    .from('tickets')
+    .select('id, created_at, metadata')
+    .eq('company_id', companyId)
+    .eq('metadata->>source', 'whatsapp_evolution')
+    .eq('metadata->>whatsapp_jid', ticketJid)
+    .order('created_at', { ascending: true });
+  const tickets = (tks || []).filter((t: any) => !t.metadata?.merged_into);
+  if (tickets.length === 0) return json({ ok: true, imported: 0, reason: 'no conversation' });
+  const ticketIds = tickets.map((t: any) => t.id);
+  const team = await loadTeam(supabase, companyId);
+
+  let imported = 0;
+  for (const rec of records) {
+    const key = rec?.key || {};
+    const waId = String(key.id || rec?.id || '').trim();
+    if (!waId) continue;
+    const msgObj = unwrapMessage(rec?.message || {});
+    const media = extractMedia(msgObj);
+    if (!media) continue;
+
+    const { data: exists } = await supabase
+      .from('whatsapp_messages')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('wa_message_id', waId)
+      .maybeSingle();
+    if (exists) continue;
+
+    const ts = messageDate(rec);
+    const fromMe = Boolean(key.fromMe);
+    const pushName = String(rec?.pushName || '').trim();
+    const caption = extractText(msgObj, rec?.message || {}, {});
+    const placeholder = mediaPlaceholder(media.kind, media.obj);
+
+    // Conversation (ticket) that was open at that time.
+    const target = [...tickets].reverse().find((t: any) => new Date(t.created_at).getTime() <= ts.getTime() + 60 * 1000) || tickets[0];
+
+    // Existing placeholder line within ±3 minutes, not yet linked to a file.
+    const fromIso = new Date(ts.getTime() - 3 * 60 * 1000).toISOString();
+    const toIso = new Date(ts.getTime() + 3 * 60 * 1000).toISOString();
+    const { data: near } = await supabase
+      .from('ticket_comments')
+      .select('id, ticket_id, body, created_at')
+      .in('ticket_id', ticketIds)
+      .gte('created_at', fromIso)
+      .lte('created_at', toIso);
+    const candidates = (near || []).filter((c: any) =>
+      /\[(Imagen|Video|Sticker|Nota de voz|Audio|Documento|Archivo)|AUDIO_URL|📎|📷|🎤|🎥/i.test(String(c.body || ''))
+    );
+    let commentId: string | null = null;
+    let commentTicket: string = target.id;
+    if (candidates.length > 0) {
+      const ids = candidates.map((c: any) => c.id);
+      const { data: linked } = await supabase.from('whatsapp_messages').select('comment_id').in('comment_id', ids);
+      const linkedSet = new Set((linked || []).map((l: any) => l.comment_id));
+      const free = candidates
+        .filter((c: any) => !linkedSet.has(c.id))
+        .sort((a: any, b: any) => Math.abs(new Date(a.created_at).getTime() - ts.getTime()) - Math.abs(new Date(b.created_at).getTime() - ts.getTime()));
+      if (free[0]) {
+        commentId = free[0].id;
+        commentTicket = free[0].ticket_id;
+      }
+    }
+
+    if (!commentId) {
+      const staff = fromMe ? null : matchStaffByName(team, pushName);
+      const senderLabel = fromMe || staff ? `👨‍💻 ${staff?.full_name || 'Equipo Soporte'}` : `👤 ${pushName || 'Cliente'}`;
+      const text = caption ? `${placeholder} ${caption}` : placeholder;
+      const { data: c } = await supabase
+        .from('ticket_comments')
+        .insert({
+          ticket_id: target.id,
+          company_id: companyId,
+          author_id: null,
+          body: `[${fmtTime(ts)}] ${senderLabel}: ${text}`,
+          is_internal: false,
+          created_at: ts.toISOString(),
+        })
+        .select('id')
+        .single();
+      commentId = c?.id || null;
+      commentTicket = target.id;
+    }
+    if (!commentId) continue;
+
+    const senderJid = isGroup ? String(key.participantAlt || key.participant || '') : String(key.remoteJidAlt || key.remoteJid || '');
+    const { error: insErr } = await supabase.from('whatsapp_messages').insert({
+      company_id: companyId,
+      ticket_id: commentTicket,
+      comment_id: commentId,
+      wa_message_id: waId,
+      remote_jid: ticketJid,
+      from_me: fromMe,
+      sender_phone: jidPhone(senderJid) || null,
+      sender_name: pushName || null,
+      message_ts: ts.toISOString(),
+      message_type: media.kind,
+      body: caption || placeholder,
+      media_status: 'pending',
+      media_mime: media.obj?.mimetype || null,
+      media_filename: media.obj?.fileName || null,
+      media_size: Number(media.obj?.fileLength?.low ?? media.obj?.fileLength) || null,
+      raw_message: { key, message: { [media.field]: slimMediaObject(media.obj) } },
+    });
+    if (!insErr) imported++;
+  }
+  return json({ ok: true, imported });
 }
 
 async function handleBridgeStatus(supabase: any): Promise<Response> {
@@ -1904,8 +2197,21 @@ async function handleClassify(supabase: any, caller: Caller, payload: any): Prom
   if (!phone) return json({ ok: false, error: 'Este chat no tiene número de teléfono' }, 409);
 
   // Vendors may only take numbers still "por clasificar" (or their own leads).
-  if (!caller.isAdmin && meta.wa_scope !== 'por_clasificar' && !(meta.wa_scope === 'lead' && t.assigned_to === caller.userId)) {
+  let ownsLead = meta.wa_scope === 'lead' && t.assigned_to === caller.userId;
+  if (!ownsLead && meta.wa_scope === 'lead' && t.lead_id) {
+    const { data: ld } = await supabase.from('leads').select('assigned_to').eq('id', t.lead_id).maybeSingle();
+    ownsLead = ld?.assigned_to === caller.userId;
+  }
+  if (!caller.isAdmin && meta.wa_scope !== 'por_clasificar' && !ownsLead) {
     return json({ ok: false, error: 'Este número ya fue clasificado' }, 409);
+  }
+  // A member of a client support group is a client, never a lead.
+  if (type === 'lead') {
+    const groupsOfPhone = await groupsContaining(supabase, t.company_id, phone, digits(meta.whatsapp_lid || ''));
+    if (groupsOfPhone.length > 0) {
+      const names = groupsOfPhone.map((g) => g.subject || g.group_jid).slice(0, 3).join(', ');
+      return json({ ok: false, error: `Este número pertenece a un grupo de soporte (${names}); es cliente, no lead.` }, 409);
+    }
   }
 
   const pushName = String(meta.whatsapp_push_name || '').trim();
