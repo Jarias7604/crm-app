@@ -2595,8 +2595,8 @@ export const SupportChatCircles: React.FC = () => {
     if (circle.scope === 'lead' && circle.leadStatus && !compact) label = `Lead · ${circle.leadStatus}`;
     if (circle.scope === 'spam' && circle.leadStatus) label = `Spam · Lead ${circle.leadStatus}`;
     return (
-      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-bold shrink-0 ${st.chip}`}>
-        <Icon className="w-2.5 h-2.5" />
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11.5px] font-bold shrink-0 ${st.chip}`}>
+        <Icon className="w-3 h-3" />
         {label}
       </span>
     );
@@ -2703,18 +2703,18 @@ export const SupportChatCircles: React.FC = () => {
   return (
     <div className="h-screen flex-1 flex flex-col bg-[#F5F6FA] overflow-hidden">
       {/* ── TOP HEADER (100% Light & Vector Clean) ── */}
-      <header className="h-13 bg-white border-b border-slate-200/80 px-5 flex items-center justify-between shrink-0 z-30 relative">
+      <header className="h-14 bg-white border-b border-slate-200/80 px-5 flex items-center justify-between shrink-0 z-30 relative">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-2">
-            <div className="w-1 h-4 rounded-full bg-indigo-600" />
-            <span className="text-sm font-bold text-slate-900 tracking-tight">Chat WhatsApp</span>
+            <div className="w-1 h-4.5 rounded-full bg-indigo-600" />
+            <span className="text-[15px] font-bold text-slate-900 tracking-tight">Chat WhatsApp</span>
           </div>
           <span className="text-slate-300 hidden sm:inline">|</span>
-          <span className="text-xs text-slate-500 hidden sm:inline truncate">
+          <span className="text-[13px] text-slate-500 hidden sm:inline truncate">
             {greetingTime()}, <strong className="font-bold text-slate-800">{profile?.full_name?.split(' ')[0] || ''}</strong>
           </span>
-          <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200/70">
-            <Phone className="w-3 h-3 text-indigo-600" />
+          <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[13px] font-medium bg-slate-100 text-slate-600 border border-slate-200/70">
+            <Phone className="w-3.5 h-3.5 text-indigo-600" />
             +503 7971-8911
           </span>
         </div>
@@ -2725,9 +2725,9 @@ export const SupportChatCircles: React.FC = () => {
             type="button"
             onClick={toggleSound}
             title={soundEnabled ? 'Alarma sonora activada (clic para silenciar)' : 'Alarma silenciada (clic para activar y probar)'}
-            className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-600 transition"
+            className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-600 transition"
           >
-            {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-indigo-600" /> : <VolumeX className="w-3.5 h-3.5 text-slate-400" />}
+            {soundEnabled ? <Volume2 className="w-4 h-4 text-indigo-600" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
           </button>
 
           {/* Interactive Alert Bell & Notification Center */}
@@ -2736,17 +2736,17 @@ export const SupportChatCircles: React.FC = () => {
               type="button"
               onClick={() => setShowAlertsPopover((v) => !v)}
               title="Centro de Alertas y Seguimiento"
-              className="relative inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 text-xs font-semibold transition"
+              className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 text-[13px] font-semibold transition"
             >
               {alertCircles.total > 0 || bellRinging ? (
-                <BellRing className={`w-3.5 h-3.5 text-indigo-600 ${bellRinging ? 'animate-bounce' : ''}`} />
+                <BellRing className={`w-4 h-4 text-indigo-600 ${bellRinging ? 'animate-bounce' : ''}`} />
               ) : (
-                <Bell className="w-3.5 h-3.5 text-slate-500" />
+                <Bell className="w-4 h-4 text-slate-500" />
               )}
               <span>Alertas</span>
               {alertCircles.total > 0 && (
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold border ${
+                  className={`px-1.5 py-0.2 rounded-full text-[11px] font-bold border ${
                     alertCircles.urgent.length > 0 || alertCircles.newLeads.length > 0
                       ? 'bg-rose-50 text-rose-600 border-rose-200'
                       : 'bg-indigo-50 text-indigo-700 border-indigo-200'
@@ -3027,7 +3027,7 @@ export const SupportChatCircles: React.FC = () => {
               <X className="w-3 h-3" />
             </button>
           ) : (
-            <span className="hidden md:inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200/70">
+            <span className="hidden md:inline-block px-2.5 py-1 rounded-lg text-[11px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200/70">
               {roleChip}
             </span>
           )}
@@ -3037,28 +3037,28 @@ export const SupportChatCircles: React.FC = () => {
                 type="button"
                 onClick={openTeamAccessModal}
                 title="Configurar qué ven los Técnicos, los Vendedores y los Administradores"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
               >
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                <ShieldCheck className="w-4 h-4 text-indigo-600" />
                 <span>Accesos</span>
               </button>
               <button
                 onClick={() => setShowAiPromptModal(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-700 border border-indigo-200/60 transition"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-700 border border-indigo-200/60 transition"
               >
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                <Sparkles className="w-4 h-4 text-indigo-600" />
                 <span>IA</span>
               </button>
               <button
                 onClick={openBridgeStatus}
                 title="Estado de la conexión WhatsApp"
-                className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 transition"
+                className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 transition"
               >
-                <Settings className="w-3.5 h-3.5" />
+                <Settings className="w-4 h-4" />
               </button>
             </>
           )}
-          <div className="w-7 h-7 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold text-xs flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 font-bold text-[13px] flex items-center justify-center">
             {initials(profile?.full_name || 'AD')}
           </div>
         </div>
@@ -3076,7 +3076,7 @@ export const SupportChatCircles: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Buscar cliente, grupo o teléfono..."
-                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-[13px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-[13.5px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
                 {searchQuery && (
                   <button
@@ -3093,7 +3093,7 @@ export const SupportChatCircles: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowFilterMenu((v) => !v)}
-                className={`px-3 py-2 rounded-xl border text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
+                className={`px-3 py-2 rounded-xl border text-[13px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
                   ownerFilter !== 'all' || channelFilter !== 'all' || ['interno', 'spam', 'tickets'].includes(circleFilter)
                     ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                     : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
@@ -3233,7 +3233,7 @@ export const SupportChatCircles: React.FC = () => {
                       setLeadSubFilter('activos');
                       setCircleFilter(tab.id);
                     }}
-                    className={`px-2.5 py-1 rounded-lg text-xs whitespace-nowrap transition inline-flex items-center gap-1.5 ${
+                    className={`px-2.5 py-1.5 rounded-lg text-[13px] whitespace-nowrap transition inline-flex items-center gap-1.5 ${
                       active
                         ? 'bg-indigo-50 text-indigo-700 font-bold'
                         : 'text-slate-600 hover:bg-slate-50 font-medium'
@@ -3249,7 +3249,7 @@ export const SupportChatCircles: React.FC = () => {
             {(circleFilter === 'reactivados' || circleFilter === 'lead') && (
               <div className="mt-1.5 pt-1.5 border-t border-slate-100 space-y-1.5">
                 {circleFilter === 'reactivados' && counts.reactivatedTotal > 0 && (
-                  <div className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-between text-[11px] text-slate-600">
+                  <div className="px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-between text-[12.5px] text-slate-600">
                     <span>
                       Enviados: <b className="text-slate-800">{counts.reactivatedTotal}</b> · Respondieron:{' '}
                       <b className="text-slate-900">{counts.reactivatedReplied}</b>
@@ -3260,7 +3260,7 @@ export const SupportChatCircles: React.FC = () => {
                   </div>
                 )}
 
-                <div className="flex items-center gap-1 flex-wrap">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {(
                     [
                       {
@@ -3279,7 +3279,7 @@ export const SupportChatCircles: React.FC = () => {
                         key={sf.id}
                         type="button"
                         onClick={() => setLeadSubFilter(sf.id)}
-                        className={`px-2 py-0.5 rounded-md text-[11px] transition ${
+                        className={`px-2.5 py-1 rounded-md text-[12.5px] transition ${
                           active
                             ? 'bg-slate-800 text-white font-semibold'
                             : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70 font-medium'
@@ -3354,7 +3354,7 @@ export const SupportChatCircles: React.FC = () => {
                   >
                     <div className="relative shrink-0">
                       <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] ${
+                        className={`w-10.5 h-10.5 rounded-full flex items-center justify-center text-[13.5px] ${
                           unread
                             ? 'bg-indigo-100 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
                             : isSelected
@@ -3369,11 +3369,11 @@ export const SupportChatCircles: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`text-[13.5px] truncate ${unread ? 'font-extrabold text-slate-950' : 'font-semibold text-slate-700'}`}>
+                          <span className={`text-[14.5px] truncate ${unread ? 'font-extrabold text-slate-950' : 'font-semibold text-slate-700'}`}>
                             {circle.clientName}
                           </span>
                           <span
-                            className={`text-xs shrink-0 ${
+                            className={`text-[12.5px] shrink-0 ${
                               circle.leadStatus === 'Perdido' || circle.leadStatus === 'Erróneo'
                                 ? 'text-slate-500 font-semibold'
                                 : 'text-slate-400'
@@ -3384,7 +3384,7 @@ export const SupportChatCircles: React.FC = () => {
                           {circle.isReactivation && (
                             <span
                               title={circle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${
+                              className={`px-1.5 py-0.5 rounded text-[11.5px] font-medium shrink-0 ${
                                 circle.reactivationReplied
                                   ? 'bg-slate-100 text-slate-700 border border-slate-200/80'
                                   : 'text-slate-400'
@@ -3398,23 +3398,23 @@ export const SupportChatCircles: React.FC = () => {
                           {isOverdue && (
                             <span
                               title={`Esperando respuesta hace ${formatWaitDuration(circle.waitMinutes)}`}
-                              className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-semibold inline-flex items-center gap-0.5"
+                              className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-xs font-semibold inline-flex items-center gap-0.5"
                             >
-                              <Clock className="w-2.5 h-2.5" />
+                              <Clock className="w-3 h-3" />
                               {formatWaitDuration(circle.waitMinutes)}
                             </span>
                           )}
-                          <span className={`text-xs ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
+                          <span className={`text-[12.5px] ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
                             {listTimeLabel(circle.lastMessageAt)}
                           </span>
                         </div>
                       </div>
                       <div className="flex items-center justify-between gap-2 mt-0.5">
-                        <p className={`text-[12.5px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
+                        <p className={`text-[13.5px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
                           {circle.lastMessageSender}: {circle.lastMessageText}
                         </p>
                         {unread && (
-                          <span className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold leading-none shrink-0">
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[11px] font-bold leading-none shrink-0">
                             Nuevo
                           </span>
                         )}
@@ -3452,19 +3452,19 @@ export const SupportChatCircles: React.FC = () => {
         {activeCircle ? (
           <main className="flex-1 flex flex-col bg-[#F3F4F8] overflow-hidden min-w-0">
             {/* Chat header (Clean, Uncluttered, 100% Vector Icons) */}
-            <div className="bg-white border-b border-slate-200/70 px-6 py-2.5 flex items-center justify-between gap-3 shrink-0 min-h-16">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-10 h-10 rounded-full font-bold text-[13px] flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
+            <div className="bg-white border-b border-slate-200/70 px-6 py-3 flex items-center justify-between gap-3 flex-wrap shrink-0 min-h-16">
+              <div className="flex items-center gap-3 min-w-[240px] flex-1">
+                <div className={`w-10.5 h-10.5 rounded-full font-bold text-[14px] flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
                   {activeCircle.isGroup ? <Users className="w-4 h-4" /> : initials(activeCircle.clientName)}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-[15px] font-bold text-slate-900 tracking-tight truncate max-w-[300px]">{activeCircle.clientName}</h3>
+                    <h3 className="text-[16px] font-bold text-slate-900 tracking-tight truncate max-w-[300px]">{activeCircle.clientName}</h3>
                     <ScopeChip circle={activeCircle} />
                     {activeCircle.isReactivation && (
                       <span
                         title={activeCircle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold border ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border ${
                           activeCircle.reactivationReplied
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
                             : 'bg-indigo-50/70 text-indigo-700 border-indigo-200/80'
@@ -3475,7 +3475,7 @@ export const SupportChatCircles: React.FC = () => {
                       </span>
                     )}
                     {activeCircle.unreadOrWaitingReply && activeCircle.waitMinutes >= 15 && activeCircle.waitMinutes <= 24 * 60 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200/80">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200/80">
                         <Clock className="w-3 h-3" />
                         Espera: {formatWaitDuration(activeCircle.waitMinutes)}
                       </span>
@@ -3485,14 +3485,14 @@ export const SupportChatCircles: React.FC = () => {
                         type="button"
                         onClick={() => handleMarkCircleAttended(activeCircle)}
                         title="Marcar conversación como ya atendida (quita la alerta de espera)"
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 transition"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 transition"
                       >
                         <CheckCircle2 className="w-3 h-3" />
                         <span>Marcar atendido</span>
                       </button>
                     )}
                   </div>
-                  <p className="text-xs font-medium text-slate-400 truncate mt-0.5">
+                  <p className="text-[13px] font-medium text-slate-400 truncate mt-0.5">
                     {activeCircle.isGroup
                       ? 'Grupo de WhatsApp'
                       : [
@@ -3567,7 +3567,7 @@ export const SupportChatCircles: React.FC = () => {
                   (scopes.all || scopes.leads) && (
                     <>
                       {activeCircle.leadId && (
-                        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-xl p-0.5">
+                        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-xl p-1">
                           {(
                             [
                               { st: 'En seguimiento', label: 'Seguimiento' },
@@ -3582,7 +3582,7 @@ export const SupportChatCircles: React.FC = () => {
                                 type="button"
                                 onClick={() => handleUpdateLeadStatus(quick.st)}
                                 title={`Cambiar etapa a ${quick.st}`}
-                                className={`px-2 py-1 rounded-lg text-[11px] transition ${
+                                className={`px-2.5 py-1 rounded-lg text-[12.5px] transition ${
                                   active
                                     ? 'bg-slate-800 text-white font-bold shadow-2xs'
                                     : 'text-slate-600 hover:bg-white font-semibold'
@@ -3596,7 +3596,7 @@ export const SupportChatCircles: React.FC = () => {
                             value={activeCircle.leadStatus || 'Prospecto'}
                             onChange={(e) => handleUpdateLeadStatus(e.target.value)}
                             title="Todas las etapas del Lead"
-                            className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-transparent text-slate-600 hover:bg-white cursor-pointer focus:outline-none transition"
+                            className="px-2 py-1 rounded-lg text-[12.5px] font-semibold bg-transparent text-slate-600 hover:bg-white cursor-pointer focus:outline-none transition"
                           >
                             {LEAD_STATUS_OPTIONS.map((st) => (
                               <option key={st} value={st}>
@@ -3613,20 +3613,20 @@ export const SupportChatCircles: React.FC = () => {
                           type="button"
                           onClick={() => setShowDiscoveryPopover((v) => !v)}
                           title="Enviar formulario de diagnóstico al prospecto o abrir las 7 preguntas del Método ARIAS"
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-semibold border transition ${
                             Object.keys(activeDiscoveryAnswers).length > 0
                               ? 'bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-800 border-emerald-200'
                               : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
                           }`}
                         >
-                          <Target className="w-3.5 h-3.5 text-slate-600" />
+                          <Target className="w-4 h-4 text-slate-600" />
                           <span>Diagnóstico</span>
                           {Object.keys(activeDiscoveryAnswers).length > 0 && (
-                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
+                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[11px] font-bold">
                               {Object.keys(activeDiscoveryAnswers).length}/7
                             </span>
                           )}
-                          <ChevronDown className="w-3 h-3 text-slate-400" />
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                         </button>
 
                         {showDiscoveryPopover && (
@@ -3719,11 +3719,11 @@ export const SupportChatCircles: React.FC = () => {
                             setShowQuotesPopover(false);
                           }}
                           title="Agendar cita, demostración o seguimiento en el calendario sin salir del chat"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
                         >
-                          <Calendar className="w-3.5 h-3.5 text-slate-600" />
+                          <Calendar className="w-4 h-4 text-slate-600" />
                           <span>Agendar</span>
-                          <ChevronDown className="w-3 h-3 text-slate-400" />
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                         </button>
 
                         {showCalendarPopover && (
@@ -3802,9 +3802,9 @@ export const SupportChatCircles: React.FC = () => {
                         type="button"
                         disabled={creatingQuote || classifying}
                         onClick={handleOpenQuoteBuilder}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[13px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition disabled:opacity-50"
                       >
-                        {creatingQuote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Receipt className="w-3.5 h-3.5" />}
+                        {creatingQuote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
                         <span>Cotizar</span>
                       </button>
 
@@ -3814,11 +3814,11 @@ export const SupportChatCircles: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setShowQuotesPopover((v) => !v)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
                           >
-                            <FileText className="w-3.5 h-3.5 text-slate-500" />
+                            <FileText className="w-4 h-4 text-slate-500" />
                             <span>Propuestas ({leadQuotes.length})</span>
-                            <ChevronDown className="w-3 h-3 text-slate-400" />
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                           </button>
                           {showQuotesPopover && (
                             <div className="absolute right-0 top-full mt-1.5 w-88 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-2.5 space-y-2">
@@ -4184,7 +4184,7 @@ export const SupportChatCircles: React.FC = () => {
                             </div>
                           )}
                           <div className="max-w-lg bg-[#DFE3FF] text-slate-900 rounded-2xl rounded-br-xs px-4 py-3 shadow-2xs">
-                            <p className="text-xs font-bold text-indigo-700/85 mb-0.5">{b.senderName}</p>
+                            <p className="text-[13px] font-bold text-indigo-700/85 mb-0.5">{b.senderName}</p>
                             {renderMedia(b)}
                             {isEditing ? (
                               <div className="mt-1.5 space-y-2 min-w-[280px] sm:min-w-[360px]">
@@ -4192,13 +4192,13 @@ export const SupportChatCircles: React.FC = () => {
                                   rows={4}
                                   value={editingCommentText}
                                   onChange={(e) => setEditingCommentText(e.target.value)}
-                                  className="w-full px-3 py-2 rounded-xl bg-white border border-indigo-200 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
+                                  className="w-full px-3 py-2 rounded-xl bg-white border border-indigo-200 text-[13.5px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
                                 />
                                 <div className="flex items-center justify-end gap-1.5 flex-wrap">
                                   <button
                                     type="button"
                                     onClick={() => setEditingCommentId(null)}
-                                    className="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-slate-600 text-[11px] font-semibold transition"
+                                    className="px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-slate-600 text-xs font-semibold transition"
                                   >
                                     Cancelar
                                   </button>
@@ -4206,7 +4206,7 @@ export const SupportChatCircles: React.FC = () => {
                                     type="button"
                                     disabled={savingCommentEdit || !editingCommentText.trim()}
                                     onClick={() => handleSaveEditedComment(b, false)}
-                                    className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-[11px] font-bold disabled:opacity-50 transition"
+                                    className="px-2.5 py-1 rounded-lg bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-xs font-bold disabled:opacity-50 transition"
                                   >
                                     Guardar en chat
                                   </button>
@@ -4214,7 +4214,7 @@ export const SupportChatCircles: React.FC = () => {
                                     type="button"
                                     disabled={savingCommentEdit || !editingCommentText.trim()}
                                     onClick={() => handleSaveEditedComment(b, true)}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold disabled:opacity-50 transition"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold disabled:opacity-50 transition"
                                   >
                                     <Send className="w-3 h-3" />
                                     Guardar y reenviar a WhatsApp
@@ -4222,14 +4222,14 @@ export const SupportChatCircles: React.FC = () => {
                                 </div>
                               </div>
                             ) : (
-                              b.text && <p className="text-[13.5px] font-medium text-slate-900 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>
+                              b.text && <p className="text-[14.5px] font-medium text-slate-900 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>
                             )}
                             <div className="flex items-center justify-end gap-1 mt-1">
-                              <span className="text-[11px] font-medium text-slate-500">{b.id.startsWith('temp-') ? 'enviando…' : fmtTime(b.createdAt)}</span>
+                              <span className="text-xs font-medium text-slate-500">{b.id.startsWith('temp-') ? 'enviando…' : fmtTime(b.createdAt)}</span>
                               {b.delivery === 'sent' ? (
                                 <CheckCheck className="w-3.5 h-3.5 text-emerald-500" aria-label="Entregado a WhatsApp" />
                               ) : b.delivery === 'error' ? (
-                                <span title={b.deliveryError || 'No se pudo enviar'} className="inline-flex items-center gap-0.5 text-[11px] font-bold text-rose-600">
+                                <span title={b.deliveryError || 'No se pudo enviar'} className="inline-flex items-center gap-0.5 text-xs font-bold text-rose-600">
                                   <AlertTriangle className="w-3 h-3" /> No enviado
                                 </span>
                               ) : b.delivery ? (
@@ -4246,17 +4246,17 @@ export const SupportChatCircles: React.FC = () => {
                       {daySep}
                       <div className="flex justify-start">
                         <div className="max-w-lg bg-white text-slate-900 rounded-2xl rounded-bl-xs px-4 py-3 shadow-2xs">
-                          <p className="text-xs font-bold text-indigo-600 mb-0.5">{b.senderName}</p>
+                          <p className="text-[13px] font-bold text-indigo-600 mb-0.5">{b.senderName}</p>
                           {renderMedia(b)}
-                          {b.text && <p className="text-[13.5px] font-medium text-slate-800 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
+                          {b.text && <p className="text-[14.5px] font-medium text-slate-800 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
                           {b.transcript && (
-                            <p className="mt-1.5 text-xs text-slate-600 bg-slate-50 rounded-lg px-2.5 py-1.5 italic">
+                            <p className="mt-1.5 text-[13px] text-slate-600 bg-slate-50 rounded-lg px-2.5 py-1.5 italic">
                               <Mic className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />
                               {b.transcript}
                             </p>
                           )}
                           <div className="flex items-center justify-end mt-1">
-                            <span className="text-[11px] font-medium text-slate-400">{fmtTime(b.createdAt)}</span>
+                            <span className="text-xs font-medium text-slate-400">{fmtTime(b.createdAt)}</span>
                           </div>
                         </div>
                       </div>
@@ -4397,13 +4397,13 @@ export const SupportChatCircles: React.FC = () => {
                       type="button"
                       onClick={() => setShowQuickRepliesPopover((v) => !v)}
                       title="Respuestas rápidas y plantillas"
-                      className={`px-3 py-2.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 border transition ${
+                      className={`px-3.5 py-2.5 rounded-xl text-[13px] font-semibold inline-flex items-center gap-1.5 border transition ${
                         showQuickRepliesPopover
                           ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                           : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
                       }`}
                     >
-                      <Zap className="w-3.5 h-3.5 text-indigo-600" />
+                      <Zap className="w-4 h-4 text-indigo-600" />
                       <span className="hidden sm:inline">Plantillas</span>
                     </button>
                     {showQuickRepliesPopover && (
@@ -4480,13 +4480,13 @@ export const SupportChatCircles: React.FC = () => {
                       ? 'Modo Nota Interna activo (el cliente NO recibe este mensaje). Clic para volver a WhatsApp.'
                       : 'Cambiar a Nota Interna para dejar instrucciones al equipo dentro del chat'
                   }
-                  className={`px-3 py-2.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shrink-0 border transition ${
+                  className={`px-3.5 py-2.5 rounded-xl text-[13px] font-semibold inline-flex items-center gap-1.5 shrink-0 border transition ${
                     composerMode === 'internal'
                       ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
                       : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200'
                   }`}
                 >
-                  <StickyNote className="w-3.5 h-3.5" />
+                  <StickyNote className="w-4 h-4" />
                   <span className="hidden sm:inline">{composerMode === 'internal' ? 'Nota interna' : 'Nota'}</span>
                 </button>
 
@@ -4505,7 +4505,7 @@ export const SupportChatCircles: React.FC = () => {
                       ? 'Escribe una nota interna para el equipo (NO se envía al WhatsApp del cliente)…'
                       : 'Escribe un mensaje a WhatsApp… (Shift+Enter = nueva línea)'
                   }
-                  className={`flex-1 resize-none max-h-32 px-4 py-2.5 rounded-xl text-[13.5px] font-medium focus:outline-none focus:ring-2 transition ${
+                  className={`flex-1 resize-none max-h-32 px-4 py-2.5 rounded-xl text-[14.5px] font-medium focus:outline-none focus:ring-2 transition ${
                     composerMode === 'internal'
                       ? 'bg-white border-2 border-amber-300 text-amber-950 placeholder:text-amber-700/60 focus:ring-amber-500/20'
                       : 'bg-slate-50 border border-slate-200/80 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-indigo-500/20'
@@ -4515,7 +4515,7 @@ export const SupportChatCircles: React.FC = () => {
                   type="button"
                   disabled={!messageInput.trim() || sendingMessage}
                   onClick={handleComposerSubmit}
-                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl disabled:opacity-40 text-white text-xs font-bold transition ${
+                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl disabled:opacity-40 text-white text-[13px] font-bold transition ${
                     composerMode === 'internal' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'
                   }`}
                 >
