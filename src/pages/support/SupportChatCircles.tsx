@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   UserCheck,
   Sparkles,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   Phone,
@@ -806,6 +807,8 @@ export const SupportChatCircles: React.FC = () => {
 
   const [activeChatSeconds, setActiveChatSeconds] = useState(0);
   const [showRightPanel, setShowRightPanel] = useState(false);
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [leftListCollapsed, setLeftListCollapsed] = useState(false);
 
   // Resizable left column
   const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
@@ -999,11 +1002,14 @@ export const SupportChatCircles: React.FC = () => {
       const meta = (latest.metadata || {}) as Record<string, any>;
       const activeMeta = (activeTicket.metadata || {}) as Record<string, any>;
 
-      const scope: WaScope = isWa ? getWaScope(latest) : 'soporte';
+      const rawScope: WaScope = isWa ? getWaScope(latest) : 'soporte';
       const isGroup = isWa && (Boolean(meta.is_group) || String(meta.whatsapp_jid || '').endsWith('@g.us'));
       const phone = String(meta.whatsapp_phone || '').replace(/\D/g, '');
       const leadId = (activeTicket.lead_id || latest.lead_id || null) as string | null;
       const lead = leadId ? leadMap.get(leadId) : undefined;
+      const isReactivationTicket = Boolean(meta.wa_reactivation || activeMeta.wa_reactivation);
+      const scope: WaScope =
+        rawScope === 'por_clasificar' && (Boolean(leadId) || isReactivationTicket) ? 'lead' : rawScope;
 
       const sanitizeWaName = (raw?: string | null): string => {
         const cleaned = stripEmojis(String(raw || '')).trim();
@@ -1119,7 +1125,13 @@ export const SupportChatCircles: React.FC = () => {
           if (!scopes.leads) return;
           // In live session, vendor only sees leads assigned to them.
           // (If Admin is previewing 'ventas_pool'/'ventas_assigned', show leads assigned to Admin or all if none assigned to Admin so preview is informative)
-          if (!adminPreviewMode && assignedTechId !== profile?.id && leadOwnerId !== profile?.id) return;
+          if (
+            !adminPreviewMode &&
+            assignedTechId !== profile?.id &&
+            leadOwnerId !== profile?.id &&
+            !(scopes.leadsPool && !assignedTechId && !leadOwnerId)
+          )
+            return;
         }
       }
 
@@ -2103,6 +2115,7 @@ export const SupportChatCircles: React.FC = () => {
         .update({
           metadata: {
             ...curMeta,
+            ...(curMeta.wa_scope === 'por_clasificar' ? { wa_scope: 'lead' } : {}),
             wa_lead_status: newStatus,
             ...(isDiscard ? { wa_attended_at: nowIso } : {}),
           },
@@ -3136,8 +3149,13 @@ export const SupportChatCircles: React.FC = () => {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* ── LEFT: chat list (Clean, Airy, Uncluttered) ── */}
-        <aside style={{ width: `${leftPanelWidth}px` }} className="bg-white flex flex-col shrink-0 relative">
+        {/* ── LEFT: chat list (Responsive on Tablet/Mobile + Collapsible on Desktop) ── */}
+        <aside
+          style={{ ['--left-w' as any]: `${leftPanelWidth}px` }}
+          className={`bg-white flex-col shrink-0 relative w-full lg:w-[var(--left-w)] ${
+            mobileChatOpen && activeCircle ? 'hidden' : 'flex'
+          } ${leftListCollapsed ? 'lg:hidden' : 'lg:flex'}`}
+        >
           <div className="px-3.5 pt-2.5 pb-1.5 border-b border-slate-100 space-y-1.5 relative">
             <div className="flex items-center gap-1.5">
               <div className="relative flex-1">
@@ -3414,6 +3432,7 @@ export const SupportChatCircles: React.FC = () => {
                     onClick={() => {
                       markCircleAsRead(circle.circleId, circle.lastMessageAt);
                       setSelectedCircleId(circle.circleId);
+                      setMobileChatOpen(true);
                     }}
                     className={`w-full text-left px-3.5 py-2.5 flex items-center gap-2.5 transition relative border-l-[3px] ${
                       isSelected
@@ -3498,7 +3517,7 @@ export const SupportChatCircles: React.FC = () => {
           </div>
         </aside>
 
-        {/* ── Resizer ── */}
+        {/* ── Resizer (Desktop only, hidden when left list is collapsed) ── */}
         <div
           onMouseDown={(e) => {
             e.preventDefault();
@@ -3512,7 +3531,7 @@ export const SupportChatCircles: React.FC = () => {
             localStorage.setItem('crm_circles_left_width', String(next));
           }}
           title="Arrastra para cambiar el ancho de la lista (doble clic para expandir)"
-          className={`w-1.5 shrink-0 cursor-col-resize relative group transition-colors flex items-center justify-center z-20 ${
+          className={`hidden ${leftListCollapsed ? 'lg:hidden' : 'lg:flex'} w-1.5 shrink-0 cursor-col-resize relative group transition-colors items-center justify-center z-20 ${
             isResizingLeft ? 'bg-indigo-600' : 'bg-slate-200/80 hover:bg-indigo-500'
           }`}
         >
@@ -3521,20 +3540,50 @@ export const SupportChatCircles: React.FC = () => {
 
         {/* ── CENTER: chat ── */}
         {activeCircle ? (
-          <main className="flex-1 flex flex-col bg-[#F3F4F8] overflow-hidden min-w-0">
-            {/* Chat header (Compact 2-line height, Uncluttered, 100% Vector Icons) */}
-            <div className="bg-white border-b border-slate-200/70 px-4 py-1.5 flex items-center justify-between gap-2 flex-wrap xl:flex-nowrap shrink-0">
-              <div className="flex items-center gap-2.5 min-w-[200px] flex-1 overflow-hidden">
+          <main
+            className={`flex-1 flex-col bg-[#F3F4F8] overflow-hidden min-w-0 ${
+              mobileChatOpen ? 'flex' : 'hidden lg:flex'
+            }`}
+          >
+            {/* Chat header (Clean 1-Bar Desktop & Adaptive Tablet Header) */}
+            <div className="bg-white border-b border-slate-200/70 px-3.5 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                {/* Tablet / Mobile Back to List Button */}
+                <button
+                  type="button"
+                  onClick={() => setMobileChatOpen(false)}
+                  title="Volver a la lista de conversaciones"
+                  className="lg:hidden inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold shrink-0 transition"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Chats</span>
+                  {counts.waiting > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[10.5px] font-bold">
+                      {counts.waiting}
+                    </span>
+                  )}
+                </button>
+
+                {/* Desktop / Tablet Landscape: Toggle Left List for Fullscreen Chat */}
+                <button
+                  type="button"
+                  onClick={() => setLeftListCollapsed((v) => !v)}
+                  title={leftListCollapsed ? 'Mostrar lista de chats' : 'Ocultar lista para pantalla completa'}
+                  className="hidden lg:inline-flex p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 transition shrink-0"
+                >
+                  {leftListCollapsed ? <PanelRightClose className="w-4 h-4 text-indigo-600" /> : <PanelRightOpen className="w-4 h-4" />}
+                </button>
+
                 <div className={`w-9 h-9 rounded-full font-bold text-[13px] flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
                   {activeCircle.isGroup ? <Users className="w-4 h-4" /> : initials(activeCircle.clientName)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  {/* Line 1: Name + compact status chips (Never wraps vertically) */}
+                  {/* Line 1: Name + essential status badges only (no duplicate Lead/Por tomar pill clutter) */}
                   <div className="flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
-                    <h3 className="text-[15px] font-bold text-slate-900 tracking-tight truncate max-w-[190px] 2xl:max-w-[260px]">
+                    <h3 className="text-[15px] font-bold text-slate-900 tracking-tight truncate max-w-[180px] sm:max-w-[240px] 2xl:max-w-[300px]">
                       {activeCircle.clientName}
                     </h3>
-                    <ScopeChip circle={activeCircle} compact={Boolean(activeCircle.leadId)} />
+                    {activeCircle.scope !== 'lead' && <ScopeChip circle={activeCircle} compact />}
                     {activeCircle.isReactivation && (
                       <span
                         title={activeCircle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
@@ -3579,7 +3628,7 @@ export const SupportChatCircles: React.FC = () => {
                       }`}
                     >
                       <RotateCcw className="w-2.5 h-2.5" />
-                      <span>No leído</span>
+                      <span className="hidden sm:inline">No leído</span>
                     </button>
                   </div>
 
@@ -3597,10 +3646,12 @@ export const SupportChatCircles: React.FC = () => {
                             .filter(Boolean)
                             .join(' · ')}
                       {activeCircle.scope === 'soporte' ? ` · Atiende: ${activeCircle.assignedTechName}` : ''}
-                      {activeCircle.scope === 'lead' ? ` · Vendedor: ${activeCircle.leadOwnerName || 'Sin asignar'}` : ''}
+                      {activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar'
+                        ? ` · Vendedor: ${activeCircle.leadOwnerName || 'Sin asignar'}`
+                        : ''}
                     </span>
                     {!activeCircle.isGroup && activeCircle.memberOfGroups.length > 0 && (
-                      <div className="inline-flex items-center gap-1 shrink-0">
+                      <div className="hidden sm:inline-flex items-center gap-1 shrink-0">
                         <span className="text-slate-300">·</span>
                         {activeCircle.memberOfGroups.slice(0, 2).map((g) => {
                           const groupCircleId = `wa:${g.jid}`;
@@ -3652,130 +3703,98 @@ export const SupportChatCircles: React.FC = () => {
                   </>
                 )}
 
-                {/* Commercial Lead & Quote controls (Sales & Multi-Industry SaaS) */}
+                {/* Commercial Lead & Quote controls (Clean 1-button Stage selector + Actions) */}
                 {!activeCircle.isGroup &&
                   activeCircle.isWhatsApp &&
                   (activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar') &&
                   (scopes.all || scopes.leads) && (
                     <>
-                      {activeCircle.leadId && (
-                        <div className="relative flex items-center gap-0.5 bg-slate-50 border border-slate-200/80 rounded-xl p-0.5">
-                          {(
-                            [
-                              { st: 'En seguimiento', label: 'Seguimiento' },
-                              { st: 'Perdido', label: 'Perdido' },
-                              { st: 'Erróneo', label: 'Erróneo' },
-                            ] as const
-                          ).map((quick) => {
-                            const active = activeCircle.leadStatus === quick.st;
-                            return (
-                              <button
-                                key={quick.st}
-                                type="button"
-                                onClick={() => {
-                                  setShowStagePopover(false);
-                                  handleUpdateLeadStatus(quick.st);
-                                }}
-                                title={`Cambiar etapa a ${quick.st}`}
-                                className={`px-2 py-1 rounded-lg text-[12px] transition ${
-                                  active
-                                    ? 'bg-slate-800 text-white font-bold shadow-2xs'
-                                    : 'text-slate-600 hover:bg-white font-semibold'
-                                }`}
-                              >
-                                {quick.label}
-                              </button>
-                            );
-                          })}
-
-                          {/* Modern Custom Dropdown for Lead Stage */}
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowStagePopover((v) => !v);
-                                setShowDiscoveryPopover(false);
-                                setShowCalendarPopover(false);
-                                setShowQuotesPopover(false);
-                              }}
-                              title="Cambiar etapa del Lead"
-                              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[12px] font-semibold transition ${
-                                showStagePopover
-                                  ? 'bg-white text-slate-900 shadow-2xs'
-                                  : 'text-slate-700 hover:bg-white'
-                              }`}
-                            >
-                              <span
-                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                                  activeCircle.leadStatus === 'Cerrado'
-                                    ? 'bg-emerald-500'
-                                    : activeCircle.leadStatus === 'En seguimiento' ||
-                                      activeCircle.leadStatus === 'Negociación' ||
-                                      activeCircle.leadStatus === 'Lead calificado'
-                                    ? 'bg-indigo-500'
-                                    : activeCircle.leadStatus === 'Perdido' || activeCircle.leadStatus === 'Erróneo'
-                                    ? 'bg-rose-400'
-                                    : 'bg-slate-400'
-                                }`}
-                              />
-                              <span>{activeCircle.leadStatus || 'Prospecto'}</span>
-                              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                            </button>
-
-                            {showStagePopover && (
-                              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-1.5 space-y-0.5">
-                                <div className="px-2.5 py-1 flex items-center justify-between border-b border-slate-100 mb-0.5">
-                                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                                    Etapa del Lead
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowStagePopover(false)}
-                                    className="text-slate-400 hover:text-slate-600"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                                {LEAD_STATUS_OPTIONS.map((st) => {
-                                  const isSelected = (activeCircle.leadStatus || 'Prospecto') === st;
-                                  const dotColor =
-                                    st === 'Cerrado'
-                                      ? 'bg-emerald-500'
-                                      : st === 'En seguimiento' || st === 'Negociación' || st === 'Lead calificado'
-                                      ? 'bg-indigo-500'
-                                      : st === 'Perdido' || st === 'Erróneo'
-                                      ? 'bg-rose-400'
-                                      : 'bg-slate-400';
-                                  return (
-                                    <button
-                                      key={st}
-                                      type="button"
-                                      onClick={() => {
-                                        setShowStagePopover(false);
-                                        handleUpdateLeadStatus(st);
-                                      }}
-                                      className={`w-full px-2.5 py-1.5 rounded-xl text-[13px] flex items-center justify-between transition ${
-                                        isSelected
-                                          ? 'bg-indigo-50 text-indigo-700 font-bold'
-                                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                                      }`}
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        <span className={`w-2 h-2 rounded-full ${dotColor}`} />
-                                        <span>{st}</span>
-                                      </span>
-                                      {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600" />}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Diagnóstico Express + Método ARIAS (7 Preguntas) */}
+                      {/* Single Clean Custom Dropdown for Lead Stage (No duplicate quick buttons next to it!) */}
                       <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowStagePopover((v) => !v);
+                            setShowDiscoveryPopover(false);
+                            setShowCalendarPopover(false);
+                            setShowQuotesPopover(false);
+                          }}
+                          title="Cambiar etapa del Lead (1 clic)"
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[12.5px] font-semibold border transition ${
+                            showStagePopover
+                              ? 'bg-white text-slate-900 border-indigo-300 shadow-2xs'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200/80'
+                          }`}
+                        >
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${
+                              activeCircle.leadStatus === 'Cerrado'
+                                ? 'bg-emerald-500'
+                                : activeCircle.leadStatus === 'En seguimiento' ||
+                                  activeCircle.leadStatus === 'Negociación' ||
+                                  activeCircle.leadStatus === 'Lead calificado'
+                                ? 'bg-indigo-500'
+                                : activeCircle.leadStatus === 'Perdido' || activeCircle.leadStatus === 'Erróneo'
+                                ? 'bg-rose-500'
+                                : 'bg-slate-400'
+                            }`}
+                          />
+                          <span>{activeCircle.leadStatus || 'Prospecto'}</span>
+                          <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                        </button>
+
+                        {showStagePopover && (
+                          <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-1.5 space-y-0.5">
+                            <div className="px-2.5 py-1 flex items-center justify-between border-b border-slate-100 mb-0.5">
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                Etapa del Lead
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setShowStagePopover(false)}
+                                className="text-slate-400 hover:text-slate-600"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            {LEAD_STATUS_OPTIONS.map((st) => {
+                              const isSelected = (activeCircle.leadStatus || 'Prospecto') === st;
+                              const dotColor =
+                                st === 'Cerrado'
+                                  ? 'bg-emerald-500'
+                                  : st === 'En seguimiento' || st === 'Negociación' || st === 'Lead calificado'
+                                  ? 'bg-indigo-500'
+                                  : st === 'Perdido' || st === 'Erróneo'
+                                  ? 'bg-rose-400'
+                                  : 'bg-slate-400';
+                              return (
+                                <button
+                                  key={st}
+                                  type="button"
+                                  onClick={() => {
+                                    setShowStagePopover(false);
+                                    handleUpdateLeadStatus(st);
+                                  }}
+                                  className={`w-full px-2.5 py-1.5 rounded-xl text-[13px] flex items-center justify-between transition ${
+                                    isSelected
+                                      ? 'bg-indigo-50 text-indigo-700 font-bold'
+                                      : 'text-slate-700 hover:bg-slate-50 font-medium'
+                                  }`}
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                                    <span>{st}</span>
+                                  </span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Diagnóstico Express + Método ARIAS (Desktop/Landscape Header; on narrow Tablet moves to bottom touch bar) */}
+                      <div className="relative hidden md:block">
                         <button
                           type="button"
                           onClick={() => {
@@ -3882,7 +3901,7 @@ export const SupportChatCircles: React.FC = () => {
                       </div>
 
                       {/* Calendario Manual: Agendar Cita / Demo / Seguimiento sin salir del chat */}
-                      <div className="relative">
+                      <div className="relative hidden md:block">
                         <button
                           type="button"
                           onClick={() => {
@@ -3975,7 +3994,7 @@ export const SupportChatCircles: React.FC = () => {
                         type="button"
                         disabled={creatingQuote || classifying}
                         onClick={handleOpenQuoteBuilder}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[12.5px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition disabled:opacity-50"
+                        className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[12.5px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition disabled:opacity-50"
                       >
                         {creatingQuote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Receipt className="w-3.5 h-3.5" />}
                         <span>Cotizar</span>
@@ -3983,7 +4002,7 @@ export const SupportChatCircles: React.FC = () => {
 
                       {/* Existing quotes dropdown with 1-click send to WhatsApp */}
                       {leadQuotes.length > 0 && (
-                        <div className="relative">
+                        <div className="relative hidden md:block">
                           <button
                             type="button"
                             onClick={() => {
@@ -4062,19 +4081,19 @@ export const SupportChatCircles: React.FC = () => {
                     </>
                   )}
 
-                {/* Unified More Options Popover (Ficha Lead, Vendedor Assignment, Clasificación) */}
-                {(canClassify || activeCircle.leadId) && activeCircle.scope !== 'por_clasificar' && (
+                {/* Unified More Options Popover (Always accessible, including on Por Clasificar) */}
+                {(canClassify || activeCircle.leadId) && (
                   <div className="relative">
                     <button
                       type="button"
                       onClick={() => setShowReclassifyMenu((v) => !v)}
-                      title="Más opciones y clasificación"
+                      title="Más opciones, vendedor y clasificación"
                       className="inline-flex items-center gap-1.5 px-2 py-1 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
                     >
                       <MoreHorizontal className="w-4 h-4 text-slate-500" />
                     </button>
                     {showReclassifyMenu && (
-                      <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl z-30 p-2 space-y-1">
+                      <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-2 space-y-1">
                         <button
                           type="button"
                           onClick={() => {
@@ -4101,7 +4120,7 @@ export const SupportChatCircles: React.FC = () => {
                           </button>
                         )}
 
-                        {scopes.all && activeCircle.scope === 'lead' && (
+                        {scopes.all && (activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar') && (
                           <div className="px-3 py-2 border-y border-slate-100 space-y-1">
                             <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Vendedor asignado</span>
                             <select
@@ -4133,7 +4152,7 @@ export const SupportChatCircles: React.FC = () => {
                                 { t: 'lead', label: 'Es lead (Ventas)', icon: UserPlus, show: activeCircle.scope !== 'lead' },
                                 { t: 'interno', label: 'Es del equipo', icon: ShieldCheck, show: scopes.all && activeCircle.scope !== 'interno' },
                                 { t: 'spam', label: 'Spam / bloquear', icon: Ban, show: activeCircle.scope !== 'spam' },
-                                { t: 'por_clasificar', label: 'Deshacer (Por clasificar)', icon: HelpCircle, show: scopes.all },
+                                { t: 'por_clasificar', label: 'Deshacer (Por clasificar)', icon: HelpCircle, show: scopes.all && activeCircle.scope !== 'por_clasificar' },
                               ] as const
                             )
                               .filter((o) => o.show)
@@ -4176,79 +4195,54 @@ export const SupportChatCircles: React.FC = () => {
               </div>
             </div>
 
-            {/* Classification card for unknown numbers */}
-            {activeCircle.scope === 'por_clasificar' && (
-              <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center gap-3 flex-wrap shrink-0">
-                <HelpCircle className="w-5 h-5 text-amber-600 shrink-0" />
-                <div className="mr-auto">
-                  <p className="text-xs font-black text-amber-900">Número nuevo — ¿quién es?</p>
-                  <p className="text-[11px] text-amber-800">Clasifícalo una vez y el sistema lo recordará para siempre.</p>
-                </div>
-                {canClassify ? (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      type="button"
+            {/* Compact, non-intrusive bar ONLY for genuinely unknown numbers (not existing leads) */}
+            {activeCircle.scope === 'por_clasificar' && !activeCircle.leadId && !activeCircle.isReactivation && canClassify && (
+              <div className="bg-slate-50 border-b border-slate-200/80 px-4 py-1.5 flex items-center justify-between gap-2 flex-wrap shrink-0">
+                <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                  <HelpCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>Contacto nuevo sin clasificar:</span>
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    disabled={classifying}
+                    onClick={() => classify('lead')}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition disabled:opacity-50"
+                  >
+                    {classifying ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserCheck className="w-3 h-3" />}
+                    <span>Tomar Lead</span>
+                  </button>
+                  {scopes.all && agents.length > 0 && (
+                    <select
                       disabled={classifying}
-                      onClick={() => setShowClientPicker(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+                      defaultValue=""
+                      onChange={(e) => {
+                        const targetAgentId = e.target.value;
+                        if (!targetAgentId) return;
+                        classify('lead', { assign_to: targetAgentId });
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer focus:outline-none disabled:opacity-50"
                     >
-                      <Building2 className="w-3.5 h-3.5" />
-                      Es cliente
-                    </button>
-                    <button
-                      type="button"
-                      disabled={classifying}
-                      onClick={() => classify('lead')}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs disabled:opacity-50"
-                    >
-                      {classifying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
-                      Tomar Lead (asignado a mí)
-                    </button>
-                    {scopes.all && agents.length > 0 && (
-                      <select
-                        disabled={classifying}
-                        defaultValue=""
-                        onChange={(e) => {
-                          const targetAgentId = e.target.value;
-                          if (!targetAgentId) return;
-                          classify('lead', { assign_to: targetAgentId });
-                        }}
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50 cursor-pointer focus:outline-none disabled:opacity-50"
-                      >
-                        <option value="" disabled>
-                          Asignar directo a vendedor...
+                      <option value="" disabled>
+                        Asignar a vendedor...
+                      </option>
+                      {agents.map((ag) => (
+                        <option key={ag.id} value={ag.id}>
+                          {ag.full_name || ag.email}
                         </option>
-                        {agents.map((ag) => (
-                          <option key={ag.id} value={ag.id}>
-                            {ag.full_name || ag.email}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                    {scopes.all && (
-                      <button
-                        type="button"
-                        disabled={classifying}
-                        onClick={() => classify('interno')}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        Es del equipo
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      disabled={classifying}
-                      onClick={() => classify('spam')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-                    >
-                      <Ban className="w-3.5 h-3.5" />
-                      Spam
-                    </button>
-                  </div>
-                ) : (
-                  <span className="text-[11px] font-semibold text-amber-800">Un vendedor o administrador debe clasificarlo.</span>
-                )}
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    disabled={classifying}
+                    onClick={() => setShowClientPicker(true)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition disabled:opacity-50"
+                  >
+                    <Building2 className="w-3 h-3 text-slate-500" />
+                    <span>Es cliente</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -4554,6 +4548,48 @@ export const SupportChatCircles: React.FC = () => {
               </div>
             )}
 
+            {/* Responsive Tablet / Touch Commercial Action Bar (shown on < 768px where top header stays minimal) */}
+            {!activeCircle.isGroup &&
+              activeCircle.isWhatsApp &&
+              (activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar') &&
+              (scopes.all || scopes.leads) && (
+                <div className="md:hidden bg-white border-t border-slate-200/80 px-3 pt-2 pb-1 flex items-center gap-1.5 overflow-x-auto shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowDiscoveryHUD(true)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 active:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 whitespace-nowrap"
+                  >
+                    <Target className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                    <span>Diagnóstico</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSendDiscoveryFormLink(false)}
+                    className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-50 active:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 whitespace-nowrap"
+                  >
+                    <Send className="w-3 h-3 text-slate-500 shrink-0" />
+                    <span>Link Form</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCalendarModal('followup')}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 active:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 whitespace-nowrap"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                    <span>Agendar</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={creatingQuote || classifying}
+                    onClick={handleOpenQuoteBuilder}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 active:bg-indigo-700 text-white text-xs font-bold whitespace-nowrap disabled:opacity-50"
+                  >
+                    {creatingQuote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Receipt className="w-3.5 h-3.5 shrink-0" />}
+                    <span>Cotizar</span>
+                  </button>
+                </div>
+              )}
+
             {/* Single-Row Clean Composer (WhatsApp message vs Internal Team Note + Floating Plantillas Popover) */}
             {canSend ? (
               <div
@@ -4729,7 +4765,7 @@ export const SupportChatCircles: React.FC = () => {
             )}
           </main>
         ) : (
-          <main className="flex-1 flex items-center justify-center bg-[#F3F4F8] text-slate-400 text-sm font-bold">
+          <main className="hidden lg:flex flex-1 items-center justify-center bg-[#F3F4F8] text-slate-400 text-sm font-bold">
             Selecciona un chat de la lista para verlo.
           </main>
         )}
