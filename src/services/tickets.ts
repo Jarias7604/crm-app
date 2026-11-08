@@ -259,7 +259,8 @@ export const ticketService = {
             .from('leads')
             .select('id, name, email, phone, status, es_cliente, assigned_to')
             .eq('company_id', companyId)
-            .order('name');
+            .order('updated_at', { ascending: false })
+            .limit(5000);
         if (error) throw error;
         return (data || []) as TicketLead[];
     },

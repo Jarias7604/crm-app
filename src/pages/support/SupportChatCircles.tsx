@@ -223,7 +223,19 @@ const DEFAULT_SALES_QUICK_REPLIES: QuickReplyTemplate[] = [
   },
 ];
 
-const LEAD_STATUS_OPTIONS = ['Prospecto', 'Contactado', 'Cotizado', 'En Negociación', 'Cerrado', 'Erróneo'] as const;
+const LEAD_STATUS_OPTIONS = [
+  'Prospecto',
+  'Llamada fría',
+  'En Nutrición',
+  'Lead calificado',
+  'En seguimiento',
+  'Negociación',
+  'Cerrado',
+  'Perdido',
+  'Erróneo',
+] as const;
+
+type LeadStageSubFilter = 'activos' | 'conversando' | 'perdidos' | 'erroneos' | 'todos';
 
 // Web Audio API synthesizer — zero external audio files, works across all modern browsers.
 let sharedAudioCtx: AudioContext | null = null;
@@ -361,6 +373,7 @@ interface SupportCircle {
   isReactivation: boolean;
   reactivationCampaign: string | null;
   reactivationReplied: boolean;
+  hasActiveConversation: boolean;
 }
 
 interface LeadQuoteSummary {
@@ -543,6 +556,7 @@ export const SupportChatCircles: React.FC = () => {
   const [circleFilter, setCircleFilter] = useState<CircleFilter>(defaultFilter);
   const [ownerFilter, setOwnerFilter] = useState<OwnerSubFilter>('all');
   const [channelFilter, setChannelFilter] = useState<'all' | SupportChannelType>('all');
+  const [leadSubFilter, setLeadSubFilter] = useState<LeadStageSubFilter>('activos');
 
   const [messageInput, setMessageInput] = useState('');
   const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal'>('whatsapp');
@@ -645,21 +659,37 @@ export const SupportChatCircles: React.FC = () => {
     };
   }, [profile?.id, profile?.full_name]);
 
-  // Customizable SaaS Quick Replies per company
-  const [customQuickReplies, setCustomQuickReplies] = useState<QuickReplyTemplate[]>([]);
+  // Customizable SaaS Quick Replies per company (all templates editable & deletable)
+  const [customQuickReplies, setCustomQuickReplies] = useState<QuickReplyTemplate[]>([
+    ...DEFAULT_SALES_QUICK_REPLIES,
+    ...DEFAULT_SUPPORT_QUICK_REPLIES,
+  ]);
   const [showQuickReplyModal, setShowQuickReplyModal] = useState(false);
   const [newQrLabel, setNewQrLabel] = useState('');
   const [newQrText, setNewQrText] = useState('');
   const [newQrScope, setNewQrScope] = useState<'soporte' | 'ventas'>('ventas');
+  const [editingQrId, setEditingQrId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeCompanyId) return;
     try {
-      const saved = localStorage.getItem(`crm_wa_quick_replies_${activeCompanyId}`);
-      if (saved) setCustomQuickReplies(JSON.parse(saved));
-      else setCustomQuickReplies([]);
+      const v2Key = `crm_wa_quick_replies_v2_${activeCompanyId}`;
+      const savedV2 = localStorage.getItem(v2Key);
+      if (savedV2) {
+        const parsed = JSON.parse(savedV2);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCustomQuickReplies(parsed);
+          return;
+        }
+      }
+      // Migrate any legacy v1 custom templates alongside defaults
+      const legacy = localStorage.getItem(`crm_wa_quick_replies_${activeCompanyId}`);
+      const legacyArr: QuickReplyTemplate[] = legacy ? JSON.parse(legacy) : [];
+      const merged = [...DEFAULT_SALES_QUICK_REPLIES, ...DEFAULT_SUPPORT_QUICK_REPLIES, ...legacyArr];
+      setCustomQuickReplies(merged);
+      localStorage.setItem(v2Key, JSON.stringify(merged));
     } catch {
-      setCustomQuickReplies([]);
+      setCustomQuickReplies([...DEFAULT_SALES_QUICK_REPLIES, ...DEFAULT_SUPPORT_QUICK_REPLIES]);
     }
   }, [activeCompanyId]);
 
@@ -667,7 +697,7 @@ export const SupportChatCircles: React.FC = () => {
     setCustomQuickReplies(next);
     if (activeCompanyId) {
       try {
-        localStorage.setItem(`crm_wa_quick_replies_${activeCompanyId}`, JSON.stringify(next));
+        localStorage.setItem(`crm_wa_quick_replies_v2_${activeCompanyId}`, JSON.stringify(next));
       } catch {
         // ignore quota errors
       }
@@ -951,10 +981,15 @@ export const SupportChatCircles: React.FC = () => {
       const isManuallyAttended =
         Boolean(attendedAt && attendedAt >= lastMessageAt) || dismissedWaitingMap[key] === lastMessageAt;
 
+      const resolvedLeadStatus =
+        lead?.status || String(meta.wa_lead_status || activeMeta.wa_lead_status || '').trim() || null;
+      const isDiscardedLead = resolvedLeadStatus === 'Perdido' || resolvedLeadStatus === 'Erróneo';
+
       const unreadOrWaitingReply =
         lastFrom === 'client' &&
         scope !== 'interno' &&
         scope !== 'spam' &&
+        !isDiscardedLead &&
         !isManuallyAttended &&
         !isCourtesyClosing &&
         (scope !== 'soporte' || isOpen);
@@ -969,11 +1004,20 @@ export const SupportChatCircles: React.FC = () => {
         : 0;
       const isReactivation = Boolean(meta.wa_reactivation || activeMeta.wa_reactivation);
       const reactivationCampaign = String(meta.wa_reactivation_campaign || activeMeta.wa_reactivation_campaign || '').trim() || null;
-      const reactivationSentAt = String(meta.wa_reactivation_sent_at || activeMeta.wa_reactivation_sent_at || '').trim() || null;
+      const hasClientLine = descLines.some((l) => l.includes('👤'));
+      const staffLineCount = descLines.filter((l) => l.includes('👨‍💻')).length;
       const reactivationReplied =
         isReactivation &&
-        (lastFrom === 'client' ||
-          Boolean(reactivationSentAt && new Date(lastMessageAt).getTime() > new Date(reactivationSentAt).getTime() + 2000 && lastFrom === 'client'));
+        (lastFrom === 'client' || hasClientLine || Boolean(meta.wa_reactivation_replied || activeMeta.wa_reactivation_replied));
+      const hasActiveConversation =
+        !isDiscardedLead &&
+        (Boolean(
+          resolvedLeadStatus &&
+            ['Lead calificado', 'En seguimiento', 'Negociación', 'En Negociación', 'Cotizado', 'Cerrado'].includes(
+              resolvedLeadStatus
+            )
+        ) ||
+          (hasClientLine && staffLineCount >= 2));
 
       // Strict per-role scope & alert isolation (enforced both here and in DB RLS):
       // - Técnicos only see 'soporte' (never sales leads or unclassified pool).
@@ -1008,7 +1052,7 @@ export const SupportChatCircles: React.FC = () => {
         scopeReason: String(meta.wa_scope_reason || ''),
         memberOfGroups: Array.isArray(meta.member_of_groups) ? meta.member_of_groups : [],
         leadId,
-        leadStatus: lead?.status || null,
+        leadStatus: resolvedLeadStatus,
         leadOwnerId,
         leadOwnerName: leadOwnerId ? agentMap.get(leadOwnerId) || null : null,
         activeTicket,
@@ -1026,6 +1070,7 @@ export const SupportChatCircles: React.FC = () => {
         isReactivation,
         reactivationCampaign,
         reactivationReplied,
+        hasActiveConversation,
       });
     });
 
@@ -1195,6 +1240,34 @@ export const SupportChatCircles: React.FC = () => {
     return tabs;
   }, [counts, scopes, circleFilter]);
 
+  const leadSubCounts = useMemo(() => {
+    const base = circles.filter((c) => {
+      if (!c.isWhatsApp) return false;
+      if (circleFilter === 'reactivados') return c.isReactivation;
+      if (circleFilter === 'lead') return c.scope === 'lead';
+      return false;
+    });
+    let activos = 0;
+    let conversando = 0;
+    let perdidos = 0;
+    let erroneos = 0;
+    for (const c of base) {
+      const isPerdido = c.leadStatus === 'Perdido';
+      const isErroneo = c.leadStatus === 'Erróneo';
+      if (isPerdido) perdidos++;
+      else if (isErroneo) erroneos++;
+      else {
+        if (circleFilter === 'reactivados') {
+          if (c.reactivationReplied) activos++;
+        } else {
+          activos++;
+        }
+        if (c.hasActiveConversation) conversando++;
+      }
+    }
+    return { activos, conversando, perdidos, erroneos, todos: base.length };
+  }, [circles, circleFilter]);
+
   const filteredCircles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const res = circles.filter((c) => {
@@ -1214,6 +1287,22 @@ export const SupportChatCircles: React.FC = () => {
 
       if (circleFilter === 'soporte' && channelFilter !== 'all' && c.supportChannel !== channelFilter) return false;
 
+      // Apply Lead / Reactivados sub-filter when not actively searching
+      if (!q && (circleFilter === 'reactivados' || circleFilter === 'lead')) {
+        const isPerdido = c.leadStatus === 'Perdido';
+        const isErroneo = c.leadStatus === 'Erróneo';
+        if (leadSubFilter === 'activos') {
+          if (isPerdido || isErroneo) return false;
+          if (circleFilter === 'reactivados' && !c.reactivationReplied) return false;
+        } else if (leadSubFilter === 'conversando') {
+          if (isPerdido || isErroneo || !c.hasActiveConversation) return false;
+        } else if (leadSubFilter === 'perdidos') {
+          if (!isPerdido) return false;
+        } else if (leadSubFilter === 'erroneos') {
+          if (!isErroneo) return false;
+        }
+      }
+
       if (q) {
         return (
           c.clientName.toLowerCase().includes(q) ||
@@ -1222,15 +1311,18 @@ export const SupportChatCircles: React.FC = () => {
           c.lastMessageText.toLowerCase().includes(q) ||
           c.assignedTechName.toLowerCase().includes(q) ||
           (c.leadOwnerName || '').toLowerCase().includes(q) ||
-          (c.reactivationCampaign || '').toLowerCase().includes(q)
+          (c.reactivationCampaign || '').toLowerCase().includes(q) ||
+          (c.leadStatus || '').toLowerCase().includes(q)
         );
       }
       return true;
     });
 
-    if (circleFilter === 'reactivados') {
+    if (circleFilter === 'reactivados' || circleFilter === 'lead') {
       return [...res].sort((a, b) => {
-        if (a.reactivationReplied !== b.reactivationReplied) return a.reactivationReplied ? -1 : 1;
+        if (circleFilter === 'reactivados' && a.reactivationReplied !== b.reactivationReplied) {
+          return a.reactivationReplied ? -1 : 1;
+        }
         return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
       });
     }
@@ -1239,7 +1331,7 @@ export const SupportChatCircles: React.FC = () => {
     }
     return res;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [circles, circleFilter, ownerFilter, channelFilter, searchQuery, readCirclesMap, profile?.id]);
+  }, [circles, circleFilter, ownerFilter, channelFilter, leadSubFilter, searchQuery, readCirclesMap, profile?.id]);
 
   useEffect(() => {
     if (!selectedCircleId && filteredCircles.length > 0) setSelectedCircleId(filteredCircles[0].circleId);
@@ -1871,25 +1963,79 @@ export const SupportChatCircles: React.FC = () => {
     }
   };
 
-  const handleUpdateLeadStatus = async (newStatus: string) => {
-    if (!activeCircle?.leadId || !activeCompanyId) return;
+  const handleUpdateLeadStatus = async (newStatus: string, targetCircle?: SupportCircle) => {
+    const circle = targetCircle || activeCircle;
+    if (!circle || !activeCompanyId) return;
+    const isDiscard = newStatus === 'Perdido' || newStatus === 'Erróneo';
+    const nowIso = new Date().toISOString();
+
+    // Instant optimistic UI update
+    if (circle.leadId) {
+      setCompanyLeads((prev) => {
+        const exists = prev.some((l) => l.id === circle.leadId);
+        if (exists) {
+          return prev.map((l) => (l.id === circle.leadId ? { ...l, status: newStatus } : l));
+        }
+        return [
+          ...prev,
+          {
+            id: circle.leadId!,
+            name: circle.clientName,
+            email: null,
+            phone: circle.phone,
+            status: newStatus,
+            es_cliente: false,
+          } as TicketLead,
+        ];
+      });
+    }
+    if (isDiscard) {
+      markCircleAsRead(circle.circleId, circle.lastMessageAt);
+      setDismissedWaitingMap((prev) => {
+        const next = { ...prev, [circle.circleId]: circle.lastMessageAt };
+        try {
+          localStorage.setItem('crm_wa_dismissed_waiting', JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+    }
+
     try {
-      const { error } = await supabase
-        .from('leads')
-        .update({ status: newStatus })
-        .eq('id', activeCircle.leadId)
-        .eq('company_id', activeCompanyId);
-      if (error) throw error;
+      if (circle.leadId) {
+        const { error } = await supabase
+          .from('leads')
+          .update({ status: newStatus })
+          .eq('id', circle.leadId)
+          .eq('company_id', activeCompanyId);
+        if (error) throw error;
+      }
+
+      const curMeta = (circle.activeTicket.metadata || {}) as Record<string, any>;
+      await supabase
+        .from('tickets')
+        .update({
+          metadata: {
+            ...curMeta,
+            wa_lead_status: newStatus,
+            ...(isDiscard ? { wa_attended_at: nowIso } : {}),
+          },
+        })
+        .eq('id', circle.activeTicket.id);
+
       await supabase.from('ticket_comments').insert({
-        ticket_id: activeCircle.activeTicket.id,
+        ticket_id: circle.activeTicket.id,
         company_id: activeCompanyId,
         author_id: profile?.id || null,
         body: `${profile?.full_name || 'Equipo'} actualizó etapa del lead a: ${newStatus}`,
         is_internal: true,
       });
-      toast.success(`Etapa del lead: ${newStatus}`);
+      toast.success(isDiscard ? `Marcado como ${newStatus} y atendido` : `Etapa del lead: ${newStatus}`);
       loadSupportData(true);
-      loadThread(false);
+      if (activeCircle?.circleId === circle.circleId) {
+        loadThread(false);
+      }
     } catch (err: any) {
       toast.error(err?.message || 'No se pudo actualizar la etapa');
     }
@@ -2033,9 +2179,7 @@ export const SupportChatCircles: React.FC = () => {
     if (!activeCircle) return [];
     const isSalesScope = activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar';
     const targetScope: 'soporte' | 'ventas' = isSalesScope ? 'ventas' : 'soporte';
-    const base = isSalesScope ? DEFAULT_SALES_QUICK_REPLIES : DEFAULT_SUPPORT_QUICK_REPLIES;
-    const custom = customQuickReplies.filter((q) => q.scope === targetScope);
-    return [...base, ...custom];
+    return customQuickReplies.filter((q) => q.scope === targetScope);
   }, [activeCircle, customQuickReplies]);
 
   const alertCircles = useMemo(() => {
@@ -2810,6 +2954,7 @@ export const SupportChatCircles: React.FC = () => {
                       setSearchQuery('');
                       setOwnerFilter('all');
                       setChannelFilter('all');
+                      setLeadSubFilter('activos');
                       setCircleFilter(tab.id);
                     }}
                     className={`px-2.5 py-1 rounded-lg text-xs whitespace-nowrap transition inline-flex items-center gap-1.5 ${
@@ -2825,14 +2970,50 @@ export const SupportChatCircles: React.FC = () => {
               })}
             </div>
 
-            {circleFilter === 'reactivados' && counts.reactivatedTotal > 0 && (
-              <div className="mt-1 px-2.5 py-1.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between gap-2 text-[11px]">
-                <span className="font-semibold text-emerald-800">
-                  Enviados: <b>{counts.reactivatedTotal}</b> · Respondieron: <b>{counts.reactivatedReplied}</b>
-                </span>
-                <span className="px-1.5 py-0.5 rounded-md bg-white text-emerald-700 font-bold border border-emerald-200/70">
-                  {Math.round((counts.reactivatedReplied / Math.max(1, counts.reactivatedTotal)) * 100)}% respuesta
-                </span>
+            {(circleFilter === 'reactivados' || circleFilter === 'lead') && (
+              <div className="mt-1.5 pt-1.5 border-t border-slate-100 space-y-1.5">
+                {circleFilter === 'reactivados' && counts.reactivatedTotal > 0 && (
+                  <div className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-between text-[11px] text-slate-600">
+                    <span>
+                      Enviados: <b className="text-slate-800">{counts.reactivatedTotal}</b> · Respondieron:{' '}
+                      <b className="text-slate-900">{counts.reactivatedReplied}</b>
+                    </span>
+                    <span className="font-bold text-indigo-700">
+                      {Math.round((counts.reactivatedReplied / Math.max(1, counts.reactivatedTotal)) * 100)}% respuesta
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-1 flex-wrap">
+                  {(
+                    [
+                      {
+                        id: 'activos' as LeadStageSubFilter,
+                        label: circleFilter === 'reactivados' ? `Interesados (${leadSubCounts.activos})` : `Activos (${leadSubCounts.activos})`,
+                      },
+                      { id: 'conversando' as LeadStageSubFilter, label: `Seguimiento / Demo (${leadSubCounts.conversando})` },
+                      { id: 'perdidos' as LeadStageSubFilter, label: `Perdidos (${leadSubCounts.perdidos})` },
+                      { id: 'erroneos' as LeadStageSubFilter, label: `Erróneos (${leadSubCounts.erroneos})` },
+                      { id: 'todos' as LeadStageSubFilter, label: `Todos (${leadSubCounts.todos})` },
+                    ]
+                  ).map((sf) => {
+                    const active = leadSubFilter === sf.id;
+                    return (
+                      <button
+                        key={sf.id}
+                        type="button"
+                        onClick={() => setLeadSubFilter(sf.id)}
+                        className={`px-2 py-0.5 rounded-md text-[11px] transition ${
+                          active
+                            ? 'bg-slate-800 text-white font-semibold'
+                            : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70 font-medium'
+                        }`}
+                      >
+                        {sf.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -2843,18 +3024,19 @@ export const SupportChatCircles: React.FC = () => {
             ) : filteredCircles.length === 0 ? (
               <div className="p-8 text-center space-y-2.5">
                 <p className="text-[13px] text-slate-400 font-medium">No hay conversaciones en esta vista.</p>
-                {(searchQuery || ownerFilter !== 'all' || channelFilter !== 'all') && (
+                {(searchQuery || ownerFilter !== 'all' || channelFilter !== 'all' || leadSubFilter !== 'todos') && (
                   <button
                     type="button"
                     onClick={() => {
                       setSearchQuery('');
                       setOwnerFilter('all');
                       setChannelFilter('all');
+                      setLeadSubFilter('todos');
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition"
                   >
                     <X className="w-3.5 h-3.5" />
-                    <span>Limpiar búsqueda y filtros</span>
+                    <span>Ver todos</span>
                   </button>
                 )}
               </div>
@@ -2871,7 +3053,9 @@ export const SupportChatCircles: React.FC = () => {
                     : circle.scope === 'por_clasificar'
                     ? 'Por tomar'
                     : circle.scope === 'lead'
-                    ? 'Lead'
+                    ? circle.leadStatus && circle.leadStatus !== 'Prospecto'
+                      ? circle.leadStatus
+                      : 'Lead'
                     : circle.scope === 'interno'
                     ? 'Equipo'
                     : 'Spam';
@@ -2912,17 +3096,25 @@ export const SupportChatCircles: React.FC = () => {
                           <span className={`text-[13.5px] truncate ${unread ? 'font-extrabold text-slate-950' : 'font-semibold text-slate-700'}`}>
                             {circle.clientName}
                           </span>
-                          <span className="text-xs text-slate-400 shrink-0">· {shortType}</span>
+                          <span
+                            className={`text-xs shrink-0 ${
+                              circle.leadStatus === 'Perdido' || circle.leadStatus === 'Erróneo'
+                                ? 'text-slate-500 font-semibold'
+                                : 'text-slate-400'
+                            }`}
+                          >
+                            · {shortType}
+                          </span>
                           {circle.isReactivation && (
                             <span
                               title={circle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
-                              className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0 ${
                                 circle.reactivationReplied
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
-                                  : 'bg-indigo-50/70 text-indigo-600'
+                                  ? 'bg-slate-100 text-slate-700 border border-slate-200/80'
+                                  : 'text-slate-400'
                               }`}
                             >
-                              {circle.reactivationReplied ? 'Respondió reactivación' : 'Reactivación'}
+                              {circle.reactivationReplied ? 'Respondió' : 'Reactivación'}
                             </span>
                           )}
                         </div>
@@ -3099,18 +3291,44 @@ export const SupportChatCircles: React.FC = () => {
                   (scopes.all || scopes.leads) && (
                     <>
                       {activeCircle.leadId && (
-                        <select
-                          value={activeCircle.leadStatus || 'Prospecto'}
-                          onChange={(e) => handleUpdateLeadStatus(e.target.value)}
-                          title="Etapa comercial del Lead"
-                          className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 cursor-pointer focus:outline-none transition"
-                        >
-                          {LEAD_STATUS_OPTIONS.map((st) => (
-                            <option key={st} value={st}>
-                              Etapa: {st}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-xl p-0.5">
+                          {(
+                            [
+                              { st: 'En seguimiento', label: 'Seguimiento' },
+                              { st: 'Perdido', label: 'Perdido' },
+                              { st: 'Erróneo', label: 'Erróneo' },
+                            ] as const
+                          ).map((quick) => {
+                            const active = activeCircle.leadStatus === quick.st;
+                            return (
+                              <button
+                                key={quick.st}
+                                type="button"
+                                onClick={() => handleUpdateLeadStatus(quick.st)}
+                                title={`Cambiar etapa a ${quick.st}`}
+                                className={`px-2 py-1 rounded-lg text-[11px] transition ${
+                                  active
+                                    ? 'bg-slate-800 text-white font-bold shadow-2xs'
+                                    : 'text-slate-600 hover:bg-white font-semibold'
+                                }`}
+                              >
+                                {quick.label}
+                              </button>
+                            );
+                          })}
+                          <select
+                            value={activeCircle.leadStatus || 'Prospecto'}
+                            onChange={(e) => handleUpdateLeadStatus(e.target.value)}
+                            title="Todas las etapas del Lead"
+                            className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-transparent text-slate-600 hover:bg-white cursor-pointer focus:outline-none transition"
+                          >
+                            {LEAD_STATUS_OPTIONS.map((st) => (
+                              <option key={st} value={st}>
+                                Etapa: {st}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       )}
 
                       {/* 1-Click Quote Builder */}
@@ -3694,29 +3912,52 @@ export const SupportChatCircles: React.FC = () => {
                             type="button"
                             onClick={() => {
                               setShowQuickRepliesPopover(false);
+                              setEditingQrId(null);
+                              setNewQrLabel('');
+                              setNewQrText('');
                               setNewQrScope(activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'ventas' : 'soporte');
                               setShowQuickReplyModal(true);
                             }}
                             className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-0.5"
                           >
                             <Plus className="w-3 h-3" />
-                            Personalizar
+                            Nueva / Editar
                           </button>
                         </div>
                         <div className="max-h-64 overflow-y-auto divide-y divide-slate-50">
                           {activeQuickReplies.map((q) => (
-                            <button
+                            <div
                               key={q.id}
-                              type="button"
-                              onClick={() => {
-                                setMessageInput(q.text);
-                                setShowQuickRepliesPopover(false);
-                              }}
-                              className="w-full px-3 py-2 rounded-xl text-left hover:bg-slate-50 transition"
+                              className="w-full px-3 py-2 rounded-xl hover:bg-slate-50 transition flex items-start justify-between gap-2 group"
                             >
-                              <p className="text-[13px] font-semibold text-slate-800">{q.label}</p>
-                              <p className="text-xs text-slate-400 truncate mt-0.5">{q.text}</p>
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMessageInput(q.text);
+                                  setShowQuickRepliesPopover(false);
+                                }}
+                                className="flex-1 text-left min-w-0"
+                              >
+                                <p className="text-[13px] font-semibold text-slate-800">{q.label}</p>
+                                <p className="text-xs text-slate-400 truncate mt-0.5">{q.text}</p>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShowQuickRepliesPopover(false);
+                                  setNewQrScope(q.scope);
+                                  setEditingQrId(q.id);
+                                  setNewQrLabel(q.label);
+                                  setNewQrText(q.text);
+                                  setShowQuickReplyModal(true);
+                                }}
+                                title="Editar esta plantilla"
+                                className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition shrink-0"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -4295,7 +4536,24 @@ export const SupportChatCircles: React.FC = () => {
             </div>
 
             <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2.5">
-              <p className="text-[10px] font-black uppercase text-slate-500">Nueva plantilla ({newQrScope === 'ventas' ? 'Ventas' : 'Soporte'})</p>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black uppercase text-slate-500">
+                  {editingQrId ? 'Editar plantilla' : `Nueva plantilla (${newQrScope === 'ventas' ? 'Ventas' : 'Soporte'})`}
+                </p>
+                {editingQrId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingQrId(null);
+                      setNewQrLabel('');
+                      setNewQrText('');
+                    }}
+                    className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
+                  >
+                    Cancelar edición
+                  </button>
+                )}
+              </div>
               <input
                 type="text"
                 value={newQrLabel}
@@ -4314,47 +4572,84 @@ export const SupportChatCircles: React.FC = () => {
                 type="button"
                 disabled={!newQrLabel.trim() || !newQrText.trim()}
                 onClick={() => {
-                  const item: QuickReplyTemplate = {
-                    id: `custom-${Date.now()}`,
-                    scope: newQrScope,
-                    label: newQrLabel.trim(),
-                    text: newQrText.trim(),
-                  };
-                  saveCustomQuickReplies([...customQuickReplies, item]);
-                  setNewQrLabel('');
-                  setNewQrText('');
-                  toast.success('Plantilla agregada');
+                  if (editingQrId) {
+                    const updated = customQuickReplies.map((q) =>
+                      q.id === editingQrId
+                        ? { ...q, scope: newQrScope, label: newQrLabel.trim(), text: newQrText.trim() }
+                        : q
+                    );
+                    saveCustomQuickReplies(updated);
+                    setEditingQrId(null);
+                    setNewQrLabel('');
+                    setNewQrText('');
+                    toast.success('Plantilla actualizada');
+                  } else {
+                    const item: QuickReplyTemplate = {
+                      id: `custom-${Date.now()}`,
+                      scope: newQrScope,
+                      label: newQrLabel.trim(),
+                      text: newQrText.trim(),
+                    };
+                    saveCustomQuickReplies([...customQuickReplies, item]);
+                    setNewQrLabel('');
+                    setNewQrText('');
+                    toast.success('Plantilla agregada');
+                  }
                 }}
                 className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-bold transition"
               >
-                Guardar plantilla
+                {editingQrId ? 'Guardar cambios' : 'Guardar plantilla'}
               </button>
             </div>
 
             <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-2xl">
-              {[
-                ...(newQrScope === 'ventas' ? DEFAULT_SALES_QUICK_REPLIES : DEFAULT_SUPPORT_QUICK_REPLIES),
-                ...customQuickReplies.filter((q) => q.scope === newQrScope),
-              ].map((q) => {
-                const isCustom = q.id.startsWith('custom-');
-                return (
-                  <div key={q.id} className="px-3.5 py-2.5 flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="text-xs font-black text-slate-900">{q.label}</span>
-                      <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{q.text}</p>
+              {customQuickReplies
+                .filter((q) => q.scope === newQrScope)
+                .map((q) => {
+                  const isEditingThis = editingQrId === q.id;
+                  return (
+                    <div
+                      key={q.id}
+                      className={`px-3.5 py-2.5 flex items-start justify-between gap-2 ${
+                        isEditingThis ? 'bg-indigo-50/70' : ''
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-slate-900">{q.label}</span>
+                        <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{q.text}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingQrId(q.id);
+                            setNewQrScope(q.scope);
+                            setNewQrLabel(q.label);
+                            setNewQrText(q.text);
+                          }}
+                          className="text-[11px] font-bold text-indigo-600 hover:underline"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (editingQrId === q.id) {
+                              setEditingQrId(null);
+                              setNewQrLabel('');
+                              setNewQrText('');
+                            }
+                            saveCustomQuickReplies(customQuickReplies.filter((x) => x.id !== q.id));
+                            toast.success('Plantilla eliminada');
+                          }}
+                          className="text-[11px] font-bold text-rose-600 hover:underline"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
                     </div>
-                    {isCustom && (
-                      <button
-                        type="button"
-                        onClick={() => saveCustomQuickReplies(customQuickReplies.filter((x) => x.id !== q.id))}
-                        className="text-[10px] font-bold text-rose-600 hover:underline shrink-0"
-                      >
-                        Eliminar
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
         </div>
