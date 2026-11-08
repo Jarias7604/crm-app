@@ -620,6 +620,7 @@ export const SupportChatCircles: React.FC = () => {
   const [showCalendarPopover, setShowCalendarPopover] = useState<boolean>(false);
   const [showNewFollowUpModal, setShowNewFollowUpModal] = useState<boolean>(false);
   const [showMeetSchedulerModal, setShowMeetSchedulerModal] = useState<boolean>(false);
+  const [showStagePopover, setShowStagePopover] = useState<boolean>(false);
 
   // Handle return from CotizadorPro with active chat & newly generated quote
   useEffect(() => {
@@ -3531,7 +3532,7 @@ export const SupportChatCircles: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center justify-end gap-1.5 flex-wrap ml-auto">
                 {/* Support area selector + quick tech assignment */}
                 {activeCircle.scope === 'soporte' && activeCircle.isWhatsApp && (
                   <>
@@ -3567,7 +3568,7 @@ export const SupportChatCircles: React.FC = () => {
                   (scopes.all || scopes.leads) && (
                     <>
                       {activeCircle.leadId && (
-                        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-xl p-1">
+                        <div className="relative flex items-center gap-0.5 bg-slate-50 border border-slate-200/80 rounded-xl p-1">
                           {(
                             [
                               { st: 'En seguimiento', label: 'Seguimiento' },
@@ -3580,9 +3581,12 @@ export const SupportChatCircles: React.FC = () => {
                               <button
                                 key={quick.st}
                                 type="button"
-                                onClick={() => handleUpdateLeadStatus(quick.st)}
+                                onClick={() => {
+                                  setShowStagePopover(false);
+                                  handleUpdateLeadStatus(quick.st);
+                                }}
                                 title={`Cambiar etapa a ${quick.st}`}
-                                className={`px-2.5 py-1 rounded-lg text-[12.5px] transition ${
+                                className={`px-2 py-1 rounded-lg text-[12.5px] transition ${
                                   active
                                     ? 'bg-slate-800 text-white font-bold shadow-2xs'
                                     : 'text-slate-600 hover:bg-white font-semibold'
@@ -3592,18 +3596,77 @@ export const SupportChatCircles: React.FC = () => {
                               </button>
                             );
                           })}
-                          <select
-                            value={activeCircle.leadStatus || 'Prospecto'}
-                            onChange={(e) => handleUpdateLeadStatus(e.target.value)}
-                            title="Todas las etapas del Lead"
-                            className="px-2 py-1 rounded-lg text-[12.5px] font-semibold bg-transparent text-slate-600 hover:bg-white cursor-pointer focus:outline-none transition"
-                          >
-                            {LEAD_STATUS_OPTIONS.map((st) => (
-                              <option key={st} value={st}>
-                                Etapa: {st}
-                              </option>
-                            ))}
-                          </select>
+
+                          {/* Modern Custom Dropdown for Lead Stage */}
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowStagePopover((v) => !v);
+                                setShowDiscoveryPopover(false);
+                                setShowCalendarPopover(false);
+                                setShowQuotesPopover(false);
+                              }}
+                              title="Cambiar etapa del Lead"
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12.5px] font-semibold transition ${
+                                showStagePopover
+                                  ? 'bg-white text-slate-900 shadow-2xs'
+                                  : 'text-slate-700 hover:bg-white'
+                              }`}
+                            >
+                              <span>Etapa: {activeCircle.leadStatus || 'Prospecto'}</span>
+                              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                            </button>
+
+                            {showStagePopover && (
+                              <div className="absolute right-0 top-full mt-1.5 w-52 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-1.5 space-y-0.5">
+                                <div className="px-2.5 py-1 flex items-center justify-between border-b border-slate-100 mb-0.5">
+                                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                                    Etapa del Lead
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowStagePopover(false)}
+                                    className="text-slate-400 hover:text-slate-600"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                                {LEAD_STATUS_OPTIONS.map((st) => {
+                                  const isSelected = (activeCircle.leadStatus || 'Prospecto') === st;
+                                  const dotColor =
+                                    st === 'Cerrado'
+                                      ? 'bg-emerald-500'
+                                      : st === 'En seguimiento' || st === 'Negociación' || st === 'Lead calificado'
+                                      ? 'bg-indigo-500'
+                                      : st === 'Perdido' || st === 'Erróneo'
+                                      ? 'bg-rose-400'
+                                      : 'bg-slate-400';
+                                  return (
+                                    <button
+                                      key={st}
+                                      type="button"
+                                      onClick={() => {
+                                        setShowStagePopover(false);
+                                        handleUpdateLeadStatus(st);
+                                      }}
+                                      className={`w-full px-2.5 py-1.5 rounded-xl text-[13px] flex items-center justify-between transition ${
+                                        isSelected
+                                          ? 'bg-indigo-50 text-indigo-700 font-bold'
+                                          : 'text-slate-700 hover:bg-slate-50 font-medium'
+                                      }`}
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                                        <span>{st}</span>
+                                      </span>
+                                      {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600" />}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
 
@@ -3611,7 +3674,12 @@ export const SupportChatCircles: React.FC = () => {
                       <div className="relative">
                         <button
                           type="button"
-                          onClick={() => setShowDiscoveryPopover((v) => !v)}
+                          onClick={() => {
+                            setShowDiscoveryPopover((v) => !v);
+                            setShowStagePopover(false);
+                            setShowCalendarPopover(false);
+                            setShowQuotesPopover(false);
+                          }}
                           title="Enviar formulario de diagnóstico al prospecto o abrir las 7 preguntas del Método ARIAS"
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-semibold border transition ${
                             Object.keys(activeDiscoveryAnswers).length > 0
@@ -3715,6 +3783,7 @@ export const SupportChatCircles: React.FC = () => {
                           type="button"
                           onClick={() => {
                             setShowCalendarPopover((v) => !v);
+                            setShowStagePopover(false);
                             setShowDiscoveryPopover(false);
                             setShowQuotesPopover(false);
                           }}
@@ -3813,7 +3882,12 @@ export const SupportChatCircles: React.FC = () => {
                         <div className="relative">
                           <button
                             type="button"
-                            onClick={() => setShowQuotesPopover((v) => !v)}
+                            onClick={() => {
+                              setShowQuotesPopover((v) => !v);
+                              setShowStagePopover(false);
+                              setShowDiscoveryPopover(false);
+                              setShowCalendarPopover(false);
+                            }}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
                           >
                             <FileText className="w-4 h-4 text-slate-500" />
