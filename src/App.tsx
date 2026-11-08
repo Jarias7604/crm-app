@@ -86,6 +86,7 @@ const PlanManager       = lazy(() => import('./pages/admin/PlanManager'));
 const BillingManager    = lazy(() => import('./pages/admin/BillingManager'));
 const BookingSettings   = lazy(() => import('./pages/calendar/BookingSettings'));
 const PublicBookingPage = lazy(() => import('./pages/public/PublicBookingPage'));
+const PublicLeadDiscoveryPage = lazy(() => import('./pages/public/PublicLeadDiscoveryPage'));
 const PrivacyPolicy     = lazy(() => import('./pages/public/PrivacyPolicy'));
 const TrialExpired      = lazy(() => import('./pages/public/TrialExpired'));
 const Workspaces        = lazy(() => import('./pages/company/Workspaces'));
@@ -341,6 +342,7 @@ function App() {
               <Route path="/public/flyer/:id" element={<PublicFlyerView />} />
               <Route path="/portal/cliente/:token" element={<ClientPortal />} />
               <Route path="/book/:slug" element={<PublicBookingPage />} />
+              <Route path="/diagnostico/:id" element={<PublicLeadDiscoveryPage />} />
               <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="/support/manual" element={<ManualPage />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />

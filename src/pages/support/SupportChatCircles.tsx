@@ -55,8 +55,10 @@ import {
   Calendar,
   Pencil,
   Trash2,
+  Target,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { LiveDemoHUDModal, parseAriasAnswersFromNotes } from '../../components/leads/LiveDemoHUDModal';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { cotizacionesService } from '../../services/cotizaciones';
@@ -606,6 +608,12 @@ export const SupportChatCircles: React.FC = () => {
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState<string>('');
   const [savingCommentEdit, setSavingCommentEdit] = useState<boolean>(false);
+
+  // Discovery (Método ARIAS 7 Preguntas) & Post-Quote Follow-Up inside chat
+  const [showDiscoveryPopover, setShowDiscoveryPopover] = useState<boolean>(false);
+  const [showDiscoveryHUD, setShowDiscoveryHUD] = useState<boolean>(false);
+  const [postQuoteFollowupCircleId, setPostQuoteFollowupCircleId] = useState<string | null>(null);
+  const [schedulingFollowup, setSchedulingFollowup] = useState<boolean>(false);
 
   // Handle return from CotizadorPro with active chat & newly generated quote
   useEffect(() => {
@@ -2097,7 +2105,7 @@ export const SupportChatCircles: React.FC = () => {
       const bookingUrl = myBookingSlug ? `${window.location.origin}/book/${myBookingSlug}` : '';
       const cleanName =
         clientName && !clientName.startsWith('+') && !/^(contacto whatsapp|cliente whatsapp)$/i.test(clientName.trim())
-          ? ` ${clientName.trim()}`
+          ? ` ${clientName.trim().split(' ')[0]}`
           : '';
       const lines = [
         `Hola${cleanName}, le comparto nuestra propuesta comercial (${q.plan_nombre}).`,
@@ -2105,12 +2113,14 @@ export const SupportChatCircles: React.FC = () => {
         `Enlace para revisar, aprobar y firmar en línea:`,
         publicUrl,
       ];
-      if (includeMeeting && bookingUrl) {
+      if (includeMeeting) {
         lines.push(
           '',
-          `Si desea que la revisemos juntos y resolver cualquier consulta, puede agendar una breve reunión aquí:`,
-          bookingUrl
+          `¿Qué día de esta semana (por ejemplo mañana a las 10:00 a. m. o 3:00 p. m.) le queda mejor para una breve llamada de 10 minutos, responder sus dudas y revisarla juntos?`
         );
+        if (bookingUrl) {
+          lines.push(`También puede elegir su horario directo aquí: ${bookingUrl}`);
+        }
       }
       return lines.join('\n');
     },
@@ -2153,20 +2163,179 @@ export const SupportChatCircles: React.FC = () => {
       if (activeCircle.leadId && activeCompanyId) {
         await supabase
           .from('leads')
-          .update({ status: 'Propuesta Enviada' })
+          .update({ status: 'En seguimiento' })
           .eq('id', activeCircle.leadId)
           .eq('company_id', activeCompanyId);
       }
 
       if (pendingQuoteId === q.id) setPendingQuoteId(null);
       setShowQuotesPopover(false);
-      toast.success('Propuesta PDF y enlaces enviados al WhatsApp del cliente', { id: toastId });
+      setPostQuoteFollowupCircleId(activeCircle.circleId);
+      toast.success('Propuesta PDF enviada · Agenda el seguimiento en 1 clic', { id: toastId });
       loadThread(false);
       loadSupportData(true);
     } catch (err: any) {
       toast.error(err?.message || 'Error al enviar propuesta PDF', { id: toastId });
     } finally {
       setSendingQuotePdfId(null);
+    }
+  };
+
+  const activeDiscoveryAnswers = useMemo<Record<string, string>>(() => {
+    if (!activeCircle) return {};
+    const fromTicket = (activeCircle.activeTicket.metadata as any)?.wa_discovery;
+    if (fromTicket && typeof fromTicket === 'object') {
+      const cleaned: Record<string, string> = {};
+      for (let i = 1; i <= 7; i++) {
+        const val = fromTicket[`q${i}`];
+        if (typeof val === 'string' && val.trim()) cleaned[`q${i}`] = val.trim();
+      }
+      if (Object.keys(cleaned).length > 0) return cleaned;
+    }
+    return {};
+  }, [activeCircle]);
+
+  const buildDiscoveryWhatsAppText = useCallback(() => {
+    if (!activeCircle) return '';
+    const targetId = activeCircle.activeTicket.id;
+    const url = `${window.location.origin}/diagnostico/${targetId}`;
+    const rawName = activeCircle.clientName || '';
+    const cleanFirst =
+      rawName && !rawName.startsWith('+') && !/^(contacto whatsapp|cliente whatsapp)$/i.test(rawName.trim())
+        ? ` ${rawName.trim().split(' ')[0]}`
+        : '';
+    return [
+      `Hola${cleanFirst}, con mucho gusto le brindo los precios y detalles.`,
+      `Para prepararle la propuesta exacta según su operación, ¿me apoya respondiendo estas breves preguntas (toma 30 segundos)?`,
+      '',
+      url,
+    ].join('\n');
+  }, [activeCircle]);
+
+  const handleSendDiscoveryFormLink = async (sendImmediately: boolean) => {
+    const text = buildDiscoveryWhatsAppText();
+    if (!text) return;
+    setShowDiscoveryPopover(false);
+    if (sendImmediately) {
+      await handleSendReply(text);
+      toast.success('Formulario de diagnóstico enviado al WhatsApp');
+    } else {
+      setComposerMode('whatsapp');
+      setMessageInput(text);
+    }
+  };
+
+  const handleApplyDiscoveryFindings = async (notes: string, structuredAnswers?: Record<string, string>) => {
+    if (!activeCircle || !activeCompanyId) return;
+    try {
+      const t = activeCircle.activeTicket;
+      const currentMeta = (t.metadata || {}) as Record<string, any>;
+      const mergedDiscovery = {
+        ...(currentMeta.wa_discovery || {}),
+        ...(structuredAnswers || parseAriasAnswersFromNotes(notes)),
+        updated_at: new Date().toISOString(),
+      };
+      await supabase
+        .from('tickets')
+        .update({
+          metadata: {
+            ...currentMeta,
+            wa_discovery: mergedDiscovery,
+          },
+        })
+        .eq('id', t.id);
+
+      let targetLeadId = activeCircle.leadId;
+      if (!targetLeadId && activeCircle.scope === 'por_clasificar') {
+        const res = await classify('lead');
+        targetLeadId = res?.lead?.id || null;
+      }
+      if (targetLeadId) {
+        const { data: leadRow } = await supabase
+          .from('leads')
+          .select('next_action_notes')
+          .eq('id', targetLeadId)
+          .maybeSingle();
+        const prevNotes = leadRow?.next_action_notes ? `${leadRow.next_action_notes}\n\n` : '';
+        await supabase
+          .from('leads')
+          .update({
+            status: 'Lead calificado',
+            next_action_notes: `${prevNotes}${notes}`,
+          })
+          .eq('id', targetLeadId)
+          .eq('company_id', activeCompanyId);
+      }
+
+      await supabase.from('ticket_comments').insert({
+        ticket_id: t.id,
+        company_id: activeCompanyId,
+        author_id: profile?.id || null,
+        is_internal: true,
+        body: `[--] 📋 Diagnóstico ARIAS actualizado por ${profile?.full_name || 'Ejecutivo'}`,
+      });
+
+      setShowDiscoveryHUD(false);
+      loadThread(false);
+      loadSupportData(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al guardar diagnóstico');
+    }
+  };
+
+  const handleSchedulePostQuoteFollowup = async (daysFromNow: number, label: string) => {
+    if (!activeCircle || !activeCompanyId) return;
+    setSchedulingFollowup(true);
+    try {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + daysFromNow);
+      targetDate.setHours(10, 0, 0, 0);
+      const dateIso = targetDate.toISOString().split('T')[0];
+
+      let targetLeadId = activeCircle.leadId;
+      if (!targetLeadId && activeCircle.scope === 'por_clasificar') {
+        const res = await classify('lead');
+        targetLeadId = res?.lead?.id || null;
+      }
+
+      if (targetLeadId) {
+        await supabase
+          .from('leads')
+          .update({
+            status: 'En seguimiento',
+            next_followup_date: targetDate.toISOString(),
+            next_action_assignee: profile?.id || null,
+          })
+          .eq('id', targetLeadId)
+          .eq('company_id', activeCompanyId);
+
+        await supabase.from('follow_ups').insert({
+          lead_id: targetLeadId,
+          company_id: activeCompanyId,
+          date: dateIso,
+          action_type: 'call',
+          notes: `Seguimiento de cotización enviada por WhatsApp (${label}) — resolver dudas y cierre.`,
+          completed: false,
+          created_by: profile?.id || null,
+        });
+      }
+
+      await supabase.from('ticket_comments').insert({
+        ticket_id: activeCircle.activeTicket.id,
+        company_id: activeCompanyId,
+        author_id: profile?.id || null,
+        is_internal: true,
+        body: `[--] 📅 Seguimiento post-cotización agendado: ${label} (${targetDate.toLocaleDateString('es-SV')})`,
+      });
+
+      setPostQuoteFollowupCircleId(null);
+      toast.success(`Seguimiento agendado para ${label}`);
+      loadThread(false);
+      loadSupportData(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudo agendar el seguimiento');
+    } finally {
+      setSchedulingFollowup(false);
     }
   };
 
@@ -3331,6 +3500,108 @@ export const SupportChatCircles: React.FC = () => {
                         </div>
                       )}
 
+                      {/* Diagnóstico Express + Método ARIAS (7 Preguntas) */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowDiscoveryPopover((v) => !v)}
+                          title="Enviar formulario de diagnóstico al prospecto o abrir las 7 preguntas del Método ARIAS"
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                            Object.keys(activeDiscoveryAnswers).length > 0
+                              ? 'bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-800 border-emerald-200'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
+                          }`}
+                        >
+                          <Target className="w-3.5 h-3.5 text-slate-600" />
+                          <span>Diagnóstico</span>
+                          {Object.keys(activeDiscoveryAnswers).length > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10px] font-bold">
+                              {Object.keys(activeDiscoveryAnswers).length}/7
+                            </span>
+                          )}
+                          <ChevronDown className="w-3 h-3 text-slate-400" />
+                        </button>
+
+                        {showDiscoveryPopover && (
+                          <div className="absolute right-0 top-full mt-1.5 w-84 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-3 space-y-2.5">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                              <div>
+                                <p className="text-xs font-bold text-slate-900">Diagnóstico previo a cotizar</p>
+                                <p className="text-[11px] text-slate-500">
+                                  El prospecto lo llena en 30 seg y se guarda en su ficha
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setShowDiscoveryPopover(false)}
+                                className="text-slate-400 hover:text-slate-600"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            {Object.keys(activeDiscoveryAnswers).length > 0 && (
+                              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1 text-[11px] text-slate-700">
+                                <p className="font-bold text-slate-900 flex items-center justify-between">
+                                  <span>Respuestas recibidas</span>
+                                  <span className="text-emerald-700 font-bold">
+                                    {Object.keys(activeDiscoveryAnswers).length} de 7
+                                  </span>
+                                </p>
+                                {activeDiscoveryAnswers.q1 && (
+                                  <p className="truncate">
+                                    <span className="font-semibold text-slate-500">Dolor:</span> {activeDiscoveryAnswers.q1}
+                                  </p>
+                                )}
+                                {activeDiscoveryAnswers.q6 && (
+                                  <p className="truncate">
+                                    <span className="font-semibold text-slate-500">Presupuesto:</span> {activeDiscoveryAnswers.q6}
+                                  </p>
+                                )}
+                                {activeDiscoveryAnswers.q5 && (
+                                  <p className="truncate">
+                                    <span className="font-semibold text-slate-500">Plazo:</span> {activeDiscoveryAnswers.q5}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="space-y-1.5">
+                              <button
+                                type="button"
+                                disabled={!canSend || sendingMessage}
+                                onClick={() => handleSendDiscoveryFormLink(true)}
+                                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold transition"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                                <span>Enviar formulario al WhatsApp (1 clic)</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleSendDiscoveryFormLink(false)}
+                                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 text-xs font-semibold transition"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Pasar link al cuadro de texto</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowDiscoveryPopover(false);
+                                  setShowDiscoveryHUD(true);
+                                }}
+                                className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-bold transition"
+                              >
+                                <Target className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>Abrir 7 Preguntas (Método ARIAS)</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       {/* 1-Click Quote Builder */}
                       <button
                         type="button"
@@ -3840,6 +4111,7 @@ export const SupportChatCircles: React.FC = () => {
                       setComposerMode('whatsapp');
                       setMessageInput(buildQuoteWhatsAppText(pendingQuote, activeCircle.clientName, true));
                       setPendingQuoteId(null);
+                      setPostQuoteFollowupCircleId(activeCircle.circleId);
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-indigo-200/90 hover:bg-indigo-50/50 text-slate-700 text-xs font-semibold transition"
                   >
@@ -3851,6 +4123,45 @@ export const SupportChatCircles: React.FC = () => {
                     onClick={() => setPendingQuoteId(null)}
                     title="Ocultar barra"
                     className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60 flex items-center justify-center transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Post-Quote 1-Click Follow-Up Scheduler Bar so no quote is left without follow-up */}
+            {canSend && postQuoteFollowupCircleId === activeCircle.circleId && (
+              <div className="bg-slate-50 border-t border-slate-200/90 px-5 py-2 flex items-center justify-between gap-3 flex-wrap shrink-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Calendar className="w-4 h-4 text-slate-600 shrink-0" />
+                  <p className="text-xs font-semibold text-slate-800 truncate">
+                    Cotización enviada · <span className="font-bold">Agendar seguimiento para resolver dudas:</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                  {(
+                    [
+                      { days: 1, label: 'Mañana 10:00 a. m.' },
+                      { days: 2, label: 'En 2 días' },
+                      { days: 4, label: 'En 4 días' },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.days}
+                      type="button"
+                      disabled={schedulingFollowup}
+                      onClick={() => handleSchedulePostQuoteFollowup(opt.days, opt.label)}
+                      className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-900 hover:text-white text-slate-700 border border-slate-200/90 text-[11px] font-semibold transition disabled:opacity-50"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setPostQuoteFollowupCircleId(null)}
+                    title="Ocultar"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 transition"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -4825,6 +5136,18 @@ export const SupportChatCircles: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Método ARIAS 7 Preguntas Drawer directly inside WhatsApp Chat */}
+      {activeCircle && (
+        <LiveDemoHUDModal
+          isOpen={showDiscoveryHUD}
+          onClose={() => setShowDiscoveryHUD(false)}
+          leadName={activeCircle.clientName}
+          leadCompany={activeCircle.clientName}
+          initialAnswers={activeDiscoveryAnswers}
+          onApplyFindings={handleApplyDiscoveryFindings}
+        />
       )}
     </div>
   );

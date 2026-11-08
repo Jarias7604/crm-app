@@ -1,7 +1,7 @@
 // src/components/leads/LiveDemoHUDModal.tsx
 // Copiloto y Guion de Demo en Vivo para Vendedores (Método ARIAS Sales Excellence)
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     X, CheckCircle, HelpCircle, ShieldAlert, Sparkles,
     ChevronDown, ChevronUp, Copy, DollarSign, Target, Clock, MessageSquare, Flame,
@@ -15,12 +15,34 @@ import {
 } from '../../types/salesExcellence';
 import toast from 'react-hot-toast';
 
+export function parseAriasAnswersFromNotes(notes?: string | null): Record<string, string> {
+    if (!notes) return {};
+    const out: Record<string, string> = {};
+    const patterns: Array<{ key: string; regex: RegExp }> = [
+        { key: 'q1', regex: /-\s*Diagnóstico \/ Dolor:\s*(.+)/i },
+        { key: 'q2', regex: /-\s*Costo \/ Impacto:\s*(.+)/i },
+        { key: 'q3', regex: /-\s*Sistema actual:\s*(.+)/i },
+        { key: 'q4', regex: /-\s*Decisor:\s*(.+)/i },
+        { key: 'q5', regex: /-\s*Tiempos de implementación:\s*(.+)/i },
+        { key: 'q6', regex: /-\s*Presupuesto:\s*(.+)/i },
+        { key: 'q7', regex: /-\s*Compromiso comercial:\s*(.+)/i },
+    ];
+    for (const { key, regex } of patterns) {
+        const m = notes.match(regex);
+        if (m && m[1]?.trim()) {
+            out[key] = m[1].trim();
+        }
+    }
+    return out;
+}
+
 interface LiveDemoHUDModalProps {
     isOpen: boolean;
     onClose: () => void;
     leadName: string;
     leadCompany?: string;
-    onApplyFindings?: (notes: string) => void;
+    initialAnswers?: Record<string, string> | null;
+    onApplyFindings?: (notes: string, structuredAnswers?: Record<string, string>) => void;
 }
 
 export const LiveDemoHUDModal: React.FC<LiveDemoHUDModalProps> = ({
@@ -28,12 +50,33 @@ export const LiveDemoHUDModal: React.FC<LiveDemoHUDModalProps> = ({
     onClose,
     leadName,
     leadCompany,
+    initialAnswers,
     onApplyFindings
 }) => {
     const [activeTab, setActiveTab] = useState<'questions' | 'objections' | 'rules'>('questions');
     const [checkedQuestions, setCheckedQuestions] = useState<Record<number, boolean>>({});
     const [questionAnswers, setQuestionAnswers] = useState<Record<number, string>>({});
     const [expandedObjection, setExpandedObjection] = useState<string | null>('price');
+
+    useEffect(() => {
+        if (!isOpen) return;
+        if (initialAnswers && Object.keys(initialAnswers).length > 0) {
+            const nextAnswers: Record<number, string> = {};
+            const nextChecked: Record<number, boolean> = {};
+            for (let i = 1; i <= 7; i++) {
+                const val = initialAnswers[`q${i}`] || initialAnswers[String(i)] || '';
+                if (val && val.trim()) {
+                    nextAnswers[i] = val.trim();
+                    nextChecked[i] = true;
+                }
+            }
+            setQuestionAnswers(nextAnswers);
+            setCheckedQuestions(nextChecked);
+        } else {
+            setQuestionAnswers({});
+            setCheckedQuestions({});
+        }
+    }, [isOpen, initialAnswers]);
 
     if (!isOpen) return null;
 
@@ -43,6 +86,9 @@ export const LiveDemoHUDModal: React.FC<LiveDemoHUDModalProps> = ({
 
     const handleAnswerChange = (id: number, text: string) => {
         setQuestionAnswers(prev => ({ ...prev, [id]: text }));
+        if (text.trim()) {
+            setCheckedQuestions(prev => ({ ...prev, [id]: true }));
+        }
     };
 
     const copyScript = (text: string) => {
@@ -59,9 +105,11 @@ export const LiveDemoHUDModal: React.FC<LiveDemoHUDModalProps> = ({
         lines.push(``);
         lines.push(`-- Preguntas de Descubrimiento realizadas: ${answeredCount}/${ARIAS_DISCOVERY_QUESTIONS.length} --`);
 
+        const structured: Record<string, string> = {};
         ARIAS_DISCOVERY_QUESTIONS.forEach(q => {
             const isChecked = checkedQuestions[q.id];
             const answer = questionAnswers[q.id];
+            if (answer) structured[`q${q.id}`] = answer;
             if (isChecked || answer) {
                 lines.push(`• [${isChecked ? '✓' : ' '}] ${q.question}`);
                 if (answer) lines.push(`  Respuesta: ${answer}`);
@@ -70,7 +118,7 @@ export const LiveDemoHUDModal: React.FC<LiveDemoHUDModalProps> = ({
 
         const compiled = lines.join('\n');
         if (onApplyFindings) {
-            onApplyFindings(compiled);
+            onApplyFindings(compiled, structured);
             toast.success('Notas de descubrimiento agregadas al lead');
         } else {
             navigator.clipboard.writeText(compiled);

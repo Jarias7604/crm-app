@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode, Box, ShieldCheck, ExternalLink, Flame, Sparkles, ChevronLeft } from 'lucide-react';
-import { LiveDemoHUDModal } from './LiveDemoHUDModal';
+import { LiveDemoHUDModal, parseAriasAnswersFromNotes } from './LiveDemoHUDModal';
 import { GeminiAuditModal } from './GeminiAuditModal';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -1941,6 +1941,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         onClose={() => setIsDemoHUDOpen(false)}
                         leadName={selectedLead.name}
                         leadCompany={selectedLead.company_name}
+                        initialAnswers={parseAriasAnswersFromNotes(selectedLead.next_action_notes)}
                         onApplyFindings={async (notes) => {
                             const currentNotes = selectedLead.next_action_notes ? `${selectedLead.next_action_notes}\n\n` : '';
                             await handleUpdateLead({ next_action_notes: `${currentNotes}${notes}` });
