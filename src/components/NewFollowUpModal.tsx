@@ -16,11 +16,21 @@ interface NewFollowUpModalProps {
     onClose: () => void;
     initialDate?: Date;
     initialLeadId?: string;
+    initialLeadName?: string;
     companyId?: string;
     companyTimezone: string;
     currentUserId?: string;
     teamMembers: { id: string; full_name: string; role: string; avatar_url?: string | null }[];
     canAssignOthers?: boolean;
+    shareToWhatsAppOption?: boolean;
+    onScheduledDetails?: (details: {
+        actionType: string;
+        actionLabel: string;
+        date: string;
+        displayTime: string;
+        notes: string;
+        shareToWhatsApp: boolean;
+    }) => void;
     onSuccess: () => void;
 }
 
@@ -37,11 +47,14 @@ export default function NewFollowUpModal({
     onClose,
     initialDate,
     initialLeadId,
+    initialLeadName,
     companyId,
     companyTimezone,
     currentUserId,
     teamMembers,
     canAssignOthers = true,
+    shareToWhatsAppOption = false,
+    onScheduledDetails,
     onSuccess,
 }: NewFollowUpModalProps) {
     const [actionType, setActionType] = useState<string>('call');
@@ -49,6 +62,7 @@ export default function NewFollowUpModal({
     const [time, setTime] = useState<string>('09:00');
     const [assignedTo, setAssignedTo] = useState<string>(() => currentUserId || '');
     const [notes, setNotes] = useState<string>('');
+    const [shareToWhatsApp, setShareToWhatsApp] = useState<boolean>(true);
     const [isSaving, setIsSaving] = useState(false);
 
     // Lead search & selection
@@ -67,6 +81,9 @@ export default function NewFollowUpModal({
     // Load initial leads
     useEffect(() => {
         if (!isOpen) return;
+        if (initialLeadId && initialLeadName) {
+            setSelectedLead({ id: initialLeadId, name: initialLeadName });
+        }
         const loadLeads = async () => {
             try {
                 setIsSearchingLeads(true);
@@ -81,6 +98,7 @@ export default function NewFollowUpModal({
                 if (initialLeadId) {
                     const match = mapped.find(l => l.id === initialLeadId);
                     if (match) setSelectedLead(match);
+                    else if (initialLeadName) setSelectedLead({ id: initialLeadId, name: initialLeadName });
                 }
             } catch (err) {
                 console.error('Error loading leads in modal:', err);
@@ -89,7 +107,7 @@ export default function NewFollowUpModal({
             }
         };
         loadLeads();
-    }, [isOpen, companyId, initialLeadId]);
+    }, [isOpen, companyId, initialLeadId, initialLeadName]);
 
     // Filter leads by search term
     const filteredLeads = useMemo(() => {
@@ -131,7 +149,17 @@ export default function NewFollowUpModal({
                 ? `${hNum % 12 === 0 ? 12 : hNum % 12}:${(mStr || '00').slice(0, 2)} ${hNum >= 12 ? 'PM' : 'AM'}`
                 : time;
 
-            toast.success(`📅 Seguimiento agendado para el ${date} a las ${displayTime}`);
+            toast.success(`Seguimiento agendado para el ${date} a las ${displayTime}`);
+            if (onScheduledDetails) {
+                onScheduledDetails({
+                    actionType,
+                    actionLabel,
+                    date,
+                    displayTime,
+                    notes: finalNotes,
+                    shareToWhatsApp: shareToWhatsAppOption ? shareToWhatsApp : false,
+                });
+            }
             onSuccess();
             onClose();
         } catch (error: any) {
@@ -331,6 +359,25 @@ export default function NewFollowUpModal({
                             className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-200 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none"
                         />
                     </div>
+
+                    {shareToWhatsAppOption && (
+                        <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={shareToWhatsApp}
+                                onChange={e => setShareToWhatsApp(e.target.checked)}
+                                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-800">
+                                    Compartir confirmación y link de cita en el chat de WhatsApp
+                                </p>
+                                <p className="text-[11px] text-slate-500">
+                                    Coloca el mensaje con fecha, hora y tu enlace de calendario listo para enviar al cliente
+                                </p>
+                            </div>
+                        </label>
+                    )}
 
                     {/* Buttons */}
                     <div className="pt-2 flex items-center justify-end gap-3 border-t border-slate-100">

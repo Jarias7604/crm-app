@@ -21,6 +21,13 @@ interface GoogleMeetSchedulerProps {
     initialLeadName?: string;
     initialLeadEmail?: string | null;
     initialEvent?: any;
+    onShareToWhatsApp?: (details: {
+        title: string;
+        dateStr: string;
+        timeStr: string;
+        meetLink?: string | null;
+        sendImmediately: boolean;
+    }) => void;
 }
 
 const DURATION_OPTIONS = [
@@ -59,6 +66,7 @@ export default function GoogleMeetScheduler({
     initialLeadName,
     initialLeadEmail,
     initialEvent,
+    onShareToWhatsApp,
 }: GoogleMeetSchedulerProps) {
     const { profile } = useAuth();
     const queryClient = useQueryClient();
@@ -436,9 +444,18 @@ Reunión programada automáticamente desde Arias CRM${suffix}.`;
                         const countText = recurrenceLimitType === 'infinite'
                             ? 'Reuniones programadas sin fin (primeras 24 agendadas)'
                             : `${res.recurrenceCount} reuniones agendadas`;
-                        toast.success(`✅ ${countText}`);
+                        toast.success(countText);
                     } else {
-                        toast.success('✅ Reunión agendada en el calendario');
+                        toast.success('Reunión agendada en el calendario');
+                    }
+                    if (onShareToWhatsApp) {
+                        onShareToWhatsApp({
+                            title,
+                            dateStr: format(parseISO(startISO), "EEEE d 'de' MMMM", { locale: es }),
+                            timeStr: formatTimeInZone(startISO, selectedTimezone),
+                            meetLink: null,
+                            sendImmediately: false,
+                        });
                     }
                     onClose();
                 }
@@ -534,6 +551,43 @@ Reunión programada automáticamente desde Arias CRM${suffix}.`;
                             <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium">
                                 <Check className="w-3.5 h-3.5" />
                                 Invitaciones enviadas a {attendees.length} asistente{attendees.length !== 1 ? 's' : ''}
+                            </div>
+                        )}
+
+                        {onShareToWhatsApp && (
+                            <div className="pt-1 space-y-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onShareToWhatsApp({
+                                            title,
+                                            dateStr: format(parseISO(startISO), "EEEE d 'de' MMMM", { locale: es }),
+                                            timeStr: formatTimeInZone(startISO, selectedTimezone),
+                                            meetLink: createdMeet.meet_link,
+                                            sendImmediately: true,
+                                        });
+                                        onClose();
+                                    }}
+                                    className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-all shadow-sm"
+                                >
+                                    Enviar cita y link por WhatsApp (1 clic)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onShareToWhatsApp({
+                                            title,
+                                            dateStr: format(parseISO(startISO), "EEEE d 'de' MMMM", { locale: es }),
+                                            timeStr: formatTimeInZone(startISO, selectedTimezone),
+                                            meetLink: createdMeet.meet_link,
+                                            sendImmediately: false,
+                                        });
+                                        onClose();
+                                    }}
+                                    className="w-full py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs transition-all"
+                                >
+                                    Pasar cita y link al cuadro de texto del chat
+                                </button>
                             </div>
                         )}
 
