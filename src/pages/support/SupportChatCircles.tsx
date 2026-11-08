@@ -57,6 +57,7 @@ import {
   Trash2,
   Target,
   Video,
+  RotateCcw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LiveDemoHUDModal, parseAriasAnswersFromNotes } from '../../components/leads/LiveDemoHUDModal';
@@ -498,12 +499,30 @@ export const SupportChatCircles: React.FC = () => {
       return {};
     }
   });
+  const [forcedUnreadMap, setForcedUnreadMap] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('crm_circles_forced_unread') || '{}');
+    } catch {
+      return {};
+    }
+  });
   const markCircleAsRead = (circleId: string, lastMessageAt: string) => {
     setReadCirclesMap((prev) => {
       if (prev[circleId] === lastMessageAt) return prev;
       const next = { ...prev, [circleId]: lastMessageAt };
       try {
         localStorage.setItem('crm_circles_read_map', JSON.stringify(next));
+      } catch {
+        // ignore storage quota errors
+      }
+      return next;
+    });
+    setForcedUnreadMap((prev) => {
+      if (!prev[circleId]) return prev;
+      const next = { ...prev };
+      delete next[circleId];
+      try {
+        localStorage.setItem('crm_circles_forced_unread', JSON.stringify(next));
       } catch {
         // ignore storage quota errors
       }
@@ -545,6 +564,53 @@ export const SupportChatCircles: React.FC = () => {
     } catch {
       toast.success('Marcado como atendido');
     }
+  };
+
+  const handleMarkCircleUnread = async (circle: SupportCircle) => {
+    setReadCirclesMap((prev) => {
+      const next = { ...prev };
+      delete next[circle.circleId];
+      try {
+        localStorage.setItem('crm_circles_read_map', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+    setDismissedWaitingMap((prev) => {
+      const next = { ...prev };
+      delete next[circle.circleId];
+      try {
+        localStorage.setItem('crm_wa_dismissed_waiting', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+    setForcedUnreadMap((prev) => {
+      const next = { ...prev, [circle.circleId]: circle.lastMessageAt };
+      try {
+        localStorage.setItem('crm_circles_forced_unread', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+    try {
+      const currentMeta = (circle.activeTicket.metadata || {}) as Record<string, any>;
+      if (currentMeta.wa_attended_at) {
+        const nextMeta = { ...currentMeta };
+        delete nextMeta.wa_attended_at;
+        await supabase
+          .from('tickets')
+          .update({ metadata: nextMeta })
+          .eq('id', circle.activeTicket.id);
+      }
+      loadSupportData(true);
+    } catch {
+      // ignore
+    }
+    toast.success('Conversación marcada como No leída');
   };
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -999,15 +1065,17 @@ export const SupportChatCircles: React.FC = () => {
       const resolvedLeadStatus =
         lead?.status || String(meta.wa_lead_status || activeMeta.wa_lead_status || '').trim() || null;
       const isDiscardedLead = resolvedLeadStatus === 'Perdido' || resolvedLeadStatus === 'Erróneo';
+      const isForcedUnread = forcedUnreadMap[key] === lastMessageAt;
 
       const unreadOrWaitingReply =
-        lastFrom === 'client' &&
-        scope !== 'interno' &&
-        scope !== 'spam' &&
-        !isDiscardedLead &&
-        !isManuallyAttended &&
-        !isCourtesyClosing &&
-        (scope !== 'soporte' || isOpen);
+        isForcedUnread ||
+        (lastFrom === 'client' &&
+          scope !== 'interno' &&
+          scope !== 'spam' &&
+          !isDiscardedLead &&
+          !isManuallyAttended &&
+          !isCourtesyClosing &&
+          (scope !== 'soporte' || isOpen));
 
       const catObj = activeTicket.category_id ? catMap.get(activeTicket.category_id) : undefined;
       const catInfo = detectShortCategory(catObj?.name || '', activeTicket.title || '');
@@ -1094,9 +1162,11 @@ export const SupportChatCircles: React.FC = () => {
       return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickets, categories, agents, realClients, companyLeads, scopes, profile?.id, adminPreviewMode, slaTick, dismissedWaitingMap]);
+  }, [tickets, categories, agents, realClients, companyLeads, scopes, profile?.id, adminPreviewMode, slaTick, dismissedWaitingMap, forcedUnreadMap]);
 
-  const isUnread = (c: SupportCircle) => c.unreadOrWaitingReply && readCirclesMap[c.circleId] !== c.lastMessageAt;
+  const isUnread = (c: SupportCircle) =>
+    forcedUnreadMap[c.circleId] === c.lastMessageAt ||
+    (c.unreadOrWaitingReply && readCirclesMap[c.circleId] !== c.lastMessageAt);
   const isMine = (c: SupportCircle) =>
     Boolean(profile?.id && (c.assignedTechId === profile.id || c.leadOwnerId === profile.id));
   const isUnassigned = (c: SupportCircle) => !c.isGroup && !c.assignedTechId && !c.leadOwnerId && c.scope !== 'interno' && c.scope !== 'spam';
@@ -2704,7 +2774,7 @@ export const SupportChatCircles: React.FC = () => {
   return (
     <div className="h-screen flex-1 flex flex-col bg-[#F5F6FA] overflow-hidden">
       {/* ── TOP HEADER (100% Light & Vector Clean) ── */}
-      <header className="h-14 bg-white border-b border-slate-200/80 px-5 flex items-center justify-between shrink-0 z-30 relative">
+      <header className="h-12 bg-white border-b border-slate-200/80 px-5 flex items-center justify-between shrink-0 z-30 relative">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-2">
             <div className="w-1 h-4.5 rounded-full bg-indigo-600" />
@@ -3068,7 +3138,7 @@ export const SupportChatCircles: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* ── LEFT: chat list (Clean, Airy, Uncluttered) ── */}
         <aside style={{ width: `${leftPanelWidth}px` }} className="bg-white flex flex-col shrink-0 relative">
-          <div className="px-4 pt-3 pb-2 border-b border-slate-100 space-y-2 relative">
+          <div className="px-3.5 pt-2.5 pb-1.5 border-b border-slate-100 space-y-1.5 relative">
             <div className="flex items-center gap-1.5">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -3077,7 +3147,7 @@ export const SupportChatCircles: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Buscar cliente, grupo o teléfono..."
-                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-[13.5px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  className="w-full pl-9 pr-8 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-[13px] font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 />
                 {searchQuery && (
                   <button
@@ -3094,7 +3164,7 @@ export const SupportChatCircles: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowFilterMenu((v) => !v)}
-                className={`px-3 py-2 rounded-xl border text-[13px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
+                className={`px-2.5 py-1.5 rounded-xl border text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
                   ownerFilter !== 'all' || channelFilter !== 'all' || ['interno', 'spam', 'tickets'].includes(circleFilter)
                     ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
                     : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
@@ -3108,7 +3178,7 @@ export const SupportChatCircles: React.FC = () => {
               <button
                 onClick={() => loadSupportData()}
                 title={`Actualizar (${filteredCircles.length} conversaciones)`}
-                className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 flex items-center justify-center transition shrink-0"
+                className="p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 flex items-center justify-center transition shrink-0"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
               </button>
@@ -3116,7 +3186,7 @@ export const SupportChatCircles: React.FC = () => {
 
             {/* Clean Filter Dropdown Menu */}
             {showFilterMenu && (
-              <div className="absolute right-4 top-12 w-60 bg-white border border-slate-200 rounded-2xl shadow-xl p-1.5 z-30 space-y-1 text-xs">
+              <div className="absolute right-4 top-11 w-60 bg-white border border-slate-200 rounded-2xl shadow-xl p-1.5 z-30 space-y-1 text-xs">
                 <div className="px-2.5 py-1 text-[11px] font-semibold text-slate-400 flex items-center justify-between">
                   <span>Filtrar conversaciones</span>
                   <button type="button" onClick={() => setShowFilterMenu(false)} className="text-slate-400 hover:text-slate-600">
@@ -3219,8 +3289,8 @@ export const SupportChatCircles: React.FC = () => {
               </div>
             )}
 
-            {/* Single clean row of primary scope tabs (no horizontal scrollbar, resets stuck search/subfilters on switch) */}
-            <div className="flex items-center gap-1 pt-0.5 flex-wrap">
+            {/* Single clean row of primary scope tabs (compact height, resets stuck search/subfilters on switch) */}
+            <div className="flex items-center gap-1 flex-wrap">
               {filterTabs.map((tab) => {
                 const active = circleFilter === tab.id;
                 return (
@@ -3234,7 +3304,7 @@ export const SupportChatCircles: React.FC = () => {
                       setLeadSubFilter('activos');
                       setCircleFilter(tab.id);
                     }}
-                    className={`px-2.5 py-1.5 rounded-lg text-[13px] whitespace-nowrap transition inline-flex items-center gap-1.5 ${
+                    className={`px-2 py-1 rounded-lg text-[12.5px] whitespace-nowrap transition inline-flex items-center gap-1 ${
                       active
                         ? 'bg-indigo-50 text-indigo-700 font-bold'
                         : 'text-slate-600 hover:bg-slate-50 font-medium'
@@ -3248,9 +3318,9 @@ export const SupportChatCircles: React.FC = () => {
             </div>
 
             {(circleFilter === 'reactivados' || circleFilter === 'lead') && (
-              <div className="mt-1.5 pt-1.5 border-t border-slate-100 space-y-1.5">
+              <div className="pt-1 border-t border-slate-100 space-y-1">
                 {circleFilter === 'reactivados' && counts.reactivatedTotal > 0 && (
-                  <div className="px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-between text-[12.5px] text-slate-600">
+                  <div className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-between text-[12px] text-slate-600">
                     <span>
                       Enviados: <b className="text-slate-800">{counts.reactivatedTotal}</b> · Respondieron:{' '}
                       <b className="text-slate-900">{counts.reactivatedReplied}</b>
@@ -3261,7 +3331,7 @@ export const SupportChatCircles: React.FC = () => {
                   </div>
                 )}
 
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex items-center gap-1 flex-wrap">
                   {(
                     [
                       {
@@ -3280,7 +3350,7 @@ export const SupportChatCircles: React.FC = () => {
                         key={sf.id}
                         type="button"
                         onClick={() => setLeadSubFilter(sf.id)}
-                        className={`px-2.5 py-1 rounded-md text-[12.5px] transition ${
+                        className={`px-2 py-0.5 rounded-md text-[12px] transition ${
                           active
                             ? 'bg-slate-800 text-white font-semibold'
                             : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70 font-medium'
@@ -3345,7 +3415,7 @@ export const SupportChatCircles: React.FC = () => {
                       markCircleAsRead(circle.circleId, circle.lastMessageAt);
                       setSelectedCircleId(circle.circleId);
                     }}
-                    className={`w-full text-left px-4 py-3 flex items-center gap-3 transition relative border-l-[3px] ${
+                    className={`w-full text-left px-3.5 py-2.5 flex items-center gap-2.5 transition relative border-l-[3px] ${
                       isSelected
                         ? 'bg-indigo-50/80 border-l-indigo-600'
                         : unread
@@ -3355,7 +3425,7 @@ export const SupportChatCircles: React.FC = () => {
                   >
                     <div className="relative shrink-0">
                       <div
-                        className={`w-10.5 h-10.5 rounded-full flex items-center justify-center text-[13.5px] ${
+                        className={`w-9.5 h-9.5 rounded-full flex items-center justify-center text-[13px] ${
                           unread
                             ? 'bg-indigo-100 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
                             : isSelected
@@ -3370,11 +3440,11 @@ export const SupportChatCircles: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`text-[14.5px] truncate ${unread ? 'font-extrabold text-slate-950' : 'font-semibold text-slate-700'}`}>
+                          <span className={`text-[14px] truncate ${unread ? 'font-extrabold text-slate-950' : 'font-semibold text-slate-700'}`}>
                             {circle.clientName}
                           </span>
                           <span
-                            className={`text-[12.5px] shrink-0 ${
+                            className={`text-[12px] shrink-0 ${
                               circle.leadStatus === 'Perdido' || circle.leadStatus === 'Erróneo'
                                 ? 'text-slate-500 font-semibold'
                                 : 'text-slate-400'
@@ -3385,7 +3455,7 @@ export const SupportChatCircles: React.FC = () => {
                           {circle.isReactivation && (
                             <span
                               title={circle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
-                              className={`px-1.5 py-0.5 rounded text-[11.5px] font-medium shrink-0 ${
+                              className={`px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 ${
                                 circle.reactivationReplied
                                   ? 'bg-slate-100 text-slate-700 border border-slate-200/80'
                                   : 'text-slate-400'
@@ -3399,23 +3469,23 @@ export const SupportChatCircles: React.FC = () => {
                           {isOverdue && (
                             <span
                               title={`Esperando respuesta hace ${formatWaitDuration(circle.waitMinutes)}`}
-                              className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-xs font-semibold inline-flex items-center gap-0.5"
+                              className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-[11.5px] font-semibold inline-flex items-center gap-0.5"
                             >
                               <Clock className="w-3 h-3" />
                               {formatWaitDuration(circle.waitMinutes)}
                             </span>
                           )}
-                          <span className={`text-[12.5px] ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
+                          <span className={`text-[12px] ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
                             {listTimeLabel(circle.lastMessageAt)}
                           </span>
                         </div>
                       </div>
                       <div className="flex items-center justify-between gap-2 mt-0.5">
-                        <p className={`text-[13.5px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
+                        <p className={`text-[13px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
                           {circle.lastMessageSender}: {circle.lastMessageText}
                         </p>
                         {unread && (
-                          <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[11px] font-bold leading-none shrink-0">
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10.5px] font-bold leading-none shrink-0">
                             Nuevo
                           </span>
                         )}
@@ -3452,33 +3522,39 @@ export const SupportChatCircles: React.FC = () => {
         {/* ── CENTER: chat ── */}
         {activeCircle ? (
           <main className="flex-1 flex flex-col bg-[#F3F4F8] overflow-hidden min-w-0">
-            {/* Chat header (Clean, Uncluttered, 100% Vector Icons) */}
-            <div className="bg-white border-b border-slate-200/70 px-6 py-3 flex items-center justify-between gap-3 flex-wrap shrink-0 min-h-16">
-              <div className="flex items-center gap-3 min-w-[240px] flex-1">
-                <div className={`w-10.5 h-10.5 rounded-full font-bold text-[14px] flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
+            {/* Chat header (Compact 2-line height, Uncluttered, 100% Vector Icons) */}
+            <div className="bg-white border-b border-slate-200/70 px-4 py-1.5 flex items-center justify-between gap-2 flex-wrap xl:flex-nowrap shrink-0">
+              <div className="flex items-center gap-2.5 min-w-[200px] flex-1 overflow-hidden">
+                <div className={`w-9 h-9 rounded-full font-bold text-[13px] flex items-center justify-center shrink-0 ${SCOPE_STYLE[activeCircle.scope].avatar}`}>
                   {activeCircle.isGroup ? <Users className="w-4 h-4" /> : initials(activeCircle.clientName)}
                 </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-[16px] font-bold text-slate-900 tracking-tight truncate max-w-[300px]">{activeCircle.clientName}</h3>
-                    <ScopeChip circle={activeCircle} />
+                <div className="min-w-0 flex-1">
+                  {/* Line 1: Name + compact status chips (Never wraps vertically) */}
+                  <div className="flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
+                    <h3 className="text-[15px] font-bold text-slate-900 tracking-tight truncate max-w-[190px] 2xl:max-w-[260px]">
+                      {activeCircle.clientName}
+                    </h3>
+                    <ScopeChip circle={activeCircle} compact={Boolean(activeCircle.leadId)} />
                     {activeCircle.isReactivation && (
                       <span
                         title={activeCircle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border ${
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border shrink-0 ${
                           activeCircle.reactivationReplied
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
                             : 'bg-indigo-50/70 text-indigo-700 border-indigo-200/80'
                         }`}
                       >
-                        <Sparkles className="w-3 h-3" />
-                        <span>{activeCircle.reactivationReplied ? 'Respondió reactivación' : 'Reactivación WhatsApp'}</span>
+                        <Sparkles className="w-2.5 h-2.5" />
+                        <span>{activeCircle.reactivationReplied ? 'Respondió' : 'Reactivación'}</span>
                       </span>
                     )}
                     {activeCircle.unreadOrWaitingReply && activeCircle.waitMinutes >= 15 && activeCircle.waitMinutes <= 24 * 60 && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200/80">
-                        <Clock className="w-3 h-3" />
-                        Espera: {formatWaitDuration(activeCircle.waitMinutes)}
+                      <span
+                        title={`Esperando respuesta hace ${formatWaitDuration(activeCircle.waitMinutes)}`}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-600 border border-rose-200/80 shrink-0"
+                      >
+                        <Clock className="w-2.5 h-2.5" />
+                        <span>{formatWaitDuration(activeCircle.waitMinutes)}</span>
                       </span>
                     )}
                     {activeCircle.unreadOrWaitingReply && (
@@ -3486,53 +3562,68 @@ export const SupportChatCircles: React.FC = () => {
                         type="button"
                         onClick={() => handleMarkCircleAttended(activeCircle)}
                         title="Marcar conversación como ya atendida (quita la alerta de espera)"
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 transition"
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 transition shrink-0"
                       >
-                        <CheckCircle2 className="w-3 h-3" />
-                        <span>Marcar atendido</span>
+                        <CheckCircle2 className="w-2.5 h-2.5" />
+                        <span>Atendido</span>
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => handleMarkCircleUnread(activeCircle)}
+                      title="Devolver conversación a No leído (Nuevo / Sin contestar)"
+                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border transition shrink-0 ${
+                        isUnread(activeCircle)
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          : 'bg-slate-100/90 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border-slate-200/80'
+                      }`}
+                    >
+                      <RotateCcw className="w-2.5 h-2.5" />
+                      <span>No leído</span>
+                    </button>
                   </div>
-                  <p className="text-[13px] font-medium text-slate-400 truncate mt-0.5">
-                    {activeCircle.isGroup
-                      ? 'Grupo de WhatsApp'
-                      : [
-                          activeCircle.phone ? `+${activeCircle.phone}` : null,
-                          activeCircle.pushName && activeCircle.pushName.toLowerCase() !== activeCircle.clientName.toLowerCase()
-                            ? `WhatsApp: ${activeCircle.pushName}`
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                    {activeCircle.scope === 'soporte' ? ` · Atiende: ${activeCircle.assignedTechName}` : ''}
-                    {activeCircle.scope === 'lead' ? ` · Vendedor: ${activeCircle.leadOwnerName || 'Sin asignar'}` : ''}
-                  </p>
-                  {!activeCircle.isGroup && activeCircle.memberOfGroups.length > 0 && (
-                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                      <Users className="w-3 h-3 text-slate-400" />
-                      <span className="text-[11px] font-semibold text-slate-500">Grupos:</span>
-                      {activeCircle.memberOfGroups.slice(0, 3).map((g) => {
-                        const groupCircleId = `wa:${g.jid}`;
-                        const exists = circles.some((c) => c.circleId === groupCircleId);
-                        return (
-                          <button
-                            key={g.jid}
-                            type="button"
-                            disabled={!exists}
-                            onClick={() => exists && setSelectedCircleId(groupCircleId)}
-                            className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-70 disabled:cursor-default transition"
-                          >
-                            {g.subject || 'Grupo'}
-                            {exists && <ExternalLink className="w-2.5 h-2.5 inline ml-1" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+
+                  {/* Line 2: Phone, PushName, Owner & Groups inline on a single truncated row */}
+                  <div className="flex items-center gap-1.5 text-[12px] font-medium text-slate-400 whitespace-nowrap overflow-hidden mt-0.5">
+                    <span className="truncate">
+                      {activeCircle.isGroup
+                        ? 'Grupo de WhatsApp'
+                        : [
+                            activeCircle.phone ? `+${activeCircle.phone}` : null,
+                            activeCircle.pushName && activeCircle.pushName.toLowerCase() !== activeCircle.clientName.toLowerCase()
+                              ? `WhatsApp: ${activeCircle.pushName}`
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                      {activeCircle.scope === 'soporte' ? ` · Atiende: ${activeCircle.assignedTechName}` : ''}
+                      {activeCircle.scope === 'lead' ? ` · Vendedor: ${activeCircle.leadOwnerName || 'Sin asignar'}` : ''}
+                    </span>
+                    {!activeCircle.isGroup && activeCircle.memberOfGroups.length > 0 && (
+                      <div className="inline-flex items-center gap-1 shrink-0">
+                        <span className="text-slate-300">·</span>
+                        {activeCircle.memberOfGroups.slice(0, 2).map((g) => {
+                          const groupCircleId = `wa:${g.jid}`;
+                          const exists = circles.some((c) => c.circleId === groupCircleId);
+                          return (
+                            <button
+                              key={g.jid}
+                              type="button"
+                              disabled={!exists}
+                              onClick={() => exists && setSelectedCircleId(groupCircleId)}
+                              className="text-[10.5px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200/70 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-70 transition"
+                            >
+                              {g.subject || 'Grupo'}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-1.5 flex-wrap ml-auto">
+              <div className="flex items-center justify-end gap-1.5 shrink-0 ml-auto">
                 {/* Support area selector + quick tech assignment */}
                 {activeCircle.scope === 'soporte' && activeCircle.isWhatsApp && (
                   <>
@@ -3541,7 +3632,7 @@ export const SupportChatCircles: React.FC = () => {
                       <select
                         value={activeCircle.supportChannel}
                         onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
-                        className="pl-8 pr-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 cursor-pointer focus:outline-none transition"
+                        className="pl-8 pr-3 py-1 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 cursor-pointer focus:outline-none transition"
                       >
                         <option value="soporte">Soporte / Operaciones</option>
                         <option value="contabilidad">Contabilidad / Finanzas</option>
@@ -3552,7 +3643,7 @@ export const SupportChatCircles: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleAssignTech(profile.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition"
                       >
                         <UserCheck className="w-3.5 h-3.5" />
                         Tomar caso
@@ -3568,7 +3659,7 @@ export const SupportChatCircles: React.FC = () => {
                   (scopes.all || scopes.leads) && (
                     <>
                       {activeCircle.leadId && (
-                        <div className="relative flex items-center gap-0.5 bg-slate-50 border border-slate-200/80 rounded-xl p-1">
+                        <div className="relative flex items-center gap-0.5 bg-slate-50 border border-slate-200/80 rounded-xl p-0.5">
                           {(
                             [
                               { st: 'En seguimiento', label: 'Seguimiento' },
@@ -3586,7 +3677,7 @@ export const SupportChatCircles: React.FC = () => {
                                   handleUpdateLeadStatus(quick.st);
                                 }}
                                 title={`Cambiar etapa a ${quick.st}`}
-                                className={`px-2 py-1 rounded-lg text-[12.5px] transition ${
+                                className={`px-2 py-1 rounded-lg text-[12px] transition ${
                                   active
                                     ? 'bg-slate-800 text-white font-bold shadow-2xs'
                                     : 'text-slate-600 hover:bg-white font-semibold'
@@ -3608,13 +3699,26 @@ export const SupportChatCircles: React.FC = () => {
                                 setShowQuotesPopover(false);
                               }}
                               title="Cambiar etapa del Lead"
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12.5px] font-semibold transition ${
+                              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[12px] font-semibold transition ${
                                 showStagePopover
                                   ? 'bg-white text-slate-900 shadow-2xs'
                                   : 'text-slate-700 hover:bg-white'
                               }`}
                             >
-                              <span>Etapa: {activeCircle.leadStatus || 'Prospecto'}</span>
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                  activeCircle.leadStatus === 'Cerrado'
+                                    ? 'bg-emerald-500'
+                                    : activeCircle.leadStatus === 'En seguimiento' ||
+                                      activeCircle.leadStatus === 'Negociación' ||
+                                      activeCircle.leadStatus === 'Lead calificado'
+                                    ? 'bg-indigo-500'
+                                    : activeCircle.leadStatus === 'Perdido' || activeCircle.leadStatus === 'Erróneo'
+                                    ? 'bg-rose-400'
+                                    : 'bg-slate-400'
+                                }`}
+                              />
+                              <span>{activeCircle.leadStatus || 'Prospecto'}</span>
                               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                             </button>
 
@@ -3681,16 +3785,16 @@ export const SupportChatCircles: React.FC = () => {
                             setShowQuotesPopover(false);
                           }}
                           title="Enviar formulario de diagnóstico al prospecto o abrir las 7 preguntas del Método ARIAS"
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-semibold border transition ${
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[12.5px] font-semibold border transition ${
                             Object.keys(activeDiscoveryAnswers).length > 0
                               ? 'bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-800 border-emerald-200'
                               : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
                           }`}
                         >
-                          <Target className="w-4 h-4 text-slate-600" />
+                          <Target className="w-3.5 h-3.5 text-slate-600" />
                           <span>Diagnóstico</span>
                           {Object.keys(activeDiscoveryAnswers).length > 0 && (
-                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[11px] font-bold">
+                            <span className="px-1.5 py-0.2 rounded-full bg-emerald-600 text-white text-[10.5px] font-bold">
                               {Object.keys(activeDiscoveryAnswers).length}/7
                             </span>
                           )}
@@ -3788,9 +3892,9 @@ export const SupportChatCircles: React.FC = () => {
                             setShowQuotesPopover(false);
                           }}
                           title="Agendar cita, demostración o seguimiento en el calendario sin salir del chat"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[12.5px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
                         >
-                          <Calendar className="w-4 h-4 text-slate-600" />
+                          <Calendar className="w-3.5 h-3.5 text-slate-600" />
                           <span>Agendar</span>
                           <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                         </button>
@@ -3871,9 +3975,9 @@ export const SupportChatCircles: React.FC = () => {
                         type="button"
                         disabled={creatingQuote || classifying}
                         onClick={handleOpenQuoteBuilder}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[13px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[12.5px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition disabled:opacity-50"
                       >
-                        {creatingQuote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
+                        {creatingQuote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Receipt className="w-3.5 h-3.5" />}
                         <span>Cotizar</span>
                       </button>
 
@@ -3888,9 +3992,9 @@ export const SupportChatCircles: React.FC = () => {
                               setShowDiscoveryPopover(false);
                               setShowCalendarPopover(false);
                             }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[12.5px] font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
                           >
-                            <FileText className="w-4 h-4 text-slate-500" />
+                            <FileText className="w-3.5 h-3.5 text-slate-500" />
                             <span>Propuestas ({leadQuotes.length})</span>
                             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                           </button>
@@ -3965,12 +4069,24 @@ export const SupportChatCircles: React.FC = () => {
                       type="button"
                       onClick={() => setShowReclassifyMenu((v) => !v)}
                       title="Más opciones y clasificación"
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 transition"
                     >
                       <MoreHorizontal className="w-4 h-4 text-slate-500" />
                     </button>
                     {showReclassifyMenu && (
                       <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl z-30 p-2 space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowReclassifyMenu(false);
+                            handleMarkCircleUnread(activeCircle);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 text-left"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 text-indigo-600" />
+                          Marcar como no leído
+                        </button>
+
                         {activeCircle.leadId && (activeCircle.scope === 'lead' || activeCircle.scope === 'spam') && (
                           <button
                             type="button"
