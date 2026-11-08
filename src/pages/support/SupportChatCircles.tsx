@@ -445,7 +445,7 @@ interface WaGroupRow {
   client_id: string | null;
 }
 
-type CircleFilter = 'all' | 'waiting' | 'soporte' | 'por_clasificar' | 'lead' | 'reactivados' | 'interno' | 'spam' | 'tickets';
+type CircleFilter = 'all' | 'unread' | 'waiting' | 'soporte' | 'por_clasificar' | 'lead' | 'reactivados' | 'interno' | 'spam' | 'tickets';
 
 // Parse "[10:42 a. m.] 👤 Nombre: texto" chat lines written by the webhook.
 function parseChatLine(raw: string): { icon: string; sender: string; text: string } | null {
@@ -1059,10 +1059,10 @@ export const SupportChatCircles: React.FC = () => {
         scope !== 'por_clasificar' &&
         normMsg.length > 0 &&
         normMsg.length <= 65 &&
-        (/^(ok|okay|okey|si|sí|gracias|muchas gracias|mil gracias|perfecto|esta bien|está bien|entendido|de acuerdo|listo|excelente|bueno|va|dale|super|súper|gracias muy amable|muchas gracias muy amable|ok gracias|ok muchas gracias|perfecto gracias|esta bien gracias|está bien gracias|listo gracias)$/i.test(
+        (/^(ok|okay|okey|si|sí|gracias|muchas gracias|mil gracias|denada|de nada|con gusto|con mucho gusto|a la orden|para servirle|perfecto|esta bien|está bien|entendido|de acuerdo|listo|excelente|bueno|va|dale|super|súper|gracias muy amable|muchas gracias muy amable|ok gracias|ok muchas gracias|perfecto gracias|esta bien gracias|está bien gracias|listo gracias)$/i.test(
           normMsg
         ) ||
-          /^(muchas\s+gracias|mil\s+gracias|gracias)\s+(por\s+|muy\s+amable|amigo|equipo|ingeniero|lic)/i.test(normMsg));
+          /^(muchas\s+gracias|mil\s+gracias|gracias|de\s+nada|denada)\s+(por\s+|muy\s+amable|amigo|equipo|ingeniero|lic)/i.test(normMsg));
 
       const attendedAt = String(meta.wa_attended_at || activeMeta.wa_attended_at || '');
       const isManuallyAttended =
@@ -1187,6 +1187,7 @@ export const SupportChatCircles: React.FC = () => {
     // WhatsApp conversations only; old Service Hub tickets live in their own tab.
     const wa = circles.filter((c) => c.isWhatsApp && c.scope !== 'spam');
     const by = (s: WaScope) => circles.filter((c) => c.isWhatsApp && c.scope === s).length;
+    const unreadList = wa.filter((c) => isUnread(c));
     const waitingList = wa.filter((c) => c.unreadOrWaitingReply);
     const slaCritical = waitingList.filter((c) => c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60).length;
     const mine = wa.filter((c) => isMine(c)).length;
@@ -1195,6 +1196,7 @@ export const SupportChatCircles: React.FC = () => {
     const reactivatedReplied = wa.filter((c) => c.reactivationReplied).length;
     return {
       all: wa.length,
+      unread: unreadList.length,
       waiting: waitingList.length,
       waitingTotal: waitingList.length,
       slaCritical,
@@ -1210,7 +1212,7 @@ export const SupportChatCircles: React.FC = () => {
       spam: by('spam'),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [circles, readCirclesMap, profile?.id]);
+  }, [circles, readCirclesMap, forcedUnreadMap, profile?.id]);
 
   // Real-time sound + desktop notification + bell shake when new incoming message arrives
   useEffect(() => {
@@ -1314,6 +1316,7 @@ export const SupportChatCircles: React.FC = () => {
   const filterTabs = useMemo(() => {
     const tabs: { id: CircleFilter; label: string; icon: React.ElementType; alert?: boolean }[] = [
       { id: 'all', label: `Todos (${counts.all})`, icon: MessageSquare },
+      { id: 'unread', label: `No leídos (${counts.unread})`, icon: MessageSquare, alert: counts.unread > 0 },
       { id: 'waiting', label: `Sin contestar (${counts.waiting})`, icon: Clock, alert: counts.waiting > 0 },
     ];
     if (scopes.soporte) tabs.push({ id: 'soporte', label: `Soporte (${counts.soporte})`, icon: Building2 });
@@ -1374,9 +1377,10 @@ export const SupportChatCircles: React.FC = () => {
         return false;
       }
       if (circleFilter === 'all' && c.scope === 'spam') return false;
+      if (circleFilter === 'unread' && (c.scope === 'spam' || !isUnread(c))) return false;
       if (circleFilter === 'waiting' && (c.scope === 'spam' || !c.unreadOrWaitingReply)) return false;
       if (circleFilter === 'reactivados' && !c.isReactivation) return false;
-      if (!['all', 'waiting', 'reactivados', 'tickets'].includes(circleFilter) && c.scope !== circleFilter) return false;
+      if (!['all', 'unread', 'waiting', 'reactivados', 'tickets'].includes(circleFilter) && c.scope !== circleFilter) return false;
 
       if (ownerFilter === 'mine' && !isMine(c)) return false;
       if (ownerFilter === 'unassigned' && !isUnassigned(c)) return false;
@@ -1428,7 +1432,7 @@ export const SupportChatCircles: React.FC = () => {
     }
     return res;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [circles, circleFilter, ownerFilter, channelFilter, leadSubFilter, searchQuery, readCirclesMap, profile?.id]);
+  }, [circles, circleFilter, ownerFilter, channelFilter, leadSubFilter, searchQuery, readCirclesMap, forcedUnreadMap, profile?.id]);
 
   useEffect(() => {
     if (!selectedCircleId && filteredCircles.length > 0) setSelectedCircleId(filteredCircles[0].circleId);
@@ -3311,6 +3315,7 @@ export const SupportChatCircles: React.FC = () => {
             <div className="flex items-center gap-1 flex-wrap">
               {filterTabs.map((tab) => {
                 const active = circleFilter === tab.id;
+                const isUnreadTab = tab.id === 'unread';
                 return (
                   <button
                     key={tab.id}
@@ -3320,11 +3325,15 @@ export const SupportChatCircles: React.FC = () => {
                       setOwnerFilter('all');
                       setChannelFilter('all');
                       setLeadSubFilter('activos');
-                      setCircleFilter(tab.id);
+                      setCircleFilter(isUnreadTab && active ? 'all' : tab.id);
                     }}
                     className={`px-2 py-1 rounded-lg text-[12.5px] whitespace-nowrap transition inline-flex items-center gap-1 ${
                       active
-                        ? 'bg-indigo-50 text-indigo-700 font-bold'
+                        ? isUnreadTab
+                          ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                          : 'bg-indigo-50 text-indigo-700 font-bold'
+                        : isUnreadTab && counts.unread > 0
+                        ? 'bg-indigo-50/70 text-indigo-700 border border-indigo-200/80 hover:bg-indigo-100/70 font-semibold'
                         : 'text-slate-600 hover:bg-slate-50 font-medium'
                     }`}
                   >
@@ -3389,7 +3398,7 @@ export const SupportChatCircles: React.FC = () => {
             ) : filteredCircles.length === 0 ? (
               <div className="p-8 text-center space-y-2.5">
                 <p className="text-[13px] text-slate-400 font-medium">No hay conversaciones en esta vista.</p>
-                {(searchQuery || ownerFilter !== 'all' || channelFilter !== 'all' || leadSubFilter !== 'todos') && (
+                {(searchQuery || ownerFilter !== 'all' || channelFilter !== 'all' || leadSubFilter !== 'todos' || circleFilter === 'unread') && (
                   <button
                     type="button"
                     onClick={() => {
@@ -3397,6 +3406,7 @@ export const SupportChatCircles: React.FC = () => {
                       setOwnerFilter('all');
                       setChannelFilter('all');
                       setLeadSubFilter('todos');
+                      if (circleFilter === 'unread') setCircleFilter('all');
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition"
                   >
@@ -3459,14 +3469,14 @@ export const SupportChatCircles: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1.5">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`text-[14px] truncate ${unread ? 'font-extrabold text-slate-950' : 'font-semibold text-slate-700'}`}>
+                          <span className={`text-[14px] truncate ${unread ? 'font-bold text-slate-950' : 'font-normal text-slate-700'}`}>
                             {circle.clientName}
                           </span>
                           <span
                             className={`text-[12px] shrink-0 ${
                               circle.leadStatus === 'Perdido' || circle.leadStatus === 'Erróneo'
-                                ? 'text-slate-500 font-semibold'
-                                : 'text-slate-400'
+                                ? 'text-slate-500 font-normal'
+                                : 'text-slate-400 font-normal'
                             }`}
                           >
                             · {shortType}
@@ -4368,7 +4378,7 @@ export const SupportChatCircles: React.FC = () => {
                             </div>
                           )}
                           <div className="max-w-lg bg-[#DFE3FF] text-slate-900 rounded-2xl rounded-br-xs px-4 py-3 shadow-2xs">
-                            <p className="text-[13px] font-bold text-indigo-700/85 mb-0.5">{b.senderName}</p>
+                            <p className="text-[12.5px] font-semibold text-indigo-700/85 mb-0.5">{b.senderName}</p>
                             {renderMedia(b)}
                             {isEditing ? (
                               <div className="mt-1.5 space-y-2 min-w-[280px] sm:min-w-[360px]">
@@ -4376,7 +4386,7 @@ export const SupportChatCircles: React.FC = () => {
                                   rows={4}
                                   value={editingCommentText}
                                   onChange={(e) => setEditingCommentText(e.target.value)}
-                                  className="w-full px-3 py-2 rounded-xl bg-white border border-indigo-200 text-[13.5px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
+                                  className="w-full px-3 py-2 rounded-xl bg-white border border-indigo-200 text-[13.5px] font-normal text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
                                 />
                                 <div className="flex items-center justify-end gap-1.5 flex-wrap">
                                   <button
@@ -4406,10 +4416,10 @@ export const SupportChatCircles: React.FC = () => {
                                 </div>
                               </div>
                             ) : (
-                              b.text && <p className="text-[14.5px] font-medium text-slate-900 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>
+                              b.text && <p className="text-[14.5px] font-normal text-slate-800 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>
                             )}
                             <div className="flex items-center justify-end gap-1 mt-1">
-                              <span className="text-xs font-medium text-slate-500">{b.id.startsWith('temp-') ? 'enviando…' : fmtTime(b.createdAt)}</span>
+                              <span className="text-xs font-normal text-slate-500">{b.id.startsWith('temp-') ? 'enviando…' : fmtTime(b.createdAt)}</span>
                               {b.delivery === 'sent' ? (
                                 <CheckCheck className="w-3.5 h-3.5 text-emerald-500" aria-label="Entregado a WhatsApp" />
                               ) : b.delivery === 'error' ? (
@@ -4430,9 +4440,9 @@ export const SupportChatCircles: React.FC = () => {
                       {daySep}
                       <div className="flex justify-start">
                         <div className="max-w-lg bg-white text-slate-900 rounded-2xl rounded-bl-xs px-4 py-3 shadow-2xs">
-                          <p className="text-[13px] font-bold text-indigo-600 mb-0.5">{b.senderName}</p>
+                          <p className="text-[12.5px] font-semibold text-indigo-600 mb-0.5">{b.senderName}</p>
                           {renderMedia(b)}
-                          {b.text && <p className="text-[14.5px] font-medium text-slate-800 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
+                          {b.text && <p className="text-[14.5px] font-normal text-slate-800 whitespace-pre-wrap leading-relaxed break-words">{b.text}</p>}
                           {b.transcript && (
                             <p className="mt-1.5 text-[13px] text-slate-600 bg-slate-50 rounded-lg px-2.5 py-1.5 italic">
                               <Mic className="w-3.5 h-3.5 inline mr-1 text-indigo-500" />
@@ -4440,7 +4450,7 @@ export const SupportChatCircles: React.FC = () => {
                             </p>
                           )}
                           <div className="flex items-center justify-end mt-1">
-                            <span className="text-xs font-medium text-slate-400">{fmtTime(b.createdAt)}</span>
+                            <span className="text-xs font-normal text-slate-400">{fmtTime(b.createdAt)}</span>
                           </div>
                         </div>
                       </div>
