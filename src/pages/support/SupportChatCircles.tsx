@@ -2277,17 +2277,20 @@ export const SupportChatCircles: React.FC = () => {
 
   const activeDiscoveryAnswers = useMemo<Record<string, string>>(() => {
     if (!activeCircle) return {};
-    const fromTicket = (activeCircle.activeTicket.metadata as any)?.wa_discovery;
-    if (fromTicket && typeof fromTicket === 'object') {
-      const cleaned: Record<string, string> = {};
-      for (let i = 1; i <= 7; i++) {
-        const val = fromTicket[`q${i}`];
-        if (typeof val === 'string' && val.trim()) cleaned[`q${i}`] = val.trim();
+    for (const t of activeCircle.allClientTickets) {
+      const fromTicket = (t.metadata as any)?.wa_discovery;
+      if (fromTicket && typeof fromTicket === 'object') {
+        const cleaned: Record<string, string> = {};
+        for (let i = 1; i <= 7; i++) {
+          const val = fromTicket[`q${i}`];
+          if (typeof val === 'string' && val.trim()) cleaned[`q${i}`] = val.trim();
+        }
+        if (Object.keys(cleaned).length > 0) return cleaned;
       }
-      if (Object.keys(cleaned).length > 0) return cleaned;
     }
-    return {};
-  }, [activeCircle]);
+    const combinedComments = comments.map((c) => c.body || '').join('\n\n');
+    return parseAriasAnswersFromNotes(combinedComments);
+  }, [activeCircle, comments]);
 
   const buildDiscoveryWhatsAppText = useCallback(() => {
     if (!activeCircle) return '';

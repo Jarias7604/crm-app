@@ -19,20 +19,43 @@ export function parseAriasAnswersFromNotes(notes?: string | null): Record<string
     if (!notes) return {};
     const out: Record<string, string> = {};
     const patterns: Array<{ key: string; regex: RegExp }> = [
-        { key: 'q1', regex: /-\s*Diagnóstico \/ Dolor:\s*(.+)/i },
-        { key: 'q2', regex: /-\s*Costo \/ Impacto:\s*(.+)/i },
+        // Formato 1: Formulario público /diagnostico/:id (submit_public_lead_discovery)
+        { key: 'q1', regex: /1\.\s*Diagn[oó]stico\s*\/\s*(?:Proceso prioritario|Dolor):\s*(.+)/i },
+        { key: 'q2', regex: /2\.\s*(?:Impacto\s*\/\s*Situaci[oó]n actual|Costo\s*\/\s*Impacto):\s*(.+)/i },
+        { key: 'q3', regex: /3\.\s*Sistema o m[eé]todo actual:\s*(.+)/i },
+        { key: 'q4', regex: /4\.\s*(?:Qui[eé]n aprueba la compra|Decisor):\s*(.+)/i },
+        { key: 'q5', regex: /5\.\s*(?:Plazo de implementaci[oó]n|Tiempos de implementaci[oó]n):\s*(.+)/i },
+        { key: 'q6', regex: /6\.\s*(?:Alcance\s*\/\s*Usuarios|Presupuesto):\s*(.+)/i },
+        { key: 'q7', regex: /7\.\s*(?:Siguiente paso preferido|Compromiso comercial):\s*(.+)/i },
+        // Formato 2: Guion / Notas clásicas con guión
+        { key: 'q1', regex: /-\s*Diagn[oó]stico\s*\/\s*Dolor:\s*(.+)/i },
+        { key: 'q2', regex: /-\s*Costo\s*\/\s*Impacto:\s*(.+)/i },
         { key: 'q3', regex: /-\s*Sistema actual:\s*(.+)/i },
         { key: 'q4', regex: /-\s*Decisor:\s*(.+)/i },
-        { key: 'q5', regex: /-\s*Tiempos de implementación:\s*(.+)/i },
+        { key: 'q5', regex: /-\s*Tiempos de implementaci[oó]n:\s*(.+)/i },
         { key: 'q6', regex: /-\s*Presupuesto:\s*(.+)/i },
         { key: 'q7', regex: /-\s*Compromiso comercial:\s*(.+)/i },
     ];
     for (const { key, regex } of patterns) {
+        if (out[key]) continue;
         const m = notes.match(regex);
         if (m && m[1]?.trim()) {
             out[key] = m[1].trim();
         }
     }
+
+    // Formato 3: Guardado directo desde LiveDemoHUDModal ("• [✓] <pregunta>\n  Respuesta: <valor>")
+    ARIAS_DISCOVERY_QUESTIONS.forEach((q) => {
+        const key = `q${q.id}`;
+        if (out[key]) return;
+        const escaped = q.question.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const rx = new RegExp(`${escaped}[\\s\\r\\n]+Respuesta:\\s*(.+)`, 'i');
+        const m = notes.match(rx);
+        if (m && m[1]?.trim()) {
+            out[key] = m[1].trim();
+        }
+    });
+
     return out;
 }
 

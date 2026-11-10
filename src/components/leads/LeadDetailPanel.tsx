@@ -263,6 +263,19 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const selectedLead = lead;
     const setIsDetailOpen = (val: boolean) => { if (!val) onClose(); };
 
+    // Extraer respuestas de las 7 preguntas obligatorias (Método ARIAS) desde seguimientos y notas del lead
+    const ariasDiscoveryAnswers = (() => {
+        const combinedSources = [
+            ...followUps.map((f) => f?.notes || ''),
+            selectedLead.next_action_notes || '',
+            ...callActivities.map((a) => a?.notes || ''),
+        ]
+            .filter(Boolean)
+            .join('\n\n');
+        return parseAriasAnswersFromNotes(combinedSources);
+    })();
+    const ariasAnsweredCount = Object.keys(ariasDiscoveryAnswers).length;
+
     // ── Cálculo del NEXT TRIGGER (Próxima Reunión / Próximo Seguimiento Agendado) ──
     const nextTrigger = (() => {
         const now = new Date();
@@ -553,6 +566,11 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 >
                                     <Flame className={`w-3.5 h-3.5 ${activeTab === 'sales' ? 'text-rose-600' : 'text-slate-400'}`} />
                                     <span>Método Arias</span>
+                                    {ariasAnsweredCount > 0 && (
+                                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                            {ariasAnsweredCount}/7
+                                        </span>
+                                    )}
                                     {leadAudit && (
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 ml-0.5 shrink-0" title="Auditado" />
                                     )}
@@ -1009,21 +1027,39 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                             <div
                                                 onClick={() => setIsDemoHUDOpen(true)}
-                                                className="p-5 rounded-2xl bg-slate-50 hover:bg-rose-50/40 border border-slate-200 hover:border-rose-300 transition-all text-left group cursor-pointer shadow-xs flex flex-col justify-between"
+                                                className={`p-5 rounded-2xl transition-all text-left group cursor-pointer border shadow-xs flex flex-col justify-between ${
+                                                    ariasAnsweredCount > 0
+                                                        ? 'bg-emerald-50/40 hover:bg-emerald-50/70 border-emerald-300'
+                                                        : 'bg-slate-50 hover:bg-rose-50/40 border-slate-200 hover:border-rose-300'
+                                                }`}
                                             >
                                                 <div>
-                                                    <div className="w-8 h-8 rounded-xl bg-white border border-rose-200 flex items-center justify-center text-rose-600 mb-3 shadow-2xs">
-                                                        <Target className="w-4 h-4" />
+                                                    <div className="flex items-center justify-between gap-2 mb-3">
+                                                        <div className={`w-8 h-8 rounded-xl bg-white border flex items-center justify-center shadow-2xs ${
+                                                            ariasAnsweredCount > 0 ? 'border-emerald-200 text-emerald-600' : 'border-rose-200 text-rose-600'
+                                                        }`}>
+                                                            <Target className="w-4 h-4" />
+                                                        </div>
+                                                        {ariasAnsweredCount > 0 && (
+                                                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold inline-flex items-center gap-1">
+                                                                <CheckCircle className="w-3 h-3" />
+                                                                {ariasAnsweredCount}/7 Completado
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <h4 className="text-sm font-black text-slate-900 group-hover:text-rose-700 transition-colors mb-1">
                                                         Guion Demo HUD
                                                     </h4>
                                                     <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                                                        Abre el copiloto en vivo con las 7 preguntas obligatorias de dolor, decisor y objeciones de prueba.
+                                                        {ariasAnsweredCount > 0
+                                                            ? `El prospecto ya respondió ${ariasAnsweredCount} de las 7 preguntas obligatorias. Haz clic para revisar o editar en el copiloto.`
+                                                            : 'Abre el copiloto en vivo con las 7 preguntas obligatorias de dolor, decisor y objeciones de prueba.'}
                                                     </p>
                                                 </div>
-                                                <div className="pt-4 flex items-center gap-1.5 text-xs font-bold text-rose-600">
-                                                    <span>Iniciar Guion en Vivo</span>
+                                                <div className={`pt-4 flex items-center gap-1.5 text-xs font-bold ${
+                                                    ariasAnsweredCount > 0 ? 'text-emerald-700' : 'text-rose-600'
+                                                }`}>
+                                                    <span>{ariasAnsweredCount > 0 ? `Ver Respuestas (${ariasAnsweredCount}/7) en Guion` : 'Iniciar Guion en Vivo'}</span>
                                                     <span>➔</span>
                                                 </div>
                                             </div>
@@ -1053,6 +1089,50 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {ariasAnsweredCount > 0 && (
+                                            <div className="p-4 rounded-2xl bg-emerald-50/40 border border-emerald-200/90 space-y-3">
+                                                <div className="flex items-center justify-between gap-2 border-b border-emerald-200/60 pb-2.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                                                        <span className="text-xs font-black text-slate-900">
+                                                            Diagnóstico Completado ({ariasAnsweredCount} de 7 preguntas obligatorias)
+                                                        </span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsDemoHUDOpen(true)}
+                                                        className="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold transition cursor-pointer"
+                                                    >
+                                                        Abrir en Guion ➔
+                                                    </button>
+                                                </div>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                                    {[
+                                                        { k: 'q1', label: '1. Diagnóstico / Dolor' },
+                                                        { k: 'q2', label: '2. Impacto / Situación actual' },
+                                                        { k: 'q3', label: '3. Sistema o método actual' },
+                                                        { k: 'q4', label: '4. Quién aprueba la compra' },
+                                                        { k: 'q5', label: '5. Plazo de implementación' },
+                                                        { k: 'q6', label: '6. Alcance / Usuarios' },
+                                                        { k: 'q7', label: '7. Siguiente paso preferido' },
+                                                    ].map((item) => {
+                                                        const val = ariasDiscoveryAnswers[item.k];
+                                                        if (!val) return null;
+                                                        return (
+                                                            <div key={item.k} className="p-2.5 rounded-xl bg-white border border-emerald-100/90">
+                                                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                                                    {item.label}
+                                                                </p>
+                                                                <p className="text-xs font-semibold text-slate-800 mt-0.5">
+                                                                    {val}
+                                                                </p>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* Banner de Auditoría */}
                                         {leadAudit ? (
@@ -1941,10 +2021,17 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         onClose={() => setIsDemoHUDOpen(false)}
                         leadName={selectedLead.name}
                         leadCompany={selectedLead.company_name}
-                        initialAnswers={parseAriasAnswersFromNotes(selectedLead.next_action_notes)}
+                        initialAnswers={ariasDiscoveryAnswers}
                         onApplyFindings={async (notes) => {
                             const currentNotes = selectedLead.next_action_notes ? `${selectedLead.next_action_notes}\n\n` : '';
                             await handleUpdateLead({ next_action_notes: `${currentNotes}${notes}` });
+                            await supabase.from('follow_ups').insert({
+                                lead_id: selectedLead.id,
+                                date: new Date().toISOString().split('T')[0],
+                                notes,
+                                action_type: 'call',
+                            });
+                            loadDetails();
                         }}
                     />
 
