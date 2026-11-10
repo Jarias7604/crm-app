@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   X,
-  Clock,
   CheckCircle2,
   Sparkles,
   Users,
@@ -12,11 +11,8 @@ import {
   ExternalLink,
   Loader2,
   Search,
-  Filter,
-  Phone,
   CheckSquare,
   Square as SquareIcon,
-  Image as ImageIcon,
   Video,
   FileText,
   Upload,
@@ -668,97 +664,71 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     setMessageTemplate((prev) => `${prev}${prev.endsWith(' ') || !prev ? '' : ' '}${variable}`);
   };
 
+  const visibleTemplates = useMemo(() => {
+    if (isResendMode) {
+      return DEFAULT_TEMPLATES.filter((t) => t.forResend);
+    }
+    return DEFAULT_TEMPLATES.filter((t) => !t.forResend);
+  }, [isResendMode]);
+
   const formatHoursElapsed = (hours: number): string => {
     if (hours < 1) return 'Hace <1h';
     if (hours < 24) return `Hace ${hours}h`;
     const d = Math.floor(hours / 24);
-    const remH = hours % 24;
-    return remH > 0 && d < 3 ? `Hace ${d}d ${remH}h` : `Hace ${d}d`;
+    return `Hace ${d}d`;
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/35 backdrop-blur-[2px] z-[80] flex items-center justify-center p-3 sm:p-5">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-[0_24px_60px_-15px_rgba(15,23,42,0.28)] max-w-6xl w-full overflow-hidden flex flex-col h-[88vh] max-h-[840px]">
-        {/* ── HEADER ── */}
-        <div className="px-6 py-3.5 bg-[#EEF0FF] border-b border-indigo-200/70 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white border border-indigo-200 flex items-center justify-center text-indigo-600 shadow-2xs">
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-[80] flex items-center justify-center p-3 sm:p-5">
+      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-[0_24px_60px_-15px_rgba(15,23,42,0.22)] max-w-5xl w-full overflow-hidden flex flex-col h-[86vh] max-h-[780px]">
+        {/* ── HEADER: Minimalist SaaS Clean ── */}
+        <div className="px-6 py-4 bg-white border-b border-slate-200/80 flex items-center justify-between gap-4 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
               {isResendMode ? <RefreshCw className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
             </div>
-            <div>
-              <h3 className="text-[15px] font-bold text-slate-900">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h3 className="text-[15px] font-bold text-slate-900 tracking-tight">
+                  {isResendMode ? 'Reenvío a Prospectos Sin Responder' : 'Reactivación de Prospectos por WhatsApp'}
+                </h3>
+                {isResendMode && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70">
+                    {resendCounts.ready48 > 0
+                      ? `${resendCounts.ready48} listos (+48h cumplidas)`
+                      : `En espera (<48h · faltan ~${resendCounts.hoursUntilNextReady}h)`}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 truncate mt-0.5">
                 {isResendMode
-                  ? 'Reenvío Inteligente a Prospectos Sin Responder (Toque 2 / Flyer / Video)'
-                  : 'Motor de Reactivación de Prospectos por WhatsApp'}
-              </h3>
-              <p className="text-xs font-medium text-slate-500">
-                {isResendMode
-                  ? 'Exclusivo para quienes no contestaron el envío anterior · Sin mezclar prospectos nuevos para cuidar tus métricas'
-                  : '1. Filtra quiénes no han respondido · 2. Revisa la lista · 3. Envía con plantilla y mide respuestas en el Chat'}
+                  ? 'Sigue los 3 pasos: 1. Confirma destinatarios · 2. Ajusta el mensaje · 3. Adjunta tu Flyer o Video (opcional)'
+                  : 'Sigue los 3 pasos: 1. Filtra destinatarios · 2. Elige plantilla · 3. Adjunta Flyer o Video (opcional)'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-white border border-emerald-200 px-3 py-1.5 rounded-xl">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Cola Anti-Bloqueo Activa</span>
-            </div>
-            {!isSending && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-8 h-8 rounded-xl bg-white hover:bg-slate-100 text-slate-500 border border-slate-200/80 flex items-center justify-center transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+          {!isSending && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 flex items-center justify-center transition shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
-        {/* ── SMART TIMING ADVISOR BANNER (In Resend Mode: tells user WHEN to resend) ── */}
-        {isResendMode && (
-          <div
-            className={`px-6 py-2 border-b text-xs flex items-center justify-between gap-3 flex-wrap shrink-0 ${
-              resendCounts.ready48 > 0
-                ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
-                : 'bg-amber-50/80 border-amber-200 text-amber-900'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Clock className={`w-4 h-4 shrink-0 ${resendCounts.ready48 > 0 ? 'text-emerald-600' : 'text-amber-600'}`} />
-              {resendCounts.ready48 > 0 ? (
-                <span>
-                  <b>Momento óptimo de reenvío:</b> Tienes <b>{resendCounts.ready48} prospectos</b> que ya cumplieron{' '}
-                  <b>+48 horas (2+ días)</b> sin responder al toque anterior. Están listos para recibir el Toque 2.
-                </span>
-              ) : (
-                <span>
-                  <b>En espera de enfriamiento (&lt;48h):</b> Los <b>{resendCounts.under48} prospectos</b> sin responder recibieron el toque anterior hace menos de 48h.{' '}
-                  <b>Se recomienda reenviar en ~{resendCounts.hoursUntilNextReady}h</b> (o puedes seleccionarlos abajo si deseas enviar hoy).
-                </span>
-              )}
-            </div>
-            <span className="font-bold text-[11px] uppercase tracking-wider px-2 py-0.5 rounded bg-white/80 border border-current/20">
-              Regla recomendada: 48h a 72h entre toques
-            </span>
-          </div>
-        )}
-
-        {/* ── STEP 1: TOP SEGMENTATION BAR (Inactivity/Resend Timing + Status + Safe Batch Size) ── */}
-        <div className="px-6 py-3 bg-[#F8F9FC] border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        {/* ── UNIFIED FILTER BAR ── */}
+        <div className="px-6 py-2.5 bg-slate-50/80 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
           {isResendMode ? (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mr-1 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                Cuándo reenviar:
-              </span>
+            <div className="inline-flex items-center bg-slate-200/70 p-0.5 rounded-xl gap-0.5 flex-wrap">
               {(
                 [
                   { id: 'ready48', label: `Listos +48h (${resendCounts.ready48})` },
-                  { id: 'ready72', label: `+72h / 3+ días (${resendCounts.ready72})` },
+                  { id: 'ready72', label: `+72h (${resendCounts.ready72})` },
                   { id: 'under48', label: `En espera <48h (${resendCounts.under48})` },
-                  { id: 'all', label: `Todos sin responder (${resendCounts.all})` },
+                  { id: 'all', label: `Todos (${resendCounts.all})` },
                 ] as const
               ).map((opt) => {
                 const active = resendTimingFilter === opt.id;
@@ -771,10 +741,10 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                       setResendTimingFilter(opt.id);
                       setExcludedIds(new Set());
                     }}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs transition ${
+                    className={`px-3 py-1 rounded-lg text-xs transition ${
                       active
-                        ? 'bg-indigo-600 text-white font-bold shadow-2xs'
-                        : 'bg-white border border-slate-200/90 text-slate-600 hover:bg-slate-50 font-semibold'
+                        ? 'bg-white text-slate-900 font-semibold shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 font-medium'
                     }`}
                   >
                     {opt.label}
@@ -783,19 +753,14 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
               })}
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mr-1 flex items-center gap-1">
-                <Filter className="w-3.5 h-3.5 text-indigo-600" />
-                Tiempo sin respuesta:
-              </span>
+            <div className="inline-flex items-center bg-slate-200/70 p-0.5 rounded-xl gap-0.5 flex-wrap">
               {(
                 [
                   { id: 'all', label: `Todos (${bucketCounts.all})` },
                   { id: 'never', label: `Sin contacto (${bucketCounts.never})` },
-                  { id: '15d', label: `+15 días (${bucketCounts.d15})` },
-                  { id: '30d', label: `+30 días (${bucketCounts.d30})` },
-                  { id: '60d', label: `+60 días (${bucketCounts.d60})` },
-                  { id: '90d', label: `+90 días (${bucketCounts.d90})` },
+                  { id: '15d', label: `+15d (${bucketCounts.d15})` },
+                  { id: '30d', label: `+30d (${bucketCounts.d30})` },
+                  { id: '60d', label: `+60d (${bucketCounts.d60})` },
                 ] as const
               ).map((opt) => {
                 const active = inactivityFilter === opt.id;
@@ -810,10 +775,10 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                       if (opt.id === 'never') setCampaignName('Reactivación Sin Contacto');
                       else if (opt.id !== 'all') setCampaignName(`Reactivación +${opt.id.replace('d', ' días')}`);
                     }}
-                    className={`px-2.5 py-1.5 rounded-xl text-xs transition ${
+                    className={`px-3 py-1 rounded-lg text-xs transition ${
                       active
-                        ? 'bg-indigo-600 text-white font-bold shadow-2xs'
-                        : 'bg-white border border-slate-200/90 text-slate-600 hover:bg-slate-50 font-semibold'
+                        ? 'bg-white text-slate-900 font-semibold shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900 font-medium'
                     }`}
                   >
                     {opt.label}
@@ -823,8 +788,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
             </div>
           )}
 
-          {/* Stage & Batch Size Selectors */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <select
               disabled={isSending}
               value={stageFilter}
@@ -832,14 +796,14 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                 setStageFilter(e.target.value);
                 setExcludedIds(new Set());
               }}
-              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none"
+              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/90 text-xs font-medium text-slate-700 focus:outline-none"
             >
               <option value="all">Todas las etapas</option>
-              <option value="Prospecto">Etapa: Prospecto</option>
-              <option value="Llamada fría">Etapa: Llamada fría</option>
-              <option value="Calificado">Etapa: Calificado</option>
-              <option value="En seguimiento">Etapa: En seguimiento</option>
-              <option value="Negociación">Etapa: Negociación</option>
+              <option value="Prospecto">Prospecto</option>
+              <option value="Llamada fría">Llamada fría</option>
+              <option value="Calificado">Calificado</option>
+              <option value="En seguimiento">En seguimiento</option>
+              <option value="Negociación">Negociación</option>
             </select>
 
             <select
@@ -849,37 +813,36 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                 setBatchLimit(Number(e.target.value));
                 setExcludedIds(new Set());
               }}
-              className="px-3 py-1.5 rounded-xl bg-[#EEF0FF] border border-indigo-200 text-xs font-bold text-indigo-800 focus:outline-none"
+              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/90 text-xs font-semibold text-indigo-700 focus:outline-none"
             >
-              <option value={20}>Lote seguro: 20 prospectos</option>
-              <option value={30}>Lote recomendado: 30 prospectos</option>
-              <option value={50}>Lote mediano: 50 prospectos</option>
-              <option value={100}>Lote amplio: 100 prospectos</option>
-              <option value={0}>Mostrar todos ({matchingLeads.length})</option>
+              <option value={20}>Lote: 20 prospectos</option>
+              <option value={30}>Lote: 30 prospectos (Recomendado)</option>
+              <option value={50}>Lote: 50 prospectos</option>
+              <option value={100}>Lote: 100 prospectos</option>
+              <option value={0}>Todos ({matchingLeads.length})</option>
             </select>
           </div>
         </div>
 
         {/* ── MAIN 2-COLUMN WORKSPACE ── */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-0 overflow-hidden divide-y lg:divide-y-0 lg:divide-x divide-slate-200/80">
-          {/* ── LEFT COLUMN (5 cols): ORGANIZED PROSPECT LIST ── */}
+          {/* ── LEFT COLUMN (5 cols): STEP 1 · RECIPIENT LIST ── */}
           <div className="lg:col-span-5 flex flex-col min-h-0 bg-white">
-            {/* List Header & Search */}
-            <div className="p-3.5 border-b border-slate-100 space-y-2.5 shrink-0">
+            <div className="p-3.5 border-b border-slate-100 space-y-2 shrink-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-5 h-5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold flex items-center justify-center">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">
                     1
                   </span>
                   <h4 className="text-[13px] font-bold text-slate-900">
-                    Destinatarios seleccionados ({activeBatchLeads.length})
+                    Destinatarios ({activeBatchLeads.length})
                   </h4>
                 </div>
                 <button
                   type="button"
                   disabled={isSending || limitedLeads.length === 0}
                   onClick={toggleSelectAllVisible}
-                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition"
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800 transition"
                 >
                   {activeBatchLeads.length === limitedLeads.length ? 'Desmarcar todos' : 'Marcar todos'}
                 </button>
@@ -891,24 +854,19 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar prospecto por nombre, empresa o teléfono..."
-                  className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none"
+                  placeholder="Buscar por nombre o teléfono..."
+                  className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none"
                 />
               </div>
             </div>
 
-            {/* Scrollable Prospect Rows */}
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
               {limitedLeads.length === 0 ? (
-                <div className="p-8 text-center space-y-2">
-                  <Users className="w-6 h-6 text-slate-300 mx-auto" />
-                  <p className="text-xs font-semibold text-slate-500">
-                    No hay prospectos en este filtro de tiempo.
-                  </p>
+                <div className="p-8 text-center space-y-1.5">
+                  <Users className="w-5 h-5 text-slate-300 mx-auto" />
+                  <p className="text-xs font-semibold text-slate-600">No hay prospectos en este filtro.</p>
                   <p className="text-[11px] text-slate-400">
-                    {isResendMode
-                      ? 'Selecciona "Todos sin responder" arriba si deseas ver los enviados hace menos de 48h.'
-                      : 'Prueba cambiar el filtro de tiempo sin respuesta o etapa arriba.'}
+                    Cambia la pestaña superior para ver otros prospectos.
                   </p>
                 </div>
               ) : (
@@ -924,12 +882,12 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                     <div
                       key={lead.id}
                       onClick={() => setPreviewLeadId(lead.id)}
-                      className={`px-3.5 py-2.5 flex items-center justify-between gap-2.5 cursor-pointer transition ${
+                      className={`px-3.5 py-2.5 flex items-center justify-between gap-2 cursor-pointer transition ${
                         isPreviewed
-                          ? 'bg-[#EEF0FF]/70'
+                          ? 'bg-indigo-50/60'
                           : isIncluded
                           ? 'bg-white hover:bg-slate-50/80'
-                          : 'bg-slate-50/60 opacity-60'
+                          : 'bg-slate-50/50 opacity-50'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
@@ -940,7 +898,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                             e.stopPropagation();
                             toggleLeadCheckbox(lead.id);
                           }}
-                          className="text-indigo-600 hover:text-indigo-800 shrink-0"
+                          className="shrink-0"
                         >
                           {isIncluded ? (
                             <CheckSquare className="w-4 h-4 text-indigo-600" />
@@ -951,63 +909,30 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
 
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-bold text-slate-400">{idx + 1}.</span>
-                            <span className="text-[13px] font-bold text-slate-900 truncate">
+                            <span className="text-[11px] text-slate-400">{idx + 1}.</span>
+                            <span className="text-[13px] font-medium text-slate-900 truncate">
                               {lead.name}
                             </span>
                             {wasSent && (
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                              <span className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-semibold">
                                 Enviado
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                            <span className="inline-flex items-center gap-0.5 font-medium text-slate-600">
-                              <Phone className="w-2.5 h-2.5 text-emerald-600" />+{cleanPhone}
-                            </span>
-                            {lead.company_name && lead.company_name !== 'Individual' && (
-                              <span className="truncate max-w-[120px]">· {lead.company_name}</span>
-                            )}
+                          <div className="text-[11px] text-slate-400 truncate">
+                            +{cleanPhone}
+                            {lead.company_name && lead.company_name !== 'Individual'
+                              ? ` · ${lead.company_name}`
+                              : ''}
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        {touchInfo ? (
-                          <>
-                            <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 text-[10px] font-bold">
-                              Toque {touchInfo.touch} ➔ Toque {touchInfo.touch + 1}
-                            </span>
-                            <span
-                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                touchInfo.hoursSinceSent >= 48
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
-                              }`}
-                            >
-                              {formatHoursElapsed(touchInfo.hoursSinceSent)}{' '}
-                              {touchInfo.hoursSinceSent >= 48 ? '· Listo' : '· <48h'}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-semibold">
-                              {lead.status}
-                            </span>
-                            <span
-                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                                inactivity.neverContacted
-                                  ? 'bg-rose-50 text-rose-700'
-                                  : inactivity.days >= 30
-                                  ? 'bg-amber-50 text-amber-700'
-                                  : 'bg-slate-50 text-slate-500'
-                              }`}
-                            >
-                              {inactivity.label}
-                            </span>
-                          </>
-                        )}
-                      </div>
+                      <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/70 text-[11px] font-medium shrink-0">
+                        {touchInfo
+                          ? `${formatHoursElapsed(touchInfo.hoursSinceSent)} · Toque ${touchInfo.touch + 1}`
+                          : inactivity.label}
+                      </span>
                     </div>
                   );
                 })
@@ -1015,14 +940,14 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
             </div>
 
             {matchingLeads.length > limitedLeads.length && (
-              <div className="px-3.5 py-2 bg-slate-50 border-t border-slate-200/70 text-[11px] font-medium text-slate-500 flex items-center justify-between">
+              <div className="px-3.5 py-2 bg-slate-50 border-t border-slate-200/70 text-[11px] text-slate-500 flex items-center justify-between shrink-0">
                 <span>
-                  Mostrando lote de <b>{limitedLeads.length}</b> de <b>{matchingLeads.length}</b> prospectos filtrados
+                  Mostrando <b>{limitedLeads.length}</b> de <b>{matchingLeads.length}</b>
                 </span>
                 <button
                   type="button"
                   onClick={() => setBatchLimit(0)}
-                  className="text-indigo-600 font-bold hover:underline"
+                  className="text-indigo-600 font-semibold hover:underline"
                 >
                   Ver todos
                 </button>
@@ -1030,168 +955,198 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
             )}
           </div>
 
-          {/* ── RIGHT COLUMN (7 cols): TEMPLATES, MESSAGE EDITOR, FLYER/VIDEO UPLOADER & LIVE PREVIEW ── */}
-          <div className="lg:col-span-7 flex flex-col min-h-0 bg-[#FAFBFD] overflow-y-auto p-5 space-y-4">
-            {/* Step 2 Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-bold flex items-center justify-center">
-                  2
-                </span>
-                <h4 className="text-[13px] font-bold text-slate-900">
-                  {isResendMode
-                    ? 'Cambia el mensaje para el Toque 2 / Toque 3 y adjunta Flyer o Video (opcional)'
-                    : 'Elige una plantilla conversacional y personaliza el mensaje'}
-                </h4>
-              </div>
-            </div>
+          {/* ── RIGHT COLUMN (7 cols): STEP 2 (MESSAGE) + STEP 3 (FLYER/VIDEO) + PREVIEW ── */}
+          <div className="lg:col-span-7 flex flex-col min-h-0 bg-[#F8F9FC] overflow-y-auto p-5 space-y-3.5">
+            {/* STEP 2: MESSAGE & COMPACT TEMPLATES */}
+            <div className="bg-white border border-slate-200/90 rounded-xl p-4 space-y-3 shadow-2xs">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">
+                    2
+                  </span>
+                  <h4 className="text-[13px] font-bold text-slate-900">Mensaje a enviar</h4>
+                </div>
 
-            {/* Clean Full-Text Template Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {DEFAULT_TEMPLATES.map((tpl) => {
-                const active = selectedTemplateId === tpl.id;
-                return (
-                  <button
-                    key={tpl.id}
-                    type="button"
-                    disabled={isSending}
-                    onClick={() => handleSelectTemplate(tpl)}
-                    className={`p-3 rounded-xl border text-left transition flex flex-col justify-between gap-1.5 ${
-                      active
-                        ? 'bg-[#EEF0FF] border-indigo-400 text-indigo-950 shadow-2xs'
-                        : 'bg-white border-slate-200/90 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs font-bold text-slate-900 leading-snug">{tpl.label}</span>
-                      <span
-                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${
-                          active ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'
+                {/* Single-row template pills */}
+                <div className="flex items-center gap-1 flex-wrap">
+                  {visibleTemplates.map((tpl) => {
+                    const active = selectedTemplateId === tpl.id;
+                    const shortLabel = tpl.label
+                      .replace(/^Toque \d+ · /i, '')
+                      .replace(/^\d+\.\s*/, '')
+                      .replace(/\s*\(.*?\)\s*/g, '');
+                    return (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        disabled={isSending}
+                        onClick={() => handleSelectTemplate(tpl)}
+                        className={`px-2.5 py-1 rounded-lg text-[11.5px] transition ${
+                          active
+                            ? 'bg-indigo-600 text-white font-semibold shadow-2xs'
+                            : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600 font-medium'
                         }`}
                       >
-                        {tpl.tag}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 leading-snug">{tpl.subtitle}</p>
-                  </button>
-                );
-              })}
-            </div>
+                        {shortLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-            {/* Message Editor + Clickable Variable Pills */}
-            <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 space-y-2.5">
+              <textarea
+                rows={3}
+                disabled={isSending}
+                value={messageTemplate}
+                onChange={(e) => setMessageTemplate(e.target.value)}
+                placeholder="Escribe el mensaje para tus prospectos..."
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/90 text-[13px] font-normal text-slate-800 leading-relaxed focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Personalizar mensaje a enviar
-                </label>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-slate-400 font-medium">Insertar variable:</span>
+                  <span className="text-[11px] text-slate-400">Variables:</span>
                   {(['{nombre}', '{empresa}', '{vendedor}'] as const).map((v) => (
                     <button
                       key={v}
                       type="button"
                       disabled={isSending}
                       onClick={() => insertVariable(v)}
-                      className="px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold transition"
+                      className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 text-[11px] font-medium transition"
                     >
                       + {v}
                     </button>
                   ))}
                 </div>
+                <span className="text-[11px] text-slate-400">
+                  Se personaliza automáticamente para cada prospecto
+                </span>
               </div>
-              <textarea
-                rows={3}
-                disabled={isSending}
-                value={messageTemplate}
-                onChange={(e) => setMessageTemplate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[13px] font-normal text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            </div>
+
+            {/* STEP 3: FLYER / VIDEO / PDF UPLOADER (100% VISIBLE AT A GLANCE) */}
+            <div className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-2xs">
+              <input
+                ref={mediaInputRef}
+                type="file"
+                accept="image/*,video/mp4,video/quicktime,application/pdf"
+                onChange={handleSelectMediaFile}
+                className="hidden"
               />
 
-              {/* Flyer (Image), Short Video (MP4) or PDF Attachment Bar */}
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
-                <input
-                  ref={mediaInputRef}
-                  type="file"
-                  accept="image/*,video/mp4,video/quicktime,application/pdf"
-                  onChange={handleSelectMediaFile}
-                  className="hidden"
-                />
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Flyer / Video / PDF (Opcional):</span>
+              <div className="flex items-center justify-between gap-3 mb-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">
+                    3
                   </span>
-                  {mediaFile ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold truncate max-w-[260px]">
-                      {mediaFile.type.startsWith('video/') ? (
-                        <Video className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      ) : mediaFile.type === 'application/pdf' ? (
-                        <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      ) : (
-                        <ImageIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      )}
-                      <span className="truncate">{mediaFile.name}</span>
-                    </span>
-                  ) : (
-                    <span className="text-[11px] text-slate-400">
-                      Sin archivo adjunto (solo texto)
-                    </span>
-                  )}
+                  <h4 className="text-[13px] font-bold text-slate-900">
+                    Flyer, Video corto o PDF
+                  </h4>
+                  <span className="text-[11px] text-slate-400 font-normal">(Opcional)</span>
                 </div>
+                {mediaFile && (
+                  <button
+                    type="button"
+                    disabled={isSending}
+                    onClick={handleRemoveMediaFile}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-rose-600 hover:text-rose-700"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Quitar archivo</span>
+                  </button>
+                )}
+              </div>
 
-                <div className="flex items-center gap-1.5">
-                  {mediaFile && (
-                    <button
-                      type="button"
-                      disabled={isSending}
-                      onClick={handleRemoveMediaFile}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Quitar</span>
-                    </button>
-                  )}
+              {!mediaFile ? (
+                <button
+                  type="button"
+                  disabled={isSending}
+                  onClick={() => mediaInputRef.current?.click()}
+                  className="w-full px-4 py-3 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/30 hover:bg-indigo-50/70 flex items-center justify-between gap-3 transition text-left group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-2xs shrink-0">
+                      <Upload className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-800 group-hover:text-indigo-700 transition">
+                        Haz clic aquí para subir una imagen (Flyer), video MP4 o PDF
+                      </p>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        Se enviará adjunto junto con el mensaje del Paso 2 · Si no subes nada, se enviará solo texto
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1.5 rounded-lg bg-white border border-slate-200/90 text-xs font-semibold text-indigo-600 shadow-2xs shrink-0">
+                    Subir archivo
+                  </span>
+                </button>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {mediaPreviewUrl && mediaFile.type.startsWith('image/') ? (
+                      <img
+                        src={mediaPreviewUrl}
+                        alt="Flyer"
+                        className="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                        {mediaFile.type.startsWith('video/') ? (
+                          <Video className="w-4 h-4" />
+                        ) : (
+                          <FileText className="w-4 h-4" />
+                        )}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-slate-800 truncate">{mediaFile.name}</p>
+                      <p className="text-[11px] text-slate-400">
+                        {(mediaFile.size / (1024 * 1024)).toFixed(2)} MB · Listo para enviar con el mensaje
+                      </p>
+                    </div>
+                  </div>
                   <button
                     type="button"
                     disabled={isSending}
                     onClick={() => mediaInputRef.current?.click()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-xs font-bold transition"
+                    className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-100 shrink-0"
                   >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>{mediaFile ? 'Cambiar archivo' : 'Subir Flyer / Video / PDF'}</span>
+                    Cambiar
                   </button>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Live WhatsApp Preview (including Flyer/Video if attached) */}
-            <div className="bg-[#F3F4F8] border border-slate-200/90 rounded-xl p-3.5 space-y-1.5">
+            {/* LIVE WHATSAPP PREVIEW */}
+            <div className="bg-white border border-slate-200/90 rounded-xl p-4 space-y-2 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                  Vista previa en WhatsApp para: <b className="text-slate-800">{previewLead.name}</b>
+                  Vista previa en WhatsApp · <span className="text-indigo-600">{previewLead.name}</span>
                 </span>
-                <span className="text-[10px] font-medium text-slate-400">
-                  Haz clic en cualquier prospecto de la izquierda para previsualizar
+                <span className="text-[11px] text-slate-400">
+                  Clic en cualquier prospecto para previsualizar
                 </span>
               </div>
-              <div className="bg-[#DFE3FF] text-slate-900 rounded-xl rounded-br-xs px-3.5 py-2.5 text-[13px] font-normal leading-relaxed shadow-2xs space-y-2">
+
+              <div className="bg-[#EEF0FF]/70 border border-indigo-100 text-slate-800 rounded-xl px-3.5 py-2.5 text-[13px] font-normal leading-relaxed space-y-2">
                 {mediaFile && mediaPreviewUrl && (
-                  <div className="rounded-lg overflow-hidden bg-white/80 border border-indigo-200/60 p-1.5">
+                  <div className="rounded-lg overflow-hidden bg-white border border-slate-200/80 p-1.5">
                     {mediaFile.type.startsWith('image/') ? (
                       <img
                         src={mediaPreviewUrl}
                         alt="Flyer preview"
-                        className="max-h-44 rounded-md object-contain mx-auto"
+                        className="max-h-36 rounded object-contain mx-auto"
                       />
                     ) : mediaFile.type.startsWith('video/') ? (
                       <video
                         src={mediaPreviewUrl}
                         controls
-                        className="max-h-44 rounded-md mx-auto w-full"
+                        className="max-h-36 rounded mx-auto w-full"
                       />
                     ) : (
-                      <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700">
+                      <div className="flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700">
                         <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
                         <span className="truncate">{mediaFile.name}</span>
                       </div>
@@ -1202,42 +1157,10 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
               </div>
             </div>
 
-            {/* Step 3: Campaign Tag & Anti-Ban Pacing */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div className="bg-white border border-slate-200/90 rounded-xl p-3">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  3. Etiqueta de campaña (para medir respuestas)
-                </label>
-                <input
-                  type="text"
-                  disabled={isSending}
-                  value={campaignName}
-                  onChange={(e) => setCampaignName(e.target.value)}
-                  placeholder="Ej. Reactivación · Toque 2"
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none"
-                />
-              </div>
-              <div className="bg-white border border-slate-200/90 rounded-xl p-3">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                  Pausa de seguridad entre cada envío
-                </label>
-                <select
-                  disabled={isSending}
-                  value={delaySeconds}
-                  onChange={(e) => setDelaySeconds(Number(e.target.value))}
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none"
-                >
-                  <option value={8}>Cada 8 segundos (Lotes pequeños &lt; 25)</option>
-                  <option value={10}>Cada 10 segundos (Recomendado)</option>
-                  <option value={15}>Cada 15 segundos (Máxima seguridad)</option>
-                </select>
-              </div>
-            </div>
-
             {/* Live Progress Box when Sending or Finished */}
             {(isSending || isFinished) && (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+              <div className="bg-indigo-50/80 border border-indigo-200 rounded-xl p-3.5 space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-800">
                   <span className="flex items-center gap-2">
                     {isSending ? (
                       <>
@@ -1246,8 +1169,8 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>Envío completado con éxito</span>
+                        <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                        <span>Envío completado</span>
                       </>
                     )}
                   </span>
@@ -1256,7 +1179,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                     {activeBatchLeads.length}
                   </span>
                 </div>
-                <div className="w-full h-2 bg-white rounded-full overflow-hidden border border-indigo-100">
+                <div className="w-full h-1.5 bg-white rounded-full overflow-hidden">
                   <div
                     className="h-full bg-indigo-600 transition-all duration-300"
                     style={{
@@ -1273,12 +1196,24 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
         </div>
 
         {/* ── FOOTER ── */}
-        <div className="px-6 py-3.5 bg-white border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
-          <div className="text-xs font-medium text-slate-500 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-indigo-500" />
-            <span>
-              Se enviarán <b>{activeBatchLeads.length}</b> {mediaFile ? 'mensajes con archivo adjunto' : 'mensajes personalizados'} · Tiempo estimado:{' '}
-              <b>~{Math.max(1, Math.ceil((activeBatchLeads.length * delaySeconds) / 60))} min</b>
+        <div className="px-6 py-3 bg-white border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="w-4 h-4 text-indigo-600" />
+              <span>Pausa segura entre envíos:</span>
+            </span>
+            <select
+              disabled={isSending}
+              value={delaySeconds}
+              onChange={(e) => setDelaySeconds(Number(e.target.value))}
+              className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 focus:outline-none"
+            >
+              <option value={8}>Cada 8s</option>
+              <option value={10}>Cada 10s (Recomendado)</option>
+              <option value={15}>Cada 15s</option>
+            </select>
+            <span className="text-slate-400">
+              · Tiempo estimado: <b className="text-slate-600">~{Math.max(1, Math.ceil((activeBatchLeads.length * delaySeconds) / 60))} min</b>
             </span>
           </div>
 
@@ -1287,7 +1222,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
               <button
                 type="button"
                 onClick={handleStop}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition"
               >
                 <Square className="w-3.5 h-3.5" />
                 <span>Detener envío</span>
@@ -1297,7 +1232,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition"
+                  className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition"
                 >
                   Cerrar
                 </button>
@@ -1305,10 +1240,10 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                   <button
                     type="button"
                     onClick={onGoToWhatsAppChat}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Ver respuestas en Chat WhatsApp</span>
+                    <span>Ver respuestas en el Chat</span>
                   </button>
                 )}
               </>
@@ -1317,7 +1252,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition"
+                  className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium transition"
                 >
                   Cancelar
                 </button>
@@ -1325,13 +1260,13 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                   type="button"
                   disabled={activeBatchLeads.length === 0 || !messageTemplate.trim()}
                   onClick={handleStartBatch}
-                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition"
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold shadow-2xs transition"
                 >
                   <Play className="w-3.5 h-3.5" />
                   <span>
                     {isResendMode
                       ? `Reenviar a ${activeBatchLeads.length} prospectos`
-                      : `Iniciar envío a ${activeBatchLeads.length} prospectos`}
+                      : `Enviar a ${activeBatchLeads.length} prospectos`}
                   </span>
                 </button>
               </>
