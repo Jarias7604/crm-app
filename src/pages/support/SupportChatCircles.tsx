@@ -240,6 +240,7 @@ const LEAD_STATUS_OPTIONS = [
   'En seguimiento',
   'Negociación',
   'Cerrado',
+  'Cliente',
   'Perdido',
   'Erróneo',
 ] as const;
@@ -1404,31 +1405,37 @@ export const SupportChatCircles: React.FC = () => {
     const touchMap: Record<string, ReactivationTouchInfo> = {};
     const seenIds = new Set<string>();
     for (const c of circles) {
-      if (!c.isWhatsApp || !c.isReactivation || c.reactivationReplied) continue;
-      if (c.leadStatus === 'Perdido' || c.leadStatus === 'Erróneo' || c.leadStatus === 'Cerrado') continue;
+      if (!c.isWhatsApp || c.isGroup || c.scope === 'interno' || c.scope === 'spam') continue;
+      if (c.leadStatus === 'Erróneo') continue;
       if (!c.phone || c.phone.length < 8) continue;
       const id = c.leadId || c.activeTicket.id;
       if (seenIds.has(id)) continue;
       seenIds.add(id);
+      const effectiveStatus =
+        c.scope === 'soporte' && (!c.leadStatus || c.leadStatus === 'Prospecto')
+          ? 'Cliente'
+          : c.leadStatus || 'Prospecto';
       pool.push({
         id,
         name: c.clientName,
         company_name: c.clientName,
         phone: c.phone,
         email: null,
-        status: (c.leadStatus || 'Prospecto') as any,
+        status: effectiveStatus as any,
         priority: 'medium' as any,
         value: 0,
         source: 'WhatsApp',
         assigned_to: c.leadOwnerId || c.assignedTechId || profile?.id || null,
-        last_follow_up_at: c.reactivationSentAt,
+        last_follow_up_at: c.reactivationSentAt || c.lastMessageAt,
         created_at: c.activeTicket.created_at,
         contact_count: c.reactivationTouch || 1,
       } as Lead);
       touchMap[id] = {
         touch: c.reactivationTouch || 1,
-        sentAt: c.reactivationSentAt,
+        sentAt: c.reactivationSentAt || c.lastMessageAt,
         hoursSinceSent: c.hoursSinceReactivation,
+        isReactivation: c.isReactivation,
+        replied: c.reactivationReplied,
       };
     }
     return { resendLeadsPool: pool, resendTouchInfoMap: touchMap };

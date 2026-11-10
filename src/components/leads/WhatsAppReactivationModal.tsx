@@ -28,6 +28,8 @@ export interface ReactivationTouchInfo {
   touch: number;
   sentAt: string;
   hoursSinceSent: number;
+  isReactivation?: boolean;
+  replied?: boolean;
 }
 
 interface WhatsAppReactivationModalProps {
@@ -52,6 +54,7 @@ interface WhatsAppReactivationModalProps {
 interface ReactivationTemplate {
   id: string;
   label: string;
+  shortLabel: string;
   subtitle: string;
   tag: string;
   body: string;
@@ -62,6 +65,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
   {
     id: 'toque2_flyer_video',
     label: 'Toque 2 · Valor Visual (Con Flyer o Video)',
+    shortLabel: 'Valor Visual (Flyer/Video)',
     subtitle: 'Ideal para los que no respondieron al Toque 1 · Acompáñalo de un Flyer o Video corto',
     tag: 'Toque 2 · Flyer / Video',
     body: 'Hola {nombre}, sé que a veces los mensajes se pasan por la operación del día. Le comparto un resumen visual de cómo ayudamos a empresas como {empresa} con Facturación Electrónica y control administrativo. ¿Le gustaría que le envíe una cotización o agendamos 10 minutos?',
@@ -70,14 +74,34 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
   {
     id: 'toque2_seguimiento_breve',
     label: 'Toque 2 · Seguimiento breve (+48h)',
+    shortLabel: 'Seguimiento breve',
     subtitle: 'Recordatorio corto y directo para quienes dejaron en visto el primer mensaje',
     tag: 'Toque 2 · Texto corto',
     body: 'Hola {nombre}, le saluda {vendedor}. Le escribo brevemente para dar seguimiento a mi mensaje anterior; ¿pudieron evaluar el sistema en {empresa} o prefiere que le comparta primero los planes y precios por este medio?',
     forResend: true,
   },
   {
+    id: 'nutricion_valor',
+    label: 'En Nutrición · Seguimiento de valor',
+    shortLabel: 'En Nutrición',
+    subtitle: 'Para prospectos que pidieron retomar más adelante (próximo mes o próximo año)',
+    tag: 'Nutrición',
+    body: 'Hola {nombre}, le saluda {vendedor}. Recordando que más adelante retomarán el proyecto en {empresa}, le comparto brevemente esta actualización para que la tengan a mano cuando inicien. Quedo atento a cualquier consulta.',
+    forResend: true,
+  },
+  {
+    id: 'clientes_upsell',
+    label: 'Clientes · Nuevos Servicios / Módulos',
+    shortLabel: 'Clientes (Nuevos servicios)',
+    subtitle: 'Para ofrecer nuevos módulos, actualizaciones o servicios adicionales a clientes actuales',
+    tag: 'Upsell Clientes',
+    body: 'Hola {nombre}, le saluda {vendedor}. Qué gusto saludarle y gracias por su confianza. Queríamos compartirle una novedad de nuevos módulos y servicios disponibles para {empresa}. ¿Le gustaría que le comente los beneficios para clientes actuales?',
+    forResend: true,
+  },
+  {
     id: 'toque3_cierre_amable',
     label: 'Toque 3 · Cierre amable (Último toque)',
+    shortLabel: 'Cierre amable',
     subtitle: 'Aplica psicología inversa para recuperar respuesta antes de pausar el seguimiento',
     tag: 'Toque 3 · Cierre',
     body: 'Hola {nombre}, le saluda {vendedor}. Para no saturar su WhatsApp dejamos en pausa su solicitud por ahora; si más adelante retoman el proyecto en {empresa}, por aquí queda mi contacto directo. ¡Muchos éxitos!',
@@ -86,6 +110,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
   {
     id: 'consultivo_corto',
     label: '1. Pregunta corta consultiva (Toque 1)',
+    shortLabel: 'Pregunta consultiva',
     subtitle: 'Ideal para prospectos que pidieron información y nunca respondieron',
     tag: 'Recomendada · Toque 1',
     body: 'Hola {nombre}, le saluda {vendedor}. Hace un tiempo nos solicitó información sobre nuestros servicios; ¿todavía están evaluando opciones en {empresa} o ya lo resolvieron por ahora?',
@@ -93,6 +118,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
   {
     id: 'seguimiento_propuesta',
     label: '2. Seguimiento de propuesta o cotización',
+    shortLabel: 'Seguimiento propuesta',
     subtitle: 'Para prospectos calificados o en seguimiento que dejaron de contestar',
     tag: 'Seguimiento comercial',
     body: 'Hola {nombre}, le escribe {vendedor}. Quería consultarle brevemente si tuvo oportunidad de revisar la información que conversamos o si le gustaría que ajustemos una propuesta a su necesidad actual.',
@@ -100,6 +126,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
   {
     id: 'cierre_expediente',
     label: '3. Cierre amable de solicitud',
+    shortLabel: 'Cierre amable',
     subtitle: 'Genera respuesta rápida en prospectos fríos de +30 o +60 días',
     tag: 'Respuesta rápida',
     body: 'Hola {nombre}, le saluda {vendedor}. Estoy actualizando las solicitudes pendientes de este mes; ¿mantenemos abierta su consulta o prefiere que la dejemos en pausa por el momento?',
@@ -107,6 +134,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
   {
     id: 'beneficio_implementacion',
     label: '4. Beneficio especial de reactivación',
+    shortLabel: 'Beneficio especial',
     subtitle: 'Para retomar negociaciones detenidas con una condición especial',
     tag: 'Promoción',
     body: 'Hola {nombre}, le saluda {vendedor}. Esta semana habilitamos condiciones especiales para proyectos pendientes y pensé en comentarle por si aún lo tienen en planes. ¿Le gustaría que lo revisemos?',
@@ -122,12 +150,27 @@ function normalizeWhatsAppPhone(raw?: string | null): string {
   return digits.length >= 8 ? digits : '';
 }
 
+function isBusinessStyleName(raw?: string | null): boolean {
+  const clean = String(raw || '')
+    .replace(/\(\+?\d+\)/g, '')
+    .trim();
+  if (!clean) return true;
+  if (/^(sin\s+nombre|contacto|cliente|prospecto|lead|soporte|admin|usuario|desconocido|\+?\d+)/i.test(clean)) {
+    return true;
+  }
+  return /\b(inversiones|lotificaci[oó]n|lotificadora|comedor|constructora|corporaci[oó]n|corp\b|grupo|residencial|tienda|ferreter[ií]a|cl[ií]nica|hotel|restaurante|autolote|auto\s+lote|taller|farmacia|supermercado|distribuidora|importadora|servicios|soluciones|agencia|asociaci[oó]n|fundaci[oó]n|iglesia|colegio|escuela|academia|laboratorio|panader[ií]a|pasteler[ií]a|est[eé]tica|sal[oó]n|barber[ií]a|gym|gimnasio|transporte|transportes|log[ií]stica|inmobiliaria|bienes\s+ra[ií]ces|desarrollos|urbanica|bosque|villas|finca|hacienda|agro|veterinaria|[oó]ptica|dental|odontolog[ií]a|abogados|bufete|contadores|despacho|consultor[ií]a|ingenier[ií]a|arquitectura|proyectos|multitienda|variedades|bazar|librer[ií]a|papeler[ií]a|imprenta|sublimaci[oó]n|publicidad|marketing|tecnolog[ií]a|sistemas|repuestos|lubricantes|llantas|motos|lavander[ií]a|florister[ií]a|eventos|banquetes|catering|seguridad|vigilancia|mantenimiento|refrigeraci[oó]n|el[eé]ctrica|plomer[ií]a|vidrier[ií]a|estructuras|carpinter[ií]a|muebler[ií]a|muebles|textiles|confecciones|bordados|serigraf[ií]a|pl[aá]sticos|empaques|reciclaje|gasolinera|cooperativa|financiera|seguros|corredora|aduana|aduanal|naviera|carga|courier|encomiendas|turismo|viajes|tours|alquiler|bodega|bodegas|almac[eé]n|mayorista|av[ií]cola|granero|granja|beneficio|caf[eé]|cafeter[ií]a|pizzer[ií]a|taquer[ií]a|pupuser[ií]a|asados|mariscos|cevicher[ií]a|spa\b|plaza\b|mercado|sucursal|boutique|s\.a\.|de\s+c\.v\.)\b/i.test(
+    clean
+  );
+}
+
 function extractFirstName(fullName?: string | null): string {
   const clean = String(fullName || '')
     .replace(/\(\+?\d+\)/g, '')
     .trim();
-  if (!clean || /^(contacto|cliente|prospecto|lead)\b/i.test(clean)) return '';
-  return clean.split(/\s+/)[0];
+  if (!clean || isBusinessStyleName(clean)) return '';
+  const first = clean.split(/[\s,.-]+/)[0] || '';
+  if (first.length < 2 || /\d/.test(first)) return '';
+  return first;
 }
 
 function getDaysInactive(lead: Lead): { days: number; neverContacted: boolean; label: string } {
@@ -251,7 +294,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
         : leadsPool;
 
     return source.filter((l) => {
-      if (l.status === 'Cerrado' || l.status === 'Perdido' || l.status === 'Erróneo') return false;
+      if (l.status === 'Erróneo') return false;
       const p = normalizeWhatsAppPhone(l.phone);
       return p.length >= 8;
     });
@@ -261,16 +304,67 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     if (touchInfoByLeadId[lead.id]) return touchInfoByLeadId[lead.id];
     const lastTouch = lead.last_follow_up_at || lead.created_at || new Date().toISOString();
     const hours = Math.max(0, Math.floor((Date.now() - new Date(lastTouch).getTime()) / (1000 * 60 * 60)));
-    return { touch: 1, sentAt: lastTouch, hoursSinceSent: hours };
+    return { touch: 1, sentAt: lastTouch, hoursSinceSent: hours, isReactivation: true, replied: false };
   };
 
+  const isLeadMatchingStage = (lead: Lead, targetStage: string): boolean => {
+    const tInfo = getLeadTouchInfo(lead);
+    if (targetStage === 'all') {
+      if (['Perdido', 'Erróneo', 'Cerrado', 'Cliente'].includes(lead.status)) return false;
+      if (isResendMode && (tInfo.isReactivation === false || tInfo.replied)) return false;
+      return true;
+    }
+    if (targetStage === 'Prospecto' || targetStage === 'Llamada fría') {
+      if (lead.status !== targetStage) return false;
+      if (isResendMode && (tInfo.isReactivation === false || tInfo.replied)) return false;
+      return true;
+    }
+    if (targetStage === 'Cliente_Cerrado') {
+      return lead.status === 'Cliente' || lead.status === 'Cerrado';
+    }
+    return lead.status === targetStage;
+  };
+
+  const stageCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: 0,
+      Prospecto: 0,
+      'Llamada fría': 0,
+      'En Nutrición': 0,
+      'Lead calificado': 0,
+      'En seguimiento': 0,
+      Negociación: 0,
+      Cliente: 0,
+      Cerrado: 0,
+      Cliente_Cerrado: 0,
+      Perdido: 0,
+    };
+    for (const l of baseLeadsWithPhone) {
+      if (isLeadMatchingStage(l, 'all')) counts.all++;
+      if (isLeadMatchingStage(l, 'Prospecto')) counts.Prospecto++;
+      if (isLeadMatchingStage(l, 'Llamada fría')) counts['Llamada fría']++;
+      if (isLeadMatchingStage(l, 'En Nutrición')) counts['En Nutrición']++;
+      if (isLeadMatchingStage(l, 'Lead calificado')) counts['Lead calificado']++;
+      if (isLeadMatchingStage(l, 'En seguimiento')) counts['En seguimiento']++;
+      if (isLeadMatchingStage(l, 'Negociación')) counts.Negociación++;
+      if (isLeadMatchingStage(l, 'Cliente')) counts.Cliente++;
+      if (isLeadMatchingStage(l, 'Cerrado')) counts.Cerrado++;
+      if (isLeadMatchingStage(l, 'Cliente_Cerrado')) counts.Cliente_Cerrado++;
+      if (isLeadMatchingStage(l, 'Perdido')) counts.Perdido++;
+    }
+    return counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseLeadsWithPhone, isResendMode, touchInfoByLeadId]);
+
   const resendCounts = useMemo(() => {
+    let all = 0;
     let ready48 = 0;
     let ready72 = 0;
     let under48 = 0;
     let maxHoursUnder48 = 0;
     for (const l of baseLeadsWithPhone) {
-      if (stageFilter !== 'all' && l.status !== stageFilter) continue;
+      if (!isLeadMatchingStage(l, stageFilter)) continue;
+      all++;
       const tInfo = getLeadTouchInfo(l);
       if (tInfo.hoursSinceSent >= 48) {
         ready48++;
@@ -282,7 +376,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     }
     const hoursUntilNextReady = under48 > 0 ? Math.max(1, 48 - maxHoursUnder48) : 0;
     return {
-      all: baseLeadsWithPhone.length,
+      all,
       ready48,
       ready72,
       under48,
@@ -294,17 +388,21 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   // If in resend mode and nobody has reached 48h yet, automatically show 'all' so the user sees why they're in cooldown
   useEffect(() => {
     if (isResendMode && isOpen) {
-      if (resendCounts.ready48 === 0 && resendCounts.all > 0) {
+      if (stageFilter !== 'all' && stageFilter !== 'Prospecto' && stageFilter !== 'Llamada fría') {
+        setResendTimingFilter('all');
+      } else if (resendCounts.ready48 === 0 && resendCounts.all > 0) {
         setResendTimingFilter('all');
       } else {
         setResendTimingFilter('ready48');
       }
     }
-  }, [isResendMode, isOpen, resendCounts.ready48, resendCounts.all]);
+  }, [isResendMode, isOpen, stageFilter, resendCounts.ready48, resendCounts.all]);
 
   // Filtered by inactivity/resend timing + stage + search
   const matchingLeads = useMemo(() => {
     return baseLeadsWithPhone.filter((l) => {
+      if (!isLeadMatchingStage(l, stageFilter)) return false;
+
       if (isResendMode) {
         const tInfo = getLeadTouchInfo(l);
         if (resendTimingFilter === 'ready48' && tInfo.hoursSinceSent < 48) return false;
@@ -318,8 +416,6 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
         if (inactivityFilter === '60d' && info.days < 60) return false;
         if (inactivityFilter === '90d' && info.days < 90) return false;
       }
-
-      if (stageFilter !== 'all' && l.status !== stageFilter) return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -347,13 +443,15 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
 
   // Counts per inactivity bucket for quick badges
   const bucketCounts = useMemo(() => {
+    let all = 0;
     let never = 0;
     let d15 = 0;
     let d30 = 0;
     let d60 = 0;
     let d90 = 0;
     for (const l of baseLeadsWithPhone) {
-      if (stageFilter !== 'all' && l.status !== stageFilter) continue;
+      if (!isLeadMatchingStage(l, stageFilter)) continue;
+      all++;
       const info = getDaysInactive(l);
       if (info.neverContacted) never++;
       if (info.days >= 15) d15++;
@@ -361,13 +459,20 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       if (info.days >= 60) d60++;
       if (info.days >= 90) d90++;
     }
-    return { all: baseLeadsWithPhone.length, never, d15, d30, d60, d90 };
+    return { all, never, d15, d30, d60, d90 };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseLeadsWithPhone, stageFilter]);
 
   const renderPersonalizedMessage = (lead: Lead, templateText: string): string => {
     const firstName = extractFirstName(lead.name);
-    const company =
-      lead.company_name && lead.company_name !== 'Individual' ? lead.company_name.trim() : 'su empresa';
+    const rawCompany = (lead.company_name || '').trim();
+    const rawName = (lead.name || '').trim();
+    let company = 'su empresa';
+    if (rawCompany && rawCompany !== 'Individual' && rawCompany.toLowerCase() !== rawName.toLowerCase()) {
+      company = rawCompany;
+    } else if (isBusinessStyleName(rawName) && !/^(sin\s+nombre|contacto|cliente|prospecto|lead)/i.test(rawName)) {
+      company = rawName;
+    }
     let text = templateText
       .replace(/\{nombre\}/gi, firstName ? firstName : '')
       .replace(/\{empresa\}/gi, company)
@@ -668,8 +773,44 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     if (isResendMode) {
       return DEFAULT_TEMPLATES.filter((t) => t.forResend);
     }
-    return DEFAULT_TEMPLATES.filter((t) => !t.forResend);
+    return DEFAULT_TEMPLATES.filter(
+      (t) => !t.forResend || t.id === 'nutricion_valor' || t.id === 'clientes_upsell'
+    );
   }, [isResendMode]);
+
+  const handleChangeStageFilter = (nextStage: string) => {
+    setStageFilter(nextStage);
+    setExcludedIds(new Set());
+    if (nextStage === 'En Nutrición') {
+      const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'nutricion_valor');
+      if (tpl) {
+        setSelectedTemplateId(tpl.id);
+        setMessageTemplate(tpl.body);
+      }
+      setCampaignName('Nutrición · Seguimiento');
+    } else if (nextStage === 'Cliente' || nextStage === 'Cerrado' || nextStage === 'Cliente_Cerrado') {
+      const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'clientes_upsell');
+      if (tpl) {
+        setSelectedTemplateId(tpl.id);
+        setMessageTemplate(tpl.body);
+      }
+      setCampaignName('Clientes · Nuevos Servicios');
+    } else if (nextStage === 'Lead calificado' || nextStage === 'En seguimiento' || nextStage === 'Negociación') {
+      const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'seguimiento_propuesta');
+      if (tpl) {
+        setSelectedTemplateId(tpl.id);
+        setMessageTemplate(tpl.body);
+      }
+      setCampaignName(`Seguimiento · ${nextStage}`);
+    } else if (isResendMode) {
+      const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'toque2_flyer_video');
+      if (tpl) {
+        setSelectedTemplateId(tpl.id);
+        setMessageTemplate(tpl.body);
+      }
+      setCampaignName('Reactivación · Toque 2');
+    }
+  };
 
   const formatHoursElapsed = (hours: number): string => {
     if (hours < 1) return 'Hace <1h';
@@ -690,7 +831,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
             <div className="min-w-0">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h3 className="text-[15px] font-bold text-slate-900 tracking-tight">
-                  {isResendMode ? 'Reenvío a Prospectos Sin Responder' : 'Reactivación de Prospectos por WhatsApp'}
+                  {isResendMode ? 'Reenvío y Campañas por Etapa' : 'Reactivación de Prospectos por WhatsApp'}
                 </h3>
                 {isResendMode && (
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70">
@@ -702,7 +843,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
               </div>
               <p className="text-xs text-slate-500 truncate mt-0.5">
                 {isResendMode
-                  ? 'Sigue los 3 pasos: 1. Confirma destinatarios · 2. Ajusta el mensaje · 3. Adjunta tu Flyer o Video (opcional)'
+                  ? 'Sigue los 3 pasos: 1. Elige etapa y destinatarios · 2. Ajusta el mensaje · 3. Adjunta Flyer o Video (opcional)'
                   : 'Sigue los 3 pasos: 1. Filtra destinatarios · 2. Elige plantilla · 3. Adjunta Flyer o Video (opcional)'}
               </p>
             </div>
@@ -788,22 +929,28 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               disabled={isSending}
               value={stageFilter}
-              onChange={(e) => {
-                setStageFilter(e.target.value);
-                setExcludedIds(new Set());
-              }}
-              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/90 text-xs font-medium text-slate-700 focus:outline-none"
+              onChange={(e) => handleChangeStageFilter(e.target.value)}
+              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/90 text-xs font-semibold text-slate-700 focus:outline-none"
             >
-              <option value="all">Todas las etapas</option>
-              <option value="Prospecto">Prospecto</option>
-              <option value="Llamada fría">Llamada fría</option>
-              <option value="Calificado">Calificado</option>
-              <option value="En seguimiento">En seguimiento</option>
-              <option value="Negociación">Negociación</option>
+              <option value="all">
+                {isResendMode
+                  ? `Etapas activas · Sin responder (${stageCounts.all})`
+                  : `Todas las etapas activas (${stageCounts.all})`}
+              </option>
+              <option value="Prospecto">Prospecto ({stageCounts.Prospecto})</option>
+              <option value="Llamada fría">Llamada fría ({stageCounts['Llamada fría']})</option>
+              <option value="En Nutrición">En Nutrición ({stageCounts['En Nutrición']})</option>
+              <option value="Lead calificado">Lead calificado ({stageCounts['Lead calificado']})</option>
+              <option value="En seguimiento">En seguimiento ({stageCounts['En seguimiento']})</option>
+              <option value="Negociación">Negociación ({stageCounts.Negociación})</option>
+              <option value="Cliente_Cerrado">Clientes / Cerrados ({stageCounts.Cliente_Cerrado})</option>
+              <option value="Cliente">Solo estado: Cliente ({stageCounts.Cliente})</option>
+              <option value="Cerrado">Solo estado: Cerrado ({stageCounts.Cerrado})</option>
+              <option value="Perdido">Perdido ({stageCounts.Perdido})</option>
             </select>
 
             <select
@@ -864,9 +1011,9 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
               {limitedLeads.length === 0 ? (
                 <div className="p-8 text-center space-y-1.5">
                   <Users className="w-5 h-5 text-slate-300 mx-auto" />
-                  <p className="text-xs font-semibold text-slate-600">No hay prospectos en este filtro.</p>
+                  <p className="text-xs font-semibold text-slate-600">No hay contactos en este filtro.</p>
                   <p className="text-[11px] text-slate-400">
-                    Cambia la pestaña superior para ver otros prospectos.
+                    Cambia la etapa o la pestaña de tiempo superior.
                   </p>
                 </div>
               ) : (
@@ -877,6 +1024,10 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                   const inactivity = getDaysInactive(lead);
                   const touchInfo = isResendMode ? getLeadTouchInfo(lead) : null;
                   const cleanPhone = normalizeWhatsAppPhone(lead.phone);
+                  const hasDistinctCompany =
+                    lead.company_name &&
+                    lead.company_name !== 'Individual' &&
+                    lead.company_name.trim().toLowerCase() !== (lead.name || '').trim().toLowerCase();
 
                   return (
                     <div
@@ -921,9 +1072,8 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                           </div>
                           <div className="text-[11px] text-slate-400 truncate">
                             +{cleanPhone}
-                            {lead.company_name && lead.company_name !== 'Individual'
-                              ? ` · ${lead.company_name}`
-                              : ''}
+                            {hasDistinctCompany ? ` · ${lead.company_name}` : ''}
+                            {lead.status ? ` · ${lead.status}` : ''}
                           </div>
                         </div>
                       </div>
@@ -958,40 +1108,37 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
           {/* ── RIGHT COLUMN (7 cols): STEP 2 (MESSAGE) + STEP 3 (FLYER/VIDEO) + PREVIEW ── */}
           <div className="lg:col-span-7 flex flex-col min-h-0 bg-[#F8F9FC] overflow-y-auto p-5 space-y-3.5">
             {/* STEP 2: MESSAGE & COMPACT TEMPLATES */}
-            <div className="bg-white border border-slate-200/90 rounded-xl p-4 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="bg-white border border-slate-200/90 rounded-xl p-4 space-y-2.5 shadow-2xs">
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">
                     2
                   </span>
                   <h4 className="text-[13px] font-bold text-slate-900">Mensaje a enviar</h4>
                 </div>
+                <span className="text-[11px] text-slate-400">Elige una plantilla o escribe tu mensaje</span>
+              </div>
 
-                {/* Single-row template pills */}
-                <div className="flex items-center gap-1 flex-wrap">
-                  {visibleTemplates.map((tpl) => {
-                    const active = selectedTemplateId === tpl.id;
-                    const shortLabel = tpl.label
-                      .replace(/^Toque \d+ · /i, '')
-                      .replace(/^\d+\.\s*/, '')
-                      .replace(/\s*\(.*?\)\s*/g, '');
-                    return (
-                      <button
-                        key={tpl.id}
-                        type="button"
-                        disabled={isSending}
-                        onClick={() => handleSelectTemplate(tpl)}
-                        className={`px-2.5 py-1 rounded-lg text-[11.5px] transition ${
-                          active
-                            ? 'bg-indigo-600 text-white font-semibold shadow-2xs'
-                            : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600 font-medium'
-                        }`}
-                      >
-                        {shortLabel}
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Dedicated row of template pills */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {visibleTemplates.map((tpl) => {
+                  const active = selectedTemplateId === tpl.id;
+                  return (
+                    <button
+                      key={tpl.id}
+                      type="button"
+                      disabled={isSending}
+                      onClick={() => handleSelectTemplate(tpl)}
+                      className={`px-2.5 py-1 rounded-lg text-[11.5px] transition ${
+                        active
+                          ? 'bg-indigo-600 text-white font-semibold shadow-2xs'
+                          : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600 font-medium'
+                      }`}
+                    >
+                      {tpl.shortLabel}
+                    </button>
+                  );
+                })}
               </div>
 
               <textarea
