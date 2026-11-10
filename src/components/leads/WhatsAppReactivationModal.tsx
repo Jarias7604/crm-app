@@ -40,6 +40,7 @@ interface WhatsAppReactivationModalProps {
   initialInactivityFilter?: 'all' | 'never' | '15d' | '30d' | '60d' | '90d';
   mode?: 'initial' | 'resend';
   touchInfoByLeadId?: Record<string, ReactivationTouchInfo>;
+  alreadyInCampaignLeadIds?: string[];
   companyId: string;
   currentUser: {
     id: string;
@@ -194,6 +195,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   initialInactivityFilter = 'all',
   mode = 'initial',
   touchInfoByLeadId = {},
+  alreadyInCampaignLeadIds = [],
   companyId,
   currentUser,
   defaultCampaignName = 'Reactivación WhatsApp',
@@ -212,6 +214,8 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [batchLimit, setBatchLimit] = useState<number>(30);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [hideAlreadyInCampaign, setHideAlreadyInCampaign] = useState<boolean>(true);
+  const alreadyInCampaignSet = useMemo(() => new Set(alreadyInCampaignLeadIds), [alreadyInCampaignLeadIds]);
 
   const [campaignName, setCampaignName] = useState(
     isResendMode ? 'Reactivación · Toque 2' : defaultCampaignName
@@ -287,6 +291,11 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   }, [currentUser.full_name]);
 
   // Base pool: if user manually checked specific rows on the table, respect that pool; otherwise use all leads in view with valid phone
+  const alreadyInCampaignPoolCount = useMemo(() => {
+    if (isResendMode || alreadyInCampaignSet.size === 0) return 0;
+    return leadsPool.filter((l) => alreadyInCampaignSet.has(l.id)).length;
+  }, [isResendMode, alreadyInCampaignSet, leadsPool]);
+
   const baseLeadsWithPhone = useMemo(() => {
     const source =
       preSelectedLeadIds.length > 0 && preSelectedLeadIds.length < leadsPool.length
@@ -295,10 +304,11 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
 
     return source.filter((l) => {
       if (l.status === 'Erróneo') return false;
+      if (!isResendMode && hideAlreadyInCampaign && alreadyInCampaignSet.has(l.id)) return false;
       const p = normalizeWhatsAppPhone(l.phone);
       return p.length >= 8;
     });
-  }, [leadsPool, preSelectedLeadIds]);
+  }, [leadsPool, preSelectedLeadIds, isResendMode, hideAlreadyInCampaign, alreadyInCampaignSet]);
 
   const getLeadTouchInfo = (lead: Lead): ReactivationTouchInfo => {
     if (touchInfoByLeadId[lead.id]) return touchInfoByLeadId[lead.id];
@@ -833,12 +843,29 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                 <h3 className="text-[15px] font-bold text-slate-900 tracking-tight">
                   {isResendMode ? 'Reenvío y Campañas por Etapa' : 'Reactivación de Prospectos por WhatsApp'}
                 </h3>
-                {isResendMode && (
+                {isResendMode ? (
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70">
                     {resendCounts.ready48 > 0
                       ? `${resendCounts.ready48} listos (+48h cumplidas)`
                       : `En espera (<48h · faltan ~${resendCounts.hoursUntilNextReady}h)`}
                   </span>
+                ) : (
+                  alreadyInCampaignPoolCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setHideAlreadyInCampaign((v) => !v)}
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition ${
+                        hideAlreadyInCampaign
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200/70'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                      }`}
+                      title="Clic para alternar si se ocultan los prospectos que ya están en tu campaña de WhatsApp"
+                    >
+                      {hideAlreadyInCampaign
+                        ? `Ocultando ${alreadyInCampaignPoolCount} ya en campaña WA`
+                        : `Mostrando también ${alreadyInCampaignPoolCount} ya en campaña WA`}
+                    </button>
+                  )
                 )}
               </div>
               <p className="text-xs text-slate-500 truncate mt-0.5">

@@ -31,6 +31,7 @@ interface LeadTableProps {
     storageService: any;
     navigate: any;
     products: LeadProduct[];
+    waCampaignByLeadId?: Record<string, { touch: number; campaign: string; sentAt?: string }>;
 }
 
 export const LeadTable: React.FC<LeadTableProps> = ({
@@ -54,6 +55,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
     storageService,
     navigate,
     products,
+    waCampaignByLeadId,
 }) => {
     return (
         <table
@@ -363,6 +365,14 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                                         title={`♻️ Recuperado desde "${lead.reengaged_from}" vía ${lead.reengaged_via?.toUpperCase()} — ${lead.reengaged_at ? new Date(lead.reengaged_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}`}
                                                                                     >
                                                                                         ♻️ Recuperado
+                                                                                    </span>
+                                                                                )}
+                                                                                {waCampaignByLeadId?.[lead.id] && (
+                                                                                    <span
+                                                                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0"
+                                                                                        title={`Ya enviado en campaña WhatsApp (${waCampaignByLeadId[lead.id].campaign}) · Toque ${waCampaignByLeadId[lead.id].touch}`}
+                                                                                    >
+                                                                                        WA · Toque {waCampaignByLeadId[lead.id].touch}
                                                                                     </span>
                                                                                 )}
                                                                             </div>

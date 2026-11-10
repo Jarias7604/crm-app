@@ -149,7 +149,59 @@ export default function Leads() {
     const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
     const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
     const [inactivityFilter, setInactivityFilter] = useState<'all' | 'never' | '15d' | '30d' | '60d' | '90d'>('all');
+    const [waCampaignFilter, setWaCampaignFilter] = useState<'all' | 'not_sent' | 'sent'>('all');
+    const [waCampaignTickets, setWaCampaignTickets] = useState<any[]>([]);
     const [isWaReactivationOpen, setIsWaReactivationOpen] = useState(false);
+
+    const loadWaCampaignTickets = async () => {
+        if (!activeCompanyId) return;
+        try {
+            const { data } = await supabase
+                .from('tickets')
+                .select('id, lead_id, metadata')
+                .eq('company_id', activeCompanyId)
+                .eq('metadata->>wa_reactivation', 'true')
+                .limit(2000);
+            setWaCampaignTickets(data || []);
+        } catch {
+            // non-blocking
+        }
+    };
+
+    useEffect(() => {
+        loadWaCampaignTickets();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeCompanyId]);
+
+    const waCampaignByLeadId = useMemo(() => {
+        const byLeadId: Record<string, { touch: number; campaign: string; sentAt?: string }> = {};
+        const byPhone8: Record<string, { touch: number; campaign: string; sentAt?: string }> = {};
+        for (const t of waCampaignTickets) {
+            const m = (t.metadata || {}) as Record<string, any>;
+            if (m.merged_into || m.is_group) continue;
+            const info = {
+                touch: Number(m.wa_reactivation_touch || 1),
+                campaign: String(m.wa_reactivation_campaign || 'Campaña WhatsApp'),
+                sentAt: String(m.wa_reactivation_sent_at || ''),
+            };
+            if (t.lead_id) {
+                byLeadId[t.lead_id] = info;
+            }
+            const ph = String(m.whatsapp_phone || '').replace(/\D/g, '');
+            if (ph.length >= 8) {
+                byPhone8[ph.slice(-8)] = info;
+            }
+        }
+        const result: Record<string, { touch: number; campaign: string; sentAt?: string }> = { ...byLeadId };
+        for (const l of leads) {
+            if (result[l.id]) continue;
+            const ph = String(l.phone || '').replace(/\D/g, '');
+            if (ph.length >= 8 && byPhone8[ph.slice(-8)]) {
+                result[l.id] = byPhone8[ph.slice(-8)];
+            }
+        }
+        return result;
+    }, [waCampaignTickets, leads]);
     const [sortConfig, setSortConfig] = useState<{ key: keyof Lead | 'value'; direction: 'asc' | 'desc' } | null>(null);
 
     // All available columns with labels
@@ -778,12 +830,36 @@ export default function Leads() {
                 }
             }
 
+            if (waCampaignFilter === 'not_sent') {
+                if (waCampaignByLeadId[lead.id]) return false;
+                const phoneDigits = String(lead.phone || '').replace(/\D/g, '');
+                if (phoneDigits.length < 8) return false;
+            } else if (waCampaignFilter === 'sent') {
+                if (!waCampaignByLeadId[lead.id]) return false;
+            }
+
             return true;
         });
 
         // Apply pipeline intelligence filter on top of standard filters
         return applyPipelineFilter(base, pipelineFilter, profile?.company_id);
-    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, industryFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, uncontactedOnly, inactivityFilter, pipelineFilter, pipelineView]);
+    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, industryFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, uncontactedOnly, inactivityFilter, waCampaignFilter, waCampaignByLeadId, pipelineFilter, pipelineView]);
+
+    const waCampaignCounts = useMemo(() => {
+        let notSent = 0;
+        let sent = 0;
+        for (const l of leads) {
+            if (!canViewAllLeads && l.assigned_to !== profile?.id) continue;
+            if (l.status === 'Erróneo' || l.status === 'Perdido') continue;
+            if (waCampaignByLeadId[l.id]) {
+                sent++;
+            } else {
+                const phoneDigits = String(l.phone || '').replace(/\D/g, '');
+                if (phoneDigits.length >= 8) notSent++;
+            }
+        }
+        return { notSent, sent };
+    }, [leads, canViewAllLeads, profile?.id, waCampaignByLeadId]);
 
     // Leads that have passed ALL filters EXCEPT the pipeline chip filter.
     // Used so chip counters respect the active date/status/priority filters.
@@ -1813,10 +1889,46 @@ export default function Leads() {
                                 {opt.label}
                             </button>
                         ))}
+
+                        <div className="w-px h-5 bg-slate-200 mx-1 hidden sm:block shrink-0" />
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setWaCampaignFilter((prev) => (prev === 'not_sent' ? 'all' : 'not_sent'));
+                                setSelectedLeadIds([]);
+                            }}
+                            className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] transition inline-flex items-center gap-1 ${
+                                waCampaignFilter === 'not_sent'
+                                    ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                                    : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70 font-semibold'
+                            }`}
+                            title="Muestra únicamente prospectos a los que todavía NUNCA les has enviado campaña de WhatsApp"
+                        >
+                            <span>Sin campaña WA ({waCampaignCounts.notSent})</span>
+                        </button>
+
+                        {waCampaignCounts.sent > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setWaCampaignFilter((prev) => (prev === 'sent' ? 'all' : 'sent'));
+                                    setSelectedLeadIds([]);
+                                }}
+                                className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] transition inline-flex items-center gap-1 ${
+                                    waCampaignFilter === 'sent'
+                                        ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                                        : 'bg-indigo-50/70 text-indigo-700 border border-indigo-200/70 hover:bg-indigo-100/70 font-semibold'
+                                }`}
+                                title="Muestra los prospectos que ya fueron incluidos en una campaña de WhatsApp"
+                            >
+                                <span>Ya en campaña WA ({waCampaignCounts.sent})</span>
+                            </button>
+                        )}
                     </div>
 
-                    {/* Quick 1-click Reactivation Batch Trigger when filtering inactive leads */}
-                    {inactivityFilter !== 'all' && filteredLeads.length > 0 && (
+                    {/* Quick 1-click Reactivation Batch Trigger */}
+                    {(inactivityFilter !== 'all' || waCampaignFilter === 'not_sent' || selectedLeadIds.length > 0) && filteredLeads.length > 0 && (
                         <button
                             type="button"
                             onClick={() => {
@@ -2188,6 +2300,7 @@ export default function Leads() {
                                             storageService={storageService}
                                             navigate={navigate}
                                             products={products}
+                                            waCampaignByLeadId={waCampaignByLeadId}
                                         />
                                     </div>
                                 </div>
@@ -3034,6 +3147,7 @@ export default function Leads() {
                     leadsPool={filteredLeads.length > 0 ? filteredLeads : leads}
                     preSelectedLeadIds={selectedLeadIds}
                     initialInactivityFilter={inactivityFilter}
+                    alreadyInCampaignLeadIds={Object.keys(waCampaignByLeadId)}
                     companyId={activeCompanyId}
                     currentUser={{
                         id: profile.id,
@@ -3049,6 +3163,7 @@ export default function Leads() {
                     }
                     onCompleted={() => {
                         loadLeads();
+                        loadWaCampaignTickets();
                     }}
                     onGoToWhatsAppChat={() => {
                         setIsWaReactivationOpen(false);
