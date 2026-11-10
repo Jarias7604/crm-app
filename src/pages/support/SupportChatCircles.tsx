@@ -62,6 +62,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LiveDemoHUDModal, parseAriasAnswersFromNotes } from '../../components/leads/LiveDemoHUDModal';
+import { WhatsAppReactivationModal, type ReactivationTouchInfo } from '../../components/leads/WhatsAppReactivationModal';
+import type { Lead } from '../../types';
 import NewFollowUpModal from '../../components/NewFollowUpModal';
 import GoogleMeetScheduler from '../../components/GoogleMeetScheduler';
 import { supabase } from '../../services/supabase';
@@ -242,7 +244,7 @@ const LEAD_STATUS_OPTIONS = [
   'Erróneo',
 ] as const;
 
-type LeadStageSubFilter = 'activos' | 'conversando' | 'perdidos' | 'erroneos' | 'todos';
+type LeadStageSubFilter = 'activos' | 'sin_responder' | 'conversando' | 'perdidos' | 'erroneos' | 'todos';
 
 // Web Audio API synthesizer — zero external audio files, works across all modern browsers.
 let sharedAudioCtx: AudioContext | null = null;
@@ -380,6 +382,9 @@ interface SupportCircle {
   isReactivation: boolean;
   reactivationCampaign: string | null;
   reactivationReplied: boolean;
+  reactivationSentAt: string;
+  reactivationTouch: number;
+  hoursSinceReactivation: number;
   hasActiveConversation: boolean;
 }
 
@@ -688,6 +693,7 @@ export const SupportChatCircles: React.FC = () => {
   const [showNewFollowUpModal, setShowNewFollowUpModal] = useState<boolean>(false);
   const [showMeetSchedulerModal, setShowMeetSchedulerModal] = useState<boolean>(false);
   const [showStagePopover, setShowStagePopover] = useState<boolean>(false);
+  const [showResendReactivationModal, setShowResendReactivationModal] = useState<boolean>(false);
 
   // Handle return from CotizadorPro with active chat & newly generated quote
   useEffect(() => {
@@ -1093,6 +1099,15 @@ export const SupportChatCircles: React.FC = () => {
         : 0;
       const isReactivation = Boolean(meta.wa_reactivation || activeMeta.wa_reactivation);
       const reactivationCampaign = String(meta.wa_reactivation_campaign || activeMeta.wa_reactivation_campaign || '').trim() || null;
+      const reactivationSentAt = String(
+        meta.wa_reactivation_sent_at || activeMeta.wa_reactivation_sent_at || latest.created_at || lastMessageAt
+      );
+      const reactivationTouch = Number(
+        meta.wa_reactivation_touch || activeMeta.wa_reactivation_touch || (isReactivation ? 1 : 0)
+      );
+      const hoursSinceReactivation = isReactivation
+        ? Math.max(0, Math.floor((Date.now() - new Date(reactivationSentAt).getTime()) / 3600000))
+        : 0;
       const hasClientLine = descLines.some((l) => l.includes('👤'));
       const staffLineCount = descLines.filter((l) => l.includes('👨‍💻')).length;
       const reactivationReplied =
@@ -1165,6 +1180,9 @@ export const SupportChatCircles: React.FC = () => {
         isReactivation,
         reactivationCampaign,
         reactivationReplied,
+        reactivationSentAt,
+        reactivationTouch,
+        hoursSinceReactivation,
         hasActiveConversation,
       });
     });
@@ -1348,6 +1366,9 @@ export const SupportChatCircles: React.FC = () => {
       return false;
     });
     let activos = 0;
+    let sinResponder = 0;
+    let readyForResend48h = 0;
+    let maxHoursUnder48 = 0;
     let conversando = 0;
     let perdidos = 0;
     let erroneos = 0;
@@ -1358,15 +1379,60 @@ export const SupportChatCircles: React.FC = () => {
       else if (isErroneo) erroneos++;
       else {
         if (circleFilter === 'reactivados') {
-          if (c.reactivationReplied) activos++;
+          if (c.reactivationReplied) {
+            activos++;
+          } else {
+            sinResponder++;
+            if (c.hoursSinceReactivation >= 48) {
+              readyForResend48h++;
+            } else if (c.hoursSinceReactivation > maxHoursUnder48) {
+              maxHoursUnder48 = c.hoursSinceReactivation;
+            }
+          }
         } else {
           activos++;
         }
         if (c.hasActiveConversation) conversando++;
       }
     }
-    return { activos, conversando, perdidos, erroneos, todos: base.length };
+    const minHoursUntil48h = sinResponder > 0 && readyForResend48h === 0 ? Math.max(1, 48 - maxHoursUnder48) : 0;
+    return { activos, sinResponder, readyForResend48h, minHoursUntil48h, conversando, perdidos, erroneos, todos: base.length };
   }, [circles, circleFilter]);
+
+  const { resendLeadsPool, resendTouchInfoMap } = useMemo(() => {
+    const pool: Lead[] = [];
+    const touchMap: Record<string, ReactivationTouchInfo> = {};
+    const seenIds = new Set<string>();
+    for (const c of circles) {
+      if (!c.isWhatsApp || !c.isReactivation || c.reactivationReplied) continue;
+      if (c.leadStatus === 'Perdido' || c.leadStatus === 'Erróneo' || c.leadStatus === 'Cerrado') continue;
+      if (!c.phone || c.phone.length < 8) continue;
+      const id = c.leadId || c.activeTicket.id;
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+      pool.push({
+        id,
+        name: c.clientName,
+        company_name: c.clientName,
+        phone: c.phone,
+        email: null,
+        status: (c.leadStatus || 'Prospecto') as any,
+        priority: 'medium' as any,
+        value: 0,
+        source: 'WhatsApp',
+        assigned_to: c.leadOwnerId || c.assignedTechId || profile?.id || null,
+        last_follow_up_at: c.reactivationSentAt,
+        created_at: c.activeTicket.created_at,
+        contact_count: c.reactivationTouch || 1,
+      } as Lead);
+      touchMap[id] = {
+        touch: c.reactivationTouch || 1,
+        sentAt: c.reactivationSentAt,
+        hoursSinceSent: c.hoursSinceReactivation,
+      };
+    }
+    return { resendLeadsPool: pool, resendTouchInfoMap: touchMap };
+  }, [circles, profile?.id]);
 
   const filteredCircles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -1395,6 +1461,8 @@ export const SupportChatCircles: React.FC = () => {
         if (leadSubFilter === 'activos') {
           if (isPerdido || isErroneo) return false;
           if (circleFilter === 'reactivados' && !c.reactivationReplied) return false;
+        } else if (leadSubFilter === 'sin_responder') {
+          if (isPerdido || isErroneo || c.reactivationReplied) return false;
         } else if (leadSubFilter === 'conversando') {
           if (isPerdido || isErroneo || !c.hasActiveConversation) return false;
         } else if (leadSubFilter === 'perdidos') {
@@ -1421,6 +1489,9 @@ export const SupportChatCircles: React.FC = () => {
 
     if (circleFilter === 'reactivados' || circleFilter === 'lead') {
       return [...res].sort((a, b) => {
+        if (circleFilter === 'reactivados' && leadSubFilter === 'sin_responder') {
+          return b.hoursSinceReactivation - a.hoursSinceReactivation;
+        }
         if (circleFilter === 'reactivados' && a.reactivationReplied !== b.reactivationReplied) {
           return a.reactivationReplied ? -1 : 1;
         }
@@ -3348,16 +3419,63 @@ export const SupportChatCircles: React.FC = () => {
             </div>
 
             {(circleFilter === 'reactivados' || circleFilter === 'lead') && (
-              <div className="pt-1 border-t border-slate-100 space-y-1">
+              <div className="pt-1 border-t border-slate-100 space-y-1.5">
                 {circleFilter === 'reactivados' && counts.reactivatedTotal > 0 && (
-                  <div className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-between text-[12px] text-slate-600">
-                    <span>
-                      Enviados: <b className="text-slate-800">{counts.reactivatedTotal}</b> · Respondieron:{' '}
-                      <b className="text-slate-900">{counts.reactivatedReplied}</b>
-                    </span>
-                    <span className="font-bold text-indigo-700">
-                      {Math.round((counts.reactivatedReplied / Math.max(1, counts.reactivatedTotal)) * 100)}% respuesta
-                    </span>
+                  <div className="space-y-1">
+                    <div className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-between text-[12px] text-slate-600">
+                      <span>
+                        Enviados: <b className="text-slate-800">{counts.reactivatedTotal}</b> · Respondieron:{' '}
+                        <b className="text-slate-900">{counts.reactivatedReplied}</b> · Sin responder:{' '}
+                        <b className="text-slate-800">{leadSubCounts.sinResponder}</b>
+                      </span>
+                      <span className="font-bold text-indigo-700">
+                        {Math.round((counts.reactivatedReplied / Math.max(1, counts.reactivatedTotal)) * 100)}% respuesta
+                      </span>
+                    </div>
+
+                    {leadSubCounts.sinResponder > 0 && (
+                      <div
+                        className={`px-2.5 py-1.5 rounded-lg border flex items-center justify-between gap-2 text-[11.5px] ${
+                          leadSubCounts.readyForResend48h > 0
+                            ? 'bg-amber-50/70 border-amber-200/90 text-amber-950'
+                            : 'bg-slate-50 border-slate-200/80 text-slate-600'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Clock
+                            className={`w-3.5 h-3.5 shrink-0 ${
+                              leadSubCounts.readyForResend48h > 0 ? 'text-amber-600' : 'text-slate-400'
+                            }`}
+                          />
+                          {leadSubCounts.readyForResend48h > 0 ? (
+                            <span className="truncate">
+                              <b>Listos para Toque 2 (+48h):</b> {leadSubCounts.readyForResend48h} sin responder
+                            </span>
+                          ) : (
+                            <span className="truncate">
+                              <b>En espera (&lt;48h):</b> reenvío recomendado en ~{leadSubCounts.minHoursUntil48h}h
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLeadSubFilter('sin_responder');
+                            setShowResendReactivationModal(true);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold shrink-0 transition shadow-2xs"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          <span>
+                            Reenviar / Flyer (
+                            {leadSubCounts.readyForResend48h > 0
+                              ? leadSubCounts.readyForResend48h
+                              : leadSubCounts.sinResponder}
+                            )
+                          </span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3367,29 +3485,37 @@ export const SupportChatCircles: React.FC = () => {
                       {
                         id: 'activos' as LeadStageSubFilter,
                         label: circleFilter === 'reactivados' ? `Interesados (${leadSubCounts.activos})` : `Activos (${leadSubCounts.activos})`,
+                        show: true,
                       },
-                      { id: 'conversando' as LeadStageSubFilter, label: `Seguimiento / Demo (${leadSubCounts.conversando})` },
-                      { id: 'perdidos' as LeadStageSubFilter, label: `Perdidos (${leadSubCounts.perdidos})` },
-                      { id: 'erroneos' as LeadStageSubFilter, label: `Erróneos (${leadSubCounts.erroneos})` },
-                      { id: 'todos' as LeadStageSubFilter, label: `Todos (${leadSubCounts.todos})` },
+                      {
+                        id: 'sin_responder' as LeadStageSubFilter,
+                        label: `Sin responder (${leadSubCounts.sinResponder})`,
+                        show: circleFilter === 'reactivados',
+                      },
+                      { id: 'conversando' as LeadStageSubFilter, label: `Seguimiento / Demo (${leadSubCounts.conversando})`, show: true },
+                      { id: 'perdidos' as LeadStageSubFilter, label: `Perdidos (${leadSubCounts.perdidos})`, show: true },
+                      { id: 'erroneos' as LeadStageSubFilter, label: `Erróneos (${leadSubCounts.erroneos})`, show: true },
+                      { id: 'todos' as LeadStageSubFilter, label: `Todos (${leadSubCounts.todos})`, show: true },
                     ]
-                  ).map((sf) => {
-                    const active = leadSubFilter === sf.id;
-                    return (
-                      <button
-                        key={sf.id}
-                        type="button"
-                        onClick={() => setLeadSubFilter(sf.id)}
-                        className={`px-2 py-0.5 rounded-md text-[12px] transition ${
-                          active
-                            ? 'bg-slate-800 text-white font-semibold'
-                            : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70 font-medium'
-                        }`}
-                      >
-                        {sf.label}
-                      </button>
-                    );
-                  })}
+                  )
+                    .filter((sf) => sf.show)
+                    .map((sf) => {
+                      const active = leadSubFilter === sf.id;
+                      return (
+                        <button
+                          key={sf.id}
+                          type="button"
+                          onClick={() => setLeadSubFilter(sf.id)}
+                          className={`px-2 py-0.5 rounded-md text-[12px] transition ${
+                            active
+                              ? 'bg-slate-800 text-white font-semibold'
+                              : 'bg-slate-100/80 text-slate-600 hover:bg-slate-200/70 font-medium'
+                          }`}
+                        >
+                          {sf.label}
+                        </button>
+                      );
+                    })}
                 </div>
               </div>
             )}
@@ -3490,10 +3616,18 @@ export const SupportChatCircles: React.FC = () => {
                               className={`px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 ${
                                 circle.reactivationReplied
                                   ? 'bg-slate-100 text-slate-700 border border-slate-200/80'
+                                  : circle.hoursSinceReactivation >= 48
+                                  ? 'bg-amber-50 text-amber-800 border border-amber-200/80'
                                   : 'text-slate-400'
                               }`}
                             >
-                              {circle.reactivationReplied ? 'Respondió' : 'Reactivación'}
+                              {circle.reactivationReplied
+                                ? 'Respondió'
+                                : `Toque ${circle.reactivationTouch || 1} · ${
+                                    circle.hoursSinceReactivation >= 24
+                                      ? `${Math.floor(circle.hoursSinceReactivation / 24)}d`
+                                      : `${circle.hoursSinceReactivation}h`
+                                  }${circle.hoursSinceReactivation >= 48 ? ' · Listo' : ''}`}
                             </span>
                           )}
                         </div>
@@ -5631,6 +5765,28 @@ export const SupportChatCircles: React.FC = () => {
               sendImmediately: details.sendImmediately,
               shareToWhatsApp: true,
             });
+          }}
+        />
+      )}
+
+      {/* Resend Reactivation Modal (Touch 2 / Flyer / Video) exclusively for non-responding reactivated prospects */}
+      {showResendReactivationModal && activeCompanyId && (
+        <WhatsAppReactivationModal
+          isOpen={showResendReactivationModal}
+          onClose={() => setShowResendReactivationModal(false)}
+          mode="resend"
+          leadsPool={resendLeadsPool}
+          touchInfoByLeadId={resendTouchInfoMap}
+          companyId={activeCompanyId}
+          currentUser={{
+            id: profile?.id || '',
+            full_name: profile?.full_name,
+            email: profile?.email,
+          }}
+          defaultCampaignName="Reactivación · Toque 2"
+          onCompleted={() => {
+            loadSupportData(true);
+            loadThread(false);
           }}
         />
       )}

@@ -16,11 +16,23 @@ import {
   Phone,
   CheckSquare,
   Square as SquareIcon,
+  Image as ImageIcon,
+  Video,
+  FileText,
+  Upload,
+  Trash2,
+  RefreshCw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
 import { leadsService } from '../../services/leads';
 import type { Lead } from '../../types';
+
+export interface ReactivationTouchInfo {
+  touch: number;
+  sentAt: string;
+  hoursSinceSent: number;
+}
 
 interface WhatsAppReactivationModalProps {
   isOpen: boolean;
@@ -28,6 +40,8 @@ interface WhatsAppReactivationModalProps {
   leadsPool: Lead[];
   preSelectedLeadIds?: string[];
   initialInactivityFilter?: 'all' | 'never' | '15d' | '30d' | '60d' | '90d';
+  mode?: 'initial' | 'resend';
+  touchInfoByLeadId?: Record<string, ReactivationTouchInfo>;
   companyId: string;
   currentUser: {
     id: string;
@@ -45,14 +59,39 @@ interface ReactivationTemplate {
   subtitle: string;
   tag: string;
   body: string;
+  forResend?: boolean;
 }
 
 const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
   {
+    id: 'toque2_flyer_video',
+    label: 'Toque 2 · Valor Visual (Con Flyer o Video)',
+    subtitle: 'Ideal para los que no respondieron al Toque 1 · Acompáñalo de un Flyer o Video corto',
+    tag: 'Toque 2 · Flyer / Video',
+    body: 'Hola {nombre}, sé que a veces los mensajes se pasan por la operación del día. Le comparto un resumen visual de cómo ayudamos a empresas como {empresa} con Facturación Electrónica y control administrativo. ¿Le gustaría que le envíe una cotización o agendamos 10 minutos?',
+    forResend: true,
+  },
+  {
+    id: 'toque2_seguimiento_breve',
+    label: 'Toque 2 · Seguimiento breve (+48h)',
+    subtitle: 'Recordatorio corto y directo para quienes dejaron en visto el primer mensaje',
+    tag: 'Toque 2 · Texto corto',
+    body: 'Hola {nombre}, le saluda {vendedor}. Le escribo brevemente para dar seguimiento a mi mensaje anterior; ¿pudieron evaluar el sistema en {empresa} o prefiere que le comparta primero los planes y precios por este medio?',
+    forResend: true,
+  },
+  {
+    id: 'toque3_cierre_amable',
+    label: 'Toque 3 · Cierre amable (Último toque)',
+    subtitle: 'Aplica psicología inversa para recuperar respuesta antes de pausar el seguimiento',
+    tag: 'Toque 3 · Cierre',
+    body: 'Hola {nombre}, le saluda {vendedor}. Para no saturar su WhatsApp dejamos en pausa su solicitud por ahora; si más adelante retoman el proyecto en {empresa}, por aquí queda mi contacto directo. ¡Muchos éxitos!',
+    forResend: true,
+  },
+  {
     id: 'consultivo_corto',
-    label: '1. Pregunta corta consultiva',
+    label: '1. Pregunta corta consultiva (Toque 1)',
     subtitle: 'Ideal para prospectos que pidieron información y nunca respondieron',
-    tag: 'Recomendada · Alta respuesta',
+    tag: 'Recomendada · Toque 1',
     body: 'Hola {nombre}, le saluda {vendedor}. Hace un tiempo nos solicitó información sobre nuestros servicios; ¿todavía están evaluando opciones en {empresa} o ya lo resolvieron por ahora?',
   },
   {
@@ -114,23 +153,38 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   leadsPool,
   preSelectedLeadIds = [],
   initialInactivityFilter = 'all',
+  mode = 'initial',
+  touchInfoByLeadId = {},
   companyId,
   currentUser,
   defaultCampaignName = 'Reactivación WhatsApp',
   onCompleted,
   onGoToWhatsAppChat,
 }) => {
+  const isResendMode = mode === 'resend';
+  const initialTemplate = isResendMode
+    ? DEFAULT_TEMPLATES.find((t) => t.id === 'toque2_flyer_video') || DEFAULT_TEMPLATES[0]
+    : DEFAULT_TEMPLATES.find((t) => t.id === 'consultivo_corto') || DEFAULT_TEMPLATES[0];
+
   const [inactivityFilter, setInactivityFilter] = useState<'all' | 'never' | '15d' | '30d' | '60d' | '90d'>(
     initialInactivityFilter
   );
+  const [resendTimingFilter, setResendTimingFilter] = useState<'ready48' | 'ready72' | 'under48' | 'all'>('ready48');
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [batchLimit, setBatchLimit] = useState<number>(30);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const [campaignName, setCampaignName] = useState(defaultCampaignName);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(DEFAULT_TEMPLATES[0].id);
-  const [messageTemplate, setMessageTemplate] = useState<string>(DEFAULT_TEMPLATES[0].body);
+  const [campaignName, setCampaignName] = useState(
+    isResendMode ? 'Reactivación · Toque 2' : defaultCampaignName
+  );
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(initialTemplate.id);
+  const [messageTemplate, setMessageTemplate] = useState<string>(initialTemplate.body);
   const [delaySeconds, setDelaySeconds] = useState<number>(10);
+
+  // Media attachment state (Flyer Image, Video MP4, or PDF)
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreviewUrl, setMediaPreviewUrl] = useState<string | null>(null);
+  const mediaInputRef = useRef<HTMLInputElement>(null);
 
   const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
   const [previewLeadId, setPreviewLeadId] = useState<string | null>(null);
@@ -146,6 +200,46 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   useEffect(() => {
     setInactivityFilter(initialInactivityFilter);
   }, [initialInactivityFilter]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isResendMode) {
+      const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'toque2_flyer_video') || DEFAULT_TEMPLATES[0];
+      setSelectedTemplateId(tpl.id);
+      setMessageTemplate(tpl.body);
+      setCampaignName('Reactivación · Toque 2');
+    } else {
+      const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'consultivo_corto') || DEFAULT_TEMPLATES[0];
+      setSelectedTemplateId(tpl.id);
+      setMessageTemplate(tpl.body);
+      setCampaignName(defaultCampaignName);
+    }
+  }, [isOpen, isResendMode, defaultCampaignName]);
+
+  useEffect(() => {
+    return () => {
+      if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
+    };
+  }, [mediaPreviewUrl]);
+
+  const handleSelectMediaFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 45 * 1024 * 1024) {
+      toast.error('El archivo supera el máximo permitido de 45 MB');
+      return;
+    }
+    if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
+    setMediaFile(file);
+    setMediaPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleRemoveMediaFile = () => {
+    if (mediaPreviewUrl) URL.revokeObjectURL(mediaPreviewUrl);
+    setMediaFile(null);
+    setMediaPreviewUrl(null);
+    if (mediaInputRef.current) mediaInputRef.current.value = '';
+  };
 
   const sellerDisplayName = useMemo(() => {
     const raw = (currentUser.full_name || '').trim();
@@ -167,15 +261,67 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     });
   }, [leadsPool, preSelectedLeadIds]);
 
-  // Filtered by inactivity + stage + search
+  const getLeadTouchInfo = (lead: Lead): ReactivationTouchInfo => {
+    if (touchInfoByLeadId[lead.id]) return touchInfoByLeadId[lead.id];
+    const lastTouch = lead.last_follow_up_at || lead.created_at || new Date().toISOString();
+    const hours = Math.max(0, Math.floor((Date.now() - new Date(lastTouch).getTime()) / (1000 * 60 * 60)));
+    return { touch: 1, sentAt: lastTouch, hoursSinceSent: hours };
+  };
+
+  const resendCounts = useMemo(() => {
+    let ready48 = 0;
+    let ready72 = 0;
+    let under48 = 0;
+    let maxHoursUnder48 = 0;
+    for (const l of baseLeadsWithPhone) {
+      if (stageFilter !== 'all' && l.status !== stageFilter) continue;
+      const tInfo = getLeadTouchInfo(l);
+      if (tInfo.hoursSinceSent >= 48) {
+        ready48++;
+        if (tInfo.hoursSinceSent >= 72) ready72++;
+      } else {
+        under48++;
+        if (tInfo.hoursSinceSent > maxHoursUnder48) maxHoursUnder48 = tInfo.hoursSinceSent;
+      }
+    }
+    const hoursUntilNextReady = under48 > 0 ? Math.max(1, 48 - maxHoursUnder48) : 0;
+    return {
+      all: baseLeadsWithPhone.length,
+      ready48,
+      ready72,
+      under48,
+      hoursUntilNextReady,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseLeadsWithPhone, stageFilter, touchInfoByLeadId]);
+
+  // If in resend mode and nobody has reached 48h yet, automatically show 'all' so the user sees why they're in cooldown
+  useEffect(() => {
+    if (isResendMode && isOpen) {
+      if (resendCounts.ready48 === 0 && resendCounts.all > 0) {
+        setResendTimingFilter('all');
+      } else {
+        setResendTimingFilter('ready48');
+      }
+    }
+  }, [isResendMode, isOpen, resendCounts.ready48, resendCounts.all]);
+
+  // Filtered by inactivity/resend timing + stage + search
   const matchingLeads = useMemo(() => {
     return baseLeadsWithPhone.filter((l) => {
-      const info = getDaysInactive(l);
-      if (inactivityFilter === 'never' && !info.neverContacted) return false;
-      if (inactivityFilter === '15d' && info.days < 15) return false;
-      if (inactivityFilter === '30d' && info.days < 30) return false;
-      if (inactivityFilter === '60d' && info.days < 60) return false;
-      if (inactivityFilter === '90d' && info.days < 90) return false;
+      if (isResendMode) {
+        const tInfo = getLeadTouchInfo(l);
+        if (resendTimingFilter === 'ready48' && tInfo.hoursSinceSent < 48) return false;
+        if (resendTimingFilter === 'ready72' && tInfo.hoursSinceSent < 72) return false;
+        if (resendTimingFilter === 'under48' && tInfo.hoursSinceSent >= 48) return false;
+      } else {
+        const info = getDaysInactive(l);
+        if (inactivityFilter === 'never' && !info.neverContacted) return false;
+        if (inactivityFilter === '15d' && info.days < 15) return false;
+        if (inactivityFilter === '30d' && info.days < 30) return false;
+        if (inactivityFilter === '60d' && info.days < 60) return false;
+        if (inactivityFilter === '90d' && info.days < 90) return false;
+      }
 
       if (stageFilter !== 'all' && l.status !== stageFilter) return false;
 
@@ -188,7 +334,8 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       }
       return true;
     });
-  }, [baseLeadsWithPhone, inactivityFilter, stageFilter, searchQuery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseLeadsWithPhone, isResendMode, resendTimingFilter, inactivityFilter, stageFilter, searchQuery, touchInfoByLeadId]);
 
   // Apply batch limit (e.g. 25, 50, 100, or all)
   const limitedLeads = useMemo(() => {
@@ -280,7 +427,11 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     }
   };
 
-  const sendSingleLeadReactivation = async (lead: Lead, campaignTag: string) => {
+  const sendSingleLeadReactivation = async (
+    lead: Lead,
+    campaignTag: string,
+    uploadedMedia?: { path: string; name: string; mime: string; size: number } | null
+  ) => {
     const normalizedPhone = normalizeWhatsAppPhone(lead.phone);
     if (!normalizedPhone) throw new Error('Teléfono inválido');
     const l8 = normalizedPhone.slice(-8);
@@ -305,10 +456,13 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     });
 
     let ticketId: string;
+    let nextTouchNumber = 1;
 
     if (existingTicket) {
       ticketId = existingTicket.id;
       const curMeta = (existingTicket.metadata || {}) as Record<string, any>;
+      const prevTouch = Number(curMeta.wa_reactivation_touch || (curMeta.wa_reactivation ? 1 : 0));
+      nextTouchNumber = prevTouch + 1;
       await supabase
         .from('tickets')
         .update({
@@ -322,6 +476,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
             whatsapp_phone: curMeta.whatsapp_phone || normalizedPhone,
             whatsapp_jid: curMeta.whatsapp_jid || jid,
             wa_reactivation: true,
+            wa_reactivation_touch: nextTouchNumber,
             wa_reactivation_campaign: campaignTag,
             wa_reactivation_sent_at: nowIso,
             wa_reactivation_by: currentUser.id,
@@ -351,6 +506,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
             whatsapp_jid: jid,
             evolution_instance: 'soporte',
             wa_reactivation: true,
+            wa_reactivation_touch: 1,
             wa_reactivation_campaign: campaignTag,
             wa_reactivation_sent_at: nowIso,
             wa_reactivation_by: currentUser.id,
@@ -385,23 +541,41 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       }
     }
 
-    const { data: sendRes, error: sendErr } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
-      body: {
-        action: 'send_reply',
-        ticket_id: ticketId,
-        message_text: personalizedText,
-        response_minutes: 1,
-      },
-    });
-    if (sendErr || (sendRes && sendRes.ok === false)) {
-      throw new Error(sendErr?.message || sendRes?.error || 'Error al encolar mensaje WhatsApp');
+    if (uploadedMedia) {
+      const { data: sendRes, error: sendErr } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
+        body: {
+          action: 'send_media',
+          ticket_id: ticketId,
+          storage_path: uploadedMedia.path,
+          file_name: uploadedMedia.name,
+          mime: uploadedMedia.mime,
+          size: uploadedMedia.size,
+          caption: personalizedText,
+        },
+      });
+      if (sendErr || (sendRes && sendRes.ok === false)) {
+        throw new Error(sendErr?.message || sendRes?.error || 'Error al encolar archivo WhatsApp');
+      }
+    } else {
+      const { data: sendRes, error: sendErr } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
+        body: {
+          action: 'send_reply',
+          ticket_id: ticketId,
+          message_text: personalizedText,
+          response_minutes: 1,
+        },
+      });
+      if (sendErr || (sendRes && sendRes.ok === false)) {
+        throw new Error(sendErr?.message || sendRes?.error || 'Error al encolar mensaje WhatsApp');
+      }
     }
 
     try {
+      const mediaNote = uploadedMedia ? ` + Adjunto (${uploadedMedia.name})` : '';
       await leadsService.createFollowUp({
         lead_id: lead.id,
         action_type: 'whatsapp' as any,
-        notes: `[${campaignTag}] Mensaje enviado por WhatsApp: "${personalizedText.slice(0, 180)}"`,
+        notes: `[${campaignTag} · Toque ${nextTouchNumber}]${mediaNote} Mensaje enviado por WhatsApp: "${personalizedText.slice(0, 180)}"`,
         date: nowIso,
       });
       await supabase
@@ -428,13 +602,40 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     let ok = 0;
     let fail = 0;
 
+    let uploadedMedia: { path: string; name: string; mime: string; size: number } | null = null;
+    if (mediaFile) {
+      try {
+        setCurrentLeadName(`Subiendo archivo (${mediaFile.name})…`);
+        const safeName = mediaFile.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+        const path = `outgoing/${companyId}/campaigns/${crypto.randomUUID()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from('whatsapp-media')
+          .upload(path, mediaFile, {
+            contentType: mediaFile.type || 'application/octet-stream',
+            upsert: false,
+          });
+        if (upErr) throw upErr;
+        uploadedMedia = {
+          path,
+          name: mediaFile.name,
+          mime: mediaFile.type || 'application/octet-stream',
+          size: mediaFile.size,
+        };
+      } catch (err: any) {
+        toast.error(err?.message || 'No se pudo subir el Flyer/Video adjunto');
+        setIsSending(false);
+        setCurrentLeadName('');
+        return;
+      }
+    }
+
     for (let i = 0; i < activeBatchLeads.length; i++) {
       if (abortRef.current) break;
       const lead = activeBatchLeads[i];
       setCurrentLeadName(`${lead.name} (${lead.phone})`);
 
       try {
-        await sendSingleLeadReactivation(lead, cleanCampaignTag);
+        await sendSingleLeadReactivation(lead, cleanCampaignTag, uploadedMedia);
         ok++;
         setSentCount(ok);
         setSentLeadIds((prev) => new Set(prev).add(lead.id));
@@ -467,21 +668,33 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     setMessageTemplate((prev) => `${prev}${prev.endsWith(' ') || !prev ? '' : ' '}${variable}`);
   };
 
+  const formatHoursElapsed = (hours: number): string => {
+    if (hours < 1) return 'Hace <1h';
+    if (hours < 24) return `Hace ${hours}h`;
+    const d = Math.floor(hours / 24);
+    const remH = hours % 24;
+    return remH > 0 && d < 3 ? `Hace ${d}d ${remH}h` : `Hace ${d}d`;
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/35 backdrop-blur-[2px] z-[80] flex items-center justify-center p-3 sm:p-5">
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-[0_24px_60px_-15px_rgba(15,23,42,0.28)] max-w-6xl w-full overflow-hidden flex flex-col h-[88vh] max-h-[820px]">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-[0_24px_60px_-15px_rgba(15,23,42,0.28)] max-w-6xl w-full overflow-hidden flex flex-col h-[88vh] max-h-[840px]">
         {/* ── HEADER ── */}
         <div className="px-6 py-3.5 bg-[#EEF0FF] border-b border-indigo-200/70 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-white border border-indigo-200 flex items-center justify-center text-indigo-600 shadow-2xs">
-              <MessageSquare className="w-4 h-4" />
+              {isResendMode ? <RefreshCw className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
             </div>
             <div>
               <h3 className="text-[15px] font-bold text-slate-900">
-                Motor de Reactivación de Prospectos por WhatsApp
+                {isResendMode
+                  ? 'Reenvío Inteligente a Prospectos Sin Responder (Toque 2 / Flyer / Video)'
+                  : 'Motor de Reactivación de Prospectos por WhatsApp'}
               </h3>
               <p className="text-xs font-medium text-slate-500">
-                1. Filtra quiénes no han respondido · 2. Revisa la lista · 3. Envía con plantilla y mide respuestas en el Chat
+                {isResendMode
+                  ? 'Exclusivo para quienes no contestaron el envío anterior · Sin mezclar prospectos nuevos para cuidar tus métricas'
+                  : '1. Filtra quiénes no han respondido · 2. Revisa la lista · 3. Envía con plantilla y mide respuestas en el Chat'}
               </p>
             </div>
           </div>
@@ -503,47 +716,112 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
           </div>
         </div>
 
-        {/* ── STEP 1: TOP SEGMENTATION BAR (Inactivity + Status + Safe Batch Size) ── */}
-        <div className="px-6 py-3 bg-[#F8F9FC] border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          {/* Inactivity Filter Pills */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mr-1 flex items-center gap-1">
-              <Filter className="w-3.5 h-3.5 text-indigo-600" />
-              Tiempo sin respuesta:
+        {/* ── SMART TIMING ADVISOR BANNER (In Resend Mode: tells user WHEN to resend) ── */}
+        {isResendMode && (
+          <div
+            className={`px-6 py-2 border-b text-xs flex items-center justify-between gap-3 flex-wrap shrink-0 ${
+              resendCounts.ready48 > 0
+                ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                : 'bg-amber-50/80 border-amber-200 text-amber-900'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Clock className={`w-4 h-4 shrink-0 ${resendCounts.ready48 > 0 ? 'text-emerald-600' : 'text-amber-600'}`} />
+              {resendCounts.ready48 > 0 ? (
+                <span>
+                  <b>Momento óptimo de reenvío:</b> Tienes <b>{resendCounts.ready48} prospectos</b> que ya cumplieron{' '}
+                  <b>+48 horas (2+ días)</b> sin responder al toque anterior. Están listos para recibir el Toque 2.
+                </span>
+              ) : (
+                <span>
+                  <b>En espera de enfriamiento (&lt;48h):</b> Los <b>{resendCounts.under48} prospectos</b> sin responder recibieron el toque anterior hace menos de 48h.{' '}
+                  <b>Se recomienda reenviar en ~{resendCounts.hoursUntilNextReady}h</b> (o puedes seleccionarlos abajo si deseas enviar hoy).
+                </span>
+              )}
+            </div>
+            <span className="font-bold text-[11px] uppercase tracking-wider px-2 py-0.5 rounded bg-white/80 border border-current/20">
+              Regla recomendada: 48h a 72h entre toques
             </span>
-            {(
-              [
-                { id: 'all', label: `Todos (${bucketCounts.all})` },
-                { id: 'never', label: `Sin contacto (${bucketCounts.never})` },
-                { id: '15d', label: `+15 días (${bucketCounts.d15})` },
-                { id: '30d', label: `+30 días (${bucketCounts.d30})` },
-                { id: '60d', label: `+60 días (${bucketCounts.d60})` },
-                { id: '90d', label: `+90 días (${bucketCounts.d90})` },
-              ] as const
-            ).map((opt) => {
-              const active = inactivityFilter === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  disabled={isSending}
-                  onClick={() => {
-                    setInactivityFilter(opt.id);
-                    setExcludedIds(new Set());
-                    if (opt.id === 'never') setCampaignName('Reactivación Sin Contacto');
-                    else if (opt.id !== 'all') setCampaignName(`Reactivación +${opt.id.replace('d', ' días')}`);
-                  }}
-                  className={`px-2.5 py-1.5 rounded-xl text-xs transition ${
-                    active
-                      ? 'bg-indigo-600 text-white font-bold shadow-2xs'
-                      : 'bg-white border border-slate-200/90 text-slate-600 hover:bg-slate-50 font-semibold'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
           </div>
+        )}
+
+        {/* ── STEP 1: TOP SEGMENTATION BAR (Inactivity/Resend Timing + Status + Safe Batch Size) ── */}
+        <div className="px-6 py-3 bg-[#F8F9FC] border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          {isResendMode ? (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mr-1 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                Cuándo reenviar:
+              </span>
+              {(
+                [
+                  { id: 'ready48', label: `Listos +48h (${resendCounts.ready48})` },
+                  { id: 'ready72', label: `+72h / 3+ días (${resendCounts.ready72})` },
+                  { id: 'under48', label: `En espera <48h (${resendCounts.under48})` },
+                  { id: 'all', label: `Todos sin responder (${resendCounts.all})` },
+                ] as const
+              ).map((opt) => {
+                const active = resendTimingFilter === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={isSending}
+                    onClick={() => {
+                      setResendTimingFilter(opt.id);
+                      setExcludedIds(new Set());
+                    }}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs transition ${
+                      active
+                        ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                        : 'bg-white border border-slate-200/90 text-slate-600 hover:bg-slate-50 font-semibold'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mr-1 flex items-center gap-1">
+                <Filter className="w-3.5 h-3.5 text-indigo-600" />
+                Tiempo sin respuesta:
+              </span>
+              {(
+                [
+                  { id: 'all', label: `Todos (${bucketCounts.all})` },
+                  { id: 'never', label: `Sin contacto (${bucketCounts.never})` },
+                  { id: '15d', label: `+15 días (${bucketCounts.d15})` },
+                  { id: '30d', label: `+30 días (${bucketCounts.d30})` },
+                  { id: '60d', label: `+60 días (${bucketCounts.d60})` },
+                  { id: '90d', label: `+90 días (${bucketCounts.d90})` },
+                ] as const
+              ).map((opt) => {
+                const active = inactivityFilter === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={isSending}
+                    onClick={() => {
+                      setInactivityFilter(opt.id);
+                      setExcludedIds(new Set());
+                      if (opt.id === 'never') setCampaignName('Reactivación Sin Contacto');
+                      else if (opt.id !== 'all') setCampaignName(`Reactivación +${opt.id.replace('d', ' días')}`);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs transition ${
+                      active
+                        ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                        : 'bg-white border border-slate-200/90 text-slate-600 hover:bg-slate-50 font-semibold'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Stage & Batch Size Selectors */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -625,10 +903,12 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                 <div className="p-8 text-center space-y-2">
                   <Users className="w-6 h-6 text-slate-300 mx-auto" />
                   <p className="text-xs font-semibold text-slate-500">
-                    No hay prospectos con teléfono en este filtro.
+                    No hay prospectos en este filtro de tiempo.
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    Prueba cambiar el filtro de tiempo sin respuesta o etapa arriba.
+                    {isResendMode
+                      ? 'Selecciona "Todos sin responder" arriba si deseas ver los enviados hace menos de 48h.'
+                      : 'Prueba cambiar el filtro de tiempo sin respuesta o etapa arriba.'}
                   </p>
                 </div>
               ) : (
@@ -637,6 +917,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                   const isPreviewed = previewLead.id === lead.id;
                   const wasSent = sentLeadIds.has(lead.id);
                   const inactivity = getDaysInactive(lead);
+                  const touchInfo = isResendMode ? getLeadTouchInfo(lead) : null;
                   const cleanPhone = normalizeWhatsAppPhone(lead.phone);
 
                   return (
@@ -692,20 +973,40 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                       </div>
 
                       <div className="flex flex-col items-end gap-1 shrink-0">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-semibold">
-                          {lead.status}
-                        </span>
-                        <span
-                          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                            inactivity.neverContacted
-                              ? 'bg-rose-50 text-rose-700'
-                              : inactivity.days >= 30
-                              ? 'bg-amber-50 text-amber-700'
-                              : 'bg-slate-50 text-slate-500'
-                          }`}
-                        >
-                          {inactivity.label}
-                        </span>
+                        {touchInfo ? (
+                          <>
+                            <span className="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200/70 text-[10px] font-bold">
+                              Toque {touchInfo.touch} ➔ Toque {touchInfo.touch + 1}
+                            </span>
+                            <span
+                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                touchInfo.hoursSinceSent >= 48
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              }`}
+                            >
+                              {formatHoursElapsed(touchInfo.hoursSinceSent)}{' '}
+                              {touchInfo.hoursSinceSent >= 48 ? '· Listo' : '· <48h'}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-semibold">
+                              {lead.status}
+                            </span>
+                            <span
+                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                                inactivity.neverContacted
+                                  ? 'bg-rose-50 text-rose-700'
+                                  : inactivity.days >= 30
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : 'bg-slate-50 text-slate-500'
+                              }`}
+                            >
+                              {inactivity.label}
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   );
@@ -729,7 +1030,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
             )}
           </div>
 
-          {/* ── RIGHT COLUMN (7 cols): TEMPLATES, MESSAGE EDITOR & LIVE PREVIEW ── */}
+          {/* ── RIGHT COLUMN (7 cols): TEMPLATES, MESSAGE EDITOR, FLYER/VIDEO UPLOADER & LIVE PREVIEW ── */}
           <div className="lg:col-span-7 flex flex-col min-h-0 bg-[#FAFBFD] overflow-y-auto p-5 space-y-4">
             {/* Step 2 Header */}
             <div className="flex items-center justify-between">
@@ -738,7 +1039,9 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                   2
                 </span>
                 <h4 className="text-[13px] font-bold text-slate-900">
-                  Elige una plantilla conversacional (sin enlaces para máxima entrega)
+                  {isResendMode
+                    ? 'Cambia el mensaje para el Toque 2 / Toque 3 y adjunta Flyer o Video (opcional)'
+                    : 'Elige una plantilla conversacional y personaliza el mensaje'}
                 </h4>
               </div>
             </div>
@@ -776,7 +1079,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
             </div>
 
             {/* Message Editor + Clickable Variable Pills */}
-            <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 space-y-2">
+            <div className="bg-white border border-slate-200/90 rounded-xl p-3.5 space-y-2.5">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   Personalizar mensaje a enviar
@@ -801,11 +1104,67 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                 disabled={isSending}
                 value={messageTemplate}
                 onChange={(e) => setMessageTemplate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[13px] font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-[13px] font-normal text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
+
+              {/* Flyer (Image), Short Video (MP4) or PDF Attachment Bar */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                <input
+                  ref={mediaInputRef}
+                  type="file"
+                  accept="image/*,video/mp4,video/quicktime,application/pdf"
+                  onChange={handleSelectMediaFile}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Flyer / Video / PDF (Opcional):</span>
+                  </span>
+                  {mediaFile ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold truncate max-w-[260px]">
+                      {mediaFile.type.startsWith('video/') ? (
+                        <Video className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      ) : mediaFile.type === 'application/pdf' ? (
+                        <FileText className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      ) : (
+                        <ImageIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      )}
+                      <span className="truncate">{mediaFile.name}</span>
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-slate-400">
+                      Sin archivo adjunto (solo texto)
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {mediaFile && (
+                    <button
+                      type="button"
+                      disabled={isSending}
+                      onClick={handleRemoveMediaFile}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Quitar</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={isSending}
+                    onClick={() => mediaInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 text-xs font-bold transition"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{mediaFile ? 'Cambiar archivo' : 'Subir Flyer / Video / PDF'}</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* Live WhatsApp Preview */}
+            {/* Live WhatsApp Preview (including Flyer/Video if attached) */}
             <div className="bg-[#F3F4F8] border border-slate-200/90 rounded-xl p-3.5 space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1.5">
@@ -816,8 +1175,30 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                   Haz clic en cualquier prospecto de la izquierda para previsualizar
                 </span>
               </div>
-              <div className="bg-[#DFE3FF] text-slate-900 rounded-xl rounded-br-xs px-3.5 py-2.5 text-[13px] font-medium leading-relaxed shadow-2xs">
-                {previewText}
+              <div className="bg-[#DFE3FF] text-slate-900 rounded-xl rounded-br-xs px-3.5 py-2.5 text-[13px] font-normal leading-relaxed shadow-2xs space-y-2">
+                {mediaFile && mediaPreviewUrl && (
+                  <div className="rounded-lg overflow-hidden bg-white/80 border border-indigo-200/60 p-1.5">
+                    {mediaFile.type.startsWith('image/') ? (
+                      <img
+                        src={mediaPreviewUrl}
+                        alt="Flyer preview"
+                        className="max-h-44 rounded-md object-contain mx-auto"
+                      />
+                    ) : mediaFile.type.startsWith('video/') ? (
+                      <video
+                        src={mediaPreviewUrl}
+                        controls
+                        className="max-h-44 rounded-md mx-auto w-full"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700">
+                        <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span className="truncate">{mediaFile.name}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <p className="whitespace-pre-wrap">{previewText}</p>
               </div>
             </div>
 
@@ -832,7 +1213,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                   disabled={isSending}
                   value={campaignName}
                   onChange={(e) => setCampaignName(e.target.value)}
-                  placeholder="Ej. Reactivación +30 días"
+                  placeholder="Ej. Reactivación · Toque 2"
                   className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none"
                 />
               </div>
@@ -896,7 +1277,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
           <div className="text-xs font-medium text-slate-500 flex items-center gap-2">
             <Clock className="w-4 h-4 text-indigo-500" />
             <span>
-              Se enviarán <b>{activeBatchLeads.length}</b> mensajes personalizados · Tiempo estimado:{' '}
+              Se enviarán <b>{activeBatchLeads.length}</b> {mediaFile ? 'mensajes con archivo adjunto' : 'mensajes personalizados'} · Tiempo estimado:{' '}
               <b>~{Math.max(1, Math.ceil((activeBatchLeads.length * delaySeconds) / 60))} min</b>
             </span>
           </div>
@@ -947,7 +1328,11 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                   className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition"
                 >
                   <Play className="w-3.5 h-3.5" />
-                  <span>Iniciar envío a {activeBatchLeads.length} prospectos</span>
+                  <span>
+                    {isResendMode
+                      ? `Reenviar a ${activeBatchLeads.length} prospectos`
+                      : `Iniciar envío a ${activeBatchLeads.length} prospectos`}
+                  </span>
                 </button>
               </>
             )}
