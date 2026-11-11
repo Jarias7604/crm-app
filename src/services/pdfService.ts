@@ -157,7 +157,12 @@ export const pdfService = {
                 doc.text('PROPUESTA ELABORADA POR', margin + agentS + 4, fY + 11);
                 doc.setTextColor(15, 23, 42);
                 doc.setFontSize(10);
-                doc.text((cotizacion.creator?.full_name || 'JIMMY ARIAS').toUpperCase(), margin + agentS + 4, fY + 16);
+                const rawCreatorName = String(cotizacion.creator?.full_name || '').trim();
+                const cleanCreatorName =
+                    !rawCreatorName || /simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(rawCreatorName)
+                        ? 'JIMMY ARIAS'
+                        : rawCreatorName.toUpperCase();
+                doc.text(cleanCreatorName, margin + agentS + 4, fY + 16);
                 doc.setTextColor(100, 116, 139);
                 doc.setFontSize(7);
                 doc.setFont('helvetica', 'normal');

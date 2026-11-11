@@ -1023,7 +1023,13 @@ export default function CotizacionDetalle() {
                             </div>
                             <div>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 font-bold">Propuesta Gestada por</p>
-                                <h4 className="text-lg font-black text-slate-900">{(cotizacion.creator?.full_name || 'Agente Comercial').toUpperCase()}</h4>
+                                <h4 className="text-lg font-black text-slate-900">
+                                    {(cotizacion.creator?.full_name &&
+                                    !/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(cotizacion.creator.full_name)
+                                        ? cotizacion.creator.full_name
+                                        : 'Jimmy Arias'
+                                    ).toUpperCase()}
+                                </h4>
                                 <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                                     <span className="flex items-center gap-1.5 truncate max-w-[150px]"><Mail className="w-3 h-3 text-blue-500" /> {cotizacion.creator?.email}</span>
                                 </div>

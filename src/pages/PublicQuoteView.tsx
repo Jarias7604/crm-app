@@ -907,7 +907,12 @@ export default function PublicQuoteView() {
                         </div>
                         <div className="text-center md:text-left">
                             <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-1">ASESOR COMERCIAL</p>
-                            <h4 className="text-xl font-black text-white leading-none uppercase tracking-tight">{cotizacion.creator?.full_name || 'AGENTE OFICIAL'}</h4>
+                            <h4 className="text-xl font-black text-white leading-none uppercase tracking-tight">
+                                {cotizacion.creator?.full_name &&
+                                !/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(cotizacion.creator.full_name)
+                                    ? cotizacion.creator.full_name
+                                    : 'JIMMY ARIAS'}
+                            </h4>
                             <p className="text-[10px] font-bold text-slate-400 mt-1.5 lowercase">{cotizacion.creator?.email}</p>
                         </div>
                     </div>

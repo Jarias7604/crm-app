@@ -99,7 +99,10 @@ export const bookingService = {
             .single();
 
         let avatarUrl = profile?.avatar_url || link.avatar_url;
-        let displayName = link.display_name || profile?.full_name || 'Agent';
+        let displayName = link.display_name || profile?.full_name || 'Jimmy Arias';
+        if (/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator|^agent$/i.test(displayName)) {
+            displayName = 'Jimmy Arias';
+        }
 
         // ⚡ SPECIAL PLATFORM OWNER SYNC:
         // If the logged-in user is the Super Admin (jarias7604@gmail.com),
@@ -193,6 +196,9 @@ export const bookingService = {
                     displayName = corporateProfile.full_name || displayName;
                 }
             }
+        }
+        if (!displayName || /simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator|^agent$/i.test(displayName)) {
+            displayName = 'Jimmy Arias';
         }
 
         return {

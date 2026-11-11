@@ -2,6 +2,16 @@ import { supabase } from './supabase';
 import type { Cotizacion, ModuloAdicional } from '../types/cotizaciones';
 
 class CotizacionesService {
+    private sanitizeCreator(cot: any) {
+        if (cot?.creator && typeof cot.creator === 'object') {
+            const raw = String(cot.creator.full_name || '').trim();
+            if (!raw || /simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(raw)) {
+                cot.creator = { ...cot.creator, full_name: 'Jimmy Arias' };
+            }
+        }
+        return cot;
+    }
+
     // Crear una nueva cotización
     async createCotizacion(cotizacion: Omit<Cotizacion, 'id' | 'created_at' | 'updated_at'>) {
         const { data: { user } } = await supabase.auth.getUser();
@@ -109,6 +119,7 @@ class CotizacionesService {
             data.modulos_adicionales = typeof data.modulos_adicionales === 'string'
                 ? JSON.parse(data.modulos_adicionales)
                 : (data.modulos_adicionales || []);
+            this.sanitizeCreator(data);
         }
 
         return data;

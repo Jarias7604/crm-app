@@ -318,6 +318,34 @@ function isInternalDevOrSystemTaskTitle(rawTitle: string): boolean {
   );
 }
 
+// Safe first-name greeting helper for WhatsApp messages (quotes, diagnostics, booking links).
+// Returns " Nombre" (with leading space) or "" if the name is a company, placeholder, or handle.
+function extractClientGreetingFirstName(rawName?: string | null): string {
+  const clean = String(rawName || '')
+    .replace(/\(\+?\d+\)/g, '')
+    .trim();
+  if (!clean || clean.startsWith('+') || /[_@]/.test(clean)) return '';
+  if (/^(sin\s+nombre|contacto|cliente|prospecto|lead|soporte|admin|usuario|desconocido|\+?\d+)/i.test(clean)) {
+    return '';
+  }
+  if (
+    /\b(inversiones|lotificaci[oó]n|lotificadora|comedor|constructora|corporaci[oó]n|corp\b|grupo|residencial|tienda|ferreter[ií]a|cl[ií]nica|hotel|restaurante|autolote|auto\s+lote|taller|farmacia|supermercado|distribuidora|importadora|servicios|soluciones|agencia|asociaci[oó]n|fundaci[oó]n|iglesia|colegio|escuela|academia|laboratorio|panader[ií]a|pasteler[ií]a|est[eé]tica|sal[oó]n|barber[ií]a|gym|gimnasio|transporte|transportes|log[ií]stica|inmobiliaria|bienes\s+ra[ií]ces|desarrollos|urbanica|bosque|villas|finca|hacienda|agro|veterinaria|[oó]ptica|dental|odontolog[ií]a|abogados|bufete|contadores|despacho|consultor[ií]a|ingenier[ií]a|arquitectura|proyectos|multitienda|variedades|bazar|librer[ií]a|papeler[ií]a|imprenta|sublimaci[oó]n|publicidad|marketing|tecnolog[ií]a|sistemas|repuestos|lubricantes|llantas|motos|lavander[ií]a|florister[ií]a|eventos|banquetes|catering|seguridad|vigilancia|mantenimiento|refrigeraci[oó]n|el[eé]ctrica|plomer[ií]a|vidrier[ií]a|estructuras|carpinter[ií]a|muebler[ií]a|muebles|textiles|confecciones|bordados|serigraf[ií]a|pl[aá]sticos|empaques|reciclaje|gasolinera|cooperativa|financiera|seguros|corredora|aduana|aduanal|naviera|carga|courier|encomiendas|turismo|viajes|tours|alquiler|bodega|bodegas|almac[eé]n|mayorista|av[ií]cola|granero|granja|beneficio|caf[eé]|cafeter[ií]a|pizzer[ií]a|taquer[ií]a|pupuser[ií]a|asados|mariscos|cevicher[ií]a|spa\b|plaza\b|mercado|sucursal|boutique|s\.a\.|de\s+c\.v\.)\b/i.test(
+      clean
+    )
+  ) {
+    return '';
+  }
+  const withoutTitle = clean
+    .replace(/^(lic(da|do)?|ing|arq|dr|dra|sr|sra|srta|don|doña|prof|abog|pastor|cnel|gral)\.?\s+/i, '')
+    .trim();
+  if (!withoutTitle) return '';
+  const tokens = withoutTitle.split(/[\s,.-]+/).filter(Boolean);
+  const first = tokens[0] || '';
+  if (first.length < 2 || /\d/.test(first)) return '';
+  if (tokens.length === 1 && first.length > 10) return '';
+  return ` ${first.charAt(0).toUpperCase() + first.slice(1).toLowerCase()}`;
+}
+
 // Client name for legacy (non-WhatsApp) support tickets.
 function extractLegacyClientName(t: Ticket): string {
   if (t.lead_name && t.lead_name.trim().length > 1) {
@@ -2293,10 +2321,7 @@ export const SupportChatCircles: React.FC = () => {
     (q: LeadQuoteSummary, clientName: string, includeMeeting = true) => {
       const publicUrl = `${window.location.origin}/propuesta/${q.id}`;
       const bookingUrl = myBookingSlug ? `${window.location.origin}/book/${myBookingSlug}` : '';
-      const cleanName =
-        clientName && !clientName.startsWith('+') && !/^(contacto whatsapp|cliente whatsapp)$/i.test(clientName.trim())
-          ? ` ${clientName.trim().split(' ')[0]}`
-          : '';
+      const cleanName = extractClientGreetingFirstName(clientName);
       const lines = [
         `Hola${cleanName}, le comparto nuestra propuesta comercial (${q.plan_nombre}).`,
         '',
@@ -2392,11 +2417,7 @@ export const SupportChatCircles: React.FC = () => {
     if (!activeCircle) return '';
     const targetId = activeCircle.activeTicket.id;
     const url = `${window.location.origin}/diagnostico/${targetId}`;
-    const rawName = activeCircle.clientName || '';
-    const cleanFirst =
-      rawName && !rawName.startsWith('+') && !/^(contacto whatsapp|cliente whatsapp)$/i.test(rawName.trim())
-        ? ` ${rawName.trim().split(' ')[0]}`
-        : '';
+    const cleanFirst = extractClientGreetingFirstName(activeCircle.clientName);
     return [
       `Hola${cleanFirst}, con mucho gusto le brindo los precios y detalles.`,
       `Para prepararle la propuesta exacta según su operación, ¿me apoya respondiendo estas breves preguntas (toma 30 segundos)?`,
@@ -2548,14 +2569,9 @@ export const SupportChatCircles: React.FC = () => {
   const handleSendBookingLinkToChat = async (sendImmediately: boolean) => {
     if (!activeCircle) return;
     setShowCalendarPopover(false);
-    const bookingUrl = myBookingSlug
-      ? `${window.location.origin}/book/${myBookingSlug}`
-      : `${window.location.origin}/calendar`;
-    const rawName = activeCircle.clientName || '';
-    const cleanFirst =
-      rawName && !rawName.startsWith('+') && !/^(contacto whatsapp|cliente whatsapp)$/i.test(rawName.trim())
-        ? ` ${rawName.trim().split(' ')[0]}`
-        : '';
+    const effectiveSlug = myBookingSlug || (profile?.id ? `jimmy-arias-${profile.id.slice(0, 4)}` : 'jimmy-arias');
+    const bookingUrl = `${window.location.origin}/book/${effectiveSlug}`;
+    const cleanFirst = extractClientGreetingFirstName(activeCircle.clientName);
     const msg = [
       `Hola${cleanFirst}, le comparto mi enlace de calendario para que elija el día y la hora que mejor le convenga para nuestra reunión o demostración:`,
       '',
@@ -2598,11 +2614,7 @@ export const SupportChatCircles: React.FC = () => {
       });
 
       if (opts.shareToWhatsApp !== false) {
-        const rawName = activeCircle.clientName || '';
-        const cleanFirst =
-          rawName && !rawName.startsWith('+') && !/^(contacto whatsapp|cliente whatsapp)$/i.test(rawName.trim())
-            ? ` ${rawName.trim().split(' ')[0]}`
-            : '';
+        const cleanFirst = extractClientGreetingFirstName(activeCircle.clientName);
         const bookingUrl = myBookingSlug ? `${window.location.origin}/book/${myBookingSlug}` : '';
         const linkToShare = opts.meetLink || bookingUrl;
 

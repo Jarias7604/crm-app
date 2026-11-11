@@ -161,9 +161,19 @@ function extractFirstName(fullName?: string | null): string {
     .replace(/\(\+?\d+\)/g, '')
     .trim();
   if (!clean || isBusinessStyleName(clean)) return '';
-  const first = clean.split(/[\s,.-]+/)[0] || '';
+  if (/[_@]/.test(clean)) return '';
+  // Strip professional/courtesy prefixes so we never greet "Hola Lic," or "Hola Ing,"
+  const withoutTitle = clean
+    .replace(/^(lic(da|do)?|ing|arq|dr|dra|sr|sra|srta|don|doña|prof|abog|pastor|cnel|gral)\.?\s+/i, '')
+    .trim();
+  if (!withoutTitle) return '';
+  const tokens = withoutTitle.split(/[\s,.-]+/).filter(Boolean);
+  const first = tokens[0] || '';
   if (first.length < 2 || /\d/.test(first)) return '';
-  return first;
+  // If single concatenated token (e.g. "marinaescobar" or "diegochicas"), skip personal name to avoid robotic greeting
+  if (tokens.length === 1 && first.length > 10) return '';
+  // Normalize ALL-CAPS or all-lowercase to Title Case ("MARIA" -> "Maria", "juan" -> "Juan")
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
 }
 
 function getDaysInactive(lead: Lead): { days: number; neverContacted: boolean; label: string } {
@@ -481,10 +491,16 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
 
   const renderPersonalizedMessage = (lead: Lead, templateText: string): string => {
     const firstName = extractFirstName(lead.name);
-    const rawCompany = (lead.company_name || '').trim();
-    const rawName = (lead.name || '').trim();
+    const rawCompany = (lead.company_name || '').replace(/\.+$/, '').trim();
+    const rawName = (lead.name || '').replace(/\.+$/, '').trim();
+    const isInvalidCompanyPlaceholder =
+      !rawCompany ||
+      rawCompany.length < 2 ||
+      /^(individual|ninguna?|no\s+tiene|no\s+aplica|n\/?a|sin\s+empresa|particular|persona\s+natural|independiente|pendiente|por\s+definir|desconocid[oa]|cliente|prospecto|lead|null|undefined|-+|\.+|\+?\d[\d\s-]*)$/i.test(
+        rawCompany
+      );
     let company = 'su empresa';
-    if (rawCompany && rawCompany !== 'Individual' && rawCompany.toLowerCase() !== rawName.toLowerCase()) {
+    if (!isInvalidCompanyPlaceholder && rawCompany.toLowerCase() !== rawName.toLowerCase()) {
       company = rawCompany;
     } else if (isBusinessStyleName(rawName) && !/^(sin\s+nombre|contacto|cliente|prospecto|lead)/i.test(rawName)) {
       company = rawName;

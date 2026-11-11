@@ -299,7 +299,10 @@ export default function GoogleMeetScheduler({
             if (isEditMode) {
                 if (!googleIntegration) throw new Error('No Google Calendar integration connected');
 
-                const hostName = profile?.full_name || 'Administrador del CRM';
+                const hostName =
+                    profile?.full_name && !/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(profile.full_name)
+                        ? profile.full_name
+                        : 'Jimmy Arias';
                 const hostEmail = profile?.email || '';
                 const enrichedDescription = `${description ? description + '\n\n' : ''}---
 Organizador: ${hostName}
@@ -401,7 +404,10 @@ Reunión modificada desde Arias CRM.`;
 
                 // Create Google Calendar event (with or without a linked follow-up)
                 if (googleIntegration && addMeetLink) {
-                    const hostName = profile?.full_name || 'Administrador del CRM';
+                    const hostName =
+                    profile?.full_name && !/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(profile.full_name)
+                        ? profile.full_name
+                        : 'Jimmy Arias';
                     const hostEmail = profile?.email || '';
                     const suffix = count > 1 ? ` (Sesión ${occ.index} de ${count})` : '';
                     const enrichedDescription = `${description ? description + '\n\n' : ''}---
