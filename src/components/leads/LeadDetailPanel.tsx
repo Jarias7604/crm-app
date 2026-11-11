@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode, Box, ShieldCheck, ExternalLink, Flame, Sparkles, ChevronLeft } from 'lucide-react';
+import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity, QrCode, Box, ShieldCheck, ExternalLink, Flame, Sparkles, ChevronLeft, Video } from 'lucide-react';
 import { LiveDemoHUDModal, parseAriasAnswersFromNotes } from './LiveDemoHUDModal';
 import { GeminiAuditModal } from './GeminiAuditModal';
 import { format } from 'date-fns';
@@ -27,6 +27,7 @@ import { ContractEditorModal } from '../contracts/ContractEditorModal';
 import { ContractShareModal } from '../contracts/ContractShareModal';
 import { contractPdfService } from '../../services/contractPdfService';
 import { QuickActionLogger } from '../QuickCallLogger';
+import GoogleMeetScheduler from '../GoogleMeetScheduler';
 import { SectionErrorBoundary } from '../ui/SectionErrorBoundary';
 import { LeadWhatsappThread } from './LeadWhatsappThread';
 import toast from 'react-hot-toast';
@@ -119,6 +120,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     const [isWhatsAppDialogOpen, setIsWhatsAppDialogOpen] = useState(false);
     const [isDocGeneratorOpen, setIsDocGeneratorOpen] = useState(false);
     const [isFollowUpLoggerOpen, setIsFollowUpLoggerOpen] = useState(false);
+    const [isMeetSchedulerOpen, setIsMeetSchedulerOpen] = useState(false);
     const [isQrModalOpen, setIsQrModalOpen] = useState(false);
     const [customMessage, setCustomMessage] = useState('');
     const [leadContracts, setLeadContracts] = useState<Contract[]>([]);
@@ -1698,6 +1700,15 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 <span className="hidden sm:inline">WhatsApp</span>
                             </button>
                         )}
+                        <button
+                            type="button"
+                            onClick={() => setIsMeetSchedulerOpen(true)}
+                            className="h-10 px-3 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-700 flex items-center justify-center gap-1.5 font-bold text-xs transition-all active:scale-95 border border-violet-200 shadow-2xs cursor-pointer"
+                            title="Agendar Demo / Reunión en Google Meet"
+                        >
+                            <Video className="w-4 h-4 text-violet-600" />
+                            <span className="hidden sm:inline">Google Meet</span>
+                        </button>
                     </div>
                     <button
                         type="button"
@@ -2014,6 +2025,19 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                     loadDetails();
                 }}
             />
+
+            {/* Google Meet Scheduler Modal directly from Lead/Client */}
+            {isMeetSchedulerOpen && (
+                <GoogleMeetScheduler
+                    onClose={() => {
+                        setIsMeetSchedulerOpen(false);
+                        loadDetails();
+                    }}
+                    initialLeadId={selectedLead.id}
+                    initialLeadName={selectedLead.company_name || selectedLead.name}
+                    initialLeadEmail={selectedLead.email || null}
+                />
+            )}
 
             {/* Gemini Audit Modal */}
             <GeminiAuditModal

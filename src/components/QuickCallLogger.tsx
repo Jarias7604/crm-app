@@ -95,7 +95,7 @@ const SPECIAL_OUTCOMES: SpecialOutcome[] = ['quote_sent', 'info_sent', 'meeting'
 const NEXT_APPOINTMENT_TYPES: { key: FollowUpActionType; label: string; icon: typeof Phone }[] = [
     { key: 'call', label: 'Llamada', icon: Phone },
     { key: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
-    { key: 'meeting', label: 'Demo / Reunión', icon: Video },
+    { key: 'meeting', label: 'Demo / Meet', icon: Video },
     { key: 'email', label: 'Correo', icon: Mail },
 ];
 
@@ -207,25 +207,39 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
     const [followUpAssignee, setFollowUpAssignee] = useState(lead.assigned_to || '');
     const [googleIntegrationId, setGoogleIntegrationId] = useState<string | null>(null);
     const [googleIntegrationEmail, setGoogleIntegrationEmail] = useState<string | null>(null);
-    const [createMeetInvite, setCreateMeetInvite] = useState(true);
+    const [createMeetInvite, setCreateMeetInvite] = useState(false);
     const [meetAttendeeEmail, setMeetAttendeeEmail] = useState(lead.email || '');
 
     useEffect(() => {
         let mounted = true;
         const loadGoogleIntegration = async () => {
             const { data: authData } = await supabase.auth.getUser();
-            const targetUserId = followUpAssignee || authData?.user?.id;
+            const currentUserId = authData?.user?.id;
+            const targetUserId = followUpAssignee || currentUserId;
             if (!targetUserId) return;
-            const { data } = await supabase
+
+            let { data } = await supabase
                 .from('calendar_integrations')
-                .select('id, email, google_email')
+                .select('id, google_email')
                 .eq('user_id', targetUserId)
                 .eq('provider', 'google')
                 .eq('is_active', true)
                 .maybeSingle();
+
+            if (!data && currentUserId && currentUserId !== targetUserId) {
+                const fallback = await supabase
+                    .from('calendar_integrations')
+                    .select('id, google_email')
+                    .eq('user_id', currentUserId)
+                    .eq('provider', 'google')
+                    .eq('is_active', true)
+                    .maybeSingle();
+                data = fallback.data;
+            }
+
             if (mounted) {
                 setGoogleIntegrationId(data?.id || null);
-                setGoogleIntegrationEmail((data as any)?.google_email || (data as any)?.email || null);
+                setGoogleIntegrationEmail(data?.google_email || null);
             }
         };
         loadGoogleIntegration();
@@ -638,7 +652,10 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                                             <button
                                                 key={item.key}
                                                 type="button"
-                                                onClick={() => setFollowUpType(item.key)}
+                                                onClick={() => {
+                                                    setFollowUpType(item.key);
+                                                    setCreateMeetInvite(item.key === 'meeting');
+                                                }}
                                                 className={`flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
                                                     isSelected
                                                         ? item.key === 'meeting'
@@ -713,34 +730,66 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                                 />
                             </div>
 
-                            {followUpType === 'meeting' && googleIntegrationId && (
-                                <div className="p-2.5 rounded-xl bg-violet-50/70 border border-violet-200/80 space-y-2">
-                                    <label className="flex items-center justify-between gap-2 cursor-pointer">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Video className="w-3.5 h-3.5 text-violet-600 shrink-0" />
-                                            <span className="text-[11px] font-bold text-violet-900 truncate">
-                                                Crear link de Google Meet en Google Calendar
-                                                {googleIntegrationEmail ? ` (${googleIntegrationEmail})` : ''}
+                            {/* Google Calendar + Google Meet Integration Card (Always visible so user can toggle it directly) */}
+                            <div
+                                className={`p-2.5 rounded-xl border transition-all space-y-2 ${
+                                    createMeetInvite
+                                        ? 'bg-violet-50/80 border-violet-300 shadow-2xs'
+                                        : 'bg-white border-slate-200'
+                                }`}
+                            >
+                                <label className="flex items-center justify-between gap-2 cursor-pointer">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <div
+                                            className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                                                createMeetInvite
+                                                    ? 'bg-violet-600 text-white'
+                                                    : 'bg-slate-100 text-slate-500'
+                                            }`}
+                                        >
+                                            <Video className="w-3.5 h-3.5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <span className="block text-[11px] font-bold text-slate-900 truncate">
+                                                Agendar en Google Calendar + Google Meet
+                                            </span>
+                                            <span className="block text-[9px] text-slate-500 truncate">
+                                                {googleIntegrationEmail
+                                                    ? `Conectado: ${googleIntegrationEmail}`
+                                                    : 'Genera sala de videollamada e invitación de calendario'}
                                             </span>
                                         </div>
-                                        <input
-                                            type="checkbox"
-                                            checked={createMeetInvite}
-                                            onChange={e => setCreateMeetInvite(e.target.checked)}
-                                            className="w-4 h-4 rounded accent-violet-600 cursor-pointer shrink-0"
-                                        />
-                                    </label>
-                                    {createMeetInvite && (
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={createMeetInvite}
+                                        onChange={e => {
+                                            const checked = e.target.checked;
+                                            setCreateMeetInvite(checked);
+                                            if (checked && followUpType !== 'meeting') {
+                                                setFollowUpType('meeting');
+                                            }
+                                        }}
+                                        className="w-4 h-4 rounded accent-violet-600 cursor-pointer shrink-0"
+                                    />
+                                </label>
+                                {createMeetInvite && (
+                                    <div className="pt-1 space-y-1.5">
                                         <input
                                             type="email"
                                             value={meetAttendeeEmail}
                                             onChange={e => setMeetAttendeeEmail(e.target.value)}
-                                            placeholder="Correo del cliente para enviar invitación Meet (opcional)"
+                                            placeholder="Correo del cliente para enviar invitación de Google Meet (opcional)"
                                             className="w-full h-8 bg-white border border-violet-200 rounded-lg px-2.5 text-[11px] font-medium text-slate-800 placeholder-slate-400 focus:border-violet-600 outline-none"
                                         />
-                                    )}
-                                </div>
-                            )}
+                                        {!googleIntegrationId && (
+                                            <p className="text-[10px] text-amber-700 font-medium">
+                                                Se agendará como Demo en el CRM (conecta Google Calendar en Configuración para generar link Meet automático).
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

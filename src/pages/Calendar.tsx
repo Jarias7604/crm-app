@@ -358,7 +358,7 @@ export default function Calendar() {
             if (canViewAllCalendar) {
                 const { data: companyInts } = await supabase
                     .from('calendar_integrations')
-                    .select('id, user_id, email')
+                    .select('id, user_id, google_email')
                     .eq('company_id', companyId)
                     .eq('provider', 'google')
                     .eq('is_active', true);
@@ -368,7 +368,7 @@ export default function Calendar() {
                         const ownerProfile = teamProfiles.find(tp => tp.id === ci.user_id);
                         sources.push({
                             integration_id: ci.id,
-                            group_name: ownerProfile?.full_name || ci.email || 'Google Calendar',
+                            group_name: ownerProfile?.full_name || ci.google_email || 'Google Calendar',
                             color: '#4285F4'
                         });
                     }
