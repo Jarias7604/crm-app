@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
     Phone, 
     X, 
@@ -205,6 +205,34 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
     const [followUpTime, setFollowUpTime] = useState('09:00');
     const [followUpNote, setFollowUpNote] = useState('');
     const [followUpAssignee, setFollowUpAssignee] = useState(lead.assigned_to || '');
+    const [googleIntegrationId, setGoogleIntegrationId] = useState<string | null>(null);
+    const [googleIntegrationEmail, setGoogleIntegrationEmail] = useState<string | null>(null);
+    const [createMeetInvite, setCreateMeetInvite] = useState(true);
+    const [meetAttendeeEmail, setMeetAttendeeEmail] = useState(lead.email || '');
+
+    useEffect(() => {
+        let mounted = true;
+        const loadGoogleIntegration = async () => {
+            const { data: authData } = await supabase.auth.getUser();
+            const targetUserId = followUpAssignee || authData?.user?.id;
+            if (!targetUserId) return;
+            const { data } = await supabase
+                .from('calendar_integrations')
+                .select('id, email, google_email')
+                .eq('user_id', targetUserId)
+                .eq('provider', 'google')
+                .eq('is_active', true)
+                .maybeSingle();
+            if (mounted) {
+                setGoogleIntegrationId(data?.id || null);
+                setGoogleIntegrationEmail((data as any)?.google_email || (data as any)?.email || null);
+            }
+        };
+        loadGoogleIntegration();
+        return () => {
+            mounted = false;
+        };
+    }, [followUpAssignee]);
 
     const handleActionTypeChange = (type: ActionType) => {
         setActionType(type);
@@ -282,13 +310,42 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                 const nextTypeLabel = NEXT_APPOINTMENT_TYPES.find(t => t.key === followUpType)?.label || 'Llamada';
                 const defaultNote = followUpType === 'meeting' ? 'Demo / Reunión' : `Seguimiento: ${nextTypeLabel}`;
 
-                await leadsService.createFollowUp({
+                const createdFollowUp = await leadsService.createFollowUp({
                     lead_id: lead.id,
                     company_id: companyId || lead.company_id,
                     date: followUpDateTime,
                     notes: followUpNote.trim() || defaultNote,
                     action_type: followUpType,
                 }, followUpAssignee || undefined);
+
+                if (followUpType === 'meeting' && createMeetInvite && googleIntegrationId) {
+                    try {
+                        const startMs = new Date(followUpDateTime).getTime();
+                        const endIso = new Date(startMs + 30 * 60 * 1000).toISOString();
+                        const cleanEmail = meetAttendeeEmail.trim().toLowerCase();
+                        const meetTitle = followUpNote.trim()
+                            ? `${followUpNote.trim()} - ${lead.company_name || lead.name}`
+                            : `Demo - ${lead.company_name || lead.name}`;
+                        const meetRes = await leadsService.createGoogleMeeting({
+                            integrationId: googleIntegrationId,
+                            followUpId: createdFollowUp?.id,
+                            title: meetTitle,
+                            description: notes.trim() || `Demo / Reunión con ${lead.name}`,
+                            start: followUpDateTime,
+                            end: endIso,
+                            attendees: cleanEmail && cleanEmail.includes('@') ? [cleanEmail] : [],
+                            addMeetLink: true,
+                            sendInvites: true,
+                            timezone: companyTimezone,
+                        });
+                        if (meetRes?.meet_link) {
+                            navigator.clipboard?.writeText(meetRes.meet_link).catch(() => {});
+                            toast.success('Sala de Google Meet creada (link copiado al portapapeles)');
+                        }
+                    } catch (gErr) {
+                        console.warn('Could not create Google Meet event automatically:', gErr);
+                    }
+                }
 
                 const displayTime = (() => { const [h, m] = (followUpTime || '09:00').split(':'); const hn = parseInt(h, 10); return !isNaN(hn) ? `${hn % 12 || 12}:${(m || '00').slice(0, 2)} ${hn >= 12 ? 'PM' : 'AM'}` : followUpTime; })();
                 toast.success(`${nextTypeLabel} agendada: ${formatDateES(followUpDate)} a las ${displayTime}`);
@@ -655,6 +712,35 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                                     className="w-full h-10 bg-white border border-slate-200 rounded-xl px-3.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all shadow-2xs"
                                 />
                             </div>
+
+                            {followUpType === 'meeting' && googleIntegrationId && (
+                                <div className="p-2.5 rounded-xl bg-violet-50/70 border border-violet-200/80 space-y-2">
+                                    <label className="flex items-center justify-between gap-2 cursor-pointer">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Video className="w-3.5 h-3.5 text-violet-600 shrink-0" />
+                                            <span className="text-[11px] font-bold text-violet-900 truncate">
+                                                Crear link de Google Meet en Google Calendar
+                                                {googleIntegrationEmail ? ` (${googleIntegrationEmail})` : ''}
+                                            </span>
+                                        </div>
+                                        <input
+                                            type="checkbox"
+                                            checked={createMeetInvite}
+                                            onChange={e => setCreateMeetInvite(e.target.checked)}
+                                            className="w-4 h-4 rounded accent-violet-600 cursor-pointer shrink-0"
+                                        />
+                                    </label>
+                                    {createMeetInvite && (
+                                        <input
+                                            type="email"
+                                            value={meetAttendeeEmail}
+                                            onChange={e => setMeetAttendeeEmail(e.target.value)}
+                                            placeholder="Correo del cliente para enviar invitación Meet (opcional)"
+                                            className="w-full h-8 bg-white border border-violet-200 rounded-lg px-2.5 text-[11px] font-medium text-slate-800 placeholder-slate-400 focus:border-violet-600 outline-none"
+                                        />
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

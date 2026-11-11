@@ -5,7 +5,8 @@ import { es } from 'date-fns/locale';
 import {
     X, Video, Calendar, Clock, Users, Mail, Copy,
     ExternalLink, Check, Loader2, AlertCircle, Link2,
-    ChevronDown, Plus, Globe, ChevronLeft, ChevronRight
+    ChevronDown, Plus, Globe, ChevronLeft, ChevronRight,
+    Search, Building2
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { leadsService } from '../services/leads';
@@ -90,6 +91,48 @@ export default function GoogleMeetScheduler({
     }, [companyTimezone, initialEvent]);
 
     // Form state
+    const [selectedLead, setSelectedLead] = useState<{
+        id: string;
+        name: string;
+        company_name?: string | null;
+        email?: string | null;
+        status?: string | null;
+    } | null>(() =>
+        initialLeadId
+            ? { id: initialLeadId, name: initialLeadName || 'Prospecto', email: initialLeadEmail || null }
+            : null
+    );
+    const [leadSearchQuery, setLeadSearchQuery] = useState('');
+    const [leadSearchResults, setLeadSearchResults] = useState<
+        { id: string; name: string; company_name?: string | null; email?: string | null; status?: string | null }[]
+    >([]);
+    const [isSearchingLeads, setIsSearchingLeads] = useState(false);
+
+    useEffect(() => {
+        if (!leadSearchQuery.trim() || leadSearchQuery.trim().length < 2) {
+            setLeadSearchResults([]);
+            return;
+        }
+        const timer = setTimeout(async () => {
+            setIsSearchingLeads(true);
+            try {
+                const companyId = localStorage.getItem('simulated_company_id') || profile?.company_id;
+                if (!companyId) return;
+                const q = leadSearchQuery.trim();
+                const { data } = await supabase
+                    .from('leads')
+                    .select('id, name, company_name, email, status')
+                    .eq('company_id', companyId)
+                    .or(`name.ilike.%${q}%,company_name.ilike.%${q}%,email.ilike.%${q}%`)
+                    .limit(8);
+                setLeadSearchResults(data || []);
+            } finally {
+                setIsSearchingLeads(false);
+            }
+        }, 220);
+        return () => clearTimeout(timer);
+    }, [leadSearchQuery, profile?.company_id]);
+
     const [title, setTitle] = useState(() => {
         if (initialEvent?._rawEvent?.summary) return initialEvent._rawEvent.summary;
         if (initialEvent?.lead?.name) return initialEvent.lead.name;
@@ -394,7 +437,7 @@ Reunión modificada desde Arias CRM.`;
                 // Create follow-up in CRM (always create it so it appears on the calendar, even if not linked to a lead)
                 const suffix = count > 1 ? ` (${occ.index}/${count})` : '';
                 const followUp = await leadsService.createFollowUp({
-                    lead_id: initialLeadId || undefined,
+                    lead_id: selectedLead?.id || initialLeadId || undefined,
                     date: occ.start,
                     notes: description || `Reunión: ${title}${suffix}`,
                     action_type: 'meeting',
@@ -694,6 +737,96 @@ Reunión programada automáticamente desde Arias CRM${suffix}.`;
                             </p>
                         </div>
                     </div>
+
+                    {/* Link to Lead or Existing Client (Optional) */}
+                    {!isEditMode && !initialLeadId && (
+                        <div>
+                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5">
+                                Vincular con Prospecto o Cliente (Opcional)
+                            </label>
+                            {selectedLead ? (
+                                <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/50">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                                            <Building2 className="w-3.5 h-3.5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5">
+                                                <p className="text-xs font-bold text-slate-900 truncate">
+                                                    {selectedLead.name}
+                                                </p>
+                                                {selectedLead.status && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[9px] font-black uppercase">
+                                                        {selectedLead.status}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[11px] text-slate-500 truncate">
+                                                {selectedLead.company_name || selectedLead.email || 'Vinculado al CRM'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedLead(null)}
+                                        className="text-xs font-bold text-slate-400 hover:text-rose-600 px-2 py-1 rounded-lg hover:bg-white transition-all"
+                                    >
+                                        Cambiar
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                    <input
+                                        value={leadSearchQuery}
+                                        onChange={e => setLeadSearchQuery(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-xs font-medium text-gray-800 transition-all"
+                                        placeholder="Buscar prospecto o cliente existente (ej. Jet Print)..."
+                                    />
+                                    {isSearchingLeads && (
+                                        <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 animate-spin" />
+                                    )}
+                                    {leadSearchResults.length > 0 && (
+                                        <div className="absolute z-40 top-full left-0 right-0 mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-48 overflow-y-auto divide-y divide-gray-50">
+                                            {leadSearchResults.map(item => (
+                                                <button
+                                                    key={item.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedLead(item);
+                                                        setLeadSearchQuery('');
+                                                        setLeadSearchResults([]);
+                                                        if (title === 'Nueva Reunión' || !title.trim()) {
+                                                            setTitle(`Demo - ${item.company_name || item.name}`);
+                                                        }
+                                                        if (item.email && !attendees.includes(item.email.toLowerCase().trim())) {
+                                                            setAttendees(prev => [...prev, item.email!.toLowerCase().trim()]);
+                                                        }
+                                                    }}
+                                                    className="w-full px-3.5 py-2.5 text-left hover:bg-indigo-50/50 flex items-center justify-between gap-2 transition-colors"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-bold text-slate-900 truncate">
+                                                            {item.name}
+                                                            {item.company_name ? ` · ${item.company_name}` : ''}
+                                                        </p>
+                                                        {item.email && (
+                                                            <p className="text-[10px] text-slate-400 truncate">{item.email}</p>
+                                                        )}
+                                                    </div>
+                                                    {item.status && (
+                                                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[9px] font-black shrink-0">
+                                                            {item.status}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Title */}
                     <div>

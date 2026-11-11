@@ -170,7 +170,7 @@ export default function Calendar() {
     const [showPerformanceReport, setShowPerformanceReport] = useState(false);
 
     // Responsable filter — admins o roles con permiso de ver calendario de equipo
-    const [calendarCollabProfiles, setCalendarCollabProfiles] = useState<{ id: string; full_name: string; role: string; avatar_url?: string | null }[]>([]);
+    const [calendarCollabProfiles, setCalendarCollabProfiles] = useState<{ id: string; full_name: string; email?: string | null; role: string; avatar_url?: string | null }[]>([]);
     const [selectedCalendarCollabId, setSelectedCalendarCollabId] = useState<string | undefined>(undefined);
     const [selectedCalendarCollabName, setSelectedCalendarCollabName] = useState<string | null>(null);
     const [isCalendarCollabOpen, setIsCalendarCollabOpen] = useState(false);
@@ -285,7 +285,7 @@ export default function Calendar() {
         const companyId = simId || profile.company_id;
         supabase
             .from('profiles')
-            .select('id, full_name, role, avatar_url')
+            .select('id, full_name, email, role, avatar_url')
             .eq('company_id', companyId)
             .eq('is_active', true)
             .order('full_name')
@@ -307,14 +307,28 @@ export default function Calendar() {
     // Real Google Calendar Events from integration
     // queryKey includes windowStart so navigating months triggers a fresh fetch
     const { data: googleEventsData } = useQuery({
-        queryKey: ['google-calendar-events', profile?.id, windowStart],
+        queryKey: ['google-calendar-events', profile?.id, profile?.company_id, canViewAllCalendar, windowStart],
         queryFn: async () => {
             if (!profile?.id || !profile?.company_id) return [];
-            
+            const simId = localStorage.getItem('simulated_company_id');
+            const companyId = simId || profile.company_id;
+
+            // Load active company profiles to map Google Calendar event ORGANIZER email -> CRM advisor
+            const { data: teamProfilesData } = await supabase
+                .from('profiles')
+                .select('id, full_name, email, role, avatar_url')
+                .eq('company_id', companyId)
+                .eq('is_active', true);
+            const teamProfiles = teamProfilesData || [];
+            const profileByEmail = new Map<string, (typeof teamProfiles)[number]>();
+            teamProfiles.forEach(p => {
+                if (p.email) profileByEmail.set(p.email.toLowerCase().trim(), p);
+            });
+
             // 1. Get personal integration
             const { data: personalInt } = await supabase
                 .from('calendar_integrations')
-                .select('id')
+                .select('id, user_id')
                 .eq('user_id', profile.id)
                 .eq('provider', 'google')
                 .eq('is_active', true)
@@ -323,13 +337,16 @@ export default function Calendar() {
             // 2. Get shared calendars
             const sharedCals = await companyCalendarsService.getMyAccessibleCalendars(profile.id);
 
-            // 3. Build sources
+            // 3. Build sources (deduplicated by integration_id)
+            const seenIntegrationIds = new Set<string>();
             const sources: any[] = [];
             if (personalInt) {
+                seenIntegrationIds.add(personalInt.id);
                 sources.push({ integration_id: personalInt.id, group_name: 'Mi Calendario', color: '#4285F4' });
             }
             sharedCals.forEach((ca: any) => {
-                if (ca.calendar?.integration?.id) {
+                if (ca.calendar?.integration?.id && !seenIntegrationIds.has(ca.calendar.integration.id)) {
+                    seenIntegrationIds.add(ca.calendar.integration.id);
                     sources.push({
                         integration_id: ca.calendar.integration.id,
                         group_name: ca.calendar.name,
@@ -338,6 +355,26 @@ export default function Calendar() {
                 }
             });
 
+            if (canViewAllCalendar) {
+                const { data: companyInts } = await supabase
+                    .from('calendar_integrations')
+                    .select('id, user_id, email')
+                    .eq('company_id', companyId)
+                    .eq('provider', 'google')
+                    .eq('is_active', true);
+                (companyInts || []).forEach((ci: any) => {
+                    if (ci.id && !seenIntegrationIds.has(ci.id)) {
+                        seenIntegrationIds.add(ci.id);
+                        const ownerProfile = teamProfiles.find(tp => tp.id === ci.user_id);
+                        sources.push({
+                            integration_id: ci.id,
+                            group_name: ownerProfile?.full_name || ci.email || 'Google Calendar',
+                            color: '#4285F4'
+                        });
+                    }
+                });
+            }
+
             if (sources.length === 0) return [];
 
             // 4. Fetch from edge function
@@ -345,24 +382,49 @@ export default function Calendar() {
                 body: { action: 'fetch_events_multi', integration_sources: sources }
             });
             if (error || !fn?.events) return [];
-            
-            return (fn.events as any[]).map((ev: any) => ({
-                id: `google-${ev.id}-${ev._groupName}`,
-                company_id: profile?.company_id || '',
-                lead_id: null,
-                action_type: 'google_calendar',
-                date: ev.start?.dateTime || ev.start?.date || new Date().toISOString(),
-                completed: false,
-                notes: ev.description || ev.location || '',
-                created_at: ev.created || new Date().toISOString(),
-                assigned_to: profile?.id || '',
-                completed_at: null,
-                action_result: null,
-                lead: { id: `g${ev.id}`, name: ev.summary || 'Evento Google', company_name: ev._groupName || ev._calendarName || null, email: null, phone: null },
-                assigned_profile: { id: profile?.id || '', full_name: profile?.full_name || '', avatar_url: null, role: 'user' },
-                _groupColor: ev._groupColor,
-                _rawEvent: ev
-            } as any));
+
+            // Deduplicate events across multiple team calendars by Google event ID
+            const uniqueEventsMap = new Map<string, any>();
+            (fn.events as any[]).forEach((ev: any) => {
+                if (!ev?.id) return;
+                if (!uniqueEventsMap.has(ev.id)) {
+                    uniqueEventsMap.set(ev.id, ev);
+                }
+            });
+
+            return Array.from(uniqueEventsMap.values()).map((ev: any) => {
+                const orgEmail = (ev.organizer?.email || ev.creator?.email || '').toLowerCase().trim();
+                const matchedOrganizer = orgEmail ? profileByEmail.get(orgEmail) : undefined;
+                const assignedProfile = matchedOrganizer || {
+                    id: profile?.id || '',
+                    full_name: profile?.full_name || '',
+                    avatar_url: profile?.avatar_url || null,
+                    role: profile?.role || 'user'
+                };
+
+                return {
+                    id: `google-${ev.id}`,
+                    company_id: companyId,
+                    lead_id: null,
+                    action_type: 'google_calendar',
+                    date: ev.start?.dateTime || ev.start?.date || new Date().toISOString(),
+                    completed: false,
+                    notes: ev.description || ev.location || '',
+                    created_at: ev.created || new Date().toISOString(),
+                    assigned_to: assignedProfile.id,
+                    completed_at: null,
+                    action_result: null,
+                    lead: { id: `g${ev.id}`, name: ev.summary || 'Evento Google', company_name: ev._groupName || ev._calendarName || null, email: orgEmail || null, phone: null },
+                    assigned_profile: {
+                        id: assignedProfile.id,
+                        full_name: assignedProfile.full_name,
+                        avatar_url: assignedProfile.avatar_url || null,
+                        role: assignedProfile.role || 'user'
+                    },
+                    _groupColor: ev._groupColor,
+                    _rawEvent: ev
+                } as any;
+            });
         },
         enabled: showGoogleEvents && !!profile?.id,
         staleTime: 10 * 60 * 1000,   // 10 min — edge function is slow, avoid redundant calls

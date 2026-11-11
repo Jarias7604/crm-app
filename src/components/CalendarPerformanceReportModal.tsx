@@ -97,6 +97,7 @@ interface RawQuote {
 interface AdvisorProfile {
     id: string;
     full_name: string;
+    email?: string | null;
     role: string;
     avatar_url: string | null;
 }
@@ -140,6 +141,7 @@ interface AdvisorMetrics {
     demosCount: number;
     demosExecutedCount: number;
     demosScheduledCount: number;
+    upcomingDemosCount: number;
     quotesCount: number;
     quotesNewAmount: number;
     quotedFollowUpsCount: number;
@@ -156,6 +158,7 @@ interface AdvisorMetrics {
     scheduledItems: RawFollowUp[];
     executedItems: RawCallActivity[];
     demosList: DemoEntry[];
+    upcomingDemosList: DemoEntry[];
     quotesCreatedList: QuoteEntry[];
     quotedFollowUpsList: QuoteEntry[];
     wonLeadsList: RawWonLead[];
@@ -246,23 +249,15 @@ function getActionIcon(type: string) {
 
 /**
  * Strict validation for whether a scheduled follow_up in the calendar is a Demo / Visit.
- * Excludes notes that are merely phone calls to coordinate/reschedule a demo.
+ * Only follow_ups explicitly created with action_type === 'meeting' count as CRM Demos.
+ * WhatsApp ('whatsapp') or Phone Call ('call') follow-ups are never counted as Demos.
  */
-function isScheduledDemoFollowUp(actionType?: string | null, notes?: string | null): boolean {
-    if (actionType === 'meeting') return true;
-    if (!notes) return false;
-    const clean = notes.trim();
-    // Exclude notes that are follow-up calls to coordinate, schedule, or reschedule a demo
-    if (
-        /\b(programar|programaci[oó]n|reprogramar|reprogramaci[oó]n|reprogramci[oó]n|coordinar|concertar|agendar|seguimiento|credenciales|llamar|validar)\b/i.test(
-            clean
-        )
-    ) {
+function isScheduledDemoFollowUp(actionType?: string | null, notes?: string | null, hasLead?: boolean): boolean {
+    if (actionType !== 'meeting') return false;
+    if (!hasLead && notes && /^detalles\s+de\s+la\s+reuni[oó]n$/i.test(notes.trim())) {
         return false;
     }
-    return /^(demo(\s+virtual|\s+presencial)?|visita\s+presencial|presentaci[oó]n(\s+de\s+sistema)?|reuni[oó]n(\s+virtual|\s+presencial)?)$/i.test(
-        clean
-    );
+    return true;
 }
 
 /**
@@ -274,14 +269,29 @@ function isExecutedDemoActivity(actionType?: string | null): boolean {
     return actionType === 'meeting';
 }
 
-function isGoogleCalendarDemoEvent(title?: string | null, notes?: string | null): boolean {
-    const text = `${title || ''} ${notes || ''}`.trim();
-    if (!text) return false;
-    // Exclude holidays or internal trainings
-    if (/\b(capacitaci[oó]n|thanksgiving|black\s+friday|feriado|vacaciones|almuerzo|reuni[oó]n\s+interna)\b/i.test(text)) {
+function isGoogleCalendarDemoEvent(title?: string | null): boolean {
+    const cleanTitle = (title || '').trim();
+    if (!cleanTitle) return false;
+    // Exclude holidays, internal development syncs, trainings, or administrative blocks
+    if (
+        /\b(capacitaci[oó]n|seguimiento\s+desarrollo|oficina|holiday|thanksgiving|black\s+friday|feriado|vacaciones|almuerzo|reuni[oó]n\s+interna|entrevista|revisi[oó]n|ajustes)\b/i.test(
+            cleanTitle
+        )
+    ) {
         return false;
     }
-    return /\b(demo|presentaci[oó]n|visita\s+presencial|google\s+meet)\b/i.test(text);
+    return /\b(demo|presentaci[oó]n\s+de\s+sistema|visita\s+presencial)\b/i.test(cleanTitle);
+}
+
+function getGoogleEventOrganizerEmail(rawEv: any): string {
+    if (!rawEv) return '';
+    if (rawEv.organizer?.email) return String(rawEv.organizer.email).toLowerCase().trim();
+    if (rawEv.creator?.email) return String(rawEv.creator.email).toLowerCase().trim();
+    const orgAttendee = Array.isArray(rawEv.attendees)
+        ? rawEv.attendees.find((a: any) => a?.organizer && a?.email)
+        : null;
+    if (orgAttendee?.email) return String(orgAttendee.email).toLowerCase().trim();
+    return '';
 }
 
 export const CalendarPerformanceReportModal: React.FC<Props> = ({
@@ -300,6 +310,8 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
     const [loading, setLoading] = useState(false);
     const [profiles, setProfiles] = useState<AdvisorProfile[]>([]);
     const [followUps, setFollowUps] = useState<RawFollowUp[]>([]);
+    const [upcomingFollowUps, setUpcomingFollowUps] = useState<RawFollowUp[]>([]);
+    const [fetchedGoogleEvents, setFetchedGoogleEvents] = useState<any[]>([]);
     const [callActivities, setCallActivities] = useState<RawCallActivity[]>([]);
     const [wonLeads, setWonLeads] = useState<RawWonLead[]>([]);
     const [quotes, setQuotes] = useState<RawQuote[]>([]);
@@ -377,12 +389,14 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
         let cancelled = false;
         setLoading(true);
 
+        const future14DaysIso = new Date(new Date(dateWindow.endIso).getTime() + 14 * 24 * 60 * 60 * 1000).toISOString();
+
         (async () => {
             try {
-                const [profRes, fuRes, actRes, wonRes, quotesRes] = await Promise.all([
+                const [profRes, fuRes, upFuRes, actRes, wonRes, quotesRes, calIntRes] = await Promise.all([
                     supabase
                         .from('profiles')
-                        .select('id, full_name, role, avatar_url')
+                        .select('id, full_name, email, role, avatar_url')
                         .eq('company_id', companyId)
                         .eq('is_active', true)
                         .order('full_name'),
@@ -394,6 +408,15 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                         .lte('date', dateWindow.endIso)
                         .order('date', { ascending: true })
                         .limit(4000),
+                    supabase
+                        .from('follow_ups')
+                        .select('id, date, notes, action_type, assigned_to, completed, completed_at, lead:leads(id, name, company_name)')
+                        .eq('company_id', companyId)
+                        .eq('action_type', 'meeting')
+                        .gt('date', dateWindow.endIso)
+                        .lte('date', future14DaysIso)
+                        .order('date', { ascending: true })
+                        .limit(500),
                     supabase
                         .from('call_activities')
                         .select('id, user_id, lead_id, call_date, duration_seconds, action_type, outcome, notes, status_before, status_after, lead:leads(id, name, company_name, status, value, document_path)')
@@ -416,12 +439,23 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                         .lte('created_at', dateWindow.endIso)
                         .order('created_at', { ascending: false })
                         .limit(2000),
+                    supabase
+                        .from('calendar_integrations')
+                        .select('id, user_id, google_email')
+                        .eq('company_id', companyId)
+                        .eq('provider', 'google')
+                        .eq('is_active', true),
                 ]);
 
                 if (cancelled) return;
                 setProfiles((profRes.data || []) as AdvisorProfile[]);
                 setFollowUps(
                     ((fuRes.data || []) as unknown as RawFollowUp[]).filter(
+                        f => !isAutoWhatsAppCampaignFollowUp(f.notes)
+                    )
+                );
+                setUpcomingFollowUps(
+                    ((upFuRes.data || []) as unknown as RawFollowUp[]).filter(
                         f => !isAutoWhatsAppCampaignFollowUp(f.notes)
                     )
                 );
@@ -436,6 +470,31 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                 });
                 setWonLeads(periodWon);
                 setQuotes((quotesRes.data || []) as unknown as RawQuote[]);
+
+                // Fetch Google Calendar events across all active company Google integrations
+                const activeCalInts = calIntRes.data || [];
+                if (activeCalInts.length > 0) {
+                    const sources = activeCalInts.map((ci: any) => ({
+                        integration_id: ci.id,
+                        group_name: ci.google_email || 'Google Calendar',
+                        color: '#4285F4',
+                    }));
+                    const { data: fnData } = await supabase.functions.invoke('google-calendar-sync', {
+                        body: { action: 'fetch_events_multi', integration_sources: sources },
+                    });
+                    if (!cancelled && fnData?.events && Array.isArray(fnData.events)) {
+                        // Deduplicate by raw Google Event id
+                        const dedup = new Map<string, any>();
+                        fnData.events.forEach((ev: any) => {
+                            if (ev?.id && !dedup.has(ev.id)) {
+                                dedup.set(ev.id, ev);
+                            }
+                        });
+                        setFetchedGoogleEvents(Array.from(dedup.values()));
+                    }
+                } else {
+                    setFetchedGoogleEvents([]);
+                }
             } catch (err) {
                 console.warn('[CalendarPerformanceReportModal] fetch error:', err);
             } finally {
@@ -483,16 +542,20 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
             const executedConnected = exe.filter(a => a.outcome === 'connected').length;
             const executedExtra = Math.max(0, executedTotal - Math.min(executedTotal, scheduledCompleted));
 
-            // 1. Identify REAL Demos / Visits (CRM scheduled 'meeting' + CRM executed 'meeting' + optional Google Calendar Demos)
+            // 1. Identify REAL Demos / Visits in the selected period (CRM 'meeting' + Google Calendar Demos by Organizer)
             const demosMap = new Map<string, DemoEntry>();
             sch.forEach(f => {
-                if (isScheduledDemoFollowUp(f.action_type, f.notes)) {
+                if (isScheduledDemoFollowUp(f.action_type, f.notes, Boolean(f.lead?.id))) {
                     const key = f.lead?.id ? `lead-${f.lead.id}` : `fu-${f.id}`;
+                    const zonedDt = utcToZonedDateTime(f.date, companyTimezone);
                     demosMap.set(key, {
                         id: f.id,
                         leadId: f.lead?.id || null,
-                        leadName: f.lead?.name || 'Prospecto',
-                        dateStr: formatTimeInZone(f.date, companyTimezone),
+                        leadName: f.lead?.name || f.notes || 'Prospecto',
+                        dateStr:
+                            periodMode === 'day'
+                                ? formatTimeInZone(f.date, companyTimezone)
+                                : format(zonedDt, 'd MMM · hh:mm a', { locale: es }),
                         source: f.notes ? `Agenda CRM: ${f.notes}` : 'Demo Agendada (CRM)',
                         notes: f.notes,
                         completed: f.completed,
@@ -504,46 +567,128 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                 if (isExecutedDemoActivity(a.action_type)) {
                     const key = a.lead_id ? `lead-${a.lead_id}` : `act-${a.id}`;
                     const existing = demosMap.get(key);
+                    const zonedDt = utcToZonedDateTime(a.call_date, companyTimezone);
                     demosMap.set(key, {
                         id: a.id,
                         leadId: a.lead_id || null,
                         leadName: a.lead?.name || existing?.leadName || 'Prospecto',
-                        dateStr: formatTimeInZone(a.call_date, companyTimezone),
-                        source: existing ? `${existing.source} · Realizada` : 'Demo / Reunión Realizada',
+                        dateStr:
+                            periodMode === 'day'
+                                ? formatTimeInZone(a.call_date, companyTimezone)
+                                : format(zonedDt, 'd MMM · hh:mm a', { locale: es }),
+                        source: existing ? `${existing.source} · Realizada` : 'Demo / Visita Realizada (CRM)',
                         notes: a.notes || existing?.notes || null,
                         completed: true,
                         origin: 'executed',
                     });
                 }
             });
-            // Optional Google Calendar integration support for SaaS companies that schedule Demos in Google Calendar
-            googleEvents.forEach((gev: any) => {
-                if (!gev?.date) return;
-                if (gev.date < dateWindow.startIso || gev.date > dateWindow.endIso) return;
-                const title = gev.lead?.name || gev._rawEvent?.summary || '';
-                const groupName = (gev.lead?.company_name || gev._rawEvent?._groupName || '').toLowerCase();
-                const advFirstName = (advisor.full_name || '').split(' ')[0].toLowerCase();
+
+            //Upcoming Demos scheduled for OTHER future days (next 14 days after selected period)
+            const upcomingDemosMap = new Map<string, DemoEntry>();
+            upcomingFollowUps
+                .filter(f => f.assigned_to === advisor.id)
+                .forEach(f => {
+                    if (isScheduledDemoFollowUp(f.action_type, f.notes, Boolean(f.lead?.id))) {
+                        const zonedDt = utcToZonedDateTime(f.date, companyTimezone);
+                        const key = f.lead?.id ? `up-lead-${f.lead.id}-${format(zonedDt, 'yyyy-MM-dd')}` : `up-fu-${f.id}`;
+                        upcomingDemosMap.set(key, {
+                            id: f.id,
+                            leadId: f.lead?.id || null,
+                            leadName: f.lead?.name || f.notes || 'Prospecto',
+                            dateStr: format(zonedDt, "EEE d MMM · hh:mm a", { locale: es }),
+                            source: f.notes ? `Agendada CRM (${f.notes})` : 'Agendada en CRM para otro día',
+                            notes: f.notes,
+                            completed: false,
+                            origin: 'scheduled_crm',
+                        });
+                    }
+                });
+
+            // Attribute Google Calendar Demo events strictly by ORGANIZER email (e.g. pmartinez@ariasdefense.com -> Patricia Martínez)
+            const advisorEmail = (advisor.email || '').toLowerCase().trim();
+            const allGoogleSourceEvents = fetchedGoogleEvents.length > 0 ? fetchedGoogleEvents : googleEvents;
+            const futureCutoffStr = format(
+                new Date(new Date(dateWindow.endIso).getTime() + 14 * 24 * 60 * 60 * 1000),
+                'yyyy-MM-dd'
+            );
+
+            allGoogleSourceEvents.forEach((gev: any) => {
+                const rawEv = gev?._rawEvent || gev;
+                const evId = rawEv?.id || gev?.id;
+                const evTitle = (rawEv?.summary || gev?.lead?.name || '').trim();
+                const evStart = rawEv?.start?.dateTime || rawEv?.start?.date || gev?.date;
+                if (!evStart || !isGoogleCalendarDemoEvent(evTitle)) return;
+
+                const orgEmail = getGoogleEventOrganizerEmail(rawEv);
                 const matchesAdvisor =
-                    gev.assigned_to === advisor.id ||
-                    (advFirstName.length >= 3 && groupName.includes(advFirstName));
+                    (advisorEmail && orgEmail === advisorEmail) ||
+                    (!orgEmail && gev?.assigned_to === advisor.id);
                 if (!matchesAdvisor) return;
-                if (isGoogleCalendarDemoEvent(title, gev.notes)) {
-                    const key = `gcal-${gev.id}`;
+
+                const zonedEvDate = utcToZonedDateTime(evStart, companyTimezone);
+                const evDayStr = format(zonedEvDate, 'yyyy-MM-dd');
+                const titleLower = evTitle.toLowerCase();
+
+                if (evDayStr >= dateWindow.startDateOnly && evDayStr <= dateWindow.endDateOnly) {
+                    // Deduplicate if the same lead already has a CRM demo entry on the same day (e.g. Mercy Amaya)
+                    const duplicateEntry = Array.from(demosMap.values()).find(d => {
+                        const dName = d.leadName.toLowerCase().trim();
+                        return dName.length >= 4 && (titleLower.includes(dName) || dName.includes(titleLower));
+                    });
+                    if (duplicateEntry) {
+                        if (!duplicateEntry.source.includes('Google')) {
+                            duplicateEntry.source = `${duplicateEntry.source} · Google Calendar`;
+                        }
+                        return;
+                    }
+
+                    const key = `gcal-${evId}`;
                     if (!demosMap.has(key)) {
+                        const isDone = new Date(evStart).getTime() <= Date.now();
                         demosMap.set(key, {
-                            id: gev.id,
+                            id: String(evId),
                             leadId: null,
-                            leadName: title || 'Demo Google Calendar',
-                            dateStr: formatTimeInZone(gev.date, companyTimezone),
-                            source: 'Google Calendar · Demo Agendada',
-                            notes: gev.notes || null,
-                            completed: new Date(gev.date).getTime() <= Date.now(),
+                            leadName: evTitle,
+                            dateStr:
+                                periodMode === 'day'
+                                    ? formatTimeInZone(evStart, companyTimezone)
+                                    : format(zonedEvDate, 'd MMM · hh:mm a', { locale: es }),
+                            source: rawEv?.hangoutLink
+                                ? `Google Meet · Organizador: ${advisor.full_name}`
+                                : `Google Calendar · Organizador: ${advisor.full_name}`,
+                            notes: rawEv?.description || gev?.notes || null,
+                            completed: isDone,
+                            origin: 'google_calendar',
+                        });
+                    }
+                } else if (evDayStr > dateWindow.endDateOnly && evDayStr <= futureCutoffStr) {
+                    const duplicateUpcoming = Array.from(upcomingDemosMap.values()).find(d => {
+                        const dName = d.leadName.toLowerCase().trim();
+                        return dName.length >= 4 && (titleLower.includes(dName) || dName.includes(titleLower));
+                    });
+                    if (duplicateUpcoming) return;
+
+                    const key = `up-gcal-${evId}`;
+                    if (!upcomingDemosMap.has(key)) {
+                        upcomingDemosMap.set(key, {
+                            id: String(evId),
+                            leadId: null,
+                            leadName: evTitle,
+                            dateStr: format(zonedEvDate, 'EEE d MMM · hh:mm a', { locale: es }),
+                            source: rawEv?.hangoutLink
+                                ? 'Google Meet · Agendada para otro día'
+                                : 'Google Calendar · Agendada para otro día',
+                            notes: rawEv?.description || gev?.notes || null,
+                            completed: false,
                             origin: 'google_calendar',
                         });
                     }
                 }
             });
+
             const demosList = Array.from(demosMap.values());
+            const upcomingDemosList = Array.from(upcomingDemosMap.values());
             const demosExecutedCount = demosList.filter(d => d.completed).length;
             const demosScheduledCount = demosList.length - demosExecutedCount;
 
@@ -684,6 +829,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                 demosCount: demosList.length,
                 demosExecutedCount,
                 demosScheduledCount,
+                upcomingDemosCount: upcomingDemosList.length,
                 quotesCount,
                 quotesNewAmount,
                 quotedFollowUpsCount,
@@ -700,6 +846,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                 scheduledItems: sch,
                 executedItems: exe,
                 demosList,
+                upcomingDemosList,
                 quotesCreatedList,
                 quotedFollowUpsList,
                 wonLeadsList: advWon,
@@ -713,7 +860,23 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
             if (b.executedTotal !== a.executedTotal) return b.executedTotal - a.executedTotal;
             return b.scheduledTotal - a.scheduledTotal;
         });
-    }, [profiles, followUps, callActivities, wonLeads, quotes, googleEvents, dateWindow.workingDays, dateWindow.startIso, dateWindow.endIso, companyTimezone]);
+    }, [
+        profiles,
+        followUps,
+        upcomingFollowUps,
+        callActivities,
+        wonLeads,
+        quotes,
+        googleEvents,
+        fetchedGoogleEvents,
+        periodMode,
+        dateWindow.workingDays,
+        dateWindow.startIso,
+        dateWindow.endIso,
+        dateWindow.startDateOnly,
+        dateWindow.endDateOnly,
+        companyTimezone,
+    ]);
 
     const filteredMetrics = useMemo(() => {
         if (filterView === 'active') {
@@ -1196,6 +1359,11 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                 {m.quotesCount} Cotiz.
                                                             </span>
                                                         </div>
+                                                        {m.upcomingDemosCount > 0 && (
+                                                            <span className="block text-[9px] text-violet-600 font-bold mt-0.5">
+                                                                +{m.upcomingDemosCount} demo{m.upcomingDemosCount === 1 ? '' : 's'} otro día
+                                                            </span>
+                                                        )}
                                                         {m.quotedFollowUpsCount > 0 && (
                                                             <span className="block text-[9px] text-slate-400 font-medium mt-0.5">
                                                                 {m.quotedFollowUpsCount} cotiz. previas en seg.
@@ -1488,6 +1656,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                 </div>
 
                                                                 {m.demosList.length === 0 &&
+                                                                m.upcomingDemosList.length === 0 &&
                                                                 m.quotesCreatedList.length === 0 &&
                                                                 m.quotedFollowUpsList.length === 0 &&
                                                                 m.wonLeadsList.length === 0 ? (
@@ -1522,7 +1691,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                             </div>
                                                                         ))}
 
-                                                                        {/* Real Demos / Meetings */}
+                                                                        {/* Real Demos / Meetings of the Selected Period */}
                                                                         {m.demosList.map(demo => (
                                                                             <div
                                                                                 key={`demo-${demo.id}`}
@@ -1550,7 +1719,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                                                 : 'bg-violet-100 text-violet-700'
                                                                                         }`}
                                                                                     >
-                                                                                        {demo.completed ? 'Realizada' : 'Agendada'}
+                                                                                        {demo.completed ? 'Realizada hoy' : 'Agendada hoy'}
                                                                                     </span>
                                                                                     <span className="block text-[10px] font-bold text-violet-700 mt-0.5">
                                                                                         {demo.dateStr}
@@ -1558,6 +1727,46 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                                 </div>
                                                                             </div>
                                                                         ))}
+
+                                                                        {/* Upcoming Demos Scheduled for Other Future Days */}
+                                                                        {m.upcomingDemosList.length > 0 && (
+                                                                            <>
+                                                                                <div className="pt-2 pb-1">
+                                                                                    <p className="text-[9px] font-black text-violet-700/80 uppercase tracking-wider">
+                                                                                        Demos agendadas para próximos días ({m.upcomingDemosList.length})
+                                                                                    </p>
+                                                                                </div>
+                                                                                {m.upcomingDemosList.map(upDemo => (
+                                                                                    <div
+                                                                                        key={`updemo-${upDemo.id}`}
+                                                                                        onClick={() => upDemo.leadId && onNavigateLead?.(upDemo.leadId)}
+                                                                                        className="flex items-center justify-between gap-2.5 p-2 rounded-xl border border-violet-100/90 bg-slate-50/70 hover:bg-violet-50/40 transition-all cursor-pointer"
+                                                                                    >
+                                                                                        <div className="flex items-center gap-2 min-w-0">
+                                                                                            <div className="w-5 h-5 rounded-md bg-violet-100/80 text-violet-600 flex items-center justify-center shrink-0">
+                                                                                                <Video className="w-3 h-3" />
+                                                                                            </div>
+                                                                                            <div className="min-w-0">
+                                                                                                <p className="text-[11px] font-bold text-slate-800 truncate">
+                                                                                                    {upDemo.leadName}
+                                                                                                </p>
+                                                                                                <p className="text-[9px] text-slate-500 truncate">
+                                                                                                    {upDemo.source}
+                                                                                                </p>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div className="text-right shrink-0">
+                                                                                            <span className="inline-block px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-700 text-[9px] font-black">
+                                                                                                Otro día
+                                                                                            </span>
+                                                                                            <span className="block text-[9px] font-bold text-violet-700 mt-0.5">
+                                                                                                {upDemo.dateStr}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </>
+                                                                        )}
 
                                                                         {/* Formal Quotes Created in Period */}
                                                                         {m.quotesCreatedList.map(q => (
