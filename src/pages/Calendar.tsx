@@ -11,7 +11,7 @@ import {
     ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail,
     CalendarDays, MessageSquare, Video, FileText, SlidersHorizontal,
     CheckCircle2, Circle, RotateCcw, X, Users, ChevronDown, CheckCircle, Calendar as CalendarIcon,
-    ExternalLink, AlignLeft, UserPlus
+    ExternalLink, AlignLeft, UserPlus, BarChart3
 } from 'lucide-react';
 import { leadsService } from '../services/leads';
 import { supabase } from '../services/supabase';
@@ -21,6 +21,7 @@ import { useTimezone } from '../hooks/useTimezone';
 import { formatTimeInZone, utcToLocalDate, getHourAndMinuteInZone, DEFAULT_TIMEZONE, localToUtcISO } from '../utils/timezone';
 import GoogleMeetScheduler from '../components/GoogleMeetScheduler';
 import NewFollowUpModal from '../components/NewFollowUpModal';
+import { CalendarPerformanceReportModal } from '../components/CalendarPerformanceReportModal';
 import toast from 'react-hot-toast';
 
 type CalendarEvent = Awaited<ReturnType<typeof leadsService.getCalendarFollowUps>>[number];
@@ -166,6 +167,7 @@ export default function Calendar() {
     // New Follow-up modal
     const [showNewFollowUpModal, setShowNewFollowUpModal] = useState(false);
     const [newFollowUpDate, setNewFollowUpDate] = useState<Date | undefined>(undefined);
+    const [showPerformanceReport, setShowPerformanceReport] = useState(false);
 
     // Responsable filter — admins o roles con permiso de ver calendario de equipo
     const [calendarCollabProfiles, setCalendarCollabProfiles] = useState<{ id: string; full_name: string; role: string; avatar_url?: string | null }[]>([]);
@@ -639,6 +641,15 @@ export default function Calendar() {
                 </button>
 
                 <button
+                    onClick={() => setShowPerformanceReport(true)}
+                    className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50/50 font-bold text-xs shadow-sm transition-all shrink-0 cursor-pointer"
+                    title="Abrir reporte de Agenda, Gestiones, Demos, Cierres y Uso del Tiempo"
+                >
+                    <BarChart3 className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Reporte</span>
+                </button>
+
+                <button
                     onClick={() => { setMeetSchedulerDate(new Date()); setShowMeetScheduler(true); }}
                     className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-gradient-to-r from-[#4285F4] to-[#1a73e8] hover:from-[#3367d6] hover:to-[#1557b0] text-white font-bold text-xs shadow-md shadow-[#4285F4]/30 transition-all shrink-0"
                 >
@@ -769,24 +780,25 @@ export default function Calendar() {
                         {(dayActs.length > 0 || totalCount > 0) && (
                             <button
                                 type="button"
-                                onClick={() => {
-                                    setDayDetailTab('executed');
-                                    setDayDetailDate(selectedDate);
-                                }}
-                                className="w-full mb-3 p-2 rounded-xl bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200/80 text-left transition-all cursor-pointer"
-                                title="Clic para ver todas las gestiones registradas hoy (igual que en Rendimiento → Actividad)"
+                                onClick={() => setShowPerformanceReport(true)}
+                                className="w-full mb-3 p-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50/50 border border-slate-200/80 hover:border-indigo-200 text-left transition-all cursor-pointer group"
+                                title="Clic para abrir el reporte comparativo de Agenda, Hechos, Demos, Cierres y Tiempo"
                             >
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[9px] font-black text-emerald-800 uppercase tracking-wider">
-                                        ⚡ Gestiones hechas
+                                    <span className="text-[9px] font-black text-slate-500 group-hover:text-indigo-700 uppercase tracking-wider">
+                                        Gestiones hechas
                                     </span>
-                                    <span className="text-xs font-black text-emerald-700">
+                                    <span className="text-xs font-black text-emerald-600">
                                         {dayActs.length}
                                     </span>
                                 </div>
-                                <p className="text-[9px] font-semibold text-emerald-700/80 mt-0.5 leading-tight">
+                                <p className="text-[9px] font-semibold text-slate-400 mt-0.5 leading-tight">
                                     {completedCount} de agenda · +{extraExecuted} adicionales
                                 </p>
+                                <span className="mt-1.5 pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-[9px] font-bold text-indigo-600">
+                                    <span>Ver reporte y tiempos</span>
+                                    <ChevronRight className="w-3 h-3" />
+                                </span>
                             </button>
                         )}
 
@@ -1707,7 +1719,7 @@ export default function Calendar() {
                                                 : 'text-gray-500 hover:text-gray-800'
                                         }`}
                                     >
-                                        📅 Agenda ({dayEvts.length})
+                                        Agenda ({dayEvts.length})
                                     </button>
                                     <button
                                         type="button"
@@ -1718,7 +1730,7 @@ export default function Calendar() {
                                                 : 'text-gray-500 hover:text-gray-800'
                                         }`}
                                     >
-                                        ⚡ Gestiones Hechas ({dayActs.length})
+                                        Gestiones Hechas ({dayActs.length})
                                     </button>
                                 </div>
                             </div>
@@ -2116,87 +2128,19 @@ export default function Calendar() {
                     onClose={() => setEditGoogleEvent(null)}
                 />
             )}
-            {/* Day Detail Modal */}
-            {dayDetailDate && (() => {
-                const dayEvents = getDailyEvents(dayDetailDate);
-                const leadIds = dayEvents.map(e => e.lead?.id).filter(Boolean) as string[];
-                return (
-                    <div className="fixed inset-0 z-[200] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in" onClick={() => setDayDetailDate(null)}>
-                        <div className="bg-white rounded-[24px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] w-full max-w-lg overflow-hidden flex flex-col border border-slate-200/60" onClick={e => e.stopPropagation()}>
-                            {/* Header */}
-                            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-                                <div>
-                                    <h2 className="text-lg font-black text-slate-900 tracking-tight">Seguimientos del Día</h2>
-                                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{format(dayDetailDate, "EEEE d 'de' MMMM", { locale: es })}</p>
-                                </div>
-                                <button onClick={() => setDayDetailDate(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600">
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
-                            
-                            {/* List */}
-                            <div className="p-4 overflow-y-auto max-h-[50vh] bg-slate-50/50 space-y-2 custom-scrollbar">
-                                {dayEvents.map(ev => {
-                                    const cfg = getActionCfg(ev.action_type);
-                                    const timeStr = formatTimeInZone(ev.date, companyTimezone);
-                                    const isOverdue = !ev.completed && isBefore(utcToLocalDate(ev.date, companyTimezone), new Date()) && !isToday(utcToLocalDate(ev.date, companyTimezone));
-                                    return (
-                                        <div 
-                                            key={ev.id} 
-                                            onClick={() => { ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); setDayDetailDate(null); }}
-                                            className={`group flex items-center gap-3 p-3 rounded-xl border bg-white cursor-pointer hover:-translate-y-0.5 hover:shadow-md transition-all ${ev.completed ? 'opacity-70 border-slate-200' : isOverdue ? 'border-red-100 hover:border-red-200' : 'border-slate-100 hover:border-indigo-100'}`}
-                                        >
-                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${ev.completed ? 'bg-slate-100 text-slate-400' : isOverdue ? 'bg-red-50 text-red-500' : cfg.badge}`}>
-                                                <cfg.Icon className={`w-4 h-4 ${ev.completed ? 'text-slate-400' : isOverdue ? 'text-red-500' : cfg.badgeText}`} />
-                                            </div>
-                                            <div className="flex flex-col flex-1 min-w-0">
-                                                <span className={`text-sm font-bold truncate ${ev.completed ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
-                                                    {ev.lead?.name || 'Lead'}
-                                                </span>
-                                                <span className="text-[11px] font-medium text-slate-400 mt-0.5 flex items-center gap-1.5">
-                                                    <Clock className="w-3 h-3" />
-                                                    {timeStr}
-                                                    {isOverdue && <span className="text-red-500 bg-red-50 px-1.5 rounded-full text-[9px] uppercase tracking-wider ml-1">Vencido</span>}
-                                                </span>
-                                            </div>
-                                            {ev.completed ? (
-                                                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                                            ) : (
-                                                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-indigo-50 text-slate-400 group-hover:text-indigo-600 transition-colors shrink-0">
-                                                    <ChevronRight className="w-4 h-4" />
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
 
-                            {/* Footer */}
-                            <div className="p-4 border-t border-slate-100 bg-white flex items-center justify-between shrink-0">
-                                <button
-                                    onClick={() => {
-                                        const targetDate = dayDetailDate || new Date();
-                                        setDayDetailDate(null);
-                                        setNewFollowUpDate(targetDate);
-                                        setShowNewFollowUpModal(true);
-                                    }}
-                                    className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-200 transition-all"
-                                >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    Agendar para este día
-                                </button>
-                                <button
-                                    onClick={() => { setDayDetailDate(null); navigate('/leads', { state: { leadIds, fromCalendar: true } }); }}
-                                    className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-200 transition-all"
-                                >
-                                    Ver {dayEvents.length} en Tabla
-                                    <ExternalLink className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
+            {/* Reporte Ejecutivo de Agenda, Gestiones, Demos, Cierres y Uso del Tiempo */}
+            <CalendarPerformanceReportModal
+                isOpen={showPerformanceReport}
+                onClose={() => setShowPerformanceReport(false)}
+                initialDate={selectedDate || new Date()}
+                companyId={localStorage.getItem('simulated_company_id') || profile?.company_id || ''}
+                companyTimezone={companyTimezone}
+                onNavigateLead={(leadId) => {
+                    setShowPerformanceReport(false);
+                    navigate('/leads', { state: { leadId } });
+                }}
+            />
 
             {/* New FollowUp Modal */}
             <NewFollowUpModal

@@ -3647,7 +3647,7 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
                                                             className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 text-[8px] font-black"
                                                             title="Compromisos agendados en el Calendario para este período"
                                                         >
-                                                            📅 Agenda: {ag.scheduled}
+                                                            Agenda: {ag.scheduled}
                                                         </span>
                                                         {extra > 0 && (
                                                             <span
