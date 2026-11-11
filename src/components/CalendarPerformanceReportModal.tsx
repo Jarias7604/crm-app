@@ -402,7 +402,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                         .order('full_name'),
                     supabase
                         .from('follow_ups')
-                        .select('id, date, notes, action_type, assigned_to, completed, completed_at, lead:leads(id, name, company_name)')
+                        .select('id, date, notes, action_type, assigned_to, completed, completed_at, lead:leads(id, name, company_name, assigned_to)')
                         .eq('company_id', companyId)
                         .gte('date', dateWindow.startIso)
                         .lte('date', dateWindow.endIso)
@@ -410,7 +410,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                         .limit(4000),
                     supabase
                         .from('follow_ups')
-                        .select('id, date, notes, action_type, assigned_to, completed, completed_at, lead:leads(id, name, company_name)')
+                        .select('id, date, notes, action_type, assigned_to, completed, completed_at, lead:leads(id, name, company_name, assigned_to)')
                         .eq('company_id', companyId)
                         .eq('action_type', 'meeting')
                         .gt('date', dateWindow.endIso)
@@ -526,7 +526,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
         const expectedWorkMinutes = dateWindow.workingDays * 8 * 60;
 
         map.forEach(advisor => {
-            const sch = followUps.filter(f => f.assigned_to === advisor.id);
+            const sch = followUps.filter(f => (f.assigned_to || (f.lead as any)?.assigned_to) === advisor.id);
             const exe = callActivities.filter(a => a.user_id === advisor.id);
             const advWon = wonLeads.filter(l => l.assigned_to === advisor.id);
             const advQuotes = quotes.filter(
@@ -587,7 +587,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
             //Upcoming Demos scheduled for OTHER future days (next 14 days after selected period)
             const upcomingDemosMap = new Map<string, DemoEntry>();
             upcomingFollowUps
-                .filter(f => f.assigned_to === advisor.id)
+                .filter(f => (f.assigned_to || (f.lead as any)?.assigned_to) === advisor.id)
                 .forEach(f => {
                     if (isScheduledDemoFollowUp(f.action_type, f.notes, Boolean(f.lead?.id))) {
                         const zonedDt = utcToZonedDateTime(f.date, companyTimezone);

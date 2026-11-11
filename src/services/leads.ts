@@ -815,6 +815,28 @@ export const leadsService = {
                 }
             }
 
+            // Create initial calendar follow_ups for any imported leads that include a next_followup_date
+            const followUpsToInsert = results.inserted
+                .filter(ins => Boolean(ins.next_followup_date))
+                .map(ins => ({
+                    lead_id: ins.id,
+                    company_id: ins.company_id || companyId,
+                    user_id: user?.id,
+                    assigned_to: ins.next_followup_assignee || ins.assigned_to || user?.id || null,
+                    date: ins.next_followup_date,
+                    action_type: 'call' as const,
+                    notes: ins.next_action_notes || 'Seguimiento programado',
+                    completed: false,
+                }));
+
+            if (followUpsToInsert.length > 0) {
+                try {
+                    await supabase.from('follow_ups').insert(followUpsToInsert);
+                } catch (fupErr) {
+                    logger.error('Failed to insert initial follow_ups during lead import', fupErr as any);
+                }
+            }
+
             logger.info('Import finished successfully', {
                 inserted: results.inserted.length,
                 skipped: results.skipped.length,

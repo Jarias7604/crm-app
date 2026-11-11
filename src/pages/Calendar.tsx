@@ -394,13 +394,16 @@ export default function Calendar() {
 
             return Array.from(uniqueEventsMap.values()).map((ev: any) => {
                 const orgEmail = (ev.organizer?.email || ev.creator?.email || '').toLowerCase().trim();
-                const matchedOrganizer = orgEmail ? profileByEmail.get(orgEmail) : undefined;
-                const assignedProfile = matchedOrganizer || {
-                    id: profile?.id || '',
-                    full_name: profile?.full_name || '',
-                    avatar_url: profile?.avatar_url || null,
-                    role: profile?.role || 'user'
-                };
+                let matchedOrganizer = orgEmail ? profileByEmail.get(orgEmail) : undefined;
+                if (!matchedOrganizer && Array.isArray(ev.attendees)) {
+                    for (const att of ev.attendees) {
+                        const attEmail = String(att?.email || '').toLowerCase().trim();
+                        if (attEmail && profileByEmail.has(attEmail)) {
+                            matchedOrganizer = profileByEmail.get(attEmail);
+                            break;
+                        }
+                    }
+                }
 
                 return {
                     id: `google-${ev.id}`,
@@ -411,16 +414,18 @@ export default function Calendar() {
                     completed: false,
                     notes: ev.description || ev.location || '',
                     created_at: ev.created || new Date().toISOString(),
-                    assigned_to: assignedProfile.id,
+                    assigned_to: matchedOrganizer?.id || null,
                     completed_at: null,
                     action_result: null,
                     lead: { id: `g${ev.id}`, name: ev.summary || 'Evento Google', company_name: ev._groupName || ev._calendarName || null, email: orgEmail || null, phone: null },
-                    assigned_profile: {
-                        id: assignedProfile.id,
-                        full_name: assignedProfile.full_name,
-                        avatar_url: assignedProfile.avatar_url || null,
-                        role: assignedProfile.role || 'user'
-                    },
+                    assigned_profile: matchedOrganizer
+                        ? {
+                              id: matchedOrganizer.id,
+                              full_name: matchedOrganizer.full_name,
+                              avatar_url: matchedOrganizer.avatar_url || null,
+                              role: matchedOrganizer.role || 'user'
+                          }
+                        : null,
                     _groupColor: ev._groupColor,
                     _rawEvent: ev
                 } as any;
@@ -870,11 +875,25 @@ export default function Calendar() {
                                 .map(([type, cfg]) => {
                                     const evs = grouped[type] || [];
                                     const doneCount = evs.filter(e => e.completed).length;
-                                    const leadIds = evs.map(e => e.lead?.id).filter(Boolean);
+                                    const leadIds = Array.from(new Set(
+                                        evs
+                                            .map(e => (e.lead?.id && !String(e.lead.id).startsWith('g') ? e.lead.id : null))
+                                            .filter(Boolean) as string[]
+                                    ));
                                     return (
                                         <button
                                             key={type}
-                                            onClick={() => navigate('/leads', { state: { leadIds, fromCalendar: true } })}
+                                            onClick={() => {
+                                                if (leadIds.length > 0) {
+                                                    navigate('/leads', { state: { leadIds, fromCalendar: true } });
+                                                } else if (evs.length === 1) {
+                                                    const ev = evs[0];
+                                                    if (ev.action_type === 'google_calendar') setSelectedGoogleEvent(ev);
+                                                    else setSelectedCrmEvent(ev);
+                                                } else if (evs.length > 1) {
+                                                    setDayDetailDate(selectedDate);
+                                                }
+                                            }}
                                             title={`${doneCount}/${evs.length} ${cfg.label}(s) completados`}
                                             className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-gray-50 hover:shadow-sm cursor-pointer group transition-all"
                                         >
@@ -931,6 +950,7 @@ export default function Calendar() {
                     count: number;
                     executedCount: number;
                     leadIds: string[];
+                    events: CalendarEvent[];
                 }> = {};
 
                 dayEvts.forEach(ev => {
@@ -944,11 +964,14 @@ export default function Calendar() {
                             count: 0,
                             executedCount: 0,
                             leadIds: [],
+                            events: [],
                         };
                     }
                     assignedMap[p.id]!.count += 1;
-                    if (ev.lead?.id && !assignedMap[p.id]!.leadIds.includes(ev.lead.id)) {
-                        assignedMap[p.id]!.leadIds.push(ev.lead.id);
+                    assignedMap[p.id]!.events.push(ev);
+                    const realLeadId = ev.lead?.id && !String(ev.lead.id).startsWith('g') ? ev.lead.id : null;
+                    if (realLeadId && !assignedMap[p.id]!.leadIds.includes(realLeadId)) {
+                        assignedMap[p.id]!.leadIds.push(realLeadId);
                     }
                 });
 
@@ -963,6 +986,7 @@ export default function Calendar() {
                             count: 0,
                             executedCount: 0,
                             leadIds: [],
+                            events: [],
                         };
                     }
                     assignedMap[act.user_id]!.executedCount += 1;
@@ -984,7 +1008,17 @@ export default function Calendar() {
                             {assignees.map(a => (
                                 <button
                                     key={a.id}
-                                    onClick={() => navigate('/leads', { state: { leadIds: a.leadIds, fromCalendar: true } })}
+                                    onClick={() => {
+                                        if (a.leadIds.length > 0) {
+                                            navigate('/leads', { state: { leadIds: a.leadIds, fromCalendar: true } });
+                                        } else if (a.events.length === 1) {
+                                            const ev = a.events[0];
+                                            if (ev.action_type === 'google_calendar') setSelectedGoogleEvent(ev);
+                                            else setSelectedCrmEvent(ev);
+                                        } else {
+                                            setDayDetailDate(selectedDate);
+                                        }
+                                    }}
                                     className="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-xl hover:bg-gray-50 hover:shadow-sm transition-all group cursor-pointer"
                                     title={`${a.full_name}: ${a.count} agendado(s) hoy · ${a.executedCount} gestión(es) realizada(s) hoy`}
                                 >
@@ -1061,7 +1095,16 @@ export default function Calendar() {
                                 onClick={() => setSelectedDate(day)}
                                 onDoubleClick={() => {
                                     if (dayEvents.length > 0) {
-                                        navigate('/leads', { state: { leadIds: dayEvents.map(e => e.lead?.id).filter(Boolean), fromCalendar: true } });
+                                        const realLeadIds = Array.from(new Set(
+                                            dayEvents
+                                                .map(e => (e.lead?.id && !String(e.lead.id).startsWith('g') ? e.lead.id : null))
+                                                .filter(Boolean) as string[]
+                                        ));
+                                        if (realLeadIds.length > 0) {
+                                            navigate('/leads', { state: { leadIds: realLeadIds, fromCalendar: true } });
+                                        } else {
+                                            setDayDetailDate(day);
+                                        }
                                     }
                                 }}
                                 className={`min-h-[130px] p-2 flex flex-col transition-colors cursor-pointer
@@ -1087,16 +1130,29 @@ export default function Calendar() {
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    const allLeadIds = dayEvents.map(e => e.lead?.id).filter(Boolean) as string[];
-                                                    const completedLeadIds = dayEvents.filter(e => e.completed).map(e => e.lead?.id).filter(Boolean) as string[];
-                                                    navigate('/leads', {
-                                                        state: {
-                                                            leadIds: allLeadIds,
-                                                            completedLeadIds,
-                                                            fromCalendar: true,
-                                                            calendarDate: format(day, "EEEE d 'de' MMMM", { locale: es })
-                                                        }
-                                                    });
+                                                    const allLeadIds = Array.from(new Set(
+                                                        dayEvents
+                                                            .map(ev => (ev.lead?.id && !String(ev.lead.id).startsWith('g') ? ev.lead.id : null))
+                                                            .filter(Boolean) as string[]
+                                                    ));
+                                                    const completedLeadIds = Array.from(new Set(
+                                                        dayEvents
+                                                            .filter(ev => ev.completed)
+                                                            .map(ev => (ev.lead?.id && !String(ev.lead.id).startsWith('g') ? ev.lead.id : null))
+                                                            .filter(Boolean) as string[]
+                                                    ));
+                                                    if (allLeadIds.length > 0) {
+                                                        navigate('/leads', {
+                                                            state: {
+                                                                leadIds: allLeadIds,
+                                                                completedLeadIds,
+                                                                fromCalendar: true,
+                                                                calendarDate: format(day, "EEEE d 'de' MMMM", { locale: es })
+                                                            }
+                                                        });
+                                                    } else {
+                                                        setDayDetailDate(day);
+                                                    }
                                                 }}
                                                 title={`${completed}/${total} completados — click para ver en Leads`}
                                                 className={`min-w-[28px] h-5 px-1.5 rounded-full ${bgColor} text-[9px] font-black transition-all hover:scale-110 flex items-center justify-center gap-0.5`}

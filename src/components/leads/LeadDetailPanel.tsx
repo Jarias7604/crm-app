@@ -2017,10 +2017,14 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                     await handleUpdateLead({ next_action_notes: `${currentNotes}${notes}` });
                     await supabase.from('follow_ups').insert({
                         lead_id: selectedLead.id,
-                        date: new Date().toISOString().split('T')[0],
+                        company_id: selectedLead.company_id || profile?.company_id,
+                        user_id: profile?.id,
+                        assigned_to: selectedLead.assigned_to || profile?.id || null,
+                        date: new Date().toISOString(),
                         notes,
                         action_type: 'call',
                         completed: true,
+                        completed_at: new Date().toISOString(),
                     });
                     loadDetails();
                 }}
