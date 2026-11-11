@@ -71,6 +71,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { cotizacionesService } from '../../services/cotizaciones';
 import { pdfService } from '../../services/pdfService';
 import { bookingService } from '../../services/bookingService';
+import { leadsService } from '../../services/leads';
 import {
   ticketService,
   computeTicketAiTimeBenchmark,
@@ -483,7 +484,11 @@ type CircleFilter = 'all' | 'unread' | 'waiting' | 'soporte' | 'por_clasificar' 
 
 // Parse "[10:42 a. m.] 👤 Nombre: texto" chat lines written by the webhook.
 function parseChatLine(raw: string): { icon: string; sender: string; text: string } | null {
-  const m = raw.match(/^\[([^\]]+)\]\s*(👤|👨‍💻)?\s*([^:\n]+):\s*([\s\S]*)$/);
+  const cleanedRaw = String(raw || '')
+    .replace(/👨‍💻\s*Simulaci[oó]n:\s*[a-zA-Z0-9_-]+:/gi, '👨‍💻 Jimmy Arias:')
+    .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Jimmy Arias de Arias Defense')
+    .replace(/\bPlatform Owner\b/gi, 'Jimmy Arias de Arias Defense');
+  const m = cleanedRaw.match(/^\[([^\]]+)\]\s*(👤|👨‍💻)?\s*([^:\n]+):\s*([\s\S]*)$/);
   if (!m) return null;
   return { icon: m[2] || '', sender: m[3].trim(), text: m[4] };
 }
@@ -505,6 +510,10 @@ export const SupportChatCircles: React.FC = () => {
   );
   const [adminPreviewMode, setAdminPreviewMode] = useState<WaAccessMode | null>(null);
   const scopes = useMemo(() => getWaViewerScopes(profile as any, adminPreviewMode), [profile, adminPreviewMode]);
+
+  useEffect(() => {
+    leadsService.purgeAutoCampaignFollowUps().catch(() => {});
+  }, []);
 
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<Ticket[]>([]);

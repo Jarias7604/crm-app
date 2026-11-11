@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
-import { leadsService } from '../../services/leads';
 import type { Lead } from '../../types';
 
 export interface ReactivationTouchInfo {
@@ -712,13 +711,6 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     }
 
     try {
-      const mediaNote = uploadedMedia ? ` + Adjunto (${uploadedMedia.name})` : '';
-      await leadsService.createFollowUp({
-        lead_id: lead.id,
-        action_type: 'whatsapp' as any,
-        notes: `[${campaignTag} · Toque ${nextTouchNumber}]${mediaNote} Mensaje enviado por WhatsApp: "${personalizedText.slice(0, 180)}"`,
-        date: nowIso,
-      });
       await supabase
         .from('leads')
         .update({

@@ -10,7 +10,7 @@ import { ManageLeadSourcesModal } from './ManageLeadSourcesModal';
 import { ManageIndustriesModal } from './ManageIndustriesModal';
 import type { LeadProduct } from '../../types';
 import { supabase } from '../../services/supabase';
-import { leadsService } from '../../services/leads';
+import { leadsService, isAutoWhatsAppCampaignFollowUp } from '../../services/leads';
 import { callActivityService, ACTION_TYPE_CONFIG, CALL_OUTCOME_CONFIG } from '../../services/callActivity';
 import { logger } from '../../utils/logger';
 import { PRIORITY_CONFIG, STATUS_CONFIG, SOURCE_CONFIG, ACTION_TYPES } from '../../types';
@@ -289,7 +289,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
         };
 
         const sortedFollowUps = [...followUps]
-            .filter(f => f && f.date)
+            .filter(f => f && f.date && !isAutoWhatsAppCampaignFollowUp(f.notes))
             .sort((a, b) => {
                 const da = parseFollowUpDate(a.date)?.getTime() || 0;
                 const db = parseFollowUpDate(b.date)?.getTime() || 0;
@@ -302,8 +302,10 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
             return dt && dt.getTime() >= startOfToday && !(f as any).completed;
         });
 
-        // 2. Si no hay futuro en followUps, verificar si selectedLead.next_followup_date es futuro, o tomar el último agendado
-        const leadNextDt = parseFollowUpDate(selectedLead.next_followup_date);
+        // 2. Si no hay futuro en followUps, verificar si selectedLead.next_followup_date es un agendamiento manual válido
+        const rawLeadNext = String(selectedLead.next_followup_date || '');
+        const isAutoCampaignTimestamp = rawLeadNext.includes('T') && !/T\d{2}:\d{2}:00(\.000)?Z?$/.test(rawLeadNext);
+        const leadNextDt = isAutoCampaignTimestamp ? null : parseFollowUpDate(selectedLead.next_followup_date);
         const latestScheduledFu = sortedFollowUps.length > 0 ? sortedFollowUps[sortedFollowUps.length - 1] : null;
         const targetFu: any = upcomingFu || latestScheduledFu;
 

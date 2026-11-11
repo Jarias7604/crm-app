@@ -1422,7 +1422,8 @@ export default function Leads() {
                 lost_reason_id: lossData.lost_reason_id,
                 lost_at_stage,
                 lost_notes: lossData.lost_notes || null,
-                lost_date: new Date().toISOString()
+                lost_date: new Date().toISOString(),
+                next_followup_date: null
             });
 
             // Create history entry for traceability
@@ -1431,7 +1432,8 @@ export default function Leads() {
                 lead_id: selectedLead.id,
                 notes: traceabilityNote,
                 action_type: 'other',
-                date: format(new Date(), 'yyyy-MM-dd')
+                date: format(new Date(), 'yyyy-MM-dd'),
+                completed: true
             });
 
             setSelectedLead({ ...selectedLead, status: 'Perdido', lost_at_stage, lost_reason_id: lossData.lost_reason_id, lost_notes: lossData.lost_notes });
@@ -1677,7 +1679,8 @@ export default function Leads() {
                 lead_id: selectedLead.id,
                 notes: traceabilityNote,
                 action_type: 'other',
-                date: format(new Date(), 'yyyy-MM-dd')
+                date: format(new Date(), 'yyyy-MM-dd'),
+                completed: true
             });
 
             setIsWonModalOpen(false);
