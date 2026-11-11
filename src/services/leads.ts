@@ -1032,6 +1032,7 @@ export const leadsService = {
                         .update({
                             next_followup_date: followUp.date,
                             next_followup_assignee: resolvedAssignee,
+                            ...(resolvedAssignee ? { assigned_to: resolvedAssignee } : {}),
                             last_follow_up_at: new Date().toISOString(),
                         })
                         .eq('id', followUp.lead_id);
@@ -1169,7 +1170,7 @@ export const leadsService = {
         }
 
         const mapped = followUps.map(item => {
-            const effectiveAssignedTo = item.assigned_to || (item.lead as any)?.assigned_to || null;
+            const effectiveAssignedTo = (item.lead as any)?.assigned_to || item.assigned_to || null;
             return {
                 id: item.id,
                 date: item.date,

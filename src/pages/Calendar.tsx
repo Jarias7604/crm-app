@@ -220,7 +220,7 @@ export default function Calendar() {
             if (!companyId) return [];
             let q = supabase
                 .from('call_activities')
-                .select('id, user_id, lead_id, call_date, action_type, outcome, notes, lead:leads(id, name, company_name)')
+                .select('id, user_id, lead_id, call_date, action_type, outcome, notes, lead:leads(id, name, company_name, assigned_to)')
                 .eq('company_id', companyId)
                 .gte('call_date', windowStart)
                 .lte('call_date', windowEnd)
@@ -238,7 +238,7 @@ export default function Calendar() {
                 action_type: string;
                 outcome: string;
                 notes: string | null;
-                lead: { id: string; name: string; company_name: string | null } | null;
+                lead: { id: string; name: string; company_name: string | null; assigned_to?: string | null } | null;
             }>;
         },
         staleTime: 60 * 1000,
@@ -977,6 +977,7 @@ export default function Calendar() {
 
                 dayActs.forEach(act => {
                     if (!act.user_id) return;
+                    const leadOwnerId = act.lead?.assigned_to || act.user_id;
                     const pInfo = profileLookup.get(act.user_id);
                     if (!assignedMap[act.user_id]) {
                         assignedMap[act.user_id] = {
@@ -990,7 +991,7 @@ export default function Calendar() {
                         };
                     }
                     assignedMap[act.user_id]!.executedCount += 1;
-                    if (act.lead_id && !assignedMap[act.user_id]!.leadIds.includes(act.lead_id)) {
+                    if (act.lead_id && leadOwnerId === act.user_id && !assignedMap[act.user_id]!.leadIds.includes(act.lead_id)) {
                         assignedMap[act.user_id]!.leadIds.push(act.lead_id);
                     }
                 });
@@ -1010,7 +1011,7 @@ export default function Calendar() {
                                     key={a.id}
                                     onClick={() => {
                                         if (a.leadIds.length > 0) {
-                                            navigate('/leads', { state: { leadIds: a.leadIds, fromCalendar: true } });
+                                            navigate('/leads', { state: { leadIds: a.leadIds, assignedFilter: a.id, fromCalendar: true } });
                                         } else if (a.events.length === 1) {
                                             const ev = a.events[0];
                                             if (ev.action_type === 'google_calendar') setSelectedGoogleEvent(ev);
