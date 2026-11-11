@@ -64,12 +64,20 @@ interface ReactivationTemplate {
 
 const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
   {
+    id: 'consultivo_corto',
+    label: '1. Pregunta corta consultiva (Toque 1)',
+    shortLabel: 'Pregunta consultiva',
+    subtitle: 'Ideal para prospectos que pidieron información y nunca respondieron',
+    tag: 'Recomendada · Toque 1',
+    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Hace un tiempo nos solicitó información sobre nuestros servicios; ¿todavía están evaluando opciones en {empresa} o ya lo resolvieron por ahora?',
+  },
+  {
     id: 'toque2_flyer_video',
     label: 'Toque 2 · Valor Visual (Con Flyer o Video)',
     shortLabel: 'Valor Visual (Flyer/Video)',
     subtitle: 'Ideal para los que no respondieron al Toque 1 · Acompáñalo de un Flyer o Video corto',
     tag: 'Toque 2 · Flyer / Video',
-    body: 'Hola {nombre}, sé que a veces los mensajes se pasan por la operación del día. Le comparto un resumen visual de cómo ayudamos a empresas como {empresa} con Facturación Electrónica y control administrativo. ¿Le gustaría que le envíe una cotización o agendamos 10 minutos?',
+    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Sé que a veces los mensajes se pasan por la operación del día; le comparto un resumen visual de cómo ayudamos a empresas como {empresa} con Facturación Electrónica y control administrativo. ¿Le gustaría que le envíe una cotización o agendamos 10 minutos?',
     forResend: true,
   },
   {
@@ -78,8 +86,16 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'Seguimiento breve',
     subtitle: 'Recordatorio corto y directo para quienes dejaron en visto el primer mensaje',
     tag: 'Toque 2 · Texto corto',
-    body: 'Hola {nombre}, le saluda {vendedor}. Le escribo brevemente para dar seguimiento a mi mensaje anterior; ¿pudieron evaluar el sistema en {empresa} o prefiere que le comparta primero los planes y precios por este medio?',
+    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Le escribo brevemente para dar seguimiento a mi mensaje anterior; ¿pudieron evaluar el sistema en {empresa} o prefiere que le comparta primero los planes y precios por este medio?',
     forResend: true,
+  },
+  {
+    id: 'seguimiento_propuesta',
+    label: '2. Seguimiento de propuesta o cotización',
+    shortLabel: 'Seguimiento propuesta',
+    subtitle: 'Para prospectos calificados o en seguimiento que dejaron de contestar',
+    tag: 'Seguimiento comercial',
+    body: 'Hola {nombre}, le escribe Jimmy Arias de Arias Defense. Quería consultarle brevemente si tuvo oportunidad de revisar la información que conversamos o si le gustaría que ajustemos una propuesta a su necesidad actual.',
   },
   {
     id: 'nutricion_valor',
@@ -87,7 +103,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'En Nutrición',
     subtitle: 'Para prospectos que pidieron retomar más adelante (próximo mes o próximo año)',
     tag: 'Nutrición',
-    body: 'Hola {nombre}, le saluda {vendedor}. Recordando que más adelante retomarán el proyecto en {empresa}, le comparto brevemente esta actualización para que la tengan a mano cuando inicien. Quedo atento a cualquier consulta.',
+    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Recordando que más adelante retomarán el proyecto en {empresa}, le comparto brevemente esta actualización para que la tengan a mano cuando inicien. Quedo atento a cualquier consulta.',
     forResend: true,
   },
   {
@@ -96,7 +112,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'Clientes (Nuevos servicios)',
     subtitle: 'Para ofrecer nuevos módulos, actualizaciones o servicios adicionales a clientes actuales',
     tag: 'Upsell Clientes',
-    body: 'Hola {nombre}, le saluda {vendedor}. Qué gusto saludarle y gracias por su confianza. Queríamos compartirle una novedad de nuevos módulos y servicios disponibles para {empresa}. ¿Le gustaría que le comente los beneficios para clientes actuales?',
+    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Qué gusto saludarle y gracias por su confianza. Queríamos compartirle una novedad de nuevos módulos y servicios disponibles para {empresa}. ¿Le gustaría que le comente los beneficios para clientes actuales?',
     forResend: true,
   },
   {
@@ -105,32 +121,8 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'Cierre amable',
     subtitle: 'Aplica psicología inversa para recuperar respuesta antes de pausar el seguimiento',
     tag: 'Toque 3 · Cierre',
-    body: 'Hola {nombre}, le saluda {vendedor}. Para no saturar su WhatsApp dejamos en pausa su solicitud por ahora; si más adelante retoman el proyecto en {empresa}, por aquí queda mi contacto directo. ¡Muchos éxitos!',
+    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Para no saturar su WhatsApp dejamos en pausa su solicitud por ahora; si más adelante retoman el proyecto en {empresa}, por aquí queda mi contacto directo. ¡Muchos éxitos!',
     forResend: true,
-  },
-  {
-    id: 'consultivo_corto',
-    label: '1. Pregunta corta consultiva (Toque 1)',
-    shortLabel: 'Pregunta consultiva',
-    subtitle: 'Ideal para prospectos que pidieron información y nunca respondieron',
-    tag: 'Recomendada · Toque 1',
-    body: 'Hola {nombre}, le saluda {vendedor}. Hace un tiempo nos solicitó información sobre nuestros servicios; ¿todavía están evaluando opciones en {empresa} o ya lo resolvieron por ahora?',
-  },
-  {
-    id: 'seguimiento_propuesta',
-    label: '2. Seguimiento de propuesta o cotización',
-    shortLabel: 'Seguimiento propuesta',
-    subtitle: 'Para prospectos calificados o en seguimiento que dejaron de contestar',
-    tag: 'Seguimiento comercial',
-    body: 'Hola {nombre}, le escribe {vendedor}. Quería consultarle brevemente si tuvo oportunidad de revisar la información que conversamos o si le gustaría que ajustemos una propuesta a su necesidad actual.',
-  },
-  {
-    id: 'cierre_expediente',
-    label: '3. Cierre amable de solicitud',
-    shortLabel: 'Cierre amable',
-    subtitle: 'Genera respuesta rápida en prospectos fríos de +30 o +60 días',
-    tag: 'Respuesta rápida',
-    body: 'Hola {nombre}, le saluda {vendedor}. Estoy actualizando las solicitudes pendientes de este mes; ¿mantenemos abierta su consulta o prefiere que la dejemos en pausa por el momento?',
   },
   {
     id: 'beneficio_implementacion',
@@ -138,7 +130,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'Beneficio especial',
     subtitle: 'Para retomar negociaciones detenidas con una condición especial',
     tag: 'Promoción',
-    body: 'Hola {nombre}, le saluda {vendedor}. Esta semana habilitamos condiciones especiales para proyectos pendientes y pensé en comentarle por si aún lo tienen en planes. ¿Le gustaría que lo revisemos?',
+    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Esta semana habilitamos condiciones especiales para proyectos pendientes y pensé en comentarle por si aún lo tienen en planes. ¿Le gustaría que lo revisemos?',
   },
 ];
 
@@ -286,9 +278,23 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
 
   const sellerDisplayName = useMemo(() => {
     const raw = (currentUser.full_name || '').trim();
-    if (!raw || /^platform\s*owner$/i.test(raw)) return 'Jimmy Arias';
+    if (
+      !raw ||
+      /simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator|^admin(istrador)?\b|^soporte\b|^usuario\b/i.test(
+        raw
+      )
+    ) {
+      return 'Jimmy Arias';
+    }
     return raw;
   }, [currentUser.full_name]);
+
+  const sellerSignature = useMemo(() => {
+    if (/^jimmy\s+arias$/i.test(sellerDisplayName)) {
+      return 'Jimmy Arias de Arias Defense';
+    }
+    return sellerDisplayName;
+  }, [sellerDisplayName]);
 
   // Base pool: if user manually checked specific rows on the table, respect that pool; otherwise use all leads in view with valid phone
   const alreadyInCampaignPoolCount = useMemo(() => {
@@ -486,7 +492,11 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     let text = templateText
       .replace(/\{nombre\}/gi, firstName ? firstName : '')
       .replace(/\{empresa\}/gi, company)
-      .replace(/\{vendedor\}/gi, sellerDisplayName);
+      .replace(/\{vendedor\}/gi, sellerSignature)
+      .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, sellerSignature)
+      .replace(/Platform\s*Owner/gi, sellerSignature)
+      .replace(/\b(company_admin|super_admin|collaborator)\b/gi, sellerSignature)
+      .replace(/(de\s+Arias\s+Defense)\s+\1/gi, '$1');
     text = text.replace(/Hola\s+,/gi, 'Hola,').replace(/[ \t]{2,}/g, ' ').trim();
     return text;
   };
@@ -780,13 +790,8 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   };
 
   const visibleTemplates = useMemo(() => {
-    if (isResendMode) {
-      return DEFAULT_TEMPLATES.filter((t) => t.forResend);
-    }
-    return DEFAULT_TEMPLATES.filter(
-      (t) => !t.forResend || t.id === 'nutricion_valor' || t.id === 'clientes_upsell'
-    );
-  }, [isResendMode]);
+    return DEFAULT_TEMPLATES;
+  }, []);
 
   const handleChangeStageFilter = (nextStage: string) => {
     setStageFilter(nextStage);
@@ -1180,7 +1185,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] text-slate-400">Variables:</span>
-                  {(['{nombre}', '{empresa}', '{vendedor}'] as const).map((v) => (
+                  {(['{nombre}', '{empresa}'] as const).map((v) => (
                     <button
                       key={v}
                       type="button"

@@ -57,7 +57,13 @@ export default function DashboardLayout() {
                         )}>
                             <div className="flex flex-col items-start gap-0 group cursor-default">
                                 <h2 className="text-[13px] md:text-[14px] font-black text-gray-800 tracking-tight flex items-center gap-1.5 transition-all group-hover:text-indigo-600">
-                                    {t('common.greeting', { name: profile?.full_name?.split(' ')[0] || profile?.email?.split('@')[0] })}
+                                    {t('common.greeting', {
+                                        name:
+                                            profile?.full_name &&
+                                            !/simulaci[oó]n|platform\s*owner/i.test(profile.full_name)
+                                                ? profile.full_name.split(' ')[0]
+                                                : 'Jimmy',
+                                    })}
                                     <span className="animate-bounce text-[12px]">✨</span>
                                 </h2>
                                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-[0.25em] opacity-70 group-hover:opacity-100 transition-opacity">

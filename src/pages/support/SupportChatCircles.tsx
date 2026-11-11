@@ -717,13 +717,19 @@ export const SupportChatCircles: React.FC = () => {
     (async () => {
       try {
         const rawName =
-          profile.full_name && !/^platform\s*owner$/i.test(profile.full_name.trim())
+          profile.full_name &&
+          !/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(profile.full_name.trim())
             ? profile.full_name.trim()
             : 'Jimmy Arias';
         const cleanSlug = `${bookingService.slugify(rawName)}-${profile.id.slice(0, 4)}`;
         const existing = await bookingService.getMyBookingLink();
         if (cancelled) return;
-        if (existing?.slug && !existing.slug.startsWith('platform-owner')) {
+        if (
+          existing?.slug &&
+          !existing.slug.startsWith('platform-owner') &&
+          !existing.slug.startsWith('simulacion') &&
+          !/simulaci[oó]n|platform\s*owner/i.test(existing.display_name || '')
+        ) {
           setMyBookingSlug(existing.slug);
           return;
         }
@@ -1052,6 +1058,12 @@ export const SupportChatCircles: React.FC = () => {
         lastMessageSender = sanitizeWaName(parsed.sender) || clientName;
         lastMessageText = stripEmojis(parsed.text);
       }
+      lastMessageSender = lastMessageSender
+        .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Jimmy Arias')
+        .replace(/Platform\s*Owner/gi, 'Jimmy Arias');
+      lastMessageText = lastMessageText
+        .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Jimmy Arias de Arias Defense')
+        .replace(/Platform\s*Owner/gi, 'Jimmy Arias de Arias Defense');
       const lastFrom: string = meta.last_message_from || (parsed ? (parsed.icon === '👨‍💻' ? 'staff' : 'client') : 'client');
       const isOpen = ['new', 'open', 'pending'].includes(activeTicket.status);
       const lastMessageAt = String(meta.last_whatsapp_at || latest.updated_at || latest.created_at);
@@ -1740,7 +1752,10 @@ export const SupportChatCircles: React.FC = () => {
       }
       lastTicketId = c.ticket_id;
 
-      const raw = String(c.body || '').trim();
+      const raw = String(c.body || '')
+        .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Jimmy Arias')
+        .replace(/Platform\s*Owner/gi, 'Jimmy Arias')
+        .trim();
       if (c.is_internal) {
         items.push({ id: c.id, kind: 'system', senderName: '', text: stripEmojis(raw), createdAt: c.created_at, ticketId: c.ticket_id });
         return;
@@ -1759,7 +1774,10 @@ export const SupportChatCircles: React.FC = () => {
       const isStaff = parsed ? parsed.icon === '👨‍💻' || (!parsed.icon && Boolean(c.author_id)) : Boolean(c.author_id);
       const agentName = c.author_id ? agents.find((a) => a.id === c.author_id)?.full_name : undefined;
       const senderName = stripEmojis(
-        (parsed?.sender || agentName || (isStaff ? 'Equipo' : activeCircle.clientName)).replace(/\(Reporte Inicial\)/i, '')
+        (parsed?.sender || agentName || (isStaff ? 'Equipo' : activeCircle.clientName))
+          .replace(/\(Reporte Inicial\)/i, '')
+          .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Jimmy Arias')
+          .replace(/Platform\s*Owner/gi, 'Jimmy Arias')
       );
       const media = mediaByComment.get(c.id);
       const ob = outboxByComment.get(c.id);
@@ -2880,7 +2898,12 @@ export const SupportChatCircles: React.FC = () => {
           </div>
           <span className="text-slate-300 hidden sm:inline">|</span>
           <span className="text-[13px] text-slate-500 hidden sm:inline truncate">
-            {greetingTime()}, <strong className="font-bold text-slate-800">{profile?.full_name?.split(' ')[0] || ''}</strong>
+            {greetingTime()},{' '}
+            <strong className="font-bold text-slate-800">
+              {profile?.full_name && !/simulaci[oó]n|platform\s*owner/i.test(profile.full_name)
+                ? profile.full_name.split(' ')[0]
+                : 'Jimmy'}
+            </strong>
           </span>
           <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[13px] font-medium bg-slate-100 text-slate-600 border border-slate-200/70">
             <Phone className="w-3.5 h-3.5 text-indigo-600" />
