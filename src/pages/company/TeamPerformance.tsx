@@ -24,6 +24,7 @@ import { teamsService, type Team } from '../../services/teams';
 import { performanceGoalsService, type PerformanceGoal } from '../../services/performanceGoals';
 import { forecastService, type ForecastWithActual } from '../../services/forecastService';
 import { callActivityService, type CallActivitySummary, type CallGoal, type ContactActivitySummary, ACTION_TYPE_CONFIG, type CallActivity } from '../../services/callActivity';
+import { leadsService, isAutoWhatsAppCampaignFollowUp } from '../../services/leads';
 import { supabase } from '../../services/supabase';
 import { DEFAULT_TIMEZONE } from '../../utils/timezone';
 
@@ -2585,6 +2586,7 @@ function CallActivitySection({
         completed: number;
         overdue: number;
     }>({ scheduled: 0, completed: 0, overdue: 0 });
+    const [advisorAgendaStats, setAdvisorAgendaStats] = useState<Record<string, { scheduled: number; completed: number }>>({});
 
     // Asesores ocultos: persiste en localStorage para no perder la configuracion
     const hiddenKey = companyId ? `crm_hidden_advisors_${companyId}` : 'crm_hidden_advisors';
@@ -2609,6 +2611,7 @@ function CallActivitySection({
         if (!companyId) return;
         const fetchFollowUpStats = async () => {
             try {
+                await leadsService.purgeAutoCampaignFollowUps();
                 // 1. Timezone de la empresa (SaaS: El Salvador, NY, California, etc.)
                 const { data: co } = await supabase
                     .from('companies').select('timezone').eq('id', companyId).single();
@@ -2685,9 +2688,27 @@ function CallActivitySection({
                     .eq('completed', false as any)
                     .lt('date', todayUtcStart);
 
-                const [sqR, cpR, ovR] = await Promise.all([sqQ, cpQ, ovQ]);
+                let sqListQ = supabase
+                    .from('follow_ups')
+                    .select('assigned_to, completed, notes')
+                    .eq('company_id', companyId)
+                    .limit(3000);
+                if (utcFrom) sqListQ = sqListQ.gte('date', utcFrom);
+                if (utcTo)   sqListQ = sqListQ.lte('date', utcTo);
+
+                const [sqR, cpR, ovR, sqListR] = await Promise.all([sqQ, cpQ, ovQ, sqListQ]);
+                const cleanRows = (sqListR.data || []).filter((r: any) => !isAutoWhatsAppCampaignFollowUp(r.notes));
+                const byAdvisor: Record<string, { scheduled: number; completed: number }> = {};
+                cleanRows.forEach((r: any) => {
+                    const uid = r.assigned_to;
+                    if (!uid) return;
+                    if (!byAdvisor[uid]) byAdvisor[uid] = { scheduled: 0, completed: 0 };
+                    byAdvisor[uid].scheduled += 1;
+                    if (r.completed) byAdvisor[uid].completed += 1;
+                });
+                setAdvisorAgendaStats(byAdvisor);
                 setFollowUpStats({
-                    scheduled: sqR.count ?? 0,
+                    scheduled: sqListR.data ? cleanRows.length : (sqR.count ?? 0),
                     completed: cpR.count ?? 0,
                     overdue:   ovR.count ?? 0,
                 });
@@ -3571,7 +3592,7 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
                 {/* Table header */}
                 <div className="grid grid-cols-12 gap-0 px-5 py-3 bg-slate-50 border-b border-slate-100 text-[9px] font-black text-slate-400 uppercase tracking-wider">
                     <div className="col-span-3">Asesor</div>
-                    <div className="col-span-2 text-center">Seguimientos</div>
+                    <div className="col-span-2 text-center">Gestiones / Agenda</div>
                     <div className="col-span-2 text-center">Meta a la Fecha</div>
                     <div className="col-span-2 text-center">Cumplimiento</div>
                     <div className="col-span-2 text-center">Abordaje</div>
@@ -3612,11 +3633,33 @@ ${pastDays.length > 0 ? `<div class="section"><div class="sec-title">📆 Desglo
                                         </div>
                                     </div>
 
-                                    {/* Llamadas */}
+                                    {/* Llamadas / Gestiones + Cruce con Agenda de Calendario */}
                                     <div className="col-span-2 text-center">
-                                        <button onClick={(e) => { e.stopPropagation(); handleCallClick(row.userId, 'all'); }} className="group">
-                                            <span className="text-base font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{row.actual}</span>
-                                            <span className="text-[9px] text-slate-400 font-medium block">seguimientos</span>
+                                        <button onClick={(e) => { e.stopPropagation(); handleCallClick(row.userId, 'all'); }} className="group inline-flex flex-col items-center">
+                                            <span className="text-base font-black text-slate-800 group-hover:text-indigo-600 transition-colors leading-tight">{row.actual}</span>
+                                            <span className="text-[9px] text-slate-400 font-medium block">gestiones hechas</span>
+                                            {(() => {
+                                                const ag = advisorAgendaStats[row.userId] || { scheduled: 0, completed: 0 };
+                                                const extra = Math.max(0, row.actual - ag.scheduled);
+                                                return (
+                                                    <div className="mt-1 flex items-center justify-center gap-1 flex-wrap">
+                                                        <span
+                                                            className="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100 text-[8px] font-black"
+                                                            title="Compromisos agendados en el Calendario para este período"
+                                                        >
+                                                            📅 Agenda: {ag.scheduled}
+                                                        </span>
+                                                        {extra > 0 && (
+                                                            <span
+                                                                className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 text-[8px] font-black"
+                                                                title="Gestiones adicionales hechas a leads nuevos, atrasados o con cita futura"
+                                                            >
+                                                                +{extra} adic.
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </button>
                                     </div>
 

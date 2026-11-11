@@ -149,6 +149,7 @@ export default function Calendar() {
     const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
     const [showAssigneeFilter, setShowAssigneeFilter] = useState(false);
     const [dayDetailDate, setDayDetailDate] = useState<Date | null>(null);
+    const [dayDetailTab, setDayDetailTab] = useState<'scheduled' | 'executed'>('scheduled');
     const [showCrmEvents, setShowCrmEvents] = useState(true);
     const [showGoogleEvents, setShowGoogleEvents] = useState(false); // Off by default — prevents edge function blocking calendar load
     const [showOutlookEvents, setShowOutlookEvents] = useState(false);
@@ -207,6 +208,49 @@ export default function Calendar() {
         if (canViewAllCalendar) return events;
         return events.filter(ev => ev.assigned_to === profile?.id);
     }, [calendarEventsData, canViewAllCalendar, profile?.id]);
+
+    // Query de gestiones ejecutadas (call_activities) en el mes para cruzar Agenda vs Actividad Realizada (Rendimiento)
+    const { data: calendarCallActivitiesData } = useQuery({
+        queryKey: ['calendar-call-activities', windowStart, windowEnd, effectiveCalendarAssigneeId, profile?.company_id],
+        queryFn: async () => {
+            const simId = localStorage.getItem('simulated_company_id');
+            const companyId = simId || profile?.company_id;
+            if (!companyId) return [];
+            let q = supabase
+                .from('call_activities')
+                .select('id, user_id, lead_id, call_date, action_type, outcome, notes, lead:leads(id, name, company_name)')
+                .eq('company_id', companyId)
+                .gte('call_date', windowStart)
+                .lte('call_date', windowEnd)
+                .order('call_date', { ascending: false })
+                .limit(3000);
+            if (effectiveCalendarAssigneeId) {
+                q = q.eq('user_id', effectiveCalendarAssigneeId);
+            }
+            const { data } = await q;
+            return (data || []) as unknown as Array<{
+                id: string;
+                user_id: string;
+                lead_id: string;
+                call_date: string;
+                action_type: string;
+                outcome: string;
+                notes: string | null;
+                lead: { id: string; name: string; company_name: string | null } | null;
+            }>;
+        },
+        staleTime: 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+    });
+
+    const calendarCallActivities = useMemo(() => {
+        const acts = calendarCallActivitiesData ?? [];
+        if (canViewAllCalendar) {
+            if (selectedCalendarCollabId) return acts.filter(a => a.user_id === selectedCalendarCollabId);
+            return acts;
+        }
+        return acts.filter(a => a.user_id === profile?.id);
+    }, [calendarCallActivitiesData, canViewAllCalendar, profile?.id, selectedCalendarCollabId]);
 
     // Prefetch silencioso de meses adyacentes — navegación sin spinner
     useEffect(() => {
@@ -411,6 +455,21 @@ export default function Calendar() {
     const getDailyEvents = useCallback((date: Date): CalendarEvent[] => {
         return eventsByDay.get(format(date, 'yyyy-MM-dd')) ?? [];
     }, [eventsByDay]);
+
+    const callActivitiesByDay = useMemo(() => {
+        const map = new Map<string, typeof calendarCallActivities>();
+        calendarCallActivities.forEach(act => {
+            if (!act.call_date) return;
+            const key = format(utcToLocalDate(act.call_date, companyTimezone), 'yyyy-MM-dd');
+            if (!map.has(key)) map.set(key, []);
+            map.get(key)!.push(act);
+        });
+        return map;
+    }, [calendarCallActivities, companyTimezone]);
+
+    const getDailyCallActivities = useCallback((date: Date) => {
+        return callActivitiesByDay.get(format(date, 'yyyy-MM-dd')) ?? [];
+    }, [callActivitiesByDay]);
 
     /* Summary: count per action type across all UPCOMING events */
     const actionSummary = useMemo(() => {
@@ -667,6 +726,7 @@ export default function Calendar() {
             {/* Leyenda + Resumen del día seleccionado */}
             {(() => {
                 const dayEvts = getDailyEvents(selectedDate);
+                const dayActs = getDailyCallActivities(selectedDate);
                 const grouped: Record<string, CalendarEvent[]> = {};
                 dayEvts.forEach(ev => {
                     const t = ev.action_type || 'call';
@@ -678,6 +738,7 @@ export default function Calendar() {
                 const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
                 const barColor = pct === 100 ? 'bg-emerald-500' : pct > 50 ? 'bg-amber-500' : pct > 0 ? 'bg-red-500' : 'bg-gray-200';
                 const textColor = pct === 100 ? 'text-emerald-600' : pct > 50 ? 'text-amber-600' : pct > 0 ? 'text-red-600' : 'text-gray-400';
+                const extraExecuted = Math.max(0, dayActs.length - completedCount);
 
                 return (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
@@ -688,9 +749,9 @@ export default function Calendar() {
 
                         {/* Progress bar */}
                         {totalCount > 0 && (
-                            <div className="mb-3">
+                            <div className="mb-2.5">
                                 <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-[10px] font-black text-gray-500 uppercase">Cumplimiento</span>
+                                    <span className="text-[10px] font-black text-gray-500 uppercase">Agenda hoy</span>
                                     <span className={`text-xs font-black ${textColor}`}>
                                         {completedCount}/{totalCount} ({pct}%)
                                     </span>
@@ -702,6 +763,31 @@ export default function Calendar() {
                                     />
                                 </div>
                             </div>
+                        )}
+
+                        {/* Cruce directo con Rendimiento: Gestiones ejecutadas en el día */}
+                        {(dayActs.length > 0 || totalCount > 0) && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setDayDetailTab('executed');
+                                    setDayDetailDate(selectedDate);
+                                }}
+                                className="w-full mb-3 p-2 rounded-xl bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200/80 text-left transition-all cursor-pointer"
+                                title="Clic para ver todas las gestiones registradas hoy (igual que en Rendimiento → Actividad)"
+                            >
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-black text-emerald-800 uppercase tracking-wider">
+                                        ⚡ Gestiones hechas
+                                    </span>
+                                    <span className="text-xs font-black text-emerald-700">
+                                        {dayActs.length}
+                                    </span>
+                                </div>
+                                <p className="text-[9px] font-semibold text-emerald-700/80 mt-0.5 leading-tight">
+                                    {completedCount} de agenda · +{extraExecuted} adicionales
+                                </p>
+                            </button>
                         )}
 
                         <div className="space-y-1.5 overflow-y-auto max-h-[128px] pr-0.5">
@@ -751,15 +837,25 @@ export default function Calendar() {
                     </div>
                 );
             })()}
-            {/* Asignados del día */}
+            {/* Asignados del día (Agenda vs Gestiones Hechas) */}
             {(() => {
                 const dayEvts = getDailyEvents(selectedDate);
-                // Group by assigned profile
+                const dayActs = getDailyCallActivities(selectedDate);
+                const profileLookup = new Map<string, { full_name: string; avatar_url: string | null }>();
+                calendarCollabProfiles.forEach(p => {
+                    profileLookup.set(p.id, { full_name: p.full_name || 'Sin nombre', avatar_url: p.avatar_url || null });
+                });
+                if (profile?.id && !profileLookup.has(profile.id)) {
+                    profileLookup.set(profile.id, { full_name: profile.full_name || 'Mi Perfil', avatar_url: (profile as any).avatar_url || null });
+                }
+
+                // Group by assigned profile (combining scheduled follow_ups + executed call_activities)
                 const assignedMap: Record<string, {
                     id: string;
                     full_name: string;
                     avatar_url: string | null;
                     count: number;
+                    executedCount: number;
                     leadIds: string[];
                 }> = {};
 
@@ -772,44 +868,80 @@ export default function Calendar() {
                             full_name: p.full_name || 'Sin nombre',
                             avatar_url: p.avatar_url,
                             count: 0,
+                            executedCount: 0,
                             leadIds: [],
                         };
                     }
                     assignedMap[p.id]!.count += 1;
-                    if (ev.lead?.id) assignedMap[p.id]!.leadIds.push(ev.lead.id);
+                    if (ev.lead?.id && !assignedMap[p.id]!.leadIds.includes(ev.lead.id)) {
+                        assignedMap[p.id]!.leadIds.push(ev.lead.id);
+                    }
                 });
 
-                const assignees = Object.values(assignedMap);
+                dayActs.forEach(act => {
+                    if (!act.user_id) return;
+                    const pInfo = profileLookup.get(act.user_id);
+                    if (!assignedMap[act.user_id]) {
+                        assignedMap[act.user_id] = {
+                            id: act.user_id,
+                            full_name: pInfo?.full_name || 'Asesor',
+                            avatar_url: pInfo?.avatar_url || null,
+                            count: 0,
+                            executedCount: 0,
+                            leadIds: [],
+                        };
+                    }
+                    assignedMap[act.user_id]!.executedCount += 1;
+                    if (act.lead_id && !assignedMap[act.user_id]!.leadIds.includes(act.lead_id)) {
+                        assignedMap[act.user_id]!.leadIds.push(act.lead_id);
+                    }
+                });
+
+                const assignees = Object.values(assignedMap).sort((a, b) => (b.executedCount + b.count) - (a.executedCount + a.count));
                 if (assignees.length === 0) return null;
 
                 return (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Asignados</p>
-                        <div className="space-y-1.5 overflow-y-auto max-h-[104px] pr-0.5">
+                        <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Asignados</p>
+                            <span className="text-[8px] font-black text-gray-400 uppercase tracking-wider">Agenda · Hechos</span>
+                        </div>
+                        <div className="space-y-1.5 overflow-y-auto max-h-[140px] pr-0.5">
                             {assignees.map(a => (
                                 <button
                                     key={a.id}
                                     onClick={() => navigate('/leads', { state: { leadIds: a.leadIds, fromCalendar: true } })}
-                                    className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-gray-50 hover:shadow-sm transition-all group cursor-pointer"
-                                    title={`Ver ${a.count} seguimiento${a.count !== 1 ? 's' : ''} de ${a.full_name}`}
+                                    className="w-full flex items-center gap-2 px-1.5 py-1.5 rounded-xl hover:bg-gray-50 hover:shadow-sm transition-all group cursor-pointer"
+                                    title={`${a.full_name}: ${a.count} agendado(s) hoy · ${a.executedCount} gestión(es) realizada(s) hoy`}
                                 >
                                     {a.avatar_url ? (
                                         <img
                                             src={a.avatar_url}
                                             alt={a.full_name}
-                                            className="w-7 h-7 rounded-full object-cover shrink-0 ring-2 ring-gray-100"
+                                            className="w-6 h-6 rounded-full object-cover shrink-0 ring-2 ring-gray-100"
                                         />
                                     ) : (
-                                        <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 text-[10px] font-black">
+                                        <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 text-[10px] font-black">
                                             {a.full_name.charAt(0).toUpperCase()}
                                         </div>
                                     )}
-                                    <span className="flex-1 text-xs font-medium text-gray-700 text-left truncate group-hover:text-indigo-700 transition-colors">
+                                    <span className="flex-1 text-[11px] font-medium text-gray-700 text-left truncate group-hover:text-indigo-700 transition-colors">
                                         {a.full_name}
                                     </span>
-                                    <span className="min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-[10px] font-semibold bg-indigo-100 text-indigo-700">
-                                        {a.count}
-                                    </span>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <span
+                                            className="min-w-[20px] h-5 px-1 rounded-md flex items-center justify-center text-[9px] font-black bg-indigo-100 text-indigo-700"
+                                            title="Agendados en calendario para este día"
+                                        >
+                                            {a.count}
+                                        </span>
+                                        <span
+                                            className="min-w-[20px] h-5 px-1 rounded-md flex items-center justify-center text-[9px] font-black bg-emerald-100 text-emerald-700"
+                                            title="Gestiones realizadas hoy (mismo dato que Rendimiento → Actividad)"
+                                        >
+                                            {a.executedCount}
+                                        </span>
+                                    </div>
                                 </button>
                             ))}
                         </div>
@@ -1525,15 +1657,23 @@ export default function Calendar() {
             {/* Day Detail Modal */}
             {dayDetailDate && (() => {
                 const dayEvts = getDailyEvents(dayDetailDate);
+                const dayActs = getDailyCallActivities(dayDetailDate);
                 const doneCount = dayEvts.filter(e => e.completed).length;
                 const totalCount = dayEvts.length;
                 const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
                 const pctColor = pct === 100 ? 'text-emerald-600' : pct > 50 ? 'text-amber-600' : 'text-red-600';
                 const barColor = pct === 100 ? 'bg-emerald-500' : pct > 50 ? 'bg-amber-500' : 'bg-red-500';
+                const profileLookup = new Map<string, { full_name: string; avatar_url: string | null }>();
+                calendarCollabProfiles.forEach(p => {
+                    profileLookup.set(p.id, { full_name: p.full_name || 'Asesor', avatar_url: p.avatar_url || null });
+                });
+                if (profile?.id && !profileLookup.has(profile.id)) {
+                    profileLookup.set(profile.id, { full_name: profile.full_name || 'Mi Perfil', avatar_url: (profile as any).avatar_url || null });
+                }
 
                 return (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setDayDetailDate(null)}>
-                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[82vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                             {/* Header */}
                             <div className="p-5 border-b border-gray-100">
                                 <div className="flex items-center justify-between">
@@ -1541,8 +1681,8 @@ export default function Calendar() {
                                         <h2 className="text-lg font-black text-gray-900 capitalize">
                                             {format(dayDetailDate, "EEEE d 'de' MMMM", { locale: es })}
                                         </h2>
-                                        <p className="text-sm text-gray-400 mt-0.5">
-                                            Seguimientos del día
+                                        <p className="text-xs text-gray-400 mt-0.5">
+                                            Agenda del día ({doneCount}/{totalCount}) · Gestiones realizadas ({dayActs.length})
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-3">
@@ -1556,79 +1696,147 @@ export default function Calendar() {
                                 <div className="mt-3 w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                                     <div className={`h-full rounded-full ${barColor} transition-all duration-500`} style={{ width: `${pct}%` }} />
                                 </div>
+                                {/* Tabs: Agenda vs Gestiones Hechas */}
+                                <div className="mt-3 flex items-center gap-2 bg-gray-100/80 p-1 rounded-xl">
+                                    <button
+                                        type="button"
+                                        onClick={() => setDayDetailTab('scheduled')}
+                                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                            dayDetailTab === 'scheduled'
+                                                ? 'bg-white text-indigo-700 shadow-xs'
+                                                : 'text-gray-500 hover:text-gray-800'
+                                        }`}
+                                    >
+                                        📅 Agenda ({dayEvts.length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDayDetailTab('executed')}
+                                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                            dayDetailTab === 'executed'
+                                                ? 'bg-white text-emerald-700 shadow-xs'
+                                                : 'text-gray-500 hover:text-gray-800'
+                                        }`}
+                                    >
+                                        ⚡ Gestiones Hechas ({dayActs.length})
+                                    </button>
+                                </div>
                             </div>
 
                             {/* List */}
                             <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                                {dayEvts.map(ev => {
-                                    const cfg = getActionCfg(ev.action_type);
-                                    const Icon = cfg.Icon;
-                                    const timeStr = formatTimeInZone(ev.date, companyTimezone);
-                                    const isOverdue = !ev.completed && isBefore(utcToLocalDate(ev.date, companyTimezone), new Date()) && !isToday(utcToLocalDate(ev.date, companyTimezone));
+                                {dayDetailTab === 'scheduled' ? (
+                                    dayEvts.length === 0 ? (
+                                        <p className="text-center text-xs text-gray-400 py-8">Sin compromisos agendados para este día.</p>
+                                    ) : dayEvts.map(ev => {
+                                        const cfg = getActionCfg(ev.action_type);
+                                        const Icon = cfg.Icon;
+                                        const timeStr = formatTimeInZone(ev.date, companyTimezone);
+                                        const isOverdue = !ev.completed && isBefore(utcToLocalDate(ev.date, companyTimezone), new Date()) && !isToday(utcToLocalDate(ev.date, companyTimezone));
 
-                                    return (
-                                        <div key={ev.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                                            ev.completed
-                                                ? 'bg-emerald-50/50 border-emerald-200'
-                                                : isOverdue
-                                                    ? 'bg-red-50/30 border-red-200'
-                                                    : 'bg-white border-gray-100'
-                                        }`}>
-                                            {/* Status icon */}
-                                            <button
-                                                onClick={() => handleToggleComplete(ev.id, ev.completed)}
-                                                className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                                                    ev.completed
-                                                        ? 'bg-emerald-500 text-white'
-                                                        : isOverdue
-                                                            ? 'bg-red-100 text-red-500 hover:bg-red-200'
-                                                            : 'bg-gray-100 text-gray-400 hover:bg-emerald-100 hover:text-emerald-500'
-                                                }`}
-                                                title={ev.completed ? 'Desmarcar' : 'Marcar como completado'}
-                                            >
-                                                {ev.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-                                            </button>
-
-                                            {/* Info */}
-                                            <div className="flex-1 min-w-0">
+                                        return (
+                                            <div key={ev.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                                                ev.completed
+                                                    ? 'bg-emerald-50/50 border-emerald-200'
+                                                    : isOverdue
+                                                        ? 'bg-red-50/30 border-red-200'
+                                                        : 'bg-white border-gray-100'
+                                            }`}>
+                                                {/* Status icon */}
                                                 <button
-                                                    onClick={() => { 
-                                                        if (ev.action_type === 'google_calendar') {
-                                                            setDayDetailDate(null);
-                                                            setSelectedGoogleEvent(ev);
-                                                            return;
-                                                        }
-                                                        setDayDetailDate(null); 
-                                                        ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); 
-                                                    }}
-                                                    className={`text-sm font-bold text-left hover:text-indigo-600 transition-colors ${
-                                                        ev.completed ? 'text-emerald-700 line-through opacity-70' : 'text-gray-900'
+                                                    onClick={() => handleToggleComplete(ev.id, ev.completed)}
+                                                    className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                                                        ev.completed
+                                                            ? 'bg-emerald-500 text-white'
+                                                            : isOverdue
+                                                                ? 'bg-red-100 text-red-500 hover:bg-red-200'
+                                                                : 'bg-gray-100 text-gray-400 hover:bg-emerald-100 hover:text-emerald-500'
                                                     }`}
+                                                    title={ev.completed ? 'Desmarcar' : 'Marcar como completado'}
                                                 >
-                                                    {ev.lead?.name ?? '—'}
+                                                    {ev.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
                                                 </button>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${ev.completed ? 'text-emerald-600' : cfg.badgeText}`}>
-                                                        <Icon className="w-2.5 h-2.5" />
-                                                        {ev.completed ? 'Hecho' : isOverdue ? '⚠ Vencido' : cfg.label}
-                                                    </span>
-                                                    <span className="text-[10px] text-gray-400">{timeStr}</span>
-                                                    {ev.lead?.company_name && <span className="text-[10px] text-gray-300">• {ev.lead.company_name}</span>}
+
+                                                {/* Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <button
+                                                        onClick={() => { 
+                                                            if (ev.action_type === 'google_calendar') {
+                                                                setDayDetailDate(null);
+                                                                setSelectedGoogleEvent(ev);
+                                                                return;
+                                                            }
+                                                            setDayDetailDate(null); 
+                                                            ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); 
+                                                        }}
+                                                        className={`text-sm font-bold text-left hover:text-indigo-600 transition-colors ${
+                                                            ev.completed ? 'text-emerald-700 line-through opacity-70' : 'text-gray-900'
+                                                        }`}
+                                                    >
+                                                        {ev.lead?.name ?? '—'}
+                                                    </button>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${ev.completed ? 'text-emerald-600' : cfg.badgeText}`}>
+                                                            <Icon className="w-2.5 h-2.5" />
+                                                            {ev.completed ? 'Hecho' : isOverdue ? '⚠ Vencido' : cfg.label}
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-400">{timeStr}</span>
+                                                        {ev.lead?.company_name && <span className="text-[10px] text-gray-300">• {ev.lead.company_name}</span>}
+                                                    </div>
+                                                </div>
+                                                {/* Assignee */}
+                                                {ev.assigned_profile && (
+                                                    ev.assigned_profile.avatar_url ? (
+                                                        <img src={ev.assigned_profile.avatar_url} alt={ev.assigned_profile.full_name ?? ''} title={ev.assigned_profile.full_name ?? ''} className="w-7 h-7 rounded-full object-cover ring-2 ring-white shadow-sm shrink-0" />
+                                                    ) : (
+                                                        <div title={ev.assigned_profile.full_name ?? ''} className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black ring-2 ring-white shadow-sm shrink-0">
+                                                            {(ev.assigned_profile.full_name ?? '?').charAt(0).toUpperCase()}
+                                                        </div>
+                                                    )
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    dayActs.length === 0 ? (
+                                        <p className="text-center text-xs text-gray-400 py-8">Sin gestiones registradas en este día.</p>
+                                    ) : dayActs.map(act => {
+                                        const cfg = getActionCfg(act.action_type === 'quote_sent' ? 'quote' : act.action_type || 'call');
+                                        const Icon = cfg.Icon;
+                                        const timeStr = formatTimeInZone(act.call_date, companyTimezone);
+                                        const pInfo = profileLookup.get(act.user_id);
+                                        return (
+                                            <div key={act.id} className="flex items-center gap-3 p-3 rounded-xl border bg-emerald-50/30 border-emerald-200/80 transition-all">
+                                                <div className="shrink-0 w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center">
+                                                    <CheckCircle2 className="w-4 h-4" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setDayDetailDate(null);
+                                                            if (act.lead_id) navigate('/leads', { state: { leadId: act.lead_id } });
+                                                        }}
+                                                        className="text-sm font-bold text-left text-gray-900 hover:text-indigo-600 transition-colors"
+                                                    >
+                                                        {act.lead?.name ?? 'Prospecto'}
+                                                    </button>
+                                                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700">
+                                                            <Icon className="w-2.5 h-2.5" />
+                                                            {cfg.label} · {act.outcome === 'connected' ? 'Conectado' : 'Registrado'}
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-400">{timeStr}</span>
+                                                        {pInfo && <span className="text-[10px] font-bold text-indigo-600">• {pInfo.full_name}</span>}
+                                                    </div>
+                                                    {act.notes && (
+                                                        <p className="text-[11px] text-gray-600 mt-1 line-clamp-1">{act.notes}</p>
+                                                    )}
                                                 </div>
                                             </div>
-                                            {/* Assignee */}
-                                            {ev.assigned_profile && (
-                                                ev.assigned_profile.avatar_url ? (
-                                                    <img src={ev.assigned_profile.avatar_url} alt={ev.assigned_profile.full_name ?? ''} title={ev.assigned_profile.full_name ?? ''} className="w-7 h-7 rounded-full object-cover ring-2 ring-white shadow-sm shrink-0" />
-                                                ) : (
-                                                    <div title={ev.assigned_profile.full_name ?? ''} className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black ring-2 ring-white shadow-sm shrink-0">
-                                                        {(ev.assigned_profile.full_name ?? '?').charAt(0).toUpperCase()}
-                                                    </div>
-                                                )
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })
+                                )}
                             </div>
                         </div>
                     </div>
