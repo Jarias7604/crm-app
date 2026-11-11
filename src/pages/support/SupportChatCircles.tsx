@@ -522,6 +522,7 @@ export const SupportChatCircles: React.FC = () => {
   const [realClients, setRealClients] = useState<Client[]>([]);
   const [companyLeads, setCompanyLeads] = useState<TicketLead[]>([]);
   const [waGroups, setWaGroups] = useState<WaGroupRow[]>([]);
+  const [nonWaTicketIds, setNonWaTicketIds] = useState<Set<string>>(() => new Set());
   const [selectedCircleId, setSelectedCircleId] = useState<string | null>(() => {
     const stateCircleId = (location.state as any)?.waCircleId;
     if (stateCircleId) return String(stateCircleId);
@@ -968,7 +969,7 @@ export const SupportChatCircles: React.FC = () => {
       if (!activeCompanyId) return;
       if (!silent) setLoading(true);
       try {
-        const [tks, cats, ags, cls, lds, grps] = await Promise.all([
+        const [tks, cats, ags, cls, lds, grps, failedOutbox] = await Promise.all([
           ticketService.getTickets(activeCompanyId, { includeNonSupportWhatsapp: true }),
           ticketService.getCategories(activeCompanyId).catch(() => [] as TicketCategory[]),
           ticketService.getAgents(activeCompanyId).catch(() => [] as CompanyAgent[]),
@@ -979,7 +980,22 @@ export const SupportChatCircles: React.FC = () => {
             .select('group_jid, subject, client_id')
             .eq('company_id', activeCompanyId)
             .then((r) => (r.data || []) as WaGroupRow[]),
+          supabase
+            .from('whatsapp_outbox')
+            .select('ticket_id, status, error, wa_message_id')
+            .in('status', ['error', 'sent'])
+            .limit(1500)
+            .then((r) => (r.data || []) as { ticket_id: string | null; status: string; error: string | null; wa_message_id: string | null }[]),
         ]);
+        const sentIds = new Set<string>();
+        const existsFalseIds = new Set<string>();
+        for (const row of failedOutbox) {
+          if (!row.ticket_id) continue;
+          if (row.status === 'sent' && row.wa_message_id) sentIds.add(row.ticket_id);
+          else if (row.status === 'error' && String(row.error || '').includes('"exists":false')) existsFalseIds.add(row.ticket_id);
+        }
+        sentIds.forEach((id) => existsFalseIds.delete(id));
+        setNonWaTicketIds(existsFalseIds);
         setTickets(tks);
         setCategories(cats);
         setAgents(ags);
@@ -1124,8 +1140,18 @@ export const SupportChatCircles: React.FC = () => {
       const isManuallyAttended =
         Boolean(attendedAt && attendedAt >= lastMessageAt) || dismissedWaitingMap[key] === lastMessageAt;
 
-      const resolvedLeadStatus =
-        lead?.status || String(meta.wa_lead_status || activeMeta.wa_lead_status || '').trim() || null;
+      const hasClientLine = descLines.some((l) => l.includes('👤'));
+      const staffLineCount = descLines.filter((l) => l.includes('👨‍💻')).length;
+      const metaLeadStatus = String(meta.wa_lead_status || activeMeta.wa_lead_status || '').trim() || null;
+      const isNonWaError =
+        !hasClientLine &&
+        lastFrom !== 'client' &&
+        (metaLeadStatus === 'Erróneo' ||
+          Boolean(meta.wa_delivery_error || activeMeta.wa_delivery_error) ||
+          nonWaTicketIds.has(activeTicket.id) ||
+          nonWaTicketIds.has(latest.id));
+
+      const resolvedLeadStatus = isNonWaError ? 'Erróneo' : lead?.status || metaLeadStatus;
       const isDiscardedLead = resolvedLeadStatus === 'Perdido' || resolvedLeadStatus === 'Erróneo';
       const isForcedUnread = forcedUnreadMap[key] === lastMessageAt;
 
@@ -1158,8 +1184,6 @@ export const SupportChatCircles: React.FC = () => {
       const hoursSinceReactivation = isReactivation
         ? Math.max(0, Math.floor((Date.now() - new Date(reactivationSentAt).getTime()) / 3600000))
         : 0;
-      const hasClientLine = descLines.some((l) => l.includes('👤'));
-      const staffLineCount = descLines.filter((l) => l.includes('👨‍💻')).length;
       const reactivationReplied =
         isReactivation &&
         (lastFrom === 'client' || hasClientLine || Boolean(meta.wa_reactivation_replied || activeMeta.wa_reactivation_replied));
@@ -1242,7 +1266,7 @@ export const SupportChatCircles: React.FC = () => {
       return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickets, categories, agents, realClients, companyLeads, scopes, profile?.id, adminPreviewMode, slaTick, dismissedWaitingMap, forcedUnreadMap]);
+  }, [tickets, categories, agents, realClients, companyLeads, nonWaTicketIds, scopes, profile?.id, adminPreviewMode, slaTick, dismissedWaitingMap, forcedUnreadMap]);
 
   const isUnread = (c: SupportCircle) =>
     forcedUnreadMap[c.circleId] === c.lastMessageAt ||
@@ -1260,8 +1284,8 @@ export const SupportChatCircles: React.FC = () => {
     const slaCritical = waitingList.filter((c) => c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60).length;
     const mine = wa.filter((c) => isMine(c)).length;
     const unassigned = wa.filter((c) => isUnassigned(c)).length;
-    const reactivatedTotal = wa.filter((c) => c.isReactivation).length;
-    const reactivatedReplied = wa.filter((c) => c.reactivationReplied).length;
+    const reactivatedTotal = wa.filter((c) => c.isReactivation && c.leadStatus !== 'Erróneo').length;
+    const reactivatedReplied = wa.filter((c) => c.reactivationReplied && c.leadStatus !== 'Erróneo').length;
     return {
       all: wa.length,
       unread: unreadList.length,
