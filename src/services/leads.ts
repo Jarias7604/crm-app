@@ -839,6 +839,16 @@ export const leadsService = {
 
         if (error) throw error;
 
+        // Keep pending follow_ups synchronized when lead owner changes
+        if (updates.assigned_to) {
+            supabase
+                .from('follow_ups')
+                .update({ assigned_to: updates.assigned_to })
+                .eq('lead_id', id)
+                .eq('completed', false)
+                .then(() => {});
+        }
+
         // Dispatch lead.won webhook when a deal is closed
         const wonStatuses = ['Cerrado', 'Cliente', 'Ganado'];
         const isNowWon = updates.status && wonStatuses.some(s => updates.status!.toLowerCase().includes(s.toLowerCase()));
@@ -906,6 +916,14 @@ export const leadsService = {
             .select('id');
 
         if (error) throw error;
+
+        // Also update pending follow_ups for these leads so they immediately appear on the new agent's calendar
+        await supabase
+            .from('follow_ups')
+            .update({ assigned_to: agentId })
+            .in('lead_id', leadIds)
+            .eq('completed', false);
+
         return data?.length ?? 0;
     },
 
@@ -934,13 +952,20 @@ export const leadsService = {
             companyId = (await this.getActiveCompanyId()) || undefined;
         }
 
-        if (!companyId && followUp.lead_id) {
+        let resolvedAssignee = assignedTo || followUp.assigned_to || null;
+
+        if ((!companyId || !resolvedAssignee) && followUp.lead_id) {
             const { data: leadRow } = await supabase
                 .from('leads')
-                .select('company_id')
+                .select('company_id, assigned_to')
                 .eq('id', followUp.lead_id)
                 .single();
-            if (leadRow?.company_id) companyId = leadRow.company_id;
+            if (!companyId && leadRow?.company_id) companyId = leadRow.company_id;
+            if (!resolvedAssignee && leadRow?.assigned_to) resolvedAssignee = leadRow.assigned_to;
+        }
+
+        if (!resolvedAssignee && user?.id) {
+            resolvedAssignee = user.id;
         }
 
         const { data, error } = await supabase
@@ -949,7 +974,7 @@ export const leadsService = {
                 ...followUp,
                 company_id: companyId,
                 user_id: user?.id,
-                assigned_to: assignedTo || null,
+                assigned_to: resolvedAssignee,
                 action_type: followUp.action_type || 'call'
             })
             .select('*')
@@ -984,7 +1009,7 @@ export const leadsService = {
                         .from('leads')
                         .update({
                             next_followup_date: followUp.date,
-                            next_followup_assignee: assignedTo || null,
+                            next_followup_assignee: resolvedAssignee,
                             last_follow_up_at: new Date().toISOString(),
                         })
                         .eq('id', followUp.lead_id);
@@ -1087,7 +1112,7 @@ export const leadsService = {
             .select(`
                 id, date, notes, action_type, assigned_to,
                 completed, completed_at,
-                lead:leads(id, name, company_name, phone, email, status)
+                lead:leads(id, name, company_name, phone, email, status, assigned_to)
             `)
             .gte('date', from)
             .lte('date', to)
@@ -1096,9 +1121,6 @@ export const leadsService = {
 
         if (companyId) {
             followUpsQuery = followUpsQuery.eq('company_id', companyId);
-        }
-        if (assignedTo) {
-            followUpsQuery = followUpsQuery.eq('assigned_to', assignedTo);
         }
 
         // ─── Parallel fetch — follow_ups + profiles run simultaneously ──────────
@@ -1124,17 +1146,26 @@ export const leadsService = {
             profilesResult.data.forEach(p => profilesMap.set(p.id, p));
         }
 
-        return followUps.map(item => ({
-            id: item.id,
-            date: item.date,
-            notes: item.notes,
-            action_type: item.action_type,
-            assigned_to: item.assigned_to,
-            completed: item.completed,
-            completed_at: item.completed_at,
-            lead: item.lead,
-            assigned_profile: item.assigned_to ? (profilesMap.get(item.assigned_to) || null) : null
-        })) as unknown as Array<{
+        const mapped = followUps.map(item => {
+            const effectiveAssignedTo = item.assigned_to || (item.lead as any)?.assigned_to || null;
+            return {
+                id: item.id,
+                date: item.date,
+                notes: item.notes,
+                action_type: item.action_type,
+                assigned_to: effectiveAssignedTo,
+                completed: item.completed,
+                completed_at: item.completed_at,
+                lead: item.lead,
+                assigned_profile: effectiveAssignedTo ? (profilesMap.get(effectiveAssignedTo) || null) : null
+            };
+        });
+
+        const filteredMapped = assignedTo
+            ? mapped.filter(ev => ev.assigned_to === assignedTo)
+            : mapped;
+
+        return filteredMapped as unknown as Array<{
             id: string;
             date: string;
             notes: string | null;

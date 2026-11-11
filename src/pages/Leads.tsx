@@ -1229,10 +1229,12 @@ export default function Leads() {
         if (isSubmitting) return; // Guard against double submit
         setIsSubmitting(true);
         try {
+            const effectiveFollowUpAssignee =
+                formData.next_followup_assignee || formData.assigned_to || profile?.id || null;
             // Clean data - convert empty strings to null for UUID fields
             const cleanData = {
                 ...formData,
-                next_followup_assignee: formData.next_followup_assignee || null,
+                next_followup_assignee: formData.next_followup_date ? effectiveFollowUpAssignee : null,
                 next_followup_date: formData.next_followup_date || null,
             };
             const newLead = await leadsService.createLead(cleanData);
@@ -1249,7 +1251,7 @@ export default function Leads() {
                     date: followUpDateTime,
                     notes: formData.next_action_notes?.trim() || 'Seguimiento programado',
                     action_type: 'call',
-                }, cleanData.next_followup_assignee || undefined);
+                }, effectiveFollowUpAssignee || newLead.assigned_to || undefined);
             }
 
             setIsModalOpen(false);
