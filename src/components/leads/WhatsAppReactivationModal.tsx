@@ -246,20 +246,44 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     setInactivityFilter(initialInactivityFilter);
   }, [initialInactivityFilter]);
 
+  const sellerDisplayName = useMemo(() => {
+    const raw = (currentUser.full_name || '').trim();
+    if (
+      !raw ||
+      /simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator|^admin(istrador)?\b|^soporte\b|^usuario\b/i.test(
+        raw
+      )
+    ) {
+      return 'Jimmy Arias';
+    }
+    return raw;
+  }, [currentUser.full_name]);
+
+  const sellerSignature = useMemo(() => {
+    if (/de\s+arias\s+defense/i.test(sellerDisplayName)) {
+      return sellerDisplayName;
+    }
+    return `${sellerDisplayName} de Arias Defense`;
+  }, [sellerDisplayName]);
+
+  const applySellerToTemplate = (body: string) =>
+    body.replace(/Jimmy Arias de Arias Defense/gi, sellerSignature);
+
   useEffect(() => {
     if (!isOpen) return;
     if (isResendMode) {
       const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'toque2_flyer_video') || DEFAULT_TEMPLATES[0];
       setSelectedTemplateId(tpl.id);
-      setMessageTemplate(tpl.body);
+      setMessageTemplate(applySellerToTemplate(tpl.body));
       setCampaignName('Reactivación · Toque 2');
     } else {
       const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'consultivo_corto') || DEFAULT_TEMPLATES[0];
       setSelectedTemplateId(tpl.id);
-      setMessageTemplate(tpl.body);
+      setMessageTemplate(applySellerToTemplate(tpl.body));
       setCampaignName(defaultCampaignName);
     }
-  }, [isOpen, isResendMode, defaultCampaignName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, isResendMode, defaultCampaignName, sellerSignature]);
 
   useEffect(() => {
     return () => {
@@ -285,26 +309,6 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     setMediaPreviewUrl(null);
     if (mediaInputRef.current) mediaInputRef.current.value = '';
   };
-
-  const sellerDisplayName = useMemo(() => {
-    const raw = (currentUser.full_name || '').trim();
-    if (
-      !raw ||
-      /simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator|^admin(istrador)?\b|^soporte\b|^usuario\b/i.test(
-        raw
-      )
-    ) {
-      return 'Jimmy Arias';
-    }
-    return raw;
-  }, [currentUser.full_name]);
-
-  const sellerSignature = useMemo(() => {
-    if (/^jimmy\s+arias$/i.test(sellerDisplayName)) {
-      return 'Jimmy Arias de Arias Defense';
-    }
-    return sellerDisplayName;
-  }, [sellerDisplayName]);
 
   // Base pool: if user manually checked specific rows on the table, respect that pool; otherwise use all leads in view with valid phone
   const alreadyInCampaignPoolCount = useMemo(() => {
@@ -543,7 +547,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
 
   const handleSelectTemplate = (tpl: ReactivationTemplate) => {
     setSelectedTemplateId(tpl.id);
-    setMessageTemplate(tpl.body);
+    setMessageTemplate(applySellerToTemplate(tpl.body));
   };
 
   const toggleLeadCheckbox = (id: string) => {
@@ -816,28 +820,28 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'nutricion_valor');
       if (tpl) {
         setSelectedTemplateId(tpl.id);
-        setMessageTemplate(tpl.body);
+        setMessageTemplate(applySellerToTemplate(tpl.body));
       }
       setCampaignName('Nutrición · Seguimiento');
     } else if (nextStage === 'Cliente' || nextStage === 'Cerrado' || nextStage === 'Cliente_Cerrado') {
       const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'clientes_upsell');
       if (tpl) {
         setSelectedTemplateId(tpl.id);
-        setMessageTemplate(tpl.body);
+        setMessageTemplate(applySellerToTemplate(tpl.body));
       }
       setCampaignName('Clientes · Nuevos Servicios');
     } else if (nextStage === 'Lead calificado' || nextStage === 'En seguimiento' || nextStage === 'Negociación') {
       const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'seguimiento_propuesta');
       if (tpl) {
         setSelectedTemplateId(tpl.id);
-        setMessageTemplate(tpl.body);
+        setMessageTemplate(applySellerToTemplate(tpl.body));
       }
       setCampaignName(`Seguimiento · ${nextStage}`);
     } else if (isResendMode) {
       const tpl = DEFAULT_TEMPLATES.find((t) => t.id === 'toque2_flyer_video');
       if (tpl) {
         setSelectedTemplateId(tpl.id);
-        setMessageTemplate(tpl.body);
+        setMessageTemplate(applySellerToTemplate(tpl.body));
       }
       setCampaignName('Reactivación · Toque 2');
     }
