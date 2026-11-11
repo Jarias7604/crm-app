@@ -35,6 +35,7 @@ interface Props {
     initialDate: Date;
     companyId: string;
     companyTimezone: string;
+    googleEvents?: any[];
     onNavigateLead?: (leadId: string) => void;
 }
 
@@ -115,6 +116,7 @@ interface DemoEntry {
     source: string;
     notes: string | null;
     completed: boolean;
+    origin: 'executed' | 'scheduled_crm' | 'google_calendar';
 }
 
 interface QuoteEntry {
@@ -136,7 +138,10 @@ interface AdvisorMetrics {
     executedConnected: number;
     executedExtra: number;
     demosCount: number;
+    demosExecutedCount: number;
+    demosScheduledCount: number;
     quotesCount: number;
+    quotesNewAmount: number;
     quotedFollowUpsCount: number;
     quotedFollowUpsAmount: number;
     wonCount: number;
@@ -269,12 +274,23 @@ function isExecutedDemoActivity(actionType?: string | null): boolean {
     return actionType === 'meeting';
 }
 
+function isGoogleCalendarDemoEvent(title?: string | null, notes?: string | null): boolean {
+    const text = `${title || ''} ${notes || ''}`.trim();
+    if (!text) return false;
+    // Exclude holidays or internal trainings
+    if (/\b(capacitaci[oó]n|thanksgiving|black\s+friday|feriado|vacaciones|almuerzo|reuni[oó]n\s+interna)\b/i.test(text)) {
+        return false;
+    }
+    return /\b(demo|presentaci[oó]n|visita\s+presencial|google\s+meet)\b/i.test(text);
+}
+
 export const CalendarPerformanceReportModal: React.FC<Props> = ({
     isOpen,
     onClose,
     initialDate,
     companyId,
     companyTimezone,
+    googleEvents = [],
     onNavigateLead,
 }) => {
     const [periodMode, setPeriodMode] = useState<PeriodMode>('day');
@@ -467,7 +483,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
             const executedConnected = exe.filter(a => a.outcome === 'connected').length;
             const executedExtra = Math.max(0, executedTotal - Math.min(executedTotal, scheduledCompleted));
 
-            // 1. Identify REAL Demos / Visits (strictly action_type='meeting' or explicit Demo/Visita calendar event)
+            // 1. Identify REAL Demos / Visits (CRM scheduled 'meeting' + CRM executed 'meeting' + optional Google Calendar Demos)
             const demosMap = new Map<string, DemoEntry>();
             sch.forEach(f => {
                 if (isScheduledDemoFollowUp(f.action_type, f.notes)) {
@@ -477,9 +493,10 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                         leadId: f.lead?.id || null,
                         leadName: f.lead?.name || 'Prospecto',
                         dateStr: formatTimeInZone(f.date, companyTimezone),
-                        source: f.notes ? `Agenda: ${f.notes}` : 'Agendada en Calendario',
+                        source: f.notes ? `Agenda CRM: ${f.notes}` : 'Demo Agendada (CRM)',
                         notes: f.notes,
                         completed: f.completed,
+                        origin: f.completed ? 'executed' : 'scheduled_crm',
                     });
                 }
             });
@@ -492,13 +509,43 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                         leadId: a.lead_id || null,
                         leadName: a.lead?.name || existing?.leadName || 'Prospecto',
                         dateStr: formatTimeInZone(a.call_date, companyTimezone),
-                        source: existing ? `${existing.source} · Ejecutada` : 'Demo / Visita Ejecutada',
+                        source: existing ? `${existing.source} · Realizada` : 'Demo / Reunión Realizada',
                         notes: a.notes || existing?.notes || null,
                         completed: true,
+                        origin: 'executed',
                     });
                 }
             });
+            // Optional Google Calendar integration support for SaaS companies that schedule Demos in Google Calendar
+            googleEvents.forEach((gev: any) => {
+                if (!gev?.date) return;
+                if (gev.date < dateWindow.startIso || gev.date > dateWindow.endIso) return;
+                const title = gev.lead?.name || gev._rawEvent?.summary || '';
+                const groupName = (gev.lead?.company_name || gev._rawEvent?._groupName || '').toLowerCase();
+                const advFirstName = (advisor.full_name || '').split(' ')[0].toLowerCase();
+                const matchesAdvisor =
+                    gev.assigned_to === advisor.id ||
+                    (advFirstName.length >= 3 && groupName.includes(advFirstName));
+                if (!matchesAdvisor) return;
+                if (isGoogleCalendarDemoEvent(title, gev.notes)) {
+                    const key = `gcal-${gev.id}`;
+                    if (!demosMap.has(key)) {
+                        demosMap.set(key, {
+                            id: gev.id,
+                            leadId: null,
+                            leadName: title || 'Demo Google Calendar',
+                            dateStr: formatTimeInZone(gev.date, companyTimezone),
+                            source: 'Google Calendar · Demo Agendada',
+                            notes: gev.notes || null,
+                            completed: new Date(gev.date).getTime() <= Date.now(),
+                            origin: 'google_calendar',
+                        });
+                    }
+                }
+            });
             const demosList = Array.from(demosMap.values());
+            const demosExecutedCount = demosList.filter(d => d.completed).length;
+            const demosScheduledCount = demosList.length - demosExecutedCount;
 
             // 2. Formal Quotes CREATED in this period (from cotizaciones table + explicit quote_sent logs)
             const quotesCreatedMap = new Map<string, QuoteEntry>();
@@ -528,6 +575,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
             });
             const quotesCreatedList = Array.from(quotesCreatedMap.values());
             const quotesCount = quotesCreatedList.length;
+            const quotesNewAmount = quotesCreatedList.reduce((s, q) => s + q.amount, 0);
 
             // 3. Follow-ups made in this period to leads that ALREADY had an active quote (created in previous days)
             const quotedFollowUpsMap = new Map<string, QuoteEntry>();
@@ -634,7 +682,10 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                 executedConnected,
                 executedExtra,
                 demosCount: demosList.length,
+                demosExecutedCount,
+                demosScheduledCount,
                 quotesCount,
+                quotesNewAmount,
                 quotedFollowUpsCount,
                 quotedFollowUpsAmount,
                 wonCount,
@@ -662,7 +713,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
             if (b.executedTotal !== a.executedTotal) return b.executedTotal - a.executedTotal;
             return b.scheduledTotal - a.scheduledTotal;
         });
-    }, [profiles, followUps, callActivities, wonLeads, quotes, dateWindow.workingDays, companyTimezone]);
+    }, [profiles, followUps, callActivities, wonLeads, quotes, googleEvents, dateWindow.workingDays, dateWindow.startIso, dateWindow.endIso, companyTimezone]);
 
     const filteredMetrics = useMemo(() => {
         if (filterView === 'active') {
@@ -681,8 +732,12 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
         const completed = advisorMetrics.reduce((s, m) => s + m.scheduledCompleted, 0);
         const executed = advisorMetrics.reduce((s, m) => s + m.executedTotal, 0);
         const demos = advisorMetrics.reduce((s, m) => s + m.demosCount, 0);
+        const demosExecuted = advisorMetrics.reduce((s, m) => s + m.demosExecutedCount, 0);
+        const demosScheduled = advisorMetrics.reduce((s, m) => s + m.demosScheduledCount, 0);
         const quotesTotal = advisorMetrics.reduce((s, m) => s + m.quotesCount, 0);
+        const quotesNewAmount = advisorMetrics.reduce((s, m) => s + m.quotesNewAmount, 0);
         const quotedFollowUpsTotal = advisorMetrics.reduce((s, m) => s + m.quotedFollowUpsCount, 0);
+        const quotedFollowUpsAmount = advisorMetrics.reduce((s, m) => s + m.quotedFollowUpsAmount, 0);
         const won = advisorMetrics.reduce((s, m) => s + m.wonCount, 0);
         const wonAmount = advisorMetrics.reduce((s, m) => s + m.wonAmount, 0);
         const effectiveMins = advisorMetrics.reduce((s, m) => s + m.effectiveMinutes, 0);
@@ -700,8 +755,12 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
             executed,
             extraExecuted: Math.max(0, executed - completed),
             demos,
+            demosExecuted,
+            demosScheduled,
             quotesTotal,
+            quotesNewAmount,
             quotedFollowUpsTotal,
+            quotedFollowUpsAmount,
             won,
             wonAmount,
             effectiveMins,
@@ -847,9 +906,11 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                 </span>
                             </div>
                             <p className="text-[10px] text-slate-400 font-medium mt-1">
-                                {globalTotals.quotedFollowUpsTotal > 0
-                                    ? `+ ${globalTotals.quotedFollowUpsTotal} cotizaciones previas en seguimiento`
-                                    : 'Presentaciones y propuestas formales'}
+                                {globalTotals.demosScheduled > 0
+                                    ? `${globalTotals.demosExecuted} realiz. · ${globalTotals.demosScheduled} agend.`
+                                    : globalTotals.quotedFollowUpsTotal > 0
+                                      ? `+ ${globalTotals.quotedFollowUpsTotal} cotiz. previas en seg.`
+                                      : 'Presentaciones y propuestas formales'}
                             </p>
                         </div>
 
@@ -888,31 +949,67 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                         </div>
                     </div>
 
-                    {/* 2. Guía de Lectura (Minimalista y Delicada) */}
-                    <div className="bg-white px-5 py-3.5 rounded-[20px] border border-slate-200/70 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
-                            <span>
-                                <strong className="text-slate-900">Agenda:</strong> Lo que tenían programado para la fecha.
-                            </span>
+                    {/* 2. Relación de Conversión Comercial del Período + Guía de Lectura */}
+                    <div className="bg-white px-5 py-3.5 rounded-[20px] border border-slate-200/70 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.16em]">
+                                    Flujo Comercial del Período:
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                                <span className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/70 font-bold text-slate-700 tabular-nums">
+                                    <strong className="text-slate-900">{globalTotals.executed}</strong> Seguimientos Hechos
+                                </span>
+                                <span className="text-slate-300 font-bold">→</span>
+                                <span className="px-2.5 py-1 rounded-lg bg-violet-50/70 border border-violet-200/70 font-bold text-violet-800 tabular-nums">
+                                    <strong className="text-violet-950">{globalTotals.demos}</strong> Demos (
+                                    {globalTotals.demosExecuted} realiz. · {globalTotals.demosScheduled} agend.)
+                                </span>
+                                <span className="text-slate-300 font-bold">→</span>
+                                <span className="px-2.5 py-1 rounded-lg bg-sky-50/70 border border-sky-200/70 font-bold text-sky-800 tabular-nums">
+                                    <strong className="text-sky-950">{globalTotals.quotesTotal}</strong> Cotiz. Nuevas
+                                    {globalTotals.quotedFollowUpsTotal > 0
+                                        ? ` + ${globalTotals.quotedFollowUpsTotal} en seg. ($${(
+                                              globalTotals.quotesNewAmount + globalTotals.quotedFollowUpsAmount
+                                          ).toLocaleString()})`
+                                        : globalTotals.quotesNewAmount > 0
+                                          ? ` ($${globalTotals.quotesNewAmount.toLocaleString()})`
+                                          : ''}
+                                </span>
+                                <span className="text-slate-300 font-bold">→</span>
+                                <span className="px-2.5 py-1 rounded-lg bg-emerald-50/70 border border-emerald-200/70 font-bold text-emerald-800 tabular-nums">
+                                    <strong className="text-emerald-950">{globalTotals.won}</strong> Cierres
+                                    {globalTotals.wonAmount > 0 ? ` ($${globalTotals.wonAmount.toLocaleString()})` : ''}
+                                </span>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                            <span>
-                                <strong className="text-slate-900">Hechos:</strong> Total de gestiones (agenda + nuevos/atrasados).
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-violet-500 shrink-0" />
-                            <span>
-                                <strong className="text-slate-900">Demos y Cotiz.:</strong> Reuniones/visitas reales y cotizaciones nuevas vs. en seguimiento.
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                            <span>
-                                <strong className="text-slate-900">Sin Registro:</strong> Horas de la jornada (8h/día) sin actividad en CRM.
-                            </span>
+
+                        <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-slate-600">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                                <span>
+                                    <strong className="text-slate-900">Agenda:</strong> Compromisos programados para la fecha.
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                <span>
+                                    <strong className="text-slate-900">Hechos:</strong> Total de gestiones (agenda + proactivos).
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-violet-500 shrink-0" />
+                                <span>
+                                    <strong className="text-slate-900">Demos y Cotiz.:</strong> Demos (CRM + Google Calendar) y cotizaciones.
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                                <span>
+                                    <strong className="text-slate-900">Sin Registro:</strong> Horas de la jornada (8h/día) sin actividad en CRM.
+                                </span>
+                            </div>
                         </div>
                     </div>
 
@@ -1445,9 +1542,20 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                                         </p>
                                                                                     </div>
                                                                                 </div>
-                                                                                <span className="text-[10px] font-bold text-violet-700 shrink-0">
-                                                                                    {demo.dateStr}
-                                                                                </span>
+                                                                                <div className="text-right shrink-0">
+                                                                                    <span
+                                                                                        className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-black ${
+                                                                                            demo.completed
+                                                                                                ? 'bg-emerald-50 text-emerald-700'
+                                                                                                : 'bg-violet-100 text-violet-700'
+                                                                                        }`}
+                                                                                    >
+                                                                                        {demo.completed ? 'Realizada' : 'Agendada'}
+                                                                                    </span>
+                                                                                    <span className="block text-[10px] font-bold text-violet-700 mt-0.5">
+                                                                                        {demo.dateStr}
+                                                                                    </span>
+                                                                                </div>
                                                                             </div>
                                                                         ))}
 

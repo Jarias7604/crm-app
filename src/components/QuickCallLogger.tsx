@@ -17,6 +17,7 @@ import {
     AlertCircle, 
     FileText, 
     Users,
+    Video,
     Sparkles
 } from 'lucide-react';
 import { SessionTimer } from './ui/SessionTimer';
@@ -87,9 +88,16 @@ type SpecialOutcome = 'quote_sent' | 'info_sent' | 'meeting';
 const SPECIAL_OUTCOME_CONFIG: Record<SpecialOutcome, OutcomeConfig> = {
     quote_sent: { label: 'Cotización Enviada', icon: FileText, iconColor: 'text-indigo-600' },
     info_sent: { label: 'Info Enviada', icon: Send, iconColor: 'text-sky-600' },
-    meeting: { label: 'Reunión Realizada', icon: Users, iconColor: 'text-purple-600' },
+    meeting: { label: 'Demo / Reunión Realizada', icon: Video, iconColor: 'text-purple-600' },
 };
 const SPECIAL_OUTCOMES: SpecialOutcome[] = ['quote_sent', 'info_sent', 'meeting'];
+
+const NEXT_APPOINTMENT_TYPES: { key: FollowUpActionType; label: string; icon: typeof Phone }[] = [
+    { key: 'call', label: 'Llamada', icon: Phone },
+    { key: 'whatsapp', label: 'WhatsApp', icon: MessageSquare },
+    { key: 'meeting', label: 'Demo / Reunión', icon: Video },
+    { key: 'email', label: 'Correo', icon: Mail },
+];
 
 // Custom outcome labels per action type
 const OUTCOME_OVERRIDES: Partial<Record<ActionType, Partial<Record<CallOutcome, Partial<OutcomeConfig>>>>> = {
@@ -192,6 +200,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
 
     // Follow-up scheduling
     const [wantsFollowUp, setWantsFollowUp] = useState(false);
+    const [followUpType, setFollowUpType] = useState<FollowUpActionType>('call');
     const [followUpDate, setFollowUpDate] = useState('');
     const [followUpTime, setFollowUpTime] = useState('09:00');
     const [followUpNote, setFollowUpNote] = useState('');
@@ -270,18 +279,19 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
 
             if (wantsFollowUp && followUpDate) {
                 const followUpDateTime = localToUtcISO(`${followUpDate}T${followUpTime}`, companyTimezone);
-                const followUpActionType = ACTION_TO_FOLLOWUP[actionType];
+                const nextTypeLabel = NEXT_APPOINTMENT_TYPES.find(t => t.key === followUpType)?.label || 'Llamada';
+                const defaultNote = followUpType === 'meeting' ? 'Demo / Reunión' : `Seguimiento: ${nextTypeLabel}`;
 
                 await leadsService.createFollowUp({
                     lead_id: lead.id,
                     company_id: companyId || lead.company_id,
                     date: followUpDateTime,
-                    notes: followUpNote.trim() || `Seguimiento: ${CHANNEL_CONFIG[actionType].label}`,
-                    action_type: followUpActionType,
+                    notes: followUpNote.trim() || defaultNote,
+                    action_type: followUpType,
                 }, followUpAssignee || undefined);
 
                 const displayTime = (() => { const [h, m] = (followUpTime || '09:00').split(':'); const hn = parseInt(h, 10); return !isNaN(hn) ? `${hn % 12 || 12}:${(m || '00').slice(0, 2)} ${hn >= 12 ? 'PM' : 'AM'}` : followUpTime; })();
-                toast.success(`📅 Seguimiento agendado: ${formatDateES(followUpDate)} a las ${displayTime}`);
+                toast.success(`${nextTypeLabel} agendada: ${formatDateES(followUpDate)} a las ${displayTime}`);
             }
 
             const effectiveLabel = specialOutcome
@@ -558,6 +568,36 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
 
                     {wantsFollowUp && (
                         <div className="p-3 bg-indigo-50/30 rounded-b-xl space-y-2.5 animate-in fade-in duration-200">
+                            {/* Tipo de Próxima Cita (Llamada | WhatsApp | Demo / Reunión | Correo) */}
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                                    Tipo de Próxima Cita en Calendario
+                                </label>
+                                <div className="grid grid-cols-4 gap-1 p-0.5 bg-white rounded-xl border border-slate-200">
+                                    {NEXT_APPOINTMENT_TYPES.map(item => {
+                                        const NextIcon = item.icon;
+                                        const isSelected = followUpType === item.key;
+                                        return (
+                                            <button
+                                                key={item.key}
+                                                type="button"
+                                                onClick={() => setFollowUpType(item.key)}
+                                                className={`flex items-center justify-center gap-1 py-1.5 px-1 rounded-lg text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer ${
+                                                    isSelected
+                                                        ? item.key === 'meeting'
+                                                            ? 'bg-violet-600 text-white shadow-2xs font-black'
+                                                            : 'bg-indigo-600 text-white shadow-2xs font-black'
+                                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                <NextIcon className="w-3.5 h-3.5 shrink-0" />
+                                                <span className="truncate">{item.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
                             {/* Fecha y Hora: Alineación perfecta horizontal y vertical (mismo baseline, mismo h-10) */}
                             <div className="grid grid-cols-2 gap-2.5 items-end">
                                 <div>
@@ -607,7 +647,11 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                                     type="text"
                                     value={followUpNote}
                                     onChange={(e) => setFollowUpNote(e.target.value)}
-                                    placeholder='Ej: "Llamar para confirmar recepción de propuesta"'
+                                    placeholder={
+                                        followUpType === 'meeting'
+                                            ? 'Ej: "Demo virtual del sistema / Visita presencial"'
+                                            : 'Ej: "Llamar para confirmar recepción de propuesta"'
+                                    }
                                     className="w-full h-10 bg-white border border-slate-200 rounded-xl px-3.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 outline-none transition-all shadow-2xs"
                                 />
                             </div>

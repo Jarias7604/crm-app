@@ -39,7 +39,7 @@ const ACTION_CONFIG: Record<string, {
     email: { label: 'Email', pill: 'bg-blue-50/80 border-blue-200 text-blue-950 hover:bg-blue-100/90 hover:border-blue-300', badge: 'bg-blue-50 border border-blue-200', badgeText: 'text-blue-700', dotColor: 'bg-blue-500', Icon: Mail },
     whatsapp: { label: 'WhatsApp', pill: 'bg-teal-50/80 border-teal-200 text-teal-950 hover:bg-teal-100/90 hover:border-teal-300', badge: 'bg-teal-50 border border-teal-200', badgeText: 'text-teal-700', dotColor: 'bg-teal-500', Icon: MessageSquare },
     telegram: { label: 'Telegram', pill: 'bg-sky-50/80 border-sky-200 text-sky-950 hover:bg-sky-100/90 hover:border-sky-300', badge: 'bg-sky-50 border border-sky-200', badgeText: 'text-sky-700', dotColor: 'bg-sky-500', Icon: MessageSquare },
-    meeting: { label: 'Reunión', pill: 'bg-violet-50/80 border-violet-200 text-violet-950 hover:bg-violet-100/90 hover:border-violet-300', badge: 'bg-violet-50 border border-violet-200', badgeText: 'text-violet-700', dotColor: 'bg-violet-500', Icon: Video },
+    meeting: { label: 'Demo / Reunión', pill: 'bg-violet-50/80 border-violet-200 text-violet-950 hover:bg-violet-100/90 hover:border-violet-300', badge: 'bg-violet-50 border border-violet-200', badgeText: 'text-violet-700', dotColor: 'bg-violet-500', Icon: Video },
     quote: { label: 'Cotización', pill: 'bg-amber-50/80 border-amber-200 text-amber-950 hover:bg-amber-100/90 hover:border-amber-300', badge: 'bg-amber-50 border border-amber-200', badgeText: 'text-amber-700', dotColor: 'bg-amber-500', Icon: FileText },
     google_calendar: { label: 'Google Event', pill: 'bg-indigo-50/80 border-indigo-200 text-indigo-950 hover:bg-indigo-100/90 hover:border-indigo-300', badge: 'bg-[#4285F4]/10 border border-[#4285F4]/20', badgeText: 'text-[#4285F4]', dotColor: 'bg-[#4285F4]', Icon: CalendarIcon },
     outlook_calendar: { label: 'Outlook Event', pill: 'bg-cyan-50/80 border-cyan-200 text-cyan-950 hover:bg-cyan-100/90 hover:border-cyan-300', badge: 'bg-[#0078D4]/10 border border-[#0078D4]/20', badgeText: 'text-[#0078D4]', dotColor: 'bg-[#0078D4]', Icon: CalendarIcon },
@@ -2136,6 +2136,7 @@ export default function Calendar() {
                 initialDate={selectedDate || new Date()}
                 companyId={localStorage.getItem('simulated_company_id') || profile?.company_id || ''}
                 companyTimezone={companyTimezone}
+                googleEvents={googleEventsData || []}
                 onNavigateLead={(leadId) => {
                     setShowPerformanceReport(false);
                     navigate('/leads', { state: { leadId } });

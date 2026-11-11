@@ -36,7 +36,7 @@ interface NewFollowUpModalProps {
 
 const ACTION_OPTIONS = [
     { type: 'call', label: 'Llamada', icon: Phone, color: 'text-emerald-700 bg-emerald-50 border-emerald-300 ring-emerald-400' },
-    { type: 'meeting', label: 'Reunión', icon: Video, color: 'text-violet-700 bg-violet-50 border-violet-300 ring-violet-400' },
+    { type: 'meeting', label: 'Demo / Reunión', icon: Video, color: 'text-violet-700 bg-violet-50 border-violet-300 ring-violet-400' },
     { type: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, color: 'text-teal-700 bg-teal-50 border-teal-300 ring-teal-400' },
     { type: 'email', label: 'Email', icon: Mail, color: 'text-blue-700 bg-blue-50 border-blue-300 ring-blue-400' },
     { type: 'quote', label: 'Cotización', icon: FileText, color: 'text-amber-700 bg-amber-50 border-amber-300 ring-amber-400' },
