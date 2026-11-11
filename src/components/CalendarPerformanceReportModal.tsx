@@ -12,8 +12,6 @@ import {
 import { es } from 'date-fns/locale';
 import {
     X,
-    CalendarDays,
-    CheckCircle2,
     Clock,
     BarChart3,
     Printer,
@@ -23,12 +21,11 @@ import {
     Mail,
     Video,
     FileText,
-    Target,
     Award,
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { isAutoWhatsAppCampaignFollowUp } from '../services/leads';
-import { formatTimeInZone, utcToLocalDate } from '../utils/timezone';
+import { formatTimeInZone, localToUtcISO } from '../utils/timezone';
 
 type PeriodMode = 'day' | 'week' | '1m' | '2m' | '3m' | '6m' | '9m' | '12m' | 'custom';
 
@@ -63,7 +60,14 @@ interface RawCallActivity {
     notes: string | null;
     status_before?: string | null;
     status_after?: string | null;
-    lead: { id: string; name: string; company_name: string | null } | null;
+    lead: {
+        id: string;
+        name: string;
+        company_name: string | null;
+        status?: string | null;
+        value?: number | null;
+        document_path?: string | null;
+    } | null;
 }
 
 interface RawWonLead {
@@ -83,8 +87,10 @@ interface RawQuote {
     lead_id: string | null;
     nombre_cliente: string | null;
     total_anual: number | null;
+    estado?: string | null;
     created_by: string | null;
     created_at: string;
+    lead?: { id: string; name: string; assigned_to: string | null } | null;
 }
 
 interface AdvisorProfile {
@@ -107,7 +113,17 @@ interface DemoEntry {
     leadName: string;
     dateStr: string;
     source: string;
+    notes: string | null;
     completed: boolean;
+}
+
+interface QuoteEntry {
+    id: string;
+    leadId: string | null;
+    clientName: string;
+    amount: number;
+    dateStr: string;
+    isNewInPeriod: boolean;
 }
 
 interface AdvisorMetrics {
@@ -121,6 +137,8 @@ interface AdvisorMetrics {
     executedExtra: number;
     demosCount: number;
     quotesCount: number;
+    quotedFollowUpsCount: number;
+    quotedFollowUpsAmount: number;
     wonCount: number;
     wonAmount: number;
     effectiveMinutes: number;
@@ -133,6 +151,8 @@ interface AdvisorMetrics {
     scheduledItems: RawFollowUp[];
     executedItems: RawCallActivity[];
     demosList: DemoEntry[];
+    quotesCreatedList: QuoteEntry[];
+    quotedFollowUpsList: QuoteEntry[];
     wonLeadsList: RawWonLead[];
     gaps: TimeGap[];
 }
@@ -156,6 +176,33 @@ function formatDurationMinutes(totalMins: number): string {
     if (h === 0) return `${m}m`;
     if (m === 0) return `${h}h`;
     return `${h}h ${m}m`;
+}
+
+/**
+ * Converts a UTC ISO string into a Date object whose local getters (getFullYear,
+ * getMonth, getDate, getHours, getMinutes) reflect the exact wall-clock time
+ * in the target IANA timezone.
+ */
+function utcToZonedDateTime(utcStr: string, ianaTimezone: string): Date {
+    try {
+        const formatter = new Intl.DateTimeFormat('sv', {
+            timeZone: ianaTimezone,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+        });
+        const formatted = formatter.format(new Date(utcStr)); // "YYYY-MM-DD HH:mm:ss"
+        const [datePart, timePart] = formatted.split(' ');
+        const [y, m, d] = datePart.split('-').map(Number);
+        const [hr, min, sec] = (timePart || '12:00:00').split(':').map(Number);
+        return new Date(y, m - 1, d, hr || 0, min || 0, sec || 0);
+    } catch {
+        return new Date(utcStr);
+    }
 }
 
 function getActionLabel(type: string): string {
@@ -192,13 +239,34 @@ function getActionIcon(type: string) {
     }
 }
 
-function isDemoNoteOrType(actionType?: string | null, notes?: string | null, statusAfter?: string | null): boolean {
+/**
+ * Strict validation for whether a scheduled follow_up in the calendar is a Demo / Visit.
+ * Excludes notes that are merely phone calls to coordinate/reschedule a demo.
+ */
+function isScheduledDemoFollowUp(actionType?: string | null, notes?: string | null): boolean {
     if (actionType === 'meeting') return true;
-    if (statusAfter && /demo|presentaci[oó]n|negociaci[oó]n/i.test(statusAfter)) return true;
-    if (notes && /\b(demo|demostraci[oó]n|reuni[oó]n|google\s*meet|zoom|presentaci[oó]n\s+de\s+sistema)\b/i.test(notes)) {
-        return true;
+    if (!notes) return false;
+    const clean = notes.trim();
+    // Exclude notes that are follow-up calls to coordinate, schedule, or reschedule a demo
+    if (
+        /\b(programar|programaci[oó]n|reprogramar|reprogramaci[oó]n|reprogramci[oó]n|coordinar|concertar|agendar|seguimiento|credenciales|llamar|validar)\b/i.test(
+            clean
+        )
+    ) {
+        return false;
     }
-    return false;
+    return /^(demo(\s+virtual|\s+presencial)?|visita\s+presencial|presentaci[oó]n(\s+de\s+sistema)?|reuni[oó]n(\s+virtual|\s+presencial)?)$/i.test(
+        clean
+    );
+}
+
+/**
+ * Strict validation for whether an executed activity in call_activities is a real Demo / Meeting.
+ * Phone calls ('call'), WhatsApps ('whatsapp'), and Emails ('email') that merely mention the word
+ * "demo" in their notes (e.g. "se llama para coordinar demo") are NOT executed demos.
+ */
+function isExecutedDemoActivity(actionType?: string | null): boolean {
+    return actionType === 'meeting';
 }
 
 export const CalendarPerformanceReportModal: React.FC<Props> = ({
@@ -259,6 +327,12 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
             end = new Date(`${t >= f ? t : f}T23:59:59.999`);
         }
 
+        const startDateOnly = format(start, 'yyyy-MM-dd');
+        const endDateOnly = format(end, 'yyyy-MM-dd');
+
+        const startIso = localToUtcISO(`${startDateOnly}T00:00:00`, companyTimezone);
+        const endIso = localToUtcISO(`${endDateOnly}T23:59:59`, companyTimezone);
+
         const now = new Date();
         const cappedEnd = isAfter(end, now) ? now : end;
         let workingDays = 1;
@@ -270,17 +344,17 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
         return {
             start,
             end,
-            startIso: start.toISOString(),
-            endIso: end.toISOString(),
-            startDateOnly: format(start, 'yyyy-MM-dd'),
-            endDateOnly: format(end, 'yyyy-MM-dd'),
+            startIso,
+            endIso,
+            startDateOnly,
+            endDateOnly,
             workingDays,
             label:
                 periodMode === 'day'
                     ? format(start, "EEEE d 'de' MMMM yyyy", { locale: es })
                     : `${format(start, 'd MMM yyyy', { locale: es })} — ${format(end, 'd MMM yyyy', { locale: es })}`,
         };
-    }, [periodMode, selectedDayStr, customFromStr, customToStr, initialDate]);
+    }, [periodMode, selectedDayStr, customFromStr, customToStr, initialDate, companyTimezone]);
 
     useEffect(() => {
         if (!isOpen || !companyId) return;
@@ -306,7 +380,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                         .limit(4000),
                     supabase
                         .from('call_activities')
-                        .select('id, user_id, lead_id, call_date, duration_seconds, action_type, outcome, notes, status_before, status_after, lead:leads(id, name, company_name)')
+                        .select('id, user_id, lead_id, call_date, duration_seconds, action_type, outcome, notes, status_before, status_after, lead:leads(id, name, company_name, status, value, document_path)')
                         .eq('company_id', companyId)
                         .gte('call_date', dateWindow.startIso)
                         .lte('call_date', dateWindow.endIso)
@@ -320,10 +394,11 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                         .limit(2000),
                     supabase
                         .from('cotizaciones')
-                        .select('id, lead_id, nombre_cliente, total_anual, created_by, created_at')
+                        .select('id, lead_id, nombre_cliente, total_anual, estado, created_by, created_at, lead:leads(id, name, assigned_to)')
                         .eq('company_id', companyId)
                         .gte('created_at', dateWindow.startIso)
                         .lte('created_at', dateWindow.endIso)
+                        .order('created_at', { ascending: false })
                         .limit(2000),
                 ]);
 
@@ -336,7 +411,6 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                 );
                 setCallActivities((actRes.data || []) as unknown as RawCallActivity[]);
 
-                // Filter won leads whose internal_won_date (or updated_at fallback) is within the selected window
                 const allWon = (wonRes.data || []) as RawWonLead[];
                 const periodWon = allWon.filter(l => {
                     const rawDt = l.internal_won_date || l.updated_at;
@@ -345,7 +419,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                     return dStr >= dateWindow.startDateOnly && dStr <= dateWindow.endDateOnly;
                 });
                 setWonLeads(periodWon);
-                setQuotes((quotesRes.data || []) as RawQuote[]);
+                setQuotes((quotesRes.data || []) as unknown as RawQuote[]);
             } catch (err) {
                 console.warn('[CalendarPerformanceReportModal] fetch error:', err);
             } finally {
@@ -380,7 +454,9 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
             const sch = followUps.filter(f => f.assigned_to === advisor.id);
             const exe = callActivities.filter(a => a.user_id === advisor.id);
             const advWon = wonLeads.filter(l => l.assigned_to === advisor.id);
-            const advQuotes = quotes.filter(q => q.created_by === advisor.id);
+            const advQuotes = quotes.filter(
+                q => q.created_by === advisor.id || (!q.created_by && q.lead?.assigned_to === advisor.id)
+            );
 
             const scheduledTotal = sch.length;
             const scheduledCompleted = sch.filter(f => f.completed).length;
@@ -391,47 +467,95 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
             const executedConnected = exe.filter(a => a.outcome === 'connected').length;
             const executedExtra = Math.max(0, executedTotal - Math.min(executedTotal, scheduledCompleted));
 
-            // Identify Demos / Meetings (deduplicated by leadId + day or id)
+            // 1. Identify REAL Demos / Visits (strictly action_type='meeting' or explicit Demo/Visita calendar event)
             const demosMap = new Map<string, DemoEntry>();
             sch.forEach(f => {
-                if (isDemoNoteOrType(f.action_type, f.notes)) {
+                if (isScheduledDemoFollowUp(f.action_type, f.notes)) {
                     const key = f.lead?.id ? `lead-${f.lead.id}` : `fu-${f.id}`;
                     demosMap.set(key, {
                         id: f.id,
                         leadId: f.lead?.id || null,
                         leadName: f.lead?.name || 'Prospecto',
                         dateStr: formatTimeInZone(f.date, companyTimezone),
-                        source: 'Agendada en Calendario',
+                        source: f.notes ? `Agenda: ${f.notes}` : 'Agendada en Calendario',
+                        notes: f.notes,
                         completed: f.completed,
                     });
                 }
             });
             exe.forEach(a => {
-                if (isDemoNoteOrType(a.action_type, a.notes, a.status_after)) {
+                if (isExecutedDemoActivity(a.action_type)) {
                     const key = a.lead_id ? `lead-${a.lead_id}` : `act-${a.id}`;
+                    const existing = demosMap.get(key);
                     demosMap.set(key, {
                         id: a.id,
                         leadId: a.lead_id || null,
-                        leadName: a.lead?.name || 'Prospecto',
+                        leadName: a.lead?.name || existing?.leadName || 'Prospecto',
                         dateStr: formatTimeInZone(a.call_date, companyTimezone),
-                        source: 'Ejecutada en Gestión',
+                        source: existing ? `${existing.source} · Ejecutada` : 'Demo / Visita Ejecutada',
+                        notes: a.notes || existing?.notes || null,
                         completed: true,
                     });
                 }
             });
             const demosList = Array.from(demosMap.values());
 
-            // Quotes count (combining cotizaciones table + quote_sent call activities)
-            const quoteLeadIds = new Set<string>();
-            advQuotes.forEach(q => quoteLeadIds.add(q.lead_id || q.id));
-            exe.filter(a => a.action_type === 'quote_sent').forEach(a => quoteLeadIds.add(a.lead_id || a.id));
-            const quotesCount = quoteLeadIds.size;
+            // 2. Formal Quotes CREATED in this period (from cotizaciones table + explicit quote_sent logs)
+            const quotesCreatedMap = new Map<string, QuoteEntry>();
+            advQuotes.forEach(q => {
+                const key = q.lead_id || q.id;
+                quotesCreatedMap.set(key, {
+                    id: q.id,
+                    leadId: q.lead_id,
+                    clientName: q.nombre_cliente || q.lead?.name || 'Cliente',
+                    amount: Number(q.total_anual) || 0,
+                    dateStr: formatTimeInZone(q.created_at, companyTimezone),
+                    isNewInPeriod: true,
+                });
+            });
+            exe.filter(a => a.action_type === 'quote_sent').forEach(a => {
+                const key = a.lead_id || a.id;
+                if (!quotesCreatedMap.has(key)) {
+                    quotesCreatedMap.set(key, {
+                        id: a.id,
+                        leadId: a.lead_id,
+                        clientName: a.lead?.name || 'Cliente',
+                        amount: Number(a.lead?.value) || 0,
+                        dateStr: formatTimeInZone(a.call_date, companyTimezone),
+                        isNewInPeriod: true,
+                    });
+                }
+            });
+            const quotesCreatedList = Array.from(quotesCreatedMap.values());
+            const quotesCount = quotesCreatedList.length;
 
-            // Won deals & amount
+            // 3. Follow-ups made in this period to leads that ALREADY had an active quote (created in previous days)
+            const quotedFollowUpsMap = new Map<string, QuoteEntry>();
+            exe.forEach(a => {
+                if (!a.lead_id || quotesCreatedMap.has(a.lead_id)) return;
+                const leadVal = Number(a.lead?.value) || 0;
+                const hasQuoteDoc = Boolean(a.lead?.document_path?.startsWith('cotizacion:'));
+                const isNegotiation = a.lead?.status === 'Negociación';
+                if (leadVal > 0 || hasQuoteDoc || isNegotiation) {
+                    quotedFollowUpsMap.set(a.lead_id, {
+                        id: a.id,
+                        leadId: a.lead_id,
+                        clientName: a.lead?.name || 'Prospecto',
+                        amount: leadVal,
+                        dateStr: formatTimeInZone(a.call_date, companyTimezone),
+                        isNewInPeriod: false,
+                    });
+                }
+            });
+            const quotedFollowUpsList = Array.from(quotedFollowUpsMap.values());
+            const quotedFollowUpsCount = quotedFollowUpsList.length;
+            const quotedFollowUpsAmount = quotedFollowUpsList.reduce((s, q) => s + q.amount, 0);
+
+            // 4. Won deals & amount
             const wonCount = advWon.length;
             const wonAmount = advWon.reduce((s, l) => s + (Number(l.closing_amount) || Number(l.value) || 0), 0);
 
-            // Effective minutes spent in calls/follow-ups/demos
+            // 5. Effective minutes spent in calls/follow-ups/demos
             const effectiveMinutes = exe.reduce((sum, a) => {
                 if (a.duration_seconds && a.duration_seconds > 0) {
                     return sum + Math.max(2, Math.ceil(a.duration_seconds / 60) + 1);
@@ -440,12 +564,13 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                 return sum + 4;
             }, 0);
 
+            // 6. Accurate Zoned Timestamps for Workday Span & Inactivity Gaps
             const byDay = new Map<string, Date[]>();
             exe.forEach(a => {
-                const localDt = utcToLocalDate(a.call_date, companyTimezone);
-                const key = format(localDt, 'yyyy-MM-dd');
+                const zonedDt = utcToZonedDateTime(a.call_date, companyTimezone);
+                const key = format(zonedDt, 'yyyy-MM-dd');
                 if (!byDay.has(key)) byDay.set(key, []);
-                byDay.get(key)!.push(localDt);
+                byDay.get(key)!.push(zonedDt);
             });
 
             let totalSpanMinutes = 0;
@@ -460,13 +585,13 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
 
                 const dayLabel = format(first, 'dd MMM', { locale: es });
 
-                const workStart = new Date(first.getFullYear(), first.getMonth(), first.getDate(), 8, 30, 0);
+                const workStart = new Date(first.getFullYear(), first.getMonth(), first.getDate(), 8, 0, 0);
                 const startDiffMins = Math.round((first.getTime() - workStart.getTime()) / 60000);
                 if (startDiffMins >= 60) {
                     gaps.push({
                         dayLabel,
-                        fromTime: '08:30 a. m.',
-                        toTime: format(first, 'hh:mm a'),
+                        fromTime: '08:00 a. m.',
+                        toTime: format(first, 'hh:mm a', { locale: es }),
                         minutes: startDiffMins,
                     });
                 }
@@ -476,8 +601,8 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                     if (diffMins >= 45) {
                         gaps.push({
                             dayLabel,
-                            fromTime: format(sorted[i], 'hh:mm a'),
-                            toTime: format(sorted[i + 1], 'hh:mm a'),
+                            fromTime: format(sorted[i], 'hh:mm a', { locale: es }),
+                            toTime: format(sorted[i + 1], 'hh:mm a', { locale: es }),
                             minutes: diffMins,
                         });
                     }
@@ -488,7 +613,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                 if (endDiffMins >= 60) {
                     gaps.push({
                         dayLabel,
-                        fromTime: format(last, 'hh:mm a'),
+                        fromTime: format(last, 'hh:mm a', { locale: es }),
                         toTime: '05:00 p. m.',
                         minutes: endDiffMins,
                     });
@@ -510,6 +635,8 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                 executedExtra,
                 demosCount: demosList.length,
                 quotesCount,
+                quotedFollowUpsCount,
+                quotedFollowUpsAmount,
                 wonCount,
                 wonAmount,
                 effectiveMinutes,
@@ -522,6 +649,8 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                 scheduledItems: sch,
                 executedItems: exe,
                 demosList,
+                quotesCreatedList,
+                quotedFollowUpsList,
                 wonLeadsList: advWon,
                 gaps: gaps.sort((a, b) => b.minutes - a.minutes),
             });
@@ -553,6 +682,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
         const executed = advisorMetrics.reduce((s, m) => s + m.executedTotal, 0);
         const demos = advisorMetrics.reduce((s, m) => s + m.demosCount, 0);
         const quotesTotal = advisorMetrics.reduce((s, m) => s + m.quotesCount, 0);
+        const quotedFollowUpsTotal = advisorMetrics.reduce((s, m) => s + m.quotedFollowUpsCount, 0);
         const won = advisorMetrics.reduce((s, m) => s + m.wonCount, 0);
         const wonAmount = advisorMetrics.reduce((s, m) => s + m.wonAmount, 0);
         const effectiveMins = advisorMetrics.reduce((s, m) => s + m.effectiveMinutes, 0);
@@ -571,6 +701,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
             extraExecuted: Math.max(0, executed - completed),
             demos,
             quotesTotal,
+            quotedFollowUpsTotal,
             won,
             wonAmount,
             effectiveMins,
@@ -712,11 +843,13 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                     {globalTotals.demos}
                                 </span>
                                 <span className="text-xs font-bold text-violet-600">
-                                    demos · {globalTotals.quotesTotal} cotiz.
+                                    {globalTotals.demos === 1 ? 'demo' : 'demos'} · {globalTotals.quotesTotal} cotiz. nuevas
                                 </span>
                             </div>
                             <p className="text-[10px] text-slate-400 font-medium mt-1">
-                                Presentaciones y propuestas formales
+                                {globalTotals.quotedFollowUpsTotal > 0
+                                    ? `+ ${globalTotals.quotedFollowUpsTotal} cotizaciones previas en seguimiento`
+                                    : 'Presentaciones y propuestas formales'}
                             </p>
                         </div>
 
@@ -772,7 +905,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                         <div className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-violet-500 shrink-0" />
                             <span>
-                                <strong className="text-slate-900">Demos y Cierres:</strong> Resultados reales generados, no solo llamadas.
+                                <strong className="text-slate-900">Demos y Cotiz.:</strong> Reuniones/visitas reales y cotizaciones nuevas vs. en seguimiento.
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -792,7 +925,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                     Rendimiento por Asesor · Agenda, Demos, Cierres y Uso de Jornada
                                 </h3>
                                 <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                                    Selecciona cualquier fila para auditar cuáles son sus agendados, sus gestiones hora por hora y sus demos/cierres
+                                    Selecciona cualquier fila para auditar cuáles son sus agendados, sus gestiones hora por hora y sus demos/cotizaciones/cierres
                                 </p>
                             </div>
 
@@ -940,7 +1073,6 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                 style={{
                                                                     width: `${(barWidthPct * (100 - agendaSharePct)) / 100}%`,
                                                                 }}
-                                                                title="Adicionales / Proactivos"
                                                             />
                                                         </div>
                                                     </div>
@@ -967,6 +1099,11 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                 {m.quotesCount} Cotiz.
                                                             </span>
                                                         </div>
+                                                        {m.quotedFollowUpsCount > 0 && (
+                                                            <span className="block text-[9px] text-slate-400 font-medium mt-0.5">
+                                                                {m.quotedFollowUpsCount} cotiz. previas en seg.
+                                                            </span>
+                                                        )}
                                                     </div>
 
                                                     {/* Col 5: Cerrados */}
@@ -1049,9 +1186,12 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                             {m.firstActionTime && m.lastActionTime
                                                                                 ? `, entre ${m.firstActionTime} y ${m.lastActionTime}`
                                                                                 : ''}
-                                                                            ), generando <strong className="text-violet-700">{m.demosCount} demo(s)</strong>,{' '}
-                                                                            <strong className="text-sky-700">{m.quotesCount} cotización(es)</strong> y{' '}
-                                                                            <strong className="text-emerald-700">{m.wonCount} cierre(s)</strong>. Restan{' '}
+                                                                            ), con <strong className="text-violet-700">{m.demosCount} demo/visita real</strong>,{' '}
+                                                                            <strong className="text-sky-700">{m.quotesCount} cotización(es) nueva(s)</strong>
+                                                                            {m.quotedFollowUpsCount > 0
+                                                                                ? ` (más ${m.quotedFollowUpsCount} seguimiento(s) a cotizaciones previas por $${m.quotedFollowUpsAmount.toLocaleString()})`
+                                                                                : ''}{' '}
+                                                                            y <strong className="text-emerald-700">{m.wonCount} cierre(s)</strong>. Restan{' '}
                                                                             <strong className="text-rose-600">
                                                                                 {formatDurationMinutes(m.unaccountedMinutes)}
                                                                             </strong>{' '}
@@ -1075,7 +1215,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                             )}
                                                         </div>
 
-                                                        {/* Three Columns: 1) Agenda | 2) Hechos (con huecos de tiempo) | 3) Demos & Cierres */}
+                                                        {/* Three Columns: 1) Agenda | 2) Hechos (con huecos de tiempo) | 3) Demos, Cotizaciones & Cierres */}
                                                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                                                             {/* Column 1: Scheduled Follow-Ups */}
                                                             <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col">
@@ -1173,23 +1313,25 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                         {m.executedItems.map((act, i) => {
                                                                             const Icon = getActionIcon(act.action_type);
                                                                             const prevAct = i > 0 ? m.executedItems[i - 1] : null;
-                                                                            const gapMins = prevAct
-                                                                                ? Math.round(
-                                                                                      (new Date(act.call_date).getTime() -
-                                                                                          new Date(prevAct.call_date).getTime()) /
-                                                                                          60000
-                                                                                  )
+                                                                            const currZoned = utcToZonedDateTime(act.call_date, companyTimezone);
+                                                                            const prevZoned = prevAct
+                                                                                ? utcToZonedDateTime(prevAct.call_date, companyTimezone)
+                                                                                : null;
+                                                                            const gapMins = prevZoned
+                                                                                ? Math.round((currZoned.getTime() - prevZoned.getTime()) / 60000)
                                                                                 : 0;
                                                                             const sameDayAsPrev =
-                                                                                prevAct &&
-                                                                                format(utcToLocalDate(act.call_date, companyTimezone), 'yyyy-MM-dd') ===
-                                                                                    format(utcToLocalDate(prevAct.call_date, companyTimezone), 'yyyy-MM-dd');
+                                                                                prevZoned &&
+                                                                                format(currZoned, 'yyyy-MM-dd') === format(prevZoned, 'yyyy-MM-dd');
 
                                                                             return (
                                                                                 <React.Fragment key={act.id}>
-                                                                                    {sameDayAsPrev && gapMins >= 45 && (
+                                                                                    {sameDayAsPrev && gapMins >= 45 && prevZoned && (
                                                                                         <div className="px-2.5 py-1 rounded-lg bg-amber-50/80 border border-dashed border-amber-200 text-[10px] font-bold text-amber-800 flex items-center justify-between">
-                                                                                            <span>Intervalo sin registros</span>
+                                                                                            <span>
+                                                                                                Sin registro: {format(prevZoned, 'hh:mm a', { locale: es })} a{' '}
+                                                                                                {format(currZoned, 'hh:mm a', { locale: es })}
+                                                                                            </span>
                                                                                             <span>{formatDurationMinutes(gapMins)}</span>
                                                                                         </div>
                                                                                     )}
@@ -1208,6 +1350,7 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                                                 <p className="text-[10px] text-slate-400 truncate">
                                                                                                     {getActionLabel(act.action_type)} ·{' '}
                                                                                                     {act.outcome === 'connected' ? 'Conectado' : 'Sin respuesta'}
+                                                                                                    {act.notes ? ` · ${act.notes}` : ''}
                                                                                                 </p>
                                                                                             </div>
                                                                                         </div>
@@ -1218,7 +1361,9 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                                             <span className="text-[9px] text-slate-400 font-medium">
                                                                                                 {act.duration_seconds && act.duration_seconds > 0
                                                                                                     ? `${Math.ceil(act.duration_seconds / 60)}m`
-                                                                                                    : '~4m'}
+                                                                                                    : act.action_type === 'meeting'
+                                                                                                      ? '~25m'
+                                                                                                      : '~4m'}
                                                                                             </span>
                                                                                         </div>
                                                                                     </div>
@@ -1229,28 +1374,32 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                 )}
                                                             </div>
 
-                                                            {/* Column 3: Demos & Won Deals */}
+                                                            {/* Column 3: Demos, Quotes & Won Deals */}
                                                             <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col">
                                                                 <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                                                                     <div>
                                                                         <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                                                                            3. Demos ({m.demosCount}) y Cierres ({m.wonCount})
+                                                                            3. Demos ({m.demosCount}), Cotiz. ({m.quotesCount}) y Cierres ({m.wonCount})
                                                                         </h4>
                                                                         <p className="text-[10px] text-slate-400 font-medium">
                                                                             Conversión comercial del período
                                                                         </p>
                                                                     </div>
                                                                     <span className="px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 text-[10px] font-black">
-                                                                        {m.quotesCount} cotiz.
+                                                                        {m.quotesCount} nuevas
                                                                     </span>
                                                                 </div>
 
-                                                                {m.demosList.length === 0 && m.wonLeadsList.length === 0 ? (
+                                                                {m.demosList.length === 0 &&
+                                                                m.quotesCreatedList.length === 0 &&
+                                                                m.quotedFollowUpsList.length === 0 &&
+                                                                m.wonLeadsList.length === 0 ? (
                                                                     <p className="text-xs text-slate-400 py-6 text-center">
-                                                                        Sin demos ni cierres registrados en este período.
+                                                                        Sin demos, cotizaciones ni cierres en este período.
                                                                     </p>
                                                                 ) : (
                                                                     <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                                                        {/* Won Deals */}
                                                                         {m.wonLeadsList.map(won => (
                                                                             <div
                                                                                 key={`won-${won.id}`}
@@ -1276,22 +1425,23 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                             </div>
                                                                         ))}
 
+                                                                        {/* Real Demos / Meetings */}
                                                                         {m.demosList.map(demo => (
                                                                             <div
                                                                                 key={`demo-${demo.id}`}
                                                                                 onClick={() => demo.leadId && onNavigateLead?.(demo.leadId)}
-                                                                                className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/60 transition-all cursor-pointer"
+                                                                                className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl border border-violet-200/70 bg-violet-50/30 hover:bg-violet-50/60 transition-all cursor-pointer"
                                                                             >
                                                                                 <div className="flex items-center gap-2 min-w-0">
-                                                                                    <div className="w-6 h-6 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+                                                                                    <div className="w-6 h-6 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center shrink-0">
                                                                                         <Video className="w-3.5 h-3.5" />
                                                                                     </div>
                                                                                     <div className="min-w-0">
                                                                                         <p className="text-xs font-bold text-slate-900 truncate">
                                                                                             {demo.leadName}
                                                                                         </p>
-                                                                                        <p className="text-[10px] text-slate-400 truncate">
-                                                                                            Demo · {demo.source}
+                                                                                        <p className="text-[10px] text-violet-700 font-semibold truncate">
+                                                                                            {demo.source}
                                                                                         </p>
                                                                                     </div>
                                                                                 </div>
@@ -1300,6 +1450,69 @@ export const CalendarPerformanceReportModal: React.FC<Props> = ({
                                                                                 </span>
                                                                             </div>
                                                                         ))}
+
+                                                                        {/* Formal Quotes Created in Period */}
+                                                                        {m.quotesCreatedList.map(q => (
+                                                                            <div
+                                                                                key={`qnew-${q.id}`}
+                                                                                onClick={() => q.leadId && onNavigateLead?.(q.leadId)}
+                                                                                className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl border border-sky-200/80 bg-sky-50/30 hover:bg-sky-50/60 transition-all cursor-pointer"
+                                                                            >
+                                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                                    <div className="w-6 h-6 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+                                                                                        <FileText className="w-3.5 h-3.5" />
+                                                                                    </div>
+                                                                                    <div className="min-w-0">
+                                                                                        <p className="text-xs font-bold text-slate-900 truncate">
+                                                                                            {q.clientName}
+                                                                                        </p>
+                                                                                        <p className="text-[10px] text-sky-700 font-semibold truncate">
+                                                                                            Cotización nueva creada
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <span className="text-xs font-black text-sky-700 tabular-nums shrink-0">
+                                                                                    ${q.amount.toLocaleString()}
+                                                                                </span>
+                                                                            </div>
+                                                                        ))}
+
+                                                                        {/* Follow-ups on Existing Quotes from Earlier Dates */}
+                                                                        {m.quotedFollowUpsList.length > 0 && (
+                                                                            <>
+                                                                                <div className="pt-2 pb-1">
+                                                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                                                                                        Seguimiento a cotizaciones de fechas previas ({m.quotedFollowUpsList.length})
+                                                                                    </p>
+                                                                                </div>
+                                                                                {m.quotedFollowUpsList.map(qf => (
+                                                                                    <div
+                                                                                        key={`qprev-${qf.id}`}
+                                                                                        onClick={() => qf.leadId && onNavigateLead?.(qf.leadId)}
+                                                                                        className="flex items-center justify-between gap-2.5 p-2 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/60 transition-all cursor-pointer"
+                                                                                    >
+                                                                                        <div className="flex items-center gap-2 min-w-0">
+                                                                                            <div className="w-5 h-5 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center shrink-0">
+                                                                                                <FileText className="w-3 h-3" />
+                                                                                            </div>
+                                                                                            <div className="min-w-0">
+                                                                                                <p className="text-[11px] font-bold text-slate-800 truncate">
+                                                                                                    {qf.clientName}
+                                                                                                </p>
+                                                                                                <p className="text-[9px] text-slate-400 truncate">
+                                                                                                    Cotización previa en seguimiento · {qf.dateStr}
+                                                                                                </p>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        {qf.amount > 0 && (
+                                                                                            <span className="text-[11px] font-bold text-slate-600 tabular-nums shrink-0">
+                                                                                                ${qf.amount.toLocaleString()}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                ))}
+                                                                            </>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </div>
