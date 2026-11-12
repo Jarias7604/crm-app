@@ -1925,7 +1925,7 @@ async function handleBridgeSh(supabase: any, selfUrl: string): Promise<Response>
         .createSignedUrl('system/baileys-7.0.0-rc.9-messages-recv.js', 600);
       const fixUrlB64 = b64Utf8(String(signedFix?.signedUrl || ''));
       lines.push(
-        `(B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); DCMD="docker"; if ! docker ps >/dev/null 2>&1 && sudo -n docker ps >/dev/null 2>&1; then DCMD="sudo -n docker"; fi; CID=$($DCMD ps --format '{{.ID}} {{.Ports}}' 2>/dev/null | grep '8085' | head -n 1 | awk '{print $1}'); FURL=$(echo "${fixUrlB64}" | base64 -d); RES="missing_cid"; if [ -n "$CID" ] && [ -n "$FURL" ]; then curl -fsSL "$FURL" -o /tmp/baileys_mr.js && grep -q "CB:status" /tmp/baileys_mr.js && grep -q "sourceMappingURL=messages-recv.js.map" /tmp/baileys_mr.js && $DCMD cp "$CID:/evolution/node_modules/baileys/lib/Socket/messages-recv.js" /tmp/baileys_mr.bak && $DCMD cp /tmp/baileys_mr.js "$CID:/evolution/node_modules/baileys/lib/Socket/messages-recv.js" && RES=$($DCMD restart "$CID" 2>&1); fi; sleep 18; LOGS=$($DCMD logs --tail 25 "$CID" 2>&1); B3=$(printf 'sync=%s\\nlogs=%s' "$RES" "$LOGS" | base64 | tr -d '\\n'); B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B4=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"state_before":"%s","webhook":"%s","restart":"%s","state_after":"%s"}' "$B1" "$B2" "$B3" "$B4" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
+        `(B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); DCMD="docker"; if ! docker ps >/dev/null 2>&1 && sudo -n docker ps >/dev/null 2>&1; then DCMD="sudo -n docker"; fi; CID=$($DCMD ps --format '{{.ID}} {{.Ports}}' 2>/dev/null | grep '8085' | head -n 1 | awk '{print $1}'); FURL=$(echo "${fixUrlB64}" | base64 -d); RES="missing_cid"; if [ -n "$CID" ]; then IMG=$($DCMD inspect "$CID" --format '{{.Config.Image}}' 2>/dev/null); $DCMD cp "$CID:/evolution/node_modules/baileys/lib/Socket/messages-recv.js" /tmp/baileys_cur.js 2>/dev/null; if grep -q "CB:status" /tmp/baileys_cur.js 2>/dev/null; then CMT=$($DCMD commit --pause=false "$CID" "$IMG" 2>&1); RES="already_patched_committed:$IMG:$CMT"; elif [ -n "$FURL" ]; then curl -fsSL "$FURL" -o /tmp/baileys_mr.js && grep -q "CB:status" /tmp/baileys_mr.js && grep -q "sourceMappingURL=messages-recv.js.map" /tmp/baileys_mr.js && cp /tmp/baileys_cur.js /tmp/baileys_mr.bak && $DCMD cp /tmp/baileys_mr.js "$CID:/evolution/node_modules/baileys/lib/Socket/messages-recv.js" && CMT=$($DCMD commit --pause=false "$CID" "$IMG" 2>&1) && RST=$($DCMD restart "$CID" 2>&1) && sleep 16 && RES="patched_committed_restarted:$IMG:$CMT:$RST"; fi; fi; B3=$(printf '%s' "$RES" | base64 | tr -d '\\n'); B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B4=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"state_before":"%s","webhook":"%s","restart":"%s","state_after":"%s"}' "$B1" "$B2" "$B3" "$B4" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
       );
     } else {
       lines.push(
@@ -1973,7 +1973,7 @@ async function handleBridgeSh(supabase: any, selfUrl: string): Promise<Response>
     const wdBody = b64Utf8(JSON.stringify(wdQuery));
     const wdUrl = `${selfUrl}?action=watchdog_check&token=${shellSafe(wdToken)}`;
     lines.push(
-      `(S1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); M1=$(echo "${wdBody}" | base64 -d | curl -s -X POST "${evo}/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | base64 | tr -d '\\n'); printf '{"state":"%s","messages":"%s"}' "$S1" "$M1" | curl -s -X POST "${wdUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
+      `(S1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); M1=$(echo "${wdBody}" | base64 -d | curl -s -X POST "${evo}/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | base64 | tr -d '\\n'); DCMD="docker"; if ! docker ps >/dev/null 2>&1 && sudo -n docker ps >/dev/null 2>&1; then DCMD="sudo -n docker"; fi; CID=$($DCMD ps --format '{{.ID}} {{.Ports}}' 2>/dev/null | grep '8085' | head -n 1 | awk '{print $1}'); BUP="0"; if [ -n "$CID" ]; then $DCMD cp "$CID:/evolution/node_modules/baileys/package.json" /tmp/b_pkg.json 2>/dev/null; $DCMD cp "$CID:/evolution/node_modules/baileys/lib/Socket/messages-recv.js" /tmp/b_mr.js 2>/dev/null; if grep -q '"7.0.0-rc.9"' /tmp/b_pkg.json 2>/dev/null && ! grep -q 'CB:status' /tmp/b_mr.js 2>/dev/null; then BUP="1"; fi; fi; printf '{"state":"%s","messages":"%s","baileys_unpatched":"%s"}' "$S1" "$M1" "$BUP" | curl -s -X POST "${wdUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
     );
     await setBridgeState(supabase, 'evo_watchdog', { ...wd, token: wdToken, requested_at: now.toISOString() });
   }
@@ -2546,10 +2546,19 @@ async function handleWatchdogCheck(supabase: any, url: URL, payload: any): Promi
     }
   }
 
+  const baileysUnpatched = String(payload?.baileys_unpatched || '0') === '1';
   const lastAutoHealMs = wd.last_auto_heal_at ? new Date(wd.last_auto_heal_at).getTime() : 0;
   const canAutoHeal = now - lastAutoHealMs > 15 * 60 * 1000;
   let autoHealTriggered = false;
-  if (canAutoHeal && (recovered >= 3 || connState === 'connecting')) {
+  if (baileysUnpatched) {
+    await setBridgeState(supabase, 'evo_heal', {
+      status: 'requested',
+      mode: 'sync_baileys_recv',
+      reason: 'watchdog_baileys_status_unpatched',
+      requested_at: nowIso,
+    });
+    autoHealTriggered = true;
+  } else if (canAutoHeal && (recovered >= 3 || connState === 'connecting')) {
     await setBridgeState(supabase, 'evo_heal', {
       status: 'requested',
       mode: 'restart_and_catchup',
@@ -2563,6 +2572,7 @@ async function handleWatchdogCheck(supabase: any, url: URL, payload: any): Promi
     ...wd,
     checked_at: nowIso,
     connection_state: connState,
+    baileys_shield_ok: !baileysUnpatched,
     no_ts_filter: noTsFilter,
     last_total_pages: totalPages || wd.last_total_pages || 0,
     newest_evo_ts: newestEvoTs,
