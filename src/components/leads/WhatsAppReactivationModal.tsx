@@ -29,6 +29,8 @@ export interface ReactivationTouchInfo {
   hoursSinceSent: number;
   isReactivation?: boolean;
   replied?: boolean;
+  ticketId?: string;
+  realLeadId?: string | null;
 }
 
 interface WhatsAppReactivationModalProps {
@@ -136,7 +138,10 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
 function normalizeWhatsAppPhone(raw?: string | null): string {
   const digits = String(raw || '').replace(/\D/g, '');
   if (!digits) return '';
-  if (digits.length === 8 && /^[267]/.test(digits)) {
+  if ((digits.length === 8 && digits.startsWith('2')) || /^5032\d{7}$/.test(digits)) {
+    return '';
+  }
+  if (digits.length === 8 && /^[67]/.test(digits)) {
     return `503${digits}`;
   }
   return digits.length >= 8 ? digits : '';
@@ -237,6 +242,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   const [isFinished, setIsFinished] = useState(false);
   const [sentCount, setSentCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
+  const [lastErrorMsg, setLastErrorMsg] = useState<string>('');
   const [sentLeadIds, setSentLeadIds] = useState<Set<string>>(new Set());
   const [currentLeadName, setCurrentLeadName] = useState<string>('');
   const abortRef = useRef(false);
@@ -573,153 +579,29 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     uploadedMedia?: { path: string; name: string; mime: string; size: number } | null
   ) => {
     const normalizedPhone = normalizeWhatsAppPhone(lead.phone);
-    if (!normalizedPhone) throw new Error('Teléfono inválido');
-    const l8 = normalizedPhone.slice(-8);
-    const jid = `${normalizedPhone}@s.whatsapp.net`;
-    const nowIso = new Date().toISOString();
+    if (!normalizedPhone) throw new Error('Teléfono inválido o fijo sin WhatsApp');
     const personalizedText = renderPersonalizedMessage(lead, messageTemplate);
+    const touchInfo = touchInfoByLeadId[lead.id];
 
-    const { data: existingTickets } = await supabase
-      .from('tickets')
-      .select('id, metadata, lead_id, assigned_to')
-      .eq('company_id', companyId)
-      .eq('metadata->>source', 'whatsapp_evolution')
-      .order('updated_at', { ascending: false })
-      .limit(200);
-
-    const existingTicket = (existingTickets || []).find((t: any) => {
-      const m = t.metadata || {};
-      if (m.merged_into || m.is_group) return false;
-      if (lead.id && t.lead_id === lead.id) return true;
-      const tPhone = String(m.whatsapp_phone || '').replace(/\D/g, '');
-      return tPhone.length >= 8 && tPhone.slice(-8) === l8;
+    const { data: sendRes, error: sendErr } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
+      body: {
+        action: 'send_reactivation',
+        company_id: companyId,
+        ticket_id: touchInfo?.ticketId || undefined,
+        lead_id: touchInfo?.realLeadId !== undefined ? touchInfo.realLeadId : lead.id,
+        lead_name: lead.name,
+        lead_assigned_to: lead.assigned_to || null,
+        lead_contact_count: Number(lead.contact_count || 0),
+        phone: normalizedPhone,
+        campaign_tag: campaignTag,
+        seller_display_name: sellerDisplayName,
+        message_text: personalizedText,
+        uploaded_media: uploadedMedia || null,
+      },
     });
 
-    let ticketId: string;
-    let nextTouchNumber = 1;
-
-    if (existingTicket) {
-      ticketId = existingTicket.id;
-      const curMeta = (existingTicket.metadata || {}) as Record<string, any>;
-      const prevTouch = Number(curMeta.wa_reactivation_touch || (curMeta.wa_reactivation ? 1 : 0));
-      nextTouchNumber = prevTouch + 1;
-      await supabase
-        .from('tickets')
-        .update({
-          lead_id: lead.id,
-          lead_name: lead.name,
-          assigned_to: existingTicket.assigned_to || lead.assigned_to || currentUser.id,
-          updated_at: nowIso,
-          metadata: {
-            ...curMeta,
-            wa_scope: curMeta.wa_scope === 'soporte' ? 'soporte' : 'lead',
-            whatsapp_phone: curMeta.whatsapp_phone || normalizedPhone,
-            whatsapp_jid: curMeta.whatsapp_jid || jid,
-            wa_reactivation: true,
-            wa_reactivation_touch: nextTouchNumber,
-            wa_reactivation_campaign: campaignTag,
-            wa_reactivation_sent_at: nowIso,
-            wa_reactivation_by: currentUser.id,
-            wa_reactivation_by_name: sellerDisplayName,
-            wa_attended_at: nowIso,
-          },
-        })
-        .eq('id', ticketId);
-    } else {
-      const { data: createdTicket, error: createErr } = await supabase
-        .from('tickets')
-        .insert({
-          company_id: companyId,
-          title: `[WhatsApp · Lead] ${lead.name || `+${normalizedPhone}`}`,
-          description: `Reactivación comercial por WhatsApp (${campaignTag})`,
-          status: 'open',
-          priority: 'medium',
-          lead_id: lead.id,
-          lead_name: lead.name,
-          assigned_to: lead.assigned_to || currentUser.id,
-          metadata: {
-            source: 'whatsapp_evolution',
-            wa_scope: 'lead',
-            support_channel: 'ventas',
-            ai_category: 'Ventas / Reactivación Lead',
-            whatsapp_phone: normalizedPhone,
-            whatsapp_jid: jid,
-            evolution_instance: 'soporte',
-            wa_reactivation: true,
-            wa_reactivation_touch: 1,
-            wa_reactivation_campaign: campaignTag,
-            wa_reactivation_sent_at: nowIso,
-            wa_reactivation_by: currentUser.id,
-            wa_reactivation_by_name: sellerDisplayName,
-            wa_attended_at: nowIso,
-          },
-        })
-        .select('id')
-        .single();
-
-      if (createErr || !createdTicket?.id) {
-        throw new Error(createErr?.message || 'No se pudo crear la conversación de WhatsApp');
-      }
-      ticketId = createdTicket.id;
-
-      try {
-        await supabase.from('whatsapp_contacts').upsert(
-          {
-            company_id: companyId,
-            phone: normalizedPhone,
-            display_name: lead.name,
-            contact_type: 'lead',
-            lead_id: lead.id,
-            classified_by: currentUser.id,
-            classified_at: nowIso,
-            updated_at: nowIso,
-          },
-          { onConflict: 'company_id,phone' }
-        );
-      } catch {
-        // non-blocking
-      }
-    }
-
-    if (uploadedMedia) {
-      const { data: sendRes, error: sendErr } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
-        body: {
-          action: 'send_media',
-          ticket_id: ticketId,
-          storage_path: uploadedMedia.path,
-          file_name: uploadedMedia.name,
-          mime: uploadedMedia.mime,
-          size: uploadedMedia.size,
-          caption: personalizedText,
-        },
-      });
-      if (sendErr || (sendRes && sendRes.ok === false)) {
-        throw new Error(sendErr?.message || sendRes?.error || 'Error al encolar archivo WhatsApp');
-      }
-    } else {
-      const { data: sendRes, error: sendErr } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
-        body: {
-          action: 'send_reply',
-          ticket_id: ticketId,
-          message_text: personalizedText,
-          response_minutes: 1,
-        },
-      });
-      if (sendErr || (sendRes && sendRes.ok === false)) {
-        throw new Error(sendErr?.message || sendRes?.error || 'Error al encolar mensaje WhatsApp');
-      }
-    }
-
-    try {
-      await supabase
-        .from('leads')
-        .update({
-          last_follow_up_at: nowIso,
-          contact_count: Number(lead.contact_count || 0) + 1,
-        })
-        .eq('id', lead.id);
-    } catch {
-      // non-blocking
+    if (sendErr || !sendRes || sendRes.ok === false) {
+      throw new Error(sendErr?.message || sendRes?.error || 'No se pudo enviar el mensaje de WhatsApp');
     }
   };
 
@@ -729,11 +611,13 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     setIsFinished(false);
     setSentCount(0);
     setFailedCount(0);
+    setLastErrorMsg('');
     abortRef.current = false;
 
     const cleanCampaignTag = campaignName.trim() || 'Reactivación WhatsApp';
     let ok = 0;
     let fail = 0;
+    let lastErr = '';
 
     let uploadedMedia: { path: string; name: string; mime: string; size: number } | null = null;
     if (mediaFile) {
@@ -766,19 +650,23 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       if (abortRef.current) break;
       const lead = activeBatchLeads[i];
       setCurrentLeadName(`${lead.name} (${lead.phone})`);
+      let sentOk = false;
 
       try {
         await sendSingleLeadReactivation(lead, cleanCampaignTag, uploadedMedia);
         ok++;
+        sentOk = true;
         setSentCount(ok);
         setSentLeadIds((prev) => new Set(prev).add(lead.id));
-      } catch (err) {
+      } catch (err: any) {
         console.warn('[WhatsAppReactivation] Error sending to lead:', lead.id, err);
         fail++;
         setFailedCount(fail);
+        lastErr = String(err?.message || 'Error al enviar');
+        setLastErrorMsg(lastErr);
       }
 
-      if (i < activeBatchLeads.length - 1 && !abortRef.current) {
+      if (sentOk && i < activeBatchLeads.length - 1 && !abortRef.current) {
         await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
       }
     }
@@ -786,9 +674,14 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     setIsSending(false);
     setIsFinished(true);
     setCurrentLeadName('');
-    if (ok > 0) {
+    if (ok > 0 && fail === 0) {
       toast.success(`Reactivación enviada a ${ok} prospecto${ok === 1 ? '' : 's'}`);
       onCompleted?.();
+    } else if (ok > 0 && fail > 0) {
+      toast.success(`Enviados: ${ok} · Con error: ${fail} (${lastErr})`);
+      onCompleted?.();
+    } else if (fail > 0) {
+      toast.error(`No se pudieron enviar los mensajes (${fail} fallidos): ${lastErr}`);
     }
   };
 
@@ -1370,6 +1263,11 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                     {activeBatchLeads.length}
                   </span>
                 </div>
+                {failedCount > 0 && lastErrorMsg && (
+                  <p className="text-[11px] text-rose-600 font-medium">
+                    Detalle del último error: {lastErrorMsg}
+                  </p>
+                )}
                 <div className="w-full h-1.5 bg-white rounded-full overflow-hidden">
                   <div
                     className="h-full bg-indigo-600 transition-all duration-300"

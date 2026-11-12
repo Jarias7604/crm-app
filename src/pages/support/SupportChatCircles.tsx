@@ -1509,6 +1509,8 @@ export const SupportChatCircles: React.FC = () => {
         hoursSinceSent: c.hoursSinceReactivation,
         isReactivation: c.isReactivation,
         replied: c.reactivationReplied,
+        ticketId: c.activeTicket.id,
+        realLeadId: c.leadId || null,
       };
     }
     return { resendLeadsPool: pool, resendTouchInfoMap: touchMap };

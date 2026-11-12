@@ -834,18 +834,24 @@ async function getCaller(req: Request, supabase: any, supabaseUrl: string): Prom
     scopes = ['soporte', 'leads'];
   } else if (explicitMode === 'none') {
     scopes = [];
-  } else if (prof.custom_role_id) {
-    const { data: rp } = await supabase
-      .from('role_permissions')
-      .select('permission_key')
-      .eq('role_id', prof.custom_role_id)
-      .eq('is_enabled', true)
-      .in('permission_key', ['wa_chat_all', 'wa_chat_soporte', 'wa_chat_leads']);
-    const keys = (rp || []).map((r: any) => r.permission_key);
-    if (keys.includes('wa_chat_all')) scopes = ['all'];
-    else {
-      if (keys.includes('wa_chat_soporte')) scopes.push('soporte');
-      if (keys.includes('wa_chat_leads')) scopes.push('leads');
+  } else {
+    let keys: string[] = [];
+    if (prof.custom_role_id) {
+      const { data: rp } = await supabase
+        .from('role_permissions')
+        .select('permission_key')
+        .eq('role_id', prof.custom_role_id)
+        .eq('is_enabled', true)
+        .in('permission_key', ['wa_chat_all', 'wa_chat_soporte', 'wa_chat_leads']);
+      keys = (rp || []).map((r: any) => r.permission_key);
+    }
+    if (keys.includes('wa_chat_all') || p.wa_chat_all === true) {
+      scopes = ['all'];
+    } else {
+      if (keys.includes('wa_chat_soporte') || p.wa_chat_soporte === true) scopes.push('soporte');
+      if (keys.includes('wa_chat_leads') || p.wa_chat_leads === true || p.leads === true || p.leads_view === true) {
+        scopes.push('leads');
+      }
     }
   }
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
@@ -959,12 +965,16 @@ serve(async (req: Request) => {
     if (action === 'sync_group_subject') return await handleSyncGroup(supabase, url, payload);
     if (action === 'sync_all_groups') return await handleSyncAllGroups(supabase, url, payload);
     if (action === 'import_history') return await handleImportHistory(supabase, url, payload);
+    if (action === 'report_evo_heal') return await handleReportEvoHeal(supabase, url, payload);
+    if (action === 'catchup_messages') return await handleCatchupMessages(supabase, url, payload);
+    if (action === 'watchdog_check') return await handleWatchdogCheck(supabase, url, payload);
 
     // ── Actions from the CRM UI (require a logged-in user) ──
     const uiActions = [
       'get_ai_config', 'test_openai', 'save_ai_config', 'save_ai_prompt', 'set_ticket_channel',
-      'promote_to_lead', 'classify_contact', 'send_reply', 'send_media', 'retry_media', 'bridge_status',
-      'rescope_now', 'request_history_import', 'get_wa_team_access', 'set_wa_user_access',
+      'promote_to_lead', 'classify_contact', 'send_reply', 'send_media', 'send_reactivation',
+      'retry_media', 'bridge_status', 'rescope_now', 'request_history_import', 'request_evo_heal',
+      'get_wa_team_access', 'set_wa_user_access',
     ];
     if (uiActions.includes(action)) {
       const caller = await getCaller(req, supabase, supabaseUrl);
@@ -995,6 +1005,8 @@ serve(async (req: Request) => {
           return await handleSendReply(supabase, caller, payload);
         case 'send_media':
           return await handleSendMedia(supabase, caller, payload);
+        case 'send_reactivation':
+          return await handleSendReactivation(supabase, caller, payload);
         case 'retry_media':
           return await handleRetryMedia(supabase, caller, payload);
         case 'bridge_status':
@@ -1008,6 +1020,16 @@ serve(async (req: Request) => {
         case 'request_history_import': {
           if (!caller.isAdmin) return json({ ok: false, error: 'Solo un administrador' }, 403);
           await setBridgeState(supabase, 'history_import', { status: 'requested', requested_at: new Date().toISOString() });
+          return json({ ok: true });
+        }
+        case 'request_evo_heal': {
+          if (!caller.isAdmin) return json({ ok: false, error: 'Solo un administrador' }, 403);
+          await setBridgeState(supabase, 'evo_heal', {
+            status: 'requested',
+            mode: String(payload?.mode || 'restart_and_catchup'),
+            since: payload?.since || null,
+            requested_at: new Date().toISOString(),
+          });
           return json({ ok: true });
         }
       }
@@ -1038,12 +1060,54 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
     return json({ ok: false, error: 'apikey inválida' }, 401);
   }
 
+  const companyId = await resolveMainCompanyId(supabase, url.searchParams.get('company_id'));
+  if (!companyId) return json({ ok: false, error: 'No company_id resolved' }, 400);
+
+  // Remember Evolution credentials/instance server-side (never in tickets).
+  if (incomingKey || instanceName) {
+    const st = await getBridgeState(supabase, 'evolution');
+    if ((incomingKey && st.apikey !== incomingKey) || st.instance !== instanceName) {
+      await setBridgeState(supabase, 'evolution', { ...st, ...(incomingKey ? { apikey: incomingKey } : {}), instance: instanceName });
+    }
+  }
+
   const rawData = payload?.data || payload;
-  const entry = Array.isArray(rawData) ? rawData[0] : Array.isArray(rawData?.messages) ? rawData.messages[0] : rawData;
+  const entries: any[] = Array.isArray(rawData)
+    ? rawData
+    : Array.isArray(rawData?.messages)
+    ? rawData.messages
+    : [rawData];
+
+  const sorted = entries.length > 1
+    ? [...entries].sort((a, b) => messageDate(a).getTime() - messageDate(b).getTime())
+    : entries;
+
+  const team = await loadTeam(supabase, companyId);
+  let lastResult: Record<string, any> = { ok: true, ignored: true, reason: 'empty payload' };
+  for (const entry of sorted) {
+    lastResult = await ingestWhatsAppEntry(supabase, companyId, instanceName, entry, rawData, payload, {
+      isCatchup: false,
+      teamCache: team,
+    });
+  }
+  await setBridgeState(supabase, 'last_webhook_in', { at: new Date().toISOString() });
+  return json(lastResult);
+}
+
+async function ingestWhatsAppEntry(
+  supabase: any,
+  companyId: string,
+  instanceName: string,
+  entry: any,
+  rawData: any,
+  payload: any,
+  opts?: { isCatchup?: boolean; teamCache?: any }
+): Promise<Record<string, any>> {
+  const isCatchup = Boolean(opts?.isCatchup);
   const key = entry?.key || payload?.key || {};
   const remoteJidRaw: string = key?.remoteJid || entry?.remoteJid || payload?.remoteJid || '';
   if (!remoteJidRaw || remoteJidRaw === 'status@broadcast' || remoteJidRaw.endsWith('@newsletter')) {
-    return json({ ok: true, ignored: true, reason: 'broadcast/status ignored' });
+    return { ok: true, ignored: true, reason: 'broadcast/status ignored' };
   }
 
   const fromMe = Boolean(key?.fromMe ?? entry?.fromMe ?? false);
@@ -1055,12 +1119,12 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
   const rawMsgObj = entry?.message || payload?.message || {};
   const msgObj = unwrapMessage(rawMsgObj);
   if (msgObj?.protocolMessage || msgObj?.reactionMessage || msgObj?.pollUpdateMessage) {
-    return json({ ok: true, ignored: true, reason: 'protocol/reaction message' });
+    return { ok: true, ignored: true, reason: 'protocol/reaction message' };
   }
   const media = extractMedia(msgObj);
   const text = extractText(msgObj, rawMsgObj, entry);
   const displayText = text || (media ? mediaPlaceholder(media.kind, media.obj) : '');
-  if (!displayText) return json({ ok: true, ignored: true, reason: 'No text or media content' });
+  if (!displayText) return { ok: true, ignored: true, reason: 'No text or media content' };
 
   // Sender identity
   const participantJid: string = key?.participant || entry?.participant || '';
@@ -1075,17 +1139,6 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
   const chatJid = isGroup ? remoteJidRaw : senderPhone ? `${senderPhone}@s.whatsapp.net` : remoteJidRaw;
   const chatPhone = isGroup ? '' : senderPhone;
 
-  const companyId = await resolveMainCompanyId(supabase, url.searchParams.get('company_id'));
-  if (!companyId) return json({ ok: false, error: 'No company_id resolved' }, 400);
-
-  // Remember Evolution credentials/instance server-side (never in tickets).
-  if (incomingKey || instanceName) {
-    const st = await getBridgeState(supabase, 'evolution');
-    if ((incomingKey && st.apikey !== incomingKey) || st.instance !== instanceName) {
-      await setBridgeState(supabase, 'evolution', { ...st, ...(incomingKey ? { apikey: incomingKey } : {}), instance: instanceName });
-    }
-  }
-
   // Dedupe (Evolution may deliver the same message twice).
   if (waMessageId) {
     const { data: dup } = await supabase
@@ -1094,10 +1147,10 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
       .eq('company_id', companyId)
       .eq('wa_message_id', waMessageId)
       .maybeSingle();
-    if (dup) return json({ ok: true, ignored: true, reason: 'duplicate message' });
+    if (dup) return { ok: true, ignored: true, reason: 'duplicate message' };
   }
 
-  const team = await loadTeam(supabase, companyId);
+  const team = opts?.teamCache || (await loadTeam(supabase, companyId));
 
   // Who is speaking?
   // In 1-on-1 chats, only fromMe (sent by +503 7971-8911) is the outgoing side; messages sent from
@@ -1183,12 +1236,14 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
 
   // A fromMe message may be the echo of something the CRM itself sent through the bridge.
   if (fromMe && tickets.length > 0) {
-    const since = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const since = new Date(msgDate.getTime() - 30 * 60 * 1000).toISOString();
+    const until = new Date(msgDate.getTime() + 30 * 60 * 1000).toISOString();
     const { data: recentOut } = await supabase
       .from('whatsapp_outbox')
       .select('id, ticket_id, comment_id, kind, payload, wa_message_id, status')
       .in('ticket_id', tickets.map((t) => t.id))
       .gte('created_at', since)
+      .lte('created_at', until)
       .order('created_at', { ascending: false })
       .limit(20);
     const outs = (recentOut || []) as any[];
@@ -1220,7 +1275,7 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
           );
         }
       }
-      return json({ ok: true, ignored: true, reason: 'echo of CRM-sent message' });
+      return { ok: true, ignored: true, reason: 'echo of CRM-sent message' };
     }
   }
 
@@ -1228,7 +1283,7 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
     ? tickets.find((t) => {
         if (!['resolved', 'closed'].includes(t.status) || t.metadata?.merged_into) return false;
         const closedAt = new Date(t.resolved_at || t.updated_at || t.created_at).getTime();
-        return Date.now() - closedAt <= 4 * 60 * 60 * 1000;
+        return Math.abs(msgDate.getTime() - closedAt) <= 4 * 60 * 60 * 1000;
       })
     : null;
 
@@ -1237,7 +1292,7 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
   if (!targetTicket && isStaff) {
     targetTicket = tickets.find((t) => !t.metadata?.merged_into) || null;
     if (!targetTicket && (scope === 'soporte' || isGroup)) {
-      return json({ ok: true, ignored: true, reason: 'Staff message with no conversation — no self-ticket' });
+      return { ok: true, ignored: true, reason: 'Staff message with no conversation — no self-ticket' };
     }
   }
   // Client courtesy ("gracias", "ok") right after closing: attach to the closed ticket, don't reopen.
@@ -1348,7 +1403,7 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
   }
   const { data: claimed, error: claimErr } = await supabase.from('whatsapp_messages').insert(waRow).select('id').single();
   if (claimErr) {
-    if (String(claimErr.code) === '23505') return json({ ok: true, ignored: true, reason: 'duplicate message (race)' });
+    if (String(claimErr.code) === '23505') return { ok: true, ignored: true, reason: 'duplicate message (race)' };
     throw claimErr;
   }
   waRowId = claimed.id;
@@ -1378,8 +1433,13 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
 
   // ── Update the ticket ──
   const currentMeta = cleanMeta(targetTicket.metadata || {});
+  const prevLastIso = String(currentMeta.last_whatsapp_at || '');
+  const isNewerOrEqual = !prevLastIso || msgDate.toISOString() >= prevLastIso;
   const isResolutionReply =
-    staffStrong && scope === 'soporte' && /listo|resuelto|solucionado|arreglado|ya quedo|ya quedó|corregido|actualizado/i.test(displayText);
+    isNewerOrEqual &&
+    staffStrong &&
+    scope === 'soporte' &&
+    /listo|resuelto|solucionado|arreglado|ya quedo|ya quedó|corregido|actualizado/i.test(displayText);
   const shouldUpgradeTitle =
     scope === 'soporte' &&
     !isStaff &&
@@ -1389,13 +1449,19 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
 
   let lastPreview = displayText.slice(0, 200);
   let description = String(targetTicket.description || '');
-  description = description.includes('💬 Historial de WhatsApp:')
-    ? `${description}\n${line}`
-    : `${description}\n\n💬 Historial de WhatsApp:\n${line}`;
+  if (!description.includes('💬 Historial de WhatsApp:')) {
+    description = `${description}\n\n💬 Historial de WhatsApp:\n${line}`;
+  } else if (isNewerOrEqual) {
+    description = `${description}\n${line}`;
+  } else {
+    // Insert before the last chat line so SupportChatCircles preview keeps the newest message at the end.
+    const lastNl = description.lastIndexOf('\n');
+    description = lastNl > 0 ? `${description.slice(0, lastNl)}\n${line}${description.slice(lastNl)}` : `${description}\n${line}`;
+  }
 
-  // Optional AI text auto-reply (OFF by default). Never for staff, team, spam or audio (audio replies after transcription).
+  // Optional AI text auto-reply (OFF by default). Never for catchup, staff, team, spam or audio.
   let aiReplied = false;
-  if (!isStaff && !media && ['soporte', 'lead', 'por_clasificar'].includes(scope) && !isGreetingOrClosingAgreement(displayText) && currentMeta.ai_auto_reply_text_enabled !== false) {
+  if (!isCatchup && !isStaff && !media && ['soporte', 'lead', 'por_clasificar'].includes(scope) && !isGreetingOrClosingAgreement(displayText) && currentMeta.ai_auto_reply_text_enabled !== false) {
     const aiCfg = await loadSupportAiConfig(supabase);
     if (aiCfg.autoReplyText && aiCfg.openAiKey) {
       const reply = await askOpenAi(
@@ -1425,15 +1491,15 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
   const scopeChanged = prevScope !== '' && prevScope !== scope;
   const updated: Record<string, any> = {
     description,
-    updated_at: new Date().toISOString(),
+    updated_at: isNewerOrEqual ? (isCatchup ? msgDate.toISOString() : new Date().toISOString()) : targetTicket.updated_at || new Date().toISOString(),
     metadata: {
       ...currentMeta,
       ...baseMetaPatch,
       support_channel: scope === 'soporte' ? (classification.supportChannel !== 'soporte' && classification.supportChannel !== 'ventas' && !isStaff ? classification.supportChannel : currentMeta.support_channel === 'ventas' ? 'soporte' : currentMeta.support_channel || 'soporte') : 'ventas',
       whatsapp_message_count: Number(currentMeta.whatsapp_message_count || 0) + 1 + (aiReplied ? 1 : 0),
-      last_whatsapp_message: lastPreview,
-      last_whatsapp_at: msgDate.toISOString(),
-      last_message_from: aiReplied || isStaff ? 'staff' : 'client',
+      last_whatsapp_message: isNewerOrEqual ? lastPreview : currentMeta.last_whatsapp_message,
+      last_whatsapp_at: isNewerOrEqual ? msgDate.toISOString() : prevLastIso,
+      last_message_from: isNewerOrEqual ? (aiReplied || isStaff ? 'staff' : 'client') : currentMeta.last_message_from,
       ...(scopeChanged ? { wa_scope_changed_at: new Date().toISOString(), wa_scope_previous: prevScope } : {}),
       ai_category:
         scope !== 'soporte'
@@ -1467,14 +1533,14 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
 
   await supabase.from('tickets').update(updated).eq('id', targetTicket.id);
 
-  return json({
+  return {
     ok: true,
     action: createdNew ? 'ticket_created' : isResolutionReply ? 'ticket_resolved' : 'message_appended',
     ticket_id: targetTicket.id,
     wa_scope: scope,
     scope_reason: scopeInfo.reason,
     media: media?.kind || null,
-  });
+  };
 }
 
 // =============================================================================
@@ -1821,6 +1887,89 @@ async function handleBridgeSh(supabase: any, selfUrl: string): Promise<Response>
     });
   }
 
+  // 6. On-demand or auto-triggered Evolution instance heal (connection check + restart + catchup).
+  const heal = await getBridgeState(supabase, 'evo_heal');
+  if (heal.status === 'requested') {
+    const inst = shellSafe(instance);
+    const healToken = crypto.randomUUID().replace(/-/g, '');
+    const mode = String(heal.mode || 'restart_and_catchup');
+    await setBridgeState(supabase, 'evo_heal', {
+      ...heal,
+      status: 'dispatched',
+      token: healToken,
+      dispatched_at: now.toISOString(),
+    });
+    const healUrl = `${selfUrl}?action=report_evo_heal&token=${shellSafe(healToken)}`;
+    if (mode === 'check_only') {
+      lines.push(
+        `(B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"state_before":"%s","webhook":"%s","restart":"","state_after":"%s"}' "$B1" "$B2" "$B1" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
+      );
+    } else if (mode === 'restore_webhook') {
+      const whBody = b64Utf8(
+        JSON.stringify({
+          webhook: {
+            enabled: true,
+            url: selfUrl,
+            webhookByEvents: false,
+            webhookBase64: true,
+            events: ['MESSAGES_UPSERT'],
+          },
+        })
+      );
+      lines.push(
+        `(B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); echo "${whBody}" | base64 -d | curl -s -X POST "${evo}/webhook/set/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- >/dev/null 2>&1; B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B3=$(curl -s "${evo}/instance/connect/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); sleep 8; B4=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"state_before":"%s","webhook":"%s","restart":"%s","state_after":"%s"}' "$B1" "$B2" "$B3" "$B4" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
+      );
+    } else {
+      lines.push(
+        `(B0=$(curl -s "${evo}/instance/fetchInstances" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); R1=$(curl -s "${evo}/instance/connect/${inst}" -H "apikey: ${safeKey}"); B3=$(printf '%s' "$R1" | base64 | tr -d '\\n'); sleep 8; B4=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"evo_info":"%s","state_before":"%s","webhook":"%s","restart":"%s","state_after":"%s"}' "$B0" "$B1" "$B2" "$B3" "$B4" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
+      );
+    }
+  }
+
+  // 7. Sequential multi-page catchup of missed text + media messages (chronological order).
+  const mc = await getBridgeState(supabase, 'message_catchup');
+  if (mc.status === 'running' && Number(mc.page) >= 1) {
+    const notBeforeOk = !mc.not_before || now.getTime() >= new Date(mc.not_before).getTime();
+    const inflightExpired = !mc.inflight_at || now.getTime() - new Date(mc.inflight_at).getTime() > 40 * 1000;
+    if (notBeforeOk && inflightExpired) {
+      const inst = shellSafe(instance);
+      const pageNum = Number(mc.page);
+      const offsetNum = Number(mc.offset || 80);
+      const sinceSec = mc.since ? Math.floor(new Date(mc.since).getTime() / 1000) : Math.floor((now.getTime() - 14 * 3600 * 1000) / 1000);
+      const whereClause = mc.no_ts_filter ? {} : { messageTimestamp: { gte: sinceSec } };
+      const body = b64Utf8(JSON.stringify({ where: whereClause, page: pageNum, offset: offsetNum }));
+      const catchupUrl = `${selfUrl}?action=catchup_messages&page=${pageNum}&token=${shellSafe(mc.token)}`;
+      lines.push(
+        `(echo "${body}" | base64 -d | curl -s -X POST "${evo}/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | curl -s -X POST "${catchupUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
+      );
+      await setBridgeState(supabase, 'message_catchup', { ...mc, inflight_at: now.toISOString() });
+    }
+  }
+
+  // 8. Permanent 2-minute watchdog: checks connectionState + latest messages, auto-recovers
+  //    dropped webhooks and auto-restarts the Evolution instance if its webhook emitter freezes.
+  const wd = await getBridgeState(supabase, 'evo_watchdog');
+  const lastWdReq = wd.requested_at ? new Date(wd.requested_at).getTime() : 0;
+  if (
+    heal.status !== 'requested' &&
+    heal.status !== 'dispatched' &&
+    mc.status !== 'running' &&
+    now.getTime() - lastWdReq > 2 * 60 * 1000
+  ) {
+    const inst = shellSafe(instance);
+    const wdToken = crypto.randomUUID().replace(/-/g, '');
+    const sinceSec = Math.floor((now.getTime() - 6 * 3600 * 1000) / 1000);
+    const wdQuery = wd.no_ts_filter && Number(wd.last_total_pages) > 0
+      ? { where: {}, page: Number(wd.last_total_pages), offset: 40 }
+      : { where: { messageTimestamp: { gte: sinceSec } }, page: 1, offset: 40 };
+    const wdBody = b64Utf8(JSON.stringify(wdQuery));
+    const wdUrl = `${selfUrl}?action=watchdog_check&token=${shellSafe(wdToken)}`;
+    lines.push(
+      `(S1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); M1=$(echo "${wdBody}" | base64 -d | curl -s -X POST "${evo}/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | base64 | tr -d '\\n'); printf '{"state":"%s","messages":"%s"}' "$S1" "$M1" | curl -s -X POST "${wdUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
+    );
+    await setBridgeState(supabase, 'evo_watchdog', { ...wd, token: wdToken, requested_at: now.toISOString() });
+  }
+
   return new Response(lines.length > 0 ? lines.join('\n') + '\n' : '# idle\n', {
     headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' },
   });
@@ -2071,12 +2220,362 @@ async function handleImportHistory(supabase: any, url: URL, payload: any): Promi
   return json({ ok: true, imported });
 }
 
+function fromB64Json(b64: unknown): any {
+  const s = String(b64 || '').replace(/\s/g, '');
+  if (!s) return null;
+  try {
+    const txt = new TextDecoder().decode(decodeBase64(s));
+    try {
+      return JSON.parse(txt);
+    } catch {
+      return txt;
+    }
+  } catch {
+    return null;
+  }
+}
+
+async function handleReportEvoHeal(supabase: any, url: URL, payload: any): Promise<Response> {
+  const heal = await getBridgeState(supabase, 'evo_heal');
+  const token = shellSafe(url.searchParams.get('token') || '');
+  if (!heal.token || token !== heal.token) return json({ ok: false, error: 'invalid token' }, 401);
+
+  const evoInfo = fromB64Json(payload?.evo_info);
+  const stateBefore = fromB64Json(payload?.state_before);
+  const webhookCfg = fromB64Json(payload?.webhook);
+  const restartRes = fromB64Json(payload?.restart);
+  const stateAfter = fromB64Json(payload?.state_after);
+  const nowIso = new Date().toISOString();
+
+  const connAfter = String(stateAfter?.instance?.state || stateAfter?.state || 'unknown');
+  const whEnabled = webhookCfg?.enabled ?? webhookCfg?.webhook?.enabled;
+
+  await setBridgeState(supabase, 'evo_heal', {
+    ...heal,
+    status: 'done',
+    completed_at: nowIso,
+    evo_info: evoInfo || heal.evo_info || null,
+    connection_before: stateBefore?.instance?.state || stateBefore?.state || stateBefore,
+    connection_after: connAfter,
+    state_before: stateBefore,
+    webhook: webhookCfg,
+    restart: restartRes,
+    state_after: stateAfter,
+  });
+
+  // If webhook was disabled on Evolution API, automatically re-enable it once.
+  if (whEnabled === false && !heal.restore_attempted) {
+    await setBridgeState(supabase, 'evo_heal', {
+      status: 'requested',
+      mode: 'restore_webhook',
+      restore_attempted: true,
+      since: heal.since || null,
+      requested_at: nowIso,
+    });
+    return json({ ok: true, action: 'scheduled_restore_webhook' });
+  }
+
+  // Start catchup at page 1 with messageTimestamp.gte; handleCatchupMessages auto-adapts to pagination order.
+  if (String(heal.mode || 'restart_and_catchup') !== 'check_only') {
+    const catchupSince = heal.since || new Date(Date.now() - 14 * 60 * 60 * 1000).toISOString();
+    await setBridgeState(supabase, 'message_catchup', {
+      status: 'running',
+      token: crypto.randomUUID().replace(/-/g, ''),
+      page: 1,
+      end_page: 1,
+      step: 1,
+      no_ts_filter: false,
+      jumped: false,
+      offset: 80,
+      since: catchupSince,
+      not_before: new Date(Date.now() + 4000).toISOString(),
+      inflight_at: null,
+      pages_done: 0,
+      imported_total: 0,
+      started_at: nowIso,
+    });
+  }
+
+  return json({ ok: true, connection_after: connAfter });
+}
+
+async function handleCatchupMessages(supabase: any, url: URL, payload: any): Promise<Response> {
+  const mc = await getBridgeState(supabase, 'message_catchup');
+  const token = shellSafe(url.searchParams.get('token') || '');
+  if (!mc.token || token !== mc.token) return json({ ok: false, error: 'invalid token' }, 401);
+  const page = Number(url.searchParams.get('page') || 0);
+  if (mc.status !== 'running' || page !== Number(mc.page)) {
+    return json({ ok: true, skipped: true });
+  }
+
+  const companyId = await resolveMainCompanyId(supabase, url.searchParams.get('company_id'));
+  if (!companyId) return json({ ok: false, error: 'No company' }, 400);
+  const { instance } = await evolutionCredentials(supabase);
+  const sinceMs = mc.since ? new Date(mc.since).getTime() : Date.now() - 14 * 60 * 60 * 1000;
+
+  const totalPages = Number(payload?.messages?.pages || payload?.pages || 1);
+  const totalRecords = Number(payload?.messages?.total || payload?.total || 0);
+  const records: any[] = payload?.messages?.records || payload?.records || (Array.isArray(payload) ? payload : []);
+
+  const firstTs = records.length > 0 ? messageDate(records[0]).toISOString() : null;
+  const lastTs = records.length > 0 ? messageDate(records[records.length - 1]).toISOString() : null;
+
+  // Auto-adapt on first probe if Evolution ignored where.messageTimestamp.gte or returned newest-first across >1 pages.
+  if (!mc.jumped && page === 1) {
+    // Case A: Evolution returned an error on messageTimestamp.gte (records empty & error present) -> retry without ts filter on tail pages.
+    if (records.length === 0 && (payload?.error || payload?.status >= 400) && !mc.no_ts_filter) {
+      await setBridgeState(supabase, 'message_catchup', {
+        ...mc,
+        no_ts_filter: true,
+        jumped: false,
+        page: 1,
+        inflight_at: null,
+        probe_error: payload?.message || payload?.error,
+      });
+      return json({ ok: true, action: 'fallback_no_ts_filter' });
+    }
+    // Case B: Oldest-first pagination across whole history (page 1 has ancient records < sinceMs and totalPages > 1).
+    if (records.length > 0 && totalPages > 1 && messageDate(records[records.length - 1]).getTime() < sinceMs && messageDate(records[0]).getTime() < sinceMs) {
+      const startTail = Math.max(1, totalPages - 4);
+      await setBridgeState(supabase, 'message_catchup', {
+        ...mc,
+        jumped: true,
+        page: startTail,
+        end_page: totalPages,
+        step: 1,
+        inflight_at: null,
+        total_pages: totalPages,
+        total_records: totalRecords,
+      });
+      return json({ ok: true, action: 'jump_to_tail', start_page: startTail, end_page: totalPages });
+    }
+    // Case C: Filtered query succeeded and has multiple pages.
+    if (totalPages > 1 && records.length > 1) {
+      const isDescending = messageDate(records[0]).getTime() > messageDate(records[records.length - 1]).getTime();
+      if (isDescending) {
+        const startDesc = Math.min(totalPages, 6);
+        await setBridgeState(supabase, 'message_catchup', {
+          ...mc,
+          jumped: true,
+          page: startDesc,
+          end_page: 1,
+          step: -1,
+          inflight_at: null,
+          total_pages: totalPages,
+          total_records: totalRecords,
+        });
+        return json({ ok: true, action: 'jump_to_oldest_filtered_page', start_page: startDesc });
+      } else {
+        await setBridgeState(supabase, 'message_catchup', {
+          ...mc,
+          jumped: true,
+          page: 1,
+          end_page: Math.min(totalPages, 8),
+          step: 1,
+          inflight_at: null,
+          total_pages: totalPages,
+          total_records: totalRecords,
+        });
+        // Fall through to process page 1 right now since page 1 IS the oldest filtered page!
+        mc.jumped = true;
+        mc.end_page = Math.min(totalPages, 8);
+        mc.step = 1;
+      }
+    } else {
+      mc.jumped = true;
+      mc.end_page = 1;
+      mc.step = 1;
+    }
+  }
+
+  const candidates = records
+    .filter((rec) => {
+      const key = rec?.key || {};
+      const jid = String(key.remoteJid || rec?.remoteJid || '');
+      if (!jid || jid === 'status@broadcast' || jid.endsWith('@newsletter')) return false;
+      return messageDate(rec).getTime() >= sinceMs;
+    })
+    .sort((a, b) => messageDate(a).getTime() - messageDate(b).getTime());
+
+  let imported = 0;
+  const samples: string[] = [];
+  if (candidates.length > 0) {
+    const waIds = candidates
+      .map((r) => String(r?.key?.id || r?.id || '').trim())
+      .filter(Boolean);
+    const existingSet = new Set<string>();
+    if (waIds.length > 0) {
+      const { data: ex } = await supabase
+        .from('whatsapp_messages')
+        .select('wa_message_id')
+        .eq('company_id', companyId)
+        .in('wa_message_id', waIds);
+      for (const row of ex || []) {
+        if (row.wa_message_id) existingSet.add(String(row.wa_message_id));
+      }
+    }
+
+    const missing = candidates.filter((r) => {
+      const id = String(r?.key?.id || r?.id || '').trim();
+      return !id || !existingSet.has(id);
+    });
+
+    if (missing.length > 0) {
+      const team = await loadTeam(supabase, companyId);
+      for (const rec of missing) {
+        try {
+          const res = await ingestWhatsAppEntry(supabase, companyId, instance, rec, payload, payload, {
+            isCatchup: true,
+            teamCache: team,
+          });
+          if (res?.ok && !res?.ignored) {
+            imported++;
+            if (samples.length < 15) {
+              samples.push(`${rec?.key?.remoteJid || ''}@${messageDate(rec).toISOString()}`);
+            }
+          }
+        } catch (err) {
+          console.error('[wa] catchup ingest error:', err);
+        }
+      }
+    }
+  }
+
+  const stepDir = Number(mc.step || 1);
+  const endPage = Number(mc.end_page || 1);
+  const nextPage = page + stepDir;
+  const isDone = stepDir > 0 ? nextPage > endPage : nextPage < endPage;
+  const prevSamples: string[] = Array.isArray(mc.samples) ? mc.samples : [];
+
+  await setBridgeState(supabase, 'message_catchup', {
+    ...mc,
+    page: isDone ? 0 : nextPage,
+    inflight_at: null,
+    pages_done: Number(mc.pages_done || 0) + 1,
+    imported_total: Number(mc.imported_total || 0) + imported,
+    samples: [...prevSamples, ...samples].slice(-30),
+    total_pages: totalPages,
+    total_records: totalRecords,
+    last_page_records: records.length,
+    last_page_candidates: candidates.length,
+    sample_first_ts: firstTs,
+    sample_last_ts: lastTs,
+    ...(isDone ? { status: 'done', finished_at: new Date().toISOString() } : {}),
+  });
+
+  return json({ ok: true, page, imported, next_page: isDone ? 0 : nextPage });
+}
+
+async function handleWatchdogCheck(supabase: any, url: URL, payload: any): Promise<Response> {
+  const wd = await getBridgeState(supabase, 'evo_watchdog');
+  const token = shellSafe(url.searchParams.get('token') || '');
+  if (!wd.token || token !== wd.token) return json({ ok: false, error: 'invalid token' }, 401);
+
+  const stateObj = fromB64Json(payload?.state);
+  const msgPayload = fromB64Json(payload?.messages);
+  const connState = String(stateObj?.instance?.state || stateObj?.state || 'unknown');
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+
+  const companyId = await resolveMainCompanyId(supabase, null);
+  const { instance } = await evolutionCredentials(supabase);
+  const totalPages = Number(msgPayload?.messages?.pages || msgPayload?.pages || 0);
+  const records: any[] = msgPayload?.messages?.records || msgPayload?.records || (Array.isArray(msgPayload) ? msgPayload : []);
+  const noTsFilter =
+    Boolean(wd.no_ts_filter) ||
+    (records.length === 0 && Boolean(msgPayload?.error || msgPayload?.status >= 400)) ||
+    (records.length > 0 && totalPages > 5 && messageDate(records[records.length - 1]).getTime() < now - 7 * 24 * 3600 * 1000);
+
+  let recovered = 0;
+  const newestEvoTs = records.length > 0
+    ? new Date(Math.max(...records.map((r) => messageDate(r).getTime()))).toISOString()
+    : null;
+
+  if (companyId && records.length > 0) {
+    const windowStart = now - 12 * 60 * 60 * 1000;
+    const windowEnd = now - 12 * 1000; // give live webhooks 12s before considering a message missed
+    const candidates = records
+      .filter((rec) => {
+        const key = rec?.key || {};
+        const jid = String(key.remoteJid || rec?.remoteJid || '');
+        if (!jid || jid === 'status@broadcast' || jid.endsWith('@newsletter')) return false;
+        const ts = messageDate(rec).getTime();
+        return ts >= windowStart && ts <= windowEnd;
+      })
+      .sort((a, b) => messageDate(a).getTime() - messageDate(b).getTime());
+
+    if (candidates.length > 0) {
+      const waIds = candidates.map((r) => String(r?.key?.id || r?.id || '').trim()).filter(Boolean);
+      const existingSet = new Set<string>();
+      if (waIds.length > 0) {
+        const { data: ex } = await supabase
+          .from('whatsapp_messages')
+          .select('wa_message_id')
+          .eq('company_id', companyId)
+          .in('wa_message_id', waIds);
+        for (const row of ex || []) {
+          if (row.wa_message_id) existingSet.add(String(row.wa_message_id));
+        }
+      }
+      const missing = candidates.filter((r) => {
+        const id = String(r?.key?.id || r?.id || '').trim();
+        return !id || !existingSet.has(id);
+      });
+      if (missing.length > 0) {
+        const team = await loadTeam(supabase, companyId);
+        for (const rec of missing) {
+          try {
+            const res = await ingestWhatsAppEntry(supabase, companyId, instance, rec, msgPayload, msgPayload, {
+              isCatchup: true,
+              teamCache: team,
+            });
+            if (res?.ok && !res?.ignored) recovered++;
+          } catch (err) {
+            console.error('[wa] watchdog ingest error:', err);
+          }
+        }
+      }
+    }
+  }
+
+  const lastAutoHealMs = wd.last_auto_heal_at ? new Date(wd.last_auto_heal_at).getTime() : 0;
+  const canAutoHeal = now - lastAutoHealMs > 15 * 60 * 1000;
+  let autoHealTriggered = false;
+  if (canAutoHeal && (recovered >= 3 || connState === 'connecting')) {
+    await setBridgeState(supabase, 'evo_heal', {
+      status: 'requested',
+      mode: 'restart_and_catchup',
+      reason: recovered >= 3 ? `watchdog_recovered_${recovered}` : 'watchdog_connecting_stuck',
+      requested_at: nowIso,
+    });
+    autoHealTriggered = true;
+  }
+
+  await setBridgeState(supabase, 'evo_watchdog', {
+    ...wd,
+    checked_at: nowIso,
+    connection_state: connState,
+    no_ts_filter: noTsFilter,
+    last_total_pages: totalPages || wd.last_total_pages || 0,
+    newest_evo_ts: newestEvoTs,
+    recovered_last_run: recovered,
+    recovered_total: Number(wd.recovered_total || 0) + recovered,
+    ...(autoHealTriggered ? { last_auto_heal_at: nowIso } : {}),
+  });
+
+  return json({ ok: true, connection_state: connState, recovered, auto_heal: autoHealTriggered });
+}
+
 async function handleBridgeStatus(supabase: any): Promise<Response> {
-  const [poll, ack, gs, { count: pendingMedia }, { count: failedMedia }, { count: pendingOut }, { count: errorOut }] =
+  const [poll, ack, gs, wd, heal, mc, lastWh, { count: pendingMedia }, { count: failedMedia }, { count: pendingOut }, { count: errorOut }] =
     await Promise.all([
       getBridgeState(supabase, 'bridge_last_poll'),
       getBridgeState(supabase, 'bridge_last_ack'),
       getBridgeState(supabase, 'groups_sync'),
+      getBridgeState(supabase, 'evo_watchdog'),
+      getBridgeState(supabase, 'evo_heal'),
+      getBridgeState(supabase, 'message_catchup'),
+      getBridgeState(supabase, 'last_webhook_in'),
       supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).in('media_status', ['pending', 'requested']),
       supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('media_status', 'failed'),
       supabase.from('whatsapp_outbox').select('id', { count: 'exact', head: true }).in('status', ['pending', 'dispatched']),
@@ -2092,6 +2591,12 @@ async function handleBridgeStatus(supabase: any): Promise<Response> {
     bridge_last_poll: poll.at || null,
     bridge_last_ack: ack.at || null,
     bridge_last_error: ack.error || null,
+    last_webhook_in: lastWh.at || null,
+    evo_connection_state: wd.connection_state || heal.connection_after || null,
+    evo_watchdog_checked_at: wd.checked_at || null,
+    evo_watchdog_recovered_total: wd.recovered_total || 0,
+    catchup_status: mc.status || null,
+    catchup_imported_total: mc.imported_total || 0,
     groups_synced_at: gs.synced_at || null,
     groups_count: gs.groups || 0,
     groups_last_error: gs.last_error || null,
@@ -2577,13 +3082,18 @@ async function handleSendMedia(supabase: any, caller: Caller, payload: any): Pro
         createdBy: caller.userId,
       })
     : null;
+  const mediaDesc = String(t.description || '').includes('💬 Historial de WhatsApp:')
+    ? `${t.description}\n${line}`
+    : `${t.description || ''}\n\n💬 Historial de WhatsApp:\n${line}`;
   await supabase
     .from('tickets')
     .update({
+      description: mediaDesc,
       updated_at: new Date().toISOString(),
       ...(t.assigned_to || (meta.wa_scope || 'soporte') !== 'soporte' ? {} : { assigned_to: caller.userId }),
       metadata: {
         ...meta,
+        whatsapp_message_count: Number(meta.whatsapp_message_count || 0) + 1,
         last_whatsapp_message: `${label}${caption ? ` ${caption}` : ''}`.slice(0, 200),
         last_whatsapp_at: new Date().toISOString(),
         last_message_from: 'staff',
@@ -2591,4 +3101,349 @@ async function handleSendMedia(supabase: any, caller: Caller, payload: any): Pro
     })
     .eq('id', ticketId);
   return json({ ok: true, comment, outbox_id: outboxId });
+}
+
+async function handleSendReactivation(supabase: any, caller: Caller, payload: any): Promise<Response> {
+  if (!caller.isAdmin && !caller.scopes.includes('leads')) {
+    return json({ ok: false, error: 'Sin permiso para enviar reactivaciones de Leads' }, 403);
+  }
+
+  const companyId = String(payload?.company_id || caller.companyId || (await resolveMainCompanyId(supabase, null)) || '');
+  if (!companyId) return json({ ok: false, error: 'Empresa no identificada' }, 400);
+  if (!caller.isAdmin && caller.companyId && caller.companyId !== companyId) {
+    return json({ ok: false, error: 'Acceso denegado a otra empresa' }, 403);
+  }
+
+  let normPhone = digits(payload?.phone || '');
+  if (normPhone.length === 8 && /^[67]/.test(normPhone)) {
+    normPhone = `503${normPhone}`;
+  }
+  if (!normPhone || normPhone.length < 8) {
+    return json({ ok: false, error: 'Teléfono inválido' }, 400);
+  }
+  if ((normPhone.length === 8 && normPhone.startsWith('2')) || /^5032\d{7}$/.test(normPhone)) {
+    return json({ ok: false, error: 'Teléfono fijo sin WhatsApp (2xxx-xxxx)' }, 400);
+  }
+
+  const messageText = String(payload?.message_text || '').trim();
+  const uploadedMedia = payload?.uploaded_media && typeof payload.uploaded_media === 'object' ? payload.uploaded_media : null;
+  if (!messageText && !uploadedMedia) {
+    return json({ ok: false, error: 'Mensaje vacío' }, 400);
+  }
+
+  const l8 = last8(normPhone);
+  const jid = `${normPhone}@s.whatsapp.net`;
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const campaignTag = String(payload?.campaign_tag || 'Reactivación WhatsApp').trim();
+  const rawSellerName = String(payload?.seller_display_name || caller.fullName || 'Equipo Comercial').trim();
+  const sellerName = /simulaci|platform\s*owner/i.test(rawSellerName) ? 'Jimmy Arias' : rawSellerName;
+
+  // Verify real lead row in public.leads (prevents FK error when resending from an unlinked WhatsApp ticket).
+  let realLead: { id: string; name: string | null; assigned_to: string | null; contact_count: number | null } | null = null;
+  const candidateLeadId = String(payload?.lead_id || '').trim();
+  if (candidateLeadId) {
+    const { data: lRow } = await supabase
+      .from('leads')
+      .select('id, name, assigned_to, contact_count')
+      .eq('id', candidateLeadId)
+      .eq('company_id', companyId)
+      .maybeSingle();
+    if (lRow) realLead = lRow;
+  }
+  if (!realLead && l8) {
+    const { data: byPhone } = await supabase
+      .from('leads')
+      .select('id, name, assigned_to, contact_count')
+      .eq('company_id', companyId)
+      .ilike('phone', `%${l8}%`)
+      .order('updated_at', { ascending: false })
+      .limit(5);
+    const match = (byPhone || []).find((r: any) => last8(r.phone || l8) === l8) || (byPhone || [])[0];
+    if (match) realLead = match;
+  }
+
+  const leadDisplayName = String(payload?.lead_name || realLead?.name || `+${normPhone}`).trim();
+  const leadOwner = realLead?.assigned_to || (payload?.lead_assigned_to ? String(payload.lead_assigned_to) : null) || caller.userId;
+
+  // Non-admin sales agents may only reactivate leads assigned to them (or unassigned).
+  if (!caller.isAdmin && realLead?.assigned_to && realLead.assigned_to !== caller.userId) {
+    return json({ ok: false, error: 'Este prospecto está asignado a otro asesor' }, 403);
+  }
+
+  // Targeted open-ticket lookup (no .limit(200) truncation — matches uq_wa_open_ticket_per_chat 1-to-1).
+  let existingTicket: any = null;
+  const explicitTicketId = String(payload?.ticket_id || '').trim();
+  if (explicitTicketId) {
+    const { data: tById } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('id', explicitTicketId)
+      .eq('company_id', companyId)
+      .maybeSingle();
+    if (tById && ['new', 'open', 'pending'].includes(tById.status) && !tById.metadata?.merged_into && !tById.metadata?.is_group) {
+      existingTicket = tById;
+    }
+  }
+  if (!existingTicket) {
+    const { data: byJid } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('metadata->>source', 'whatsapp_evolution')
+      .eq('metadata->>whatsapp_jid', jid)
+      .in('status', ['new', 'open', 'pending'])
+      .order('updated_at', { ascending: false })
+      .limit(5);
+    existingTicket = (byJid || []).find((t: any) => !t.metadata?.merged_into && !t.metadata?.is_group) || null;
+  }
+  if (!existingTicket && realLead?.id) {
+    const { data: byLead } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('metadata->>source', 'whatsapp_evolution')
+      .eq('lead_id', realLead.id)
+      .in('status', ['new', 'open', 'pending'])
+      .order('updated_at', { ascending: false })
+      .limit(5);
+    existingTicket = (byLead || []).find((t: any) => !t.metadata?.merged_into && !t.metadata?.is_group) || null;
+  }
+  if (!existingTicket && l8) {
+    const { data: byL8 } = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('company_id', companyId)
+      .eq('metadata->>source', 'whatsapp_evolution')
+      .ilike('metadata->>whatsapp_phone', `%${l8}`)
+      .in('status', ['new', 'open', 'pending'])
+      .order('updated_at', { ascending: false })
+      .limit(5);
+    existingTicket = (byL8 || []).find((t: any) => !t.metadata?.merged_into && !t.metadata?.is_group) || null;
+  }
+
+  let targetTicket: any = existingTicket;
+  let nextTouchNumber = 1;
+
+  if (targetTicket) {
+    const curMeta = cleanMeta(targetTicket.metadata || {});
+    const prevTouch = Number(curMeta.wa_reactivation_touch || (curMeta.wa_reactivation ? 1 : 0));
+    nextTouchNumber = prevTouch + 1;
+  } else {
+    const { instance: defaultInst } = await evolutionCredentials(supabase);
+    const insertPayload = {
+      company_id: companyId,
+      title: `[WhatsApp · Lead] ${leadDisplayName}`,
+      description: `Reactivación comercial por WhatsApp (${campaignTag})`,
+      status: 'open',
+      priority: 'medium',
+      lead_id: realLead?.id || null,
+      lead_name: leadDisplayName,
+      assigned_to: leadOwner,
+      metadata: {
+        source: 'whatsapp_evolution',
+        wa_scope: 'lead',
+        support_channel: 'ventas',
+        ai_category: 'Ventas / Reactivación Lead',
+        whatsapp_phone: normPhone,
+        whatsapp_jid: jid,
+        evolution_instance: defaultInst,
+        wa_reactivation: true,
+        wa_reactivation_touch: 1,
+        wa_reactivation_campaign: campaignTag,
+        wa_reactivation_sent_at: nowIso,
+        wa_reactivation_by: caller.userId,
+        wa_reactivation_by_name: sellerName,
+        wa_attended_at: nowIso,
+      },
+    };
+    const { data: created, error: createErr } = await supabase.from('tickets').insert(insertPayload).select('*').single();
+    if (createErr) {
+      if (String(createErr.code) === '23505') {
+        const { data: winner } = await supabase
+          .from('tickets')
+          .select('*')
+          .eq('company_id', companyId)
+          .eq('metadata->>source', 'whatsapp_evolution')
+          .eq('metadata->>whatsapp_jid', jid)
+          .in('status', ['new', 'open', 'pending'])
+          .maybeSingle();
+        if (!winner) return json({ ok: false, error: createErr.message }, 500);
+        targetTicket = winner;
+        const curMeta = cleanMeta(winner.metadata || {});
+        const prevTouch = Number(curMeta.wa_reactivation_touch || (curMeta.wa_reactivation ? 1 : 0));
+        nextTouchNumber = prevTouch + 1;
+      } else {
+        return json({ ok: false, error: createErr.message || 'No se pudo crear el chat de WhatsApp' }, 500);
+      }
+    } else {
+      targetTicket = created;
+      nextTouchNumber = 1;
+    }
+
+    try {
+      await supabase.from('whatsapp_contacts').upsert(
+        {
+          company_id: companyId,
+          phone: normPhone,
+          display_name: leadDisplayName,
+          contact_type: 'lead',
+          lead_id: realLead?.id || null,
+          classified_by: caller.userId,
+          classified_at: nowIso,
+          updated_at: nowIso,
+        },
+        { onConflict: 'company_id,phone' }
+      );
+    } catch {
+      // non-blocking
+    }
+  }
+
+  const ticketId: string = targetTicket.id;
+  const curMeta = cleanMeta(targetTicket.metadata || {});
+  delete curMeta.wa_delivery_error;
+  const instanceName = normalizeInstance(curMeta.evolution_instance);
+  const targetNumber = String(curMeta.whatsapp_jid || jid);
+
+  let outboxId: string | null = null;
+  let commentRow: any = null;
+  let previewText = messageText.slice(0, 200);
+  let chatLine = '';
+
+  if (uploadedMedia && uploadedMedia.path) {
+    const mediaPath = String(uploadedMedia.path);
+    if (!mediaPath.startsWith(`outgoing/${companyId}/`)) {
+      return json({ ok: false, error: 'Ruta de archivo inválida' }, 400);
+    }
+    const fileName = String(uploadedMedia.name || 'archivo').slice(0, 120);
+    const mime = String(uploadedMedia.mime || 'application/octet-stream');
+    const size = Number(uploadedMedia.size) || null;
+    const { data: signed, error: signErr } = await supabase.storage
+      .from(MEDIA_BUCKET)
+      .createSignedUrl(mediaPath, 60 * 60 * 24 * 7);
+    if (signErr || !signed?.signedUrl) {
+      return json({ ok: false, error: 'No se pudo firmar el archivo adjunto' }, 500);
+    }
+    const kind = mediaTypeForSend(mime);
+    const label = kind === 'image' ? '[Imagen]' : kind === 'video' ? '[Video]' : kind === 'audio' ? '[Audio]' : `[Documento: ${fileName}]`;
+    chatLine = `[${fmtTime(now)}] 👨‍💻 ${sellerName}: ${label}${messageText ? ` ${messageText}` : ''}`;
+    previewText = `${label}${messageText ? ` ${messageText}` : ''}`.slice(0, 200);
+
+    const { data: c } = await supabase
+      .from('ticket_comments')
+      .insert({ ticket_id: ticketId, company_id: companyId, author_id: caller.userId, body: chatLine, is_internal: false })
+      .select('*')
+      .single();
+    commentRow = c;
+
+    await supabase.from('whatsapp_messages').insert({
+      company_id: companyId,
+      ticket_id: ticketId,
+      comment_id: c?.id || null,
+      remote_jid: targetNumber,
+      from_me: true,
+      message_type: kind === 'document' ? 'document' : kind,
+      body: messageText || label,
+      media_status: 'ready',
+      media_path: mediaPath,
+      media_mime: mime,
+      media_filename: fileName,
+      media_size: size,
+    });
+
+    outboxId = await enqueueOutbox(supabase, {
+      companyId,
+      ticketId,
+      commentId: c?.id || null,
+      instance: instanceName,
+      number: targetNumber,
+      kind: 'media',
+      payload: { url: signed.signedUrl, mimetype: mime, fileName, mediatype: kind, caption: messageText },
+      createdBy: caller.userId,
+    });
+  } else {
+    chatLine = `[${fmtTime(now)}] 👨‍💻 ${sellerName}: ${messageText}`;
+    const { data: c } = await supabase
+      .from('ticket_comments')
+      .insert({ ticket_id: ticketId, company_id: companyId, author_id: caller.userId, body: chatLine, is_internal: false })
+      .select('*')
+      .single();
+    commentRow = c;
+
+    outboxId = await enqueueOutbox(supabase, {
+      companyId,
+      ticketId,
+      commentId: c?.id || null,
+      instance: instanceName,
+      number: targetNumber,
+      kind: 'text',
+      payload: { text: messageText },
+      createdBy: caller.userId,
+    });
+  }
+
+  if (!outboxId) {
+    return json({ ok: false, error: 'No se pudo encolar el envío en whatsapp_outbox' }, 500);
+  }
+
+  const prevDesc = String(targetTicket.description || '');
+  const nextDesc = prevDesc.includes('💬 Historial de WhatsApp:')
+    ? `${prevDesc}\n${chatLine}`
+    : `${prevDesc}\n\n💬 Historial de WhatsApp:\n${chatLine}`;
+
+  await supabase
+    .from('tickets')
+    .update({
+      description: nextDesc,
+      lead_id: targetTicket.lead_id || realLead?.id || null,
+      lead_name: targetTicket.lead_name || leadDisplayName,
+      assigned_to: targetTicket.assigned_to || leadOwner,
+      updated_at: nowIso,
+      metadata: {
+        ...curMeta,
+        source: 'whatsapp_evolution',
+        wa_scope: curMeta.wa_scope === 'soporte' ? 'soporte' : 'lead',
+        whatsapp_phone: curMeta.whatsapp_phone || normPhone,
+        whatsapp_jid: curMeta.whatsapp_jid || jid,
+        evolution_instance: instanceName,
+        wa_reactivation: true,
+        wa_reactivation_touch: nextTouchNumber,
+        wa_reactivation_campaign: campaignTag,
+        wa_reactivation_sent_at: nowIso,
+        wa_reactivation_by: caller.userId,
+        wa_reactivation_by_name: sellerName,
+        wa_attended_at: nowIso,
+        whatsapp_message_count: Number(curMeta.whatsapp_message_count || 0) + 1,
+        last_whatsapp_message: previewText,
+        last_whatsapp_at: nowIso,
+        last_message_from: 'staff',
+        last_staff_reply_at: nowIso,
+        last_staff_reply_by: sellerName,
+      },
+    })
+    .eq('id', ticketId);
+
+  if (realLead?.id) {
+    try {
+      const prevCount = Number(realLead.contact_count ?? payload?.lead_contact_count ?? 0);
+      await supabase
+        .from('leads')
+        .update({
+          last_follow_up_at: nowIso,
+          contact_count: prevCount + 1,
+        })
+        .eq('id', realLead.id);
+    } catch {
+      // non-blocking
+    }
+  }
+
+  return json({
+    ok: true,
+    ticket_id: ticketId,
+    outbox_id: outboxId,
+    touch: nextTouchNumber,
+    comment: commentRow,
+  });
 }
