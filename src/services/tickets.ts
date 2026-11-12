@@ -20,6 +20,7 @@ export interface TicketLead {
     status?: string | null;
     es_cliente?: boolean | null;
     assigned_to?: string | null;
+    interested_product_id?: string | null;
 }
 
 export interface TicketCategory {
@@ -262,7 +263,7 @@ export const ticketService = {
         for (let from = 0; from < 50000; from += PAGE) {
             const { data, error } = await supabase
                 .from('leads')
-                .select('id, name, email, phone, status, es_cliente, assigned_to, updated_at')
+                .select('id, name, email, phone, status, es_cliente, assigned_to, interested_product_id, updated_at')
                 .eq('company_id', companyId)
                 .order('id', { ascending: true })
                 .range(from, from + PAGE - 1);

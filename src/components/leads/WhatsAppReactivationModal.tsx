@@ -218,6 +218,8 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   );
   const [resendTimingFilter, setResendTimingFilter] = useState<'ready48' | 'ready72' | 'under48' | 'all'>('ready48');
   const [stageFilter, setStageFilter] = useState<string>('all');
+  const [productFilter, setProductFilter] = useState<string>('all');
+  const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
   const [batchLimit, setBatchLimit] = useState<number>(30);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [hideAlreadyInCampaign, setHideAlreadyInCampaign] = useState<boolean>(true);
@@ -252,6 +254,31 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   useEffect(() => {
     setInactivityFilter(initialInactivityFilter);
   }, [initialInactivityFilter]);
+
+  useEffect(() => {
+    if (!isOpen || !companyId) return;
+    let cancelled = false;
+    supabase
+      .from('lead_products')
+      .select('id, name')
+      .eq('company_id', companyId)
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+      .then(({ data }) => {
+        if (!cancelled && data) {
+          setProducts(data as { id: string; name: string }[]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, companyId]);
+
+  const productNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of products) map.set(p.id, p.name);
+    return map;
+  }, [products]);
 
   const sellerDisplayName = useMemo(() => {
     const raw = (currentUser.full_name || '').trim();
@@ -362,6 +389,30 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     return lead.status === targetStage;
   };
 
+  const isLeadMatchingProduct = (lead: Lead, targetProduct: string): boolean => {
+    if (targetProduct === 'all') return true;
+    const pid = String(lead.interested_product_id || '').trim();
+    if (targetProduct === 'none') return !pid;
+    return pid === targetProduct;
+  };
+
+  const isLeadMatchingTiming = (lead: Lead): boolean => {
+    if (isResendMode) {
+      const tInfo = getLeadTouchInfo(lead);
+      if (resendTimingFilter === 'ready48' && tInfo.hoursSinceSent < 48) return false;
+      if (resendTimingFilter === 'ready72' && tInfo.hoursSinceSent < 72) return false;
+      if (resendTimingFilter === 'under48' && tInfo.hoursSinceSent >= 48) return false;
+      return true;
+    }
+    const info = getDaysInactive(lead);
+    if (inactivityFilter === 'never' && !info.neverContacted) return false;
+    if (inactivityFilter === '15d' && info.days < 15) return false;
+    if (inactivityFilter === '30d' && info.days < 30) return false;
+    if (inactivityFilter === '60d' && info.days < 60) return false;
+    if (inactivityFilter === '90d' && info.days < 90) return false;
+    return true;
+  };
+
   const stageCounts = useMemo(() => {
     const counts: Record<string, number> = {
       all: 0,
@@ -377,6 +428,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       Perdido: 0,
     };
     for (const l of baseLeadsWithPhone) {
+      if (!isLeadMatchingProduct(l, productFilter)) continue;
       if (isLeadMatchingStage(l, 'all')) counts.all++;
       if (isLeadMatchingStage(l, 'Prospecto')) counts.Prospecto++;
       if (isLeadMatchingStage(l, 'Llamada fría')) counts['Llamada fría']++;
@@ -391,7 +443,27 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     }
     return counts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseLeadsWithPhone, isResendMode, touchInfoByLeadId]);
+  }, [baseLeadsWithPhone, isResendMode, touchInfoByLeadId, productFilter]);
+
+  const productCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: 0, none: 0 };
+    for (const p of products) counts[p.id] = 0;
+    for (const l of baseLeadsWithPhone) {
+      if (!isLeadMatchingStage(l, stageFilter)) continue;
+      if (!isLeadMatchingTiming(l)) continue;
+      counts.all++;
+      const pid = String(l.interested_product_id || '').trim();
+      if (!pid) {
+        counts.none++;
+      } else if (counts[pid] !== undefined) {
+        counts[pid]++;
+      } else {
+        counts[pid] = 1;
+      }
+    }
+    return counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseLeadsWithPhone, products, stageFilter, isResendMode, resendTimingFilter, inactivityFilter, touchInfoByLeadId]);
 
   const resendCounts = useMemo(() => {
     let all = 0;
@@ -401,6 +473,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     let maxHoursUnder48 = 0;
     for (const l of baseLeadsWithPhone) {
       if (!isLeadMatchingStage(l, stageFilter)) continue;
+      if (!isLeadMatchingProduct(l, productFilter)) continue;
       all++;
       const tInfo = getLeadTouchInfo(l);
       if (tInfo.hoursSinceSent >= 48) {
@@ -420,7 +493,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       hoursUntilNextReady,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseLeadsWithPhone, stageFilter, touchInfoByLeadId]);
+  }, [baseLeadsWithPhone, stageFilter, productFilter, touchInfoByLeadId]);
 
   // If in resend mode and nobody has reached 48h yet, automatically show 'all' so the user sees why they're in cooldown
   useEffect(() => {
@@ -435,36 +508,25 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     }
   }, [isResendMode, isOpen, stageFilter, resendCounts.ready48, resendCounts.all]);
 
-  // Filtered by inactivity/resend timing + stage + search
+  // Filtered by inactivity/resend timing + stage + product + search
   const matchingLeads = useMemo(() => {
     return baseLeadsWithPhone.filter((l) => {
       if (!isLeadMatchingStage(l, stageFilter)) return false;
-
-      if (isResendMode) {
-        const tInfo = getLeadTouchInfo(l);
-        if (resendTimingFilter === 'ready48' && tInfo.hoursSinceSent < 48) return false;
-        if (resendTimingFilter === 'ready72' && tInfo.hoursSinceSent < 72) return false;
-        if (resendTimingFilter === 'under48' && tInfo.hoursSinceSent >= 48) return false;
-      } else {
-        const info = getDaysInactive(l);
-        if (inactivityFilter === 'never' && !info.neverContacted) return false;
-        if (inactivityFilter === '15d' && info.days < 15) return false;
-        if (inactivityFilter === '30d' && info.days < 30) return false;
-        if (inactivityFilter === '60d' && info.days < 60) return false;
-        if (inactivityFilter === '90d' && info.days < 90) return false;
-      }
+      if (!isLeadMatchingProduct(l, productFilter)) return false;
+      if (!isLeadMatchingTiming(l)) return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchName = (l.name || '').toLowerCase().includes(q);
         const matchComp = (l.company_name || '').toLowerCase().includes(q);
         const matchPhone = (l.phone || '').toLowerCase().includes(q);
-        if (!matchName && !matchComp && !matchPhone) return false;
+        const prodLabel = (l.interested_product_id ? productNameById.get(l.interested_product_id) || '' : '').toLowerCase();
+        if (!matchName && !matchComp && !matchPhone && !prodLabel.includes(q)) return false;
       }
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseLeadsWithPhone, isResendMode, resendTimingFilter, inactivityFilter, stageFilter, searchQuery, touchInfoByLeadId]);
+  }, [baseLeadsWithPhone, isResendMode, resendTimingFilter, inactivityFilter, stageFilter, productFilter, searchQuery, touchInfoByLeadId, productNameById]);
 
   // Apply batch limit (e.g. 25, 50, 100, or all)
   const limitedLeads = useMemo(() => {
@@ -488,6 +550,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     let d90 = 0;
     for (const l of baseLeadsWithPhone) {
       if (!isLeadMatchingStage(l, stageFilter)) continue;
+      if (!isLeadMatchingProduct(l, productFilter)) continue;
       all++;
       const info = getDaysInactive(l);
       if (info.neverContacted) never++;
@@ -498,7 +561,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     }
     return { all, never, d15, d30, d60, d90 };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseLeadsWithPhone, stageFilter]);
+  }, [baseLeadsWithPhone, stageFilter, productFilter]);
 
   const renderPersonalizedMessage = (lead: Lead, templateText: string): string => {
     const firstName = extractFirstName(lead.name);
@@ -914,6 +977,25 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
 
             <select
               disabled={isSending}
+              value={productFilter}
+              onChange={(e) => {
+                setProductFilter(e.target.value);
+                setExcludedIds(new Set());
+              }}
+              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/90 text-xs font-semibold text-slate-700 focus:outline-none"
+              title="Filtrar por Producto de Interés (opcional)"
+            >
+              <option value="all">Todos los productos ({productCounts.all || 0})</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  Producto: {p.name} ({productCounts[p.id] || 0})
+                </option>
+              ))}
+              <option value="none">Sin especificar ({productCounts.none || 0})</option>
+            </select>
+
+            <select
+              disabled={isSending}
               value={batchLimit}
               onChange={(e) => {
                 setBatchLimit(Number(e.target.value));
@@ -960,10 +1042,70 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar por nombre o teléfono..."
+                  placeholder="Buscar por nombre, teléfono o producto..."
                   className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none"
                 />
               </div>
+
+              {products.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">
+                    Producto:
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isSending}
+                    onClick={() => {
+                      setProductFilter('all');
+                      setExcludedIds(new Set());
+                    }}
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border transition ${
+                      productFilter === 'all'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                        : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
+                    }`}
+                  >
+                    Todos ({productCounts.all || 0})
+                  </button>
+                  {products.map((p) => {
+                    const active = productFilter === p.id;
+                    const cnt = productCounts[p.id] || 0;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={isSending}
+                        onClick={() => {
+                          setProductFilter(p.id);
+                          setExcludedIds(new Set());
+                        }}
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border transition ${
+                          active
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                            : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
+                        }`}
+                      >
+                        {p.name} ({cnt})
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    disabled={isSending}
+                    onClick={() => {
+                      setProductFilter('none');
+                      setExcludedIds(new Set());
+                    }}
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border transition ${
+                      productFilter === 'none'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                        : 'bg-slate-50 text-slate-500 border-slate-200/80 hover:bg-slate-100'
+                    }`}
+                  >
+                    Sin especificar ({productCounts.none || 0})
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
@@ -1029,10 +1171,17 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-400 truncate">
-                            +{cleanPhone}
-                            {hasDistinctCompany ? ` · ${lead.company_name}` : ''}
-                            {lead.status ? ` · ${lead.status}` : ''}
+                          <div className="text-[11px] text-slate-400 truncate flex items-center gap-1">
+                            <span>
+                              +{cleanPhone}
+                              {hasDistinctCompany ? ` · ${lead.company_name}` : ''}
+                              {lead.status ? ` · ${lead.status}` : ''}
+                            </span>
+                            {lead.interested_product_id && productNameById.get(lead.interested_product_id) && (
+                              <span className="px-1.5 py-0 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/70 text-[10px] font-semibold shrink-0">
+                                {productNameById.get(lead.interested_product_id)}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>

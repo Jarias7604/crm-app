@@ -395,6 +395,7 @@ interface SupportCircle {
   memberOfGroups: { jid: string; subject: string | null }[];
   leadId: string | null;
   leadStatus: string | null;
+  interestedProductId: string | null;
   leadOwnerId: string | null;
   leadOwnerName: string | null;
   activeTicket: Ticket;
@@ -1027,7 +1028,12 @@ export const SupportChatCircles: React.FC = () => {
     const agentMap = new Map<string, string>();
     agents.forEach((a) => agentMap.set(a.id, a.full_name || a.email));
     const leadMap = new Map<string, TicketLead & { assigned_to?: string | null }>();
-    companyLeads.forEach((l) => leadMap.set(l.id, l as any));
+    const leadByPhone = new Map<string, TicketLead & { assigned_to?: string | null }>();
+    companyLeads.forEach((l) => {
+      leadMap.set(l.id, l as any);
+      const l8 = String(l.phone || '').replace(/\D/g, '').slice(-8);
+      if (l8.length === 8 && !leadByPhone.has(l8)) leadByPhone.set(l8, l as any);
+    });
     const clientNames = new Set(realClients.map((c) => (c.nombre || '').trim().toLowerCase()).filter(Boolean));
 
     const groupMap = new Map<string, Ticket[]>();
@@ -1071,8 +1077,9 @@ export const SupportChatCircles: React.FC = () => {
       const rawScope: WaScope = isWa ? getWaScope(latest) : 'soporte';
       const isGroup = isWa && (Boolean(meta.is_group) || String(meta.whatsapp_jid || '').endsWith('@g.us'));
       const phone = String(meta.whatsapp_phone || '').replace(/\D/g, '');
-      const leadId = (activeTicket.lead_id || latest.lead_id || null) as string | null;
-      const lead = leadId ? leadMap.get(leadId) : undefined;
+      const rawLeadId = (activeTicket.lead_id || latest.lead_id || null) as string | null;
+      const lead = (rawLeadId ? leadMap.get(rawLeadId) : undefined) || (phone.length >= 8 ? leadByPhone.get(phone.slice(-8)) : undefined);
+      const leadId = rawLeadId || lead?.id || null;
       const isReactivationTicket = Boolean(meta.wa_reactivation || activeMeta.wa_reactivation);
       const scope: WaScope =
         rawScope === 'por_clasificar' && (Boolean(leadId) || isReactivationTicket) ? 'lead' : rawScope;
@@ -1237,6 +1244,7 @@ export const SupportChatCircles: React.FC = () => {
         memberOfGroups: Array.isArray(meta.member_of_groups) ? meta.member_of_groups : [],
         leadId,
         leadStatus: resolvedLeadStatus,
+        interestedProductId: (lead as any)?.interested_product_id || null,
         leadOwnerId,
         leadOwnerName: leadOwnerId ? agentMap.get(leadOwnerId) || null : null,
         activeTicket,
@@ -1502,6 +1510,7 @@ export const SupportChatCircles: React.FC = () => {
         last_follow_up_at: c.reactivationSentAt || c.lastMessageAt,
         created_at: c.activeTicket.created_at,
         contact_count: c.reactivationTouch || 1,
+        interested_product_id: c.interestedProductId || null,
       } as Lead);
       touchMap[id] = {
         touch: c.reactivationTouch || 1,
