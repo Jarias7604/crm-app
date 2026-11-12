@@ -242,7 +242,9 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   const [isFinished, setIsFinished] = useState(false);
   const [sentCount, setSentCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
+  const [skippedCount, setSkippedCount] = useState(0);
   const [lastErrorMsg, setLastErrorMsg] = useState<string>('');
+  const [lastSkipMsg, setLastSkipMsg] = useState<string>('');
   const [sentLeadIds, setSentLeadIds] = useState<Set<string>>(new Set());
   const [currentLeadName, setCurrentLeadName] = useState<string>('');
   const abortRef = useRef(false);
@@ -600,9 +602,14 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       },
     });
 
+    if (sendRes && sendRes.ok === false && sendRes.skipped) {
+      // Server refused on purpose (Erróneo/Perdido or already sent < 24h): not an error, nothing was sent.
+      return { skipped: true, reason: String(sendRes.error || 'Omitido') };
+    }
     if (sendErr || !sendRes || sendRes.ok === false) {
       throw new Error(sendErr?.message || sendRes?.error || 'No se pudo enviar el mensaje de WhatsApp');
     }
+    return { skipped: false, reason: '' };
   };
 
   const handleStartBatch = async () => {
@@ -611,13 +618,17 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     setIsFinished(false);
     setSentCount(0);
     setFailedCount(0);
+    setSkippedCount(0);
     setLastErrorMsg('');
+    setLastSkipMsg('');
     abortRef.current = false;
 
     const cleanCampaignTag = campaignName.trim() || 'Reactivación WhatsApp';
     let ok = 0;
     let fail = 0;
+    let skipped = 0;
     let lastErr = '';
+    let lastSkip = '';
 
     let uploadedMedia: { path: string; name: string; mime: string; size: number } | null = null;
     if (mediaFile) {
@@ -653,11 +664,18 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       let sentOk = false;
 
       try {
-        await sendSingleLeadReactivation(lead, cleanCampaignTag, uploadedMedia);
-        ok++;
-        sentOk = true;
-        setSentCount(ok);
-        setSentLeadIds((prev) => new Set(prev).add(lead.id));
+        const res = await sendSingleLeadReactivation(lead, cleanCampaignTag, uploadedMedia);
+        if (res.skipped) {
+          skipped++;
+          setSkippedCount(skipped);
+          lastSkip = res.reason;
+          setLastSkipMsg(lastSkip);
+        } else {
+          ok++;
+          sentOk = true;
+          setSentCount(ok);
+          setSentLeadIds((prev) => new Set(prev).add(lead.id));
+        }
       } catch (err: any) {
         console.warn('[WhatsAppReactivation] Error sending to lead:', lead.id, err);
         fail++;
@@ -674,14 +692,18 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     setIsSending(false);
     setIsFinished(true);
     setCurrentLeadName('');
+    const skipTxt = skipped > 0 ? ` · Omitidos: ${skipped}` : '';
     if (ok > 0 && fail === 0) {
-      toast.success(`Reactivación enviada a ${ok} prospecto${ok === 1 ? '' : 's'}`);
+      toast.success(`Enviados: ${ok}${skipTxt}`);
       onCompleted?.();
     } else if (ok > 0 && fail > 0) {
-      toast.success(`Enviados: ${ok} · Con error: ${fail} (${lastErr})`);
+      toast.success(`Enviados: ${ok} · Con error: ${fail}${skipTxt} (${lastErr})`);
       onCompleted?.();
     } else if (fail > 0) {
-      toast.error(`No se pudieron enviar los mensajes (${fail} fallidos): ${lastErr}`);
+      toast.error(`No se pudieron enviar los mensajes (${fail} fallidos)${skipTxt}: ${lastErr}`);
+    } else if (skipped > 0) {
+      toast(`Nada enviado · Omitidos: ${skipped} (${lastSkip})`);
+      onCompleted?.();
     }
   };
 
@@ -1259,10 +1281,16 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                     )}
                   </span>
                   <span className="text-indigo-700">
-                    {sentCount} enviados · {failedCount > 0 ? `${failedCount} con error · ` : ''}de{' '}
+                    {sentCount} enviados · {failedCount > 0 ? `${failedCount} con error · ` : ''}
+                    {skippedCount > 0 ? `${skippedCount} omitidos · ` : ''}de{' '}
                     {activeBatchLeads.length}
                   </span>
                 </div>
+                {skippedCount > 0 && lastSkipMsg && (
+                  <p className="text-[11px] text-amber-700 font-medium">
+                    Omitidos (no se les envió nada): {lastSkipMsg}
+                  </p>
+                )}
                 {failedCount > 0 && lastErrorMsg && (
                   <p className="text-[11px] text-rose-600 font-medium">
                     Detalle del último error: {lastErrorMsg}
@@ -1274,7 +1302,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                     style={{
                       width: `${Math.min(
                         100,
-                        Math.round(((sentCount + failedCount) / Math.max(1, activeBatchLeads.length)) * 100)
+                        Math.round(((sentCount + failedCount + skippedCount) / Math.max(1, activeBatchLeads.length)) * 100)
                       )}%`,
                     }}
                   />

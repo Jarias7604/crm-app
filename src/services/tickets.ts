@@ -255,14 +255,25 @@ export const ticketService = {
 
     // ─── Leads (for ticket association) ─────────────────────────────────────
     async getLeads(companyId: string): Promise<TicketLead[]> {
-        const { data, error } = await supabase
-            .from('leads')
-            .select('id, name, email, phone, status, es_cliente, assigned_to')
-            .eq('company_id', companyId)
-            .order('updated_at', { ascending: false })
-            .limit(5000);
-        if (error) throw error;
-        return (data || []) as TicketLead[];
+        // Supabase caps every response at 1000 rows. Page through ALL leads so no lead
+        // (e.g. an 'Erróneo' or 'Perdido' one) is missing and wrongly treated as 'Prospecto'.
+        const PAGE = 1000;
+        const all: TicketLead[] = [];
+        for (let from = 0; from < 50000; from += PAGE) {
+            const { data, error } = await supabase
+                .from('leads')
+                .select('id, name, email, phone, status, es_cliente, assigned_to, updated_at')
+                .eq('company_id', companyId)
+                .order('id', { ascending: true })
+                .range(from, from + PAGE - 1);
+            if (error) throw error;
+            const rows = (data || []) as TicketLead[];
+            all.push(...rows);
+            if (rows.length < PAGE) break;
+        }
+        // Keep the previous order (most recently updated first) for dropdowns.
+        all.sort((a: any, b: any) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+        return all;
     },
 
     // ─── Categories ─────────────────────────────────────────────────────────

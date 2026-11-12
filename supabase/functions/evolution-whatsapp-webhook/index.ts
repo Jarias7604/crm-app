@@ -3158,12 +3158,12 @@ async function handleSendReactivation(supabase: any, caller: Caller, payload: an
   const sellerName = /simulaci|platform\s*owner/i.test(rawSellerName) ? 'Jimmy Arias' : rawSellerName;
 
   // Verify real lead row in public.leads (prevents FK error when resending from an unlinked WhatsApp ticket).
-  let realLead: { id: string; name: string | null; assigned_to: string | null; contact_count: number | null } | null = null;
+  let realLead: { id: string; name: string | null; assigned_to: string | null; contact_count: number | null; status?: string | null } | null = null;
   const candidateLeadId = String(payload?.lead_id || '').trim();
   if (candidateLeadId) {
     const { data: lRow } = await supabase
       .from('leads')
-      .select('id, name, assigned_to, contact_count')
+      .select('id, name, assigned_to, contact_count, status')
       .eq('id', candidateLeadId)
       .eq('company_id', companyId)
       .maybeSingle();
@@ -3172,7 +3172,7 @@ async function handleSendReactivation(supabase: any, caller: Caller, payload: an
   if (!realLead && l8) {
     const { data: byPhone } = await supabase
       .from('leads')
-      .select('id, name, assigned_to, contact_count')
+      .select('id, name, assigned_to, contact_count, status')
       .eq('company_id', companyId)
       .ilike('phone', `%${l8}%`)
       .order('updated_at', { ascending: false })
@@ -3187,6 +3187,14 @@ async function handleSendReactivation(supabase: any, caller: Caller, payload: an
   // Non-admin sales agents may only reactivate leads assigned to them (or unassigned).
   if (!caller.isAdmin && realLead?.assigned_to && realLead.assigned_to !== caller.userId) {
     return json({ ok: false, error: 'Este prospecto está asignado a otro asesor' }, 403);
+  }
+
+  // Server-side guard: never send campaigns to leads marked 'Erróneo' (wrong/invalid contact).
+  // 'Perdido' leads ARE allowed on purpose: the team may send them updates / new packages later.
+  // (HTTP 200 + ok:false so the CRM shows the real reason instead of a generic error.)
+  const realStatus = String(realLead?.status || '').trim();
+  if (realStatus === 'Erróneo') {
+    return json({ ok: false, skipped: true, error: `Omitido: el prospecto está marcado como ${realStatus}` });
   }
 
   // Targeted open-ticket lookup (no .limit(200) truncation — matches uq_wa_open_ticket_per_chat 1-to-1).
@@ -3245,6 +3253,18 @@ async function handleSendReactivation(supabase: any, caller: Caller, payload: an
 
   if (targetTicket) {
     const curMeta = cleanMeta(targetTicket.metadata || {});
+    // Server-side guard: never send a campaign twice to the same chat within 24h.
+    const lastSentAt = Date.parse(String(curMeta.wa_reactivation_sent_at || ''));
+    if (Number.isFinite(lastSentAt)) {
+      const hoursAgo = (Date.now() - lastSentAt) / 3600000;
+      if (hoursAgo < 24) {
+        return json({
+          ok: false,
+          skipped: true,
+          error: `Omitido: ya se le envió hace ${Math.max(0, Math.floor(hoursAgo))} h (mínimo 24 h entre envíos)`,
+        });
+      }
+    }
     const prevTouch = Number(curMeta.wa_reactivation_touch || (curMeta.wa_reactivation ? 1 : 0));
     nextTouchNumber = prevTouch + 1;
   } else {
