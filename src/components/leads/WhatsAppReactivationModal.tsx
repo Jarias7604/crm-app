@@ -135,13 +135,18 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
   },
 ];
 
-function normalizeWhatsAppPhone(raw?: string | null): string {
+function isElSalvadorLandline(raw?: string | null): boolean {
+  const digits = String(raw || '').replace(/\D/g, '');
+  return (digits.length === 8 && digits.startsWith('2')) || /^5032\d{7}$/.test(digits);
+}
+
+function normalizeWhatsAppPhone(raw?: string | null, allowLandlines = false): string {
   const digits = String(raw || '').replace(/\D/g, '');
   if (!digits) return '';
-  if ((digits.length === 8 && digits.startsWith('2')) || /^5032\d{7}$/.test(digits)) {
+  if (!allowLandlines && isElSalvadorLandline(digits)) {
     return '';
   }
-  if (digits.length === 8 && /^[67]/.test(digits)) {
+  if (digits.length === 8 && /^[267]/.test(digits)) {
     return `503${digits}`;
   }
   return digits.length >= 8 ? digits : '';
@@ -223,6 +228,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   const [batchLimit, setBatchLimit] = useState<number>(30);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [hideAlreadyInCampaign, setHideAlreadyInCampaign] = useState<boolean>(true);
+  const [includeLandlines, setIncludeLandlines] = useState<boolean | null>(null);
   const alreadyInCampaignSet = useMemo(() => new Set(alreadyInCampaignLeadIds), [alreadyInCampaignLeadIds]);
 
   const [campaignName, setCampaignName] = useState(
@@ -252,8 +258,11 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   const abortRef = useRef(false);
 
   useEffect(() => {
-    setInactivityFilter(initialInactivityFilter);
-  }, [initialInactivityFilter]);
+    if (isOpen) {
+      setInactivityFilter(initialInactivityFilter);
+      setIncludeLandlines(null);
+    }
+  }, [isOpen, initialInactivityFilter]);
 
   useEffect(() => {
     if (!isOpen || !companyId) return;
@@ -350,19 +359,40 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     return leadsPool.filter((l) => alreadyInCampaignSet.has(l.id)).length;
   }, [isResendMode, alreadyInCampaignSet, leadsPool]);
 
-  const baseLeadsWithPhone = useMemo(() => {
-    const source =
-      preSelectedLeadIds.length > 0 && preSelectedLeadIds.length < leadsPool.length
+  const sourceLeads = useMemo(() => {
+    const selectedInPool =
+      preSelectedLeadIds.length > 0
         ? leadsPool.filter((l) => preSelectedLeadIds.includes(l.id))
-        : leadsPool;
+        : [];
+    return selectedInPool.length > 0 ? selectedInPool : leadsPool;
+  }, [leadsPool, preSelectedLeadIds]);
 
-    return source.filter((l) => {
+  const { mobilePoolCount, landlinePoolCount } = useMemo(() => {
+    let mobile = 0;
+    let landline = 0;
+    for (const l of sourceLeads) {
+      if (l.status === 'Erróneo') continue;
+      if (!isResendMode && hideAlreadyInCampaign && alreadyInCampaignSet.has(l.id)) continue;
+      if (isElSalvadorLandline(l.phone)) {
+        landline++;
+      } else if (normalizeWhatsAppPhone(l.phone, false).length >= 8) {
+        mobile++;
+      }
+    }
+    return { mobilePoolCount: mobile, landlinePoolCount: landline };
+  }, [sourceLeads, isResendMode, hideAlreadyInCampaign, alreadyInCampaignSet]);
+
+  const effectiveIncludeLandlines =
+    includeLandlines !== null ? includeLandlines : mobilePoolCount === 0 && landlinePoolCount > 0;
+
+  const baseLeadsWithPhone = useMemo(() => {
+    return sourceLeads.filter((l) => {
       if (l.status === 'Erróneo') return false;
       if (!isResendMode && hideAlreadyInCampaign && alreadyInCampaignSet.has(l.id)) return false;
-      const p = normalizeWhatsAppPhone(l.phone);
+      const p = normalizeWhatsAppPhone(l.phone, effectiveIncludeLandlines);
       return p.length >= 8;
     });
-  }, [leadsPool, preSelectedLeadIds, isResendMode, hideAlreadyInCampaign, alreadyInCampaignSet]);
+  }, [sourceLeads, isResendMode, hideAlreadyInCampaign, alreadyInCampaignSet, effectiveIncludeLandlines]);
 
   const getLeadTouchInfo = (lead: Lead): ReactivationTouchInfo => {
     if (touchInfoByLeadId[lead.id]) return touchInfoByLeadId[lead.id];
@@ -643,8 +673,8 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
     campaignTag: string,
     uploadedMedia?: { path: string; name: string; mime: string; size: number } | null
   ) => {
-    const normalizedPhone = normalizeWhatsAppPhone(lead.phone);
-    if (!normalizedPhone) throw new Error('Teléfono inválido o fijo sin WhatsApp');
+    const normalizedPhone = normalizeWhatsAppPhone(lead.phone, true);
+    if (!normalizedPhone) throw new Error('Teléfono inválido');
     const personalizedText = renderPersonalizedMessage(lead, messageTemplate);
     const touchInfo = touchInfoByLeadId[lead.id];
 
@@ -845,22 +875,40 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                       : `En espera (<48h · faltan ~${resendCounts.hoursUntilNextReady}h)`}
                   </span>
                 ) : (
-                  alreadyInCampaignPoolCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setHideAlreadyInCampaign((v) => !v)}
-                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition ${
-                        hideAlreadyInCampaign
-                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200/70'
-                          : 'bg-slate-100 text-slate-600 border-slate-200'
-                      }`}
-                      title="Clic para alternar si se ocultan los prospectos que ya están en tu campaña de WhatsApp"
-                    >
-                      {hideAlreadyInCampaign
-                        ? `Ocultando ${alreadyInCampaignPoolCount} ya en campaña WA`
-                        : `Mostrando también ${alreadyInCampaignPoolCount} ya en campaña WA`}
-                    </button>
-                  )
+                  <>
+                    {alreadyInCampaignPoolCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setHideAlreadyInCampaign((v) => !v)}
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition ${
+                          hideAlreadyInCampaign
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200/70'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                        title="Clic para alternar si se ocultan los prospectos que ya están en tu campaña de WhatsApp"
+                      >
+                        {hideAlreadyInCampaign
+                          ? `Ocultando ${alreadyInCampaignPoolCount} ya en campaña WA`
+                          : `Mostrando también ${alreadyInCampaignPoolCount} ya en campaña WA`}
+                      </button>
+                    )}
+                    {landlinePoolCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIncludeLandlines(!effectiveIncludeLandlines)}
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition ${
+                          effectiveIncludeLandlines
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-amber-50/60'
+                        }`}
+                        title="Los teléfonos que inician con 2 (2xxx-xxxx) son líneas fijas; actívalos si usan WhatsApp Business"
+                      >
+                        {effectiveIncludeLandlines
+                          ? `Incluyendo ${landlinePoolCount} tel. fijo${landlinePoolCount === 1 ? '' : 's'} (2xxx)`
+                          : `Ocultando ${landlinePoolCount} tel. fijo${landlinePoolCount === 1 ? '' : 's'} (2xxx)`}
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
               <p className="text-xs text-slate-500 truncate mt-0.5">
@@ -1109,13 +1157,27 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
             </div>
 
             <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+              {effectiveIncludeLandlines && landlinePoolCount > 0 && (
+                <div className="px-3.5 py-2 bg-amber-50/80 border-b border-amber-100 text-[11px] text-amber-800 leading-snug">
+                  <strong>Nota:</strong> {mobilePoolCount === 0 ? 'Estos prospectos tienen' : `Se incluyen ${landlinePoolCount} con`} teléfono fijo (<span className="font-mono">2xxx-xxxx</span>). Solo recibirán el WhatsApp si tienen <strong>WhatsApp Business</strong> vinculado a ese número fijo.
+                </div>
+              )}
               {limitedLeads.length === 0 ? (
-                <div className="p-8 text-center space-y-1.5">
+                <div className="p-8 text-center space-y-2">
                   <Users className="w-5 h-5 text-slate-300 mx-auto" />
                   <p className="text-xs font-semibold text-slate-600">No hay contactos en este filtro.</p>
                   <p className="text-[11px] text-slate-400">
                     Cambia la etapa o la pestaña de tiempo superior.
                   </p>
+                  {!effectiveIncludeLandlines && landlinePoolCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setIncludeLandlines(true)}
+                      className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold transition"
+                    >
+                      Mostrar {landlinePoolCount} con teléfono fijo (2xxx-xxxx)
+                    </button>
+                  )}
                 </div>
               ) : (
                 limitedLeads.map((lead, idx) => {
@@ -1124,7 +1186,8 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                   const wasSent = sentLeadIds.has(lead.id);
                   const inactivity = getDaysInactive(lead);
                   const touchInfo = isResendMode ? getLeadTouchInfo(lead) : null;
-                  const cleanPhone = normalizeWhatsAppPhone(lead.phone);
+                  const cleanPhone = normalizeWhatsAppPhone(lead.phone, true);
+                  const isLandline = isElSalvadorLandline(lead.phone);
                   const hasDistinctCompany =
                     lead.company_name &&
                     lead.company_name !== 'Individual' &&
@@ -1177,6 +1240,11 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
                               {hasDistinctCompany ? ` · ${lead.company_name}` : ''}
                               {lead.status ? ` · ${lead.status}` : ''}
                             </span>
+                            {isLandline && (
+                              <span className="px-1.5 py-0 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold shrink-0">
+                                Tel. fijo
+                              </span>
+                            )}
                             {lead.interested_product_id && productNameById.get(lead.interested_product_id) && (
                               <span className="px-1.5 py-0 rounded bg-indigo-50 text-indigo-700 border border-indigo-200/70 text-[10px] font-semibold shrink-0">
                                 {productNameById.get(lead.interested_product_id)}

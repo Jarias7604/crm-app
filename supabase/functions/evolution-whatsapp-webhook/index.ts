@@ -3133,14 +3133,11 @@ async function handleSendReactivation(supabase: any, caller: Caller, payload: an
   }
 
   let normPhone = digits(payload?.phone || '');
-  if (normPhone.length === 8 && /^[67]/.test(normPhone)) {
+  if (normPhone.length === 8 && /^[267]/.test(normPhone)) {
     normPhone = `503${normPhone}`;
   }
   if (!normPhone || normPhone.length < 8) {
     return json({ ok: false, error: 'Teléfono inválido' }, 400);
-  }
-  if ((normPhone.length === 8 && normPhone.startsWith('2')) || /^5032\d{7}$/.test(normPhone)) {
-    return json({ ok: false, error: 'Teléfono fijo sin WhatsApp (2xxx-xxxx)' }, 400);
   }
 
   const messageText = String(payload?.message_text || '').trim();
