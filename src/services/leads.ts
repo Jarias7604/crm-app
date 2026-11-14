@@ -125,7 +125,7 @@ export const leadsService = {
     // Get leads with lightweight payload (optimized for List/Kanban views)
     // PROTECTED by safeSelect — if ANY column is missing, auto-fallback to SELECT *
     async getLeads(page = 1, pageSize = 1000, companyId?: string | string[]) {
-        await this.purgeAutoCampaignFollowUps();
+        this.purgeAutoCampaignFollowUps().catch(() => {});
         const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, assigned_at, interested_product_id';
 
         const from = (page - 1) * pageSize;
@@ -161,7 +161,7 @@ export const leadsService = {
     // Cursor & Offset-based Pagination for ultra-fast performance on millions of rows
     // PROTECTED by safeSelect
     async getLeadsCursor(limit = 1000, offsetOrCursor?: string | number, companyId?: string | string[]) {
-        await this.purgeAutoCampaignFollowUps();
+        this.purgeAutoCampaignFollowUps().catch(() => {});
         const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, last_follow_up_at, first_follow_up_at, assigned_at, interested_product_id';
 
         const resolvedCompanyId = companyId || (await this.getActiveCompanyId());

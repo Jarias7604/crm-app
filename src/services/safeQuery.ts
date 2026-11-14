@@ -84,7 +84,12 @@ export async function safeSelect<T = any>(opts: SafeQueryOptions): Promise<SafeQ
             }
         }
 
-        if (orderBy) query = query.order(orderBy, { ascending: orderAsc });
+        if (orderBy) {
+            query = query.order(orderBy, { ascending: orderAsc });
+            if (orderBy !== 'id') {
+                query = query.order('id', { ascending: true });
+            }
+        }
         if (rangeFrom !== undefined && rangeTo !== undefined) {
             query = query.range(rangeFrom, rangeTo);
         } else if (limit) {
@@ -126,7 +131,12 @@ export async function safeSelect<T = any>(opts: SafeQueryOptions): Promise<SafeQ
             }
         }
 
-        if (orderBy) fallbackQuery = fallbackQuery.order(orderBy, { ascending: orderAsc });
+        if (orderBy) {
+            fallbackQuery = fallbackQuery.order(orderBy, { ascending: orderAsc });
+            if (orderBy !== 'id') {
+                fallbackQuery = fallbackQuery.order('id', { ascending: true });
+            }
+        }
         if (rangeFrom !== undefined && rangeTo !== undefined) {
             fallbackQuery = fallbackQuery.range(rangeFrom, rangeTo);
         } else if (limit) {

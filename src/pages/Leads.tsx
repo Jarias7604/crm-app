@@ -80,6 +80,7 @@ export default function Leads() {
     const { 
         data: leadsData, 
         isLoading: loading,
+        isFetching,
         fetchNextPage,
         hasNextPage,
         isFetchingNextPage
@@ -92,19 +93,40 @@ export default function Leads() {
         initialPageParam: 0,
         getNextPageParam: (lastPage, allPages) => {
             if (!lastPage.data || lastPage.data.length < 1000) return undefined;
+            if (allPages.length > 1) {
+                const previousIds = new Set<string>();
+                for (let i = 0; i < allPages.length - 1; i++) {
+                    for (const lead of allPages[i].data || []) {
+                        if (lead?.id) previousIds.add(lead.id);
+                    }
+                }
+                const hasNewLead = lastPage.data.some((lead) => lead?.id && !previousIds.has(lead.id));
+                if (!hasNewLead) return undefined;
+            }
             return allPages.length * 1000;
         },
         staleTime: 5 * 1000, // 5 seconds — ensures newly imported leads appear immediately on navigation
         gcTime: 10 * 60 * 1000,
     });
-    const leads = leadsData?.pages.flatMap(page => page.data) ?? [];
+    const leads = useMemo(() => {
+        if (!leadsData?.pages) return [];
+        const map = new Map<string, Lead>();
+        for (const page of leadsData.pages) {
+            for (const lead of page.data || []) {
+                if (lead?.id) {
+                    map.set(lead.id, lead);
+                }
+            }
+        }
+        return Array.from(map.values());
+    }, [leadsData]);
 
     // Auto-fetch remaining pages if they exceed the 1000 row Supabase API limit
     useEffect(() => {
-        if (hasNextPage && !isFetchingNextPage) {
-            fetchNextPage();
+        if (hasNextPage && !isFetchingNextPage && !isFetching) {
+            fetchNextPage({ cancelRefetch: false });
         }
-    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+    }, [hasNextPage, isFetchingNextPage, isFetching, fetchNextPage]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -2500,9 +2522,22 @@ export default function Leads() {
 
                             try {
                                 // Optimistic update via query cache
-                                queryClient.setQueryData(['leads'], (old: Lead[] | undefined) =>
-                                    (old ?? []).map(l => l.id === leadId ? { ...l, status: newStatus } : l)
-                                );
+                                queryClient.setQueriesData({ queryKey: ['leads'] }, (old: any) => {
+                                    if (!old) return old;
+                                    if (Array.isArray(old.pages)) {
+                                        return {
+                                            ...old,
+                                            pages: old.pages.map((page: any) => ({
+                                                ...page,
+                                                data: (page.data ?? []).map((l: Lead) => l.id === leadId ? { ...l, status: newStatus } : l),
+                                            })),
+                                        };
+                                    }
+                                    if (Array.isArray(old)) {
+                                        return old.map((l: Lead) => l.id === leadId ? { ...l, status: newStatus } : l);
+                                    }
+                                    return old;
+                                });
 
                                 const prevStatus = lead.status;
                                 await leadsService.updateLead(leadId, { status: newStatus });
