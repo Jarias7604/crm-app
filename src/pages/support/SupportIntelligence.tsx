@@ -390,6 +390,7 @@ export const SupportIntelligence: React.FC = () => {
           .from('tickets')
           .select('*')
           .eq('company_id', activeCompanyId)
+          .or('metadata->>wa_scope.is.null,metadata->>wa_scope.eq.soporte')
           .gte('created_at', cutoffIso)
           .order('created_at', { ascending: false })
           .limit(500),

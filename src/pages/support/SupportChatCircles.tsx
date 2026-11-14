@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, memo, forwardRef, useImperativeHandle } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Search,
@@ -72,7 +72,6 @@ import { useAuth } from '../../auth/AuthProvider';
 import { cotizacionesService } from '../../services/cotizaciones';
 import { pdfService } from '../../services/pdfService';
 import { bookingService } from '../../services/bookingService';
-import { leadsService } from '../../services/leads';
 import {
   ticketService,
   computeTicketAiTimeBenchmark,
@@ -82,8 +81,6 @@ import {
   type CompanyAgent,
   type TicketLead,
 } from '../../services/tickets';
-import { clientsService } from '../../services/clients';
-import type { Client } from '../../types/clients';
 import {
   getWaViewerScopes,
   getWaScope,
@@ -95,47 +92,107 @@ import {
   type WaAccessMode,
 } from '../../lib/whatsappScopes';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+interface LightClientRow {
+  id: string;
+  nombre: string;
+  contacto?: string | null;
+  telefono?: string | null;
+}
+
+// ─── Helpers (Cached Intl & String Formatters for 60fps UI) ─────────────────
+
+const EMOJI_RE = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{2702}-\u{27B0}]/gu;
+const stripEmojiCache = new Map<string, string>();
 
 // Strip all emoji characters so UI uses 100% vector icons only
 function stripEmojis(text: string): string {
-  return (text || '')
-    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{2702}-\u{27B0}]/gu, '')
-    .replace(/[ \t]+/g, ' ')
-    .trim();
+  if (!text) return '';
+  const hit = stripEmojiCache.get(text);
+  if (hit !== undefined) return hit;
+  const out = text.replace(EMOJI_RE, '').replace(/[ \t]+/g, ' ').trim();
+  if (stripEmojiCache.size > 4000) stripEmojiCache.clear();
+  stripEmojiCache.set(text, out);
+  return out;
 }
 
 const TZ = 'America/El_Salvador';
+const TIME_FORMATTER = new Intl.DateTimeFormat('es-SV', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+const DAY_KEY_FORMATTER = new Intl.DateTimeFormat('en-CA', { timeZone: TZ });
+const DAY_NO_YEAR_FORMATTER = new Intl.DateTimeFormat('es-SV', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  timeZone: TZ,
+});
+const DAY_WITH_YEAR_FORMATTER = new Intl.DateTimeFormat('es-SV', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: TZ,
+});
+
+const fmtTimeCache = new Map<string, string>();
+const dayKeyCache = new Map<string, string>();
+const initialsCache = new Map<string, string>();
+let cachedRelativeDayBounds = { ts: 0, today: '', yesterday: '', yearPrefix: '' };
+
+function getRelativeDayBounds() {
+  const now = Date.now();
+  if (now - cachedRelativeDayBounds.ts < 15000 && cachedRelativeDayBounds.today) {
+    return cachedRelativeDayBounds;
+  }
+  const today = DAY_KEY_FORMATTER.format(new Date(now));
+  const yesterday = DAY_KEY_FORMATTER.format(new Date(now - 86400000));
+  cachedRelativeDayBounds = { ts: now, today, yesterday, yearPrefix: today.slice(0, 4) };
+  return cachedRelativeDayBounds;
+}
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+  if (!iso) return '';
+  const hit = fmtTimeCache.get(iso);
+  if (hit !== undefined) return hit;
+  const d = new Date(iso);
+  const out = Number.isNaN(d.getTime()) ? '' : TIME_FORMATTER.format(d);
+  if (fmtTimeCache.size > 4000) fmtTimeCache.clear();
+  fmtTimeCache.set(iso, out);
+  return out;
 }
 
 function dayKey(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ });
+  if (!iso) return '';
+  const hit = dayKeyCache.get(iso);
+  if (hit !== undefined) return hit;
+  const d = new Date(iso);
+  const out = Number.isNaN(d.getTime()) ? '' : DAY_KEY_FORMATTER.format(d);
+  if (dayKeyCache.size > 4000) dayKeyCache.clear();
+  dayKeyCache.set(iso, out);
+  return out;
 }
 
 function dayLabel(iso: string): string {
   const k = dayKey(iso);
-  const today = dayKey(new Date().toISOString());
-  const yesterday = dayKey(new Date(Date.now() - 86400000).toISOString());
+  if (!k) return '';
+  const { today, yesterday, yearPrefix } = getRelativeDayBounds();
   if (k === today) return 'Hoy';
   if (k === yesterday) return 'Ayer';
-  return new Date(iso).toLocaleDateString('es-SV', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: k.slice(0, 4) === today.slice(0, 4) ? undefined : 'numeric',
-    timeZone: TZ,
-  });
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return k.slice(0, 4) === yearPrefix ? DAY_NO_YEAR_FORMATTER.format(d) : DAY_WITH_YEAR_FORMATTER.format(d);
 }
 
 function listTimeLabel(iso: string): string {
-  return dayKey(iso) === dayKey(new Date().toISOString()) ? fmtTime(iso) : dayLabel(iso);
+  const k = dayKey(iso);
+  if (!k) return '';
+  const { today } = getRelativeDayBounds();
+  return k === today ? fmtTime(iso) : dayLabel(iso);
 }
 
 function initials(name: string): string {
-  return (
+  if (!name) return '?';
+  const hit = initialsCache.get(name);
+  if (hit !== undefined) return hit;
+  const out =
     stripEmojis(name)
       .replace(/\(\+?[\d\s-]+\)/g, '')
       .split(' ')
@@ -143,8 +200,10 @@ function initials(name: string): string {
       .map((w) => w[0])
       .join('')
       .slice(0, 2)
-      .toUpperCase() || '?'
-  );
+      .toUpperCase() || '?';
+  if (initialsCache.size > 3000) initialsCache.clear();
+  initialsCache.set(name, out);
+  return out;
 }
 
 function formatBytes(n?: number | null): string {
@@ -605,6 +664,420 @@ function parseChatLine(raw: string): { icon: string; sender: string; text: strin
   return { icon: m[2] || '', sender: m[3].trim(), text: m[4] };
 }
 
+interface CachedTicketDescStats {
+  rev: string;
+  parsedLastLine: { icon: string; sender: string; text: string } | null;
+  hasClientLine: boolean;
+  staffLineCount: number;
+}
+const ticketDescStatsCache = new Map<string, CachedTicketDescStats>();
+function getCachedTicketDescStats(ticket: Ticket): CachedTicketDescStats {
+  const desc = String(ticket.description || '');
+  const rev = `${ticket.updated_at || ticket.created_at}|${desc.length}`;
+  const cached = ticketDescStatsCache.get(ticket.id);
+  if (cached && cached.rev === rev) return cached;
+
+  let hasClientLine = false;
+  let staffLineCount = 0;
+  let lastChatLine = '';
+  if (desc) {
+    const lines = desc.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i].trim();
+      if (!l) continue;
+      const hasClient = l.includes('👤');
+      const hasStaff = l.includes('👨‍💻');
+      if (hasClient) hasClientLine = true;
+      if (hasStaff) staffLineCount++;
+      if (l.startsWith('[') && (hasClient || hasStaff)) {
+        lastChatLine = l;
+      }
+    }
+  }
+  const computed: CachedTicketDescStats = {
+    rev,
+    parsedLastLine: lastChatLine ? parseChatLine(lastChatLine) : null,
+    hasClientLine,
+    staffLineCount,
+  };
+  if (ticketDescStatsCache.size > 3500) ticketDescStatsCache.clear();
+  ticketDescStatsCache.set(ticket.id, computed);
+  return computed;
+}
+
+const ActiveSessionTimer = memo<{ startedAt: number }>(({ startedAt }) => {
+  const [sec, setSec] = useState(() => Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+  useEffect(() => {
+    setSec(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    const id = window.setInterval(() => {
+      setSec(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [startedAt]);
+  return (
+    <>
+      {Math.floor(sec / 60)}m {sec % 60 < 10 ? '0' : ''}
+      {sec % 60}s
+    </>
+  );
+});
+ActiveSessionTimer.displayName = 'ActiveSessionTimer';
+
+interface CircleListRowProps {
+  circle: SupportCircle;
+  isSelected: boolean;
+  unread: boolean;
+  onSelect: (circle: SupportCircle) => void;
+}
+const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unread, onSelect }) => {
+  const isOverdue = circle.unreadOrWaitingReply && circle.waitMinutes >= 15 && circle.waitMinutes <= 24 * 60;
+  const shortType =
+    circle.scope === 'soporte'
+      ? circle.isGroup
+        ? 'Grupo'
+        : 'Cliente'
+      : circle.scope === 'por_clasificar'
+      ? 'Por tomar'
+      : circle.scope === 'lead'
+      ? circle.leadStatus && circle.leadStatus !== 'Prospecto'
+        ? circle.leadStatus
+        : 'Lead'
+      : circle.scope === 'interno'
+      ? 'Equipo'
+      : 'Spam';
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(circle)}
+      className={`w-full text-left px-3.5 py-2.5 flex items-center gap-2.5 transition relative border-l-[3px] ${
+        isSelected
+          ? 'bg-indigo-50/80 border-l-indigo-600'
+          : unread
+          ? 'bg-[#F5F7FF] hover:bg-indigo-50/60 border-l-indigo-500'
+          : 'bg-white hover:bg-slate-50/80 border-l-transparent'
+      }`}
+    >
+      <div className="relative shrink-0">
+        <div
+          className={`w-9.5 h-9.5 rounded-full flex items-center justify-center text-[13px] ${
+            unread
+              ? 'bg-indigo-100 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
+              : isSelected
+              ? 'bg-indigo-100 text-indigo-700 font-semibold'
+              : 'bg-slate-100 text-slate-500 font-semibold'
+          }`}
+        >
+          {circle.isGroup ? <Users className="w-4 h-4" /> : initials(circle.clientName)}
+        </div>
+        {unread && <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 border-2 border-white absolute -top-0.5 -right-0.5" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className={`text-[14px] truncate ${unread ? 'font-bold text-slate-950' : 'font-normal text-slate-700'}`}>
+              {circle.clientName}
+            </span>
+            <span
+              className={`text-[12px] shrink-0 ${
+                circle.leadStatus === 'Perdido' || circle.leadStatus === 'Erróneo'
+                  ? 'text-slate-500 font-normal'
+                  : 'text-slate-400 font-normal'
+              }`}
+            >
+              · {shortType}
+            </span>
+            {circle.isReactivation && (
+              <span
+                title={circle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
+                className={`text-[11px] font-medium shrink-0 ${
+                  circle.reactivationReplied
+                    ? 'px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200/80'
+                    : 'text-slate-400'
+                }`}
+              >
+                {circle.reactivationReplied ? 'Respondió' : `· Toque ${circle.reactivationTouch || 1}`}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isOverdue && (
+              <span
+                title={`Esperando respuesta hace ${formatWaitDuration(circle.waitMinutes)}`}
+                className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-[11.5px] font-semibold inline-flex items-center gap-0.5"
+              >
+                <Clock className="w-3 h-3" />
+                {formatWaitDuration(circle.waitMinutes)}
+              </span>
+            )}
+            <span className={`text-[12px] ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
+              {listTimeLabel(circle.lastMessageAt)}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-2 mt-0.5">
+          <p className={`text-[13px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
+            {circle.lastMessageSender}: {circle.lastMessageText}
+          </p>
+          {unread && (
+            <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10.5px] font-bold leading-none shrink-0">
+              Nuevo
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+});
+CircleListRow.displayName = 'CircleListRow';
+
+interface ChatComposerHandle {
+  setDraft: (text: string, mode?: 'whatsapp' | 'internal') => void;
+}
+interface ChatComposerProps {
+  canSend: boolean;
+  scope: WaScope;
+  sendingMessage: boolean;
+  uploadingFile: boolean;
+  activeQuickReplies: QuickReplyTemplate[];
+  onSendWhatsApp: (text: string) => Promise<boolean>;
+  onSaveInternalNote: (text: string) => Promise<boolean>;
+  onUploadAttachment: (file: File, caption: string) => Promise<boolean>;
+  onOpenNewQuickReply: () => void;
+  onEditQuickReply: (q: QuickReplyTemplate) => void;
+  onNavigateTickets: () => void;
+}
+
+const ChatComposer = memo(
+  forwardRef<ChatComposerHandle, ChatComposerProps>(
+    (
+      {
+        canSend,
+        scope,
+        sendingMessage,
+        uploadingFile,
+        activeQuickReplies,
+        onSendWhatsApp,
+        onSaveInternalNote,
+        onUploadAttachment,
+        onOpenNewQuickReply,
+        onEditQuickReply,
+        onNavigateTickets,
+      },
+      ref,
+    ) => {
+      const [messageInput, setMessageInput] = useState('');
+      const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal'>('whatsapp');
+      const [showQuickRepliesPopover, setShowQuickRepliesPopover] = useState(false);
+      const fileInputRef = useRef<HTMLInputElement>(null);
+      const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+      useImperativeHandle(
+        ref,
+        () => ({
+          setDraft: (text: string, mode?: 'whatsapp' | 'internal') => {
+            if (mode) setComposerMode(mode);
+            setMessageInput(text);
+            requestAnimationFrame(() => textareaRef.current?.focus());
+          },
+        }),
+        [],
+      );
+
+      const handleSubmit = async () => {
+        const trimmed = messageInput.trim();
+        if (!trimmed || sendingMessage) return;
+        setMessageInput('');
+        if (composerMode === 'internal') {
+          const ok = await onSaveInternalNote(trimmed);
+          if (ok) setComposerMode('whatsapp');
+          else setMessageInput(trimmed);
+        } else {
+          const ok = await onSendWhatsApp(trimmed);
+          if (!ok) setMessageInput(trimmed);
+        }
+      };
+
+      const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const caption = messageInput.trim();
+        const ok = await onUploadAttachment(file, caption);
+        if (ok) setMessageInput('');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      };
+
+      if (!canSend) {
+        return (
+          <div className="bg-white px-5 py-3 border-t border-slate-200/70 text-center text-[11px] font-semibold text-slate-400">
+            {scope === 'spam' ? (
+              'Este número está marcado como spam.'
+            ) : (
+              <>
+                Este ticket no vino por WhatsApp.{' '}
+                <button type="button" onClick={onNavigateTickets} className="text-indigo-600 font-bold underline">
+                  Gestionarlo en Tickets
+                </button>
+              </>
+            )}
+          </div>
+        );
+      }
+
+      return (
+        <div
+          className={`px-5 py-3 border-t flex items-end gap-2 transition-colors relative ${
+            composerMode === 'internal' ? 'bg-amber-50/70 border-amber-200' : 'bg-white border-slate-200/70'
+          }`}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          {composerMode === 'whatsapp' && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingFile}
+              title="Enviar imagen, documento o archivo"
+              className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0 disabled:opacity-50"
+            >
+              {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            </button>
+          )}
+
+          {composerMode === 'whatsapp' && (
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowQuickRepliesPopover((v) => !v)}
+                title="Respuestas rápidas y plantillas"
+                className={`px-3.5 py-2.5 rounded-xl text-[13px] font-semibold inline-flex items-center gap-1.5 border transition ${
+                  showQuickRepliesPopover
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
+                }`}
+              >
+                <Zap className="w-4 h-4 text-indigo-600" />
+                <span className="hidden sm:inline">Plantillas</span>
+              </button>
+              {showQuickRepliesPopover && (
+                <div className="absolute left-0 bottom-full mb-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-2 space-y-1">
+                  <div className="px-2.5 py-1.5 flex items-center justify-between border-b border-slate-100">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      {scope === 'lead' || scope === 'por_clasificar' ? 'Plantillas de Ventas' : 'Plantillas de Soporte'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowQuickRepliesPopover(false);
+                        onOpenNewQuickReply();
+                      }}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-0.5"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Nueva / Editar
+                    </button>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto divide-y divide-slate-50">
+                    {activeQuickReplies.map((q) => (
+                      <div
+                        key={q.id}
+                        className="w-full px-3 py-2 rounded-xl hover:bg-slate-50 transition flex items-start justify-between gap-2 group"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMessageInput(q.text);
+                            setShowQuickRepliesPopover(false);
+                            requestAnimationFrame(() => textareaRef.current?.focus());
+                          }}
+                          className="flex-1 text-left min-w-0"
+                        >
+                          <p className="text-[13px] font-semibold text-slate-800">{q.label}</p>
+                          <p className="text-xs text-slate-400 truncate mt-0.5">{q.text}</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowQuickRepliesPopover(false);
+                            onEditQuickReply(q);
+                          }}
+                          title="Editar esta plantilla"
+                          className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition shrink-0"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setComposerMode((m) => (m === 'whatsapp' ? 'internal' : 'whatsapp'))}
+            title={
+              composerMode === 'internal'
+                ? 'Modo Nota Interna activo (el cliente NO recibe este mensaje). Clic para volver a WhatsApp.'
+                : 'Cambiar a Nota Interna para dejar instrucciones al equipo dentro del chat'
+            }
+            className={`px-3.5 py-2.5 rounded-xl text-[13px] font-semibold inline-flex items-center gap-1.5 shrink-0 border transition ${
+              composerMode === 'internal'
+                ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
+                : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200'
+            }`}
+          >
+            <StickyNote className="w-4 h-4" />
+            <span className="hidden sm:inline">{composerMode === 'internal' ? 'Nota interna' : 'Nota'}</span>
+          </button>
+
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={messageInput}
+            onChange={(e) => setMessageInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder={
+              composerMode === 'internal'
+                ? 'Escribe una nota interna para el equipo (NO se envía al WhatsApp del cliente)…'
+                : 'Escribe un mensaje a WhatsApp… (Shift+Enter = nueva línea)'
+            }
+            className={`flex-1 resize-none max-h-32 px-4 py-2.5 rounded-xl text-[14.5px] font-medium focus:outline-none focus:ring-2 transition ${
+              composerMode === 'internal'
+                ? 'bg-white border-2 border-amber-300 text-amber-950 placeholder:text-amber-700/60 focus:ring-amber-500/20'
+                : 'bg-slate-50 border border-slate-200/80 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-indigo-500/20'
+            }`}
+          />
+          <button
+            type="button"
+            disabled={!messageInput.trim() || sendingMessage}
+            onClick={handleSubmit}
+            className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl disabled:opacity-40 text-white text-[13px] font-bold transition ${
+              composerMode === 'internal' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'
+            }`}
+          >
+            {composerMode === 'internal' ? <StickyNote className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+            {composerMode === 'internal' && <span className="hidden sm:inline">Guardar nota</span>}
+          </button>
+        </div>
+      );
+    },
+  ),
+);
+ChatComposer.displayName = 'ChatComposer';
+
 // =============================================================================
 
 export const SupportChatCircles: React.FC = () => {
@@ -623,15 +1096,11 @@ export const SupportChatCircles: React.FC = () => {
   const [adminPreviewMode, setAdminPreviewMode] = useState<WaAccessMode | null>(null);
   const scopes = useMemo(() => getWaViewerScopes(profile as any, adminPreviewMode), [profile, adminPreviewMode]);
 
-  useEffect(() => {
-    leadsService.purgeAutoCampaignFollowUps().catch(() => {});
-  }, []);
-
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [categories, setCategories] = useState<TicketCategory[]>([]);
   const [agents, setAgents] = useState<CompanyAgent[]>([]);
-  const [realClients, setRealClients] = useState<Client[]>([]);
+  const [realClients, setRealClients] = useState<LightClientRow[]>([]);
   const [companyLeads, setCompanyLeads] = useState<TicketLead[]>([]);
   const [waGroups, setWaGroups] = useState<WaGroupRow[]>([]);
   const [nonWaTicketIds, setNonWaTicketIds] = useState<Set<string>>(() => new Set());
@@ -786,8 +1255,8 @@ export const SupportChatCircles: React.FC = () => {
   const [channelFilter, setChannelFilter] = useState<'all' | SupportChannelType>('all');
   const [leadSubFilter, setLeadSubFilter] = useState<LeadStageSubFilter>('activos');
 
-  const [messageInput, setMessageInput] = useState('');
-  const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal'>('whatsapp');
+  const [visibleCircleLimit, setVisibleCircleLimit] = useState(80);
+  const composerRef = useRef<ChatComposerHandle>(null);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [classifying, setClassifying] = useState(false);
@@ -795,8 +1264,6 @@ export const SupportChatCircles: React.FC = () => {
   const [clientPickerQuery, setClientPickerQuery] = useState('');
   const [showReclassifyMenu, setShowReclassifyMenu] = useState(false);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const [showQuickRepliesPopover, setShowQuickRepliesPopover] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Alarm & Notification Center (Bell)
@@ -968,7 +1435,8 @@ export const SupportChatCircles: React.FC = () => {
     return () => window.clearInterval(t);
   }, []);
 
-  const [activeChatSeconds, setActiveChatSeconds] = useState(0);
+  const [chatSessionStartedAt, setChatSessionStartedAt] = useState<number>(() => Date.now());
+  const getActiveChatSeconds = () => Math.max(0, Math.floor((Date.now() - chatSessionStartedAt) / 1000));
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const [leftListCollapsed, setLeftListCollapsed] = useState(false);
@@ -1032,8 +1500,40 @@ export const SupportChatCircles: React.FC = () => {
   const [sendingBatchResolved, setSendingBatchResolved] = useState(false);
   const [batchResolvedProgress, setBatchResolvedProgress] = useState({ current: 0, total: 0 });
   const [aiPrompts, setAiPrompts] = useState<Record<SupportChannelType, string>>({ ...DEFAULT_PROMPTS });
-  const [openAiStatus, setOpenAiStatus] = useState({ checking: true, verified: false, model: 'gpt-4o-mini', error: '' });
+  const [openAiStatus, setOpenAiStatus] = useState({ checking: false, verified: false, model: 'gpt-4o-mini', error: '' });
   const [savingAiConfig, setSavingAiConfig] = useState(false);
+  const aiVerifiedOnceRef = useRef(false);
+
+  // Restore AI config from localStorage immediately on company switch (0 network calls, 0 OpenAI pings)
+  useEffect(() => {
+    aiVerifiedOnceRef.current = false;
+    if (!activeCompanyId) return;
+    try {
+      const raw = localStorage.getItem(`crm_wa_ai_cfg_${activeCompanyId}`);
+      if (!raw) return;
+      const cached = JSON.parse(raw);
+      if (typeof cached.auto_reply_text === 'boolean') setAiAutoReplyText(cached.auto_reply_text);
+      if (typeof cached.auto_reply_audio === 'boolean') setAiAutoReplyAudio(cached.auto_reply_audio);
+      if (typeof cached.auto_reply_resolved_enabled === 'boolean') setAutoReplyResolvedEnabled(cached.auto_reply_resolved_enabled);
+      if (typeof cached.auto_resolved_mark_lost === 'boolean') setAutoResolvedMarkLost(cached.auto_resolved_mark_lost);
+      if (typeof cached.resolved_reply_template === 'string' && cached.resolved_reply_template.trim()) {
+        setResolvedReplyTemplate(cached.resolved_reply_template);
+      }
+      if (Array.isArray(cached.resolved_trigger_phrases) && cached.resolved_trigger_phrases.length > 0) {
+        setResolvedTriggerPhrasesText(cached.resolved_trigger_phrases.join(', '));
+      }
+      if (cached.prompts) {
+        setAiPrompts({
+          soporte: cached.prompts.soporte || DEFAULT_PROMPTS.soporte,
+          contabilidad: cached.prompts.contabilidad || DEFAULT_PROMPTS.contabilidad,
+          ventas: cached.prompts.ventas || DEFAULT_PROMPTS.ventas,
+          otros: cached.prompts.otros || DEFAULT_PROMPTS.otros,
+        });
+      }
+    } catch {
+      // ignore invalid cache
+    }
+  }, [activeCompanyId]);
 
   const invoke = async (body: Record<string, unknown>) => {
     const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
@@ -1085,6 +1585,24 @@ export const SupportChatCircles: React.FC = () => {
           otros: data.prompts.otros || DEFAULT_PROMPTS.otros,
         });
       }
+      if (activeCompanyId) {
+        try {
+          localStorage.setItem(
+            `crm_wa_ai_cfg_${activeCompanyId}`,
+            JSON.stringify({
+              auto_reply_text: data.auto_reply_text,
+              auto_reply_audio: data.auto_reply_audio,
+              auto_reply_resolved_enabled: data.auto_reply_resolved_enabled,
+              auto_resolved_mark_lost: data.auto_resolved_mark_lost,
+              resolved_reply_template: data.resolved_reply_template,
+              resolved_trigger_phrases: data.resolved_trigger_phrases,
+              prompts: data.prompts,
+            }),
+          );
+        } catch {
+          // ignore quota errors
+        }
+      }
       if (showToast) {
         if (data.openai_verified) toast.success(`OpenAI conectado (${data.openai_model || 'gpt-4o-mini'} + Whisper)`);
         else toast.error(`OpenAI no respondió: ${data.openai_error || 'Verificar API Key'}`);
@@ -1094,45 +1612,78 @@ export const SupportChatCircles: React.FC = () => {
     }
   };
 
-  // ── Data loading ──────────────────────────────────────────────────────────
+  // ── Data loading (split into Reference tables vs Tickets so silent updates never re-download 7 tables) ──
+  const refsLoadedForCompanyRef = useRef<string | null>(null);
+  const lastTicketsSyncRef = useRef<number>(0);
+
+  const loadReferenceData = useCallback(async () => {
+    if (!activeCompanyId) return;
+    const [cats, ags, cls, lds, grps, existsFalseIds] = await Promise.all([
+      ticketService.getCategories(activeCompanyId).catch(() => [] as TicketCategory[]),
+      ticketService.getAgents(activeCompanyId).catch(() => [] as CompanyAgent[]),
+      supabase
+        .from('clients')
+        .select('id, nombre, contacto, telefono')
+        .eq('company_id', activeCompanyId)
+        .then((r) => (r.data || []) as LightClientRow[], () => [] as LightClientRow[]),
+      ticketService.getLeads(activeCompanyId).catch(() => [] as TicketLead[]),
+      supabase
+        .from('whatsapp_groups')
+        .select('group_jid, subject, client_id')
+        .eq('company_id', activeCompanyId)
+        .then((r) => (r.data || []) as WaGroupRow[], () => [] as WaGroupRow[]),
+      (async () => {
+        const { data: errRows } = await supabase
+          .from('whatsapp_outbox')
+          .select('ticket_id')
+          .eq('company_id', activeCompanyId)
+          .eq('status', 'error')
+          .ilike('error', '%exists":false%')
+          .limit(1000);
+        const ids = new Set<string>();
+        for (const r of (errRows || []) as { ticket_id: string | null }[]) {
+          if (r.ticket_id) ids.add(r.ticket_id);
+        }
+        if (ids.size === 0) return ids;
+        const { data: sentRows } = await supabase
+          .from('whatsapp_outbox')
+          .select('ticket_id')
+          .in('ticket_id', Array.from(ids))
+          .eq('status', 'sent')
+          .not('wa_message_id', 'is', null);
+        for (const r of (sentRows || []) as { ticket_id: string | null }[]) {
+          if (r.ticket_id) ids.delete(r.ticket_id);
+        }
+        return ids;
+      })().catch(() => new Set<string>()),
+    ]);
+    setCategories(cats);
+    setAgents(ags);
+    setRealClients(cls);
+    setCompanyLeads(lds);
+    setWaGroups(grps);
+    setNonWaTicketIds(existsFalseIds);
+    refsLoadedForCompanyRef.current = activeCompanyId;
+  }, [activeCompanyId]);
+
+  const loadTicketsOnly = useCallback(async () => {
+    if (!activeCompanyId) return;
+    const tks = await ticketService.getTickets(activeCompanyId, { includeNonSupportWhatsapp: true });
+    lastTicketsSyncRef.current = Date.now();
+    setTickets(tks);
+  }, [activeCompanyId]);
+
   const loadSupportData = useCallback(
-    async (silent = false) => {
+    async (silent = false, refreshRefs = false) => {
       if (!activeCompanyId) return;
       if (!silent) setLoading(true);
       try {
-        const [tks, cats, ags, cls, lds, grps, failedOutbox] = await Promise.all([
-          ticketService.getTickets(activeCompanyId, { includeNonSupportWhatsapp: true }),
-          ticketService.getCategories(activeCompanyId).catch(() => [] as TicketCategory[]),
-          ticketService.getAgents(activeCompanyId).catch(() => [] as CompanyAgent[]),
-          clientsService.getAll({ companyId: activeCompanyId }).catch(() => [] as Client[]),
-          ticketService.getLeads(activeCompanyId).catch(() => [] as TicketLead[]),
-          supabase
-            .from('whatsapp_groups')
-            .select('group_jid, subject, client_id')
-            .eq('company_id', activeCompanyId)
-            .then((r) => (r.data || []) as WaGroupRow[]),
-          supabase
-            .from('whatsapp_outbox')
-            .select('ticket_id, status, error, wa_message_id')
-            .in('status', ['error', 'sent'])
-            .limit(1500)
-            .then((r) => (r.data || []) as { ticket_id: string | null; status: string; error: string | null; wa_message_id: string | null }[]),
-        ]);
-        const sentIds = new Set<string>();
-        const existsFalseIds = new Set<string>();
-        for (const row of failedOutbox) {
-          if (!row.ticket_id) continue;
-          if (row.status === 'sent' && row.wa_message_id) sentIds.add(row.ticket_id);
-          else if (row.status === 'error' && String(row.error || '').includes('"exists":false')) existsFalseIds.add(row.ticket_id);
+        const needRefs = !silent || refreshRefs || refsLoadedForCompanyRef.current !== activeCompanyId;
+        if (needRefs) {
+          await Promise.all([loadTicketsOnly(), loadReferenceData()]);
+        } else {
+          await loadTicketsOnly();
         }
-        sentIds.forEach((id) => existsFalseIds.delete(id));
-        setNonWaTicketIds(existsFalseIds);
-        setTickets(tks);
-        setCategories(cats);
-        setAgents(ags);
-        setRealClients(cls);
-        setCompanyLeads(lds);
-        setWaGroups(grps);
       } catch (err) {
         console.error('[SupportChatCircles] Error loading:', err);
         if (!silent) toast.error('No se pudieron cargar los chats');
@@ -1140,13 +1691,12 @@ export const SupportChatCircles: React.FC = () => {
         if (!silent) setLoading(false);
       }
     },
-    [activeCompanyId]
+    [activeCompanyId, loadTicketsOnly, loadReferenceData],
   );
 
   useEffect(() => {
     if (activeCompanyId && scopes.any) {
-      loadSupportData();
-      if (scopes.all) verifyAndLoadAiConfig(false);
+      loadSupportData(false, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCompanyId, scopes.any]);
@@ -1235,15 +1785,11 @@ export const SupportChatCircles: React.FC = () => {
           )
         : extractLegacyClientName(activeTicket);
 
-      // Last message preview & unread state
-      const descLines = String(latest.description || '')
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean);
-      const lastChatLine = [...descLines].reverse().find((l) => l.startsWith('[') && (l.includes('👤') || l.includes('👨‍💻')));
+      // Last message preview & unread state (cached per ticket revision)
+      const descStats = getCachedTicketDescStats(latest);
       let lastMessageSender = cleanPushName || clientName;
       let lastMessageText = stripEmojis(String(meta.last_whatsapp_message || latest.title || ''));
-      const parsed = lastChatLine ? parseChatLine(lastChatLine) : null;
+      const parsed = descStats.parsedLastLine;
       if (parsed) {
         lastMessageSender = sanitizeWaName(parsed.sender) || clientName;
         lastMessageText = stripEmojis(parsed.text);
@@ -1277,8 +1823,8 @@ export const SupportChatCircles: React.FC = () => {
       const isManuallyAttended =
         Boolean(attendedAt && attendedAt >= lastMessageAt) || dismissedWaitingMap[key] === lastMessageAt;
 
-      const hasClientLine = descLines.some((l) => l.includes('👤'));
-      const staffLineCount = descLines.filter((l) => l.includes('👨‍💻')).length;
+      const hasClientLine = descStats.hasClientLine;
+      const staffLineCount = descStats.staffLineCount;
       const metaLeadStatus = String(meta.wa_lead_status || activeMeta.wa_lead_status || '').trim() || null;
       const isNonWaError =
         !hasClientLine &&
@@ -1843,6 +2389,40 @@ export const SupportChatCircles: React.FC = () => {
   }, [circles, circleFilter, ownerFilter, channelFilter, leadSubFilter, searchQuery, readCirclesMap, forcedUnreadMap, profile?.id]);
 
   useEffect(() => {
+    setVisibleCircleLimit(80);
+  }, [circleFilter, ownerFilter, channelFilter, leadSubFilter, searchQuery]);
+
+  const visibleCircles = useMemo(() => {
+    if (filteredCircles.length <= visibleCircleLimit) return filteredCircles;
+    if (selectedCircleId) {
+      const idx = filteredCircles.findIndex((c) => c.circleId === selectedCircleId);
+      if (idx >= visibleCircleLimit) {
+        return filteredCircles.slice(0, Math.min(filteredCircles.length, idx + 15));
+      }
+    }
+    return filteredCircles.slice(0, visibleCircleLimit);
+  }, [filteredCircles, visibleCircleLimit, selectedCircleId]);
+
+  const handleCirclesScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      if (visibleCircleLimit >= filteredCircles.length) return;
+      const el = e.currentTarget;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 420) {
+        setVisibleCircleLimit((prev) =>
+          prev >= filteredCircles.length ? prev : Math.min(filteredCircles.length, prev + 80),
+        );
+      }
+    },
+    [visibleCircleLimit, filteredCircles.length],
+  );
+
+  const handleSelectCircle = useCallback((circle: SupportCircle) => {
+    markCircleAsRead(circle.circleId, circle.lastMessageAt);
+    setSelectedCircleId(circle.circleId);
+    setMobileChatOpen(true);
+  }, []);
+
+  useEffect(() => {
     if (!selectedCircleId && filteredCircles.length > 0) setSelectedCircleId(filteredCircles[0].circleId);
   }, [filteredCircles, selectedCircleId]);
 
@@ -1985,7 +2565,7 @@ export const SupportChatCircles: React.FC = () => {
       solution: t.solution || '',
       time_justification: String(meta.time_justification || ''),
     });
-    setActiveChatSeconds(0);
+    setChatSessionStartedAt(Date.now());
     setShowReclassifyMenu(false);
     setShowClientPicker(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1995,51 +2575,136 @@ export const SupportChatCircles: React.FC = () => {
     loadThread(true);
   }, [loadThread]);
 
-  useEffect(() => {
-    const interval = setInterval(() => setActiveChatSeconds((s) => s + 1), 1000);
-    return () => clearInterval(interval);
-  }, [activeCircle?.activeTicket.id]);
-
-  // ── Realtime (debounced) ──────────────────────────────────────────────────
+  // ── Realtime (incremental in-memory patching — zero full-table storms) ────
   const threadIdsRef = useRef<string[]>([]);
   threadIdsRef.current = threadTicketIds;
-  const listTimer = useRef<number | null>(null);
   const threadTimer = useRef<number | null>(null);
   const loadThreadRef = useRef(loadThread);
   loadThreadRef.current = loadThread;
+  const knownLeadIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    knownLeadIdsRef.current = new Set(companyLeads.map((l) => l.id));
+  }, [companyLeads]);
 
   useEffect(() => {
     if (!activeCompanyId || !scopes.any) return;
-    const scheduleList = () => {
-      if (listTimer.current) window.clearTimeout(listTimer.current);
-      listTimer.current = window.setTimeout(() => loadSupportData(true), 700);
-    };
     const scheduleThread = (ticketId?: string) => {
       if (ticketId && !threadIdsRef.current.includes(ticketId)) return;
       if (threadTimer.current) window.clearTimeout(threadTimer.current);
-      threadTimer.current = window.setTimeout(() => loadThreadRef.current(false), 400);
+      threadTimer.current = window.setTimeout(() => loadThreadRef.current(false), 320);
     };
+    const fetchMissingLead = async (leadId: string) => {
+      if (!leadId || knownLeadIdsRef.current.has(leadId)) return;
+      knownLeadIdsRef.current.add(leadId);
+      const { data } = await supabase
+        .from('leads')
+        .select('id, name, email, phone, status, es_cliente, assigned_to, interested_product_id')
+        .eq('id', leadId)
+        .maybeSingle();
+      if (data) {
+        setCompanyLeads((prev) => {
+          const exists = prev.some((l) => l.id === data.id);
+          return exists ? prev.map((l) => (l.id === data.id ? (data as TicketLead) : l)) : [...prev, data as TicketLead];
+        });
+      }
+    };
+
     const filter = `company_id=eq.${activeCompanyId}`;
     const channel = supabase
       .channel(`support_circles_${activeCompanyId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets', filter }, scheduleList)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets', filter }, (p: any) => {
+        lastTicketsSyncRef.current = Date.now();
+        if (p.eventType === 'DELETE') {
+          const deletedId = p.old?.id;
+          if (deletedId) {
+            setTickets((prev) => prev.filter((t) => t.id !== deletedId));
+          }
+          return;
+        }
+        const incoming = p.new as Ticket | undefined;
+        if (!incoming?.id) return;
+        setTickets((prev) => {
+          const idx = prev.findIndex((t) => t.id === incoming.id);
+          if (idx === -1) return [incoming, ...prev];
+          const next = prev.slice();
+          next[idx] = { ...prev[idx], ...incoming };
+          return next;
+        });
+        if (incoming.lead_id && !knownLeadIdsRef.current.has(incoming.lead_id)) {
+          fetchMissingLead(incoming.lead_id).catch(() => {});
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', filter }, (p: any) => {
+        if (p.eventType === 'DELETE') {
+          const deletedId = p.old?.id;
+          if (deletedId) {
+            setCompanyLeads((prev) => prev.filter((l) => l.id !== deletedId));
+          }
+          return;
+        }
+        const row = p.new;
+        if (!row?.id) return;
+        const patched: TicketLead = {
+          id: row.id,
+          name: row.name || '',
+          email: row.email ?? null,
+          phone: row.phone ?? null,
+          status: row.status ?? null,
+          es_cliente: row.es_cliente ?? null,
+          assigned_to: row.assigned_to ?? null,
+          interested_product_id: row.interested_product_id ?? null,
+        };
+        knownLeadIdsRef.current.add(row.id);
+        setCompanyLeads((prev) => {
+          const idx = prev.findIndex((l) => l.id === row.id);
+          if (idx === -1) return [...prev, patched];
+          const next = prev.slice();
+          next[idx] = { ...prev[idx], ...patched };
+          return next;
+        });
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_comments', filter }, (p: any) => {
         scheduleThread(p.new?.ticket_id || p.old?.ticket_id);
-        scheduleList();
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_messages', filter }, (p: any) =>
-        scheduleThread(p.new?.ticket_id)
+        scheduleThread(p.new?.ticket_id),
       )
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_outbox', filter }, (p: any) =>
-        scheduleThread(p.new?.ticket_id)
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'whatsapp_outbox', filter }, (p: any) => {
+        const tId = p.new?.ticket_id as string | undefined;
+        if (tId) {
+          if (p.new?.status === 'sent' && p.new?.wa_message_id) {
+            setNonWaTicketIds((prev) => {
+              if (!prev.has(tId)) return prev;
+              const next = new Set(prev);
+              next.delete(tId);
+              return next;
+            });
+          } else if (p.new?.status === 'error' && String(p.new?.error || '').includes('"exists":false')) {
+            setNonWaTicketIds((prev) => {
+              if (prev.has(tId)) return prev;
+              const next = new Set(prev);
+              next.add(tId);
+              return next;
+            });
+          }
+        }
+        scheduleThread(tId);
+      })
       .subscribe();
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && Date.now() - lastTicketsSyncRef.current > 120_000) {
+        loadTicketsOnly().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
-      if (listTimer.current) window.clearTimeout(listTimer.current);
       if (threadTimer.current) window.clearTimeout(threadTimer.current);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       supabase.removeChannel(channel);
     };
-  }, [activeCompanyId, scopes.any, loadSupportData]);
+  }, [activeCompanyId, scopes.any, loadTicketsOnly]);
 
   // ── Chat items ────────────────────────────────────────────────────────────
   const chatItems = useMemo<ChatItem[]>(() => {
@@ -2200,12 +2865,12 @@ export const SupportChatCircles: React.FC = () => {
       (scopes.all || (scopes.leads && (activeCircle.scope === 'por_clasificar' || (activeCircle.scope === 'lead' && activeCircle.activeTicket.assigned_to === profile?.id))))
   );
 
-  const handleSendReply = async (customText?: string) => {
-    const textToSend = (customText ?? messageInput).trim();
-    if (!textToSend || !activeCircle || !activeCompanyId || !canSend) return;
+  const handleSendReply = async (customText: string): Promise<boolean> => {
+    const textToSend = String(customText || '').trim();
+    if (!textToSend || !activeCircle || !activeCompanyId || !canSend) return false;
     markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt);
     const t = activeCircle.activeTicket;
-    if (!customText) setMessageInput('');
+    const nowIso = new Date().toISOString();
     const optimistic: TicketComment = {
       id: `temp-${Date.now()}`,
       ticket_id: t.id,
@@ -2213,8 +2878,8 @@ export const SupportChatCircles: React.FC = () => {
       author_id: profile?.id || null,
       body: `[--] 👨‍💻 ${profile?.full_name || 'Equipo'}: ${textToSend}`,
       is_internal: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: nowIso,
+      updated_at: nowIso,
     };
     setComments((prev) => [...prev, optimistic]);
     if (activeCircle.scope === 'soporte' && (!resForm.actual_hours || Number(resForm.actual_hours) <= 0)) {
@@ -2226,26 +2891,45 @@ export const SupportChatCircles: React.FC = () => {
         action: 'send_reply',
         ticket_id: t.id,
         message_text: textToSend,
-        response_minutes: Math.max(1, Math.round(activeChatSeconds / 60)),
+        response_minutes: Math.max(1, Math.round(getActiveChatSeconds() / 60)),
       });
-      setComments((prev) => prev.map((c) => (c.id === optimistic.id ? (data.comment as TicketComment) : c)));
+      if (data?.comment) {
+        setComments((prev) => prev.map((c) => (c.id === optimistic.id ? (data.comment as TicketComment) : c)));
+      }
+      const replyIso = String((data?.comment as TicketComment | undefined)?.created_at || new Date().toISOString());
+      markCircleAsRead(activeCircle.circleId, replyIso);
+      setTickets((prev) =>
+        prev.map((row) =>
+          row.id === t.id
+            ? {
+                ...row,
+                updated_at: replyIso,
+                metadata: {
+                  ...((row.metadata || {}) as Record<string, unknown>),
+                  last_whatsapp_message: textToSend,
+                  last_message_from: 'staff',
+                  last_whatsapp_at: replyIso,
+                },
+              }
+            : row,
+        ),
+      );
       loadThread(false);
-      loadSupportData(true);
+      return true;
     } catch (err: any) {
       setComments((prev) => prev.filter((c) => c.id !== optimistic.id));
-      if (!customText) setMessageInput(textToSend);
       toast.error(err?.message || 'Error al enviar mensaje');
+      return false;
     } finally {
       setSendingMessage(false);
     }
   };
 
-  const handleUploadAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeCircle || !canSend) return;
+  const handleUploadAttachment = async (file: File, caption: string): Promise<boolean> => {
+    if (!file || !activeCircle || !canSend) return false;
     if (file.size > 45 * 1024 * 1024) {
       toast.error('El archivo es muy grande (máximo 45 MB)');
-      return;
+      return false;
     }
     setUploadingFile(true);
     try {
@@ -2263,17 +2947,17 @@ export const SupportChatCircles: React.FC = () => {
         file_name: file.name,
         mime: file.type || 'application/octet-stream',
         size: file.size,
-        caption: messageInput.trim(),
+        caption: caption.trim(),
       });
-      setMessageInput('');
       toast.success('Archivo enviado');
       loadThread(false);
       loadSupportData(true);
+      return true;
     } catch (err: any) {
       toast.error(err?.message || 'Error al enviar archivo');
+      return false;
     } finally {
       setUploadingFile(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -2353,6 +3037,24 @@ export const SupportChatCircles: React.FC = () => {
         spam: 'Spam',
         por_clasificar: 'Lead nuevo (por tomar)',
       };
+      if (data?.lead?.id) {
+        const ld = data.lead;
+        knownLeadIdsRef.current.add(ld.id);
+        setCompanyLeads((prev) => {
+          const exists = prev.some((l) => l.id === ld.id);
+          const nextLead: TicketLead = {
+            id: ld.id,
+            name: ld.name || '',
+            email: ld.email ?? null,
+            phone: ld.phone ?? null,
+            status: ld.status ?? null,
+            es_cliente: ld.es_cliente ?? null,
+            assigned_to: ld.assigned_to ?? null,
+            interested_product_id: ld.interested_product_id ?? null,
+          };
+          return exists ? prev.map((l) => (l.id === ld.id ? { ...l, ...nextLead } : l)) : [...prev, nextLead];
+        });
+      }
       toast.success(
         type === 'lead' && data?.lead?.name ? `Lead creado y asignado: ${data.lead.name}` : `Clasificado como ${labels[type]}`
       );
@@ -2370,11 +3072,10 @@ export const SupportChatCircles: React.FC = () => {
     }
   };
 
-  const handleSaveInternalNote = async () => {
-    const text = messageInput.trim();
-    if (!text || !activeCircle || !activeCompanyId) return;
+  const handleSaveInternalNote = async (rawText: string): Promise<boolean> => {
+    const text = String(rawText || '').trim();
+    if (!text || !activeCircle || !activeCompanyId) return false;
     const t = activeCircle.activeTicket;
-    setMessageInput('');
     setSendingMessage(true);
     try {
       const noteBody = `Nota interna (${profile?.full_name || 'Equipo'}): ${text}`;
@@ -2392,20 +3093,12 @@ export const SupportChatCircles: React.FC = () => {
       if (error) throw error;
       if (inserted) setComments((prev) => [...prev, inserted as TicketComment]);
       toast.success('Nota interna guardada en el chat');
-      setComposerMode('whatsapp');
+      return true;
     } catch (err: any) {
-      setMessageInput(text);
       toast.error(err?.message || 'No se pudo guardar la nota interna');
+      return false;
     } finally {
       setSendingMessage(false);
-    }
-  };
-
-  const handleComposerSubmit = () => {
-    if (composerMode === 'internal') {
-      handleSaveInternalNote();
-    } else {
-      handleSendReply();
     }
   };
 
@@ -2753,8 +3446,7 @@ export const SupportChatCircles: React.FC = () => {
       await handleSendReply(text);
       toast.success('Formulario de diagnóstico enviado al WhatsApp');
     } else {
-      setComposerMode('whatsapp');
-      setMessageInput(text);
+      composerRef.current?.setDraft(text, 'whatsapp');
     }
   };
 
@@ -2901,8 +3593,7 @@ export const SupportChatCircles: React.FC = () => {
       await handleSendReply(msg);
       toast.success('Enlace de calendario enviado al WhatsApp');
     } else {
-      setComposerMode('whatsapp');
-      setMessageInput(msg);
+      composerRef.current?.setDraft(msg, 'whatsapp');
     }
   };
 
@@ -2951,8 +3642,7 @@ export const SupportChatCircles: React.FC = () => {
           await handleSendReply(msgText);
           toast.success('Cita y enlace enviados al WhatsApp del cliente');
         } else {
-          setComposerMode('whatsapp');
-          setMessageInput(msgText);
+          composerRef.current?.setDraft(msgText, 'whatsapp');
           toast.success('Mensaje de confirmación listo en el chat para enviar');
         }
       }
@@ -3061,7 +3751,7 @@ export const SupportChatCircles: React.FC = () => {
           time_justification: resForm.time_justification.trim(),
           ai_expected_hours: aiTimeAudit.expectedHours,
           ai_time_verdict: aiTimeAudit.status,
-          chat_session_seconds: activeChatSeconds,
+          chat_session_seconds: getActiveChatSeconds(),
         },
       });
       if (notifyClient) {
@@ -3087,7 +3777,6 @@ export const SupportChatCircles: React.FC = () => {
     }
   };
 
-  const formatTimer = (sec: number) => `${Math.floor(sec / 60)}m ${sec % 60 < 10 ? '0' : ''}${sec % 60}s`;
   const greetingTime = () => {
     const hr = new Date().getHours();
     if (hr < 12) return 'Buenos días';
@@ -3571,6 +4260,10 @@ export const SupportChatCircles: React.FC = () => {
                     setActivePromptTab('ya_resolvimos');
                   }
                   setShowAiPromptModal(true);
+                  if (!aiVerifiedOnceRef.current) {
+                    aiVerifiedOnceRef.current = true;
+                    verifyAndLoadAiConfig(false);
+                  }
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-700 border border-indigo-200/60 transition"
               >
@@ -3646,7 +4339,7 @@ export const SupportChatCircles: React.FC = () => {
               </button>
 
               <button
-                onClick={() => loadSupportData()}
+                onClick={() => loadSupportData(false, true)}
                 title={`Actualizar (${filteredCircles.length} conversaciones)`}
                 className="p-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 flex items-center justify-center transition shrink-0"
               >
@@ -3870,7 +4563,7 @@ export const SupportChatCircles: React.FC = () => {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-100" onScroll={handleCirclesScroll}>
             {loading && circles.length === 0 ? (
               <div className="p-8 text-center text-[13px] text-slate-400 font-medium">Cargando chats…</div>
             ) : filteredCircles.length === 0 ? (
@@ -3894,115 +4587,15 @@ export const SupportChatCircles: React.FC = () => {
                 )}
               </div>
             ) : (
-              filteredCircles.map((circle) => {
-                const isSelected = activeCircle?.circleId === circle.circleId;
-                const unread = isUnread(circle);
-                const isOverdue = circle.unreadOrWaitingReply && circle.waitMinutes >= 15 && circle.waitMinutes <= 24 * 60;
-                const shortType =
-                  circle.scope === 'soporte'
-                    ? circle.isGroup
-                      ? 'Grupo'
-                      : 'Cliente'
-                    : circle.scope === 'por_clasificar'
-                    ? 'Por tomar'
-                    : circle.scope === 'lead'
-                    ? circle.leadStatus && circle.leadStatus !== 'Prospecto'
-                      ? circle.leadStatus
-                      : 'Lead'
-                    : circle.scope === 'interno'
-                    ? 'Equipo'
-                    : 'Spam';
-
-                return (
-                  <button
-                    key={circle.circleId}
-                    type="button"
-                    onClick={() => {
-                      markCircleAsRead(circle.circleId, circle.lastMessageAt);
-                      setSelectedCircleId(circle.circleId);
-                      setMobileChatOpen(true);
-                    }}
-                    className={`w-full text-left px-3.5 py-2.5 flex items-center gap-2.5 transition relative border-l-[3px] ${
-                      isSelected
-                        ? 'bg-indigo-50/80 border-l-indigo-600'
-                        : unread
-                        ? 'bg-[#F5F7FF] hover:bg-indigo-50/60 border-l-indigo-500'
-                        : 'bg-white hover:bg-slate-50/80 border-l-transparent'
-                    }`}
-                  >
-                    <div className="relative shrink-0">
-                      <div
-                        className={`w-9.5 h-9.5 rounded-full flex items-center justify-center text-[13px] ${
-                          unread
-                            ? 'bg-indigo-100 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
-                            : isSelected
-                            ? 'bg-indigo-100 text-indigo-700 font-semibold'
-                            : 'bg-slate-100 text-slate-500 font-semibold'
-                        }`}
-                      >
-                        {circle.isGroup ? <Users className="w-4 h-4" /> : initials(circle.clientName)}
-                      </div>
-                      {unread && <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 border-2 border-white absolute -top-0.5 -right-0.5" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1.5">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`text-[14px] truncate ${unread ? 'font-bold text-slate-950' : 'font-normal text-slate-700'}`}>
-                            {circle.clientName}
-                          </span>
-                          <span
-                            className={`text-[12px] shrink-0 ${
-                              circle.leadStatus === 'Perdido' || circle.leadStatus === 'Erróneo'
-                                ? 'text-slate-500 font-normal'
-                                : 'text-slate-400 font-normal'
-                            }`}
-                          >
-                            · {shortType}
-                          </span>
-                          {circle.isReactivation && (
-                            <span
-                              title={circle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
-                              className={`text-[11px] font-medium shrink-0 ${
-                                circle.reactivationReplied
-                                  ? 'px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200/80'
-                                  : 'text-slate-400'
-                              }`}
-                            >
-                              {circle.reactivationReplied
-                                ? 'Respondió'
-                                : `· Toque ${circle.reactivationTouch || 1}`}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {isOverdue && (
-                            <span
-                              title={`Esperando respuesta hace ${formatWaitDuration(circle.waitMinutes)}`}
-                              className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-[11.5px] font-semibold inline-flex items-center gap-0.5"
-                            >
-                              <Clock className="w-3 h-3" />
-                              {formatWaitDuration(circle.waitMinutes)}
-                            </span>
-                          )}
-                          <span className={`text-[12px] ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
-                            {listTimeLabel(circle.lastMessageAt)}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between gap-2 mt-0.5">
-                        <p className={`text-[13px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
-                          {circle.lastMessageSender}: {circle.lastMessageText}
-                        </p>
-                        {unread && (
-                          <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10.5px] font-bold leading-none shrink-0">
-                            Nuevo
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })
+              visibleCircles.map((circle) => (
+                <CircleListRow
+                  key={circle.circleId}
+                  circle={circle}
+                  isSelected={activeCircle?.circleId === circle.circleId}
+                  unread={isUnread(circle)}
+                  onSelect={handleSelectCircle}
+                />
+              ))
             )}
           </div>
         </aside>
@@ -4595,8 +5188,10 @@ export const SupportChatCircles: React.FC = () => {
                                         <button
                                           type="button"
                                           onClick={() => {
-                                            setComposerMode('whatsapp');
-                                            setMessageInput(buildQuoteWhatsAppText(q, activeCircle.clientName, true));
+                                            composerRef.current?.setDraft(
+                                              buildQuoteWhatsAppText(q, activeCircle.clientName, true),
+                                              'whatsapp',
+                                            );
                                             setShowQuotesPopover(false);
                                           }}
                                           title="Colocar enlaces de firma y reunión en el cuadro de texto para editar antes de enviar"
@@ -5022,8 +5617,10 @@ export const SupportChatCircles: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setComposerMode('whatsapp');
-                      setMessageInput(buildQuoteWhatsAppText(pendingQuote, activeCircle.clientName, true));
+                      composerRef.current?.setDraft(
+                        buildQuoteWhatsAppText(pendingQuote, activeCircle.clientName, true),
+                        'whatsapp',
+                      );
                       setPendingQuoteId(null);
                       setPostQuoteFollowupCircleId(activeCircle.circleId);
                     }}
@@ -5125,179 +5722,33 @@ export const SupportChatCircles: React.FC = () => {
                 </div>
               )}
 
-            {/* Single-Row Clean Composer (WhatsApp message vs Internal Team Note + Floating Plantillas Popover) */}
-            {canSend ? (
-              <div
-                className={`px-5 py-3 border-t flex items-end gap-2 transition-colors relative ${
-                  composerMode === 'internal' ? 'bg-amber-50/70 border-amber-200' : 'bg-white border-slate-200/70'
-                }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
-                  onChange={handleUploadAttachment}
-                  className="hidden"
-                />
-                {composerMode === 'whatsapp' && (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingFile}
-                    title="Enviar imagen, documento o archivo"
-                    className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0 disabled:opacity-50"
-                  >
-                    {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  </button>
-                )}
-
-                {/* Floating Quick Replies Popover Button (Replaces permanent horizontal bar) */}
-                {composerMode === 'whatsapp' && (
-                  <div className="relative shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setShowQuickRepliesPopover((v) => !v)}
-                      title="Respuestas rápidas y plantillas"
-                      className={`px-3.5 py-2.5 rounded-xl text-[13px] font-semibold inline-flex items-center gap-1.5 border transition ${
-                        showQuickRepliesPopover
-                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                          : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
-                      }`}
-                    >
-                      <Zap className="w-4 h-4 text-indigo-600" />
-                      <span className="hidden sm:inline">Plantillas</span>
-                    </button>
-                    {showQuickRepliesPopover && (
-                      <div className="absolute left-0 bottom-full mb-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-2 space-y-1">
-                        <div className="px-2.5 py-1.5 flex items-center justify-between border-b border-slate-100">
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                            {activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar'
-                              ? 'Plantillas de Ventas'
-                              : 'Plantillas de Soporte'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowQuickRepliesPopover(false);
-                              setEditingQrId(null);
-                              setNewQrLabel('');
-                              setNewQrText('');
-                              setNewQrScope(activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'ventas' : 'soporte');
-                              setShowQuickReplyModal(true);
-                            }}
-                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-0.5"
-                          >
-                            <Plus className="w-3 h-3" />
-                            Nueva / Editar
-                          </button>
-                        </div>
-                        <div className="max-h-64 overflow-y-auto divide-y divide-slate-50">
-                          {activeQuickReplies.map((q) => (
-                            <div
-                              key={q.id}
-                              className="w-full px-3 py-2 rounded-xl hover:bg-slate-50 transition flex items-start justify-between gap-2 group"
-                            >
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setMessageInput(q.text);
-                                  setShowQuickRepliesPopover(false);
-                                }}
-                                className="flex-1 text-left min-w-0"
-                              >
-                                <p className="text-[13px] font-semibold text-slate-800">{q.label}</p>
-                                <p className="text-xs text-slate-400 truncate mt-0.5">{q.text}</p>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setShowQuickRepliesPopover(false);
-                                  setNewQrScope(q.scope);
-                                  setEditingQrId(q.id);
-                                  setNewQrLabel(q.label);
-                                  setNewQrText(q.text);
-                                  setShowQuickReplyModal(true);
-                                }}
-                                title="Editar esta plantilla"
-                                className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition shrink-0"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Mode switcher: WhatsApp vs Nota Interna */}
-                <button
-                  type="button"
-                  onClick={() => setComposerMode((m) => (m === 'whatsapp' ? 'internal' : 'whatsapp'))}
-                  title={
-                    composerMode === 'internal'
-                      ? 'Modo Nota Interna activo (el cliente NO recibe este mensaje). Clic para volver a WhatsApp.'
-                      : 'Cambiar a Nota Interna para dejar instrucciones al equipo dentro del chat'
-                  }
-                  className={`px-3.5 py-2.5 rounded-xl text-[13px] font-semibold inline-flex items-center gap-1.5 shrink-0 border transition ${
-                    composerMode === 'internal'
-                      ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
-                      : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200'
-                  }`}
-                >
-                  <StickyNote className="w-4 h-4" />
-                  <span className="hidden sm:inline">{composerMode === 'internal' ? 'Nota interna' : 'Nota'}</span>
-                </button>
-
-                <textarea
-                  rows={1}
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleComposerSubmit();
-                    }
-                  }}
-                  placeholder={
-                    composerMode === 'internal'
-                      ? 'Escribe una nota interna para el equipo (NO se envía al WhatsApp del cliente)…'
-                      : 'Escribe un mensaje a WhatsApp… (Shift+Enter = nueva línea)'
-                  }
-                  className={`flex-1 resize-none max-h-32 px-4 py-2.5 rounded-xl text-[14.5px] font-medium focus:outline-none focus:ring-2 transition ${
-                    composerMode === 'internal'
-                      ? 'bg-white border-2 border-amber-300 text-amber-950 placeholder:text-amber-700/60 focus:ring-amber-500/20'
-                      : 'bg-slate-50 border border-slate-200/80 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-indigo-500/20'
-                  }`}
-                />
-                <button
-                  type="button"
-                  disabled={!messageInput.trim() || sendingMessage}
-                  onClick={handleComposerSubmit}
-                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl disabled:opacity-40 text-white text-[13px] font-bold transition ${
-                    composerMode === 'internal' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'
-                  }`}
-                >
-                  {composerMode === 'internal' ? <StickyNote className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                  {composerMode === 'internal' && <span className="hidden sm:inline">Guardar nota</span>}
-                </button>
-              </div>
-            ) : (
-              <div className="bg-white px-5 py-3 border-t border-slate-200/70 text-center text-[11px] font-semibold text-slate-400">
-                {activeCircle.scope === 'spam' ? (
-                  'Este número está marcado como spam.'
-                ) : (
-                  <>
-                    Este ticket no vino por WhatsApp.{' '}
-                    <button type="button" onClick={() => navigate('/support/tickets')} className="text-indigo-600 font-bold underline">
-                      Gestionarlo en Tickets
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+            {/* Single-Row Clean Composer (Isolated from parent re-renders for zero typing lag) */}
+            <ChatComposer
+              ref={composerRef}
+              canSend={Boolean(canSend)}
+              scope={activeCircle.scope}
+              sendingMessage={sendingMessage}
+              uploadingFile={uploadingFile}
+              activeQuickReplies={activeQuickReplies}
+              onSendWhatsApp={handleSendReply}
+              onSaveInternalNote={handleSaveInternalNote}
+              onUploadAttachment={handleUploadAttachment}
+              onOpenNewQuickReply={() => {
+                setEditingQrId(null);
+                setNewQrLabel('');
+                setNewQrText('');
+                setNewQrScope(activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'ventas' : 'soporte');
+                setShowQuickReplyModal(true);
+              }}
+              onEditQuickReply={(q) => {
+                setNewQrScope(q.scope);
+                setEditingQrId(q.id);
+                setNewQrLabel(q.label);
+                setNewQrText(q.text);
+                setShowQuickReplyModal(true);
+              }}
+              onNavigateTickets={() => navigate('/support/tickets')}
+            />
           </main>
         ) : (
           <main className="hidden lg:flex flex-1 items-center justify-center bg-[#F3F4F8] text-slate-400 text-sm font-bold">
@@ -5336,7 +5787,7 @@ export const SupportChatCircles: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <Clock className="w-3 h-3" /> Abierto · {formatTimer(activeChatSeconds)}
+                      <Clock className="w-3 h-3" /> Abierto · <ActiveSessionTimer startedAt={chatSessionStartedAt} />
                     </>
                   )}
                 </span>
@@ -6018,6 +6469,29 @@ export const SupportChatCircles: React.FC = () => {
                         otros: aiPrompts.otros.trim(),
                       },
                     });
+                    if (activeCompanyId) {
+                      try {
+                        localStorage.setItem(
+                          `crm_wa_ai_cfg_${activeCompanyId}`,
+                          JSON.stringify({
+                            auto_reply_text: aiAutoReplyText,
+                            auto_reply_audio: aiAutoReplyAudio,
+                            auto_reply_resolved_enabled: autoReplyResolvedEnabled,
+                            auto_resolved_mark_lost: autoResolvedMarkLost,
+                            resolved_reply_template: resolvedReplyTemplate.trim() || DEFAULT_RESOLVED_REPLY_TEMPLATE,
+                            resolved_trigger_phrases: parsedResolvedTriggerPhrases,
+                            prompts: {
+                              soporte: aiPrompts.soporte.trim(),
+                              contabilidad: aiPrompts.contabilidad.trim(),
+                              ventas: aiPrompts.ventas.trim(),
+                              otros: aiPrompts.otros.trim(),
+                            },
+                          }),
+                        );
+                      } catch {
+                        // ignore quota errors
+                      }
+                    }
                     toast.success('Configuración guardada');
                     setShowAiPromptModal(false);
                   } catch (e: any) {

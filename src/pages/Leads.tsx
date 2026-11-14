@@ -183,7 +183,7 @@ export default function Leads() {
                 .select('id, lead_id, metadata')
                 .eq('company_id', activeCompanyId)
                 .eq('metadata->>wa_reactivation', 'true')
-                .limit(2000);
+                .limit(2500);
             setWaCampaignTickets(data || []);
         } catch {
             // non-blocking
@@ -191,7 +191,11 @@ export default function Leads() {
     };
 
     useEffect(() => {
-        loadWaCampaignTickets();
+        // Defer secondary WhatsApp badge enrichment slightly so primary Leads query renders immediately
+        const timer = window.setTimeout(() => {
+            loadWaCampaignTickets();
+        }, 250);
+        return () => window.clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeCompanyId]);
 

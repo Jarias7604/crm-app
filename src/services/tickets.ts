@@ -330,28 +330,50 @@ export const ticketService = {
         // NOTE: We avoid PostgREST relationship join syntax (lead:leads, profiles!fkey)
         // because those require a registered FK in the schema cache which may be absent
         // in the testing environment. Instead we use the lead_name snapshot + separate queries.
-        let query = supabase
-            .from('tickets')
-            .select('*')
-            .eq('company_id', companyId);
+        const buildBaseQuery = () => {
+            let q = supabase
+                .from('tickets')
+                .select('*')
+                .eq('company_id', companyId);
 
-        if (filters?.status && filters.status.length > 0) {
-            query = query.in('status', filters.status);
-        }
-        if (filters?.categoryId) {
-            query = query.eq('category_id', filters.categoryId);
-        }
-        if (filters?.assignedTo) {
-            query = query.eq('assigned_to', filters.assignedTo);
+            if (!filters?.includeNonSupportWhatsapp) {
+                // Exclude commercial Lead / Unclassified / Internal / Spam WhatsApp rows directly in SQL
+                // so Service Hub screens never download hundreds of sales chats or hit the 1000-row cap.
+                q = q.or('metadata->>wa_scope.is.null,metadata->>wa_scope.eq.soporte');
+            }
+            if (filters?.status && filters.status.length > 0) {
+                q = q.in('status', filters.status);
+            }
+            if (filters?.categoryId) {
+                q = q.eq('category_id', filters.categoryId);
+            }
+            if (filters?.assignedTo) {
+                q = q.eq('assigned_to', filters.assignedTo);
+            }
+            return q;
+        };
+
+        let rows: Record<string, unknown>[] = [];
+        if (filters?.includeNonSupportWhatsapp) {
+            const PAGE = 1000;
+            for (let from = 0; from < 10000; from += PAGE) {
+                const { data, error } = await buildBaseQuery()
+                    .order('updated_at', { ascending: false })
+                    .range(from, from + PAGE - 1);
+                if (error) throw error;
+                const batch = (data || []) as Record<string, unknown>[];
+                rows.push(...batch);
+                if (batch.length < PAGE) break;
+            }
+        } else {
+            const { data, error } = await buildBaseQuery().order('created_at', { ascending: false });
+            if (error) throw error;
+            rows = (data || []) as Record<string, unknown>[];
         }
 
-        const { data, error } = await query.order('created_at', { ascending: false });
-        if (error) throw error;
-
-        const rows = (data || []) as Record<string, unknown>[];
         const visible = filters?.includeNonSupportWhatsapp
             ? rows
-            : rows.filter((t) => isSupportTicket(t as { metadata?: Record<string, unknown> | null }));
+            : rows.filter((t) => isSupportTicket(t as { metadata?: Record<string, unknown> | null; title?: string | null; description?: string | null }));
 
         // Build lead object from the lead_name snapshot (always available, no RLS issues)
         return visible.map((t: Record<string, unknown>) => ({
@@ -505,13 +527,14 @@ export const ticketService = {
     async getStats(companyId: string): Promise<TicketStats> {
         const { data, error } = await supabase
             .from('tickets')
-            .select('status, priority, created_at, resolved_at, last_status_change_at, category_id, metadata')
-            .eq('company_id', companyId);
+            .select('title, status, priority, created_at, resolved_at, last_status_change_at, category_id, metadata')
+            .eq('company_id', companyId)
+            .or('metadata->>wa_scope.is.null,metadata->>wa_scope.eq.soporte');
 
         if (error) throw error;
 
         // Lead / unclassified WhatsApp chats are not support tickets.
-        const all = (data || []).filter((t: { metadata?: Record<string, unknown> | null }) => isSupportTicket(t));
+        const all = (data || []).filter((t: { title?: string | null; metadata?: Record<string, unknown> | null }) => isSupportTicket(t));
         const todayStr = new Date().toISOString().split('T')[0];
 
         // Avg resolution time
