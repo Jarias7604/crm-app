@@ -59,6 +59,7 @@ import {
   Target,
   Video,
   RotateCcw,
+  Ticket as TicketIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LiveDemoHUDModal, parseAriasAnswersFromNotes } from '../../components/leads/LiveDemoHUDModal';
@@ -87,6 +88,7 @@ import {
   getWaViewerScopes,
   getWaScope,
   isWhatsappTicket,
+  isSupportTicket,
   WA_SCOPE_LABELS,
   WA_ACCESS_MODE_OPTIONS,
   type WaScope,
@@ -1003,6 +1005,7 @@ export const SupportChatCircles: React.FC = () => {
 
   const [showHistoryAccordion, setShowHistoryAccordion] = useState(false);
   const [savingResolution, setSavingResolution] = useState(false);
+  const [togglingTechTicket, setTogglingTechTicket] = useState(false);
   const [resForm, setResForm] = useState({
     actual_hours: '',
     findings: '',
@@ -2303,6 +2306,35 @@ export const SupportChatCircles: React.FC = () => {
       loadSupportData(true);
     } catch (err: any) {
       toast.error(err?.message || 'Error al cambiar categoría');
+    }
+  };
+
+  const handleToggleTechnicalTicket = async (
+    makeTechnical: boolean,
+    opts?: { closeChat?: boolean; customTitle?: string },
+  ) => {
+    if (!activeCircle || togglingTechTicket) return;
+    setTogglingTechTicket(true);
+    try {
+      await invoke({
+        action: 'set_technical_ticket',
+        ticket_id: activeCircle.activeTicket.id,
+        is_technical_ticket: makeTechnical,
+        close_chat: opts?.closeChat,
+        custom_title: opts?.customTitle,
+      });
+      if (opts?.closeChat) {
+        toast.success('Conversación marcada como atendida (sin ticket)');
+      } else if (makeTechnical) {
+        toast.success('Convertido en Ticket Técnico');
+      } else {
+        toast.success('Movido a Solo Chat (no cuenta como ticket técnico)');
+      }
+      await loadSupportData(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al actualizar tipo de caso');
+    } finally {
+      setTogglingTechTicket(false);
     }
   };
 
@@ -4133,33 +4165,78 @@ export const SupportChatCircles: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-end gap-1.5 shrink-0 ml-auto">
-                {/* Support area selector + quick tech assignment */}
-                {activeCircle.scope === 'soporte' && activeCircle.isWhatsApp && (
-                  <>
-                    <div className="relative flex items-center">
-                      <Wrench className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-                      <select
-                        value={activeCircle.supportChannel}
-                        onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
-                        className="pl-8 pr-3 py-1 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 cursor-pointer focus:outline-none transition"
-                      >
-                        <option value="soporte">Soporte / Operaciones</option>
-                        <option value="contabilidad">Contabilidad / Finanzas</option>
-                        <option value="otros">Otros</option>
-                      </select>
-                    </div>
-                    {!activeCircle.assignedTechId && profile?.id && (
-                      <button
-                        type="button"
-                        onClick={() => handleAssignTech(profile.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition"
-                      >
-                        <UserCheck className="w-3.5 h-3.5" />
-                        Tomar caso
-                      </button>
-                    )}
-                  </>
-                )}
+                {/* Support area selector + ticket status + quick tech assignment */}
+                {activeCircle.scope === 'soporte' && activeCircle.isWhatsApp && (() => {
+                  const isTechTicket = isSupportTicket(activeCircle.activeTicket);
+                  const isClosed = ['resolved', 'closed'].includes(activeCircle.activeTicket.status);
+                  return (
+                    <>
+                      {isTechTicket ? (
+                        <span
+                          title="Ticket técnico activo en Service Hub"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80"
+                        >
+                          <TicketIcon className="w-3.5 h-3.5" />
+                          Ticket #{activeCircle.activeTicket.id.slice(0, 8).toUpperCase()}
+                        </span>
+                      ) : (
+                        <>
+                          <span
+                            title="Conversación de saludo o consulta general (no genera ticket técnico)"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200/80"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+                            Solo Chat
+                          </span>
+                          <button
+                            type="button"
+                            disabled={togglingTechTicket}
+                            onClick={() => handleToggleTechnicalTicket(true)}
+                            title="Convertir esta conversación en Ticket Técnico formal"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition disabled:opacity-50"
+                          >
+                            <TicketIcon className="w-3.5 h-3.5" />
+                            Crear Ticket Técnico
+                          </button>
+                          {!isClosed && (
+                            <button
+                              type="button"
+                              disabled={togglingTechTicket}
+                              onClick={() => handleToggleTechnicalTicket(false, { closeChat: true })}
+                              title="Marcar saludo o consulta como atendida sin llenar formulario de ticket"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 transition disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Atendido
+                            </button>
+                          )}
+                        </>
+                      )}
+                      <div className="relative flex items-center">
+                        <Wrench className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+                        <select
+                          value={activeCircle.supportChannel}
+                          onChange={(e) => handleSwitchChannel(e.target.value as SupportChannelType)}
+                          className="pl-8 pr-3 py-1 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 cursor-pointer focus:outline-none transition"
+                        >
+                          <option value="soporte">Soporte / Operaciones</option>
+                          <option value="contabilidad">Contabilidad / Finanzas</option>
+                          <option value="otros">Otros</option>
+                        </select>
+                      </div>
+                      {!activeCircle.assignedTechId && profile?.id && (
+                        <button
+                          type="button"
+                          onClick={() => handleAssignTech(profile.id)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition"
+                        >
+                          <UserCheck className="w-3.5 h-3.5" />
+                          Tomar caso
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Commercial Lead & Quote controls (Clean 1-button Stage selector + Actions) */}
                 {!activeCircle.isGroup &&
@@ -5229,22 +5306,33 @@ export const SupportChatCircles: React.FC = () => {
         )}
 
         {/* ── RIGHT: ticket control (support only) ── */}
-        {activeCircle && showRightPanel && activeCircle.scope === 'soporte' && (
+        {activeCircle && showRightPanel && activeCircle.scope === 'soporte' && (() => {
+          const isTechTicket = isSupportTicket(activeCircle.activeTicket);
+          const isClosedTicket = ['resolved', 'closed'].includes(activeCircle.activeTicket.status);
+          return (
           <aside className="w-96 bg-white border-l border-slate-200/80 flex flex-col overflow-y-auto shrink-0">
             <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-[#EEF0FF]/70 to-white">
               <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-indigo-700">
-                  <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                  Control del ticket
+                <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider ${isTechTicket ? 'text-indigo-700' : 'text-slate-600'}`}>
+                  {isTechTicket ? <FileText className="w-3.5 h-3.5 text-indigo-600" /> : <MessageSquare className="w-3.5 h-3.5 text-slate-500" />}
+                  {isTechTicket ? 'Control del ticket' : 'Solo Chat (Sin Ticket)'}
                 </span>
                 <span
                   className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                    ['resolved', 'closed'].includes(activeCircle.activeTicket.status) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'
+                    isClosedTicket
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : !isTechTicket
+                      ? 'bg-slate-100 text-slate-700'
+                      : 'bg-amber-100 text-amber-900'
                   }`}
                 >
-                  {['resolved', 'closed'].includes(activeCircle.activeTicket.status) ? (
+                  {isClosedTicket ? (
                     <>
-                      <CheckCircle2 className="w-3 h-3" /> Resuelto
+                      <CheckCircle2 className="w-3 h-3" /> {isTechTicket ? 'Resuelto' : 'Atendido'}
+                    </>
+                  ) : !isTechTicket ? (
+                    <>
+                      <MessageSquare className="w-3 h-3" /> Conversación
                     </>
                   ) : (
                     <>
@@ -5253,11 +5341,51 @@ export const SupportChatCircles: React.FC = () => {
                   )}
                 </span>
               </div>
-              <h4 className="text-sm font-black text-slate-900 mt-1">Ticket #{activeCircle.activeTicket.id.slice(0, 8).toUpperCase()}</h4>
+              <h4 className="text-sm font-black text-slate-900 mt-1">
+                {isTechTicket
+                  ? `Ticket #${activeCircle.activeTicket.id.slice(0, 8).toUpperCase()}`
+                  : `Chat #${activeCircle.activeTicket.id.slice(0, 8).toUpperCase()}`}
+              </h4>
               <p className="text-[11px] text-slate-500 font-medium line-clamp-2 mt-0.5">{stripEmojis(activeCircle.activeTicket.title)}</p>
             </div>
 
             <div className="p-4 space-y-4 flex-1">
+              {!isTechTicket ? (
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-indigo-600" />
+                      No genera ticket técnico automático
+                    </p>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Este mensaje se detectó como saludo, cortesía o consulta sin problema técnico. No cuenta en <strong>Tickets</strong>, <strong>Atrasados</strong> ni <strong>IA QA</strong>. Si el cliente describe una falla luego, se promoverá automáticamente.
+                    </p>
+                  </div>
+                  <div className="space-y-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={togglingTechTicket}
+                      onClick={() => handleToggleTechnicalTicket(true)}
+                      className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-black shadow-sm transition inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    >
+                      <TicketIcon className="w-4 h-4" />
+                      <span>{togglingTechTicket ? 'Procesando...' : 'Convertir en Ticket Técnico'}</span>
+                    </button>
+                    {!isClosedTicket && (
+                      <button
+                        type="button"
+                        disabled={togglingTechTicket}
+                        onClick={() => handleToggleTechnicalTicket(false, { closeChat: true })}
+                        className="w-full py-2 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Marcar como Atendido (Sin Ticket)</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <>
               <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2">
                 <label className="text-[10px] font-black uppercase text-slate-500 flex items-center gap-1.5">
                   <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
@@ -5415,6 +5543,20 @@ export const SupportChatCircles: React.FC = () => {
                 </div>
               </div>
 
+              {activeCircle.isWhatsApp && (
+                <button
+                  type="button"
+                  disabled={togglingTechTicket}
+                  onClick={() => handleToggleTechnicalTicket(false)}
+                  className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-[11px] font-bold transition inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+                  <span>{togglingTechTicket ? 'Actualizando...' : 'Pasar a Solo Chat (No es ticket técnico)'}</span>
+                </button>
+              )}
+                </>
+              )}
+
               <div className="rounded-2xl border border-slate-200 overflow-hidden">
                 <button
                   type="button"
@@ -5448,7 +5590,8 @@ export const SupportChatCircles: React.FC = () => {
               </div>
             </div>
           </aside>
-        )}
+          );
+        })()}
       </div>
 
       {/* ── "Es cliente" picker ── */}

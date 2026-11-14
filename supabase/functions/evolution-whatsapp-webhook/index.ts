@@ -119,24 +119,59 @@ function messageDate(entry: any): Date {
 
 // ─── Classification of the PROBLEM category (support only) ───────────────────
 
-function isGreetingOrClosingAgreement(text: string): boolean {
-  const clean = (text || '')
+function normalizeGreetingText(text: string): string {
+  return (text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[¡!¿?.,;:👍🙏👌✅👋]/g, ' ')
+    .replace(/bu3n/g, 'buen')
+    .replace(/0la/g, 'ola')
+    .replace(/[¡!¿?.,;:👍🙏👌✅🙌😊🤝🙃🟢🐺\-_/()]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function isGreetingOrClosingAgreement(text: string): boolean {
+  const raw = String(text || '').trim();
+  if (!raw || /^[.\s…_-]+$/.test(raw)) return true;
+
+  const clean = normalizeGreetingText(raw);
   if (clean.length < 4) return true;
+
   const startsWithAgreement =
-    /^(ok|okay|va|dale|de acuerdo|esta bien|está bien|perfecto|excelente|entendido|muchas gracias|gracias|mil gracias|ah ok|ah bueno|listo|ya quedo|ya quedó|si esta bien|sí está bien|bueno)\b/i.test(
+    /^(ok|okay|okey|va|dale|de acuerdo|esta bien|perfecto|excelente|entendido|entiendo|muchas gracias|gracias|mil gracias|ah ok|ah bueno|listo|ya quedo|si esta bien|bueno)\b/i.test(
       clean
     );
   const hasExplicitNewErrorAfterOk =
-    /\b(pero sigue|sigue dando error|no funciono|no funcionó|volvio a fallar|volvió a fallar|otro problema|otro error)\b/i.test(
+    /\b(pero sigue|sigue dando|no funciono|volvio a fallar|otro problema|otro error|no ingresa|no me deja|no carga|error|falla)\b/i.test(
       clean
     );
-  if (startsWithAgreement && !hasExplicitNewErrorAfterOk) return true;
-  return /^(hola|buenas|buenos dias|buenos días|buenas tardes|buenas noches|saludos|hey|alo|aló)(\s+(equipo|melvin|gerson|soporte|amigo|amigos|inge|ingeniero|como estan|cómo están))?$/i.test(
-    clean
+  if (startsWithAgreement && !hasExplicitNewErrorAfterOk && clean.length <= 65) return true;
+
+  const greetingWord =
+    '(?:hola+|ola+|buen(?:os|as)?(?:\\s+(?:dias?|tardes?|noches?))?|saludos|hey|alo|que\\s+tal|disculpe|perdon)';
+  const vocative =
+    '(?:muchachos|chicos|equipo|soporte|amigos?|inges?|ingenieros?|lic(?:enciados?)?|melvin|gerson|jimmy|paty|patricia|estimados?|companeros?|todos|como\\s+estan|como\\s+esta)';
+  const pureGreetingRegex = new RegExp(
+    `^${greetingWord}(?:\\s+${greetingWord})*(?:\\s+${vocative})*$`,
+    'i'
+  );
+  return pureGreetingRegex.test(clean);
+}
+
+function isNonTechnicalAdministrativeChat(text: string): boolean {
+  const clean = normalizeGreetingText(text);
+  if (!clean) return false;
+  const hasTechFailure =
+    /\b(error|falla|fallando|fallo|no puedo|no podemos|no pude|no funciona|no ingresa|no carga|no genera|no transmite|no actualiza|no refleja|no da paso|no da acceso|rechaza|rechazado|bloqueado|caido|correlativo|dte|hacienda|factura|invalidacion|firmador|sello|planilla|iva|anexo|inventario|soporte|ayuda|capacitacion)\b/i.test(
+      clean
+    );
+  if (hasTechFailure) return false;
+
+  return (
+    /\b(numero de cuenta|cuenta bancaria|comparte.*cuenta|para el pago de este mes)\b/i.test(clean) ||
+    /\b(vamos con la reunion|ya estoy en el link|link de la reunion)\b/i.test(clean) ||
+    /\b(para analizarla y hablamos luego|sobre los cambios)\b/i.test(clean)
   );
 }
 
@@ -158,23 +193,40 @@ function classifyIssueCategory(text: string): {
   isActualSupportProblem: boolean;
   priority: 'low' | 'medium' | 'high' | 'urgent';
 } {
-  const lower = (text || '').toLowerCase();
+  const textWithoutMediaPlaceholders = (text || '')
+    .replace(/^\[(Imagen|Video|Sticker|Nota de voz|Documento|Archivo)[^\]]*\]$/i, '')
+    .trim();
+  const lower = textWithoutMediaPlaceholders
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
   const has = (list: string[]) => list.some((k) => lower.includes(k));
 
-  const isUrgent = has(['urgente', 'caido', 'caído', 'no funciona nada', 'bloqueado', 'no podemos facturar', 'produccion', 'producción', 'error critico', 'error crítico']);
-  const isSales = has(['precio', 'precios', 'costo', 'costos', 'cotizacion', 'cotización', 'cotizar', 'cuanto cuesta', 'cuánto cuesta', 'cuanto vale', 'cuánto vale', 'planes', 'mensualidad', 'anualidad', 'demo', 'demostracion', 'demostración', 'comprar', 'adquirir', 'contratar', 'licencia', 'licencias', 'paquete', 'paquetes', 'tarifa', 'tarifas', 'implementacion', 'implementación', 'me interesa el sistema', 'informacion del sistema', 'información del sistema', 'quiero informacion', 'quiero información', 'venden', 'ofrecen', 'prospecto']);
-  const isAccounting = has(['contabilidad', 'contable', 'contador', 'libro de iva', 'libros de iva', 'libro compras', 'libro ventas', 'consumidor final', 'contribuyente', 'declaracion', 'declaración', 'anexo', 'anexos', 'f07', 'f-07', 'f14', 'f-14', 'f11', 'retencion', 'retención', 'percepcion', 'percepción', 'planilla', 'planillas', 'isss', 'afp', 'renta', 'balance general', 'estado de resultado', 'partida contable', 'partidas', 'catalogo de cuentas', 'catálogo de cuentas', 'cierre contable', 'conciliacion', 'conciliación']);
-  const isOtherProduct = has(['otro producto', 'otros productos', 'otro servicio', 'otros servicios', 'catalogo', 'catálogo', 'horario de atencion', 'horario de atención', 'ubicacion', 'ubicación', 'direccion', 'dirección', 'estado de cuenta']);
-  const hasProblemKeyword = has(['error', 'problema', 'falla', 'fallando', 'fallo', 'falló', 'no deja', 'no puedo', 'no podemos', 'no carga', 'no sale', 'no aparece', 'no funciona', 'no genera', 'no transmite', 'no envia', 'no envía', 'no cuadra', 'no imprime', 'impresora', 'ayuda', 'ayudarme', 'apoyo', 'soporte', 'revisar', 'revisen', 'arreglar', 'corregir', 'bug', 'lento', 'traba', 'pegado', 'rechaza', 'rechazado', 'inconveniente', 'duda', 'consulta', 'como hago', 'cómo hago', 'factura', 'dte', 'hacienda', 'invalidacion', 'invalidación', 'credito fiscal', 'crédito fiscal', 'sello', 'firmador', 'contingencia', 'planilla', 'calculo', 'cálculo', 'permiso', 'acceso', 'contraseña', 'login', 'sincroniza', 'base de datos', 'nota de voz', 'imagen enviada', 'documento:']);
-  const isClosingOrGreeting = isGreetingOrClosingAgreement(text);
+  const isUrgent = has(['urgente', 'caido', 'se cayo', 'no funciona nada', 'bloqueado', 'no podemos facturar', 'no me deja facturar', 'produccion', 'error critico']);
+  const isSales = has(['precio', 'precios', 'costo', 'costos', 'cotizacion', 'cotizar', 'cuanto cuesta', 'cuanto vale', 'planes', 'mensualidad', 'anualidad', 'demo', 'demostracion', 'comprar', 'adquirir', 'contratar', 'licencia', 'licencias', 'paquete', 'paquetes', 'tarifa', 'tarifas', 'implementacion', 'me interesa el sistema', 'informacion del sistema', 'quiero informacion', 'venden', 'ofrecen', 'prospecto']);
+  const isAccounting = has(['contabilidad', 'contable', 'contador', 'libro de iva', 'libros de iva', 'libro compras', 'libro ventas', 'consumidor final', 'contribuyente', 'declaracion', 'anexo', 'anexos', 'f07', 'f-07', 'f14', 'f-14', 'f11', 'retencion', 'percepcion', 'planilla', 'planillas', 'isss', 'afp', 'renta', 'balance general', 'estado de resultado', 'partida contable', 'partidas', 'catalogo de cuentas', 'cierre contable', 'conciliacion']);
+  const isOtherProduct = has(['otro producto', 'otros productos', 'otro servicio', 'otros servicios', 'catalogo', 'horario de atencion', 'ubicacion', 'direccion', 'estado de cuenta']);
+  const hasProblemKeyword = has([
+    'error', 'problema', 'falla', 'fallando', 'fallo', 'no deja', 'no me deja', 'no puedo', 'no podemos', 'no pude',
+    'no ingresa', 'no me puedo lograr', 'no me puedo loguear', 'no me deja entrar', 'no pude entrar', 'no da paso', 'no da acceso',
+    'no hay conexion', 'se ha caido', 'se cayo', 'caido el sistema', 'correlativo', 'no se estan actualizando', 'no actualiza',
+    'no refleja', 'arroja error', 'da error', 'sigue dando el problema', 'error de calculo', 'no me deja facturar',
+    'no carga', 'no sale', 'no aparece', 'no funciona', 'no genera', 'no transmite', 'no envia', 'no cuadra', 'no imprime', 'impresora',
+    'ayuda', 'ayudarme', 'ayuden', 'apoyo', 'soporte', 'revisar', 'revisen', 'arreglar', 'corregir', 'bug', 'lento', 'traba', 'pegado',
+    'rechaza', 'rechazado', 'inconveniente', 'duda', 'consulta', 'como hago', 'factura', 'facturar', 'facturacion', 'dte', 'hacienda',
+    'invalidacion', 'credito fiscal', 'comprobante', 'liquidacion', 'sello', 'firmador', 'contingencia', 'planilla', 'calculo',
+    'permiso', 'acceso', 'contrasena', 'login', 'sincroniza', 'base de datos', 'capacitacion', 'capacitaciom', 'entrenamiento', 'iva'
+  ]);
+  const isClosingOrGreeting = isGreetingOrClosingAgreement(textWithoutMediaPlaceholders);
+  const isAdminNonTech = isNonTechnicalAdministrativeChat(textWithoutMediaPlaceholders);
   const isActualSupportProblem =
-    (isUrgent || isSales || isAccounting || isOtherProduct || hasProblemKeyword) && !isClosingOrGreeting;
+    Boolean(lower) && (isUrgent || isAccounting || hasProblemKeyword) && !isClosingOrGreeting && !isAdminNonTech;
 
   let supportChannel: SupportChannelType = 'soporte';
   let category = 'Soporte General / Consulta';
   let shortCategoryTag = 'Soporte';
 
-  if (isSales) {
+  if (isSales && !hasProblemKeyword) {
     supportChannel = 'ventas';
     category = 'Ventas / Precios / Cotización';
     shortCategoryTag = 'Ventas / Precios';
@@ -186,23 +238,23 @@ function classifyIssueCategory(text: string): {
     supportChannel = 'otros';
     category = 'Otros Productos / Información General';
     shortCategoryTag = 'Otros Productos';
-  } else if (/dte|hacienda|factura|invalidaci|credito fiscal|crédito fiscal|fe\b|contingencia|sello|firmador/i.test(lower)) {
+  } else if (/dte|hacienda|factur|invalidaci|credito fiscal|fe\b|contingencia|sello|firmador|correlativo|liquidacion|comprobante/i.test(lower)) {
     category = 'Facturación Electrónica / DTE / Hacienda';
     shortCategoryTag = 'Facturación DTE';
-  } else if (/whatsapp|mensaje|cola|api|envio|envío|notificaci/i.test(lower)) {
+  } else if (/whatsapp\s*api|cola\s+de\s+whatsapp|no\s+envia\s+whatsapp|evolution\s*api|mensajeria\s+whatsapp/i.test(lower)) {
     category = 'WhatsApp / Mensajería / API';
     shortCategoryTag = 'WhatsApp API';
-  } else if (/login|acceso|usuario|permiso|contrase|rol|sesion|sesión/i.test(lower)) {
+  } else if (/login|acceso|usuario|permiso|contrasen|rol|sesion|no\s+ingresa|loguear|lograr|da\s+paso|entrar/i.test(lower)) {
     category = 'Accesos / Usuarios / Permisos';
     shortCategoryTag = 'Accesos/Permisos';
   } else if (/reporte|excel|pdf|descarga|filtro|estadistica|dashboard/i.test(lower)) {
     category = 'Reportes / Exportación / Datos';
     shortCategoryTag = 'Reportes';
-  } else if (/calculo|cálculo|monto|total|descuento|pago|cobro/i.test(lower)) {
+  } else if (/calculo|monto|total|descuento|abono|cuota|prima|cobro/i.test(lower)) {
     supportChannel = 'contabilidad';
     category = 'Cálculos / Finanzas / Pagos';
     shortCategoryTag = 'Contabilidad';
-  } else if (/lento|carga|caido|caído|servidor|base de datos|sql|sincroni/i.test(lower)) {
+  } else if (/lento|carga|caido|cayo|conexion|servidor|base\s+de\s+datos|sql|sincroni/i.test(lower)) {
     category = 'Infraestructura / Base de Datos / Lentitud';
     shortCategoryTag = 'Base de Datos/Server';
   }
@@ -211,11 +263,11 @@ function classifyIssueCategory(text: string): {
 }
 
 function isGenericProblemTitle(title: string): boolean {
-  const lower = (title || '').toLowerCase();
-  return (
-    lower.length < 32 ||
-    /tengo un problema|necesito ayuda|una consulta|me ayudan|hay un error|no funciona$/i.test(lower)
-  );
+  const snippet = String(title || '').replace(/^\[WhatsApp\s*·\s*[^\]]+\]\s*[^:]+:\s*/i, '').trim();
+  if (!snippet || snippet.length < 18) return true;
+  if (/^\[(Imagen|Video|Sticker|Nota de voz|Documento|Archivo)/i.test(snippet)) return true;
+  if (isGreetingOrClosingAgreement(snippet)) return true;
+  return /tengo un problema|necesito ayuda|una consulta|me ayudan|hay un error|no funciona|sobre los cambios$/i.test(snippet);
 }
 
 // ─── AI config (stored per-company + synced with active OpenAI integration) ──
@@ -386,6 +438,40 @@ function aiBotLabel(ch: SupportChannelType): string {
   if (ch === 'ventas') return '🤖 IA Ventas';
   if (ch === 'otros') return '🤖 IA Atención';
   return '🤖 IA Soporte';
+}
+
+async function askOpenAiTechnicalClassifier(openAiKey: string, text: string): Promise<boolean> {
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openAiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0,
+        max_tokens: 40,
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Eres un clasificador estricto de tickets de Soporte Técnico para software ERP / Facturación Electrónica DTE / Contabilidad. Responde SOLO JSON válido: {"is_technical":true} si el mensaje reporta un error, falla, problema de acceso, caída del sistema, duda operativa técnica, solicitud de soporte/capacitación o problema contable/DTE; o {"is_technical":false} si es solo un saludo, cortesía, agradecimiento, coordinación administrativa, pago/número de cuenta o charla general sin problema técnico.',
+          },
+          { role: 'user', content: text.slice(0, 600) },
+        ],
+      }),
+    });
+    if (!res.ok) return false;
+    const j = await res.json();
+    const raw = String(j?.choices?.[0]?.message?.content || '').trim();
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed?.is_technical === true;
+    } catch {
+      return /"is_technical"\s*:\s*true/i.test(raw);
+    }
+  } catch (e) {
+    console.error('[wa] OpenAI tech classifier error', e);
+    return false;
+  }
 }
 
 async function askOpenAi(openAiKey: string, systemPrompt: string, userContent: string): Promise<string> {
@@ -1106,7 +1192,7 @@ serve(async (req: Request) => {
 
     // ── Actions from the CRM UI (require a logged-in user) ──
     const uiActions = [
-      'get_ai_config', 'test_openai', 'save_ai_config', 'save_ai_prompt', 'set_ticket_channel',
+      'get_ai_config', 'test_openai', 'save_ai_config', 'save_ai_prompt', 'set_ticket_channel', 'set_technical_ticket',
       'promote_to_lead', 'classify_contact', 'send_reply', 'send_media', 'send_reactivation',
       'retry_media', 'bridge_status', 'rescope_now', 'request_history_import', 'request_evo_heal',
       'get_wa_team_access', 'set_wa_user_access',
@@ -1132,6 +1218,8 @@ serve(async (req: Request) => {
           return await handleSetWaUserAccess(supabase, caller, payload);
         case 'set_ticket_channel':
           return await handleSetChannel(supabase, caller, payload);
+        case 'set_technical_ticket':
+          return await handleSetTechnicalTicket(supabase, caller, payload);
         case 'promote_to_lead':
           return await handleClassify(supabase, caller, { ...payload, contact_type: 'lead' });
         case 'classify_contact':
@@ -1418,7 +1506,7 @@ async function ingestWhatsAppEntry(
     ? tickets.find((t) => {
         if (!['resolved', 'closed'].includes(t.status) || t.metadata?.merged_into) return false;
         const closedAt = new Date(t.resolved_at || t.updated_at || t.created_at).getTime();
-        return Math.abs(msgDate.getTime() - closedAt) <= 4 * 60 * 60 * 1000;
+        return Math.abs(msgDate.getTime() - closedAt) <= 12 * 60 * 60 * 1000;
       })
     : null;
 
@@ -1440,6 +1528,29 @@ async function ingestWhatsAppEntry(
     !media
   ) {
     targetTicket = recentlyClosed;
+  }
+
+  let aiCfgCache: any = null;
+  const getAiCfg = async () => {
+    if (!aiCfgCache) aiCfgCache = await loadSupportAiConfig(supabase, companyId);
+    return aiCfgCache;
+  };
+
+  let isTechProblem = scope === 'soporte' && !isStaff && classification.isActualSupportProblem;
+  if (
+    scope === 'soporte' &&
+    !isStaff &&
+    !isTechProblem &&
+    !isCatchup &&
+    !media &&
+    !isGreetingOrClosingAgreement(displayText) &&
+    !isNonTechnicalAdministrativeChat(displayText) &&
+    displayText.length >= 20
+  ) {
+    const aiCfg = await getAiCfg();
+    if (aiCfg.openAiKey) {
+      isTechProblem = await askOpenAiTechnicalClassifier(aiCfg.openAiKey, displayText);
+    }
   }
 
   const baseMetaPatch: Record<string, any> = {
@@ -1466,8 +1577,15 @@ async function ingestWhatsAppEntry(
       (t) => ['resolved', 'closed'].includes(t.status) && t.metadata?.ai_category === classification.category
     );
     const shortTitle = displayText.length > 85 ? `${displayText.slice(0, 82).trim()}...` : displayText;
-    const tag = scope === 'soporte' ? classification.shortCategoryTag : SCOPE_TITLE_TAG[scope];
+    const tag =
+      scope === 'soporte' ? (isTechProblem ? classification.shortCategoryTag : 'Chat') : SCOPE_TITLE_TAG[scope];
     const parentTicketId = scope === 'soporte' ? previousSameCategory?.id || null : null;
+    const headerLine =
+      scope === 'soporte'
+        ? isTechProblem
+          ? `📌 PROBLEMA REPORTADO (${classification.category}):`
+          : '💬 Conversación de WhatsApp (Soporte):'
+        : `💬 Conversación de WhatsApp (${SCOPE_TITLE_TAG[scope]}):`;
     const insertRow = {
       company_id: companyId,
       lead_id: scopeInfo.leadId,
@@ -1476,18 +1594,20 @@ async function ingestWhatsAppEntry(
       assigned_to: scope === 'lead' ? scopeInfo.leadOwner : null,
       title: `[WhatsApp · ${tag}] ${clientDisplayName}: ${shortTitle}`,
       description: [
-        scope === 'soporte' ? `📌 PROBLEMA REPORTADO (${classification.category}):` : `💬 Conversación de WhatsApp (${SCOPE_TITLE_TAG[scope]}):`,
+        headerLine,
         displayText,
         '',
         '💬 Historial de WhatsApp:',
       ].join('\n'),
       status: 'open',
-      priority: scope === 'soporte' ? classification.priority : 'medium',
+      priority: scope === 'soporte' && isTechProblem ? classification.priority : 'medium',
       metadata: {
         ...baseMetaPatch,
         support_channel: supportChannel,
         ai_category: scope === 'soporte' ? classification.category : 'Ventas / Precios / Nuevo Lead',
         whatsapp_message_count: 0,
+        is_technical_ticket: scope === 'soporte' ? isTechProblem : false,
+        awaiting_problem_details: scope === 'soporte' ? !isTechProblem : false,
         is_recurring_client_issue: scope === 'soporte' && Boolean(previousSameCategory),
         previous_ticket_id: scope === 'soporte' ? previousSameCategory?.id || null : null,
       },
@@ -1575,12 +1695,14 @@ async function ingestWhatsAppEntry(
     staffStrong &&
     scope === 'soporte' &&
     /listo|resuelto|solucionado|arreglado|ya quedo|ya quedó|corregido|actualizado/i.test(displayText);
+  const wasTechTicket = currentMeta.is_technical_ticket === true;
+  const promoteToTechTicket = scope === 'soporte' && !isStaff && isTechProblem && currentMeta.is_technical_ticket !== true;
   const shouldUpgradeTitle =
     scope === 'soporte' &&
     !isStaff &&
-    classification.isActualSupportProblem &&
-    isGenericProblemTitle(targetTicket.title) &&
-    displayText.length >= 15;
+    isTechProblem &&
+    (promoteToTechTicket || isGenericProblemTitle(targetTicket.title)) &&
+    displayText.length >= 8;
 
   let lastPreview = displayText.slice(0, 200);
   let description = String(targetTicket.description || '');
@@ -1598,7 +1720,7 @@ async function ingestWhatsAppEntry(
   let aiReplied = false;
   let autoResolvedMetaPatch: Record<string, any> = {};
   if (!isCatchup && !isStaff && !media && ['soporte', 'lead', 'por_clasificar'].includes(scope) && currentMeta.ai_auto_reply_text_enabled !== false) {
-    const aiCfg = await loadSupportAiConfig(supabase, companyId);
+    const aiCfg = await getAiCfg();
     if (aiCfg.autoReplyText && aiCfg.openAiKey && !isGreetingOrClosingAgreement(displayText)) {
       const reply = await askOpenAi(
         aiCfg.openAiKey,
@@ -1686,8 +1808,23 @@ async function ingestWhatsAppEntry(
     }
   }
 
+  const nextIsTechTicket =
+    scope !== 'soporte'
+      ? false
+      : promoteToTechTicket || wasTechTicket
+      ? true
+      : currentMeta.is_technical_ticket === false
+      ? false
+      : undefined;
+
   const prevScope = String(currentMeta.wa_scope || '');
   const scopeChanged = prevScope !== '' && prevScope !== scope;
+  if (shouldUpgradeTitle) {
+    description = description.replace(
+      /^(?:📌 PROBLEMA REPORTADO \([^)]+\)|💬 Conversación de WhatsApp \([^)]+\)):\n[\s\S]*?(?=\n\n💬 Historial de WhatsApp:)/,
+      `📌 PROBLEMA REPORTADO (${classification.category}):\n${displayText}`
+    );
+  }
   const updated: Record<string, any> = {
     description,
     updated_at: isNewerOrEqual ? (isCatchup ? msgDate.toISOString() : new Date().toISOString()) : targetTicket.updated_at || new Date().toISOString(),
@@ -1695,6 +1832,8 @@ async function ingestWhatsAppEntry(
       ...currentMeta,
       ...baseMetaPatch,
       ...autoResolvedMetaPatch,
+      ...(nextIsTechTicket !== undefined ? { is_technical_ticket: nextIsTechTicket } : {}),
+      awaiting_problem_details: scope === 'soporte' ? !(nextIsTechTicket === true) : false,
       support_channel: scope === 'soporte' ? (classification.supportChannel !== 'soporte' && classification.supportChannel !== 'ventas' && !isStaff ? classification.supportChannel : currentMeta.support_channel === 'ventas' ? 'soporte' : currentMeta.support_channel || 'soporte') : 'ventas',
       whatsapp_message_count: Number(currentMeta.whatsapp_message_count || 0) + 1 + (aiReplied ? 1 : 0),
       last_whatsapp_message: isNewerOrEqual ? lastPreview : currentMeta.last_whatsapp_message,
@@ -1721,6 +1860,9 @@ async function ingestWhatsAppEntry(
   if (shouldUpgradeTitle) {
     const snippet = displayText.length > 85 ? `${displayText.slice(0, 82).trim()}...` : displayText;
     updated.title = `[WhatsApp · ${classification.shortCategoryTag}] ${clientDisplayName}: ${snippet}`;
+    if (promoteToTechTicket) {
+      updated.priority = classification.priority;
+    }
   } else if (scopeChanged) {
     updated.title = String(targetTicket.title || '').replace(/^\[WhatsApp · [^\]]*\]/, `[WhatsApp · ${scope === 'soporte' ? 'Soporte' : SCOPE_TITLE_TAG[scope]}]`);
   }
@@ -1831,8 +1973,46 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
         await supabase.from('whatsapp_messages').update({ body: transcript }).eq('id', row.id);
       }
       const { data: t } = await supabase.from('tickets').select('*').eq('id', row.ticket_id).maybeSingle();
-      const meta = cleanMeta(t?.metadata || {});
+      let meta = cleanMeta(t?.metadata || {});
       const scope = String(meta.wa_scope || 'soporte') as WaScope;
+      if (t && transcript && scope === 'soporte') {
+        const trClass = classifyIssueCategory(transcript);
+        let trIsTech = trClass.isActualSupportProblem;
+        if (
+          !trIsTech &&
+          !isGreetingOrClosingAgreement(transcript) &&
+          !isNonTechnicalAdministrativeChat(transcript) &&
+          transcript.length >= 20 &&
+          aiCfg.openAiKey
+        ) {
+          trIsTech = await askOpenAiTechnicalClassifier(aiCfg.openAiKey, transcript);
+        }
+        if (trIsTech && (meta.is_technical_ticket === false || isGenericProblemTitle(t.title))) {
+          const snippet = transcript.length > 85 ? `${transcript.slice(0, 82).trim()}...` : transcript;
+          const nextTitle = `[WhatsApp · ${trClass.shortCategoryTag}] ${t.lead_name || 'Cliente'}: ${snippet}`;
+          const nextDesc = String(t.description || '').replace(
+            /^(?:📌 PROBLEMA REPORTADO \([^)]+\)|💬 Conversación de WhatsApp \([^)]+\)):\n[\s\S]*?(?=\n\n💬 Historial de WhatsApp:)/,
+            `📌 PROBLEMA REPORTADO (${trClass.category}):\n[Nota de voz]: ${transcript}`
+          );
+          const nextMeta = {
+            ...meta,
+            is_technical_ticket: true,
+            awaiting_problem_details: false,
+            ai_category: trClass.category,
+          };
+          await supabase
+            .from('tickets')
+            .update({
+              title: nextTitle,
+              description: nextDesc,
+              priority: trClass.priority,
+              updated_at: new Date().toISOString(),
+              metadata: nextMeta,
+            })
+            .eq('id', t.id);
+          meta = nextMeta;
+        }
+      }
       if (t && isRecentMsg && aiCfg.autoReplyAudio && meta.ai_auto_reply_enabled !== false && ['soporte', 'lead', 'por_clasificar'].includes(scope)) {
         const ch: SupportChannelType = scope === 'soporte' ? (meta.support_channel as SupportChannelType) || 'soporte' : 'ventas';
         const reply = await askOpenAi(
@@ -3032,6 +3212,102 @@ async function handleSetChannel(supabase: any, caller: Caller, payload: any): Pr
     .update({ updated_at: new Date().toISOString(), metadata: { ...cleanMeta(t.metadata || {}), support_channel: ch, ai_category: labels[ch] } })
     .eq('id', ticketId);
   return json({ ok: true, support_channel: ch });
+}
+
+async function handleSetTechnicalTicket(supabase: any, caller: Caller, payload: any): Promise<Response> {
+  const ticketId = String(payload?.ticket_id || '');
+  if (!ticketId) return json({ ok: false, error: 'Falta ticket_id' }, 400);
+  if (!(await ticketVisibleTo(caller, ticketId))) return json({ ok: false, error: 'No tienes acceso a este chat' }, 403);
+
+  const { data: t } = await supabase
+    .from('tickets')
+    .select('id, company_id, title, status, lead_name, description, metadata')
+    .eq('id', ticketId)
+    .maybeSingle();
+  if (!t) return json({ ok: false, error: 'Ticket no encontrado' }, 404);
+
+  const isTech = payload?.is_technical_ticket === true;
+  const closeChat = payload?.close_chat === true;
+  const customTitle = String(payload?.custom_title || '').trim();
+  const nowIso = new Date().toISOString();
+  const curMeta = cleanMeta(t.metadata || {});
+
+  const nextMeta: Record<string, any> = {
+    ...curMeta,
+    is_technical_ticket: isTech,
+    awaiting_problem_details: false,
+    wa_attended_at: nowIso,
+    wa_ticket_manual_override: true,
+    wa_ticket_override_by: caller.userId,
+    wa_ticket_override_at: nowIso,
+  };
+
+  const updatePatch: Record<string, any> = {
+    updated_at: nowIso,
+    metadata: nextMeta,
+  };
+
+  if (isTech) {
+    let summaryText = customTitle;
+    if (!summaryText && isGenericProblemTitle(String(t.title || ''))) {
+      const clientLines = String(t.description || '')
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith('[') && l.includes('👤'));
+      for (const line of [...clientLines].reverse()) {
+        const idx = line.indexOf(': ');
+        const msg = idx > 0 ? line.slice(idx + 2).trim() : '';
+        if (msg && !isGreetingOrClosingAgreement(msg) && !/^\[(Imagen|Video|Sticker|Nota de voz|Documento|Archivo)/i.test(msg)) {
+          summaryText = msg;
+          break;
+        }
+      }
+    }
+    const cls = classifyIssueCategory(summaryText || String(t.title || ''));
+    nextMeta.ai_category = cls.category;
+    if (summaryText) {
+      const snippet = summaryText.length > 85 ? `${summaryText.slice(0, 82).trim()}...` : summaryText;
+      const clientName = String(t.lead_name || 'Cliente').trim() || 'Cliente';
+      updatePatch.title = `[WhatsApp · ${cls.shortCategoryTag}] ${clientName}: ${snippet}`;
+      updatePatch.description = String(t.description || '').replace(
+        /^(?:📌 PROBLEMA REPORTADO \([^)]+\)|💬 Conversación de WhatsApp \([^)]+\)):\n[\s\S]*?(?=\n\n💬 Historial de WhatsApp:)/,
+        `📌 PROBLEMA REPORTADO (${cls.category}):\n${summaryText}`
+      );
+    } else if (/^\[WhatsApp\s*·\s*Chat\]/i.test(String(t.title || ''))) {
+      updatePatch.title = String(t.title || '').replace(/^\[WhatsApp\s*·\s*Chat\]/i, `[WhatsApp · ${cls.shortCategoryTag}]`);
+    }
+    if (['resolved', 'closed'].includes(t.status)) {
+      updatePatch.status = 'open';
+      updatePatch.resolved_at = null;
+      updatePatch.last_status_change_at = nowIso;
+    }
+  } else {
+    if (closeChat && ['new', 'open', 'pending'].includes(t.status)) {
+      updatePatch.status = 'closed';
+      updatePatch.resolved_at = nowIso;
+      updatePatch.last_status_change_at = nowIso;
+    }
+  }
+
+  const { data: updatedTicket, error: upErr } = await supabase
+    .from('tickets')
+    .update(updatePatch)
+    .eq('id', ticketId)
+    .select('*')
+    .single();
+  if (upErr) return json({ ok: false, error: upErr.message }, 500);
+
+  await supabase.from('ticket_comments').insert({
+    ticket_id: ticketId,
+    company_id: t.company_id,
+    author_id: caller.userId,
+    body: isTech
+      ? `🎫 ${caller.fullName} activó Ticket Técnico para este chat`
+      : `💬 ${caller.fullName} ${closeChat ? 'cerró el chat (sin problema técnico)' : 'marcó el chat como Solo Conversación (no requiere ticket técnico)'}`,
+    is_internal: true,
+  });
+
+  return json({ ok: true, is_technical_ticket: isTech, ticket: updatedTicket });
 }
 
 // Classify a WhatsApp number: cliente | lead | interno | spam | por_clasificar (undo).

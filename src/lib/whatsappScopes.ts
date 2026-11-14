@@ -211,11 +211,18 @@ export function getWaViewerScopes(
 interface TicketLike {
     metadata?: Record<string, unknown> | null;
     title?: string | null;
+    description?: string | null;
 }
 
 export function isWhatsappTicket(t: TicketLike): boolean {
     const m = (t.metadata || {}) as Record<string, unknown>;
-    return m.source === 'whatsapp_evolution' || Boolean(m.whatsapp_jid) || Boolean(m.whatsapp_phone);
+    return (
+        m.source === 'whatsapp_evolution' ||
+        Boolean(m.whatsapp_jid) ||
+        Boolean(m.whatsapp_phone) ||
+        Boolean(m.wa_reactivation) ||
+        /^\[WhatsApp\s*·/i.test(String(t.title || ''))
+    );
 }
 
 export function getWaScope(t: TicketLike): WaScope {
@@ -225,10 +232,77 @@ export function getWaScope(t: TicketLike): WaScope {
     return 'soporte';
 }
 
-// A real support ticket: every non-WhatsApp ticket, and WhatsApp chats of clients.
-// Lead / unclassified / team / spam chats are conversations, not support work.
+export function isPureGreetingOrNonTechnicalTitle(title?: string | null): boolean {
+    const raw = String(title || '').trim();
+    if (!raw) return true;
+
+    let snippet = raw;
+    if (/^\[WhatsApp\s*·\s*[^\]]+\]\s*/i.test(raw)) {
+        const afterTag = raw.replace(/^\[WhatsApp\s*·\s*[^\]]+\]\s*/i, '').trim();
+        const colonIdx = afterTag.indexOf(':');
+        if (colonIdx === -1) return true;
+        snippet = afterTag.slice(colonIdx + 1).trim();
+    }
+
+    if (!snippet || /^[.\s…_-]+$/.test(snippet)) return true;
+
+    if (/^\[(?:imagen|foto|audio|nota\s+de\s+voz|video|documento|archivo|sticker)[^\]]*\]$/i.test(snippet)) {
+        return true;
+    }
+
+    const clean = snippet
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/bu3n/g, 'buen')
+        .replace(/0la/g, 'ola')
+        .replace(/[¡!¿?.,;:👍🙏👌✅🙌😊🤝🙃🟢🐺]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (clean.length < 4) return true;
+
+    const greetingWord =
+        '(?:hola+|ola+|buen(?:os|as)?(?:\\s+(?:dias?|tardes?|noches?))?|saludos|hey|alo|que\\s+tal|disculpe|perdon)';
+    const vocative =
+        '(?:muchachos|chicos|equipo|soporte|amigos?|inges?|ingenieros?|lic(?:enciados?)?|melvin|gerson|jimmy|paty|patricia|estimados?|companeros?|todos|como\\s+estan|como\\s+esta)';
+    const greetingRegex = new RegExp(
+        `^(?:${greetingWord}(?:\\s+${greetingWord})*(?:\\s+${vocative})*|(?:ok|okay|okey|si|va|dale|perfecto|excelente|entendido|de\\s+acuerdo|listo|bueno|mil\\s+gracias|muchas\\s+gracias|gracias)(?:\\s+(?:ok|entiendo|entendido|muchas\\s+gracias|gracias|muy\\s+amable|amigo|equipo|inge|ingeniero))*)$`,
+        'i'
+    );
+    if (/^(?:comparte|me\s+compartes?|enviar?|enviame|pasame|me\s+pasas?)\s+(?:el\s+)?numero\s+de\s+cuenta/i.test(clean)) {
+        return true;
+    }
+    return greetingRegex.test(clean);
+}
+
+// A real support ticket: every non-WhatsApp ticket, and WhatsApp support chats that
+// actually represent a technical/support issue rather than a pure greeting/courtesy.
+// Lead / unclassified / team / spam / reactivation chats are conversations, not support work.
 export function isSupportTicket(t: TicketLike): boolean {
-    return !isWhatsappTicket(t) || getWaScope(t) === 'soporte';
+    const m = (t.metadata || {}) as Record<string, unknown>;
+    const title = String(t.title || '');
+    const desc = String(t.description || '');
+
+    if (
+        m.wa_reactivation === true ||
+        /^\[WhatsApp\s*·\s*Lead\]/i.test(title) ||
+        /^Reactivaci[oó]n comercial por WhatsApp/i.test(desc)
+    ) {
+        return false;
+    }
+
+    if (/arias\s+equipo\s+comercial/i.test(title)) {
+        return false;
+    }
+
+    if (m.is_technical_ticket === false) return false;
+    if (!isWhatsappTicket(t)) return true;
+    if (getWaScope(t) !== 'soporte') return false;
+
+    if (m.is_technical_ticket === true) return true;
+
+    return !isPureGreetingOrNonTechnicalTitle(t.title);
 }
 
 export const WA_SCOPE_LABELS: Record<WaScope, string> = {
