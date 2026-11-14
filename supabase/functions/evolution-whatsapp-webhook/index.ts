@@ -1855,7 +1855,6 @@ async function ingestWhatsAppEntry(
   if (!isGroup && (scopeInfo.leadName || scopeInfo.clientName) && targetTicket.lead_name !== clientDisplayName) {
     updated.lead_name = clientDisplayName;
   }
-  if (staffStrong && staffProfileId && !targetTicket.assigned_to && scope === 'soporte') updated.assigned_to = staffProfileId;
   if (scope === 'lead' && !targetTicket.assigned_to && scopeInfo.leadOwner) updated.assigned_to = scopeInfo.leadOwner;
   if (shouldUpgradeTitle) {
     const snippet = displayText.length > 85 ? `${displayText.slice(0, 82).trim()}...` : displayText;
@@ -3556,8 +3555,7 @@ async function handleSendReply(supabase: any, caller: Caller, payload: any): Pro
       ...(markLeadLost ? { wa_lead_status: 'Perdido' } : {}),
     },
   };
-  // Leads keep their owner; support chats get the first technician who answers.
-  if (!t.assigned_to && (meta.wa_scope || 'soporte') === 'soporte') update.assigned_to = caller.userId;
+  // Manual ticket assignment only — do not auto-assign support chats when replying.
   await supabase.from('tickets').update(update).eq('id', ticketId);
 
   if (markLeadLost) {
@@ -3629,7 +3627,6 @@ async function handleSendMedia(supabase: any, caller: Caller, payload: any): Pro
     .update({
       description: mediaDesc,
       updated_at: new Date().toISOString(),
-      ...(t.assigned_to || (meta.wa_scope || 'soporte') !== 'soporte' ? {} : { assigned_to: caller.userId }),
       metadata: {
         ...meta,
         whatsapp_message_count: Number(meta.whatsapp_message_count || 0) + 1,

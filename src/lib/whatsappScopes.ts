@@ -286,7 +286,7 @@ export function isSupportTicket(t: TicketLike): boolean {
 
     if (
         m.wa_reactivation === true ||
-        /^\[WhatsApp\s*·\s*Lead\]/i.test(title) ||
+        /^\[WhatsApp\s*·\s*(?:Nuevo\s+)?Lead\]/i.test(title) ||
         /^Reactivaci[oó]n comercial por WhatsApp/i.test(desc)
     ) {
         return false;
