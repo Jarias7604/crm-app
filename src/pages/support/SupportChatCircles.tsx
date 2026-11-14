@@ -3535,7 +3535,7 @@ export const SupportChatCircles: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  if (filter === 'reactivated' || pendingResolvedCircles.length > 0) {
+                  if (circleFilter === 'reactivados' || pendingResolvedCircles.length > 0) {
                     setActivePromptTab('ya_resolvimos');
                   }
                   setShowAiPromptModal(true);
