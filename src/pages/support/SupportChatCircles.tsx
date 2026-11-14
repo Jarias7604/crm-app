@@ -172,6 +172,115 @@ const DEFAULT_PROMPTS: Record<SupportChannelType, string> = {
     'Eres el Asistente IA de Atención al Cliente. Lee o escucha el mensaje del cliente y respóndele de forma cortés, clara y servicial en máximo 3 líneas por WhatsApp, confirmando que recibimos su consulta y canalizándola con el especialista correspondiente.',
 };
 
+const DEFAULT_RESOLVED_REPLY_TEMPLATE =
+  '¡Muchas gracias por comentarnos, {nombre}! Qué gusto saber que ya cuentan con una solución. Quedamos a su entera disposición por si en el futuro desean evaluar nuevas opciones o apoyo adicional. ¡Muchos éxitos en sus operaciones!';
+
+const DEFAULT_RESOLVED_TRIGGER_PHRASES: string[] = [
+  'ya resolvimos',
+  'lo resolvimos',
+  'ya se resolvio',
+  'ya lo resolvimos',
+  'ya resolvi',
+  'ya lo resolvi',
+  'ya contamos con un servicio',
+  'ya contamos con servicio',
+  'ya contamos con un sistema',
+  'ya contamos con sistema',
+  'ya contamos con proveedor',
+  'tenemos un servicio',
+  'ya tenemos un servicio',
+  'ya tenemos servicio',
+  'ya tenemos un sistema',
+  'ya tenemos sistema',
+  'ya tenemos proveedor',
+  'ya contratamos',
+  'ya adquirimos',
+  'ya implementamos',
+  'por ahora no necesitamos',
+  'no necesitamos por ahora',
+  'ya no necesitamos',
+  'ya no lo necesitamos',
+];
+
+function normalizeResolvedPhraseText(raw: string): string {
+  return String(raw || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[.,;:¡!¿?\-_/()"'+*👍🙏👌✅🙌😊🤝]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isAlreadyResolvedReply(text: string, customPhrases?: string[]): boolean {
+  const raw = String(text || '').trim();
+  if (!raw || raw.length > 180) return false;
+  if (/[?¿]/.test(raw)) return false;
+
+  const norm = normalizeResolvedPhraseText(raw);
+  if (!norm || norm.length < 6) return false;
+
+  const blockRegex =
+    /\b(cotiz\w*|precio\w*|costo\w*|cuanto\w*|plan|planes|demo\w*|informaci\w*|info|interesa\w*|comenzando|iniciando|adelante|despues|proxim\w*|llamar\w*|llamame|reuni\w*|agendar|visita\w*|error\w*|falla\w*|problema\w*|ayuda\w*|soporte|anydesk)\b/i;
+  if (blockRegex.test(norm)) return false;
+
+  const phrases = Array.isArray(customPhrases) && customPhrases.length > 0 ? customPhrases : DEFAULT_RESOLVED_TRIGGER_PHRASES;
+  for (const p of phrases) {
+    const np = normalizeResolvedPhraseText(p);
+    if (np && np.length >= 5 && norm.includes(np)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isBusinessOrGenericName(raw?: string | null): boolean {
+  const clean = String(raw || '')
+    .replace(/\(\+?\d+\)/g, '')
+    .trim();
+  if (!clean) return true;
+  if (/^(sin\s+nombre|contacto|cliente|prospecto|lead|soporte|admin|usuario|desconocido|whatsapp|\+?\d+)/i.test(clean)) {
+    return true;
+  }
+  return /\b(casa|inversiones|lotificaci[oó]n|lotificadora|comedor|constructora|corporaci[oó]n|corp\b|grupo|residencial|tienda|ferreter[ií]a|cl[ií]nica|hotel|restaurante|autolote|auto\s+lote|taller|farmacia|supermercado|distribuidora|importadora|servicios|soluciones|agencia|asociaci[oó]n|fundaci[oó]n|iglesia|colegio|escuela|academia|laboratorio|panader[ií]a|pasteler[ií]a|est[eé]tica|sal[oó]n|barber[ií]a|gym|gimnasio|transporte|transportes|log[ií]stica|inmobiliaria|bienes\s+ra[ií]ces|desarrollos|urbanica|bosque|villas|finca|hacienda|agro|veterinaria|[oó]ptica|dental|odontolog[ií]a|abogados|bufete|contadores|despacho|consultor[ií]a|ingenier[ií]a|arquitectura|proyectos|multitienda|variedades|bazar|librer[ií]a|papeler[ií]a|imprenta|sublimaci[oó]n|publicidad|marketing|tecnolog[ií]a|sistemas|repuestos|lubricantes|llantas|motos|lavander[ií]a|florister[ií]a|eventos|banquetes|catering|seguridad|vigilancia|mantenimiento|refrigeraci[oó]n|el[eé]ctrica|plomer[ií]a|vidrier[ií]a|estructuras|carpinter[ií]a|muebler[ií]a|muebles|textiles|confecciones|bordados|serigraf[ií]a|pl[aá]sticos|empaques|reciclaje|gasolinera|cooperativa|financiera|seguros|corredora|aduana|aduanal|naviera|carga|courier|encomiendas|turismo|viajes|tours|alquiler|bodega|bodegas|almac[eé]n|mayorista|av[ií]cola|granero|granja|beneficio|caf[eé]|cafeter[ií]a|pizzer[ií]a|taquer[ií]a|pupuser[ií]a|asados|mariscos|cevicher[ií]a|spa\b|plaza\b|mercado|sucursal|boutique|s\.a\.|de\s+c\.v\.)\b/i.test(
+    clean
+  );
+}
+
+function extractCleanLeadFirstName(rawName?: string | null): string {
+  const clean = String(rawName || '')
+    .replace(/\(\+?\d+\)/g, '')
+    .trim();
+  if (!clean || isBusinessOrGenericName(clean)) return '';
+  if (/[_@]/.test(clean)) return '';
+  const withoutTitle = clean
+    .replace(/^(lic(da|do)?|ing|arq|dr|dra|sr|sra|srta|don|doña|prof|abog|pastor|cnel|gral)\.?\s+/i, '')
+    .trim();
+  if (!withoutTitle) return '';
+  const tokens = withoutTitle.split(/[\s,.-]+/).filter(Boolean);
+  const first = tokens[0] || '';
+  if (first.length < 2 || /\d/.test(first)) return '';
+  if (tokens.length === 1 && first.length > 10) return '';
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
+function renderResolvedReplyTemplate(template: string, rawName?: string | null): string {
+  const base = String(template || DEFAULT_RESOLVED_REPLY_TEMPLATE).trim() || DEFAULT_RESOLVED_REPLY_TEMPLATE;
+  const firstName = extractCleanLeadFirstName(rawName);
+  const cleanCompany = String(rawName || '').replace(/\(\+?\d+\)/g, '').trim() || 'su empresa';
+
+  let out = base.replace(/\{empresa\}/gi, cleanCompany);
+  if (firstName) {
+    out = out.replace(/\{nombre\}/gi, firstName);
+  } else {
+    out = out
+      .replace(/,\s*\{nombre\}/gi, '')
+      .replace(/\s+\{nombre\}/gi, '')
+      .replace(/\{nombre\}/gi, '');
+  }
+  return out.replace(/\s{2,}/g, ' ').trim();
+}
+
 export interface QuickReplyTemplate {
   id: string;
   scope: 'soporte' | 'ventas';
@@ -908,15 +1017,25 @@ export const SupportChatCircles: React.FC = () => {
 
   // AI auto-responder settings (admin)
   const [showAiPromptModal, setShowAiPromptModal] = useState(false);
-  const [activePromptTab, setActivePromptTab] = useState<SupportChannelType>('soporte');
+  const [activePromptTab, setActivePromptTab] = useState<SupportChannelType | 'ya_resolvimos'>('soporte');
   const [aiAutoReplyText, setAiAutoReplyText] = useState(false);
   const [aiAutoReplyAudio, setAiAutoReplyAudio] = useState(false);
+  const [autoReplyResolvedEnabled, setAutoReplyResolvedEnabled] = useState(false);
+  const [autoResolvedMarkLost, setAutoResolvedMarkLost] = useState(true);
+  const [resolvedReplyTemplate, setResolvedReplyTemplate] = useState(DEFAULT_RESOLVED_REPLY_TEMPLATE);
+  const [resolvedTriggerPhrasesText, setResolvedTriggerPhrasesText] = useState(DEFAULT_RESOLVED_TRIGGER_PHRASES.join(', '));
+  const [showTriggerPhrasesEditor, setShowTriggerPhrasesEditor] = useState(false);
+  const [selectedPendingResolvedIds, setSelectedPendingResolvedIds] = useState<string[]>([]);
+  const [sendingBatchResolved, setSendingBatchResolved] = useState(false);
+  const [batchResolvedProgress, setBatchResolvedProgress] = useState({ current: 0, total: 0 });
   const [aiPrompts, setAiPrompts] = useState<Record<SupportChannelType, string>>({ ...DEFAULT_PROMPTS });
   const [openAiStatus, setOpenAiStatus] = useState({ checking: true, verified: false, model: 'gpt-4o-mini', error: '' });
   const [savingAiConfig, setSavingAiConfig] = useState(false);
 
   const invoke = async (body: Record<string, unknown>) => {
-    const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', { body });
+    const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
+      body: { company_id: activeCompanyId || undefined, ...body },
+    });
     if (error) {
       // supabase-js wraps non-2xx responses; surface the server's message.
       let msg = error.message;
@@ -938,7 +1057,7 @@ export const SupportChatCircles: React.FC = () => {
   const verifyAndLoadAiConfig = async (showToast = false) => {
     setOpenAiStatus((p) => ({ ...p, checking: true }));
     try {
-      const data = await invoke({ action: 'get_ai_config' });
+      const data = await invoke({ action: 'get_ai_config', company_id: activeCompanyId });
       setOpenAiStatus({
         checking: false,
         verified: Boolean(data.openai_verified),
@@ -947,6 +1066,14 @@ export const SupportChatCircles: React.FC = () => {
       });
       if (typeof data.auto_reply_text === 'boolean') setAiAutoReplyText(data.auto_reply_text);
       if (typeof data.auto_reply_audio === 'boolean') setAiAutoReplyAudio(data.auto_reply_audio);
+      if (typeof data.auto_reply_resolved_enabled === 'boolean') setAutoReplyResolvedEnabled(data.auto_reply_resolved_enabled);
+      if (typeof data.auto_resolved_mark_lost === 'boolean') setAutoResolvedMarkLost(data.auto_resolved_mark_lost);
+      if (typeof data.resolved_reply_template === 'string' && data.resolved_reply_template.trim()) {
+        setResolvedReplyTemplate(data.resolved_reply_template);
+      }
+      if (Array.isArray(data.resolved_trigger_phrases) && data.resolved_trigger_phrases.length > 0) {
+        setResolvedTriggerPhrasesText(data.resolved_trigger_phrases.join(', '));
+      }
       if (data.prompts) {
         setAiPrompts({
           soporte: data.prompts.soporte || DEFAULT_PROMPTS.soporte,
@@ -1275,6 +1402,122 @@ export const SupportChatCircles: React.FC = () => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickets, categories, agents, realClients, companyLeads, nonWaTicketIds, scopes, profile?.id, adminPreviewMode, slaTick, dismissedWaitingMap, forcedUnreadMap]);
+
+  const parsedResolvedTriggerPhrases = useMemo(() => {
+    const arr = resolvedTriggerPhrasesText
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return arr.length > 0 ? arr : DEFAULT_RESOLVED_TRIGGER_PHRASES;
+  }, [resolvedTriggerPhrasesText]);
+
+  const pendingResolvedCircles = useMemo(() => {
+    return circles.filter((c) => {
+      if (!c.isWhatsApp || c.isGroup) return false;
+      if (!c.isReactivation && c.scope !== 'lead' && c.scope !== 'por_clasificar') return false;
+      if (
+        c.leadStatus === 'Perdido' ||
+        c.leadStatus === 'Erróneo' ||
+        c.leadStatus === 'Cerrado' ||
+        c.leadStatus === 'Cliente'
+      ) {
+        return false;
+      }
+      if (!c.unreadOrWaitingReply) return false;
+      const meta = (c.activeTicket.metadata || {}) as Record<string, any>;
+      if (meta.auto_resolved_replied_at) return false;
+      return isAlreadyResolvedReply(c.lastMessageText, parsedResolvedTriggerPhrases);
+    });
+  }, [circles, parsedResolvedTriggerPhrases]);
+
+  useEffect(() => {
+    if (showAiPromptModal) {
+      setSelectedPendingResolvedIds(pendingResolvedCircles.map((c) => c.circleId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAiPromptModal, pendingResolvedCircles.length]);
+
+  const handleSendBatchResolvedReplies = async () => {
+    const targets = pendingResolvedCircles.filter((c) => selectedPendingResolvedIds.includes(c.circleId));
+    if (targets.length === 0 || sendingBatchResolved) return;
+    setSendingBatchResolved(true);
+    setBatchResolvedProgress({ current: 0, total: targets.length });
+    try {
+      await invoke({
+        action: 'save_ai_config',
+        company_id: activeCompanyId,
+        auto_reply_text: aiAutoReplyText,
+        auto_reply_audio: aiAutoReplyAudio,
+        auto_reply_resolved_enabled: autoReplyResolvedEnabled,
+        auto_resolved_mark_lost: autoResolvedMarkLost,
+        resolved_reply_template: resolvedReplyTemplate.trim() || DEFAULT_RESOLVED_REPLY_TEMPLATE,
+        resolved_trigger_phrases: parsedResolvedTriggerPhrases,
+        prompts: {
+          soporte: aiPrompts.soporte.trim(),
+          contabilidad: aiPrompts.contabilidad.trim(),
+          ventas: aiPrompts.ventas.trim(),
+          otros: aiPrompts.otros.trim(),
+        },
+      });
+    } catch {
+      // non-blocking config save before batch send
+    }
+
+    let sentCount = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const c = targets[i];
+      setBatchResolvedProgress({ current: i + 1, total: targets.length });
+      const personalizedText = renderResolvedReplyTemplate(resolvedReplyTemplate, c.clientName);
+      try {
+        await invoke({
+          action: 'send_reply',
+          ticket_id: c.activeTicket.id,
+          lead_id: c.leadId || undefined,
+          message_text: personalizedText,
+          response_minutes: 1,
+          is_resolved_auto_reply: true,
+          mark_lead_lost: autoResolvedMarkLost,
+        });
+        sentCount++;
+        markCircleAsRead(c.circleId, c.lastMessageAt);
+        setDismissedWaitingMap((prev) => {
+          const next = { ...prev, [c.circleId]: c.lastMessageAt };
+          try {
+            localStorage.setItem('crm_wa_dismissed_waiting', JSON.stringify(next));
+          } catch {
+            // ignore
+          }
+          return next;
+        });
+        if (autoResolvedMarkLost && c.leadId) {
+          setCompanyLeads((prev) =>
+            prev.map((l) => (l.id === c.leadId && l.status !== 'Cliente' && l.status !== 'Cerrado' ? { ...l, status: 'Perdido' } : l))
+          );
+        }
+        if (i < targets.length - 1) {
+          await new Promise((r) => setTimeout(r, 1100));
+        }
+      } catch (err: any) {
+        console.error('Error auto-replying resolved lead:', c.clientName, err);
+      }
+    }
+
+    setSendingBatchResolved(false);
+    setBatchResolvedProgress({ current: 0, total: 0 });
+    if (sentCount > 0) {
+      toast.success(
+        autoResolvedMarkLost
+          ? `Se respondieron ${sentCount} chats y se movieron a Perdidos`
+          : `Se respondieron ${sentCount} chats automáticamente`
+      );
+      loadSupportData(true);
+      if (activeCircle && targets.some((t) => t.circleId === activeCircle.circleId)) {
+        loadThread(false);
+      }
+    } else {
+      toast.error('No se pudieron enviar las respuestas');
+    }
+  };
 
   const isUnread = (c: SupportCircle) =>
     forcedUnreadMap[c.circleId] === c.lastMessageAt ||
@@ -3291,11 +3534,24 @@ export const SupportChatCircles: React.FC = () => {
                 <span>Accesos</span>
               </button>
               <button
-                onClick={() => setShowAiPromptModal(true)}
+                onClick={() => {
+                  if (filter === 'reactivated' || pendingResolvedCircles.length > 0) {
+                    setActivePromptTab('ya_resolvimos');
+                  }
+                  setShowAiPromptModal(true);
+                }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold bg-indigo-50/70 hover:bg-indigo-100/70 text-indigo-700 border border-indigo-200/60 transition"
               >
                 <Sparkles className="w-4 h-4 text-indigo-600" />
                 <span>IA</span>
+                {pendingResolvedCircles.length > 0 && (
+                  <span
+                    title={`${pendingResolvedCircles.length} chats de "Ya resolvimos" pendientes de contestar`}
+                    className="px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-black leading-tight"
+                  >
+                    {pendingResolvedCircles.length}
+                  </span>
+                )}
               </button>
               <button
                 onClick={openBridgeStatus}
@@ -5389,13 +5645,210 @@ export const SupportChatCircles: React.FC = () => {
                     </button>
                   );
                 })}
+                <button
+                  type="button"
+                  onClick={() => setActivePromptTab('ya_resolvimos')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition ${
+                    activePromptTab === 'ya_resolvimos'
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100'
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Cierre "Ya resolvimos"</span>
+                  {pendingResolvedCircles.length > 0 && (
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                        activePromptTab === 'ya_resolvimos' ? 'bg-white text-emerald-700' : 'bg-emerald-600 text-white'
+                      }`}
+                    >
+                      {pendingResolvedCircles.length}
+                    </span>
+                  )}
+                </button>
               </div>
-              <textarea
-                rows={5}
-                value={aiPrompts[activePromptTab]}
-                onChange={(e) => setAiPrompts((prev) => ({ ...prev, [activePromptTab]: e.target.value }))}
-                className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
-              />
+
+              {activePromptTab !== 'ya_resolvimos' ? (
+                <textarea
+                  rows={5}
+                  value={aiPrompts[activePromptTab]}
+                  onChange={(e) => setAiPrompts((prev) => ({ ...prev, [activePromptTab]: e.target.value }))}
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
+                />
+              ) : (
+                <div className="space-y-3 pt-1">
+                  <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-2">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoReplyResolvedEnabled}
+                        onChange={(e) => setAutoReplyResolvedEnabled(e.target.checked)}
+                        className="mt-0.5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <div>
+                        <span className="text-xs font-black text-slate-900 block">
+                          Responder automáticamente cuando un lead diga "Ya resolvimos"
+                        </span>
+                        <span className="text-[11px] text-slate-600 leading-snug block">
+                          Funciona de forma independiente aunque la IA general esté apagada. Solo responde a cierres cortos sin preguntas ni solicitud de precios.
+                        </span>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-2.5 cursor-pointer pt-1 border-t border-emerald-200/60">
+                      <input
+                        type="checkbox"
+                        checked={autoResolvedMarkLost}
+                        onChange={(e) => setAutoResolvedMarkLost(e.target.checked)}
+                        className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                      />
+                      <span className="text-xs font-bold text-slate-800">
+                        Mover automáticamente el prospecto a "Perdido" al responder (limpia Interesados)
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black text-slate-800">
+                        Mensaje dinámico de cierre amable
+                      </label>
+                      <span className="text-[10px] font-semibold text-slate-500">
+                        Variables: <code className="text-emerald-700 font-bold">{'{nombre}'}</code> y <code className="text-emerald-700 font-bold">{'{empresa}'}</code>
+                      </span>
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={resolvedReplyTemplate}
+                      onChange={(e) => setResolvedReplyTemplate(e.target.value)}
+                      placeholder={DEFAULT_RESOLVED_REPLY_TEMPLATE}
+                      className="w-full px-3.5 py-2 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    />
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
+                      <span className="truncate max-w-[360px]" title={renderResolvedReplyTemplate(resolvedReplyTemplate, 'Julio Hernández')}>
+                        Ej: <strong className="text-slate-700">{renderResolvedReplyTemplate(resolvedReplyTemplate, 'Julio Hernández')}</strong>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowTriggerPhrasesEditor((v) => !v)}
+                        className="text-emerald-700 hover:text-emerald-800 font-bold shrink-0 underline"
+                      >
+                        {showTriggerPhrasesEditor
+                          ? 'Ocultar frases'
+                          : `Frases que activan (${parsedResolvedTriggerPhrases.length})`}
+                      </button>
+                    </div>
+                  </div>
+
+                  {showTriggerPhrasesEditor && (
+                    <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-slate-700">
+                          Frases clave separadas por coma (personalizable por empresa):
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setResolvedTriggerPhrasesText(DEFAULT_RESOLVED_TRIGGER_PHRASES.join(', '))}
+                          className="text-[10px] font-bold text-slate-500 hover:text-slate-800"
+                        >
+                          Restaurar por defecto
+                        </button>
+                      </div>
+                      <textarea
+                        rows={2}
+                        value={resolvedTriggerPhrasesText}
+                        onChange={(e) => setResolvedTriggerPhrasesText(e.target.value)}
+                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl text-[11px] text-slate-700 bg-white focus:outline-none"
+                      />
+                    </div>
+                  )}
+
+                  {pendingResolvedCircles.length > 0 ? (
+                    <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/90 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-amber-950">
+                          Pendientes sin contestar en bandeja ({pendingResolvedCircles.length})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedPendingResolvedIds((prev) =>
+                              prev.length === pendingResolvedCircles.length
+                                ? []
+                                : pendingResolvedCircles.map((c) => c.circleId)
+                            )
+                          }
+                          className="text-[11px] font-bold text-amber-800 hover:underline"
+                        >
+                          {selectedPendingResolvedIds.length === pendingResolvedCircles.length
+                            ? 'Desmarcar todos'
+                            : 'Seleccionar todos'}
+                        </button>
+                      </div>
+                      <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
+                        {pendingResolvedCircles.map((c) => {
+                          const checked = selectedPendingResolvedIds.includes(c.circleId);
+                          return (
+                            <label
+                              key={c.circleId}
+                              className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-white border border-amber-200/60 cursor-pointer hover:bg-amber-50/40"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    setSelectedPendingResolvedIds((prev) =>
+                                      e.target.checked ? [...prev, c.circleId] : prev.filter((id) => id !== c.circleId)
+                                    );
+                                  }}
+                                  className="rounded border-amber-300 text-emerald-600 shrink-0"
+                                />
+                                <span className="text-xs font-black text-slate-800 truncate max-w-[130px]">
+                                  {c.clientName}
+                                </span>
+                                <span className="text-[11px] text-slate-500 truncate">
+                                  "{c.lastMessageText}"
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-bold text-amber-700 shrink-0">
+                                {c.waitMinutes >= 60 ? `${Math.floor(c.waitMinutes / 60)}h` : `${c.waitMinutes}m`}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={sendingBatchResolved || selectedPendingResolvedIds.length === 0}
+                        onClick={handleSendBatchResolvedReplies}
+                        className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black flex items-center justify-center gap-2 shadow-xs transition"
+                      >
+                        {sendingBatchResolved ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>
+                              Respondiendo {batchResolvedProgress.current}/{batchResolvedProgress.total}...
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>
+                              Responder y cerrar {selectedPendingResolvedIds.length} pendiente
+                              {selectedPendingResolvedIds.length === 1 ? '' : 's'} ahora
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/70 text-[11px] text-slate-500 flex items-center gap-2">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>No hay chats pendientes con "Ya resolvimos" sin contestar en este momento.</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setShowAiPromptModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100">
@@ -5408,8 +5861,13 @@ export const SupportChatCircles: React.FC = () => {
                   try {
                     await invoke({
                       action: 'save_ai_config',
+                      company_id: activeCompanyId,
                       auto_reply_text: aiAutoReplyText,
                       auto_reply_audio: aiAutoReplyAudio,
+                      auto_reply_resolved_enabled: autoReplyResolvedEnabled,
+                      auto_resolved_mark_lost: autoResolvedMarkLost,
+                      resolved_reply_template: resolvedReplyTemplate.trim() || DEFAULT_RESOLVED_REPLY_TEMPLATE,
+                      resolved_trigger_phrases: parsedResolvedTriggerPhrases,
                       prompts: {
                         soporte: aiPrompts.soporte.trim(),
                         contabilidad: aiPrompts.contabilidad.trim(),
@@ -5417,7 +5875,7 @@ export const SupportChatCircles: React.FC = () => {
                         otros: aiPrompts.otros.trim(),
                       },
                     });
-                    toast.success('Configuración IA guardada');
+                    toast.success('Configuración guardada');
                     setShowAiPromptModal(false);
                   } catch (e: any) {
                     toast.error(e?.message || 'Error al guardar configuración IA');

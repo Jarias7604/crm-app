@@ -218,9 +218,120 @@ function isGenericProblemTitle(title: string): boolean {
   );
 }
 
-// ─── AI config (stored in the active OpenAI marketing integration) ───────────
+// ─── AI config (stored per-company + synced with active OpenAI integration) ──
 
-async function loadSupportAiConfig(supabase: any) {
+export const DEFAULT_RESOLVED_REPLY_TEMPLATE =
+  '¡Muchas gracias por comentarnos, {nombre}! Qué gusto saber que ya cuentan con una solución. Quedamos a su entera disposición por si en el futuro desean evaluar nuevas opciones o apoyo adicional. ¡Muchos éxitos en sus operaciones! 🤝';
+
+export const DEFAULT_RESOLVED_TRIGGER_PHRASES: string[] = [
+  'ya resolvimos',
+  'lo resolvimos',
+  'ya se resolvio',
+  'ya lo resolvimos',
+  'ya resolvi',
+  'ya lo resolvi',
+  'ya contamos con un servicio',
+  'ya contamos con servicio',
+  'ya contamos con un sistema',
+  'ya contamos con sistema',
+  'ya contamos con proveedor',
+  'tenemos un servicio',
+  'ya tenemos un servicio',
+  'ya tenemos servicio',
+  'ya tenemos un sistema',
+  'ya tenemos sistema',
+  'ya tenemos proveedor',
+  'ya contratamos',
+  'ya adquirimos',
+  'ya implementamos',
+  'por ahora no necesitamos',
+  'no necesitamos por ahora',
+  'ya no necesitamos',
+  'ya no lo necesitamos',
+];
+
+function normalizePhraseText(raw: string): string {
+  return String(raw || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[.,;:¡!¿?\-_/()"'+*👍🙏👌✅🙌😊🤝]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function isAlreadyResolvedReply(text: string, customPhrases?: string[]): boolean {
+  const raw = String(text || '').trim();
+  if (!raw || raw.length > 180) return false;
+  // Never auto-reply if the prospect asks a question
+  if (/[?¿]/.test(raw)) return false;
+
+  const norm = normalizePhraseText(raw);
+  if (!norm || norm.length < 6) return false;
+
+  // Never trigger if message contains buying intent, future follow-up, or support keywords
+  const blockRegex =
+    /\b(cotiz\w*|precio\w*|costo\w*|cuanto\w*|plan|planes|demo\w*|informaci\w*|info|interesa\w*|comenzando|iniciando|adelante|despues|proxim\w*|llamar\w*|llamame|reuni\w*|agendar|visita\w*|error\w*|falla\w*|problema\w*|ayuda\w*|soporte|anydesk)\b/i;
+  if (blockRegex.test(norm)) return false;
+
+  const phrases = Array.isArray(customPhrases) && customPhrases.length > 0 ? customPhrases : DEFAULT_RESOLVED_TRIGGER_PHRASES;
+  for (const p of phrases) {
+    const np = normalizePhraseText(p);
+    if (np && np.length >= 5 && norm.includes(np)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isBusinessOrGenericLeadName(raw?: string | null): boolean {
+  const clean = String(raw || '')
+    .replace(/\(\+?\d+\)/g, '')
+    .trim();
+  if (!clean) return true;
+  if (/^(sin\s+nombre|contacto|cliente|prospecto|lead|soporte|admin|usuario|desconocido|whatsapp|\+?\d+)/i.test(clean)) {
+    return true;
+  }
+  return /\b(casa|inversiones|lotificaci[oó]n|lotificadora|comedor|constructora|corporaci[oó]n|corp\b|grupo|residencial|tienda|ferreter[ií]a|cl[ií]nica|hotel|restaurante|autolote|auto\s+lote|taller|farmacia|supermercado|distribuidora|importadora|servicios|soluciones|agencia|asociaci[oó]n|fundaci[oó]n|iglesia|colegio|escuela|academia|laboratorio|panader[ií]a|pasteler[ií]a|est[eé]tica|sal[oó]n|barber[ií]a|gym|gimnasio|transporte|transportes|log[ií]stica|inmobiliaria|bienes\s+ra[ií]ces|desarrollos|urbanica|bosque|villas|finca|hacienda|agro|veterinaria|[oó]ptica|dental|odontolog[ií]a|abogados|bufete|contadores|despacho|consultor[ií]a|ingenier[ií]a|arquitectura|proyectos|multitienda|variedades|bazar|librer[ií]a|papeler[ií]a|imprenta|sublimaci[oó]n|publicidad|marketing|tecnolog[ií]a|sistemas|repuestos|lubricantes|llantas|motos|lavander[ií]a|florister[ií]a|eventos|banquetes|catering|seguridad|vigilancia|mantenimiento|refrigeraci[oó]n|el[eé]ctrica|plomer[ií]a|vidrier[ií]a|estructuras|carpinter[ií]a|muebler[ií]a|muebles|textiles|confecciones|bordados|serigraf[ií]a|pl[aá]sticos|empaques|reciclaje|gasolinera|cooperativa|financiera|seguros|corredora|aduana|aduanal|naviera|carga|courier|encomiendas|turismo|viajes|tours|alquiler|bodega|bodegas|almac[eé]n|mayorista|av[ií]cola|granero|granja|beneficio|caf[eé]|cafeter[ií]a|pizzer[ií]a|taquer[ií]a|pupuser[ií]a|asados|mariscos|cevicher[ií]a|spa\b|plaza\b|mercado|sucursal|boutique|s\.a\.|de\s+c\.v\.)\b/i.test(
+    clean
+  );
+}
+
+function extractCleanFirstName(rawName?: string | null): string {
+  const clean = String(rawName || '')
+    .replace(/\(\+?\d+\)/g, '')
+    .trim();
+  if (!clean || isBusinessOrGenericLeadName(clean)) return '';
+  if (/[_@]/.test(clean)) return '';
+  const withoutTitle = clean
+    .replace(/^(lic(da|do)?|ing|arq|dr|dra|sr|sra|srta|don|doña|prof|abog|pastor|cnel|gral)\.?\s+/i, '')
+    .trim();
+  if (!withoutTitle) return '';
+  const tokens = withoutTitle.split(/[\s,.-]+/).filter(Boolean);
+  const first = tokens[0] || '';
+  if (first.length < 2 || /\d/.test(first)) return '';
+  if (tokens.length === 1 && first.length > 10) return '';
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
+export function renderResolvedReplyTemplate(template: string, rawName?: string | null): string {
+  const base = String(template || DEFAULT_RESOLVED_REPLY_TEMPLATE).trim() || DEFAULT_RESOLVED_REPLY_TEMPLATE;
+  const firstName = extractCleanFirstName(rawName);
+  const cleanCompany = String(rawName || '').replace(/\(\+?\d+\)/g, '').trim() || 'su empresa';
+
+  let out = base.replace(/\{empresa\}/gi, cleanCompany);
+  if (firstName) {
+    out = out.replace(/\{nombre\}/gi, firstName);
+  } else {
+    out = out
+      .replace(/,\s*\{nombre\}/gi, '')
+      .replace(/\s+\{nombre\}/gi, '')
+      .replace(/\{nombre\}/gi, '');
+  }
+  return out.replace(/\s{2,}/g, ' ').trim();
+}
+
+async function loadSupportAiConfig(supabase: any, companyId?: string | null) {
   const { data: openAiInt } = await supabase
     .from('marketing_integrations')
     .select('id, settings')
@@ -230,13 +341,37 @@ async function loadSupportAiConfig(supabase: any) {
     .maybeSingle();
   const rawSettings = (openAiInt?.settings || {}) as Record<string, any>;
   const openAiKey = String(rawSettings.apiKey || Deno.env.get('OPENAI_API_KEY') || '').trim();
-  const savedCfg = (rawSettings.support_ai_config || {}) as Record<string, any>;
+  const globalSavedCfg = (rawSettings.support_ai_config || {}) as Record<string, any>;
+
+  let companySavedCfg: Record<string, any> = {};
+  if (companyId) {
+    try {
+      companySavedCfg = await getBridgeState(supabase, `ai_config_${companyId}`);
+    } catch {
+      companySavedCfg = {};
+    }
+  }
+  const savedCfg: Record<string, any> = { ...globalSavedCfg, ...companySavedCfg };
+  const rawPhrases = savedCfg.resolved_trigger_phrases;
+  const resolvedTriggerPhrases: string[] = Array.isArray(rawPhrases)
+    ? rawPhrases.map((p: any) => String(p || '').trim()).filter(Boolean)
+    : typeof rawPhrases === 'string' && rawPhrases.trim()
+    ? rawPhrases
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean)
+    : DEFAULT_RESOLVED_TRIGGER_PHRASES;
+
   return {
     integrationId: (openAiInt?.id as string) || null,
     openAiKey,
     rawSettings,
     autoReplyText: savedCfg.auto_reply_text === true,
     autoReplyAudio: savedCfg.auto_reply_audio === true,
+    autoReplyResolvedEnabled: savedCfg.auto_reply_resolved_enabled === true,
+    autoResolvedMarkLost: savedCfg.auto_resolved_mark_lost !== false,
+    resolvedReplyTemplate: String(savedCfg.resolved_reply_template || DEFAULT_RESOLVED_REPLY_TEMPLATE).trim(),
+    resolvedTriggerPhrases: resolvedTriggerPhrases.length > 0 ? resolvedTriggerPhrases : DEFAULT_RESOLVED_TRIGGER_PHRASES,
     prompts: {
       soporte: String(savedCfg.prompt_soporte || DEFAULT_AI_PROMPTS.soporte).trim(),
       contabilidad: String(savedCfg.prompt_contabilidad || DEFAULT_AI_PROMPTS.contabilidad).trim(),
@@ -984,11 +1119,11 @@ serve(async (req: Request) => {
       switch (action) {
         case 'get_ai_config':
         case 'test_openai':
-          return await handleGetAiConfig(supabase);
+          return await handleGetAiConfig(supabase, caller, payload);
         case 'save_ai_config':
         case 'save_ai_prompt':
           if (!caller.isAdmin) return json({ ok: false, error: 'Solo un administrador puede cambiar la IA' }, 403);
-          return await handleSaveAiConfig(supabase, payload);
+          return await handleSaveAiConfig(supabase, caller, payload);
         case 'get_wa_team_access':
           if (!caller.isAdmin) return json({ ok: false, error: 'Solo un administrador puede ver accesos del equipo' }, 403);
           return await handleGetWaTeamAccess(supabase, caller, payload);
@@ -1461,9 +1596,10 @@ async function ingestWhatsAppEntry(
 
   // Optional AI text auto-reply (OFF by default). Never for catchup, staff, team, spam or audio.
   let aiReplied = false;
-  if (!isCatchup && !isStaff && !media && ['soporte', 'lead', 'por_clasificar'].includes(scope) && !isGreetingOrClosingAgreement(displayText) && currentMeta.ai_auto_reply_text_enabled !== false) {
-    const aiCfg = await loadSupportAiConfig(supabase);
-    if (aiCfg.autoReplyText && aiCfg.openAiKey) {
+  let autoResolvedMetaPatch: Record<string, any> = {};
+  if (!isCatchup && !isStaff && !media && ['soporte', 'lead', 'por_clasificar'].includes(scope) && currentMeta.ai_auto_reply_text_enabled !== false) {
+    const aiCfg = await loadSupportAiConfig(supabase, companyId);
+    if (aiCfg.autoReplyText && aiCfg.openAiKey && !isGreetingOrClosingAgreement(displayText)) {
       const reply = await askOpenAi(
         aiCfg.openAiKey,
         aiCfg.prompts[supportChannel] || DEFAULT_AI_PROMPTS.soporte,
@@ -1485,6 +1621,69 @@ async function ingestWhatsAppEntry(
         aiReplied = true;
       }
     }
+
+    // Isolated Campaign / Lead Auto-Reply for polite closures ("Ya resolvimos", "Ya contamos con servicio")
+    if (
+      !aiReplied &&
+      !isGroup &&
+      aiCfg.autoReplyResolvedEnabled &&
+      (scope === 'lead' || scope === 'por_clasificar' || Boolean(currentMeta.wa_reactivation)) &&
+      !currentMeta.auto_resolved_replied_at &&
+      isAlreadyResolvedReply(displayText, aiCfg.resolvedTriggerPhrases)
+    ) {
+      const resolvedReply = renderResolvedReplyTemplate(aiCfg.resolvedReplyTemplate, clientDisplayName);
+      if (resolvedReply) {
+        const nowIso = new Date().toISOString();
+        const senderTag = String(
+          currentMeta.wa_reactivation_by_name || currentMeta.last_staff_reply_by || 'Equipo Comercial'
+        )
+          .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Equipo Comercial')
+          .trim();
+        const resLine = `[${fmtTime(new Date())}] 👨‍💻 ${senderTag}: ${resolvedReply}`;
+        const { data: resComment } = await supabase
+          .from('ticket_comments')
+          .insert({
+            ticket_id: targetTicket.id,
+            company_id: companyId,
+            author_id: null,
+            body: resLine,
+            is_internal: false,
+          })
+          .select('id')
+          .single();
+        description = `${description}\n${resLine}`;
+        lastPreview = resolvedReply.slice(0, 200);
+        await enqueueOutbox(supabase, {
+          companyId,
+          ticketId: targetTicket.id,
+          commentId: resComment?.id || null,
+          instance: instanceName,
+          number: chatJid,
+          kind: 'text',
+          payload: { text: resolvedReply },
+        });
+        aiReplied = true;
+        autoResolvedMetaPatch = {
+          auto_resolved_replied_at: nowIso,
+          wa_attended_at: nowIso,
+          ...(aiCfg.autoResolvedMarkLost ? { wa_lead_status: 'Perdido' } : {}),
+        };
+
+        if (aiCfg.autoResolvedMarkLost) {
+          const targetLeadId = targetTicket.lead_id || scopeInfo.leadId || null;
+          if (targetLeadId) {
+            const { data: ld } = await supabase
+              .from('leads')
+              .select('id, status')
+              .eq('id', targetLeadId)
+              .maybeSingle();
+            if (ld && ld.status !== 'Cliente' && ld.status !== 'Cerrado') {
+              await supabase.from('leads').update({ status: 'Perdido' }).eq('id', targetLeadId);
+            }
+          }
+        }
+      }
+    }
   }
 
   const prevScope = String(currentMeta.wa_scope || '');
@@ -1495,6 +1694,7 @@ async function ingestWhatsAppEntry(
     metadata: {
       ...currentMeta,
       ...baseMetaPatch,
+      ...autoResolvedMetaPatch,
       support_channel: scope === 'soporte' ? (classification.supportChannel !== 'soporte' && classification.supportChannel !== 'ventas' && !isStaff ? classification.supportChannel : currentMeta.support_channel === 'ventas' ? 'soporte' : currentMeta.support_channel || 'soporte') : 'ventas',
       whatsapp_message_count: Number(currentMeta.whatsapp_message_count || 0) + 1 + (aiReplied ? 1 : 0),
       last_whatsapp_message: isNewerOrEqual ? lastPreview : currentMeta.last_whatsapp_message,
@@ -1620,7 +1820,7 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
   // Historical media (imported from the chat history) never triggers an automatic reply.
   const isRecentMsg = !row?.message_ts || Date.now() - new Date(row.message_ts).getTime() < 15 * 60 * 1000;
   if (row?.message_type === 'audio' && !row.from_me && stored.bytes) {
-    const aiCfg = await loadSupportAiConfig(supabase);
+    const aiCfg = await loadSupportAiConfig(supabase, row.company_id || null);
     if (aiCfg.openAiKey) {
       const transcript = await transcribeAudio(aiCfg.openAiKey, stored.bytes, stored.mime || 'audio/ogg');
       if (transcript && row.comment_id) {
@@ -2630,8 +2830,9 @@ async function handleBridgeStatus(supabase: any): Promise<Response> {
 // UI actions
 // =============================================================================
 
-async function handleGetAiConfig(supabase: any): Promise<Response> {
-  const aiCfg = await loadSupportAiConfig(supabase);
+async function handleGetAiConfig(supabase: any, caller?: Caller | null, payload?: any): Promise<Response> {
+  const companyId = String(payload?.company_id || caller?.companyId || '');
+  const aiCfg = await loadSupportAiConfig(supabase, companyId || null);
   let verified = false;
   let model = 'gpt-4o-mini';
   let err = '';
@@ -2658,12 +2859,27 @@ async function handleGetAiConfig(supabase: any): Promise<Response> {
     openai_error: err,
     auto_reply_text: aiCfg.autoReplyText,
     auto_reply_audio: aiCfg.autoReplyAudio,
+    auto_reply_resolved_enabled: aiCfg.autoReplyResolvedEnabled,
+    auto_resolved_mark_lost: aiCfg.autoResolvedMarkLost,
+    resolved_reply_template: aiCfg.resolvedReplyTemplate,
+    resolved_trigger_phrases: aiCfg.resolvedTriggerPhrases,
     prompts: aiCfg.prompts,
   });
 }
 
-async function handleSaveAiConfig(supabase: any, payload: any): Promise<Response> {
-  const aiCfg = await loadSupportAiConfig(supabase);
+async function handleSaveAiConfig(supabase: any, caller: Caller | null, payload: any): Promise<Response> {
+  const companyId = String(payload?.company_id || caller?.companyId || '');
+  const aiCfg = await loadSupportAiConfig(supabase, companyId || null);
+  const rawPhrases = payload?.resolved_trigger_phrases;
+  const resolvedTriggerPhrases = Array.isArray(rawPhrases)
+    ? rawPhrases.map((p: any) => String(p || '').trim()).filter(Boolean)
+    : typeof rawPhrases === 'string' && rawPhrases.trim()
+    ? rawPhrases
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean)
+    : aiCfg.resolvedTriggerPhrases;
+
   const cfg = {
     auto_reply_text: payload?.auto_reply_text !== undefined ? Boolean(payload.auto_reply_text) : aiCfg.autoReplyText,
     auto_reply_audio:
@@ -2672,12 +2888,25 @@ async function handleSaveAiConfig(supabase: any, payload: any): Promise<Response
         : payload?.ai_auto_reply_enabled !== undefined
         ? Boolean(payload.ai_auto_reply_enabled)
         : aiCfg.autoReplyAudio,
+    auto_reply_resolved_enabled:
+      payload?.auto_reply_resolved_enabled !== undefined
+        ? Boolean(payload.auto_reply_resolved_enabled)
+        : aiCfg.autoReplyResolvedEnabled,
+    auto_resolved_mark_lost:
+      payload?.auto_resolved_mark_lost !== undefined
+        ? Boolean(payload.auto_resolved_mark_lost)
+        : aiCfg.autoResolvedMarkLost,
+    resolved_reply_template: String(payload?.resolved_reply_template || aiCfg.resolvedReplyTemplate).trim(),
+    resolved_trigger_phrases: resolvedTriggerPhrases.length > 0 ? resolvedTriggerPhrases : DEFAULT_RESOLVED_TRIGGER_PHRASES,
     prompt_soporte: String(payload?.prompts?.soporte || payload?.ai_voice_prompt || aiCfg.prompts.soporte).trim(),
     prompt_contabilidad: String(payload?.prompts?.contabilidad || aiCfg.prompts.contabilidad).trim(),
     prompt_ventas: String(payload?.prompts?.ventas || aiCfg.prompts.ventas).trim(),
     prompt_otros: String(payload?.prompts?.otros || aiCfg.prompts.otros).trim(),
     updated_at: new Date().toISOString(),
   };
+  if (companyId) {
+    await setBridgeState(supabase, `ai_config_${companyId}`, cfg);
+  }
   if (aiCfg.integrationId) {
     await supabase
       .from('marketing_integrations')
@@ -3030,24 +3259,40 @@ async function handleSendReply(supabase: any, caller: Caller, payload: any): Pro
       })
     : null;
 
+  const nowIso = new Date().toISOString();
+  const markLeadLost = payload?.mark_lead_lost === true;
+  const isResolvedClosure = payload?.is_resolved_auto_reply === true;
   const update: Record<string, any> = {
     description,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso,
     metadata: {
       ...meta,
       whatsapp_message_count: Number(meta.whatsapp_message_count || 0) + 1,
       last_whatsapp_message: text.slice(0, 200),
-      last_whatsapp_at: new Date().toISOString(),
+      last_whatsapp_at: nowIso,
       last_message_from: 'staff',
-      last_staff_reply_at: new Date().toISOString(),
+      last_staff_reply_at: nowIso,
       last_staff_reply_by: authorName,
+      wa_attended_at: nowIso,
       staff_text_reply_count: Number(meta.staff_text_reply_count || 0) + 1,
       text_reply_minutes: Number(meta.text_reply_minutes || 0) + (Number(payload?.response_minutes) || 2),
+      ...(isResolvedClosure ? { auto_resolved_replied_at: nowIso } : {}),
+      ...(markLeadLost ? { wa_lead_status: 'Perdido' } : {}),
     },
   };
   // Leads keep their owner; support chats get the first technician who answers.
   if (!t.assigned_to && (meta.wa_scope || 'soporte') === 'soporte') update.assigned_to = caller.userId;
   await supabase.from('tickets').update(update).eq('id', ticketId);
+
+  if (markLeadLost) {
+    const targetLeadId = String(payload?.lead_id || t.lead_id || '').trim();
+    if (targetLeadId) {
+      const { data: ld } = await supabase.from('leads').select('id, status').eq('id', targetLeadId).maybeSingle();
+      if (ld && ld.status !== 'Cliente' && ld.status !== 'Cerrado') {
+        await supabase.from('leads').update({ status: 'Perdido' }).eq('id', targetLeadId);
+      }
+    }
+  }
 
   return json({ ok: true, action: 'reply_queued', whatsapp_delivered: Boolean(outboxId), outbox_id: outboxId, comment });
 }
