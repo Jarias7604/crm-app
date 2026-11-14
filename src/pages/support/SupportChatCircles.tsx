@@ -1300,7 +1300,7 @@ export const SupportChatCircles: React.FC = () => {
           !isDiscardedLead &&
           !isManuallyAttended &&
           !isCourtesyClosing &&
-          (scope !== 'soporte' || isOpen));
+          (scope !== 'soporte' || isOpen || activeMeta.is_technical_ticket === false));
 
       const catObj = activeTicket.category_id ? catMap.get(activeTicket.category_id) : undefined;
       const catInfo = detectShortCategory(catObj?.name || '', activeTicket.title || '');

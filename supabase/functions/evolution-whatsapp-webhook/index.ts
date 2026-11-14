@@ -175,6 +175,21 @@ function isNonTechnicalAdministrativeChat(text: string): boolean {
   );
 }
 
+function stripLeadingGreetingForTicketTitle(text: string): string {
+  const flat = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!flat) return '';
+  let trimmed = flat;
+  const leadingPrefixRe =
+    /^(?:(?:hola+|ola+|(?:muy\s+)?buen(?:os|as)?(?:\s+(?:d[ií]as?|tardes?|noches?))?|saludos|estimados?|disculpen?|perd[oó]n|qu[eé]\s+tal)(?:\s+(?:muchachos|chicos|equipo|soporte|amigos?|inges?|ingenieros?|lic(?:enciados?)?|paty|patricia|gerson|melvin|jimmy|estimados?|por\s+favor))?|(?:nos\s+pueden\s+ayudar(?:\s+por\s+favor)?|me\s+pueden\s+ayudar(?:\s+por\s+favor)?|por\s+favor))[\s,!¡¿?.:;\-–—👍🙏👌✅🙌😊🤝🙃🟢🐺]*/i;
+  for (let i = 0; i < 4; i++) {
+    const next = trimmed.replace(leadingPrefixRe, '').trim();
+    if (next === trimmed) break;
+    trimmed = next;
+  }
+  const result = trimmed.length >= 6 ? trimmed : flat;
+  return result.charAt(0).toUpperCase() + result.slice(1);
+}
+
 export const DEFAULT_AI_PROMPTS: Record<SupportChannelType, string> = {
   soporte:
     'Eres el Asistente IA de Soporte Técnico de Arias Defense / ERP Facturación Electrónica (DTE Hacienda). Lee o escucha lo que el cliente reportó y respóndele de forma amable, clara y resolutiva en máximo 3 líneas por WhatsApp. Confírmale que entendiste su reporte técnico y pídele captura de pantalla del error o su código de AnyDesk si requiere revisión en su equipo.',
@@ -884,7 +899,7 @@ async function resolveScope(
 async function rescopeChats(supabase: any, companyId: string): Promise<{ checked: number; changed: any[] }> {
   const { data: rows } = await supabase
     .from('tickets')
-    .select('id, lead_id, status, updated_at, metadata')
+    .select('id, title, description, lead_id, status, assigned_to, updated_at, metadata')
     .eq('company_id', companyId)
     .eq('metadata->>source', 'whatsapp_evolution')
     .order('updated_at', { ascending: false })
@@ -908,6 +923,35 @@ async function rescopeChats(supabase: any, companyId: string): Promise<{ checked
     const info = await resolveScope(supabase, companyId, team, phone, lid);
     for (const t of list) {
       const m = t.metadata || {};
+      const isCommercialLead =
+        m.wa_reactivation === true ||
+        /^\[WhatsApp\s*·\s*(?:Nuevo\s+)?Lead\]/i.test(String(t.title || '')) ||
+        /^Reactivaci[oó]n comercial por WhatsApp/i.test(String(t.description || ''));
+      if (isCommercialLead && (info.scope === 'soporte' || m.wa_scope === 'soporte' || !m.wa_scope)) {
+        const safeScope: WaScope = ['lead', 'por_clasificar', 'spam'].includes(String(m.wa_scope || ''))
+          ? (m.wa_scope as WaScope)
+          : t.assigned_to || info.leadOwner
+          ? 'lead'
+          : 'por_clasificar';
+        if (m.wa_scope !== safeScope || m.is_technical_ticket !== false || m.wa_scope_locked !== true) {
+          const patch: Record<string, any> = {
+            metadata: {
+              ...cleanMeta(m),
+              wa_scope: safeScope,
+              wa_scope_locked: true,
+              wa_scope_reason: 'reactivation_or_lead_locked',
+              is_existing_client: false,
+              is_technical_ticket: false,
+              support_channel: 'ventas',
+            },
+          };
+          if (!t.lead_id && info.leadId) patch.lead_id = info.leadId;
+          await supabase.from('tickets').update(patch).eq('id', t.id);
+          if (t === list[0]) changed.push({ jid, from: m.wa_scope || null, to: safeScope, reason: 'reactivation_or_lead_locked' });
+        }
+        continue;
+      }
+      if (m.wa_scope_locked === true) continue;
       const sameScope = m.wa_scope === info.scope && m.wa_scope_reason === info.reason;
       const needsLead = !t.lead_id && info.leadId && ['lead', 'spam', 'por_clasificar'].includes(info.scope);
       if (sameScope && !needsLead) continue;
@@ -917,6 +961,11 @@ async function rescopeChats(supabase: any, companyId: string): Promise<{ checked
           wa_scope: info.scope,
           wa_scope_reason: info.reason,
           is_existing_client: info.scope === 'soporte',
+          ...(info.scope !== 'soporte'
+            ? { is_technical_ticket: false }
+            : m.is_technical_ticket !== undefined
+            ? { is_technical_ticket: m.is_technical_ticket }
+            : {}),
           member_of_groups: info.memberOfGroups,
           support_channel: info.scope === 'soporte' ? (m.support_channel && m.support_channel !== 'ventas' ? m.support_channel : 'soporte') : 'ventas',
           ...(info.clientId ? { client_id: info.clientId } : {}),
@@ -1418,9 +1467,9 @@ async function ingestWhatsAppEntry(
     scopeInfo = await resolveScope(supabase, companyId, team, chatPhone, senderLid);
   }
 
-  const scope = scopeInfo.scope;
+  let scope: WaScope = scopeInfo.scope;
   const classification = classifyIssueCategory(displayText);
-  const supportChannel: SupportChannelType =
+  let supportChannel: SupportChannelType =
     scope === 'soporte' ? (classification.supportChannel === 'ventas' ? 'soporte' : classification.supportChannel) : 'ventas';
 
   const clientDisplayName = isGroup
@@ -1455,7 +1504,24 @@ async function ingestWhatsAppEntry(
       .limit(20);
     tickets = (legacy || []) as any[];
   }
-  let activeTicket = tickets.find((t) => ['new', 'open', 'pending'].includes(t.status)) || null;
+  const activeTicket = tickets.find((t) => ['new', 'open', 'pending'].includes(t.status)) || null;
+  const lockSourceTicket = activeTicket || tickets.find((t) => !t.metadata?.merged_into) || tickets[0] || null;
+  const lockMeta = lockSourceTicket?.metadata || {};
+  const isCommercialLeadThread =
+    !isGroup &&
+    Boolean(lockSourceTicket) &&
+    (lockMeta.wa_reactivation === true ||
+      /^\[WhatsApp\s*·\s*(?:Nuevo\s+)?Lead\]/i.test(String(lockSourceTicket.title || '')) ||
+      /^Reactivaci[oó]n comercial por WhatsApp/i.test(String(lockSourceTicket.description || '')) ||
+      (lockMeta.wa_scope_locked === true && lockMeta.wa_scope === 'lead'));
+  if (isCommercialLeadThread && scope === 'soporte') {
+    scope = ['lead', 'por_clasificar', 'spam'].includes(String(lockMeta.wa_scope || ''))
+      ? (lockMeta.wa_scope as WaScope)
+      : lockSourceTicket?.assigned_to || scopeInfo.leadOwner
+      ? 'lead'
+      : 'por_clasificar';
+    supportChannel = 'ventas';
+  }
 
   // A fromMe message may be the echo of something the CRM itself sent through the bridge.
   if (fromMe && tickets.length > 0) {
@@ -1510,6 +1576,15 @@ async function ingestWhatsAppEntry(
       })
     : null;
 
+  const nonTechRecent =
+    !activeTicket && scope === 'soporte'
+      ? tickets.find((t) => {
+          if (t.metadata?.merged_into || t.metadata?.is_technical_ticket !== false) return false;
+          const updatedAt = new Date(t.updated_at || t.created_at).getTime();
+          return Math.abs(msgDate.getTime() - updatedAt) <= 24 * 60 * 60 * 1000;
+        })
+      : null;
+
   // Staff talking with no open conversation: attach to the latest one, never open a "self-ticket".
   let targetTicket: any = activeTicket;
   if (!targetTicket && isStaff) {
@@ -1528,6 +1603,9 @@ async function ingestWhatsAppEntry(
     !media
   ) {
     targetTicket = recentlyClosed;
+  }
+  if (!targetTicket && nonTechRecent) {
+    targetTicket = nonTechRecent;
   }
 
   let aiCfgCache: any = null;
@@ -1561,7 +1639,8 @@ async function ingestWhatsAppEntry(
     whatsapp_phone: chatPhone,
     is_group: isGroup,
     wa_scope: scope,
-    wa_scope_reason: scopeInfo.reason,
+    wa_scope_reason: isCommercialLeadThread && scopeInfo.scope === 'soporte' ? 'reactivation_or_lead_locked' : scopeInfo.reason,
+    ...(isCommercialLeadThread && scopeInfo.scope === 'soporte' ? { wa_scope_locked: true } : {}),
     is_existing_client: scope === 'soporte',
     member_of_groups: scopeInfo.memberOfGroups,
     ...(isGroup && groupSubject ? { whatsapp_group_subject: groupSubject, group_subject_synced: true } : {}),
@@ -1576,7 +1655,11 @@ async function ingestWhatsAppEntry(
     const previousSameCategory = tickets.find(
       (t) => ['resolved', 'closed'].includes(t.status) && t.metadata?.ai_category === classification.category
     );
-    const shortTitle = displayText.length > 85 ? `${displayText.slice(0, 82).trim()}...` : displayText;
+    const cleanedDisplay =
+      scope === 'soporte' && isTechProblem
+        ? stripLeadingGreetingForTicketTitle(displayText)
+        : displayText.replace(/\s+/g, ' ').trim();
+    const shortTitle = cleanedDisplay.length > 85 ? `${cleanedDisplay.slice(0, 82).trim()}...` : cleanedDisplay;
     const tag =
       scope === 'soporte' ? (isTechProblem ? classification.shortCategoryTag : 'Chat') : SCOPE_TITLE_TAG[scope];
     const parentTicketId = scope === 'soporte' ? previousSameCategory?.id || null : null;
@@ -1599,7 +1682,7 @@ async function ingestWhatsAppEntry(
         '',
         '💬 Historial de WhatsApp:',
       ].join('\n'),
-      status: 'open',
+      status: scope === 'soporte' && !isTechProblem ? 'closed' : 'open',
       priority: scope === 'soporte' && isTechProblem ? classification.priority : 'medium',
       metadata: {
         ...baseMetaPatch,
@@ -1857,10 +1940,17 @@ async function ingestWhatsAppEntry(
   }
   if (scope === 'lead' && !targetTicket.assigned_to && scopeInfo.leadOwner) updated.assigned_to = scopeInfo.leadOwner;
   if (shouldUpgradeTitle) {
-    const snippet = displayText.length > 85 ? `${displayText.slice(0, 82).trim()}...` : displayText;
+    const cleanDesc = stripLeadingGreetingForTicketTitle(displayText);
+    const snippet = cleanDesc.length > 85 ? `${cleanDesc.slice(0, 82).trim()}...` : cleanDesc;
     updated.title = `[WhatsApp · ${classification.shortCategoryTag}] ${clientDisplayName}: ${snippet}`;
     if (promoteToTechTicket) {
       updated.priority = classification.priority;
+      if (targetTicket.status !== 'open') {
+        const reopenIso = new Date().toISOString();
+        updated.status = 'open';
+        updated.resolved_at = null;
+        updated.last_status_change_at = reopenIso;
+      }
     }
   } else if (scopeChanged) {
     updated.title = String(targetTicket.title || '').replace(/^\[WhatsApp · [^\]]*\]/, `[WhatsApp · ${scope === 'soporte' ? 'Soporte' : SCOPE_TITLE_TAG[scope]}]`);
@@ -1987,7 +2077,8 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
           trIsTech = await askOpenAiTechnicalClassifier(aiCfg.openAiKey, transcript);
         }
         if (trIsTech && (meta.is_technical_ticket === false || isGenericProblemTitle(t.title))) {
-          const snippet = transcript.length > 85 ? `${transcript.slice(0, 82).trim()}...` : transcript;
+          const cleanTr = stripLeadingGreetingForTicketTitle(transcript);
+          const snippet = cleanTr.length > 85 ? `${cleanTr.slice(0, 82).trim()}...` : cleanTr;
           const nextTitle = `[WhatsApp · ${trClass.shortCategoryTag}] ${t.lead_name || 'Cliente'}: ${snippet}`;
           const nextDesc = String(t.description || '').replace(
             /^(?:📌 PROBLEMA REPORTADO \([^)]+\)|💬 Conversación de WhatsApp \([^)]+\)):\n[\s\S]*?(?=\n\n💬 Historial de WhatsApp:)/,
@@ -1999,15 +2090,21 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
             awaiting_problem_details: false,
             ai_category: trClass.category,
           };
+          const voicePatch: Record<string, any> = {
+            title: nextTitle,
+            description: nextDesc,
+            priority: trClass.priority,
+            updated_at: new Date().toISOString(),
+            metadata: nextMeta,
+          };
+          if (['resolved', 'closed'].includes(t.status)) {
+            voicePatch.status = 'open';
+            voicePatch.resolved_at = null;
+            voicePatch.last_status_change_at = new Date().toISOString();
+          }
           await supabase
             .from('tickets')
-            .update({
-              title: nextTitle,
-              description: nextDesc,
-              priority: trClass.priority,
-              updated_at: new Date().toISOString(),
-              metadata: nextMeta,
-            })
+            .update(voicePatch)
             .eq('id', t.id);
           meta = nextMeta;
         }
@@ -3265,7 +3362,8 @@ async function handleSetTechnicalTicket(supabase: any, caller: Caller, payload: 
     const cls = classifyIssueCategory(summaryText || String(t.title || ''));
     nextMeta.ai_category = cls.category;
     if (summaryText) {
-      const snippet = summaryText.length > 85 ? `${summaryText.slice(0, 82).trim()}...` : summaryText;
+      const cleanSummary = customTitle ? summaryText : stripLeadingGreetingForTicketTitle(summaryText);
+      const snippet = cleanSummary.length > 85 ? `${cleanSummary.slice(0, 82).trim()}...` : cleanSummary;
       const clientName = String(t.lead_name || 'Cliente').trim() || 'Cliente';
       updatePatch.title = `[WhatsApp · ${cls.shortCategoryTag}] ${clientName}: ${snippet}`;
       updatePatch.description = String(t.description || '').replace(
@@ -3275,15 +3373,15 @@ async function handleSetTechnicalTicket(supabase: any, caller: Caller, payload: 
     } else if (/^\[WhatsApp\s*·\s*Chat\]/i.test(String(t.title || ''))) {
       updatePatch.title = String(t.title || '').replace(/^\[WhatsApp\s*·\s*Chat\]/i, `[WhatsApp · ${cls.shortCategoryTag}]`);
     }
-    if (['resolved', 'closed'].includes(t.status)) {
+    if (t.status !== 'open') {
       updatePatch.status = 'open';
       updatePatch.resolved_at = null;
       updatePatch.last_status_change_at = nowIso;
     }
   } else {
-    if (closeChat && ['new', 'open', 'pending'].includes(t.status)) {
+    if (['new', 'open', 'pending'].includes(t.status)) {
       updatePatch.status = 'closed';
-      updatePatch.resolved_at = nowIso;
+      updatePatch.resolved_at = null;
       updatePatch.last_status_change_at = nowIso;
     }
   }
@@ -3796,6 +3894,9 @@ async function handleSendReactivation(supabase: any, caller: Caller, payload: an
       metadata: {
         source: 'whatsapp_evolution',
         wa_scope: 'lead',
+        wa_scope_locked: true,
+        is_existing_client: false,
+        is_technical_ticket: false,
         support_channel: 'ventas',
         ai_category: 'Ventas / Reactivación Lead',
         whatsapp_phone: normPhone,
@@ -3956,7 +4057,11 @@ async function handleSendReactivation(supabase: any, caller: Caller, payload: an
       metadata: {
         ...curMeta,
         source: 'whatsapp_evolution',
-        wa_scope: curMeta.wa_scope === 'soporte' ? 'soporte' : 'lead',
+        wa_scope: 'lead',
+        wa_scope_locked: true,
+        is_existing_client: false,
+        is_technical_ticket: false,
+        support_channel: 'ventas',
         whatsapp_phone: curMeta.whatsapp_phone || normPhone,
         whatsapp_jid: curMeta.whatsapp_jid || jid,
         evolution_instance: instanceName,
