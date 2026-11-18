@@ -357,7 +357,7 @@ export const pdfService = {
                 if (pagoUnicoMonto > 0 && costoAnual > 0) {
                     // Ítem Híbrido: desglosar suscripción recurrente y setup inicial de forma transparente
                     drawRow(m.nombre, costoAnual, false, m.descripcion);
-                    drawRow('Implementación', pagoUnicoMonto, true, 'Configuración inicial, capacitación (Pago único)');
+                    drawRow(`Implementación · ${m.nombre}`, pagoUnicoMonto, true, 'Configuración inicial, capacitación (Pago único)');
                 } else if (pagoUnicoMonto > 0) {
                     drawRow(m.nombre, pagoUnicoMonto, true, m.descripcion);
                 } else {
@@ -465,7 +465,7 @@ export const pdfService = {
                 // Calcular número de items para determinar altura dinámica
                 const modulosArr = parseModules(cotizacion.modulos_adicionales);
                 const serviciosUnicos = modulosArr.filter((m: any) => (Number(m.pago_unico) || 0) > 0);
-                const serviciosRec = modulosArr.filter((m: any) => (Number(m.pago_unico) || 0) === 0 && ((Number(m.costo_anual) || Number(m.costo) || 0) > 0));
+                const serviciosRec = modulosArr.filter((m: any) => (Number(m.costo_anual) || Number(m.costo) || 0) > 0);
                 const costoWhatsApp = cotizacion.servicio_whatsapp ? (Number(cotizacion.costo_whatsapp) || 0) : 0;
                 const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
 
@@ -530,7 +530,9 @@ export const pdfService = {
                     serviciosUnicos.forEach((serv: any) => {
                         const monto = Number(serv.pago_unico) || 0;
                         const qty = Number(serv.cantidad) || 1;
-                        const label = qty > 1 ? `${serv.nombre.substring(0, 14)} (${qty}x)` : serv.nombre.substring(0, 18);
+                        const isHibrido = (Number(serv.costo_anual) || Number(serv.costo) || 0) > 0;
+                        const baseName = isHibrido ? `Impl. ${serv.nombre}` : serv.nombre;
+                        const label = qty > 1 ? `${baseName.substring(0, 14)} (${qty}x)` : baseName.substring(0, 22);
                         doc.text(label, x + 7, lineY);
                         doc.text(`$${monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
                         lineY += lineHeight;
@@ -665,11 +667,12 @@ export const pdfService = {
                 const numCols = Math.min(allPlans.length, 2);
                 const totalW = pageWidth - (margin * 2);
                 const colW = (totalW - 4) / numCols;
-                // Altura dinámica según número de módulos recurrentes
+                // Altura dinámica según número de módulos recurrentes (incluye híbridos)
                 const _modulosRecPDF = parseModules(cotizacion.modulos_adicionales)
-                    .filter((m: any) => !(Number(m.pago_unico) > 0) && (Number(m.costo_anual || m.costo) > 0));
+                    .filter((m: any) => Number(m.costo_anual || m.costo) > 0);
                 const _waEnabled = cotizacion.servicio_whatsapp && Number(cotizacion.costo_whatsapp) > 0;
-                const _extraLines = _modulosRecPDF.length + (_waEnabled ? 1 : 0) + (_modulosRecPDF.length + (_waEnabled ? 1 : 0) > 0 ? 1 : 0); // modules + WA + subtotal
+                const _hasAnyDiscount = allPlans.slice(0, numCols).some((p) => p.tipo_ajuste === 'discount' || Number(cotizacion.descuento_porcentaje) > 0);
+                const _extraLines = _modulosRecPDF.length + (_waEnabled ? 1 : 0) + (_modulosRecPDF.length + (_waEnabled ? 1 : 0) > 0 ? 1 : 0) + (_hasAnyDiscount ? 1 : 0); // modules + WA + subtotal + discount
                 const colH = 82 + _extraLines * 5; // 5px per extra line
 
                 allPlans.slice(0, numCols).forEach((plan: PlanForPDF, idx: number) => {
@@ -770,9 +773,9 @@ export const pdfService = {
                         lineY += lineH;
                     }
 
-                    // Módulos recurrentes adicionales
+                    // Módulos recurrentes adicionales (incluye ítems híbridos)
                     const _planModulosRec = parseModules(cotizacion.modulos_adicionales)
-                        .filter((m: any) => !(Number(m.pago_unico) > 0) && (Number(m.costo_anual || m.costo) > 0));
+                        .filter((m: any) => Number(m.costo_anual || m.costo) > 0);
                     const _planWAEnabled = cotizacion.servicio_whatsapp && Number(cotizacion.costo_whatsapp) > 0;
                     _planModulosRec.forEach((m: any) => {
                         const monto = Number(m.costo_anual || m.costo) || 0;
@@ -813,6 +816,17 @@ export const pdfService = {
                         doc.setTextColor(249, 115, 22);
                         doc.setFont('helvetica', 'bold');
                         doc.text(`+$${pf.recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
+                        lineY += lineH;
+                    }
+
+                    // Descuento del plan (pago anticipado)
+                    if (pf.tipoAjuste === 'discount' && pf.ajustePct > 0) {
+                        const etiquetaDescPDF = (plan as any).etiqueta_ajuste?.trim() || 'Descuento anticipado';
+                        doc.setTextColor(22, 163, 74);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(`${etiquetaDescPDF} (${Math.round(pf.ajustePct * 100)}%)`, colX + 5, lineY);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`-$${(pf.licenciaAnual * pf.ajustePct).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
                         lineY += lineH;
                     }
 
@@ -907,9 +921,11 @@ export const pdfService = {
                         doc.setFontSize(iFontSize);
                         doc.setFont('helvetica', 'normal');
                         const qty = Number(serv.cantidad) || 1;
+                        const isHibrido = (Number(serv.costo_anual) || Number(serv.costo) || 0) > 0;
+                        const baseName = isHibrido ? `Implementación · ${serv.nombre || ''}` : (serv.nombre || '');
                         const label = qty > 1 
-                            ? `${(serv.nombre || '').substring(0, 22)} (${qty} ${formatUnitLabel(serv.unidad, qty, serv.tipo)} × $${Number(serv.precio_unitario || Math.round(Number(serv.pago_unico) / qty)).toLocaleString()})`
-                            : (serv.nombre || '').substring(0, 30);
+                            ? `${baseName.substring(0, 26)} (${qty} ${formatUnitLabel(serv.unidad, qty, serv.tipo)} × $${Number(serv.precio_unitario || Math.round(Number(serv.pago_unico) / qty)).toLocaleString()})`
+                            : baseName.substring(0, 38);
                         doc.text(label, margin + 6, iy);
                         doc.setFont('helvetica', 'bold');
                         const monto = Number(serv.pago_unico) || 0;

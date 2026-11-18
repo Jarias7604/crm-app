@@ -19,6 +19,7 @@ export interface CotizadorPaquete {
     metadata: any;
     created_at: string;
     updated_at: string;
+    _orig_costo_implementacion?: number;
 }
 
 export interface CotizadorItem {
@@ -28,6 +29,7 @@ export interface CotizadorItem {
     nombre: string;
     codigo?: string;
     pago_unico: number;
+    _orig_pago_unico?: number;
     precio_anual: number;
     precio_mensual: number;
     precio_por_dte: number;
@@ -58,6 +60,8 @@ export interface DetalleLinea {
     cantidad?: number;
     precio_unitario?: number;
     unidad?: string;
+    item_id?: string;
+    es_setup_hibrido?: boolean;
 }
 
 export interface CotizacionCalculada {
@@ -290,13 +294,15 @@ class CotizadorService {
         const desglose: DetalleLinea[] = [];
 
         // 1. IMPLEMENTACIÓN (Pago Único)
-        if (config.incluir_implementacion && paquete.costo_implementacion > 0) {
-            subtotal_pagos_unicos += paquete.costo_implementacion;
+        const implOriginal = paquete._orig_costo_implementacion ?? paquete.costo_implementacion;
+        const implActual = Math.max(0, Number(paquete.costo_implementacion) || 0);
+        if (config.incluir_implementacion && (implActual > 0 || implOriginal > 0)) {
+            subtotal_pagos_unicos += implActual;
             desglose.push({
                 es_pago_unico: true,
                 tipo: 'Implementación',
                 nombre: 'Implementación y Configuración',
-                precio_anual: paquete.costo_implementacion,
+                precio_anual: implActual,
                 precio_mensual: 0,
                 descripcion: 'Configuración inicial, capacitación (Pago único)'
             });
@@ -321,27 +327,32 @@ class CotizadorService {
 
         // 3. ITEMS (separar únicos de recurrentes, soportando ítems híbridos con setup fee + suscripción)
         items.forEach(item => {
-            const tienePagoUnico = (item.pago_unico || 0) > 0;
+            const setupVal = Math.max(0, Number(item.pago_unico) || 0);
+            const origSetupVal = Math.max(0, Number(item._orig_pago_unico ?? setupVal) || 0);
+            const tienePagoUnico = setupVal > 0;
+            const tieneSetupHibridoEditable = origSetupVal > 0;
             const tieneRecurrentePorDTE = (item.precio_por_dte || 0) > 0;
             const tieneRecurrenteFijo = (item.precio_anual || 0) > 0 || (item.precio_mensual || 0) > 0;
-            const esHibrido = tienePagoUnico && (tieneRecurrentePorDTE || tieneRecurrenteFijo);
+            const esHibrido = (tienePagoUnico || tieneSetupHibridoEditable) && (tieneRecurrentePorDTE || tieneRecurrenteFijo);
 
             // 3.1 Componente de Pago Único (Setup fee, hardware, servicio puntual)
             const incluirEstePagoUnico = esHibrido ? config.incluir_implementacion : true;
-            if (tienePagoUnico && incluirEstePagoUnico) {
-                subtotal_pagos_unicos += item.pago_unico;
+            if (((esHibrido && (tienePagoUnico || tieneSetupHibridoEditable)) || (!esHibrido && tienePagoUnico)) && incluirEstePagoUnico) {
+                subtotal_pagos_unicos += setupVal;
                 desglose.push({
                     es_pago_unico: true,
                     tipo: esHibrido
                         ? 'Implementación'
                         : (item.tipo === 'modulo' ? 'Módulo' : (item.tipo === 'equipo' ? 'Equipo' : (item.tipo === 'partes' ? 'Partes' : 'Servicio'))),
-                    nombre: esHibrido ? 'Implementación' : item.nombre,
-                    precio_anual: item.pago_unico,
+                    nombre: esHibrido ? `Implementación · ${item.nombre}` : item.nombre,
+                    precio_anual: setupVal,
                     precio_mensual: 0,
                     descripcion: esHibrido ? 'Configuración inicial, capacitación (Pago único)' : (item.descripcion || 'Pago único'),
                     cantidad: item.cantidad_default,
                     precio_unitario: item.precio_unitario,
-                    unidad: item.unidad
+                    unidad: item.unidad,
+                    item_id: item.id,
+                    es_setup_hibrido: esHibrido
                 });
             }
 
@@ -355,7 +366,8 @@ class CotizadorService {
                     nombre: item.nombre,
                     precio_anual: precio,
                     precio_mensual: precio / 12,
-                    descripcion: item.descripcion || `${cantidad_dtes.toLocaleString()} DTEs × $${item.precio_por_dte}`
+                    descripcion: item.descripcion || `${cantidad_dtes.toLocaleString()} DTEs × $${item.precio_por_dte}`,
+                    item_id: item.id
                 });
             } else if (tieneRecurrenteFijo) {
                 const precio = item.precio_anual || (item.precio_mensual * 12);
@@ -366,7 +378,8 @@ class CotizadorService {
                     nombre: item.nombre,
                     precio_anual: precio,
                     precio_mensual: item.precio_mensual || precio / 12,
-                    descripcion: item.descripcion || (item.precio_anual > 0 ? 'Suscripción anual' : 'Suscripción mensual')
+                    descripcion: item.descripcion || (item.precio_anual > 0 ? 'Suscripción anual' : 'Suscripción mensual'),
+                    item_id: item.id
                 });
             }
         });

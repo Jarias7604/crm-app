@@ -187,7 +187,8 @@ class InvoicesService {
         if (Array.isArray(parsedModules)) {
             parsedModules.forEach((m: any) => {
                 const qty = Number(m.cantidad) || 1;
-                const totalItem = Number(m.total ?? m.precio ?? m.costo_anual ?? m.amount ?? 0);
+                const hybridSum = (Number(m.pago_unico) || 0) + (Number(m.costo_anual || m.costo) || 0);
+                const totalItem = Number(m.total ?? m.precio ?? (hybridSum > 0 ? hybridSum : 0));
                 const unitPrice = Number(m.precio_unitario) || (qty > 0 ? totalItem / qty : totalItem);
                 const unitLabel = formatUnitLabel(m.unidad, qty, m.tipo);
 

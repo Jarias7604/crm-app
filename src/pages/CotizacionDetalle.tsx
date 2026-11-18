@@ -782,14 +782,17 @@ export default function CotizacionDetalle() {
                                 const modulosArr = Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [];
                                 const serviciosUnicos = modulosArr
                                     .filter((mod: any) => (Number(mod.pago_unico) || 0) > 0)
-                                    .map((mod: any) => ({
-                                        nombre: mod.nombre,
-                                        monto: Number(mod.pago_unico) || 0,
-                                        cantidad: Number(mod.cantidad) || 1,
-                                        unidad: mod.unidad,
-                                        tipo: mod.tipo,
-                                        precio_unitario: Number(mod.precio_unitario) || (Number(mod.pago_unico) / (Number(mod.cantidad) || 1))
-                                    }));
+                                    .map((mod: any) => {
+                                        const isHibrido = (Number(mod.costo_anual || mod.costo) || 0) > 0;
+                                        return {
+                                            nombre: isHibrido ? `Implementación · ${mod.nombre}` : mod.nombre,
+                                            monto: Number(mod.pago_unico) || 0,
+                                            cantidad: Number(mod.cantidad) || 1,
+                                            unidad: mod.unidad,
+                                            tipo: mod.tipo,
+                                            precio_unitario: Number(mod.precio_unitario) || (Number(mod.pago_unico) / (Number(mod.cantidad) || 1))
+                                        };
+                                    });
                                 return (
                                     <>
                                         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -847,9 +850,9 @@ export default function CotizacionDetalle() {
                                                                             <span className="font-bold text-slate-700 ml-2 flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
                                                                         </div>
                                                                     )}
-                                                                    {/* Módulos adicionales recurrentes — uno por línea */}
+                                                                    {/* Módulos adicionales recurrentes — uno por línea (incluye híbridos con setup + anualidad) */}
                                                                     {plan.show_breakdown !== false && modulosArr
-                                                                        .filter((mod: any) => !(Number(mod.pago_unico) > 0) && (Number(mod.costo_anual || mod.costo) > 0))
+                                                                        .filter((mod: any) => Number(mod.costo_anual || mod.costo) > 0)
                                                                         .map((mod: any, modIdx: number) => (
                                                                             <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
                                                                                 <span className="truncate">{mod.nombre}</span>
@@ -883,7 +886,7 @@ export default function CotizacionDetalle() {
                                                                         </div>
                                                                     )}
                                                                     {/* Descuento del plan (tipo discount) */}
-                                                                    {!pf.isPagoUnico && pf.tipoAjuste === 'discount' && pf.ajustePct > 0 && (
+                                                                    {pf.tipoAjuste === 'discount' && pf.ajustePct > 0 && (
                                                                         <div className="flex justify-between text-[10px] text-emerald-600 font-medium">
                                                                             <span>- {plan.etiqueta_ajuste?.trim() || 'Descuento anticipado'} ({Math.round(pf.ajustePct * 100)}%)</span>
                                                                             <span>-${(pf.licenciaAnual * pf.ajustePct).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

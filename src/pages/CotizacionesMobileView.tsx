@@ -426,14 +426,37 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
 
                                                         {/* Breakdown */}
                                                         <div className="space-y-1 border-t border-slate-100 pt-2.5">
-                                                            <div className="flex justify-between text-[10px] text-slate-500 font-medium">
-                                                                <span>Licencia {sheet.plan_nombre}</span>
-                                                                <span className="font-bold text-slate-700">${Number(sheet.costo_plan_anual).toLocaleString()}</span>
-                                                            </div>
+                                                            {Number(sheet.costo_plan_anual) > 0 && (
+                                                                <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                                    <span>Licencia {sheet.plan_nombre}</span>
+                                                                    <span className="font-bold text-slate-700">${Number(sheet.costo_plan_anual).toLocaleString()}</span>
+                                                                </div>
+                                                            )}
+                                                            {modulosArr
+                                                                .filter((mod: any) => Number(mod.costo_anual || mod.costo) > 0)
+                                                                .map((mod: any, modIdx: number) => (
+                                                                    <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                                        <span className="truncate">{mod.nombre}</span>
+                                                                        <span className="font-bold text-slate-700">${Number(mod.costo_anual || mod.costo || 0).toLocaleString()}</span>
+                                                                    </div>
+                                                                ))
+                                                            }
+                                                            {sheet.servicio_whatsapp && Number(sheet.costo_whatsapp) > 0 && (
+                                                                <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                                    <span>WhatsApp AI</span>
+                                                                    <span className="font-bold text-slate-700">${Number(sheet.costo_whatsapp).toLocaleString()}</span>
+                                                                </div>
+                                                            )}
                                                             {!pf.isPagoUnico && pf.recargoMonto > 0 && (
                                                                 <div className="flex justify-between text-[10px] text-slate-400 font-medium">
                                                                     <span>Financiamiento {(plan as any).interes_porcentaje}%</span>
                                                                     <span className="text-orange-500">+${pf.recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            )}
+                                                            {pf.tipoAjuste === 'discount' && pf.ajustePct > 0 && (
+                                                                <div className="flex justify-between text-[10px] text-emerald-600 font-medium">
+                                                                    <span>Descuento anticipado ({Math.round(pf.ajustePct * 100)}%)</span>
+                                                                    <span>-${(pf.licenciaAnual * pf.ajustePct).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                                 </div>
                                                             )}
                                                             {pf.descuentoManualMonto > 0 && (
@@ -485,12 +508,15 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                                                                 <span className="font-bold text-slate-800">${implementacionBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                             </div>
                                                         )}
-                                                        {serviciosUnicos.map((serv: any, si: number) => (
+                                                        {serviciosUnicos.map((serv: any, si: number) => {
+                                                            const isHibrido = Number(serv.costo_anual || serv.costo) > 0;
+                                                            return (
                                                             <div key={si} className="flex justify-between text-[10px] text-slate-600 font-medium">
-                                                                <span>{serv.nombre}</span>
+                                                                <span>{isHibrido ? `Implementación · ${serv.nombre}` : serv.nombre}</span>
                                                                 <span className="font-bold text-slate-800">${(Number(serv.pago_unico) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                             </div>
-                                                        ))}
+                                                            );
+                                                        })}
                                                         <div className="flex justify-between text-[10px] text-slate-500 font-medium">
                                                             <span>IVA ({Math.round(firstPlanFin.ivaPct * 100)}%)</span>
                                                             <span className="text-orange-500">+${firstPlanFin.ivaImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

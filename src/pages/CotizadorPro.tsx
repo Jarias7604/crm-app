@@ -75,6 +75,7 @@ export default function CotizadorPro() {
 
     const [paqueteSugerido, setPaqueteSugerido] = useState<CotizadorPaquete | null>(null);
     const [overrides, setOverrides] = useState<Record<string, number>>({});
+    const [setupOverrides, setSetupOverrides] = useState<Record<string, number>>({});
     const [implementationOverride, setImplementationOverride] = useState<number | null>(null);
     const [paqueteOverride, setPaqueteOverride] = useState<number | null>(null);
     const [totales, setTotales] = useState<CotizacionCalculada | null>(null);
@@ -136,30 +137,64 @@ export default function CotizadorPro() {
             // Usar catálogo pasado (fresco) o el estado actual como fallback
             const paqList = catalog?.paqData ?? paquetes;
             const modulosList = catalog?.modulosData ?? modulos;
+            const serviciosList = catalog?.serviciosData ?? servicios;
+            const allCatalogItems = [...modulosList, ...serviciosList];
             const plansData = catalog?.plansData ?? financingPlans;
 
             // 1. Restaurar paquete por nombre
             const paqueteFound = paqList.find((p: CotizadorPaquete) => p.paquete === cot.plan_nombre);
 
-            // 2. Restaurar módulos por nombre y restaurar cantidades
+            // 2. Restaurar módulos y servicios por ID/nombre, separando setup único vs anualidad en híbridos
             const modulosArr = Array.isArray(cot.modulos_adicionales) ? cot.modulos_adicionales : [];
-            const modulosIds = modulosArr
-                .map((m: any) => modulosList.find((mod: CotizadorItem) => mod.nombre === m.nombre)?.id)
-                .filter(Boolean) as string[];
+            const modulosIds: string[] = [];
+            const serviciosIds: string[] = [];
 
             const restoredQtys: Record<string, number> = {};
             const restoredOverrides: Record<string, number> = {};
+            const restoredSetupOverrides: Record<string, number> = {};
             modulosArr.forEach((m: any) => {
-                const found = modulosList.find((mod: CotizadorItem) => mod.nombre === m.nombre);
+                const found = allCatalogItems.find((item: CotizadorItem) => (m.id && item.id === m.id) || item.nombre === m.nombre);
                 if (found) {
+                    if (found.tipo === 'modulo') modulosIds.push(found.id);
+                    else serviciosIds.push(found.id);
+
                     if (m.cantidad) restoredQtys[found.id] = Number(m.cantidad);
-                    if (m.pago_unico || m.costo_anual) {
-                        restoredOverrides[found.id] = Number(m.pago_unico || m.costo_anual);
+
+                    const isPhysical = found.tipo === 'equipo' || found.tipo === 'partes' || found.tipo === 'repuestos';
+                    const tracksStock = Boolean(found.controla_stock ?? found.metadata?.controla_stock ?? isPhysical);
+                    const hasCatalogHybrid = (found.pago_unico || 0) > 0 && ((found.precio_anual || 0) > 0 || (found.precio_mensual || 0) > 0 || (found.precio_por_dte || 0) > 0);
+                    const hasSavedHybrid = (Number(m.pago_unico) || 0) > 0 && (Number(m.costo_anual) || 0) > 0;
+                    const isHibrido = !isPhysical && !tracksStock && found.modelo_precio !== 'por_unidad' && (hasCatalogHybrid || hasSavedHybrid);
+
+                    if (isHibrido) {
+                        if (m.costo_anual !== undefined) restoredOverrides[found.id] = Number(m.costo_anual);
+                        if (m.pago_unico !== undefined) restoredSetupOverrides[found.id] = Number(m.pago_unico);
+                    } else if (Number(m.pago_unico) > 0) {
+                        restoredOverrides[found.id] = Number(m.pago_unico);
+                    } else if (Number(m.costo_anual) > 0) {
+                        restoredOverrides[found.id] = Number(m.costo_anual);
                     }
                 }
             });
+
+            if (cot.servicio_whatsapp) {
+                const waItem = serviciosList.find((s: CotizadorItem) => s.nombre.toLowerCase().includes('whatsapp'));
+                if (waItem && !serviciosIds.includes(waItem.id)) {
+                    serviciosIds.push(waItem.id);
+                    if (cot.costo_whatsapp != null) restoredOverrides[waItem.id] = Number(cot.costo_whatsapp);
+                }
+            }
+            if ((cot as any).servicio_personalizacion) {
+                const persItem = serviciosList.find((s: CotizadorItem) => s.nombre.toLowerCase().includes('personaliz'));
+                if (persItem && !serviciosIds.includes(persItem.id)) {
+                    serviciosIds.push(persItem.id);
+                    if ((cot as any).costo_personalizacion != null) restoredOverrides[persItem.id] = Number((cot as any).costo_personalizacion);
+                }
+            }
+
             if (Object.keys(restoredQtys).length > 0) setItemQtys(prev => ({ ...prev, ...restoredQtys }));
             if (Object.keys(restoredOverrides).length > 0) setOverrides(prev => ({ ...prev, ...restoredOverrides }));
+            if (Object.keys(restoredSetupOverrides).length > 0) setSetupOverrides(prev => ({ ...prev, ...restoredSetupOverrides }));
 
             // 3. Restaurar plan de financiamiento
             const planesComparativa = (cot as any).planes_comparativa as string[] | null;
@@ -200,12 +235,13 @@ export default function CotizadorPro() {
                 incluir_implementacion: cot.incluir_implementacion,
                 porcentaje_anticipo: cot.metadata?.porcentaje_anticipo !== undefined ? cot.metadata.porcentaje_anticipo : undefined,
                 paquete_id: paqueteFound?.id || prev.paquete_id,
-                modulos_ids: modulosIds,
+                modulos_ids: Array.from(new Set(modulosIds)),
+                servicios_ids: Array.from(new Set(serviciosIds)),
                 notas: (cot as any).notas || ''
             }));
 
-            // Saltar directo al paso 4 (resumen) si ya teníamos todos los datos
-            if (paqueteFound) setPasoActual(4);
+            // Saltar directo al paso 4 (resumen) si ya teníamos datos cargados
+            if (paqueteFound || modulosIds.length > 0 || serviciosIds.length > 0) setPasoActual(4);
 
         } catch (error) {
             logger.error('Error loading existing cotizacion', error, { action: 'loadExistingCotizacion', cotId });
@@ -240,7 +276,9 @@ export default function CotizadorPro() {
         formData.descuento_porcentaje,
         formData.iva_porcentaje,
         formData.recargo_mensual_porcentaje,
+        formData.porcentaje_anticipo,
         overrides,
+        setupOverrides,
         itemQtys,
         implementationOverride,
         paqueteOverride,
@@ -402,17 +440,62 @@ export default function CotizadorPro() {
         }
     };
 
-    const calcularTotales = () => {
+    // Fuente única de verdad para clasificar y valorar cada ítem (recurrente, setup único, híbrido)
+    const computeQuoteItemPricing = (item: CotizadorItem) => {
+        const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
+        const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
+        const needsQty = item.modelo_precio === 'por_unidad' || item.modelo_precio === 'por_hora' || tracksStock;
+        const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
+
+        const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0 || item.precio_por_dte > 0);
+        const hasSetup = (item.pago_unico || 0) > 0;
+        const isHibrido = hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
+
+        const baseUnit = item.precio_por_dte > 0
+            ? item.precio_por_dte
+            : (item.precio_mensual > 0
+                ? item.precio_mensual
+                : (item.precio_unitario || item.pago_unico || item.precio_anual || 0));
+
+        const defaultPrice = item.precio_por_dte > 0
+            ? (formData.volumen_dtes * item.precio_por_dte)
+            : needsQty
+                ? baseUnit * qty
+                : (isHibrido
+                    ? (item.precio_anual || (item.precio_mensual * 12))
+                    : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual));
+
+        const calculatedTotal = overrides[item.id] !== undefined ? overrides[item.id] : defaultPrice;
+        const esPagoUnico = !hasRecurring && ((item.pago_unico || 0) > 0 || isPhysical || tracksStock || item.modelo_precio === 'por_unidad');
+
+        const setupVal = isHibrido
+            ? (formData.incluir_implementacion
+                ? (setupOverrides[item.id] !== undefined ? setupOverrides[item.id] : (item.pago_unico || 0))
+                : 0)
+            : (esPagoUnico ? calculatedTotal : 0);
+
+        const recurringAnnual = isHibrido ? calculatedTotal : (esPagoUnico ? 0 : calculatedTotal);
+        const recurringMonthly = isHibrido
+            ? (overrides[item.id] !== undefined ? calculatedTotal / 12 : (item.precio_mensual || calculatedTotal / 12))
+            : (esPagoUnico ? 0 : (overrides[item.id] !== undefined ? calculatedTotal / 12 : (item.precio_mensual || calculatedTotal / 12)));
+
+        return {
+            isPhysical,
+            tracksStock,
+            needsQty,
+            qty,
+            isHibrido,
+            esPagoUnico,
+            baseUnit,
+            calculatedTotal,
+            setupVal,
+            recurringAnnual,
+            recurringMonthly,
+        };
+    };
+
+    const buildPackageWithOverride = (): CotizadorPaquete => {
         const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id);
-        // Paquete es OPCIONAL: si no hay paquete pero sí hay módulos/servicios, calcular igual
-        // usando un paquete vacío (precio 0) como base.
-        const tieneItems = formData.modulos_ids.length > 0 || formData.servicios_ids.length > 0;
-        if (!paqueteSeleccionado && !tieneItems) {
-            setTotales(null);
-            return;
-        }
-        // Si no hay paquete seleccionado, usar paquete neutro de precio $0
-        // (sin terminología DTE — aplica a cualquier industria)
         const paqueteBase: CotizadorPaquete = paqueteSeleccionado ?? {
             id: '__items_only__',
             company_id: profile?.company_id ?? null,
@@ -427,59 +510,46 @@ export default function CotizadorPro() {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
         };
-
-        const itemsSeleccionados = [
-            ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
-            ...servicios.filter(s => formData.servicios_ids.includes(s.id))
-        ].map(item => {
-            const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
-            const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
-            const needsQty = item.modelo_precio === 'por_unidad' || item.modelo_precio === 'por_hora' || tracksStock;
-            const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
-
-            const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
-            const hasSetup = (item.pago_unico || 0) > 0;
-            const isHibrido = hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
-
-            const baseUnit = item.precio_por_dte > 0
-                ? item.precio_por_dte
-                : (item.precio_mensual > 0
-                    ? item.precio_mensual
-                    : (item.precio_unitario || item.pago_unico || item.precio_anual || 0));
-
-            const defaultPrice = item.precio_por_dte > 0
-                ? (formData.volumen_dtes * item.precio_por_dte)
-                : needsQty
-                    ? baseUnit * qty
-                    : (isHibrido
-                        ? (item.precio_anual || (item.precio_mensual * 12))
-                        : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual));
-
-            const calculatedTotal = overrides[item.id] !== undefined ? overrides[item.id] : defaultPrice;
-            const esPagoUnico = !hasRecurring && ((item.pago_unico || 0) > 0 || isPhysical || tracksStock || item.modelo_precio === 'por_unidad');
-
-            return {
-                ...item,
-                pago_unico: isHibrido
-                    ? (formData.incluir_implementacion
-                        ? (implementationOverride !== null && !formData.paquete_id ? implementationOverride : item.pago_unico)
-                        : 0)
-                    : (esPagoUnico ? calculatedTotal : 0),
-                precio_anual: isHibrido ? calculatedTotal : (esPagoUnico ? 0 : calculatedTotal),
-                precio_mensual: isHibrido ? (item.precio_mensual || calculatedTotal / 12) : (esPagoUnico ? item.precio_mensual : calculatedTotal / 12),
-                precio_por_dte: 0,
-                cantidad_default: qty,
-                precio_unitario: baseUnit,
-                unidad: item.unidad || (item.modelo_precio === 'por_hora' ? 'hr' : 'und'),
-            };
-        });
-
-        // Aplicar override de paquete (precio del plan) y/o implementación
-        const packageWithOverride = {
+        return {
             ...paqueteBase,
+            _orig_costo_implementacion: paqueteBase.costo_implementacion,
             ...(paqueteOverride !== null ? { costo_paquete_anual: paqueteOverride } : {}),
             ...(implementationOverride !== null ? { costo_implementacion: implementationOverride } : {})
         };
+    };
+
+    const buildSelectedItemsForCalc = (): CotizadorItem[] => {
+        return [
+            ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
+            ...servicios.filter(s => formData.servicios_ids.includes(s.id))
+        ].map(item => {
+            const p = computeQuoteItemPricing(item);
+            return {
+                ...item,
+                pago_unico: p.setupVal,
+                _orig_pago_unico: p.isHibrido ? (item.pago_unico || 0) : undefined,
+                precio_anual: p.recurringAnnual,
+                precio_mensual: p.recurringMonthly,
+                precio_por_dte: 0,
+                cantidad_default: p.qty,
+                precio_unitario: p.baseUnit,
+                unidad: item.unidad || (item.modelo_precio === 'por_hora' ? 'hr' : 'und'),
+            };
+        });
+    };
+
+    const calcularTotales = () => {
+        const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id);
+        // Paquete es OPCIONAL: si no hay paquete pero sí hay módulos/servicios, calcular igual
+        // usando un paquete vacío (precio 0) como base.
+        const tieneItems = formData.modulos_ids.length > 0 || formData.servicios_ids.length > 0;
+        if (!paqueteSeleccionado && !tieneItems) {
+            setTotales(null);
+            return;
+        }
+
+        const itemsSeleccionados = buildSelectedItemsForCalc();
+        const packageWithOverride = buildPackageWithOverride();
 
         const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
 
@@ -624,56 +694,22 @@ export default function CotizadorPro() {
             ];
 
             const todosLosItems = rawSelectedItems.map(item => {
-                const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
-                const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
-                const needsQty = item.modelo_precio === 'por_unidad' || item.modelo_precio === 'por_hora' || tracksStock;
-                const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
-
-                const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
-                const hasSetup = (item.pago_unico || 0) > 0;
-                const isHibrido = hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
-
-                const baseUnit = item.precio_por_dte > 0
-                    ? item.precio_por_dte
-                    : (item.precio_mensual > 0
-                        ? item.precio_mensual
-                        : (item.precio_unitario || item.pago_unico || item.precio_anual || 0));
-
-                const manualPrice = overrides[item.id];
-                const costoCalculado = manualPrice !== undefined
-                    ? manualPrice
-                    : (item.precio_por_dte > 0
-                        ? formData.volumen_dtes * item.precio_por_dte
-                        : (needsQty ? baseUnit * qty : (isHibrido ? (item.precio_anual || item.precio_mensual * 12) : (item.pago_unico || item.precio_anual))));
-
-                const esPagoUnico = !hasRecurring && ((item.pago_unico || 0) > 0 || isPhysical || tracksStock || item.modelo_precio === 'por_unidad');
-
-                const setupVal = isHibrido
-                    ? (formData.incluir_implementacion
-                        ? (implementationOverride !== null && !formData.paquete_id ? implementationOverride : item.pago_unico)
-                        : 0)
-                    : (esPagoUnico ? costoCalculado : 0);
-
+                const p = computeQuoteItemPricing(item);
                 return {
                     id: item.id,
                     nombre: item.nombre,
                     tipo: item.tipo,
                     descripcion: item.descripcion || '',
-                    cantidad: needsQty ? qty : 1,
-                    precio_unitario: baseUnit,
-                    total: isHibrido ? (setupVal + costoCalculado) : costoCalculado,
+                    cantidad: p.needsQty ? p.qty : 1,
+                    precio_unitario: p.baseUnit,
+                    total: p.isHibrido ? (p.setupVal + p.recurringAnnual) : p.calculatedTotal,
                     unidad: getBaseUnit(item.unidad || item.metadata?.unidad_medida, item.tipo),
-                    // Si es híbrido, guardar setup en pago_unico (o 0 si se excluyó la implementación) y suscripción en costo_anual
-                    pago_unico: setupVal,
-                    costo_anual: isHibrido ? costoCalculado : (esPagoUnico ? 0 : costoCalculado),
-                    costo_mensual: item.precio_mensual || (isHibrido ? (costoCalculado / 12) : 0)
+                    // Si es híbrido, guardar setup independiente en pago_unico y suscripción en costo_anual
+                    pago_unico: p.setupVal,
+                    costo_anual: p.recurringAnnual,
+                    costo_mensual: p.recurringMonthly
                 };
             });
-
-            // Buscar costo de implementación híbrida si aplica
-            const costoImpHibridosGen = rawSelectedItems
-                .filter(i => (i.pago_unico || 0) > 0 && ((i.precio_anual || 0) > 0 || (i.precio_mensual || 0) > 0))
-                .reduce((s, it) => s + (it.pago_unico || 0), 0);
 
             // Preparar datos para guardar (formato correcto)
             const cotizacionData = {
@@ -689,10 +725,9 @@ export default function CotizadorPro() {
                 plan_nombre: paqueteSeleccionado?.paquete || 'Cotización Personalizada',
                 costo_plan_anual: paqueteSeleccionado ? (paqueteOverride ?? paqueteSeleccionado.costo_paquete_anual) : 0,
                 costo_plan_mensual: paqueteSeleccionado?.costo_paquete_mensual ?? 0,
-                costo_implementacion: formData.incluir_implementacion
-                    ? (paqueteSeleccionado
-                        ? (implementationOverride ?? paqueteSeleccionado.costo_implementacion)
-                        : (implementationOverride ?? costoImpHibridosGen))
+                // La implementación de ítems híbridos vive en modulos_adicionales[].pago_unico (no duplicar aquí)
+                costo_implementacion: formData.incluir_implementacion && paqueteSeleccionado
+                    ? (implementationOverride ?? paqueteSeleccionado.costo_implementacion)
                     : 0,
                 modulos_adicionales: todosLosItems,
                 servicio_whatsapp: whatsappSeleccionado,
@@ -1534,21 +1569,26 @@ export default function CotizadorPro() {
 
                     {pasoActual === 3 && (() => {
                         const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id);
-                        const costoImpPaquete = paqueteSeleccionado?.costo_implementacion || 0;
+                        const costoImpPaqueteOrig = paqueteSeleccionado?.costo_implementacion || 0;
+                        const costoImpPaquete = paqueteSeleccionado ? (implementationOverride ?? costoImpPaqueteOrig) : 0;
                         const hybridItemsSel = [
                             ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
                             ...servicios.filter(s => formData.servicios_ids.includes(s.id))
                         ].filter(item => {
                             const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
                             const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
-                            const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
+                            const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0 || item.precio_por_dte > 0);
                             const hasSetup = (item.pago_unico || 0) > 0;
                             return hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
                         });
-                        const costoImpHibridos = hybridItemsSel.reduce((sum, item) => sum + (item.pago_unico || 0), 0);
+                        const costoImpHibridos = hybridItemsSel.reduce(
+                            (sum, item) => sum + (setupOverrides[item.id] ?? (item.pago_unico || 0)),
+                            0
+                        );
                         const costoImp = costoImpPaquete + costoImpHibridos;
+                        const hasAnyImpl = costoImpPaqueteOrig > 0 || hybridItemsSel.length > 0;
 
-                        return costoImp > 0 ? (
+                        return hasAnyImpl ? (
                             <div className="mt-4 flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl">
                                 <div>
                                     <p className="font-bold text-sm text-amber-800">🔧 Costo de Implementación</p>
@@ -1563,8 +1603,17 @@ export default function CotizadorPro() {
                                     <div
                                         onClick={() => {
                                             const turningOn = !formData.incluir_implementacion;
-                                            if (turningOn && implementationOverride === 0) {
-                                                setImplementationOverride(costoImp);
+                                            if (turningOn) {
+                                                if (implementationOverride === 0 && costoImpPaqueteOrig > 0) {
+                                                    setImplementationOverride(costoImpPaqueteOrig);
+                                                }
+                                                setSetupOverrides(prev => {
+                                                    const next = { ...prev };
+                                                    hybridItemsSel.forEach(h => {
+                                                        if (next[h.id] === 0) delete next[h.id];
+                                                    });
+                                                    return next;
+                                                });
                                             }
                                             setFormData({ ...formData, incluir_implementacion: turningOn });
                                         }}
@@ -1623,17 +1672,23 @@ export default function CotizadorPro() {
 
                                             <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
                                                 {canEditPrices ? (() => {
-                                                    const itemOriginal = (item.tipo !== 'Implementación' && item.tipo !== 'Paquete')
-                                                        ? [...modulos, ...servicios].find(i => i.nombre === item.nombre)
+                                                    const allCatalog = [...modulos, ...servicios];
+                                                    const itemOriginal = (item.tipo !== 'Paquete' && !(item.tipo === 'Implementación' && !item.es_setup_hibrido))
+                                                        ? (item.item_id
+                                                            ? allCatalog.find(i => i.id === item.item_id)
+                                                            : allCatalog.find(i => i.nombre === item.nombre))
                                                         : null;
+                                                    const isHybridSetup = Boolean(item.es_setup_hibrido && item.item_id);
                                                     const currentValue =
-                                                        item.tipo === 'Implementación'
-                                                            ? (implementationOverride ?? item.precio_anual)
-                                                            : item.tipo === 'Paquete'
-                                                                ? (paqueteOverride ?? item.precio_anual)
-                                                                : (itemOriginal && overrides[itemOriginal.id] !== undefined
-                                                                    ? overrides[itemOriginal.id]
-                                                                    : item.precio_anual);
+                                                        isHybridSetup && item.item_id
+                                                            ? (setupOverrides[item.item_id] ?? item.precio_anual)
+                                                            : item.tipo === 'Implementación'
+                                                                ? (implementationOverride ?? item.precio_anual)
+                                                                : item.tipo === 'Paquete'
+                                                                    ? (paqueteOverride ?? item.precio_anual)
+                                                                    : (itemOriginal && overrides[itemOriginal.id] !== undefined
+                                                                        ? overrides[itemOriginal.id]
+                                                                        : item.precio_anual);
                                                     return (
                                                         <div className="flex flex-col items-end gap-1">
                                                             <div className="flex items-center gap-1">
@@ -1641,6 +1696,7 @@ export default function CotizadorPro() {
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
+                                                                    min={0}
                                                                     className={`w-20 sm:w-28 text-right font-bold text-base border rounded px-2 py-1 focus:ring-2 outline-none ${item.tipo === 'Implementación'
                                                                         ? 'text-orange-600 border-orange-100 bg-orange-50/30 focus:ring-orange-400'
                                                                         : item.tipo === 'Paquete'
@@ -1649,19 +1705,32 @@ export default function CotizadorPro() {
                                                                         }`}
                                                                     value={currentValue}
                                                                     onChange={(e) => {
-                                                                        const val = Number(e.target.value);
-                                                                        if (item.tipo === 'Implementación') {
+                                                                        const raw = Number(e.target.value);
+                                                                        const val = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+                                                                        if (isHybridSetup && item.item_id) {
+                                                                            setSetupOverrides(prev => ({ ...prev, [item.item_id!]: val }));
+                                                                        } else if (item.tipo === 'Implementación') {
                                                                             setImplementationOverride(val);
                                                                         } else if (item.tipo === 'Paquete') {
                                                                             setPaqueteOverride(val);
                                                                         } else if (itemOriginal) {
-                                                                            setOverrides({ ...overrides, [itemOriginal.id]: val });
+                                                                            setOverrides(prev => ({ ...prev, [itemOriginal.id]: val }));
                                                                         }
                                                                     }}
                                                                 />
                                                             </div>
-                                                            {/* Restore link — only for Implementación when price is 0 */}
-                                                            {item.tipo === 'Implementación' && currentValue === 0 && (() => {
+                                                            {/* Restore link — only for Implementación (paquete o setup híbrido) when price is 0 */}
+                                                            {isHybridSetup && item.item_id && currentValue === 0 && (itemOriginal?.pago_unico || 0) > 0 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setSetupOverrides(prev => ({ ...prev, [item.item_id!]: itemOriginal!.pago_unico }))}
+                                                                    className="text-[10px] text-orange-500 hover:text-orange-700 font-bold flex items-center gap-0.5 transition-colors"
+                                                                    title={`Restaurar precio original: $${itemOriginal!.pago_unico.toFixed(2)}`}
+                                                                >
+                                                                    <span>↺</span> Restaurar ${itemOriginal!.pago_unico.toFixed(2)}
+                                                                </button>
+                                                            )}
+                                                            {item.tipo === 'Implementación' && !isHybridSetup && currentValue === 0 && (() => {
                                                                 const origPrice = paquetes.find(p => p.id === formData.paquete_id)?.costo_implementacion || 0;
                                                                 return origPrice > 0 ? (
                                                                     <button
@@ -1998,7 +2067,7 @@ export default function CotizadorPro() {
                                                 <div className="space-y-1.5">
                                                     {/* Listar cada ítem de pago único por separado con cantidades */}
                                                     {totales.desglose
-                                                        .filter(d => d.es_pago_unico)
+                                                        .filter(d => d.es_pago_unico && d.precio_anual > 0)
                                                         .map((d, i) => (
                                                             <div key={i} className="flex justify-between text-[11px] text-gray-600 font-medium leading-none">
                                                                 <span className="flex items-center gap-1.5 truncate pr-2">
@@ -2013,6 +2082,18 @@ export default function CotizadorPro() {
                                                             </div>
                                                         ))
                                                     }
+                                                    {(() => {
+                                                        const rawUnicosSum = totales.desglose
+                                                            .filter(d => d.es_pago_unico && d.precio_anual > 0)
+                                                            .reduce((s, d) => s + d.precio_anual, 0);
+                                                        const descUnicos = Math.max(0, Number((rawUnicosSum - totales.subtotal_pagos_unicos).toFixed(2)));
+                                                        return descUnicos > 0 ? (
+                                                            <div className="flex justify-between text-[11px] text-emerald-600 font-bold leading-none">
+                                                                <span>- Descuento aplicado</span>
+                                                                <span>-${descUnicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                        ) : null;
+                                                    })()}
                                                     <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none pt-1 border-t border-orange-100">
                                                         <span>IVA ({formData.iva_porcentaje}%)</span>
                                                         <span className="text-orange-600">+${totales.iva_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -2025,15 +2106,10 @@ export default function CotizadorPro() {
                                             </div>
                                         )}
 
-                                        {/* 2. OPCIONES DE PAGO — una card por plan seleccionado (igual que CotizacionDetalle) */}
+                                        {/* 2. OPCIONES DE PAGO — una card por plan seleccionado (fuente única compartida) */}
                                         {totales.subtotal_recurrente_base > 0 && selectedPlanIds.length > 0 && (() => {
-                                            const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id);
-                                            const paqueteBase: CotizadorPaquete = paqueteSeleccionado ?? { id: '__items_only__', company_id: profile?.company_id ?? null, paquete: 'Propuesta Personalizada', cantidad_dtes: 0, costo_paquete_anual: 0, costo_paquete_mensual: 0, costo_implementacion: 0, orden: 0, activo: true, metadata: null, created_at: '', updated_at: '' };
-                                            const pkgFinal = { ...paqueteBase, ...(paqueteOverride !== null ? { costo_paquete_anual: paqueteOverride } : {}), ...(implementationOverride !== null ? { costo_implementacion: implementationOverride } : {}) };
-                                            const itemsSel = [...modulos.filter(m => formData.modulos_ids.includes(m.id)), ...servicios.filter(s => formData.servicios_ids.includes(s.id))].map(item => {
-                                                if (overrides[item.id] !== undefined) { const esPU = (item.pago_unico || 0) > 0; const ov = overrides[item.id]; return { ...item, pago_unico: esPU ? ov : 0, precio_anual: esPU ? 0 : ov, precio_mensual: esPU ? item.precio_mensual : ov / 12, precio_por_dte: 0 }; }
-                                                return item;
-                                            });
+                                            const pkgFinal = buildPackageWithOverride();
+                                            const itemsSel = buildSelectedItemsForCalc();
                                             return (
                                                 <div>
                                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Opciones de Pago</p>
@@ -2047,6 +2123,12 @@ export default function CotizadorPro() {
                                                             const numCuotas = plan.cuotas || plan.meses || 1;
                                                             const isPU = numCuotas <= 1;
                                                             const displayAmt = isPU ? pt.total_recurrente : pt.cuota_mensual;
+                                                            const recurringLines = pt.desglose.filter((d) => !d.es_pago_unico && d.precio_anual > 0);
+                                                            const recurrenteLinesSum = recurringLines.reduce((s, d) => s + d.precio_anual, 0);
+                                                            const planDiscAmt = plan.tipo_ajuste === 'discount' && plan.interes_porcentaje > 0
+                                                                ? Number((recurrenteLinesSum * (plan.interes_porcentaje / 100)).toFixed(2))
+                                                                : 0;
+                                                            const manualDiscOnRec = Number(Math.max(0, (recurrenteLinesSum + (!isPU ? pt.recargo_mensual_monto : 0) - planDiscAmt) - pt.precio_anual_con_recargo).toFixed(2));
                                                             return (
                                                                 <div key={planId} className={`rounded-2xl p-5 border-2 relative ${isMain ? 'border-[#4449AA] bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg shadow-[#4449AA]/10' : 'border-gray-200 bg-white shadow-sm'}`}>
                                                                     <div className="flex gap-1.5 mb-3 flex-wrap min-h-[22px]">
@@ -2062,14 +2144,15 @@ export default function CotizadorPro() {
                                                                     </div>
                                                                     <p className={`text-[10px] font-bold mb-4 ${isPU ? 'text-emerald-500' : 'text-blue-500'}`}>{isPU ? 'Pago único adelantado' : `${numCuotas} pagos consecutivos`}</p>
                                                                     <div className="space-y-1.5 mb-4 border-t border-gray-100 pt-3">
-                                                                        {totales.desglose.filter((d: any) => !d.es_pago_unico && d.precio_anual > 0).map((d: any, i: number) => (
+                                                                        {recurringLines.map((d, i) => (
                                                                             <div key={i} className="flex justify-between text-[10px] text-gray-500 font-medium">
                                                                                 <span className="truncate">{d.nombre}</span>
                                                                                 <span className="font-bold text-gray-700 ml-2 flex-shrink-0">${d.precio_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                                             </div>
                                                                         ))}
                                                                         {!isPU && pt.recargo_mensual_monto > 0 && <div className="flex justify-between text-[10px] text-blue-500 font-medium"><span>+ {plan.etiqueta_ajuste?.trim() || 'Financiamiento'} ({plan.interes_porcentaje}%)</span><span>+${pt.recargo_mensual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
-                                                                        {plan.tipo_ajuste === 'discount' && pt.ahorro_pago_anual > 0 && <div className="flex justify-between text-[10px] text-emerald-600 font-medium"><span>- Descuento anticipado ({plan.interes_porcentaje}%)</span><span>-${pt.ahorro_pago_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
+                                                                        {planDiscAmt > 0 && <div className="flex justify-between text-[10px] text-emerald-600 font-medium"><span>- {plan.etiqueta_ajuste?.trim() || 'Descuento anticipado'} ({plan.interes_porcentaje}%)</span><span>-${planDiscAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
+                                                                        {manualDiscOnRec > 0 && <div className="flex justify-between text-[10px] text-emerald-600 font-medium"><span>- Descuento ({formData.descuento_porcentaje}%)</span><span>-${manualDiscOnRec.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
                                                                         <div className="flex justify-between text-[10px] text-gray-400 font-medium"><span>IVA ({formData.iva_porcentaje}%)</span><span className={isPU ? 'text-emerald-500' : 'text-blue-500'}>+${pt.iva_monto_recurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                                                                         <div className="pt-2 border-t border-gray-100 flex justify-between text-[11px] font-bold text-gray-700"><span>Total {isPU ? 'a pagar' : `(${numCuotas} cuotas)`}</span><span>${pt.total_recurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                                                                     </div>
@@ -2179,21 +2262,26 @@ export default function CotizadorPro() {
                                     <div className="space-y-1 text-sm">
                                         {(() => {
                                             const paqSel = paquetes.find(p => p.id === formData.paquete_id);
-                                            const costoImpPaquete = paqSel?.costo_implementacion || 0;
+                                            const costoImpPaqueteOrig = paqSel?.costo_implementacion || 0;
+                                            const costoImpPaquete = paqSel ? (implementationOverride ?? costoImpPaqueteOrig) : 0;
                                             const hybridItemsSel = [
                                                 ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
                                                 ...servicios.filter(s => formData.servicios_ids.includes(s.id))
                                             ].filter(item => {
                                                 const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
                                                 const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
-                                                const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
+                                                const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0 || item.precio_por_dte > 0);
                                                 const hasSetup = (item.pago_unico || 0) > 0;
                                                 return hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
                                             });
-                                            const costoImpHibridos = hybridItemsSel.reduce((sum, item) => sum + (item.pago_unico || 0), 0);
+                                            const costoImpHibridos = hybridItemsSel.reduce(
+                                                (sum, item) => sum + (setupOverrides[item.id] ?? (item.pago_unico || 0)),
+                                                0
+                                            );
                                             const costoImp = costoImpPaquete + costoImpHibridos;
+                                            const hasAnyImpl = costoImpPaqueteOrig > 0 || hybridItemsSel.length > 0;
 
-                                            if (costoImp === 0) return null;
+                                            if (!hasAnyImpl) return null;
                                             return (
                                                 <div className="flex justify-between items-center bg-amber-50 p-2 rounded-lg border border-amber-200 mb-2">
                                                     <div>
@@ -2213,9 +2301,17 @@ export default function CotizadorPro() {
                                                             checked={formData.incluir_implementacion}
                                                             onChange={(e) => {
                                                                 const turningOn = e.target.checked;
-                                                                // Auto-reset to original price if turning ON with price at 0
-                                                                if (turningOn && implementationOverride === 0) {
-                                                                    setImplementationOverride(costoImp);
+                                                                if (turningOn) {
+                                                                    if (implementationOverride === 0 && costoImpPaqueteOrig > 0) {
+                                                                        setImplementationOverride(costoImpPaqueteOrig);
+                                                                    }
+                                                                    setSetupOverrides(prev => {
+                                                                        const next = { ...prev };
+                                                                        hybridItemsSel.forEach(h => {
+                                                                            if (next[h.id] === 0) delete next[h.id];
+                                                                        });
+                                                                        return next;
+                                                                    });
                                                                 }
                                                                 setFormData({ ...formData, incluir_implementacion: turningOn });
                                                             }}

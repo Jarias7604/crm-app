@@ -121,9 +121,15 @@ export function generateContractDefaults(seed: ContractSeedData): {
   if (Array.isArray(cotizacion?.modulos_adicionales)) {
     cotizacion.modulos_adicionales.forEach((m: any) => {
       const nombre = typeof m === 'string' ? m : m.nombre;
-      const precio = typeof m === 'object' ? (m.pago_unico || m.costo_anual || m.costo_mensual) : null;
+      const pagoUnico = typeof m === 'object' ? Number(m.pago_unico || 0) : 0;
+      const costoAnual = typeof m === 'object' ? Number(m.costo_anual || m.costo_mensual || 0) : 0;
       if (nombre) {
-        modulosList.push(precio ? `${nombre} ($${Number(precio).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD)` : nombre);
+        if (pagoUnico > 0 && costoAnual > 0) {
+          modulosList.push(`${nombre} ($${costoAnual.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD/año + $${pagoUnico.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD impl.)`);
+        } else {
+          const precio = pagoUnico || costoAnual;
+          modulosList.push(precio ? `${nombre} ($${Number(precio).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD)` : nombre);
+        }
       }
     });
   }

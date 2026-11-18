@@ -717,12 +717,12 @@ export default function PublicQuoteView() {
                                                     </div>
                                                 ))
                                             }
-                                            {/* Servicios o setup fees de pago único */}
+                                            {/* Servicios o setup fees de pago único (solo en propuestas sin recurrentes; los setups híbridos van en Pago Inicial) */}
                                             {plan.show_breakdown !== false && (cotizacion.modulos_adicionales || [])
-                                                .filter((mod: any) => Number(mod.pago_unico) > 0 && (isServiceOnly || Number(mod.costo_anual || mod.costo) > 0))
+                                                .filter((mod: any) => isServiceOnly && Number(mod.pago_unico) > 0)
                                                 .map((mod: any, modIdx: number) => (
                                                     <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
-                                                        <span className="truncate">{mod.nombre} {Number(mod.costo_anual || mod.costo) > 0 ? '(Setup)' : ''}</span>
+                                                        <span className="truncate">{mod.nombre}</span>
                                                         <span className="font-bold text-slate-700 ml-2 flex-shrink-0">
                                                             ${Number(mod.pago_unico).toLocaleString()}
                                                         </span>
@@ -763,7 +763,7 @@ export default function PublicQuoteView() {
                                             {pf.tipoAjuste === 'discount' && pf.ajustePct > 0 && (
                                                 <div className="flex justify-between text-[10px] text-emerald-600 font-medium">
                                                     <span>- {plan.etiqueta_ajuste?.trim() || 'Descuento anticipado'} ({Math.round(pf.ajustePct * 100)}%)</span>
-                                                    <span>-${((isServiceOnly ? pf.implementacion : pf.licenciaAnual) * pf.ajustePct).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    <span>-${(isServiceOnly ? pf.descuentoImplementacionMonto : (pf.licenciaAnual * pf.ajustePct)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                             )}
                                             {/* Descuento manual del agente */}
@@ -830,10 +830,12 @@ export default function PublicQuoteView() {
                                             <span className="font-bold text-slate-800 whitespace-nowrap">${implementacionBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                     )}
-                                    {serviciosUnicos.map((serv: any, idx: number) => (
+                                    {serviciosUnicos.map((serv: any, idx: number) => {
+                                        const isHibrido = Number(serv.costo_anual || serv.costo) > 0;
+                                        return (
                                         <div key={idx} className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
                                             <span className="truncate flex-1">
-                                                {serv.nombre}
+                                                {isHibrido ? `Implementación · ${serv.nombre}` : serv.nombre}
                                                 {Number(serv.cantidad) > 1 && (
                                                     <span className="text-[10px] text-orange-600 font-bold ml-1.5">
                                                         ({serv.cantidad} {formatUnitLabel(serv.unidad, Number(serv.cantidad), serv.tipo)} × ${Number(serv.precio_unitario || (Number(serv.pago_unico) / Number(serv.cantidad))).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })})
@@ -842,7 +844,8 @@ export default function PublicQuoteView() {
                                             </span>
                                             <span className="font-bold text-slate-800 whitespace-nowrap">${Number(serv.pago_unico).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                     {descuentoImplementacionMonto > 0 && (
                                         <div className="flex justify-between items-center text-[11px] text-emerald-600 font-bold gap-2">
                                             <span className="truncate flex-1">{ajusteLabel || 'Descuento aplicado'}</span>
