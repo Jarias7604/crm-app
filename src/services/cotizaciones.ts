@@ -6,7 +6,12 @@ class CotizacionesService {
         if (cot?.creator && typeof cot.creator === 'object') {
             const raw = String(cot.creator.full_name || '').trim();
             if (!raw || /simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(raw)) {
-                cot.creator = { ...cot.creator, full_name: 'Jimmy Arias' };
+                const email = cot.creator.email as string | undefined;
+                const fallback =
+                    email === 'jarias7604@gmail.com' || email === 'jarias@ariasdefense.com'
+                        ? 'Jimmy Arias'
+                        : (email?.split('@')[0] || cot.company?.name || 'Asesor Comercial');
+                cot.creator = { ...cot.creator, full_name: fallback };
             }
         }
         return cot;

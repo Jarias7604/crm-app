@@ -1030,7 +1030,7 @@ export default function CotizacionDetalle() {
                                     {(cotizacion.creator?.full_name &&
                                     !/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(cotizacion.creator.full_name)
                                         ? cotizacion.creator.full_name
-                                        : 'Jimmy Arias'
+                                        : (cotizacion.creator?.email?.split('@')[0] || cotizacion.company?.name || 'Asesor Comercial')
                                     ).toUpperCase()}
                                 </h4>
                                 <div className="flex items-center gap-3 mt-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">

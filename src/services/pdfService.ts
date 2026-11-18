@@ -93,11 +93,11 @@ export const pdfService = {
                 doc.setTextColor(255, 255, 255);
                 doc.setFontSize(11);
                 doc.setFont('helvetica', 'bold');
-                doc.text((cotizacion.company?.name || 'ARIAS DEFENSE').toUpperCase(), margin, 40);
+                doc.text((cotizacion.company?.name || 'MI EMPRESA').toUpperCase(), margin, 40);
 
                 doc.setTextColor(42, 171, 238); // C_BLUE_ACCENT
                 doc.setFontSize(8);
-                doc.text((cotizacion.company?.website || 'WWW.ARIASDEFENSE.COM').toUpperCase(), margin, 45);
+                doc.text((cotizacion.company?.website || '').toUpperCase(), margin, 45);
 
                 doc.setTextColor(148, 163, 184);
                 doc.setFontSize(7);
@@ -158,9 +158,14 @@ export const pdfService = {
                 doc.setTextColor(15, 23, 42);
                 doc.setFontSize(10);
                 const rawCreatorName = String(cotizacion.creator?.full_name || '').trim();
+                const creatorEmail = cotizacion.creator?.email;
+                const creatorFallback =
+                    creatorEmail === 'jarias7604@gmail.com' || creatorEmail === 'jarias@ariasdefense.com'
+                        ? 'JIMMY ARIAS'
+                        : (creatorEmail?.split('@')[0] || cotizacion.company?.name || 'ASESOR COMERCIAL').toUpperCase();
                 const cleanCreatorName =
                     !rawCreatorName || /simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(rawCreatorName)
-                        ? 'JIMMY ARIAS'
+                        ? creatorFallback
                         : rawCreatorName.toUpperCase();
                 doc.text(cleanCreatorName, margin + agentS + 4, fY + 16);
                 doc.setTextColor(100, 116, 139);

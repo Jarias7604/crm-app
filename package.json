@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "audit:rls": "node scripts/audit-rls.cjs"
+    "audit:rls": "node scripts/audit-rls.cjs",
+    "test": "node scripts/test-financials.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

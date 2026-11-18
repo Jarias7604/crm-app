@@ -99,9 +99,13 @@ export const bookingService = {
             .single();
 
         let avatarUrl = profile?.avatar_url || link.avatar_url;
-        let displayName = link.display_name || profile?.full_name || 'Jimmy Arias';
+        const ownerFallback =
+            user.email === 'jarias7604@gmail.com' || user.email === 'jarias@ariasdefense.com'
+                ? 'Jimmy Arias'
+                : (user.email?.split('@')[0] || 'Asesor Comercial');
+        let displayName = link.display_name || profile?.full_name || ownerFallback;
         if (/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator|^agent$/i.test(displayName)) {
-            displayName = 'Jimmy Arias';
+            displayName = ownerFallback;
         }
 
         // ⚡ SPECIAL PLATFORM OWNER SYNC:
@@ -198,7 +202,10 @@ export const bookingService = {
             }
         }
         if (!displayName || /simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator|^agent$/i.test(displayName)) {
-            displayName = 'Jimmy Arias';
+            displayName =
+                profile?.email === 'jarias7604@gmail.com' || profile?.email === 'jarias@ariasdefense.com'
+                    ? 'Jimmy Arias'
+                    : (profile?.email?.split('@')[0] || company?.name || 'Asesor Comercial');
         }
 
         return {

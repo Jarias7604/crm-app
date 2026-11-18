@@ -26,7 +26,6 @@ const Companies         = lazy(() => import('./pages/admin/Companies'));
 const Team              = lazy(() => import('./pages/company/Team'));
 const Permissions       = lazy(() => import('./pages/company/Permissions'));
 const Cotizaciones      = lazy(() => import('./pages/Cotizaciones'));
-const NuevaCotizacion   = lazy(() => import('./pages/NuevaCotizacionDinamica'));
 const CatalogoProductos   = lazy(() => import('./pages/CatalogoProductos'));
 const FinancialRules    = lazy(() => import('./pages/admin/FinancialRules'));
 const LossReasons       = lazy(() => import('./pages/admin/LossReasons'));
@@ -219,7 +218,7 @@ function App() {
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/leads" element={<Leads />} />
                   <Route path="/cotizaciones" element={<Cotizaciones />} />
-                  <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />
+                  <Route path="/cotizaciones/nueva" element={<Navigate to="/cotizaciones/nueva-pro" replace />} />
                   <Route path="/cotizaciones/nueva-pro" element={<CotizadorPro />} />
                   <Route path="/cotizaciones/:id/editar" element={<CotizadorPro />} />
                   <Route path="/cotizaciones/:id" element={<CotizacionDetalle />} />

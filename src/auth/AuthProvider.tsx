@@ -33,13 +33,16 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
-function sanitizeUserFullName(rawName?: string | null, fallback = 'Jimmy Arias'): string {
+function sanitizeUserFullName(rawName?: string | null, email?: string | null): string {
     const clean = String(rawName || '').trim();
     if (
         !clean ||
         /simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(clean)
     ) {
-        return fallback;
+        if (email === 'jarias7604@gmail.com' || email === 'jarias@ariasdefense.com') {
+            return 'Jimmy Arias';
+        }
+        return email ? email.split('@')[0] : 'Usuario';
     }
     return clean;
 }
@@ -106,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     sessionStorage.removeItem('crm_cached_profile_v1');
                     localStorage.removeItem('crm_cached_profile_v1');
                 } else if (cachedProfile?.id) {
-                    cachedProfile.full_name = sanitizeUserFullName(cachedProfile.full_name, 'Jimmy Arias');
+                    cachedProfile.full_name = sanitizeUserFullName(cachedProfile.full_name, cachedProfile.email);
                     setProfile(cachedProfile);
                 }
             } catch {
@@ -381,7 +384,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 
                 const masterCompanyId = simCompanyId || data.company_id || '7a582ba5-f7d0-4ae3-9985-35788deb1c30';
                 const finalRole = (simRole as any) || 'super_admin';
-                const realFullName = sanitizeUserFullName(data.full_name, 'Jimmy Arias');
+                const realFullName = sanitizeUserFullName(data.full_name, _userEmail || data.email);
 
                 // Auto-repair DB profile full_name if it was ever set to Platform Owner or Simulación
                 if (data.full_name !== realFullName) {
@@ -635,7 +638,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setSimulatedRole(null);
                 }
             }
-            finalProfile.full_name = sanitizeUserFullName(finalProfile.full_name, 'Jimmy Arias');
+            finalProfile.full_name = sanitizeUserFullName(finalProfile.full_name, finalProfile.email);
             setProfile(finalProfile);
             // ⚡ Cache active profile for instant optimistic hydration on reload (only if active)
             if (finalProfile && finalProfile.is_active !== false && finalProfile.status !== 'inactive') {
