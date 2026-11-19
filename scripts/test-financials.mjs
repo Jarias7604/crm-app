@@ -446,7 +446,7 @@ const dualSubscriptionItem = () => ({
   incluye_en_paquete: false,
   activo: true,
   orden: 1,
-  modelo_precio: 'suscripcion_dual',
+  modelo_precio: 'suscripcion_anual',
   unidad: 'und',
   cantidad_default: 1,
   metadata: null,
@@ -696,4 +696,30 @@ test('12. Suscripción Dual + descuento manual 10% y generación de contrato coi
   const clause1 = contract.clausulas.find((c) => c.numero === 'PRIMERA')?.contenido || '';
   assert.ok(clause1.includes('$20.00 USD/mes'), 'Contrato en 12 cuotas debe mostrar tarifa mensual $20.00 USD/mes');
   assertClose(contract.valor_cuota, 20.34, 'Cuota contrato dual 12M con desc 10% = $20.34');
+});
+
+test('13. CatalogoProductos solo escribe valores válidos de pricing_items_modelo_precio_check', () => {
+  const allowed = new Set([
+    'precio_fijo',
+    'por_hora',
+    'por_unidad',
+    'suscripcion_mensual',
+    'suscripcion_anual',
+    'implementacion',
+    'por_volumen',
+  ]);
+  const src = fs.readFileSync(path.resolve('src/pages/CatalogoProductos.tsx'), 'utf8');
+  const assignBlockMatch = src.match(/Si controla stock[\s\S]*?finalUpdate\.metadata\s*=/);
+  assert.ok(assignBlockMatch, 'Debe encontrarse el bloque de asignación de finalUpdate.modelo_precio');
+  const literals = [...assignBlockMatch[0].matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]);
+  const modelLiterals = literals.filter((v) => v.includes('_') || ['implementacion'].includes(v));
+  assert.ok(modelLiterals.includes('suscripcion_anual'), 'Debe incluir suscripcion_anual');
+  assert.ok(modelLiterals.includes('suscripcion_mensual'), 'Debe incluir suscripcion_mensual');
+  assert.ok(modelLiterals.includes('precio_fijo'), 'Debe incluir precio_fijo');
+  assert.ok(modelLiterals.includes('por_unidad'), 'Debe incluir por_unidad');
+  for (const val of modelLiterals) {
+    if (['equipo', 'partes', 'repuestos', 'unidad', 'recurrente', 'unico', 'unit_price'].includes(val)) continue;
+    assert.ok(allowed.has(val), `modelo_precio "${val}" viola constraint CHECK pricing_items_modelo_precio_check`);
+  }
+  assert.ok(!assignBlockMatch[0].includes('suscripcion_dual'), 'No debe enviarse suscripcion_dual a pricing_items');
 });

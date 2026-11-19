@@ -237,9 +237,7 @@ export default function CatalogoProductos() {
                 finalUpdate.unidad = uiState.unidad_medida || 'unidad';
                 finalUpdate.precio_unitario = effectiveUnitPrice;
             } else if (uiState.frecuencia_cobro === 'recurrente') {
-                finalUpdate.modelo_precio = (finalUpdate.precio_mensual > 0 && finalUpdate.precio_anual > 0)
-                    ? 'suscripcion_dual'
-                    : (finalUpdate.precio_anual > 0 ? 'suscripcion_anual' : 'suscripcion_mensual');
+                finalUpdate.modelo_precio = finalUpdate.precio_anual > 0 ? 'suscripcion_anual' : 'suscripcion_mensual';
             } else {
                 finalUpdate.modelo_precio = 'precio_fijo';
             }

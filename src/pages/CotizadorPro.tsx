@@ -1172,7 +1172,13 @@ export default function CotizadorPro() {
                             const isSelected = isModulo ? formData.modulos_ids.includes(item.id) : formData.servicios_ids.includes(item.id);
                             const toggle = isModulo ? () => toggleModulo(item.id) : () => toggleServicio(item.id);
                             const p = computeQuoteItemPricing(item);
-                            const modelo = (item as any).modelo_precio || (p.tracksStock || p.isPhysical ? 'por_unidad' : (p.hasDualPricing ? 'suscripcion_dual' : (p.isMonthlyOnly ? 'suscripcion_mensual' : (p.esPagoUnico ? 'precio_fijo' : 'suscripcion_anual'))));
+                            const modelo = (p.tracksStock || p.isPhysical || (item as any).modelo_precio === 'por_unidad')
+                                ? 'por_unidad'
+                                : (p.hasDualPricing
+                                    ? 'suscripcion_dual'
+                                    : (p.isMonthlyOnly
+                                        ? 'suscripcion_mensual'
+                                        : ((item as any).modelo_precio || (p.esPagoUnico ? 'precio_fijo' : 'suscripcion_anual'))));
                             const meta = MODELO_LABELS[modelo] || MODELO_LABELS.precio_fijo;
                             const { needsQty, qty } = p;
                             const stockActual = Number(item.stock_actual ?? item.metadata?.stock_actual ?? 0);
@@ -1282,7 +1288,13 @@ export default function CotizadorPro() {
                                 : formData.servicios_ids.includes(item.id);
                             const toggle = isModulo ? () => toggleModulo(item.id) : () => toggleServicio(item.id);
                             const p = computeQuoteItemPricing(item);
-                            const modelo = (item as any).modelo_precio || (p.tracksStock || p.isPhysical ? 'por_unidad' : (p.hasDualPricing ? 'suscripcion_dual' : (p.isMonthlyOnly ? 'suscripcion_mensual' : (p.esPagoUnico ? 'precio_fijo' : 'suscripcion_anual'))));
+                            const modelo = (p.tracksStock || p.isPhysical || (item as any).modelo_precio === 'por_unidad')
+                                ? 'por_unidad'
+                                : (p.hasDualPricing
+                                    ? 'suscripcion_dual'
+                                    : (p.isMonthlyOnly
+                                        ? 'suscripcion_mensual'
+                                        : ((item as any).modelo_precio || (p.esPagoUnico ? 'precio_fijo' : 'suscripcion_anual'))));
                             const meta = MODELO_LABELS[modelo] || MODELO_LABELS.precio_fijo;
                             const { needsQty, qty } = p;
                             const stockActual = Number(item.stock_actual ?? item.metadata?.stock_actual ?? 0);
