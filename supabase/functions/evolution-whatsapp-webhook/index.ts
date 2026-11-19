@@ -15,548 +15,83 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { decode as decodeBase64 } from 'https://deno.land/std@0.168.0/encoding/base64.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import {
+  corsHeaders,
+  SUPPORT_PHONE,
+  MEDIA_BUCKET,
+  MEDIA_MAX_ATTEMPTS,
+  MEDIA_RETRY_AFTER_MS,
+  GROUP_SYNC_EVERY_MS,
+  STAFF_GROUP_MIN,
+  STAFF_GROUP_SHARE,
+  TZ,
+  type WaScope,
+  type SupportChannelType,
+  SCOPE_TITLE_TAG,
+  MEDIA_KINDS,
+  json,
+  digits,
+  last8,
+  jidPhone,
+  jidLid,
+  shellSafe,
+  b64Utf8,
+  fmtTime,
+  normName,
+  messageDate,
+} from './types.ts';
+import {
+  staffGroupThreshold,
+  getBridgeState,
+  setBridgeState,
+  evolutionCredentials,
+  normalizeInstance,
+  enqueueOutbox,
+} from './bridgeState.ts';
+import {
+  normalizeGreetingText,
+  isGreetingOrClosingAgreement,
+  isNonTechnicalAdministrativeChat,
+  stripLeadingGreetingForTicketTitle,
+  classifyIssueCategory,
+  isGenericProblemTitle,
+} from './classification.ts';
+import {
+  DEFAULT_AI_PROMPTS,
+  DEFAULT_RESOLVED_REPLY_TEMPLATE,
+  DEFAULT_RESOLVED_TRIGGER_PHRASES,
+  isAlreadyResolvedReply,
+  renderResolvedReplyTemplate,
+  loadSupportAiConfig,
+  aiBotLabel,
+  askOpenAiTechnicalClassifier,
+  askOpenAi,
+  transcribeAudio,
+} from './aiHelpers.ts';
+import {
+  unwrapMessage,
+  extractMedia,
+  mediaPlaceholder,
+  slimMediaObject,
+  extractText,
+  guessExt,
+  mediaTypeForSend,
+  cleanMeta,
+} from './messageParsing.ts';
+import {
+  handleBridgeSh,
+  handleBridgeAck,
+  handleBridgeStatus,
+} from './bridge.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-evolution-apikey',
+export type { SupportChannelType };
+export {
+  DEFAULT_AI_PROMPTS,
+  DEFAULT_RESOLVED_REPLY_TEMPLATE,
+  DEFAULT_RESOLVED_TRIGGER_PHRASES,
+  isAlreadyResolvedReply,
+  renderResolvedReplyTemplate,
 };
-
-const SUPPORT_PHONE = '50379718911';
-const MEDIA_BUCKET = 'whatsapp-media';
-const MEDIA_MAX_ATTEMPTS = 3;
-const MEDIA_RETRY_AFTER_MS = 2 * 60 * 1000;
-const GROUP_SYNC_EVERY_MS = 6 * 60 * 60 * 1000;
-// A phone present in a large share of ALL client groups is our own staff (techs/owners
-// are added to every group); clients/accountants appear in only a few.
-const STAFF_GROUP_MIN = 5;
-const STAFF_GROUP_SHARE = 0.3;
-
-async function staffGroupThreshold(supabase: any, companyId: string): Promise<number> {
-  const { count } = await supabase
-    .from('whatsapp_groups')
-    .select('id', { count: 'exact', head: true })
-    .eq('company_id', companyId);
-  return Math.max(STAFF_GROUP_MIN, Math.ceil((count || 0) * STAFF_GROUP_SHARE));
-}
-const TZ = 'America/El_Salvador';
-
-type WaScope = 'soporte' | 'por_clasificar' | 'lead' | 'interno' | 'spam';
-export type SupportChannelType = 'soporte' | 'contabilidad' | 'ventas' | 'otros';
-
-const SCOPE_TITLE_TAG: Record<WaScope, string> = {
-  soporte: 'Soporte',
-  por_clasificar: 'Por clasificar',
-  lead: 'Lead',
-  interno: 'Equipo',
-  spam: 'Spam',
-};
-
-const MEDIA_KINDS: Record<string, 'image' | 'video' | 'audio' | 'document' | 'sticker'> = {
-  imageMessage: 'image',
-  videoMessage: 'video',
-  ptvMessage: 'video',
-  audioMessage: 'audio',
-  documentMessage: 'document',
-  stickerMessage: 'sticker',
-};
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-
-function digits(v: unknown): string {
-  return String(v || '').replace(/\D/g, '');
-}
-
-function last8(v: unknown): string {
-  const d = digits(v);
-  return d.length >= 8 ? d.slice(-8) : '';
-}
-
-function jidPhone(jid: string): string {
-  return /@(s\.whatsapp\.net|c\.us)$/.test(jid || '') ? digits(jid.split('@')[0]) : '';
-}
-
-function jidLid(jid: string): string {
-  return /@lid$/.test(jid || '') ? digits(jid.split('@')[0]) : '';
-}
-
-// Only [A-Za-z0-9_-] may ever reach a shell line.
-function shellSafe(v: unknown): string {
-  return String(v || '').replace(/[^a-zA-Z0-9_-]/g, '');
-}
-
-function b64Utf8(s: string): string {
-  return btoa(unescape(encodeURIComponent(s)));
-}
-
-function fmtTime(d: Date): string {
-  return d.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
-}
-
-function normName(s: string): string {
-  return (s || '')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function messageDate(entry: any): Date {
-  const raw = entry?.messageTimestamp;
-  const n = Number(typeof raw === 'object' && raw !== null ? raw.low : raw);
-  if (!Number.isFinite(n) || n <= 0) return new Date();
-  const ms = n > 1e12 ? n : n * 1000;
-  // Never trust a timestamp in the future (clock skew) or older than 30 days for "now" ordering.
-  if (ms > Date.now() + 5 * 60 * 1000) return new Date();
-  return new Date(ms);
-}
-
-// ─── Classification of the PROBLEM category (support only) ───────────────────
-
-function normalizeGreetingText(text: string): string {
-  return (text || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/bu3n/g, 'buen')
-    .replace(/0la/g, 'ola')
-    .replace(/[¡!¿?.,;:👍🙏👌✅🙌😊🤝🙃🟢🐺\-_/()]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function isGreetingOrClosingAgreement(text: string): boolean {
-  const raw = String(text || '').trim();
-  if (!raw || /^[.\s…_-]+$/.test(raw)) return true;
-
-  const clean = normalizeGreetingText(raw);
-  if (clean.length < 4) return true;
-
-  const startsWithAgreement =
-    /^(ok|okay|okey|va|dale|de acuerdo|esta bien|perfecto|excelente|entendido|entiendo|muchas gracias|gracias|mil gracias|ah ok|ah bueno|listo|ya quedo|si esta bien|bueno)\b/i.test(
-      clean
-    );
-  const hasExplicitNewErrorAfterOk =
-    /\b(pero sigue|sigue dando|no funciono|volvio a fallar|otro problema|otro error|no ingresa|no me deja|no carga|error|falla)\b/i.test(
-      clean
-    );
-  if (startsWithAgreement && !hasExplicitNewErrorAfterOk && clean.length <= 65) return true;
-
-  const greetingWord =
-    '(?:hola+|ola+|buen(?:os|as)?(?:\\s+(?:dias?|tardes?|noches?))?|saludos|hey|alo|que\\s+tal|disculpe|perdon)';
-  const vocative =
-    '(?:muchachos|chicos|equipo|soporte|amigos?|inges?|ingenieros?|lic(?:enciados?)?|melvin|gerson|jimmy|paty|patricia|estimados?|companeros?|todos|como\\s+estan|como\\s+esta)';
-  const pureGreetingRegex = new RegExp(
-    `^${greetingWord}(?:\\s+${greetingWord})*(?:\\s+${vocative})*$`,
-    'i'
-  );
-  return pureGreetingRegex.test(clean);
-}
-
-function isNonTechnicalAdministrativeChat(text: string): boolean {
-  const clean = normalizeGreetingText(text);
-  if (!clean) return false;
-  const hasTechFailure =
-    /\b(error|falla|fallando|fallo|no puedo|no podemos|no pude|no funciona|no ingresa|no carga|no genera|no transmite|no actualiza|no refleja|no da paso|no da acceso|rechaza|rechazado|bloqueado|caido|correlativo|dte|hacienda|factura|invalidacion|firmador|sello|planilla|iva|anexo|inventario|soporte|ayuda|capacitacion)\b/i.test(
-      clean
-    );
-  if (hasTechFailure) return false;
-
-  return (
-    /\b(numero de cuenta|cuenta bancaria|comparte.*cuenta|para el pago de este mes)\b/i.test(clean) ||
-    /\b(vamos con la reunion|ya estoy en el link|link de la reunion)\b/i.test(clean) ||
-    /\b(para analizarla y hablamos luego|sobre los cambios)\b/i.test(clean)
-  );
-}
-
-function stripLeadingGreetingForTicketTitle(text: string): string {
-  const flat = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!flat) return '';
-  let trimmed = flat;
-  const leadingPrefixRe =
-    /^(?:(?:hola+|ola+|(?:muy\s+)?buen(?:os|as)?(?:\s+(?:d[ií]as?|tardes?|noches?))?|saludos|estimados?|disculpen?|perd[oó]n|qu[eé]\s+tal)(?:\s+(?:muchachos|chicos|equipo|soporte|amigos?|inges?|ingenieros?|lic(?:enciados?)?|paty|patricia|gerson|melvin|jimmy|estimados?|por\s+favor))?|(?:nos\s+pueden\s+ayudar(?:\s+por\s+favor)?|me\s+pueden\s+ayudar(?:\s+por\s+favor)?|por\s+favor))[\s,!¡¿?.:;\-–—👍🙏👌✅🙌😊🤝🙃🟢🐺]*/i;
-  for (let i = 0; i < 4; i++) {
-    const next = trimmed.replace(leadingPrefixRe, '').trim();
-    if (next === trimmed) break;
-    trimmed = next;
-  }
-  const result = trimmed.length >= 6 ? trimmed : flat;
-  return result.charAt(0).toUpperCase() + result.slice(1);
-}
-
-export const DEFAULT_AI_PROMPTS: Record<SupportChannelType, string> = {
-  soporte:
-    'Eres el Asistente IA de Soporte Técnico de Arias Defense / ERP Facturación Electrónica (DTE Hacienda). Lee o escucha lo que el cliente reportó y respóndele de forma amable, clara y resolutiva en máximo 3 líneas por WhatsApp. Confírmale que entendiste su reporte técnico y pídele captura de pantalla del error o su código de AnyDesk si requiere revisión en su equipo.',
-  contabilidad:
-    'Eres el Asistente IA del Área Contable y Fiscal (Libros de IVA, Planillas, Declaraciones F07/F14, Anexos Hacienda y Retenciones). Lee o escucha la consulta del cliente y respóndele de forma profesional, precisa y amable en máximo 3 líneas por WhatsApp. Si necesita revisión de algún libro, anexo o cuadre contable, pídele el período (mes/año) o captura del reporte para que el especialista contable lo valide.',
-  ventas:
-    'Eres el Asesor Comercial IA de Arias Defense (Sistemas ERP, Facturación Electrónica DTE, Contabilidad, POS e Inventarios). El cliente está consultando por precios, planes, demostración o nuevos productos. Respóndele con entusiasmo, cortesía y enfoque comercial en máximo 3 líneas por WhatsApp: infórmale que contamos con planes adaptados a su volumen de facturación/operación y pregúntale su giro de negocio o cantidad aproximada de documentos mensuales para enviarle su cotización o agendar una demo.',
-  otros:
-    'Eres el Asistente IA de Atención al Cliente de Arias Defense. Lee o escucha el mensaje del cliente y respóndele de forma cortés, clara y servicial en máximo 3 líneas por WhatsApp, confirmando que recibimos su consulta y canalizándola con el área correspondiente.',
-};
-
-function classifyIssueCategory(text: string): {
-  category: string;
-  shortCategoryTag: string;
-  supportChannel: SupportChannelType;
-  isActualSupportProblem: boolean;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-} {
-  const textWithoutMediaPlaceholders = (text || '')
-    .replace(/^\[(Imagen|Video|Sticker|Nota de voz|Documento|Archivo)[^\]]*\]$/i, '')
-    .trim();
-  const lower = textWithoutMediaPlaceholders
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-  const has = (list: string[]) => list.some((k) => lower.includes(k));
-
-  const isUrgent = has(['urgente', 'caido', 'se cayo', 'no funciona nada', 'bloqueado', 'no podemos facturar', 'no me deja facturar', 'produccion', 'error critico']);
-  const isSales = has(['precio', 'precios', 'costo', 'costos', 'cotizacion', 'cotizar', 'cuanto cuesta', 'cuanto vale', 'planes', 'mensualidad', 'anualidad', 'demo', 'demostracion', 'comprar', 'adquirir', 'contratar', 'licencia', 'licencias', 'paquete', 'paquetes', 'tarifa', 'tarifas', 'implementacion', 'me interesa el sistema', 'informacion del sistema', 'quiero informacion', 'venden', 'ofrecen', 'prospecto']);
-  const isAccounting = has(['contabilidad', 'contable', 'contador', 'libro de iva', 'libros de iva', 'libro compras', 'libro ventas', 'consumidor final', 'contribuyente', 'declaracion', 'anexo', 'anexos', 'f07', 'f-07', 'f14', 'f-14', 'f11', 'retencion', 'percepcion', 'planilla', 'planillas', 'isss', 'afp', 'renta', 'balance general', 'estado de resultado', 'partida contable', 'partidas', 'catalogo de cuentas', 'cierre contable', 'conciliacion']);
-  const isOtherProduct = has(['otro producto', 'otros productos', 'otro servicio', 'otros servicios', 'catalogo', 'horario de atencion', 'ubicacion', 'direccion', 'estado de cuenta']);
-  const hasProblemKeyword = has([
-    'error', 'problema', 'falla', 'fallando', 'fallo', 'no deja', 'no me deja', 'no puedo', 'no podemos', 'no pude',
-    'no ingresa', 'no me puedo lograr', 'no me puedo loguear', 'no me deja entrar', 'no pude entrar', 'no da paso', 'no da acceso',
-    'no hay conexion', 'se ha caido', 'se cayo', 'caido el sistema', 'correlativo', 'no se estan actualizando', 'no actualiza',
-    'no refleja', 'arroja error', 'da error', 'sigue dando el problema', 'error de calculo', 'no me deja facturar',
-    'no carga', 'no sale', 'no aparece', 'no funciona', 'no genera', 'no transmite', 'no envia', 'no cuadra', 'no imprime', 'impresora',
-    'ayuda', 'ayudarme', 'ayuden', 'apoyo', 'soporte', 'revisar', 'revisen', 'arreglar', 'corregir', 'bug', 'lento', 'traba', 'pegado',
-    'rechaza', 'rechazado', 'inconveniente', 'duda', 'consulta', 'como hago', 'factura', 'facturar', 'facturacion', 'dte', 'hacienda',
-    'invalidacion', 'credito fiscal', 'comprobante', 'liquidacion', 'sello', 'firmador', 'contingencia', 'planilla', 'calculo',
-    'permiso', 'acceso', 'contrasena', 'login', 'sincroniza', 'base de datos', 'capacitacion', 'capacitaciom', 'entrenamiento', 'iva'
-  ]);
-  const isClosingOrGreeting = isGreetingOrClosingAgreement(textWithoutMediaPlaceholders);
-  const isAdminNonTech = isNonTechnicalAdministrativeChat(textWithoutMediaPlaceholders);
-  const isActualSupportProblem =
-    Boolean(lower) && (isUrgent || isAccounting || hasProblemKeyword) && !isClosingOrGreeting && !isAdminNonTech;
-
-  let supportChannel: SupportChannelType = 'soporte';
-  let category = 'Soporte General / Consulta';
-  let shortCategoryTag = 'Soporte';
-
-  if (isSales && !hasProblemKeyword) {
-    supportChannel = 'ventas';
-    category = 'Ventas / Precios / Cotización';
-    shortCategoryTag = 'Ventas / Precios';
-  } else if (isAccounting) {
-    supportChannel = 'contabilidad';
-    category = 'Contabilidad / IVA / Planillas';
-    shortCategoryTag = 'Contabilidad';
-  } else if (isOtherProduct && !hasProblemKeyword) {
-    supportChannel = 'otros';
-    category = 'Otros Productos / Información General';
-    shortCategoryTag = 'Otros Productos';
-  } else if (/dte|hacienda|factur|invalidaci|credito fiscal|fe\b|contingencia|sello|firmador|correlativo|liquidacion|comprobante/i.test(lower)) {
-    category = 'Facturación Electrónica / DTE / Hacienda';
-    shortCategoryTag = 'Facturación DTE';
-  } else if (/whatsapp\s*api|cola\s+de\s+whatsapp|no\s+envia\s+whatsapp|evolution\s*api|mensajeria\s+whatsapp/i.test(lower)) {
-    category = 'WhatsApp / Mensajería / API';
-    shortCategoryTag = 'WhatsApp API';
-  } else if (/login|acceso|usuario|permiso|contrasen|rol|sesion|no\s+ingresa|loguear|lograr|da\s+paso|entrar/i.test(lower)) {
-    category = 'Accesos / Usuarios / Permisos';
-    shortCategoryTag = 'Accesos/Permisos';
-  } else if (/reporte|excel|pdf|descarga|filtro|estadistica|dashboard/i.test(lower)) {
-    category = 'Reportes / Exportación / Datos';
-    shortCategoryTag = 'Reportes';
-  } else if (/calculo|monto|total|descuento|abono|cuota|prima|cobro/i.test(lower)) {
-    supportChannel = 'contabilidad';
-    category = 'Cálculos / Finanzas / Pagos';
-    shortCategoryTag = 'Contabilidad';
-  } else if (/lento|carga|caido|cayo|conexion|servidor|base\s+de\s+datos|sql|sincroni/i.test(lower)) {
-    category = 'Infraestructura / Base de Datos / Lentitud';
-    shortCategoryTag = 'Base de Datos/Server';
-  }
-
-  return { category, shortCategoryTag, supportChannel, isActualSupportProblem, priority: isUrgent ? 'urgent' : 'high' };
-}
-
-function isGenericProblemTitle(title: string): boolean {
-  const snippet = String(title || '').replace(/^\[WhatsApp\s*·\s*[^\]]+\]\s*[^:]+:\s*/i, '').trim();
-  if (!snippet || snippet.length < 18) return true;
-  if (/^\[(Imagen|Video|Sticker|Nota de voz|Documento|Archivo)/i.test(snippet)) return true;
-  if (isGreetingOrClosingAgreement(snippet)) return true;
-  return /tengo un problema|necesito ayuda|una consulta|me ayudan|hay un error|no funciona|sobre los cambios$/i.test(snippet);
-}
-
-// ─── AI config (stored per-company + synced with active OpenAI integration) ──
-
-export const DEFAULT_RESOLVED_REPLY_TEMPLATE =
-  '¡Muchas gracias por comentarnos, {nombre}! Qué gusto saber que ya cuentan con una solución. Quedamos a su entera disposición por si en el futuro desean evaluar nuevas opciones o apoyo adicional. ¡Muchos éxitos en sus operaciones! 🤝';
-
-export const DEFAULT_RESOLVED_TRIGGER_PHRASES: string[] = [
-  'ya resolvimos',
-  'lo resolvimos',
-  'ya se resolvio',
-  'ya lo resolvimos',
-  'ya resolvi',
-  'ya lo resolvi',
-  'ya contamos con un servicio',
-  'ya contamos con servicio',
-  'ya contamos con un sistema',
-  'ya contamos con sistema',
-  'ya contamos con proveedor',
-  'tenemos un servicio',
-  'ya tenemos un servicio',
-  'ya tenemos servicio',
-  'ya tenemos un sistema',
-  'ya tenemos sistema',
-  'ya tenemos proveedor',
-  'ya contratamos',
-  'ya adquirimos',
-  'ya implementamos',
-  'por ahora no necesitamos',
-  'no necesitamos por ahora',
-  'ya no necesitamos',
-  'ya no lo necesitamos',
-];
-
-function normalizePhraseText(raw: string): string {
-  return String(raw || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[.,;:¡!¿?\-_/()"'+*👍🙏👌✅🙌😊🤝]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-export function isAlreadyResolvedReply(text: string, customPhrases?: string[]): boolean {
-  const raw = String(text || '').trim();
-  if (!raw || raw.length > 180) return false;
-  // Never auto-reply if the prospect asks a question
-  if (/[?¿]/.test(raw)) return false;
-
-  const norm = normalizePhraseText(raw);
-  if (!norm || norm.length < 6) return false;
-
-  // Never trigger if message contains buying intent, future follow-up, or support keywords
-  const blockRegex =
-    /\b(cotiz\w*|precio\w*|costo\w*|cuanto\w*|plan|planes|demo\w*|informaci\w*|info|interesa\w*|comenzando|iniciando|adelante|despues|proxim\w*|llamar\w*|llamame|reuni\w*|agendar|visita\w*|error\w*|falla\w*|problema\w*|ayuda\w*|soporte|anydesk)\b/i;
-  if (blockRegex.test(norm)) return false;
-
-  const phrases = Array.isArray(customPhrases) && customPhrases.length > 0 ? customPhrases : DEFAULT_RESOLVED_TRIGGER_PHRASES;
-  for (const p of phrases) {
-    const np = normalizePhraseText(p);
-    if (np && np.length >= 5 && norm.includes(np)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function isBusinessOrGenericLeadName(raw?: string | null): boolean {
-  const clean = String(raw || '')
-    .replace(/\(\+?\d+\)/g, '')
-    .trim();
-  if (!clean) return true;
-  if (/^(sin\s+nombre|contacto|cliente|prospecto|lead|soporte|admin|usuario|desconocido|whatsapp|\+?\d+)/i.test(clean)) {
-    return true;
-  }
-  return /\b(casa|inversiones|lotificaci[oó]n|lotificadora|comedor|constructora|corporaci[oó]n|corp\b|grupo|residencial|tienda|ferreter[ií]a|cl[ií]nica|hotel|restaurante|autolote|auto\s+lote|taller|farmacia|supermercado|distribuidora|importadora|servicios|soluciones|agencia|asociaci[oó]n|fundaci[oó]n|iglesia|colegio|escuela|academia|laboratorio|panader[ií]a|pasteler[ií]a|est[eé]tica|sal[oó]n|barber[ií]a|gym|gimnasio|transporte|transportes|log[ií]stica|inmobiliaria|bienes\s+ra[ií]ces|desarrollos|urbanica|bosque|villas|finca|hacienda|agro|veterinaria|[oó]ptica|dental|odontolog[ií]a|abogados|bufete|contadores|despacho|consultor[ií]a|ingenier[ií]a|arquitectura|proyectos|multitienda|variedades|bazar|librer[ií]a|papeler[ií]a|imprenta|sublimaci[oó]n|publicidad|marketing|tecnolog[ií]a|sistemas|repuestos|lubricantes|llantas|motos|lavander[ií]a|florister[ií]a|eventos|banquetes|catering|seguridad|vigilancia|mantenimiento|refrigeraci[oó]n|el[eé]ctrica|plomer[ií]a|vidrier[ií]a|estructuras|carpinter[ií]a|muebler[ií]a|muebles|textiles|confecciones|bordados|serigraf[ií]a|pl[aá]sticos|empaques|reciclaje|gasolinera|cooperativa|financiera|seguros|corredora|aduana|aduanal|naviera|carga|courier|encomiendas|turismo|viajes|tours|alquiler|bodega|bodegas|almac[eé]n|mayorista|av[ií]cola|granero|granja|beneficio|caf[eé]|cafeter[ií]a|pizzer[ií]a|taquer[ií]a|pupuser[ií]a|asados|mariscos|cevicher[ií]a|spa\b|plaza\b|mercado|sucursal|boutique|s\.a\.|de\s+c\.v\.)\b/i.test(
-    clean
-  );
-}
-
-function extractCleanFirstName(rawName?: string | null): string {
-  const clean = String(rawName || '')
-    .replace(/\(\+?\d+\)/g, '')
-    .trim();
-  if (!clean || isBusinessOrGenericLeadName(clean)) return '';
-  if (/[_@]/.test(clean)) return '';
-  const withoutTitle = clean
-    .replace(/^(lic(da|do)?|ing|arq|dr|dra|sr|sra|srta|don|doña|prof|abog|pastor|cnel|gral)\.?\s+/i, '')
-    .trim();
-  if (!withoutTitle) return '';
-  const tokens = withoutTitle.split(/[\s,.-]+/).filter(Boolean);
-  const first = tokens[0] || '';
-  if (first.length < 2 || /\d/.test(first)) return '';
-  if (tokens.length === 1 && first.length > 10) return '';
-  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
-}
-
-export function renderResolvedReplyTemplate(template: string, rawName?: string | null): string {
-  const base = String(template || DEFAULT_RESOLVED_REPLY_TEMPLATE).trim() || DEFAULT_RESOLVED_REPLY_TEMPLATE;
-  const firstName = extractCleanFirstName(rawName);
-  const cleanCompany = String(rawName || '').replace(/\(\+?\d+\)/g, '').trim() || 'su empresa';
-
-  let out = base.replace(/\{empresa\}/gi, cleanCompany);
-  if (firstName) {
-    out = out.replace(/\{nombre\}/gi, firstName);
-  } else {
-    out = out
-      .replace(/,\s*\{nombre\}/gi, '')
-      .replace(/\s+\{nombre\}/gi, '')
-      .replace(/\{nombre\}/gi, '');
-  }
-  return out.replace(/\s{2,}/g, ' ').trim();
-}
-
-async function loadSupportAiConfig(supabase: any, companyId?: string | null) {
-  const { data: openAiInt } = await supabase
-    .from('marketing_integrations')
-    .select('id, settings')
-    .eq('provider', 'openai')
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
-  const rawSettings = (openAiInt?.settings || {}) as Record<string, any>;
-  const openAiKey = String(rawSettings.apiKey || Deno.env.get('OPENAI_API_KEY') || '').trim();
-  const globalSavedCfg = (rawSettings.support_ai_config || {}) as Record<string, any>;
-
-  let companySavedCfg: Record<string, any> = {};
-  if (companyId) {
-    try {
-      companySavedCfg = await getBridgeState(supabase, `ai_config_${companyId}`);
-    } catch {
-      companySavedCfg = {};
-    }
-  }
-  const savedCfg: Record<string, any> = { ...globalSavedCfg, ...companySavedCfg };
-  const rawPhrases = savedCfg.resolved_trigger_phrases;
-  const resolvedTriggerPhrases: string[] = Array.isArray(rawPhrases)
-    ? rawPhrases.map((p: any) => String(p || '').trim()).filter(Boolean)
-    : typeof rawPhrases === 'string' && rawPhrases.trim()
-    ? rawPhrases
-        .split(',')
-        .map((p) => p.trim())
-        .filter(Boolean)
-    : DEFAULT_RESOLVED_TRIGGER_PHRASES;
-
-  return {
-    integrationId: (openAiInt?.id as string) || null,
-    openAiKey,
-    rawSettings,
-    autoReplyText: savedCfg.auto_reply_text === true,
-    autoReplyAudio: savedCfg.auto_reply_audio === true,
-    autoReplyResolvedEnabled: savedCfg.auto_reply_resolved_enabled === true,
-    autoResolvedMarkLost: savedCfg.auto_resolved_mark_lost !== false,
-    resolvedReplyTemplate: String(savedCfg.resolved_reply_template || DEFAULT_RESOLVED_REPLY_TEMPLATE).trim(),
-    resolvedTriggerPhrases: resolvedTriggerPhrases.length > 0 ? resolvedTriggerPhrases : DEFAULT_RESOLVED_TRIGGER_PHRASES,
-    prompts: {
-      soporte: String(savedCfg.prompt_soporte || DEFAULT_AI_PROMPTS.soporte).trim(),
-      contabilidad: String(savedCfg.prompt_contabilidad || DEFAULT_AI_PROMPTS.contabilidad).trim(),
-      ventas: String(savedCfg.prompt_ventas || DEFAULT_AI_PROMPTS.ventas).trim(),
-      otros: String(savedCfg.prompt_otros || DEFAULT_AI_PROMPTS.otros).trim(),
-    } as Record<SupportChannelType, string>,
-  };
-}
-
-function aiBotLabel(ch: SupportChannelType): string {
-  if (ch === 'contabilidad') return '🤖 IA Contabilidad';
-  if (ch === 'ventas') return '🤖 IA Ventas';
-  if (ch === 'otros') return '🤖 IA Atención';
-  return '🤖 IA Soporte';
-}
-
-async function askOpenAiTechnicalClassifier(openAiKey: string, text: string): Promise<boolean> {
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openAiKey}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        temperature: 0,
-        max_tokens: 40,
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Eres un clasificador estricto de tickets de Soporte Técnico para software ERP / Facturación Electrónica DTE / Contabilidad. Responde SOLO JSON válido: {"is_technical":true} si el mensaje reporta un error, falla, problema de acceso, caída del sistema, duda operativa técnica, solicitud de soporte/capacitación o problema contable/DTE; o {"is_technical":false} si es solo un saludo, cortesía, agradecimiento, coordinación administrativa, pago/número de cuenta o charla general sin problema técnico.',
-          },
-          { role: 'user', content: text.slice(0, 600) },
-        ],
-      }),
-    });
-    if (!res.ok) return false;
-    const j = await res.json();
-    const raw = String(j?.choices?.[0]?.message?.content || '').trim();
-    try {
-      const parsed = JSON.parse(raw);
-      return parsed?.is_technical === true;
-    } catch {
-      return /"is_technical"\s*:\s*true/i.test(raw);
-    }
-  } catch (e) {
-    console.error('[wa] OpenAI tech classifier error', e);
-    return false;
-  }
-}
-
-async function askOpenAi(openAiKey: string, systemPrompt: string, userContent: string): Promise<string> {
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openAiKey}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        temperature: 0.4,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent },
-        ],
-      }),
-    });
-    if (!res.ok) return '';
-    const j = await res.json();
-    return String(j?.choices?.[0]?.message?.content || '').trim();
-  } catch (e) {
-    console.error('[wa] OpenAI error', e);
-    return '';
-  }
-}
-
-async function transcribeAudio(openAiKey: string, bytes: Uint8Array, mime: string): Promise<string> {
-  try {
-    const form = new FormData();
-    form.append('file', new Blob([bytes], { type: mime || 'audio/ogg' }), 'voice.ogg');
-    form.append('model', 'whisper-1');
-    form.append('language', 'es');
-    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${openAiKey}` },
-      body: form,
-    });
-    if (!res.ok) return '';
-    const j = await res.json();
-    return String(j?.text || '').trim();
-  } catch (e) {
-    console.error('[wa] Whisper error', e);
-    return '';
-  }
-}
-
-// ─── Evolution key / instance (never hardcoded, never stored in tickets) ─────
-
-async function getBridgeState(supabase: any, key: string): Promise<Record<string, any>> {
-  const { data } = await supabase.from('whatsapp_bridge_state').select('value').eq('key', key).maybeSingle();
-  return (data?.value || {}) as Record<string, any>;
-}
-
-async function setBridgeState(supabase: any, key: string, value: Record<string, any>) {
-  await supabase
-    .from('whatsapp_bridge_state')
-    .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
-}
-
-async function evolutionCredentials(supabase: any): Promise<{ key: string; instance: string }> {
-  const envKey = Deno.env.get('EVOLUTION_API_KEY') || '';
-  const envInstance = Deno.env.get('EVOLUTION_INSTANCE') || '';
-  if (envKey) return { key: envKey, instance: envInstance || 'soporte' };
-  const st = await getBridgeState(supabase, 'evolution');
-  return { key: String(st.apikey || ''), instance: envInstance || String(st.instance || 'soporte') };
-}
-
-function normalizeInstance(name: unknown): string {
-  const n = String(name || '').trim();
-  return !n || n === 'arias' ? 'soporte' : n;
-}
 
 // ─── Company + team helpers ──────────────────────────────────────────────────
 
@@ -979,93 +514,6 @@ async function rescopeChats(supabase: any, companyId: string): Promise<{ checked
   return { checked: latestByJid.size, changed };
 }
 
-// ─── Message parsing ─────────────────────────────────────────────────────────
-
-function unwrapMessage(raw: any): any {
-  return (
-    raw?.ephemeralMessage?.message ||
-    raw?.viewOnceMessage?.message ||
-    raw?.viewOnceMessageV2?.message ||
-    raw?.viewOnceMessageV2Extension?.message ||
-    raw?.documentWithCaptionMessage?.message ||
-    raw?.deviceSentMessage?.message ||
-    raw?.editedMessage?.message?.protocolMessage?.editedMessage ||
-    raw ||
-    {}
-  );
-}
-
-function extractMedia(msgObj: any): { field: string; kind: string; obj: any } | null {
-  for (const field of Object.keys(MEDIA_KINDS)) {
-    if (msgObj?.[field]) return { field, kind: MEDIA_KINDS[field], obj: msgObj[field] };
-  }
-  return null;
-}
-
-function mediaPlaceholder(kind: string, obj: any): string {
-  if (kind === 'image') return '[Imagen enviada por WhatsApp]';
-  if (kind === 'audio') return '[Nota de voz enviada por WhatsApp]';
-  if (kind === 'video') return '[Video enviado por WhatsApp]';
-  if (kind === 'sticker') return '[Sticker enviado por WhatsApp]';
-  if (kind === 'document') return `[Documento: ${obj?.fileName || obj?.title || 'Archivo'}]`;
-  return '[Archivo]';
-}
-
-// Media object without thumbnails/context (keeps the shell line small).
-function slimMediaObject(obj: any): any {
-  const out: Record<string, any> = {};
-  for (const [k, v] of Object.entries(obj || {})) {
-    if (/thumbnail|contextInfo|scansSidecar|scanLengths|streamingSidecar|waveform/i.test(k)) continue;
-    out[k] = v;
-  }
-  return out;
-}
-
-function extractText(msgObj: any, rawMsgObj: any, entry: any): string {
-  const ext = msgObj?.extendedTextMessage || rawMsgObj?.extendedTextMessage || {};
-  return String(
-    msgObj?.conversation ||
-      ext?.text ||
-      ext?.matchedText ||
-      ext?.canonicalUrl ||
-      ext?.title ||
-      msgObj?.imageMessage?.caption ||
-      msgObj?.videoMessage?.caption ||
-      msgObj?.documentMessage?.caption ||
-      msgObj?.buttonsResponseMessage?.selectedDisplayText ||
-      msgObj?.listResponseMessage?.title ||
-      msgObj?.templateButtonReplyMessage?.selectedDisplayText ||
-      msgObj?.interactiveResponseMessage?.body?.text ||
-      entry?.body ||
-      entry?.text ||
-      (msgObj?.contactMessage || msgObj?.contactsArrayMessage ? '[Contacto enviado por WhatsApp]' : '') ||
-      (msgObj?.locationMessage ? '[Ubicacion enviada por WhatsApp]' : '') ||
-      ''
-  ).trim();
-}
-
-function guessExt(mime: string, fileName: string): string {
-  const fromName = (fileName || '').split('.').pop() || '';
-  if (fromName && fromName.length <= 5 && fromName !== fileName) return shellSafe(fromName).toLowerCase() || 'bin';
-  const m = (mime || '').split(';')[0].trim();
-  const map: Record<string, string> = {
-    'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
-    'video/mp4': 'mp4', 'video/3gpp': '3gp', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a',
-    'application/pdf': 'pdf',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
-    'application/vnd.ms-excel': 'xls', 'application/msword': 'doc', 'text/plain': 'txt',
-  };
-  return map[m] || 'bin';
-}
-
-function mediaTypeForSend(mime: string): 'image' | 'video' | 'audio' | 'document' {
-  if (mime.startsWith('image/')) return 'image';
-  if (mime.startsWith('video/')) return 'video';
-  if (mime.startsWith('audio/')) return 'audio';
-  return 'document';
-}
-
 // ─── Auth for actions invoked from the CRM UI ────────────────────────────────
 
 interface Caller {
@@ -1145,59 +593,6 @@ async function ticketVisibleTo(caller: Caller, ticketId: string): Promise<boolea
   return Boolean(data?.id);
 }
 
-// ─── Outbox (CRM -> WhatsApp through the bridge) ─────────────────────────────
-// One row per outgoing message in whatsapp_outbox (atomic, no lost updates).
-
-async function enqueueOutbox(
-  supabase: any,
-  item: {
-    companyId: string;
-    ticketId: string;
-    commentId: string | null;
-    instance: string;
-    number: string;
-    kind: 'text' | 'media';
-    payload: Record<string, any>;
-    createdBy?: string | null;
-  }
-) {
-  if (!item.number) return null;
-  const { data, error } = await supabase
-    .from('whatsapp_outbox')
-    .insert({
-      company_id: item.companyId,
-      ticket_id: item.ticketId,
-      comment_id: item.commentId,
-      instance: normalizeInstance(item.instance),
-      number: item.number,
-      kind: item.kind,
-      payload: item.payload,
-      created_by: item.createdBy || null,
-    })
-    .select('id')
-    .single();
-  if (error) {
-    console.error('[wa] outbox insert error', error);
-    return null;
-  }
-  return data?.id || null;
-}
-
-// Strip secrets / legacy queues that older versions stored in ticket metadata.
-function cleanMeta(meta: Record<string, any>): Record<string, any> {
-  const m = { ...(meta || {}) };
-  delete m.evolution_apikey;
-  delete m.pending_audio_jobs;
-  delete m.last_bridge_evo_response;
-  if (Array.isArray(m.pending_whatsapp_outbox)) {
-    m.pending_whatsapp_outbox = m.pending_whatsapp_outbox.map((i: any) => {
-      const { apikey: _k, ...rest } = i || {};
-      return rest;
-    });
-  }
-  return m;
-}
-
 // =============================================================================
 // HTTP handler
 // =============================================================================
@@ -1221,7 +616,7 @@ serve(async (req: Request) => {
   try {
     if (req.method === 'GET') {
       if (url.searchParams.get('action') === 'bridge_sh') {
-        return await handleBridgeSh(supabase, selfUrl);
+        return await handleBridgeSh(supabase, selfUrl, { resolveMainCompanyId, rescopeChats });
       }
       return json({ ok: true, status: 'active', service: 'evolution-whatsapp-webhook', version: '2026-11-06' });
     }
@@ -2158,360 +1553,6 @@ async function handleRetryMedia(supabase: any, caller: Caller, payload: any): Pr
   return json({ ok: true });
 }
 
-// =============================================================================
-// Bridge (polled by the Evolution server) — every user value is base64-encoded
-// or reduced to [A-Za-z0-9_-] before reaching the shell.
-// =============================================================================
-
-async function handleBridgeSh(supabase: any, selfUrl: string): Promise<Response> {
-  const { key, instance } = await evolutionCredentials(supabase);
-  const safeKey = shellSafe(key);
-  const lines: string[] = [];
-  const evo = 'http://localhost:8085';
-  const now = new Date();
-  await setBridgeState(supabase, 'bridge_last_poll', { at: now.toISOString() });
-
-  if (!safeKey) return new Response('# no evolution key configured\n', { headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' } });
-
-  // 0. Recently active conversations: legacy queued items (pre-upgrade) and group subject sync.
-  const { data: recent } = await supabase
-    .from('tickets')
-    .select('id, company_id, metadata')
-    .eq('metadata->>source', 'whatsapp_evolution')
-    .order('updated_at', { ascending: false })
-    .limit(40);
-  for (const row of recent || []) {
-    const m = row.metadata || {};
-    const queue: any[] = Array.isArray(m.pending_whatsapp_outbox) ? m.pending_whatsapp_outbox : [];
-    const legacyPending = queue.filter((i) => i && i.status === 'pending');
-    const needsSubject = typeof m.whatsapp_jid === 'string' && m.whatsapp_jid.endsWith('@g.us') && !m.group_subject_synced;
-    if (legacyPending.length === 0 && !needsSubject) continue;
-
-    for (const item of legacyPending) {
-      await enqueueOutbox(supabase, {
-        companyId: row.company_id, ticketId: row.id, commentId: item.comment_id || null,
-        instance: item.instance || instance, number: item.number, kind: 'text', payload: { text: item.text },
-      });
-    }
-    if (needsSubject) {
-      const inst = shellSafe(normalizeInstance(m.evolution_instance || instance));
-      const syncUrl = `${selfUrl}?action=sync_group_subject&ticket_id=${shellSafe(row.id)}`;
-      lines.push(
-        `(curl -s "${evo}/group/findGroupInfos/${inst}?groupJid=${encodeURIComponent(m.whatsapp_jid).replace(/[^a-zA-Z0-9%._-]/g, '')}" -H "apikey: ${safeKey}" | curl -s -X POST "${syncUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
-      );
-    }
-    await supabase
-      .from('tickets')
-      .update({
-        metadata: {
-          ...cleanMeta(m),
-          pending_whatsapp_outbox: queue.map((i) => {
-            const { apikey: _k, ...rest } = i || {};
-            return rest.status === 'pending' ? { ...rest, status: 'migrated' } : rest;
-          }),
-          ...(needsSubject ? { group_subject_synced: true } : {}),
-        },
-      })
-      .eq('id', row.id);
-  }
-
-  // 1. Outgoing messages (text + media). Each row is claimed atomically (pending -> dispatched).
-  const { data: outRows } = await supabase
-    .from('whatsapp_outbox')
-    .select('id, ticket_id, instance, number, kind, payload')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: true })
-    .limit(20);
-  for (const item of outRows || []) {
-    const { data: claimed } = await supabase
-      .from('whatsapp_outbox')
-      .update({ status: 'dispatched', dispatched_at: now.toISOString() })
-      .eq('id', item.id)
-      .eq('status', 'pending')
-      .select('id');
-    if (!claimed || claimed.length === 0) continue; // another poll took it
-    const inst = shellSafe(normalizeInstance(item.instance || instance));
-    const ackUrl = `${selfUrl}?action=bridge_ack&ticket_id=${shellSafe(item.ticket_id)}&outbox_id=${shellSafe(item.id)}`;
-    const p = item.payload || {};
-    let endpoint = 'sendText';
-    let body: Record<string, any> = { number: item.number, text: p.text || '' };
-    if (item.kind === 'media' && p.url) {
-      endpoint = 'sendMedia';
-      body = {
-        number: item.number,
-        mediatype: p.mediatype,
-        mimetype: p.mimetype,
-        caption: p.caption || '',
-        media: p.url,
-        fileName: p.fileName,
-      };
-    }
-    const b64 = b64Utf8(JSON.stringify(body));
-    lines.push(
-      `EVO_OUT=$(echo "${b64}" | base64 -d | curl -s -X POST "${evo}/message/${endpoint}/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @-); printf '%s' "$EVO_OUT" | curl -s -X POST "${ackUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1`
-    );
-  }
-
-  // 2. Media downloads (images, documents, audio, video). Run in background (&) so they never block outbox polling.
-  const staleBefore = new Date(now.getTime() - MEDIA_RETRY_AFTER_MS).toISOString();
-  const { data: mediaJobs } = await supabase
-    .from('whatsapp_messages')
-    .select('id, raw_message, media_attempts, media_status, media_requested_at')
-    .in('media_status', ['pending', 'requested'])
-    .lt('media_attempts', MEDIA_MAX_ATTEMPTS)
-    .gte('created_at', new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString())
-    .order('created_at', { ascending: true })
-    .limit(6);
-  let mediaQueued = 0;
-  for (const job of mediaJobs || []) {
-    if (mediaQueued >= 3) break;
-    if (job.media_status === 'requested' && job.media_requested_at && job.media_requested_at > staleBefore) continue;
-    if (!job.raw_message) continue;
-    const inst = shellSafe(instance);
-    const upUrl = `${selfUrl}?action=upload_media&wamsg=${shellSafe(job.id)}`;
-    const b64 = b64Utf8(JSON.stringify({ message: job.raw_message, convertToMp4: false }));
-    lines.push(
-      `(echo "${b64}" | base64 -d | curl -s -X POST "${evo}/chat/getBase64FromMediaMessage/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | curl -s -X POST "${upUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
-    );
-    await supabase
-      .from('whatsapp_messages')
-      .update({ media_status: 'requested', media_attempts: Number(job.media_attempts || 0) + 1, media_requested_at: now.toISOString() })
-      .eq('id', job.id);
-    mediaQueued++;
-  }
-  // Give up on jobs that exhausted retries.
-  await supabase
-    .from('whatsapp_messages')
-    .update({ media_status: 'failed', media_error: 'No se pudo descargar después de varios intentos' })
-    .eq('media_status', 'requested')
-    .gte('media_attempts', MEDIA_MAX_ATTEMPTS)
-    .lt('media_requested_at', staleBefore);
-
-  // 3. Periodic full group/participant sync (who belongs to which client group).
-  const gs = await getBridgeState(supabase, 'groups_sync');
-  const lastReq = gs.requested_at ? new Date(gs.requested_at).getTime() : 0;
-  if (now.getTime() - lastReq > GROUP_SYNC_EVERY_MS || gs.force === true) {
-    const inst = shellSafe(instance);
-    lines.push(
-      `(curl -s "${evo}/group/fetchAllGroups/${inst}?getParticipants=true" -H "apikey: ${safeKey}" | curl -s -X POST "${selfUrl}?action=sync_all_groups" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
-    );
-    await setBridgeState(supabase, 'groups_sync', { ...gs, requested_at: now.toISOString(), force: false });
-  }
-
-  // 4. Periodic re-check of chat classifications (every 10 min) so chats follow CRM changes.
-  const rs = await getBridgeState(supabase, 'rescope');
-  if (!rs.at || now.getTime() - new Date(rs.at).getTime() > 10 * 60 * 1000) {
-    await setBridgeState(supabase, 'rescope', { at: now.toISOString() });
-    const cid = await resolveMainCompanyId(supabase, null);
-    if (cid) {
-      rescopeChats(supabase, cid)
-        .then((r) => setBridgeState(supabase, 'rescope', { at: now.toISOString(), checked: r.checked, changed: r.changed.slice(0, 50) }))
-        .catch((e) => console.error('[wa] rescope error', e));
-    }
-  }
-
-  // 5. One-time import of photos / documents / audio / video from the chat history
-  //    (messages received before media was tracked). Runs automatically once, a few chats per poll.
-  let hi = await getBridgeState(supabase, 'history_import');
-  const histCid = !hi.status || hi.status === 'requested' ? await resolveMainCompanyId(supabase, null) : null;
-  if (histCid) {
-    const cid = histCid;
-    const since = new Date(now.getTime() - 120 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: chats } = await supabase
-      .from('tickets')
-      .select('metadata, updated_at')
-      .eq('company_id', cid)
-      .eq('metadata->>source', 'whatsapp_evolution')
-      .gte('updated_at', since)
-      .order('updated_at', { ascending: false })
-      .limit(2000);
-    const queue: { q: string; t: string }[] = [];
-    const seen = new Set<string>();
-    for (const c of chats || []) {
-      const m = c.metadata || {};
-      const tj = String(m.whatsapp_jid || '');
-      if (!tj || m.merged_into) continue;
-      const evoJids = [tj];
-      if (m.whatsapp_lid && !tj.endsWith('@g.us')) evoJids.push(`${digits(m.whatsapp_lid)}@lid`);
-      for (const q of evoJids) {
-        if (seen.has(q)) continue;
-        seen.add(q);
-        queue.push({ q, t: tj });
-      }
-    }
-    hi = { status: 'running', token: crypto.randomUUID().replace(/-/g, ''), queue, next: 0, started_at: now.toISOString() };
-    await setBridgeState(supabase, 'history_import', hi);
-  }
-  if (hi.status === 'running' && Array.isArray(hi.queue)) {
-    const inst = shellSafe(instance);
-    const batch = 3;
-    const start = Number(hi.next || 0);
-    for (let i = start; i < Math.min(start + batch, hi.queue.length); i++) {
-      for (let page = 1; page <= 3; page++) {
-        const body = b64Utf8(JSON.stringify({ where: { key: { remoteJid: hi.queue[i].q } }, page, offset: 50 }));
-        const impUrl = `${selfUrl}?action=import_history&i=${i}&token=${shellSafe(hi.token)}`;
-        lines.push(
-          `(echo "${body}" | base64 -d | curl -s -X POST "${evo}/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | curl -s -X POST "${impUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
-        );
-      }
-    }
-    const next = start + batch;
-    await setBridgeState(supabase, 'history_import', {
-      ...hi,
-      next,
-      ...(next >= hi.queue.length ? { status: 'done', finished_at: now.toISOString() } : {}),
-    });
-  }
-
-  // 6. On-demand or auto-triggered Evolution instance heal (connection check + restart + catchup).
-  const heal = await getBridgeState(supabase, 'evo_heal');
-  if (heal.status === 'requested') {
-    const inst = shellSafe(instance);
-    const healToken = crypto.randomUUID().replace(/-/g, '');
-    const mode = String(heal.mode || 'restart_and_catchup');
-    await setBridgeState(supabase, 'evo_heal', {
-      ...heal,
-      status: 'dispatched',
-      token: healToken,
-      dispatched_at: now.toISOString(),
-    });
-    const healUrl = `${selfUrl}?action=report_evo_heal&token=${shellSafe(healToken)}`;
-    if (mode === 'check_only') {
-      lines.push(
-        `(B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"state_before":"%s","webhook":"%s","restart":"","state_after":"%s"}' "$B1" "$B2" "$B1" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
-      );
-    } else if (mode === 'restore_webhook') {
-      const whBody = b64Utf8(
-        JSON.stringify({
-          webhook: {
-            enabled: true,
-            url: selfUrl,
-            webhookByEvents: false,
-            webhookBase64: true,
-            events: ['MESSAGES_UPSERT'],
-          },
-        })
-      );
-      lines.push(
-        `(B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); echo "${whBody}" | base64 -d | curl -s -X POST "${evo}/webhook/set/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- >/dev/null 2>&1; B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B3=$(curl -s "${evo}/instance/connect/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); sleep 8; B4=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"state_before":"%s","webhook":"%s","restart":"%s","state_after":"%s"}' "$B1" "$B2" "$B3" "$B4" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
-      );
-    } else if (mode === 'sync_baileys_recv') {
-      const { data: signedFix } = await supabase.storage
-        .from(MEDIA_BUCKET)
-        .createSignedUrl('system/baileys-7.0.0-rc.9-messages-recv.js', 600);
-      const fixUrlB64 = b64Utf8(String(signedFix?.signedUrl || ''));
-      lines.push(
-        `(B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); DCMD="docker"; if ! docker ps >/dev/null 2>&1 && sudo -n docker ps >/dev/null 2>&1; then DCMD="sudo -n docker"; fi; CID=$($DCMD ps --format '{{.ID}} {{.Ports}}' 2>/dev/null | grep '8085' | head -n 1 | awk '{print $1}'); FURL=$(echo "${fixUrlB64}" | base64 -d); RES="missing_cid"; if [ -n "$CID" ]; then IMG=$($DCMD inspect "$CID" --format '{{.Config.Image}}' 2>/dev/null); $DCMD cp "$CID:/evolution/node_modules/baileys/lib/Socket/messages-recv.js" /tmp/baileys_cur.js 2>/dev/null; if grep -q "CB:status" /tmp/baileys_cur.js 2>/dev/null; then CMT=$($DCMD commit --pause=false "$CID" "$IMG" 2>&1); RES="already_patched_committed:$IMG:$CMT"; elif [ -n "$FURL" ]; then curl -fsSL "$FURL" -o /tmp/baileys_mr.js && grep -q "CB:status" /tmp/baileys_mr.js && grep -q "sourceMappingURL=messages-recv.js.map" /tmp/baileys_mr.js && cp /tmp/baileys_cur.js /tmp/baileys_mr.bak && $DCMD cp /tmp/baileys_mr.js "$CID:/evolution/node_modules/baileys/lib/Socket/messages-recv.js" && CMT=$($DCMD commit --pause=false "$CID" "$IMG" 2>&1) && RST=$($DCMD restart "$CID" 2>&1) && sleep 16 && RES="patched_committed_restarted:$IMG:$CMT:$RST"; fi; fi; B3=$(printf '%s' "$RES" | base64 | tr -d '\\n'); B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B4=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"state_before":"%s","webhook":"%s","restart":"%s","state_after":"%s"}' "$B1" "$B2" "$B3" "$B4" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
-      );
-    } else {
-      lines.push(
-        `(B0=$(curl -s "${evo}/instance/fetchInstances" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); R1=$(curl -s "${evo}/instance/connect/${inst}" -H "apikey: ${safeKey}"); B3=$(printf '%s' "$R1" | base64 | tr -d '\\n'); sleep 8; B4=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"evo_info":"%s","state_before":"%s","webhook":"%s","restart":"%s","state_after":"%s"}' "$B0" "$B1" "$B2" "$B3" "$B4" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
-      );
-    }
-  }
-
-  // 7. Sequential multi-page catchup of missed text + media messages (chronological order).
-  const mc = await getBridgeState(supabase, 'message_catchup');
-  if (mc.status === 'running' && Number(mc.page) >= 1) {
-    const notBeforeOk = !mc.not_before || now.getTime() >= new Date(mc.not_before).getTime();
-    const inflightExpired = !mc.inflight_at || now.getTime() - new Date(mc.inflight_at).getTime() > 40 * 1000;
-    if (notBeforeOk && inflightExpired) {
-      const inst = shellSafe(instance);
-      const pageNum = Number(mc.page);
-      const offsetNum = Number(mc.offset || 80);
-      const sinceSec = mc.since ? Math.floor(new Date(mc.since).getTime() / 1000) : Math.floor((now.getTime() - 14 * 3600 * 1000) / 1000);
-      const whereClause = mc.no_ts_filter ? {} : { messageTimestamp: { gte: sinceSec } };
-      const body = b64Utf8(JSON.stringify({ where: whereClause, page: pageNum, offset: offsetNum }));
-      const catchupUrl = `${selfUrl}?action=catchup_messages&page=${pageNum}&token=${shellSafe(mc.token)}`;
-      lines.push(
-        `(echo "${body}" | base64 -d | curl -s -X POST "${evo}/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | curl -s -X POST "${catchupUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
-      );
-      await setBridgeState(supabase, 'message_catchup', { ...mc, inflight_at: now.toISOString() });
-    }
-  }
-
-  // 8. Permanent 2-minute watchdog: checks connectionState + latest messages, auto-recovers
-  //    dropped webhooks and auto-restarts the Evolution instance if its webhook emitter freezes.
-  const wd = await getBridgeState(supabase, 'evo_watchdog');
-  const lastWdReq = wd.requested_at ? new Date(wd.requested_at).getTime() : 0;
-  if (
-    heal.status !== 'requested' &&
-    heal.status !== 'dispatched' &&
-    mc.status !== 'running' &&
-    now.getTime() - lastWdReq > 2 * 60 * 1000
-  ) {
-    const inst = shellSafe(instance);
-    const wdToken = crypto.randomUUID().replace(/-/g, '');
-    const sinceSec = Math.floor((now.getTime() - 6 * 3600 * 1000) / 1000);
-    const wdQuery = wd.no_ts_filter && Number(wd.last_total_pages) > 0
-      ? { where: {}, page: Number(wd.last_total_pages), offset: 40 }
-      : { where: { messageTimestamp: { gte: sinceSec } }, page: 1, offset: 40 };
-    const wdBody = b64Utf8(JSON.stringify(wdQuery));
-    const wdUrl = `${selfUrl}?action=watchdog_check&token=${shellSafe(wdToken)}`;
-    lines.push(
-      `(S1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); M1=$(echo "${wdBody}" | base64 -d | curl -s -X POST "${evo}/chat/findMessages/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- | base64 | tr -d '\\n'); DCMD="docker"; if ! docker ps >/dev/null 2>&1 && sudo -n docker ps >/dev/null 2>&1; then DCMD="sudo -n docker"; fi; CID=$($DCMD ps --format '{{.ID}} {{.Ports}}' 2>/dev/null | grep '8085' | head -n 1 | awk '{print $1}'); BUP="0"; if [ -n "$CID" ]; then $DCMD cp "$CID:/evolution/node_modules/baileys/package.json" /tmp/b_pkg.json 2>/dev/null; $DCMD cp "$CID:/evolution/node_modules/baileys/lib/Socket/messages-recv.js" /tmp/b_mr.js 2>/dev/null; if grep -q '"7.0.0-rc.9"' /tmp/b_pkg.json 2>/dev/null && ! grep -q 'CB:status' /tmp/b_mr.js 2>/dev/null; then BUP="1"; fi; fi; printf '{"state":"%s","messages":"%s","baileys_unpatched":"%s"}' "$S1" "$M1" "$BUP" | curl -s -X POST "${wdUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
-    );
-    await setBridgeState(supabase, 'evo_watchdog', { ...wd, token: wdToken, requested_at: now.toISOString() });
-  }
-
-  return new Response(lines.length > 0 ? lines.join('\n') + '\n' : '# idle\n', {
-    headers: { ...corsHeaders, 'Content-Type': 'text/plain; charset=utf-8' },
-  });
-}
-
-async function handleBridgeAck(supabase: any, url: URL, payload: any): Promise<Response> {
-  const ticketId = url.searchParams.get('ticket_id') || payload?.ticket_id;
-  const outboxId = url.searchParams.get('outbox_id') || payload?.outbox_id || '';
-  if (!ticketId) return json({ ok: false, error: 'missing ticket_id' }, 400);
-  // New bridge lines post Evolution's raw response; legacy ones wrap it in evo_response.
-  let evo: any = payload?.evo_response !== undefined ? payload.evo_response : payload;
-  if (typeof evo === 'string') {
-    try {
-      evo = JSON.parse(evo);
-    } catch (_e) {
-      /* keep string */
-    }
-  }
-  const sentId: string = evo?.key?.id || '';
-  const evoError = !sentId ? JSON.stringify(evo || {}).slice(0, 300) : '';
-  const nowIso = new Date().toISOString();
-  await setBridgeState(supabase, 'bridge_last_ack', { at: nowIso, ok: Boolean(sentId), error: evoError || null });
-
-  if (!outboxId) return json({ ok: true, legacy: true });
-  const { data: ob } = await supabase
-    .from('whatsapp_outbox')
-    .update({
-      status: sentId ? 'sent' : 'error',
-      acked_at: nowIso,
-      ...(sentId ? { wa_message_id: sentId, error: null } : { error: evoError || 'Evolution no confirmó el envío' }),
-    })
-    .eq('id', outboxId)
-    .eq('ticket_id', ticketId)
-    .select('id, company_id, ticket_id, comment_id, number, kind')
-    .maybeSingle();
-  if (!ob) return json({ ok: false, error: 'outbox item not found' }, 404);
-
-  if (sentId && ob.comment_id) {
-    // Link the WhatsApp id to the chat line so the fromMe echo is recognised as a duplicate.
-    const { data: linked } = await supabase
-      .from('whatsapp_messages')
-      .update({ wa_message_id: sentId })
-      .eq('comment_id', ob.comment_id)
-      .is('wa_message_id', null)
-      .select('id');
-    if (!linked || linked.length === 0) {
-      await supabase.from('whatsapp_messages').upsert(
-        {
-          company_id: ob.company_id, ticket_id: ob.ticket_id, comment_id: ob.comment_id, wa_message_id: sentId,
-          remote_jid: ob.number, from_me: true, message_type: ob.kind === 'media' ? 'document' : 'text',
-        },
-        { onConflict: 'company_id,wa_message_id', ignoreDuplicates: true }
-      );
-    }
-  }
-  return json({ ok: true, sent: Boolean(sentId) });
-}
-
 async function handleSyncGroup(supabase: any, url: URL, payload: any): Promise<Response> {
   const ticketId = url.searchParams.get('ticket_id') || payload?.ticket_id;
   const g = payload?.data || payload || {};
@@ -3058,48 +2099,6 @@ async function handleWatchdogCheck(supabase: any, url: URL, payload: any): Promi
   });
 
   return json({ ok: true, connection_state: connState, recovered, auto_heal: autoHealTriggered });
-}
-
-async function handleBridgeStatus(supabase: any): Promise<Response> {
-  const [poll, ack, gs, wd, heal, mc, lastWh, { count: pendingMedia }, { count: failedMedia }, { count: pendingOut }, { count: errorOut }] =
-    await Promise.all([
-      getBridgeState(supabase, 'bridge_last_poll'),
-      getBridgeState(supabase, 'bridge_last_ack'),
-      getBridgeState(supabase, 'groups_sync'),
-      getBridgeState(supabase, 'evo_watchdog'),
-      getBridgeState(supabase, 'evo_heal'),
-      getBridgeState(supabase, 'message_catchup'),
-      getBridgeState(supabase, 'last_webhook_in'),
-      supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).in('media_status', ['pending', 'requested']),
-      supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('media_status', 'failed'),
-      supabase.from('whatsapp_outbox').select('id', { count: 'exact', head: true }).in('status', ['pending', 'dispatched']),
-      supabase
-        .from('whatsapp_outbox')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'error')
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
-    ]);
-  const { key } = await evolutionCredentials(supabase);
-  return json({
-    ok: true,
-    bridge_last_poll: poll.at || null,
-    bridge_last_ack: ack.at || null,
-    bridge_last_error: ack.error || null,
-    last_webhook_in: lastWh.at || null,
-    evo_connection_state: wd.connection_state || heal.connection_after || null,
-    evo_watchdog_checked_at: wd.checked_at || null,
-    evo_watchdog_recovered_total: wd.recovered_total || 0,
-    catchup_status: mc.status || null,
-    catchup_imported_total: mc.imported_total || 0,
-    groups_synced_at: gs.synced_at || null,
-    groups_count: gs.groups || 0,
-    groups_last_error: gs.last_error || null,
-    media_pending: pendingMedia || 0,
-    media_failed: failedMedia || 0,
-    outbox_pending: pendingOut || 0,
-    outbox_errors_24h: errorOut || 0,
-    evolution_key_configured: Boolean(key),
-  });
 }
 
 // =============================================================================

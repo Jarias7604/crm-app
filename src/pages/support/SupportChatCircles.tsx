@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback, memo, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Search,
@@ -31,8 +31,6 @@ import {
   Building2,
   UserPlus,
   Wrench,
-  Calculator,
-  DollarSign,
   Package,
   FolderOpen,
   Bot,
@@ -51,7 +49,6 @@ import {
   Flame,
   User,
   Filter,
-  Zap,
   MoreHorizontal,
   Calendar,
   Pencil,
@@ -91,992 +88,70 @@ import {
   type WaScope,
   type WaAccessMode,
 } from '../../lib/whatsappScopes';
-
-interface LightClientRow {
-  id: string;
-  nombre: string;
-  contacto?: string | null;
-  telefono?: string | null;
-}
-
-// ─── Helpers (Cached Intl & String Formatters for 60fps UI) ─────────────────
-
-const EMOJI_RE = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{2702}-\u{27B0}]/gu;
-const stripEmojiCache = new Map<string, string>();
-
-// Strip all emoji characters so UI uses 100% vector icons only
-function stripEmojis(text: string): string {
-  if (!text) return '';
-  const hit = stripEmojiCache.get(text);
-  if (hit !== undefined) return hit;
-  const out = text.replace(EMOJI_RE, '').replace(/[ \t]+/g, ' ').trim();
-  if (stripEmojiCache.size > 4000) stripEmojiCache.clear();
-  stripEmojiCache.set(text, out);
-  return out;
-}
-
-const TZ = 'America/El_Salvador';
-const TIME_FORMATTER = new Intl.DateTimeFormat('es-SV', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
-const DAY_KEY_FORMATTER = new Intl.DateTimeFormat('en-CA', { timeZone: TZ });
-const DAY_NO_YEAR_FORMATTER = new Intl.DateTimeFormat('es-SV', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  timeZone: TZ,
-});
-const DAY_WITH_YEAR_FORMATTER = new Intl.DateTimeFormat('es-SV', {
-  weekday: 'long',
-  day: 'numeric',
-  month: 'long',
-  year: 'numeric',
-  timeZone: TZ,
-});
-
-const fmtTimeCache = new Map<string, string>();
-const dayKeyCache = new Map<string, string>();
-const initialsCache = new Map<string, string>();
-let cachedRelativeDayBounds = { ts: 0, today: '', yesterday: '', yearPrefix: '' };
-
-function getRelativeDayBounds() {
-  const now = Date.now();
-  if (now - cachedRelativeDayBounds.ts < 15000 && cachedRelativeDayBounds.today) {
-    return cachedRelativeDayBounds;
-  }
-  const today = DAY_KEY_FORMATTER.format(new Date(now));
-  const yesterday = DAY_KEY_FORMATTER.format(new Date(now - 86400000));
-  cachedRelativeDayBounds = { ts: now, today, yesterday, yearPrefix: today.slice(0, 4) };
-  return cachedRelativeDayBounds;
-}
-
-function fmtTime(iso: string): string {
-  if (!iso) return '';
-  const hit = fmtTimeCache.get(iso);
-  if (hit !== undefined) return hit;
-  const d = new Date(iso);
-  const out = Number.isNaN(d.getTime()) ? '' : TIME_FORMATTER.format(d);
-  if (fmtTimeCache.size > 4000) fmtTimeCache.clear();
-  fmtTimeCache.set(iso, out);
-  return out;
-}
-
-function dayKey(iso: string): string {
-  if (!iso) return '';
-  const hit = dayKeyCache.get(iso);
-  if (hit !== undefined) return hit;
-  const d = new Date(iso);
-  const out = Number.isNaN(d.getTime()) ? '' : DAY_KEY_FORMATTER.format(d);
-  if (dayKeyCache.size > 4000) dayKeyCache.clear();
-  dayKeyCache.set(iso, out);
-  return out;
-}
-
-function dayLabel(iso: string): string {
-  const k = dayKey(iso);
-  if (!k) return '';
-  const { today, yesterday, yearPrefix } = getRelativeDayBounds();
-  if (k === today) return 'Hoy';
-  if (k === yesterday) return 'Ayer';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return k.slice(0, 4) === yearPrefix ? DAY_NO_YEAR_FORMATTER.format(d) : DAY_WITH_YEAR_FORMATTER.format(d);
-}
-
-function listTimeLabel(iso: string): string {
-  const k = dayKey(iso);
-  if (!k) return '';
-  const { today } = getRelativeDayBounds();
-  return k === today ? fmtTime(iso) : dayLabel(iso);
-}
-
-function initials(name: string): string {
-  if (!name) return '?';
-  const hit = initialsCache.get(name);
-  if (hit !== undefined) return hit;
-  const out =
-    stripEmojis(name)
-      .replace(/\(\+?[\d\s-]+\)/g, '')
-      .split(' ')
-      .filter(Boolean)
-      .map((w) => w[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase() || '?';
-  if (initialsCache.size > 3000) initialsCache.clear();
-  initialsCache.set(name, out);
-  return out;
-}
-
-function formatBytes(n?: number | null): string {
-  if (!n) return '';
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
-export type SupportChannelType = 'soporte' | 'contabilidad' | 'ventas' | 'otros';
-
-const SUPPORT_CHANNEL_LABELS: Record<SupportChannelType, string> = {
-  soporte: 'Soporte / Operaciones',
-  contabilidad: 'Contabilidad / Finanzas',
-  ventas: 'Ventas / Cotizaciones',
-  otros: 'Otros / General',
-};
-
-const DEFAULT_PROMPTS: Record<SupportChannelType, string> = {
-  soporte:
-    'Eres el Asistente IA de Soporte y Operaciones de nuestra empresa. Lee o escucha lo que el cliente reportó y respóndele de forma amable, clara y resolutiva en máximo 3 líneas por WhatsApp. Confírmale que entendiste su solicitud y pídele captura de pantalla, foto o detalle adicional si requiere revisión.',
-  contabilidad:
-    'Eres el Asistente IA del Área Contable, Facturación y Finanzas. Lee o escucha la consulta del cliente y respóndele de forma profesional, precisa y amable en máximo 3 líneas por WhatsApp. Si necesita revisión de algún estado de cuenta, factura o reporte, pídele el período o comprobante para validarlo.',
-  ventas:
-    'Eres el Asesor Comercial IA de nuestra empresa. El prospecto está consultando por precios, planes, catálogo o cotización. Respóndele con entusiasmo, cortesía y enfoque comercial en máximo 3 líneas por WhatsApp: infórmale que contamos con opciones adaptadas a su necesidad y pregúntale su giro o requerimiento principal para enviarle su cotización formal o agendar una demostración.',
-  otros:
-    'Eres el Asistente IA de Atención al Cliente. Lee o escucha el mensaje del cliente y respóndele de forma cortés, clara y servicial en máximo 3 líneas por WhatsApp, confirmando que recibimos su consulta y canalizándola con el especialista correspondiente.',
-};
-
-const DEFAULT_RESOLVED_REPLY_TEMPLATE =
-  '¡Muchas gracias por comentarnos, {nombre}! Qué gusto saber que ya cuentan con una solución. Quedamos a su entera disposición por si en el futuro desean evaluar nuevas opciones o apoyo adicional. ¡Muchos éxitos en sus operaciones!';
-
-const DEFAULT_RESOLVED_TRIGGER_PHRASES: string[] = [
-  'ya resolvimos',
-  'lo resolvimos',
-  'ya se resolvio',
-  'ya lo resolvimos',
-  'ya resolvi',
-  'ya lo resolvi',
-  'ya contamos con un servicio',
-  'ya contamos con servicio',
-  'ya contamos con un sistema',
-  'ya contamos con sistema',
-  'ya contamos con proveedor',
-  'tenemos un servicio',
-  'ya tenemos un servicio',
-  'ya tenemos servicio',
-  'ya tenemos un sistema',
-  'ya tenemos sistema',
-  'ya tenemos proveedor',
-  'ya contratamos',
-  'ya adquirimos',
-  'ya implementamos',
-  'por ahora no necesitamos',
-  'no necesitamos por ahora',
-  'ya no necesitamos',
-  'ya no lo necesitamos',
-];
-
-function normalizeResolvedPhraseText(raw: string): string {
-  return String(raw || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[.,;:¡!¿?\-_/()"'+*👍🙏👌✅🙌😊🤝]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function isAlreadyResolvedReply(text: string, customPhrases?: string[]): boolean {
-  const raw = String(text || '').trim();
-  if (!raw || raw.length > 180) return false;
-  if (/[?¿]/.test(raw)) return false;
-
-  const norm = normalizeResolvedPhraseText(raw);
-  if (!norm || norm.length < 6) return false;
-
-  const blockRegex =
-    /\b(cotiz\w*|precio\w*|costo\w*|cuanto\w*|plan|planes|demo\w*|informaci\w*|info|interesa\w*|comenzando|iniciando|adelante|despues|proxim\w*|llamar\w*|llamame|reuni\w*|agendar|visita\w*|error\w*|falla\w*|problema\w*|ayuda\w*|soporte|anydesk)\b/i;
-  if (blockRegex.test(norm)) return false;
-
-  const phrases = Array.isArray(customPhrases) && customPhrases.length > 0 ? customPhrases : DEFAULT_RESOLVED_TRIGGER_PHRASES;
-  for (const p of phrases) {
-    const np = normalizeResolvedPhraseText(p);
-    if (np && np.length >= 5 && norm.includes(np)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function isBusinessOrGenericName(raw?: string | null): boolean {
-  const clean = String(raw || '')
-    .replace(/\(\+?\d+\)/g, '')
-    .trim();
-  if (!clean) return true;
-  if (/^(sin\s+nombre|contacto|cliente|prospecto|lead|soporte|admin|usuario|desconocido|whatsapp|\+?\d+)/i.test(clean)) {
-    return true;
-  }
-  return /\b(casa|inversiones|lotificaci[oó]n|lotificadora|comedor|constructora|corporaci[oó]n|corp\b|grupo|residencial|tienda|ferreter[ií]a|cl[ií]nica|hotel|restaurante|autolote|auto\s+lote|taller|farmacia|supermercado|distribuidora|importadora|servicios|soluciones|agencia|asociaci[oó]n|fundaci[oó]n|iglesia|colegio|escuela|academia|laboratorio|panader[ií]a|pasteler[ií]a|est[eé]tica|sal[oó]n|barber[ií]a|gym|gimnasio|transporte|transportes|log[ií]stica|inmobiliaria|bienes\s+ra[ií]ces|desarrollos|urbanica|bosque|villas|finca|hacienda|agro|veterinaria|[oó]ptica|dental|odontolog[ií]a|abogados|bufete|contadores|despacho|consultor[ií]a|ingenier[ií]a|arquitectura|proyectos|multitienda|variedades|bazar|librer[ií]a|papeler[ií]a|imprenta|sublimaci[oó]n|publicidad|marketing|tecnolog[ií]a|sistemas|repuestos|lubricantes|llantas|motos|lavander[ií]a|florister[ií]a|eventos|banquetes|catering|seguridad|vigilancia|mantenimiento|refrigeraci[oó]n|el[eé]ctrica|plomer[ií]a|vidrier[ií]a|estructuras|carpinter[ií]a|muebler[ií]a|muebles|textiles|confecciones|bordados|serigraf[ií]a|pl[aá]sticos|empaques|reciclaje|gasolinera|cooperativa|financiera|seguros|corredora|aduana|aduanal|naviera|carga|courier|encomiendas|turismo|viajes|tours|alquiler|bodega|bodegas|almac[eé]n|mayorista|av[ií]cola|granero|granja|beneficio|caf[eé]|cafeter[ií]a|pizzer[ií]a|taquer[ií]a|pupuser[ií]a|asados|mariscos|cevicher[ií]a|spa\b|plaza\b|mercado|sucursal|boutique|s\.a\.|de\s+c\.v\.)\b/i.test(
-    clean
-  );
-}
-
-function extractCleanLeadFirstName(rawName?: string | null): string {
-  const clean = String(rawName || '')
-    .replace(/\(\+?\d+\)/g, '')
-    .trim();
-  if (!clean || isBusinessOrGenericName(clean)) return '';
-  if (/[_@]/.test(clean)) return '';
-  const withoutTitle = clean
-    .replace(/^(lic(da|do)?|ing|arq|dr|dra|sr|sra|srta|don|doña|prof|abog|pastor|cnel|gral)\.?\s+/i, '')
-    .trim();
-  if (!withoutTitle) return '';
-  const tokens = withoutTitle.split(/[\s,.-]+/).filter(Boolean);
-  const first = tokens[0] || '';
-  if (first.length < 2 || /\d/.test(first)) return '';
-  if (tokens.length === 1 && first.length > 10) return '';
-  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
-}
-
-function renderResolvedReplyTemplate(template: string, rawName?: string | null): string {
-  const base = String(template || DEFAULT_RESOLVED_REPLY_TEMPLATE).trim() || DEFAULT_RESOLVED_REPLY_TEMPLATE;
-  const firstName = extractCleanLeadFirstName(rawName);
-  const cleanCompany = String(rawName || '').replace(/\(\+?\d+\)/g, '').trim() || 'su empresa';
-
-  let out = base.replace(/\{empresa\}/gi, cleanCompany);
-  if (firstName) {
-    out = out.replace(/\{nombre\}/gi, firstName);
-  } else {
-    out = out
-      .replace(/,\s*\{nombre\}/gi, '')
-      .replace(/\s+\{nombre\}/gi, '')
-      .replace(/\{nombre\}/gi, '');
-  }
-  return out.replace(/\s{2,}/g, ' ').trim();
-}
-
-export interface QuickReplyTemplate {
-  id: string;
-  scope: 'soporte' | 'ventas';
-  label: string;
-  text: string;
-}
-
-const DEFAULT_SUPPORT_QUICK_REPLIES: QuickReplyTemplate[] = [
-  {
-    id: 'sup-rev',
-    scope: 'soporte',
-    label: 'En revisión',
-    text: 'Hola, hemos recibido su mensaje. Nuestro especialista ya está revisando su caso y le daremos respuesta en breve.',
-  },
-  {
-    id: 'sup-cap',
-    scope: 'soporte',
-    label: 'Pedir detalle / captura',
-    text: 'Estimado cliente, para ayudarle lo más rápido posible, ¿nos podría compartir por favor el detalle por escrito acompañado de una captura de pantalla o foto?',
-  },
-  {
-    id: 'sup-ok',
-    scope: 'soporte',
-    label: 'Confirmar solución',
-    text: '¡Listo! Ya aplicamos la solución correspondiente a su solicitud. ¿Nos confirma por favor si ya todo le funciona correctamente?',
-  },
-  {
-    id: 'sup-rem',
-    scope: 'soporte',
-    label: 'Asistencia remota / llamada',
-    text: 'Para asistirle directamente, ¿nos confirma por favor en qué horario está disponible o nos comparte su acceso remoto?',
-  },
-];
-
-const DEFAULT_SALES_QUICK_REPLIES: QuickReplyTemplate[] = [
-  {
-    id: 'sal-welcome',
-    scope: 'ventas',
-    label: 'Saludo comercial',
-    text: '¡Hola! Muchas gracias por escribirnos. Con gusto le asesoramos con información y precios. ¿Para qué tipo de negocio o necesidad busca la solución?',
-  },
-  {
-    id: 'sal-quote-data',
-    scope: 'ventas',
-    label: 'Pedir datos para cotizar',
-    text: 'Con mucho gusto le preparamos su cotización formal ahora mismo. ¿Me confirma por favor su nombre o empresa, correo electrónico y el requerimiento o volumen aproximado?',
-  },
-  {
-    id: 'sal-demo',
-    scope: 'ventas',
-    label: 'Agendar demo / llamada',
-    text: '¿Le gustaría que agendemos una breve llamada o demostración de 15 minutos hoy o mañana para mostrarle cómo funciona y resolver todas sus dudas?',
-  },
-  {
-    id: 'sal-followup',
-    scope: 'ventas',
-    label: 'Seguimiento de propuesta',
-    text: 'Hola, le escribo para saber si pudo revisar la cotización que le compartimos y si tiene alguna consulta o ajuste que desee que revisemos.',
-  },
-];
-
-const LEAD_STATUS_OPTIONS = [
-  'Prospecto',
-  'Llamada fría',
-  'En Nutrición',
-  'Lead calificado',
-  'En seguimiento',
-  'Negociación',
-  'Cerrado',
-  'Cliente',
-  'Perdido',
-  'Erróneo',
-] as const;
-
-type LeadStageSubFilter = 'activos' | 'sin_responder' | 'conversando' | 'perdidos' | 'erroneos' | 'todos';
-
-// Web Audio API synthesizer — zero external audio files, works across all modern browsers.
-let sharedAudioCtx: AudioContext | null = null;
-function getUnlockedAudioCtx(): AudioContext | null {
-  try {
-    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    if (!Ctx) return null;
-    if (!sharedAudioCtx) sharedAudioCtx = new Ctx();
-    if (sharedAudioCtx.state === 'suspended') {
-      sharedAudioCtx.resume().catch(() => {});
-    }
-    return sharedAudioCtx;
-  } catch {
-    return null;
-  }
-}
-
-export function playWaAlertSound(kind: 'message' | 'urgent' | 'test' = 'message'): boolean {
-  const ctx = getUnlockedAudioCtx();
-  if (!ctx) return false;
-  try {
-    const now = ctx.currentTime;
-    const notes =
-      kind === 'urgent' || kind === 'test'
-        ? [
-            { freq: 659.25, start: 0, dur: 0.14, gain: 0.28 },
-            { freq: 880.0, start: 0.15, dur: 0.14, gain: 0.3 },
-            { freq: 1046.5, start: 0.3, dur: 0.2, gain: 0.32 },
-            { freq: 880.0, start: 0.55, dur: 0.14, gain: 0.28 },
-            { freq: 1174.66, start: 0.7, dur: 0.28, gain: 0.34 },
-          ]
-        : [
-            { freq: 587.33, start: 0, dur: 0.15, gain: 0.24 },
-            { freq: 880.0, start: 0.16, dur: 0.24, gain: 0.26 },
-          ];
-    notes.forEach((n) => {
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(n.freq, now + n.start);
-      g.gain.setValueAtTime(0.0001, now + n.start);
-      g.gain.exponentialRampToValueAtTime(n.gain, now + n.start + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, now + n.start + n.dur);
-      osc.connect(g);
-      g.connect(ctx.destination);
-      osc.start(now + n.start);
-      osc.stop(now + n.start + n.dur + 0.02);
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function formatWaitDuration(mins: number): string {
-  if (mins <= 1) return '1m';
-  if (mins < 60) return `${mins}m`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (h < 24) return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  const d = Math.floor(h / 24);
-  return `${d}d`;
-}
-
-// Internal developer/system task titles that are NOT clients (legacy non-WhatsApp tickets).
-function isInternalDevOrSystemTaskTitle(rawTitle: string): boolean {
-  const clean = stripEmojis(rawTitle || '').toLowerCase();
-  return /^(importaci[oó]n de proveedores|estandarizar dise[ñn]o|actualizar precios de mayoreo|importar precios por mayoreo|ajustes de estilos|estilos cotizacion|cotizaciones:\s*(personas|quitar)|cotizaciones\s+2\s*hours|revisi[oó]n de cambios normativa|apertura de gaveta de dinero|faq erp\b|nota de remisi[oó]n\b|factura de exportaci[oó]n\b|pos\s*1\b|jornada\s+(melvin|gerson)|comunicado oficial|libro de iva para mantenimientos)/i.test(
-    clean
-  );
-}
-
-// Safe first-name greeting helper for WhatsApp messages (quotes, diagnostics, booking links).
-// Returns " Nombre" (with leading space) or "" if the name is a company, placeholder, or handle.
-function extractClientGreetingFirstName(rawName?: string | null): string {
-  const clean = String(rawName || '')
-    .replace(/\(\+?\d+\)/g, '')
-    .trim();
-  if (!clean || clean.startsWith('+') || /[_@]/.test(clean)) return '';
-  if (/^(sin\s+nombre|contacto|cliente|prospecto|lead|soporte|admin|usuario|desconocido|\+?\d+)/i.test(clean)) {
-    return '';
-  }
-  if (
-    /\b(inversiones|lotificaci[oó]n|lotificadora|comedor|constructora|corporaci[oó]n|corp\b|grupo|residencial|tienda|ferreter[ií]a|cl[ií]nica|hotel|restaurante|autolote|auto\s+lote|taller|farmacia|supermercado|distribuidora|importadora|servicios|soluciones|agencia|asociaci[oó]n|fundaci[oó]n|iglesia|colegio|escuela|academia|laboratorio|panader[ií]a|pasteler[ií]a|est[eé]tica|sal[oó]n|barber[ií]a|gym|gimnasio|transporte|transportes|log[ií]stica|inmobiliaria|bienes\s+ra[ií]ces|desarrollos|urbanica|bosque|villas|finca|hacienda|agro|veterinaria|[oó]ptica|dental|odontolog[ií]a|abogados|bufete|contadores|despacho|consultor[ií]a|ingenier[ií]a|arquitectura|proyectos|multitienda|variedades|bazar|librer[ií]a|papeler[ií]a|imprenta|sublimaci[oó]n|publicidad|marketing|tecnolog[ií]a|sistemas|repuestos|lubricantes|llantas|motos|lavander[ií]a|florister[ií]a|eventos|banquetes|catering|seguridad|vigilancia|mantenimiento|refrigeraci[oó]n|el[eé]ctrica|plomer[ií]a|vidrier[ií]a|estructuras|carpinter[ií]a|muebler[ií]a|muebles|textiles|confecciones|bordados|serigraf[ií]a|pl[aá]sticos|empaques|reciclaje|gasolinera|cooperativa|financiera|seguros|corredora|aduana|aduanal|naviera|carga|courier|encomiendas|turismo|viajes|tours|alquiler|bodega|bodegas|almac[eé]n|mayorista|av[ií]cola|granero|granja|beneficio|caf[eé]|cafeter[ií]a|pizzer[ií]a|taquer[ií]a|pupuser[ií]a|asados|mariscos|cevicher[ií]a|spa\b|plaza\b|mercado|sucursal|boutique|s\.a\.|de\s+c\.v\.)\b/i.test(
-      clean
-    )
-  ) {
-    return '';
-  }
-  const withoutTitle = clean
-    .replace(/^(lic(da|do)?|ing|arq|dr|dra|sr|sra|srta|don|doña|prof|abog|pastor|cnel|gral)\.?\s+/i, '')
-    .trim();
-  if (!withoutTitle) return '';
-  const tokens = withoutTitle.split(/[\s,.-]+/).filter(Boolean);
-  const first = tokens[0] || '';
-  if (first.length < 2 || /\d/.test(first)) return '';
-  if (tokens.length === 1 && first.length > 10) return '';
-  return ` ${first.charAt(0).toUpperCase() + first.slice(1).toLowerCase()}`;
-}
-
-// Client name for legacy (non-WhatsApp) support tickets.
-function extractLegacyClientName(t: Ticket): string {
-  if (t.lead_name && t.lead_name.trim().length > 1) {
-    return stripEmojis(t.lead_name.replace(/\(\+\d+\)/g, '').trim());
-  }
-  const colonMatch = (t.title || '').match(
-    /^(?:soporte\s+t[eé]cnico|error(?:\s+en\s+json)?\s+reportado|capacitaci[oó]n(?:\s+presencial)?|pregunta\s+frecuente|go\s*live|solicitud(?:\s+de\s+cliente)?)\s*:\s*([^-\n(|]+)/i
-  );
-  if (colonMatch && colonMatch[1]) return stripEmojis(colonMatch[1].trim());
-  return stripEmojis(t.title || 'Cliente Soporte');
-}
-
-function detectShortCategory(catName: string, title: string): { code: string; name: string; color: string } {
-  const text = `${catName} ${title}`.toLowerCase();
-  if (text.startsWith('p1') || /urgente|cr[ií]tico|hacienda|dte|factura\s+electr/i.test(text)) {
-    return { code: 'P1', name: catName || 'P1 - Prioridad Alta', color: '#EF4444' };
-  }
-  if (text.startsWith('p2') || /error\s+reportado/i.test(text)) {
-    return { code: 'P2', name: catName || 'P2 - Incidencia', color: '#F97316' };
-  }
-  if (text.startsWith('p4')) return { code: 'P4', name: catName || 'P4 - Mejoras', color: '#3B82F6' };
-  if (/pegunta|pregunta\s+frecuente/i.test(text)) return { code: 'FAQ', name: 'Preguntas Frecuentes', color: '#10B981' };
-  return { code: 'P3', name: catName || 'P3 - Soporte General', color: '#F59E0B' };
-}
-
-const SCOPE_STYLE: Record<WaScope, { avatar: string; chip: string; icon: React.ElementType }> = {
-  soporte: { avatar: 'bg-slate-100 text-slate-700', chip: 'bg-slate-100 text-slate-600 border-slate-200/80', icon: Building2 },
-  por_clasificar: { avatar: 'bg-amber-50 text-amber-700', chip: 'bg-amber-50 text-amber-800 border-amber-200/80', icon: HelpCircle },
-  lead: { avatar: 'bg-indigo-50 text-indigo-700', chip: 'bg-slate-100 text-slate-600 border-slate-200/80', icon: UserPlus },
-  interno: { avatar: 'bg-slate-100 text-slate-600', chip: 'bg-slate-100 text-slate-600 border-slate-200/80', icon: ShieldCheck },
-  spam: { avatar: 'bg-rose-50 text-rose-600', chip: 'bg-rose-50 text-rose-700 border-rose-200/80', icon: Ban },
-};
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface SupportCircle {
-  circleId: string;
-  clientName: string;
-  pushName: string;
-  phone: string;
-  whatsappJid: string;
-  isWhatsApp: boolean;
-  isGroup: boolean;
-  scope: WaScope;
-  scopeReason: string;
-  memberOfGroups: { jid: string; subject: string | null }[];
-  leadId: string | null;
-  leadStatus: string | null;
-  interestedProductId: string | null;
-  leadOwnerId: string | null;
-  leadOwnerName: string | null;
-  activeTicket: Ticket;
-  allClientTickets: Ticket[];
-  unreadOrWaitingReply: boolean;
-  waitMinutes: number;
-  lastMessageText: string;
-  lastMessageSender: string;
-  lastMessageAt: string;
-  assignedTechId: string | null;
-  assignedTechName: string;
-  categoryCode: string;
-  categoryName: string;
-  supportChannel: SupportChannelType;
-  isReactivation: boolean;
-  reactivationCampaign: string | null;
-  reactivationReplied: boolean;
-  reactivationSentAt: string;
-  reactivationTouch: number;
-  hoursSinceReactivation: number;
-  hasActiveConversation: boolean;
-}
-
-interface LeadQuoteSummary {
-  id: string;
-  plan_nombre: string;
-  total_anual: number;
-  total_mensual: number;
-  estado: string;
-  created_at: string;
-}
-
-interface TeamWaAccessMember {
-  id: string;
-  full_name: string;
-  email: string;
-  role: string;
-  role_label: string;
-  is_system_admin: boolean;
-  access_mode: WaAccessMode;
-}
-
-type OwnerSubFilter = 'all' | 'mine' | 'unassigned' | 'urgent';
-
-interface WaMessageRow {
-  id: string;
-  ticket_id: string;
-  comment_id: string | null;
-  message_type: string;
-  media_status: 'none' | 'pending' | 'requested' | 'ready' | 'failed';
-  media_path: string | null;
-  media_mime: string | null;
-  media_filename: string | null;
-  media_size: number | null;
-  media_error: string | null;
-  from_me: boolean;
-}
-
-interface OutboxRow {
-  id: string;
-  comment_id: string | null;
-  status: 'pending' | 'dispatched' | 'sent' | 'error';
-  error: string | null;
-}
-
-interface ChatItem {
-  id: string;
-  kind: 'client' | 'staff' | 'system' | 'ticket';
-  senderName: string;
-  text: string;
-  transcript?: string;
-  createdAt: string;
-  ticketId: string;
-  media?: WaMessageRow & { url?: string };
-  legacyMedia?: { url: string; type: 'image' | 'video' | 'file' | 'audio'; name?: string };
-  delivery?: OutboxRow['status'];
-  deliveryError?: string | null;
-}
-
-interface WaGroupRow {
-  group_jid: string;
-  subject: string | null;
-  client_id: string | null;
-}
-
-type CircleFilter = 'all' | 'unread' | 'waiting' | 'soporte' | 'por_clasificar' | 'lead' | 'reactivados' | 'interno' | 'spam' | 'tickets';
-
-// Parse "[10:42 a. m.] 👤 Nombre: texto" chat lines written by the webhook.
-function parseChatLine(raw: string): { icon: string; sender: string; text: string } | null {
-  const cleanedRaw = String(raw || '')
-    .replace(/👨‍💻\s*Simulaci[oó]n:\s*[a-zA-Z0-9_-]+:/gi, '👨‍💻 Jimmy Arias:')
-    .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Jimmy Arias de Arias Defense')
-    .replace(/\bPlatform Owner\b/gi, 'Jimmy Arias de Arias Defense');
-  const m = cleanedRaw.match(/^\[([^\]]+)\]\s*(👤|👨‍💻)?\s*([^:\n]+):\s*([\s\S]*)$/);
-  if (!m) return null;
-  return { icon: m[2] || '', sender: m[3].trim(), text: m[4] };
-}
-
-interface CachedTicketDescStats {
-  rev: string;
-  parsedLastLine: { icon: string; sender: string; text: string } | null;
-  hasClientLine: boolean;
-  staffLineCount: number;
-}
-const ticketDescStatsCache = new Map<string, CachedTicketDescStats>();
-function getCachedTicketDescStats(ticket: Ticket): CachedTicketDescStats {
-  const desc = String(ticket.description || '');
-  const rev = `${ticket.updated_at || ticket.created_at}|${desc.length}`;
-  const cached = ticketDescStatsCache.get(ticket.id);
-  if (cached && cached.rev === rev) return cached;
-
-  let hasClientLine = false;
-  let staffLineCount = 0;
-  let lastChatLine = '';
-  if (desc) {
-    const lines = desc.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      const l = lines[i].trim();
-      if (!l) continue;
-      const hasClient = l.includes('👤');
-      const hasStaff = l.includes('👨‍💻');
-      if (hasClient) hasClientLine = true;
-      if (hasStaff) staffLineCount++;
-      if (l.startsWith('[') && (hasClient || hasStaff)) {
-        lastChatLine = l;
-      }
-    }
-  }
-  const computed: CachedTicketDescStats = {
-    rev,
-    parsedLastLine: lastChatLine ? parseChatLine(lastChatLine) : null,
-    hasClientLine,
-    staffLineCount,
-  };
-  if (ticketDescStatsCache.size > 3500) ticketDescStatsCache.clear();
-  ticketDescStatsCache.set(ticket.id, computed);
-  return computed;
-}
-
-const ActiveSessionTimer = memo<{ startedAt: number }>(({ startedAt }) => {
-  const [sec, setSec] = useState(() => Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
-  useEffect(() => {
-    setSec(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
-    const id = window.setInterval(() => {
-      setSec(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [startedAt]);
-  return (
-    <>
-      {Math.floor(sec / 60)}m {sec % 60 < 10 ? '0' : ''}
-      {sec % 60}s
-    </>
-  );
-});
-ActiveSessionTimer.displayName = 'ActiveSessionTimer';
-
-interface CircleListRowProps {
-  circle: SupportCircle;
-  isSelected: boolean;
-  unread: boolean;
-  onSelect: (circle: SupportCircle) => void;
-}
-const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unread, onSelect }) => {
-  const isOverdue = circle.unreadOrWaitingReply && circle.waitMinutes >= 15 && circle.waitMinutes <= 24 * 60;
-  const shortType =
-    circle.scope === 'soporte'
-      ? circle.isGroup
-        ? 'Grupo'
-        : 'Cliente'
-      : circle.scope === 'por_clasificar'
-      ? 'Por tomar'
-      : circle.scope === 'lead'
-      ? circle.leadStatus && circle.leadStatus !== 'Prospecto'
-        ? circle.leadStatus
-        : 'Lead'
-      : circle.scope === 'interno'
-      ? 'Equipo'
-      : 'Spam';
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(circle)}
-      className={`w-full text-left px-3.5 py-2.5 flex items-center gap-2.5 transition relative border-l-[3px] ${
-        isSelected
-          ? 'bg-indigo-50/80 border-l-indigo-600'
-          : unread
-          ? 'bg-[#F5F7FF] hover:bg-indigo-50/60 border-l-indigo-500'
-          : 'bg-white hover:bg-slate-50/80 border-l-transparent'
-      }`}
-    >
-      <div className="relative shrink-0">
-        <div
-          className={`w-9.5 h-9.5 rounded-full flex items-center justify-center text-[13px] ${
-            unread
-              ? 'bg-indigo-100 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
-              : isSelected
-              ? 'bg-indigo-100 text-indigo-700 font-semibold'
-              : 'bg-slate-100 text-slate-500 font-semibold'
-          }`}
-        >
-          {circle.isGroup ? <Users className="w-4 h-4" /> : initials(circle.clientName)}
-        </div>
-        {unread && <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 border-2 border-white absolute -top-0.5 -right-0.5" />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-1.5">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className={`text-[14px] truncate ${unread ? 'font-bold text-slate-950' : 'font-normal text-slate-700'}`}>
-              {circle.clientName}
-            </span>
-            <span
-              className={`text-[12px] shrink-0 ${
-                circle.leadStatus === 'Perdido' || circle.leadStatus === 'Erróneo'
-                  ? 'text-slate-500 font-normal'
-                  : 'text-slate-400 font-normal'
-              }`}
-            >
-              · {shortType}
-            </span>
-            {circle.isReactivation && (
-              <span
-                title={circle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
-                className={`text-[11px] font-medium shrink-0 ${
-                  circle.reactivationReplied
-                    ? 'px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200/80'
-                    : 'text-slate-400'
-                }`}
-              >
-                {circle.reactivationReplied ? 'Respondió' : `· Toque ${circle.reactivationTouch || 1}`}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {isOverdue && (
-              <span
-                title={`Esperando respuesta hace ${formatWaitDuration(circle.waitMinutes)}`}
-                className="px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200 text-[11.5px] font-semibold inline-flex items-center gap-0.5"
-              >
-                <Clock className="w-3 h-3" />
-                {formatWaitDuration(circle.waitMinutes)}
-              </span>
-            )}
-            <span className={`text-[12px] ${unread ? 'font-bold text-indigo-600' : 'text-slate-400'}`}>
-              {listTimeLabel(circle.lastMessageAt)}
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          <p className={`text-[13px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
-            {circle.lastMessageSender}: {circle.lastMessageText}
-          </p>
-          {unread && (
-            <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10.5px] font-bold leading-none shrink-0">
-              Nuevo
-            </span>
-          )}
-        </div>
-      </div>
-    </button>
-  );
-});
-CircleListRow.displayName = 'CircleListRow';
-
-interface ChatComposerHandle {
-  setDraft: (text: string, mode?: 'whatsapp' | 'internal') => void;
-}
-interface ChatComposerProps {
-  canSend: boolean;
-  scope: WaScope;
-  sendingMessage: boolean;
-  uploadingFile: boolean;
-  activeQuickReplies: QuickReplyTemplate[];
-  onSendWhatsApp: (text: string) => Promise<boolean>;
-  onSaveInternalNote: (text: string) => Promise<boolean>;
-  onUploadAttachment: (file: File, caption: string) => Promise<boolean>;
-  onOpenNewQuickReply: () => void;
-  onEditQuickReply: (q: QuickReplyTemplate) => void;
-  onNavigateTickets: () => void;
-}
-
-const ChatComposer = memo(
-  forwardRef<ChatComposerHandle, ChatComposerProps>(
-    (
-      {
-        canSend,
-        scope,
-        sendingMessage,
-        uploadingFile,
-        activeQuickReplies,
-        onSendWhatsApp,
-        onSaveInternalNote,
-        onUploadAttachment,
-        onOpenNewQuickReply,
-        onEditQuickReply,
-        onNavigateTickets,
-      },
-      ref,
-    ) => {
-      const [messageInput, setMessageInput] = useState('');
-      const [composerMode, setComposerMode] = useState<'whatsapp' | 'internal'>('whatsapp');
-      const [showQuickRepliesPopover, setShowQuickRepliesPopover] = useState(false);
-      const fileInputRef = useRef<HTMLInputElement>(null);
-      const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-      useImperativeHandle(
-        ref,
-        () => ({
-          setDraft: (text: string, mode?: 'whatsapp' | 'internal') => {
-            if (mode) setComposerMode(mode);
-            setMessageInput(text);
-            requestAnimationFrame(() => textareaRef.current?.focus());
-          },
-        }),
-        [],
-      );
-
-      const handleSubmit = async () => {
-        const trimmed = messageInput.trim();
-        if (!trimmed || sendingMessage) return;
-        setMessageInput('');
-        if (composerMode === 'internal') {
-          const ok = await onSaveInternalNote(trimmed);
-          if (ok) setComposerMode('whatsapp');
-          else setMessageInput(trimmed);
-        } else {
-          const ok = await onSendWhatsApp(trimmed);
-          if (!ok) setMessageInput(trimmed);
-        }
-      };
-
-      const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const caption = messageInput.trim();
-        const ok = await onUploadAttachment(file, caption);
-        if (ok) setMessageInput('');
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      };
-
-      if (!canSend) {
-        return (
-          <div className="bg-white px-5 py-3 border-t border-slate-200/70 text-center text-[11px] font-semibold text-slate-400">
-            {scope === 'spam' ? (
-              'Este número está marcado como spam.'
-            ) : (
-              <>
-                Este ticket no vino por WhatsApp.{' '}
-                <button type="button" onClick={onNavigateTickets} className="text-indigo-600 font-bold underline">
-                  Gestionarlo en Tickets
-                </button>
-              </>
-            )}
-          </div>
-        );
-      }
-
-      return (
-        <div
-          className={`px-5 py-3 border-t flex items-end gap-2 transition-colors relative ${
-            composerMode === 'internal' ? 'bg-amber-50/70 border-amber-200' : 'bg-white border-slate-200/70'
-          }`}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-          {composerMode === 'whatsapp' && (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingFile}
-              title="Enviar imagen, documento o archivo"
-              className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-500 hover:bg-slate-100 flex items-center justify-center transition shrink-0 disabled:opacity-50"
-            >
-              {uploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-            </button>
-          )}
-
-          {composerMode === 'whatsapp' && (
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowQuickRepliesPopover((v) => !v)}
-                title="Respuestas rápidas y plantillas"
-                className={`px-3.5 py-2.5 rounded-xl text-[13px] font-semibold inline-flex items-center gap-1.5 border transition ${
-                  showQuickRepliesPopover
-                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                    : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-slate-100'
-                }`}
-              >
-                <Zap className="w-4 h-4 text-indigo-600" />
-                <span className="hidden sm:inline">Plantillas</span>
-              </button>
-              {showQuickRepliesPopover && (
-                <div className="absolute left-0 bottom-full mb-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-40 p-2 space-y-1">
-                  <div className="px-2.5 py-1.5 flex items-center justify-between border-b border-slate-100">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                      {scope === 'lead' || scope === 'por_clasificar' ? 'Plantillas de Ventas' : 'Plantillas de Soporte'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowQuickRepliesPopover(false);
-                        onOpenNewQuickReply();
-                      }}
-                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-0.5"
-                    >
-                      <Plus className="w-3 h-3" />
-                      Nueva / Editar
-                    </button>
-                  </div>
-                  <div className="max-h-64 overflow-y-auto divide-y divide-slate-50">
-                    {activeQuickReplies.map((q) => (
-                      <div
-                        key={q.id}
-                        className="w-full px-3 py-2 rounded-xl hover:bg-slate-50 transition flex items-start justify-between gap-2 group"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMessageInput(q.text);
-                            setShowQuickRepliesPopover(false);
-                            requestAnimationFrame(() => textareaRef.current?.focus());
-                          }}
-                          className="flex-1 text-left min-w-0"
-                        >
-                          <p className="text-[13px] font-semibold text-slate-800">{q.label}</p>
-                          <p className="text-xs text-slate-400 truncate mt-0.5">{q.text}</p>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowQuickRepliesPopover(false);
-                            onEditQuickReply(q);
-                          }}
-                          title="Editar esta plantilla"
-                          className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition shrink-0"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setComposerMode((m) => (m === 'whatsapp' ? 'internal' : 'whatsapp'))}
-            title={
-              composerMode === 'internal'
-                ? 'Modo Nota Interna activo (el cliente NO recibe este mensaje). Clic para volver a WhatsApp.'
-                : 'Cambiar a Nota Interna para dejar instrucciones al equipo dentro del chat'
-            }
-            className={`px-3.5 py-2.5 rounded-xl text-[13px] font-semibold inline-flex items-center gap-1.5 shrink-0 border transition ${
-              composerMode === 'internal'
-                ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
-                : 'bg-slate-50 text-slate-600 border-slate-200/80 hover:bg-amber-50 hover:text-amber-800 hover:border-amber-200'
-            }`}
-          >
-            <StickyNote className="w-4 h-4" />
-            <span className="hidden sm:inline">{composerMode === 'internal' ? 'Nota interna' : 'Nota'}</span>
-          </button>
-
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit();
-              }
-            }}
-            placeholder={
-              composerMode === 'internal'
-                ? 'Escribe una nota interna para el equipo (NO se envía al WhatsApp del cliente)…'
-                : 'Escribe un mensaje a WhatsApp… (Shift+Enter = nueva línea)'
-            }
-            className={`flex-1 resize-none max-h-32 px-4 py-2.5 rounded-xl text-[14.5px] font-medium focus:outline-none focus:ring-2 transition ${
-              composerMode === 'internal'
-                ? 'bg-white border-2 border-amber-300 text-amber-950 placeholder:text-amber-700/60 focus:ring-amber-500/20'
-                : 'bg-slate-50 border border-slate-200/80 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-indigo-500/20'
-            }`}
-          />
-          <button
-            type="button"
-            disabled={!messageInput.trim() || sendingMessage}
-            onClick={handleSubmit}
-            className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl disabled:opacity-40 text-white text-[13px] font-bold transition ${
-              composerMode === 'internal' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-indigo-600 hover:bg-indigo-700'
-            }`}
-          >
-            {composerMode === 'internal' ? <StickyNote className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-            {composerMode === 'internal' && <span className="hidden sm:inline">Guardar nota</span>}
-          </button>
-        </div>
-      );
-    },
-  ),
-);
-ChatComposer.displayName = 'ChatComposer';
+import {
+  readLocalQuickReplies,
+  loadCompanyQuickReplies,
+  saveCompanyQuickReplies,
+  syncTicketReadState,
+  computeEffectiveCircleUnread,
+  buildReadStateMetadataPatch,
+  maxIsoTimestamp,
+  type TicketReadSyncMode,
+} from '../../services/whatsappSync';
+import type {
+  LightClientRow,
+  SupportChannelType,
+  LeadStageSubFilter,
+  QuickReplyTemplate,
+  SupportCircle,
+  LeadQuoteSummary,
+  TeamWaAccessMember,
+  OwnerSubFilter,
+  WaMessageRow,
+  OutboxRow,
+  ChatItem,
+  WaGroupRow,
+  CircleFilter,
+} from './whatsapp/types';
+import {
+  TZ,
+  stripEmojis,
+  fmtTime,
+  dayKey,
+  dayLabel,
+  listTimeLabel,
+  initials,
+  formatBytes,
+  SUPPORT_CHANNEL_LABELS,
+  DEFAULT_PROMPTS,
+  DEFAULT_RESOLVED_REPLY_TEMPLATE,
+  DEFAULT_RESOLVED_TRIGGER_PHRASES,
+  isAlreadyResolvedReply,
+  renderResolvedReplyTemplate,
+  DEFAULT_SUPPORT_QUICK_REPLIES,
+  DEFAULT_SALES_QUICK_REPLIES,
+  LEAD_STATUS_OPTIONS,
+  getUnlockedAudioCtx,
+  playWaAlertSound,
+  formatWaitDuration,
+  isInternalDevOrSystemTaskTitle,
+  extractClientGreetingFirstName,
+  extractLegacyClientName,
+  detectShortCategory,
+  SCOPE_STYLE,
+  parseChatLine,
+  getCachedTicketDescStats,
+} from './whatsapp/helpers';
+import { ActiveSessionTimer, CircleListRow } from './whatsapp/CircleListRow';
+import { ChatComposer, type ChatComposerHandle } from './whatsapp/ChatComposer';
+import { ClientPickerModal } from './whatsapp/modals/ClientPickerModal';
+import { BridgeStatusModal } from './whatsapp/modals/BridgeStatusModal';
+import { QuickReplyManagerModal } from './whatsapp/modals/QuickReplyManagerModal';
+import { TeamWaAccessModal } from './whatsapp/modals/TeamWaAccessModal';
+import { AiPromptConfigModal } from './whatsapp/modals/AiPromptConfigModal';
+
+export type { SupportChannelType, QuickReplyTemplate };
+export { playWaAlertSound };
 
 // =============================================================================
 
@@ -1132,7 +207,35 @@ export const SupportChatCircles: React.FC = () => {
       return {};
     }
   });
-  const markCircleAsRead = (circleId: string, lastMessageAt: string) => {
+
+  const applyTicketReadPatchToState = useCallback(
+    (ticketId: string | undefined, mode: TicketReadSyncMode, lastMessageAt: string) => {
+      if (!ticketId || !profile?.id) return;
+      setTickets((prev) =>
+        prev.map((row) =>
+          row.id === ticketId
+            ? {
+                ...row,
+                metadata: buildReadStateMetadataPatch(
+                  (row.metadata || {}) as Record<string, any>,
+                  profile.id,
+                  mode,
+                  lastMessageAt,
+                ),
+              }
+            : row,
+        ),
+      );
+    },
+    [profile?.id],
+  );
+
+  const markCircleAsRead = (
+    circleId: string,
+    lastMessageAt: string,
+    ticketId?: string,
+    skipRemoteSync = false,
+  ) => {
     setReadCirclesMap((prev) => {
       if (prev[circleId] === lastMessageAt) return prev;
       const next = { ...prev, [circleId]: lastMessageAt };
@@ -1154,6 +257,10 @@ export const SupportChatCircles: React.FC = () => {
       }
       return next;
     });
+    if (ticketId && profile?.id && !skipRemoteSync) {
+      applyTicketReadPatchToState(ticketId, 'read', lastMessageAt);
+      void syncTicketReadState(ticketId, profile.id, 'read', lastMessageAt);
+    }
   };
 
   const [dismissedWaitingMap, setDismissedWaitingMap] = useState<Record<string, string>>(() => {
@@ -1164,7 +271,7 @@ export const SupportChatCircles: React.FC = () => {
     }
   });
   const handleMarkCircleAttended = async (circle: SupportCircle) => {
-    markCircleAsRead(circle.circleId, circle.lastMessageAt);
+    markCircleAsRead(circle.circleId, circle.lastMessageAt, circle.activeTicket.id, true);
     setDismissedWaitingMap((prev) => {
       const next = { ...prev, [circle.circleId]: circle.lastMessageAt };
       try {
@@ -1174,17 +281,22 @@ export const SupportChatCircles: React.FC = () => {
       }
       return next;
     });
+    applyTicketReadPatchToState(circle.activeTicket.id, 'attended', circle.lastMessageAt);
     try {
-      const currentMeta = (circle.activeTicket.metadata || {}) as Record<string, any>;
-      await supabase
-        .from('tickets')
-        .update({
-          metadata: {
-            ...currentMeta,
-            wa_attended_at: circle.lastMessageAt,
-          },
-        })
-        .eq('id', circle.activeTicket.id);
+      if (profile?.id) {
+        await syncTicketReadState(circle.activeTicket.id, profile.id, 'attended', circle.lastMessageAt);
+      } else {
+        const currentMeta = (circle.activeTicket.metadata || {}) as Record<string, any>;
+        await supabase
+          .from('tickets')
+          .update({
+            metadata: {
+              ...currentMeta,
+              wa_attended_at: circle.lastMessageAt,
+            },
+          })
+          .eq('id', circle.activeTicket.id);
+      }
       toast.success('Conversación marcada como atendida');
       loadSupportData(true);
     } catch {
@@ -1222,15 +334,20 @@ export const SupportChatCircles: React.FC = () => {
       }
       return next;
     });
+    applyTicketReadPatchToState(circle.activeTicket.id, 'unread', circle.lastMessageAt);
     try {
-      const currentMeta = (circle.activeTicket.metadata || {}) as Record<string, any>;
-      if (currentMeta.wa_attended_at) {
-        const nextMeta = { ...currentMeta };
-        delete nextMeta.wa_attended_at;
-        await supabase
-          .from('tickets')
-          .update({ metadata: nextMeta })
-          .eq('id', circle.activeTicket.id);
+      if (profile?.id) {
+        await syncTicketReadState(circle.activeTicket.id, profile.id, 'unread', circle.lastMessageAt);
+      } else {
+        const currentMeta = (circle.activeTicket.metadata || {}) as Record<string, any>;
+        if (currentMeta.wa_attended_at) {
+          const nextMeta = { ...currentMeta };
+          delete nextMeta.wa_attended_at;
+          await supabase
+            .from('tickets')
+            .update({ metadata: nextMeta })
+            .eq('id', circle.activeTicket.id);
+        }
       }
       loadSupportData(true);
     } catch {
@@ -1333,11 +450,15 @@ export const SupportChatCircles: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
+        const ownerFallback =
+          profile.email === 'jarias7604@gmail.com' || profile.email === 'jarias@ariasdefense.com'
+            ? 'Jimmy Arias'
+            : profile.email?.split('@')[0] || 'Asesor Comercial';
         const rawName =
           profile.full_name &&
           !/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(profile.full_name.trim())
             ? profile.full_name.trim()
-            : 'Jimmy Arias';
+            : ownerFallback;
         const cleanSlug = `${bookingService.slugify(rawName)}-${profile.id.slice(0, 4)}`;
         const existing = await bookingService.getMyBookingLink();
         if (cancelled) return;
@@ -1371,48 +492,32 @@ export const SupportChatCircles: React.FC = () => {
     };
   }, [profile?.id, profile?.full_name]);
 
-  // Customizable SaaS Quick Replies per company (all templates editable & deletable)
-  const [customQuickReplies, setCustomQuickReplies] = useState<QuickReplyTemplate[]>([
-    ...DEFAULT_SALES_QUICK_REPLIES,
-    ...DEFAULT_SUPPORT_QUICK_REPLIES,
-  ]);
+  // Customizable SaaS Quick Replies per company (synced to DB with instant local cache)
+  const defaultQuickReplies = useMemo(
+    () => [...DEFAULT_SALES_QUICK_REPLIES, ...DEFAULT_SUPPORT_QUICK_REPLIES],
+    [],
+  );
+  const [customQuickReplies, setCustomQuickReplies] = useState<QuickReplyTemplate[]>(defaultQuickReplies);
   const [showQuickReplyModal, setShowQuickReplyModal] = useState(false);
-  const [newQrLabel, setNewQrLabel] = useState('');
-  const [newQrText, setNewQrText] = useState('');
-  const [newQrScope, setNewQrScope] = useState<'soporte' | 'ventas'>('ventas');
-  const [editingQrId, setEditingQrId] = useState<string | null>(null);
+  const [quickReplyInitialScope, setQuickReplyInitialScope] = useState<'soporte' | 'ventas'>('ventas');
+  const [editingQuickReply, setEditingQuickReply] = useState<QuickReplyTemplate | null>(null);
 
   useEffect(() => {
     if (!activeCompanyId) return;
-    try {
-      const v2Key = `crm_wa_quick_replies_v2_${activeCompanyId}`;
-      const savedV2 = localStorage.getItem(v2Key);
-      if (savedV2) {
-        const parsed = JSON.parse(savedV2);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCustomQuickReplies(parsed);
-          return;
-        }
-      }
-      // Migrate any legacy v1 custom templates alongside defaults
-      const legacy = localStorage.getItem(`crm_wa_quick_replies_${activeCompanyId}`);
-      const legacyArr: QuickReplyTemplate[] = legacy ? JSON.parse(legacy) : [];
-      const merged = [...DEFAULT_SALES_QUICK_REPLIES, ...DEFAULT_SUPPORT_QUICK_REPLIES, ...legacyArr];
-      setCustomQuickReplies(merged);
-      localStorage.setItem(v2Key, JSON.stringify(merged));
-    } catch {
-      setCustomQuickReplies([...DEFAULT_SALES_QUICK_REPLIES, ...DEFAULT_SUPPORT_QUICK_REPLIES]);
-    }
-  }, [activeCompanyId]);
+    let cancelled = false;
+    setCustomQuickReplies(readLocalQuickReplies(activeCompanyId, defaultQuickReplies));
+    loadCompanyQuickReplies(activeCompanyId, defaultQuickReplies).then((synced) => {
+      if (!cancelled) setCustomQuickReplies(synced);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCompanyId, defaultQuickReplies]);
 
   const saveCustomQuickReplies = (next: QuickReplyTemplate[]) => {
     setCustomQuickReplies(next);
     if (activeCompanyId) {
-      try {
-        localStorage.setItem(`crm_wa_quick_replies_v2_${activeCompanyId}`, JSON.stringify(next));
-      } catch {
-        // ignore quota errors
-      }
+      void saveCompanyQuickReplies(activeCompanyId, next);
     }
   };
 
@@ -1786,7 +891,8 @@ export const SupportChatCircles: React.FC = () => {
         : extractLegacyClientName(activeTicket);
 
       // Last message preview & unread state (cached per ticket revision)
-      const descStats = getCachedTicketDescStats(latest);
+      const staffDisplayName = profile?.full_name || 'Asesor Comercial';
+      const descStats = getCachedTicketDescStats(latest, staffDisplayName);
       let lastMessageSender = cleanPushName || clientName;
       let lastMessageText = stripEmojis(String(meta.last_whatsapp_message || latest.title || ''));
       const parsed = descStats.parsedLastLine;
@@ -1795,11 +901,11 @@ export const SupportChatCircles: React.FC = () => {
         lastMessageText = stripEmojis(parsed.text);
       }
       lastMessageSender = lastMessageSender
-        .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Jimmy Arias')
-        .replace(/Platform\s*Owner/gi, 'Jimmy Arias');
+        .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, staffDisplayName)
+        .replace(/Platform\s*Owner/gi, staffDisplayName);
       lastMessageText = lastMessageText
-        .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Jimmy Arias de Arias Defense')
-        .replace(/Platform\s*Owner/gi, 'Jimmy Arias de Arias Defense');
+        .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, staffDisplayName)
+        .replace(/Platform\s*Owner/gi, staffDisplayName);
       const lastFrom: string = meta.last_message_from || (parsed ? (parsed.icon === '👨‍💻' ? 'staff' : 'client') : 'client');
       const isOpen = ['new', 'open', 'pending'].includes(activeTicket.status);
       const lastMessageAt = String(meta.last_whatsapp_at || latest.updated_at || latest.created_at);
@@ -1836,7 +942,22 @@ export const SupportChatCircles: React.FC = () => {
 
       const resolvedLeadStatus = isNonWaError ? 'Erróneo' : lead?.status || metaLeadStatus;
       const isDiscardedLead = resolvedLeadStatus === 'Perdido' || resolvedLeadStatus === 'Erróneo';
-      const isForcedUnread = forcedUnreadMap[key] === lastMessageAt;
+      const syncedReadAt = profile?.id
+        ? maxIsoTimestamp(
+            (meta.wa_read_by as Record<string, string> | undefined)?.[profile.id],
+            (activeMeta.wa_read_by as Record<string, string> | undefined)?.[profile.id],
+          ) || null
+        : null;
+      const syncedForcedUnreadAt = profile?.id
+        ? String(
+            (activeMeta.wa_forced_unread_by as Record<string, string> | undefined)?.[profile.id] ||
+              (meta.wa_forced_unread_by as Record<string, string> | undefined)?.[profile.id] ||
+              '',
+          ) || null
+        : null;
+      const isForcedUnread =
+        forcedUnreadMap[key] === lastMessageAt ||
+        (syncedForcedUnreadAt === lastMessageAt && readCirclesMap[key] !== lastMessageAt);
 
       const unreadOrWaitingReply =
         isForcedUnread ||
@@ -1927,6 +1048,8 @@ export const SupportChatCircles: React.FC = () => {
         allClientTickets: sorted,
         unreadOrWaitingReply,
         waitMinutes,
+        syncedReadAt,
+        syncedForcedUnreadAt,
         lastMessageText,
         lastMessageSender,
         lastMessageAt,
@@ -1950,7 +1073,7 @@ export const SupportChatCircles: React.FC = () => {
       return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tickets, categories, agents, realClients, companyLeads, nonWaTicketIds, scopes, profile?.id, adminPreviewMode, slaTick, dismissedWaitingMap, forcedUnreadMap]);
+  }, [tickets, categories, agents, realClients, companyLeads, nonWaTicketIds, scopes, profile?.id, profile?.full_name, adminPreviewMode, slaTick, dismissedWaitingMap, forcedUnreadMap, readCirclesMap]);
 
   const parsedResolvedTriggerPhrases = useMemo(() => {
     const arr = resolvedTriggerPhrasesText
@@ -2028,7 +1151,7 @@ export const SupportChatCircles: React.FC = () => {
           mark_lead_lost: autoResolvedMarkLost,
         });
         sentCount++;
-        markCircleAsRead(c.circleId, c.lastMessageAt);
+        markCircleAsRead(c.circleId, c.lastMessageAt, c.activeTicket.id);
         setDismissedWaitingMap((prev) => {
           const next = { ...prev, [c.circleId]: c.lastMessageAt };
           try {
@@ -2069,8 +1192,14 @@ export const SupportChatCircles: React.FC = () => {
   };
 
   const isUnread = (c: SupportCircle) =>
-    forcedUnreadMap[c.circleId] === c.lastMessageAt ||
-    (c.unreadOrWaitingReply && readCirclesMap[c.circleId] !== c.lastMessageAt);
+    computeEffectiveCircleUnread({
+      lastMessageAt: c.lastMessageAt,
+      unreadOrWaitingReply: c.unreadOrWaitingReply,
+      localReadAt: readCirclesMap[c.circleId],
+      syncedReadAt: c.syncedReadAt,
+      localForcedUnreadAt: forcedUnreadMap[c.circleId],
+      syncedForcedUnreadAt: c.syncedForcedUnreadAt,
+    });
   const isMine = (c: SupportCircle) =>
     Boolean(profile?.id && (c.assignedTechId === profile.id || c.leadOwnerId === profile.id));
   const isUnassigned = (c: SupportCircle) => !c.isGroup && !c.assignedTechId && !c.leadOwnerId && c.scope !== 'interno' && c.scope !== 'spam';
@@ -2417,7 +1546,7 @@ export const SupportChatCircles: React.FC = () => {
   );
 
   const handleSelectCircle = useCallback((circle: SupportCircle) => {
-    markCircleAsRead(circle.circleId, circle.lastMessageAt);
+    markCircleAsRead(circle.circleId, circle.lastMessageAt, circle.activeTicket.id);
     setSelectedCircleId(circle.circleId);
     setMobileChatOpen(true);
   }, []);
@@ -2735,15 +1864,16 @@ export const SupportChatCircles: React.FC = () => {
       }
       lastTicketId = c.ticket_id;
 
+      const staffDisplayName = profile?.full_name || 'Asesor Comercial';
       const raw = String(c.body || '')
-        .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Jimmy Arias')
-        .replace(/Platform\s*Owner/gi, 'Jimmy Arias')
+        .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, staffDisplayName)
+        .replace(/Platform\s*Owner/gi, staffDisplayName)
         .trim();
       if (c.is_internal) {
         items.push({ id: c.id, kind: 'system', senderName: '', text: stripEmojis(raw), createdAt: c.created_at, ticketId: c.ticket_id });
         return;
       }
-      const parsed = parseChatLine(raw);
+      const parsed = parseChatLine(raw, staffDisplayName);
       let body = parsed ? parsed.text : raw;
       let transcript: string | undefined;
       const tIdx = body.indexOf('📝 Transcripción IA:');
@@ -2759,8 +1889,8 @@ export const SupportChatCircles: React.FC = () => {
       const senderName = stripEmojis(
         (parsed?.sender || agentName || (isStaff ? 'Equipo' : activeCircle.clientName))
           .replace(/\(Reporte Inicial\)/i, '')
-          .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Jimmy Arias')
-          .replace(/Platform\s*Owner/gi, 'Jimmy Arias')
+          .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, staffDisplayName)
+          .replace(/Platform\s*Owner/gi, staffDisplayName)
       );
       const media = mediaByComment.get(c.id);
       const ob = outboxByComment.get(c.id);
@@ -2868,7 +1998,7 @@ export const SupportChatCircles: React.FC = () => {
   const handleSendReply = async (customText: string): Promise<boolean> => {
     const textToSend = String(customText || '').trim();
     if (!textToSend || !activeCircle || !activeCompanyId || !canSend) return false;
-    markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt);
+    markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt, activeCircle.activeTicket.id);
     const t = activeCircle.activeTicket;
     const nowIso = new Date().toISOString();
     const optimistic: TicketComment = {
@@ -2897,7 +2027,7 @@ export const SupportChatCircles: React.FC = () => {
         setComments((prev) => prev.map((c) => (c.id === optimistic.id ? (data.comment as TicketComment) : c)));
       }
       const replyIso = String((data?.comment as TicketComment | undefined)?.created_at || new Date().toISOString());
-      markCircleAsRead(activeCircle.circleId, replyIso);
+      markCircleAsRead(activeCircle.circleId, replyIso, t.id);
       setTickets((prev) =>
         prev.map((row) =>
           row.id === t.id
@@ -3227,7 +2357,7 @@ export const SupportChatCircles: React.FC = () => {
       });
     }
     if (isDiscard) {
-      markCircleAsRead(circle.circleId, circle.lastMessageAt);
+      markCircleAsRead(circle.circleId, circle.lastMessageAt, circle.activeTicket.id, true);
       setDismissedWaitingMap((prev) => {
         const next = { ...prev, [circle.circleId]: circle.lastMessageAt };
         try {
@@ -3386,7 +2516,7 @@ export const SupportChatCircles: React.FC = () => {
         caption,
       });
 
-      markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt);
+      markCircleAsRead(activeCircle.circleId, activeCircle.lastMessageAt, t.id);
       if (activeCircle.leadId && activeCompanyId) {
         await supabase
           .from('leads')
@@ -5734,17 +4864,13 @@ export const SupportChatCircles: React.FC = () => {
               onSaveInternalNote={handleSaveInternalNote}
               onUploadAttachment={handleUploadAttachment}
               onOpenNewQuickReply={() => {
-                setEditingQrId(null);
-                setNewQrLabel('');
-                setNewQrText('');
-                setNewQrScope(activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'ventas' : 'soporte');
+                setEditingQuickReply(null);
+                setQuickReplyInitialScope(activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'ventas' : 'soporte');
                 setShowQuickReplyModal(true);
               }}
               onEditQuickReply={(q) => {
-                setNewQrScope(q.scope);
-                setEditingQrId(q.id);
-                setNewQrLabel(q.label);
-                setNewQrText(q.text);
+                setQuickReplyInitialScope(q.scope);
+                setEditingQuickReply(q);
                 setShowQuickReplyModal(true);
               }}
               onNavigateTickets={() => navigate('/support/tickets')}
@@ -6046,795 +5172,139 @@ export const SupportChatCircles: React.FC = () => {
       </div>
 
       {/* ── "Es cliente" picker ── */}
-      {showClientPicker && activeCircle && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4" onClick={() => setShowClientPicker(false)}>
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-slate-900">¿De qué cliente es este número?</h3>
-              <button onClick={() => setShowClientPicker(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <p className="text-xs text-slate-600">
-              {activeCircle.pushName ? `"${activeCircle.pushName}" ` : ''}
-              {activeCircle.phone ? `+${activeCircle.phone}` : ''} pasará a <strong>Soporte</strong>.
-            </p>
-            <div className="relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                autoFocus
-                value={clientPickerQuery}
-                onChange={(e) => setClientPickerQuery(e.target.value)}
-                placeholder="Buscar grupo o cliente…"
-                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs"
-              />
-            </div>
-            <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-2xl">
-              {pickerOptions.map((o) => (
-                <button
-                  key={o.key}
-                  type="button"
-                  disabled={classifying}
-                  onClick={() => classify('cliente', { client_id: o.client_id || undefined, group_jid: o.group_jid || undefined })}
-                  className="w-full text-left px-3 py-2.5 hover:bg-indigo-50 flex items-center gap-2"
-                >
-                  {o.group_jid ? <Users className="w-4 h-4 text-indigo-500 shrink-0" /> : <Building2 className="w-4 h-4 text-slate-400 shrink-0" />}
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-slate-800 truncate">{o.label}</p>
-                    <p className="text-[10px] text-slate-500 truncate">{o.sub}</p>
-                  </div>
-                </button>
-              ))}
-              {pickerOptions.length === 0 && <p className="p-4 text-center text-xs text-slate-400">Sin resultados</p>}
-            </div>
-            <button
-              type="button"
-              disabled={classifying}
-              onClick={() => classify('cliente')}
-              className="w-full py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700"
-            >
-              Es cliente, pero no está en la lista
-            </button>
-          </div>
-        </div>
-      )}
+      <ClientPickerModal
+        isOpen={showClientPicker}
+        activeCircle={activeCircle}
+        query={clientPickerQuery}
+        onQueryChange={setClientPickerQuery}
+        options={pickerOptions}
+        classifying={classifying}
+        onClassifyClient={(extra) => classify('cliente', extra)}
+        onClose={() => setShowClientPicker(false)}
+      />
 
       {/* ── WhatsApp connection status (admin) ── */}
-      {showStatusModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4" onClick={() => setShowStatusModal(false)}>
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-black text-slate-900">Estado de la conexión WhatsApp</h3>
-              <button onClick={() => setShowStatusModal(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            {!bridgeStatus ? (
-              <p className="text-xs text-slate-500">Consultando…</p>
-            ) : bridgeStatus.ok === false ? (
-              <p className="text-xs text-rose-700">{bridgeStatus.error}</p>
-            ) : (
-              (() => {
-                const ago = (iso?: string | null) => {
-                  if (!iso) return 'nunca';
-                  const s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-                  if (s < 90) return `hace ${s}s`;
-                  if (s < 5400) return `hace ${Math.round(s / 60)} min`;
-                  return new Date(iso).toLocaleString('es-SV');
-                };
-                const pollOk = bridgeStatus.bridge_last_poll && Date.now() - new Date(bridgeStatus.bridge_last_poll).getTime() < 2 * 60 * 1000;
-                const rows: [string, React.ReactNode][] = [
-                  [
-                    'Servidor Evolution (puente)',
-                    <span className={pollOk ? 'text-emerald-700' : 'text-rose-700'}>
-                      {pollOk ? 'Conectado' : 'Sin señal'} · {ago(bridgeStatus.bridge_last_poll)}
-                    </span>,
-                  ],
-                  ['Último envío confirmado', ago(bridgeStatus.bridge_last_ack)],
-                  ['Mensajes en cola', String(bridgeStatus.outbox_pending)],
-                  ['Envíos con error (24h)', String(bridgeStatus.outbox_errors_24h)],
-                  ['Archivos descargándose', String(bridgeStatus.media_pending)],
-                  ['Archivos con error', String(bridgeStatus.media_failed)],
-                  ['Grupos sincronizados', `${bridgeStatus.groups_count} · ${ago(bridgeStatus.groups_synced_at)}`],
-                  ['Clave Evolution configurada', bridgeStatus.evolution_key_configured ? 'Sí' : 'No'],
-                ];
-                return (
-                  <div className="divide-y divide-slate-100 border border-slate-100 rounded-2xl">
-                    {rows.map(([k, v]) => (
-                      <div key={k} className="flex items-center justify-between px-3.5 py-2 text-xs">
-                        <span className="text-slate-500 font-medium">{k}</span>
-                        <span className="font-bold text-slate-800">{v}</span>
-                      </div>
-                    ))}
-                    {bridgeStatus.bridge_last_error && (
-                      <p className="px-3.5 py-2 text-[11px] text-rose-700 break-all">Último error: {bridgeStatus.bridge_last_error}</p>
-                    )}
-                  </div>
-                );
-              })()
-            )}
-          </div>
-        </div>
-      )}
+      <BridgeStatusModal
+        isOpen={showStatusModal}
+        bridgeStatus={bridgeStatus}
+        onClose={() => setShowStatusModal(false)}
+      />
 
       {/* ── AI prompts (admin) ── */}
-      {showAiPromptModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-purple-600" />
-                <h3 className="text-base font-black text-slate-900">IA por categoría (texto y notas de voz)</h3>
-              </div>
-              <button onClick={() => setShowAiPromptModal(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div
-              className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl border ${
-                openAiStatus.checking
-                  ? 'bg-slate-50 border-slate-200 text-slate-700'
-                  : openAiStatus.verified
-                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
-                  : 'bg-rose-50 border-rose-200 text-rose-900'
-              }`}
-            >
-              <div className="flex items-center gap-2 text-xs font-bold">
-                <span className={`w-2.5 h-2.5 rounded-full ${openAiStatus.checking ? 'bg-amber-400 animate-pulse' : openAiStatus.verified ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                <span>
-                  {openAiStatus.checking
-                    ? 'Verificando conexión con OpenAI...'
-                    : openAiStatus.verified
-                    ? `OpenAI conectado (${openAiStatus.model} + Whisper)`
-                    : `OpenAI error: ${openAiStatus.error || 'Sin conexión'}`}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => verifyAndLoadAiConfig(true)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-black text-slate-700 transition"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Probar
-              </button>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Las notas de voz siempre se transcriben. Las respuestas automáticas están <strong>apagadas</strong> salvo que las actives aquí; nunca se
-              responde a Equipo ni a Spam.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={aiAutoReplyText} onChange={(e) => setAiAutoReplyText(e.target.checked)} className="rounded border-slate-300 text-purple-600" />
-                <MessageSquare className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <span className="text-xs font-black text-slate-800">Responder mensajes de texto</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={aiAutoReplyAudio} onChange={(e) => setAiAutoReplyAudio(e.target.checked)} className="rounded border-slate-300 text-purple-600" />
-                <Mic className="w-3.5 h-3.5 text-purple-600 shrink-0" />
-                <span className="text-xs font-black text-slate-800">Responder notas de voz</span>
-              </label>
-            </div>
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {(
-                  [
-                    { id: 'soporte', label: 'Soporte técnico', icon: Wrench },
-                    { id: 'contabilidad', label: 'Contabilidad / IVA', icon: Calculator },
-                    { id: 'ventas', label: 'Ventas / Leads', icon: DollarSign },
-                    { id: 'otros', label: 'Otros', icon: Package },
-                  ] as { id: SupportChannelType; label: string; icon: React.ElementType }[]
-                ).map((tab) => {
-                  const TabIcon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setActivePromptTab(tab.id)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition ${
-                        activePromptTab === tab.id ? 'bg-purple-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      <TabIcon className="w-3.5 h-3.5" />
-                      <span>{tab.label}</span>
-                    </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={() => setActivePromptTab('ya_resolvimos')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition ${
-                    activePromptTab === 'ya_resolvimos'
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100'
-                  }`}
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Cierre "Ya resolvimos"</span>
-                  {pendingResolvedCircles.length > 0 && (
-                    <span
-                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                        activePromptTab === 'ya_resolvimos' ? 'bg-white text-emerald-700' : 'bg-emerald-600 text-white'
-                      }`}
-                    >
-                      {pendingResolvedCircles.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {activePromptTab !== 'ya_resolvimos' ? (
-                <textarea
-                  rows={5}
-                  value={aiPrompts[activePromptTab]}
-                  onChange={(e) => setAiPrompts((prev) => ({ ...prev, [activePromptTab]: e.target.value }))}
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/30"
-                />
-              ) : (
-                <div className="space-y-3 pt-1">
-                  <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 space-y-2">
-                    <label className="flex items-start gap-2.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={autoReplyResolvedEnabled}
-                        onChange={(e) => setAutoReplyResolvedEnabled(e.target.checked)}
-                        className="mt-0.5 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <div>
-                        <span className="text-xs font-black text-slate-900 block">
-                          Responder automáticamente cuando un lead diga "Ya resolvimos"
-                        </span>
-                        <span className="text-[11px] text-slate-600 leading-snug block">
-                          Funciona de forma independiente aunque la IA general esté apagada. Solo responde a cierres cortos sin preguntas ni solicitud de precios.
-                        </span>
-                      </div>
-                    </label>
-                    <label className="flex items-center gap-2.5 cursor-pointer pt-1 border-t border-emerald-200/60">
-                      <input
-                        type="checkbox"
-                        checked={autoResolvedMarkLost}
-                        onChange={(e) => setAutoResolvedMarkLost(e.target.checked)}
-                        className="rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span className="text-xs font-bold text-slate-800">
-                        Mover automáticamente el prospecto a "Perdido" al responder (limpia Interesados)
-                      </span>
-                    </label>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-slate-800">
-                        Mensaje dinámico de cierre amable
-                      </label>
-                      <span className="text-[10px] font-semibold text-slate-500">
-                        Variables: <code className="text-emerald-700 font-bold">{'{nombre}'}</code> y <code className="text-emerald-700 font-bold">{'{empresa}'}</code>
-                      </span>
-                    </div>
-                    <textarea
-                      rows={3}
-                      value={resolvedReplyTemplate}
-                      onChange={(e) => setResolvedReplyTemplate(e.target.value)}
-                      placeholder={DEFAULT_RESOLVED_REPLY_TEMPLATE}
-                      className="w-full px-3.5 py-2 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                    />
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
-                      <span className="truncate max-w-[360px]" title={renderResolvedReplyTemplate(resolvedReplyTemplate, 'Julio Hernández')}>
-                        Ej: <strong className="text-slate-700">{renderResolvedReplyTemplate(resolvedReplyTemplate, 'Julio Hernández')}</strong>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowTriggerPhrasesEditor((v) => !v)}
-                        className="text-emerald-700 hover:text-emerald-800 font-bold shrink-0 underline"
-                      >
-                        {showTriggerPhrasesEditor
-                          ? 'Ocultar frases'
-                          : `Frases que activan (${parsedResolvedTriggerPhrases.length})`}
-                      </button>
-                    </div>
-                  </div>
-
-                  {showTriggerPhrasesEditor && (
-                    <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-black text-slate-700">
-                          Frases clave separadas por coma (personalizable por empresa):
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setResolvedTriggerPhrasesText(DEFAULT_RESOLVED_TRIGGER_PHRASES.join(', '))}
-                          className="text-[10px] font-bold text-slate-500 hover:text-slate-800"
-                        >
-                          Restaurar por defecto
-                        </button>
-                      </div>
-                      <textarea
-                        rows={2}
-                        value={resolvedTriggerPhrasesText}
-                        onChange={(e) => setResolvedTriggerPhrasesText(e.target.value)}
-                        className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl text-[11px] text-slate-700 bg-white focus:outline-none"
-                      />
-                    </div>
-                  )}
-
-                  {pendingResolvedCircles.length > 0 ? (
-                    <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/90 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-amber-950">
-                          Pendientes sin contestar en bandeja ({pendingResolvedCircles.length})
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelectedPendingResolvedIds((prev) =>
-                              prev.length === pendingResolvedCircles.length
-                                ? []
-                                : pendingResolvedCircles.map((c) => c.circleId)
-                            )
-                          }
-                          className="text-[11px] font-bold text-amber-800 hover:underline"
-                        >
-                          {selectedPendingResolvedIds.length === pendingResolvedCircles.length
-                            ? 'Desmarcar todos'
-                            : 'Seleccionar todos'}
-                        </button>
-                      </div>
-                      <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
-                        {pendingResolvedCircles.map((c) => {
-                          const checked = selectedPendingResolvedIds.includes(c.circleId);
-                          return (
-                            <label
-                              key={c.circleId}
-                              className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-white border border-amber-200/60 cursor-pointer hover:bg-amber-50/40"
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={(e) => {
-                                    setSelectedPendingResolvedIds((prev) =>
-                                      e.target.checked ? [...prev, c.circleId] : prev.filter((id) => id !== c.circleId)
-                                    );
-                                  }}
-                                  className="rounded border-amber-300 text-emerald-600 shrink-0"
-                                />
-                                <span className="text-xs font-black text-slate-800 truncate max-w-[130px]">
-                                  {c.clientName}
-                                </span>
-                                <span className="text-[11px] text-slate-500 truncate">
-                                  "{c.lastMessageText}"
-                                </span>
-                              </div>
-                              <span className="text-[10px] font-bold text-amber-700 shrink-0">
-                                {c.waitMinutes >= 60 ? `${Math.floor(c.waitMinutes / 60)}h` : `${c.waitMinutes}m`}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      <button
-                        type="button"
-                        disabled={sendingBatchResolved || selectedPendingResolvedIds.length === 0}
-                        onClick={handleSendBatchResolvedReplies}
-                        className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black flex items-center justify-center gap-2 shadow-xs transition"
-                      >
-                        {sendingBatchResolved ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>
-                              Respondiendo {batchResolvedProgress.current}/{batchResolvedProgress.total}...
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-3.5 h-3.5" />
-                            <span>
-                              Responder y cerrar {selectedPendingResolvedIds.length} pendiente
-                              {selectedPendingResolvedIds.length === 1 ? '' : 's'} ahora
-                            </span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/70 text-[11px] text-slate-500 flex items-center gap-2">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>No hay chats pendientes con "Ya resolvimos" sin contestar en este momento.</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setShowAiPromptModal(false)} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100">
-                Cancelar
-              </button>
-              <button
-                disabled={savingAiConfig}
-                onClick={async () => {
-                  setSavingAiConfig(true);
-                  try {
-                    await invoke({
-                      action: 'save_ai_config',
-                      company_id: activeCompanyId,
-                      auto_reply_text: aiAutoReplyText,
-                      auto_reply_audio: aiAutoReplyAudio,
-                      auto_reply_resolved_enabled: autoReplyResolvedEnabled,
-                      auto_resolved_mark_lost: autoResolvedMarkLost,
-                      resolved_reply_template: resolvedReplyTemplate.trim() || DEFAULT_RESOLVED_REPLY_TEMPLATE,
-                      resolved_trigger_phrases: parsedResolvedTriggerPhrases,
-                      prompts: {
-                        soporte: aiPrompts.soporte.trim(),
-                        contabilidad: aiPrompts.contabilidad.trim(),
-                        ventas: aiPrompts.ventas.trim(),
-                        otros: aiPrompts.otros.trim(),
-                      },
-                    });
-                    if (activeCompanyId) {
-                      try {
-                        localStorage.setItem(
-                          `crm_wa_ai_cfg_${activeCompanyId}`,
-                          JSON.stringify({
-                            auto_reply_text: aiAutoReplyText,
-                            auto_reply_audio: aiAutoReplyAudio,
-                            auto_reply_resolved_enabled: autoReplyResolvedEnabled,
-                            auto_resolved_mark_lost: autoResolvedMarkLost,
-                            resolved_reply_template: resolvedReplyTemplate.trim() || DEFAULT_RESOLVED_REPLY_TEMPLATE,
-                            resolved_trigger_phrases: parsedResolvedTriggerPhrases,
-                            prompts: {
-                              soporte: aiPrompts.soporte.trim(),
-                              contabilidad: aiPrompts.contabilidad.trim(),
-                              ventas: aiPrompts.ventas.trim(),
-                              otros: aiPrompts.otros.trim(),
-                            },
-                          }),
-                        );
-                      } catch {
-                        // ignore quota errors
-                      }
-                    }
-                    toast.success('Configuración guardada');
-                    setShowAiPromptModal(false);
-                  } catch (e: any) {
-                    toast.error(e?.message || 'Error al guardar configuración IA');
-                  } finally {
-                    setSavingAiConfig(false);
-                  }
-                }}
-                className="px-4 py-2 rounded-xl text-xs font-black bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50"
-              >
-                {savingAiConfig ? 'Guardando...' : 'Guardar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AiPromptConfigModal
+        isOpen={showAiPromptModal}
+        onClose={() => setShowAiPromptModal(false)}
+        openAiStatus={openAiStatus}
+        onTestOpenAi={() => verifyAndLoadAiConfig(true)}
+        aiAutoReplyText={aiAutoReplyText}
+        onChangeAiAutoReplyText={setAiAutoReplyText}
+        aiAutoReplyAudio={aiAutoReplyAudio}
+        onChangeAiAutoReplyAudio={setAiAutoReplyAudio}
+        activePromptTab={activePromptTab}
+        onChangeActivePromptTab={setActivePromptTab}
+        aiPrompts={aiPrompts}
+        onChangeAiPrompt={(tab, value) => setAiPrompts((prev) => ({ ...prev, [tab]: value }))}
+        autoReplyResolvedEnabled={autoReplyResolvedEnabled}
+        onChangeAutoReplyResolvedEnabled={setAutoReplyResolvedEnabled}
+        autoResolvedMarkLost={autoResolvedMarkLost}
+        onChangeAutoResolvedMarkLost={setAutoResolvedMarkLost}
+        resolvedReplyTemplate={resolvedReplyTemplate}
+        onChangeResolvedReplyTemplate={setResolvedReplyTemplate}
+        resolvedTriggerPhrasesText={resolvedTriggerPhrasesText}
+        onChangeResolvedTriggerPhrasesText={setResolvedTriggerPhrasesText}
+        parsedResolvedTriggerPhrases={parsedResolvedTriggerPhrases}
+        showTriggerPhrasesEditor={showTriggerPhrasesEditor}
+        onToggleTriggerPhrasesEditor={() => setShowTriggerPhrasesEditor((v) => !v)}
+        pendingResolvedCircles={pendingResolvedCircles}
+        selectedPendingResolvedIds={selectedPendingResolvedIds}
+        onToggleAllPendingResolved={() =>
+          setSelectedPendingResolvedIds((prev) =>
+            prev.length === pendingResolvedCircles.length ? [] : pendingResolvedCircles.map((c) => c.circleId),
+          )
+        }
+        onTogglePendingResolvedId={(circleId, checked) =>
+          setSelectedPendingResolvedIds((prev) => (checked ? [...prev, circleId] : prev.filter((id) => id !== circleId)))
+        }
+        sendingBatchResolved={sendingBatchResolved}
+        batchResolvedProgress={batchResolvedProgress}
+        onSendBatchResolvedReplies={handleSendBatchResolvedReplies}
+        savingAiConfig={savingAiConfig}
+        onSaveConfig={async () => {
+          setSavingAiConfig(true);
+          try {
+            await invoke({
+              action: 'save_ai_config',
+              company_id: activeCompanyId,
+              auto_reply_text: aiAutoReplyText,
+              auto_reply_audio: aiAutoReplyAudio,
+              auto_reply_resolved_enabled: autoReplyResolvedEnabled,
+              auto_resolved_mark_lost: autoResolvedMarkLost,
+              resolved_reply_template: resolvedReplyTemplate.trim() || DEFAULT_RESOLVED_REPLY_TEMPLATE,
+              resolved_trigger_phrases: parsedResolvedTriggerPhrases,
+              prompts: {
+                soporte: aiPrompts.soporte.trim(),
+                contabilidad: aiPrompts.contabilidad.trim(),
+                ventas: aiPrompts.ventas.trim(),
+                otros: aiPrompts.otros.trim(),
+              },
+            });
+            if (activeCompanyId) {
+              try {
+                localStorage.setItem(
+                  `crm_wa_ai_cfg_${activeCompanyId}`,
+                  JSON.stringify({
+                    auto_reply_text: aiAutoReplyText,
+                    auto_reply_audio: aiAutoReplyAudio,
+                    auto_reply_resolved_enabled: autoReplyResolvedEnabled,
+                    auto_resolved_mark_lost: autoResolvedMarkLost,
+                    resolved_reply_template: resolvedReplyTemplate.trim() || DEFAULT_RESOLVED_REPLY_TEMPLATE,
+                    resolved_trigger_phrases: parsedResolvedTriggerPhrases,
+                    prompts: {
+                      soporte: aiPrompts.soporte.trim(),
+                      contabilidad: aiPrompts.contabilidad.trim(),
+                      ventas: aiPrompts.ventas.trim(),
+                      otros: aiPrompts.otros.trim(),
+                    },
+                  }),
+                );
+              } catch {
+                // ignore quota errors
+              }
+            }
+            toast.success('Configuración guardada');
+            setShowAiPromptModal(false);
+          } catch (e: any) {
+            toast.error(e?.message || 'Error al guardar configuración IA');
+          } finally {
+            setSavingAiConfig(false);
+          }
+        }}
+      />
 
       {/* ── Customizable Quick Replies Modal (SaaS Multi-Industry) ── */}
-      {showQuickReplyModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4" onClick={() => setShowQuickReplyModal(false)}>
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-black text-slate-900">Plantillas de Respuesta Rápida</h3>
-                <p className="text-xs text-slate-500">Adapta las respuestas en 1 clic al giro de tu empresa (Ventas y Soporte).</p>
-              </div>
-              <button onClick={() => setShowQuickReplyModal(false)} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setNewQrScope('ventas')}
-                className={`flex-1 py-2 rounded-xl text-xs font-black transition ${
-                  newQrScope === 'ventas' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Ventas / Leads
-              </button>
-              <button
-                type="button"
-                onClick={() => setNewQrScope('soporte')}
-                className={`flex-1 py-2 rounded-xl text-xs font-black transition ${
-                  newQrScope === 'soporte' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                Soporte / Clientes
-              </button>
-            </div>
-
-            <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-black uppercase text-slate-500">
-                  {editingQrId ? 'Editar plantilla' : `Nueva plantilla (${newQrScope === 'ventas' ? 'Ventas' : 'Soporte'})`}
-                </p>
-                {editingQrId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingQrId(null);
-                      setNewQrLabel('');
-                      setNewQrText('');
-                    }}
-                    className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
-                  >
-                    Cancelar edición
-                  </button>
-                )}
-              </div>
-              <input
-                type="text"
-                value={newQrLabel}
-                onChange={(e) => setNewQrLabel(e.target.value)}
-                placeholder="Título corto del botón (ej. Enviar Catálogo, Pedir Requisitos)"
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
-              />
-              <textarea
-                rows={3}
-                value={newQrText}
-                onChange={(e) => setNewQrText(e.target.value)}
-                placeholder="Texto completo que se escribirá en el chat al hacer clic..."
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-800"
-              />
-              <button
-                type="button"
-                disabled={!newQrLabel.trim() || !newQrText.trim()}
-                onClick={() => {
-                  if (editingQrId) {
-                    const updated = customQuickReplies.map((q) =>
-                      q.id === editingQrId
-                        ? { ...q, scope: newQrScope, label: newQrLabel.trim(), text: newQrText.trim() }
-                        : q
-                    );
-                    saveCustomQuickReplies(updated);
-                    setEditingQrId(null);
-                    setNewQrLabel('');
-                    setNewQrText('');
-                    toast.success('Plantilla actualizada');
-                  } else {
-                    const item: QuickReplyTemplate = {
-                      id: `custom-${Date.now()}`,
-                      scope: newQrScope,
-                      label: newQrLabel.trim(),
-                      text: newQrText.trim(),
-                    };
-                    saveCustomQuickReplies([...customQuickReplies, item]);
-                    setNewQrLabel('');
-                    setNewQrText('');
-                    toast.success('Plantilla agregada');
-                  }
-                }}
-                className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-xs font-bold transition"
-              >
-                {editingQrId ? 'Guardar cambios' : 'Guardar plantilla'}
-              </button>
-            </div>
-
-            <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded-2xl">
-              {customQuickReplies
-                .filter((q) => q.scope === newQrScope)
-                .map((q) => {
-                  const isEditingThis = editingQrId === q.id;
-                  return (
-                    <div
-                      key={q.id}
-                      className={`px-3.5 py-2.5 flex items-start justify-between gap-2 ${
-                        isEditingThis ? 'bg-indigo-50/70' : ''
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <span className="text-xs font-bold text-slate-900">{q.label}</span>
-                        <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{q.text}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingQrId(q.id);
-                            setNewQrScope(q.scope);
-                            setNewQrLabel(q.label);
-                            setNewQrText(q.text);
-                          }}
-                          className="text-[11px] font-bold text-indigo-600 hover:underline"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (editingQrId === q.id) {
-                              setEditingQrId(null);
-                              setNewQrLabel('');
-                              setNewQrText('');
-                            }
-                            saveCustomQuickReplies(customQuickReplies.filter((x) => x.id !== q.id));
-                            toast.success('Plantilla eliminada');
-                          }}
-                          className="text-[11px] font-bold text-rose-600 hover:underline"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        </div>
-      )}
+      <QuickReplyManagerModal
+        isOpen={showQuickReplyModal}
+        onClose={() => setShowQuickReplyModal(false)}
+        quickReplies={customQuickReplies}
+        onSaveQuickReplies={saveCustomQuickReplies}
+        initialScope={quickReplyInitialScope}
+        initialEditingReply={editingQuickReply}
+      />
 
       {/* ── Team WhatsApp Access & Role Control Modal (Admin) ── */}
-      {showTeamAccessModal && (
-        <div
-          className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4"
-          onClick={() => setShowTeamAccessModal(false)}
-        >
-          <div
-            className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                  <h3 className="text-base font-black text-slate-900">
-                    Control de Accesos WhatsApp por Área (Admin · Técnicos · Ventas)
-                  </h3>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Define en 1 clic qué bandeja, chats y alertas puede ver cada miembro de tu equipo (protegido también por base de datos RLS).
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowTeamAccessModal(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Visual Guide of the 3 Core Profiles */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-xs">
-              <div className="bg-white p-2.5 rounded-xl border border-indigo-100 space-y-1">
-                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800">
-                  Administradores
-                </span>
-                <p className="text-[11px] text-slate-600 leading-snug">
-                  Ven <strong>Todo</strong>: Soporte, Leads nuevos, todos los Leads de todos los vendedores, Equipo, Spam e IA.
-                </p>
-              </div>
-              <div className="bg-white p-2.5 rounded-xl border border-sky-100 space-y-1">
-                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-100 text-sky-800">
-                  Técnicos (Soporte)
-                </span>
-                <p className="text-[11px] text-slate-600 leading-snug">
-                  Solo ven <strong>Soporte</strong> (grupos y clientes). <strong>0% acceso a Ventas/Leads</strong>; su campana solo suena por Soporte.
-                </p>
-              </div>
-              <div className="bg-white p-2.5 rounded-xl border border-emerald-100 space-y-1">
-                <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
-                  Vendedores (Ventas)
-                </span>
-                <p className="text-[11px] text-slate-600 leading-snug">
-                  Solo ven <strong>Leads nuevos · por tomar</strong> y <strong>Mis leads</strong>. No ven los leads de otro vendedor ni Soporte.
-                </p>
-              </div>
-            </div>
-
-            {/* 1-Click Preview Mode for Admin */}
-            <div className="flex items-center justify-between gap-2 flex-wrap bg-[#EEF0FF]/70 px-3.5 py-2.5 rounded-2xl border border-indigo-200/70">
-              <div className="text-xs">
-                <span className="font-black text-indigo-950">Simulador rápido de vista:</span>{' '}
-                <span className="text-indigo-800 font-medium">Comprueba cómo ve la pantalla cada perfil sin cerrar sesión.</span>
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {(
-                  [
-                    { mode: null, label: 'Vista Admin (Todo)' },
-                    { mode: 'soporte_team' as WaAccessMode, label: 'Probar como Técnico' },
-                    { mode: 'ventas_pool' as WaAccessMode, label: 'Probar como Vendedor' },
-                  ]
-                ).map((p) => {
-                  const active = adminPreviewMode === p.mode;
-                  return (
-                    <button
-                      key={String(p.mode)}
-                      type="button"
-                      onClick={() => {
-                        setAdminPreviewMode(p.mode);
-                        if (p.mode === 'soporte_team') setCircleFilter('soporte');
-                        else if (p.mode === 'ventas_pool') setCircleFilter('por_clasificar');
-                        else setCircleFilter('all');
-                        toast.success(`Vista cambiada a: ${p.label}`);
-                      }}
-                      className={`px-2.5 py-1 rounded-xl text-[11px] font-black transition ${
-                        active
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'bg-white text-indigo-800 border border-indigo-200 hover:bg-indigo-50'
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Team Member Access Table */}
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-2xl">
-              {loadingTeamAccess ? (
-                <div className="p-8 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
-                  <span>Cargando miembros del equipo...</span>
-                </div>
-              ) : teamAccessList.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-400">No se encontraron usuarios activos en la empresa.</div>
-              ) : (
-                teamAccessList.map((member) => {
-                  const currentOpt =
-                    WA_ACCESS_MODE_OPTIONS.find((o) => o.mode === member.access_mode) || WA_ACCESS_MODE_OPTIONS[0];
-                  const isSaving = savingUserAccessId === member.id;
-                  return (
-                    <div key={member.id} className="px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-50/70">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/70 font-bold text-xs flex items-center justify-center shrink-0">
-                          {initials(member.full_name)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-xs font-black text-slate-900 truncate">{member.full_name}</p>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${currentOpt.badgeColor}`}>
-                              {currentOpt.shortLabel}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 truncate">
-                            {member.email} · Rol base: <span className="font-semibold text-slate-700">{member.role_label}</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />}
-                        {member.is_system_admin ? (
-                          <span className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200 text-xs font-black">
-                            Administrador del Sistema (Ve Todo)
-                          </span>
-                        ) : (
-                          <select
-                            disabled={isSaving}
-                            value={member.access_mode}
-                            onChange={(e) => handleChangeUserWaAccess(member.id, e.target.value as WaAccessMode)}
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white border border-slate-300 text-slate-800 hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer disabled:opacity-50"
-                          >
-                            {WA_ACCESS_MODE_OPTIONS.map((opt) => (
-                              <option key={opt.mode} value={opt.mode}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500">
-              <span>Los cambios se aplican en tiempo real sin necesidad de que el usuario cierre sesión.</span>
-              <button
-                type="button"
-                onClick={() => setShowTeamAccessModal(false)}
-                className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition"
-              >
-                Listo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <TeamWaAccessModal
+        isOpen={showTeamAccessModal}
+        onClose={() => setShowTeamAccessModal(false)}
+        adminPreviewMode={adminPreviewMode}
+        onChangeAdminPreviewMode={(mode, nextFilter) => {
+          setAdminPreviewMode(mode);
+          setCircleFilter(nextFilter);
+        }}
+        loadingTeamAccess={loadingTeamAccess}
+        teamAccessList={teamAccessList}
+        savingUserAccessId={savingUserAccessId}
+        onChangeUserWaAccess={handleChangeUserWaAccess}
+      />
 
       {/* Método ARIAS 7 Preguntas Drawer directly inside WhatsApp Chat */}
       {activeCircle && (

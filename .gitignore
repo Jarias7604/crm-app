@@ -35,6 +35,6 @@ scratch/
 *.cjs
 !scripts/audit-rls.cjs
 *.mjs
-!scripts/test-financials.mjs
+!scripts/test-*.mjs
 env-keys.json
 supabase/.temp/

@@ -6,9 +6,8 @@ import {
   ArrowLeft, Sparkles, Download, Send, RefreshCw,
   Zap, Image, Check, ChevronLeft, ChevronRight, ChevronDown, Upload, X, Eye, Plus,
   BarChart3, Wand2, Layers, Palette, Type, Layout,
-  ExternalLink, Star, Cpu, Crown, Smile, Building2,
-  Instagram, Facebook, Linkedin, Smartphone, Video,
-  FolderOpen, Save, Loader2, Trash2, Edit2,
+  ExternalLink, Star, Cpu, Building2, Smartphone,
+  FolderOpen, Save, Loader2,
   Info, Target, Award, Globe, Moon, Sun, Sliders
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
@@ -21,211 +20,34 @@ import { FlyerTemplateA, FlyerTemplateB, parsePrompt, deriveHeadline, deriveFeat
 import { brandingService } from '../../services/branding';
 import { storageService } from '../../services/storage';
 import { industriesService } from '../../services/industries';
-
-// ─── Data ─────────────────────────────────────────────────────────────────────
-const FORMATS = [
-  { id: 'ig-post', label: 'Instagram Post', tag: '1:1', icon: Instagram },
-  { id: 'ig-portrait', label: 'IG Retrato', tag: '4:5', icon: Smartphone },
-  { id: 'fb-post', label: 'Facebook Post', tag: '6:5', icon: Facebook },
-  { id: 'story', label: 'Story / Reels', tag: '9:16', icon: Video },
-  { id: 'fb-cover', label: 'Portada Facebook', tag: 'Banner', icon: Layout },
-  { id: 'li-post', label: 'LinkedIn', tag: '1.91:1', icon: Linkedin },
-];
-
-const TONES = [
-  { key: 'premium', label: 'Premium', icon: Crown, color: '#D4AF37' },
-  { key: 'urgente', label: 'Urgente', icon: Zap, color: '#ef4444' },
-  { key: 'moderno', label: 'Moderno', icon: Sparkles, color: '#7c3aed' },
-  { key: 'amigable', label: 'Amigable', icon: Smile, color: '#10b981' },
-  { key: 'corporativo', label: 'Corporativo', icon: Building2, color: '#0070d2' },
-];
-
-const BRAND_COLORS = [
-  '#06c7d9', '#2563eb', '#6d4aff', '#071640', '#667085', '#f7f8fc',
-  '#0070d2', '#7c3aed', '#ef4444', '#f59e0b', '#10b981', '#111827',
-];
-
-const GRADIENT_PRESETS = [
-  { id: 'iclesia-brand', name: 'Iclesia Pro (#06C7D9 → #2563EB → #6D4AFF)', value: 'linear-gradient(135deg, #06c7d9 0%, #2563eb 50%, #6d4aff 100%)', c1: '#06c7d9', c2: '#2563eb', c3: '#6d4aff', angle: 135, type: 'linear' as const },
-  { id: 'meta-violet', name: 'Violeta Viral (Foto 5)', value: 'linear-gradient(135deg, #7928ca 0%, #c026d3 50%, #ff0080 100%)', c1: '#7928ca', c2: '#c026d3', c3: '#ff0080', angle: 135, type: 'linear' as const },
-  { id: 'royal-indigo', name: 'Índigo Tech', value: 'linear-gradient(135deg, #1e1b4b 0%, #4338ca 50%, #6366f1 100%)', c1: '#1e1b4b', c2: '#4338ca', c3: '#6366f1', angle: 135, type: 'linear' as const },
-  { id: 'ocean-cyan', name: 'Océano Cyan', value: 'linear-gradient(135deg, #082f49 0%, #0284c7 50%, #06b6d4 100%)', c1: '#082f49', c2: '#0284c7', c3: '#06b6d4', angle: 135, type: 'linear' as const },
-  { id: 'sunset-fire', name: 'Atardecer Coral', value: 'linear-gradient(135deg, #7c2d12 0%, #ea580c 50%, #fbbf24 100%)', c1: '#7c2d12', c2: '#ea580c', c3: '#fbbf24', angle: 135, type: 'linear' as const },
-  { id: 'emerald-pro', name: 'Esmeralda Pro', value: 'linear-gradient(135deg, #064e3b 0%, #059669 50%, #10b981 100%)', c1: '#064e3b', c2: '#059669', c3: '#10b981', angle: 135, type: 'linear' as const },
-  { id: 'gold-luxury', name: 'Oro & Bronce VIP', value: 'linear-gradient(135deg, #451a03 0%, #b45309 50%, #f59e0b 100%)', c1: '#451a03', c2: '#b45309', c3: '#f59e0b', angle: 135, type: 'linear' as const },
-  { id: 'rose-wine', name: 'Rubí & Rosa', value: 'linear-gradient(135deg, #4c0519 0%, #be123c 50%, #f43f5e 100%)', c1: '#4c0519', c2: '#be123c', c3: '#f43f5e', angle: 135, type: 'linear' as const },
-  { id: 'midnight-dark', name: 'Obsidiana Minimal', value: 'linear-gradient(135deg, #030712 0%, #0f172a 50%, #1e293b 100%)', c1: '#030712', c2: '#0f172a', c3: '#1e293b', angle: 135, type: 'linear' as const },
-];
-
-const DEFAULT_BG_IMAGE = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1080&auto=format&fit=crop';
-
-const DEFAULT_LOGO_SVG = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCI+PHBvbHlnb24gcG9pbnRzPSI1MCwxNSA5MCw4MCAxMCw4MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjN2MzYWVkIiBzdHJva2Utd2lkdGg9IjgiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIxNSIgZmlsbD0iIzdjM2FlZCIvPjwvc3ZnPg==';
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-const css = {
-  page: { height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' as const, background: '#f0f2f5', fontFamily: 'system-ui,-apple-system,sans-serif', overflow: 'hidden' },
-  header: { padding: '10px 20px', background: '#fff', borderBottom: '1px solid #dde1e7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' },
-  cols: { flex: 1, display: 'flex', gap: 0, overflow: 'hidden' },
-  col: (w: string, bg = '#fff', border = true) => ({ width: w, flexShrink: 0, background: bg, borderRight: border ? '1px solid #dde1e7' : 'none', display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' }),
-  colHead: { padding: '14px 18px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
-  colBody: { flex: 1, overflowY: 'auto' as const, padding: '16px 18px' },
-  label: { fontSize: 10, fontWeight: 800, color: '#54698d', letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 6, display: 'block' },
-  input: { width: '100%', border: '1px solid #d8dde6', borderRadius: 7, padding: '9px 12px', fontSize: 13, color: '#0f172a', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const, background: '#fff' },
-  select: {
-    width: '100%',
-    border: '1px solid #cbd5e1',
-    borderRadius: '8px',
-    padding: '10px 14px',
-    fontSize: '13px',
-    color: '#0f172a',
-    outline: 'none',
-    fontFamily: 'inherit',
-    boxSizing: 'border-box' as const,
-    background: '#ffffff',
-    cursor: 'pointer',
-    transition: 'border-color 0.15s, box-shadow 0.15s',
-    fontWeight: 700,
-    appearance: 'none' as const,
-    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'right 12px center',
-    backgroundSize: '16px 16px',
-    paddingRight: '36px',
-  },
-  textarea: { width: '100%', border: '1px solid #d8dde6', borderRadius: 7, padding: '10px 12px', fontSize: 13, color: '#0f172a', outline: 'none', resize: 'vertical' as const, minHeight: 100, fontFamily: 'inherit', boxSizing: 'border-box' as const },
-  section: { marginBottom: 20 },
-  pill: (active: boolean, accent = '#0070d2') => ({ border: `1.5px solid ${active ? accent : '#e2e8f0'}`, borderRadius: 7, padding: '7px 10px', cursor: 'pointer', background: active ? `${accent}10` : '#f8fafc', transition: 'all 0.12s', display: 'flex', alignItems: 'center', gap: 5 }),
-  btn: { background: 'linear-gradient(135deg,#0070d2,#005fb2)', border: 'none', borderRadius: 7, padding: '11px 20px', fontSize: 12, fontWeight: 800, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, width: '100%', justifyContent: 'center' as const },
-  ghost: { background: '#f4f6f9', border: '1px solid #d8dde6', borderRadius: 7, padding: '9px 14px', fontSize: 12, fontWeight: 700, color: '#0f172a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 },
-};
-
-// ─── Virality Score (local, no API) ──────────────────────────────────────────
-function calcViralScore(prompt: string, cta: string, phone: string, website: string) {
-  if (!prompt.trim() || prompt.trim().length < 10) return { score: 0, level: 'none', tips: [] as string[] };
-  let score = 0;
-  const tips: string[] = [];
-  const p = prompt.toLowerCase();
-  // Price or discount
-  if (/\$[\d,.]+|precio|costo|gratis|%\s*off|descuento|oferta|promo/i.test(prompt)) score += 18;
-  else tips.push('💰 Agrega precio o descuento concreto (ej: $12.95/mes, 30% OFF)');
-  // Urgency
-  if (/hoy|ahora|urgente|l[ií]mite|temporada|exclusiv|solo hasta|quedan/i.test(prompt)) score += 20;
-  else tips.push('⚡ Añade urgencia: HOY, OFERTA LIMITADA, SOLO ESTA SEMANA');
-  // Benefits / features
-  if (/incluye|ofrece|benefici|caracter|servicios|lleva|contiene/i.test(prompt)) score += 15;
-  else tips.push('✅ Lista 3 beneficios clave (ej: incluye: Facturación, Inventario, Reportes)');
-  // CTA
-  if (cta.trim().length > 2) score += 10;
-  else tips.push('🎯 Define tu CTA (ej: "Llama HOY", "Prueba gratis")');
-  // Contact info
-  if (phone.trim() || website.trim()) score += 8;
-  // Prompt length sweet spot
-  const len = prompt.trim().length;
-  if (len >= 80 && len <= 400) score += 15; else if (len > 40) score += 7;
-  else tips.push('📝 Describe más tu oferta (al menos 80 caracteres)');
-  // Numbers / specifics
-  if (/\d+/.test(prompt)) score += 9;
-  // Structured tags
-  if (/t[íi]tulo:|subt[íi]tulo:|incluye:/i.test(prompt)) score += 5;
-  const s = Math.min(score, 100);
-  const level = s >= 75 ? 'viral' : s >= 50 ? 'bueno' : s >= 30 ? 'mejorable' : 'bajo';
-  return { score: s, level, tips: tips.slice(0, 3) };
-}
-
-const getFlyerDimensions = (formatId: string) => {
-  switch (formatId) {
-    case 'ig-post':     return { width: 520, height: 520 };
-    case 'ig-portrait': return { width: 460, height: 575 };
-    case 'fb-post':     return { width: 520, height: 433 };
-    case 'story':       return { width: 370, height: 657 };
-    case 'fb-cover':    return { width: 540, height: 200 };
-    case 'li-post':     return { width: 540, height: 284 };
-    default:            return { width: 520, height: 520 };
-  }
-};
-
-async function urlToBase64(url: string): Promise<string> {
-  if (!url) return '';
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error('Failed to convert blob to base64'));
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error('Error fetching and converting image to base64:', error);
-    return '';
-  }
-}
-
-function getThematicImages(prompt: string, industry?: string): string[] {
-  const lI = (industry || '').toLowerCase();
-  const lP = prompt.toLowerCase();
-  const U = (id: string) => `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1080&q=80`;
-  const CHURCH = [
-    'photo-1544427920-c49ccfb85579','photo-1438232992991-995b7058bbb3','photo-1519491050282-cf00c82424b4',
-    'photo-1507692049790-de58290a4334','photo-1470225620780-dba8ba36b745','photo-1511671782779-c97d3d27a1d4',
-    'photo-1492684223066-81342ee5ff30','photo-1499209974431-9dddcece7f88','photo-1465847899084-d164df4dedc6',
-    'photo-1510525009512-ad7fc13eefab','photo-1529070538774-1843cb3265df','photo-1516450360452-9312f5e86fc7',
-    'photo-1514525253161-7a46d19cd819','photo-1523580494863-6f3031224c94','photo-1505373877841-8d25f7d46678'
-  ].map(U);
-  const FINANCE = [
-    'photo-1554224155-8d04cb21cd6c','photo-1460925895917-afdab827c52f','photo-1551288049-bebda4e38f71',
-    'photo-1559526324-4b87b5e36e44','photo-1579532537598-459ecdaf39cc','photo-1507679799987-c73779587ccf',
-    'photo-1486406146926-c627a92ad1ab','photo-1454165804606-c3d57bc86b40','photo-1551836022-d5d88e9218df',
-    'photo-1507238691740-187a5b1d37b8','photo-1590283603385-17ffb3a7f29f','photo-1611974789855-9c2a0a7236a3'
-  ].map(U);
-  const TECH = ['photo-1551288049-bebda4e38f71','photo-1460925895917-afdab827c52f','photo-1504868584819-f8e8b4b6d7e3','photo-1518770660439-4636190af475','photo-1488590528505-98d2b5aba04b','photo-1461749280684-dccba630e2f6','photo-1504639725590-34d0984388bd','photo-1551434678-e076c223a692','photo-1522071820081-009f0129c71c','photo-1542744173-8e7e53415bb0','photo-1486312338219-ce68d2c6f44d','photo-1498050108023-c5249f4df085','photo-1531297484001-80022131f5a1','photo-1519389950473-47ba0277781c','photo-1600880292203-757bb62b4baf','photo-1560472355-536de3962603','photo-1553877522-43269d4ea984'].map(U);
-  const FOOD = ['photo-1513104890138-7c749659a591','photo-1504674900247-0877df9cc836','photo-1565299624946-b28f40a0ae38','photo-1568901346375-23c9450c58cd','photo-1512621776951-a57141f2eefd','photo-1544025162-d76694265947','photo-1578985545062-69928b1d9587','photo-1555396273-367ea4eb4db5','photo-1540189549336-e6e99c3679fe','photo-1567620905732-2d1ec7ab7445'].map(U);
-  const MEDICAL = ['photo-1622253692010-333f2da6031d','photo-1559839734-2b71ea197ec2','photo-1576091160550-2173dba999ef','photo-1584515906207-523b4c207da7','photo-1537368910025-700350fe46c7','photo-1476480862126-209bfaa8edc8','photo-1519494026892-80bbd2d6fd0d','photo-1551076805-e1869033e561','photo-1631815541552-b5848c1a596c','photo-1505751172876-fa1923c5c528'].map(U);
-  const DENTAL = ['photo-1629909613654-28e377c37b09','photo-1588776814546-1ffcf47267a5','photo-1606811971618-4486d14f3f99','photo-1629909615184-74f495363b67','photo-1552566626-52f8b828add9','photo-1576765608535-5f04d1e3f289'].map(U);
-  const BEAUTY = ['photo-1560066984-138dadb4c035','photo-1522337360788-8b13dee7a37e','photo-1604654894610-df63bc536371','photo-1540555700478-4be289fbecef','photo-1512290923902-8a9f81dc236c','photo-1562322140-8baeececf3df'].map(U);
-  const GYM = ['photo-1517838277536-f5f99be501cd','photo-1534438327276-14e5300c3a48','photo-1571902943202-507ec2618e8f','photo-1526506118085-60ce8714f8c5','photo-1549719386-74dfcbf7dbed','photo-1584735935682-2f2b69dff9d2'].map(U);
-  const LEGAL = ['photo-1589829545856-d10d557cf95f','photo-1521587760476-6c12a4b040da','photo-1521791136368-1a46827d06e5','photo-1507679799987-c73779587ccf','photo-1551836022-d5d88e9218df'].map(U);
-  const CAFE = ['photo-1501339847302-ac426a4a7cbb','photo-1495474472287-4d71bcdd2085','photo-1509042239860-f550ce710b93','photo-1442512595331-e89e73853f31','photo-1554118811-1e0d58224f24'].map(U);
-  const REALESTATE = ['photo-1560518883-ce09059eeffa','photo-1512917774080-9991f1c4c750','photo-1564013799919-ab600027ffc6','photo-1600585154340-be6161a56a0c','photo-1600607687939-ce8a6c25118c','photo-1582407947304-fd86f028f716','photo-1558618666-fcd25c85cd64','photo-1523217582562-09d0def993a6','photo-1484154218962-a197022b5858','photo-1502672260266-1c1ef2d93688'].map(U);
-  const BEACH = ['photo-1507525428034-b723cf961d3e','photo-1510414842594-a61c69b5ae57','photo-1544551763-46a013bb70d5','photo-1559494007-9f5847c49d94','photo-1571003123894-1f0594d2b5d9','photo-1527489377706-5bf97e608852','photo-1501785888041-af3ef285b470','photo-1506953823976-52e1fdc0149a','photo-1573843981267-be1999ff37cd','photo-1540202404-a2f29016b523','photo-1469474968028-56623f02e42e','photo-1582610116397-edb72e9b9b4e','photo-1596178065887-1198b6148b2b','photo-1561731216-c3a4d99437d5','photo-1519046904884-53103b34b206'].map(U);
-  const AUTO = ['photo-1486006920555-c77dce18193b','photo-1619642751034-765dfdf7c58e','photo-1568605117036-5fe5e7bab0b7','photo-1492144534655-ae79c964c9d7','photo-1525609004556-c46c7d6cf0a3','photo-1503376780353-7e6692767b70'].map(U);
-  const EDUCATION = ['photo-1523240795612-9a054b0db644','photo-1509062522246-3755977927d7','photo-1497633762265-9d179a990aa6','photo-1524178232363-1fb2b075b655','photo-1513542789411-b6a5d4f31634'].map(U);
-  const DEFENSE = ['photo-1555597673-b21d5c935865','photo-1509198397868-475647b2a1e5','photo-1563986768609-322da13575f3','photo-1614064641938-3bbee52942c7'].map(U);
-  const GENERAL = ['photo-1460925895917-afdab827c52f','photo-1519389950473-47ba0277781c','photo-1522071820081-009f0129c71c','photo-1531403009284-440f080d1e12','photo-1486406146926-c627a92ad1ab','photo-1522202176988-66273c2fd55f','photo-1504384308090-c894fdcc538d','photo-1517245386807-bb43f82c33c4'].map(U);
-  function pick(t: string) {
-    if (/iglesia|iclesia|culto|pastor|ministerio|adoraci[oó]n|cristian|fe|alabanza|congregaci[oó]n|servicio religioso|templo|church|worship/i.test(t)) return CHURCH;
-    if (/facturaci[oó]n|factura|contab|finanz|impuesto|fiscal|auditor/i.test(t)) return FINANCE;
-    if (/playa|lotes?|terreno|vacaci[óo]n|vacaciones|resort|turismo|para[ío]so|club privado|sol y|arena|oc[ée]ano|caribe|tropical|frente al mar|vista al mar|costa|riviera|bungal/i.test(t)) return BEACH;
-    if (/laboratorio|cl[íi]nica|m[eé]dic|farmacia|salud|hospital|doctor|odontolog|dental|dentista|pediatr|enfermer/i.test(t)) return /dental|dentista|odontolog/i.test(t)?DENTAL:MEDICAL;
-    if (/restaurante|comida|food|pizza|taco|burger|hamburgues|sushi|pupusa/i.test(t)) return FOOD;
-    if (/cafeter[íi]a|caf[eé]|panadería|panaderia/i.test(t)) return CAFE;
-    if (/crm|software|saas|tecnolog|digital|sistema|plataforma|ecommerce|inteligencia artificial|embudos|automatizaci|inventario|reportes/i.test(t)) return TECH;
-    if (/belleza|salon|uñas|spa|maquillaje|cabello|peluquer/i.test(t)) return BEAUTY;
-    if (/gym|gimnasio|fitness|deporte|entrenamiento/i.test(t)) return GYM;
-    if (/curso|taller|capacitaci[oó]n|escuela|universidad|estudiante|colegio|aprender/i.test(t)) return EDUCATION;
-    if (/abogado|legal|firma|leyes|derecho/i.test(t)) return LEGAL;
-    if (/casa|inmobiliaria|apartamento|propiedad|construcci|bienes ra[íi]ces/i.test(t)) return REALESTATE;
-    if (/taller|automotriz|mec[aá]nico|veh[íi]culo|repuesto|carro/i.test(t)) return AUTO;
-    if (/defensa|karate|marciales|taekwondo/i.test(t)) return DEFENSE;
-    return null;
-  }
-  const chosen = (lI && pick(lI)) || pick(lP) || GENERAL;
-  return [...chosen].sort(() => Math.random() - 0.5);
-}
-
-const FONT_OPTIONS = [
-  { value: 'Outfit', name: 'Outfit', desc: 'Moderna & Limpia' },
-  { value: 'Montserrat', name: 'Montserrat', desc: 'Geométrica B2B' },
-  { value: 'Oswald', name: 'Oswald', desc: 'Condensada Impacto' },
-  { value: 'Poppins', name: 'Poppins', desc: 'Redonda Popular' },
-  { value: 'Playfair Display', name: 'Playfair Display', desc: 'Serif Elegante' },
-  { value: 'Bebas Neue', name: 'Bebas Neue', desc: 'Titulares Sans' },
-  { value: 'Raleway', name: 'Raleway', desc: 'Sofisticada Delgado' },
-  { value: 'Inter', name: 'Inter', desc: 'Estándar Pro' },
-];
+import {
+  FORMATS,
+  TONES,
+  BRAND_COLORS,
+  GRADIENT_PRESETS,
+  DEFAULT_BG_IMAGE,
+  DEFAULT_LOGO_SVG,
+  FONT_OPTIONS,
+  css,
+} from './flyerStudio/constants';
+import {
+  calcViralScore,
+  getFlyerDimensions,
+  urlToBase64,
+  getThematicImages,
+} from './flyerStudio/helpers';
+import {
+  FormatSelectionModal,
+  ToneSelectionModal,
+  BrandColorPickerModal,
+  TemplateCatalogModal,
+  FreePhotoSelectorModal,
+} from './flyerStudio/FlyerSelectionModals';
+import {
+  SaveFlyerModal,
+  FlyerGalleryModal,
+  AidaMethodologyModal,
+} from './flyerStudio/FlyerLibraryModals';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function FlyerStudio() {
@@ -6017,967 +5839,155 @@ export default function FlyerStudio() {
       )}
 
       {/* ── FORMAT SELECTION MODAL ────────────────────────────────────── */}
-      {isFormatModalOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 3000,
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'fadeIn 0.2s ease-out'
-        }} onClick={() => setIsFormatModalOpen(false)}>
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e2e8f0',
-            borderRadius: 20,
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-            width: '100%',
-            maxWidth: 440,
-            display: 'flex', flexDirection: 'column',
-            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-            overflow: 'hidden'
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Selecciona Formato</span>
-              <button onClick={() => setIsFormatModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-                <X size={16} color="#64748b" />
-              </button>
-            </div>
-            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {FORMATS.map(f => {
-                const IconComponent = f.icon;
-                const active = format === f.id;
-                return (
-                  <button
-                    key={f.id}
-                    onClick={() => { setFormat(f.id); setIsFormatModalOpen(false); }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 16px',
-                      borderRadius: 12,
-                      border: `1.5px solid ${active ? '#7c3aed' : '#e2e8f0'}`,
-                      background: active ? '#7c3aed0a' : '#fff',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      width: '100%',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <IconComponent size={18} color={active ? '#7c3aed' : '#64748b'} />
-                      <span style={{ fontSize: 13, fontWeight: active ? 800 : 600, color: '#0f172a' }}>{f.label}</span>
-                    </div>
-                    <span style={{ fontSize: 11, color: active ? '#7c3aed' : '#94a3b8', fontWeight: 700 }}>{f.tag}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      <FormatSelectionModal
+        isOpen={isFormatModalOpen}
+        onClose={() => setIsFormatModalOpen(false)}
+        format={format}
+        onSelectFormat={setFormat}
+      />
 
       {/* ── TONE SELECTION MODAL ──────────────────────────────────────── */}
-      {isToneModalOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 3000,
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'fadeIn 0.2s ease-out'
-        }} onClick={() => setIsToneModalOpen(false)}>
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e2e8f0',
-            borderRadius: 20,
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-            width: '100%',
-            maxWidth: 440,
-            display: 'flex', flexDirection: 'column',
-            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-            overflow: 'hidden'
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Selecciona Tono</span>
-              <button onClick={() => setIsToneModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-                <X size={16} color="#64748b" />
-              </button>
-            </div>
-            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {TONES.map(t => {
-                const IconComponent = t.icon;
-                const active = tone === t.key;
-                return (
-                  <button
-                    key={t.key}
-                    onClick={() => { setTone(t.key); setIsToneModalOpen(false); }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 16px',
-                      borderRadius: 12,
-                      border: `1.5px solid ${active ? '#0070d2' : '#e2e8f0'}`,
-                      background: active ? '#0070d20a' : '#fff',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      width: '100%',
-                      boxSizing: 'border-box'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <IconComponent size={18} color={active ? '#0070d2' : t.color} />
-                      <span style={{ fontSize: 13, fontWeight: active ? 800 : 600, color: '#0f172a' }}>{t.label}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      <ToneSelectionModal
+        isOpen={isToneModalOpen}
+        onClose={() => setIsToneModalOpen(false)}
+        tone={tone}
+        onSelectTone={setTone}
+      />
 
       {/* ── BRAND COLOR PICKER MODAL ──────────────────────────────────── */}
-      {isColorModalOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 3000,
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'fadeIn 0.2s ease-out'
-        }} onClick={() => setIsColorModalOpen(false)}>
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e2e8f0',
-            borderRadius: 20,
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-            width: '100%',
-            maxWidth: 360,
-            display: 'flex', flexDirection: 'column',
-            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-            overflow: 'hidden'
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Color Personalizado</span>
-              <button onClick={() => setIsColorModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-                <X size={16} color="#64748b" />
-              </button>
-            </div>
-            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <input
-                  type="color"
-                  value={customHex}
-                  onChange={e => setCustomHex(e.target.value)}
-                  style={{
-                    width: 50, height: 50, padding: 0,
-                    border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 8, flexShrink: 0
-                  }}
-                />
-                <div style={{ flex: 1 }}>
-                  <label style={{ ...css.label, marginBottom: 4 }}>Código HEX</label>
-                  <input
-                    type="text"
-                    placeholder="#000000"
-                    value={customHex}
-                    onChange={e => setCustomHex(e.target.value)}
-                    style={{ ...css.input, textTransform: 'uppercase' }}
-                  />
-                </div>
-              </div>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  let validHex = customHex.trim();
-                  if (!validHex.startsWith('#')) {
-                    validHex = '#' + validHex;
-                  }
-                  if (/^#[0-9A-F]{6}$/i.test(validHex)) {
-                    toggleColor(validHex);
-                    setIsColorModalOpen(false);
-                  } else {
-                    toast.error('Código HEX inválido. Usa el formato #RRGGBB');
-                  }
-                }}
-                style={{ ...css.btn, background: 'linear-gradient(135deg,#7c3aed,#6d28d9)' }}
-              >
-                Aplicar Color de Marca
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BrandColorPickerModal
+        isOpen={isColorModalOpen}
+        onClose={() => setIsColorModalOpen(false)}
+        customHex={customHex}
+        onChangeCustomHex={setCustomHex}
+        onApplyColor={toggleColor}
+      />
 
       {/* ── TEMPLATE CATALOG SELECTION MODAL ──────────────────────────── */}
-      {isTemplateModalOpen && (() => {
-        const ratio = canvasH / 1080;
-        const fitW = ratio > 1.3 ? 120 : 155;
-        const fitH = Math.round(fitW * ratio);
-        const sc = fitW / 1080;
-        
-        return (
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: 3000,
-            background: 'rgba(15, 23, 42, 0.4)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            animation: 'fadeIn 0.2s ease-out'
-          }} onClick={() => setIsTemplateModalOpen(false)}>
-            <div style={{
-              background: '#fff',
-              border: '1px solid #e2e8f0',
-              borderRadius: 24,
-              boxShadow: '0 20px 45px rgba(0, 0, 0, 0.18)',
-              width: '95%',
-              maxWidth: 880,
-              maxHeight: '90vh',
-              display: 'flex', flexDirection: 'column',
-              animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-              overflow: 'hidden'
-            }} onClick={e => e.stopPropagation()}>
-              <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-                <div>
-                  <span style={{ fontSize: 14, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Catálogo de Plantillas</span>
-                  <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Selecciona el diseño base para tu flyer (se actualiza con tus datos en tiempo real)</div>
-                </div>
-                <button onClick={() => setIsTemplateModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
-                  <X size={18} color="#64748b" />
-                </button>
-              </div>
-              
-              <div className="flyer-studio-col" style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>Plantillas Modernas Seleccionadas</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
-                    {TEMPLATE_LIST.map(t => {
-                      const active = selectedTemplate === t.id;
-                      return (
-                        <button
-                          key={t.id}
-                          onClick={() => {
-                            setSelectedTemplate(t.id);
-                            setPreviewMode('template');
-                            setShowFullAiResult(false);
-                            setIsTemplateModalOpen(false);
-                            if (t.id === 'vibrant-gradient') {
-                              setBgMode('gradient');
-                              toast.success('🎨 Modo Degradado Puro Activado');
-                            } else {
-                              setBgMode('photo');
-                              toast.success('📷 Modo Foto Editorial Activado');
-                            }
-                          }}
-                          style={{
-                            textAlign: 'left',
-                            padding: 0,
-                            borderRadius: 16,
-                            border: `2px solid ${active ? '#7c3aed' : '#f1f5f9'}`,
-                            background: '#fff',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            overflow: 'hidden',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            boxShadow: active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)',
-                            transform: 'none',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 12px 20px -5px rgba(0,0,0,0.08)';
-                            if (!active) e.currentTarget.style.borderColor = '#ddd6fe';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'none';
-                            e.currentTarget.style.boxShadow = active ? '0 10px 25px -5px rgba(124, 58, 237, 0.15)' : '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01)';
-                            if (!active) e.currentTarget.style.borderColor = '#f1f5f9';
-                          }}
-                        >
-                          <div style={{ width: '100%', height: 200, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid #f1f5f9', overflow: 'hidden', position: 'relative' }}>
-                            <div style={{ width: fitW, height: fitH, position: 'relative', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.06)', borderRadius: 8, background: '#fff', flexShrink: 0 }}>
-                              <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: canvasH, pointerEvents: 'none' }}>
-                                <RenderFlyer d={{
-                                  title: manualTitle || 'TU OFERTA',
-                                  subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
-                                  cta: cta || 'CONTACTAR AHORA',
-                                  beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
-                                  accent: colors[0] || '#0070d2',
-                                  bgImageUrl: t.id === 'vibrant-gradient' ? null : (bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE),
-                                  bgType: t.id === 'vibrant-gradient' ? 'gradient' : 'photo',
-                                  logoUrl: logoPreview || null,
-                                  industria: companyName || 'Mi Empresa',
-                                  companyName: companyName,
-                                  phone, website, templateId: t.id,
-                                  gradientBg: selectedGradient,
-                                  bgOverlayOpacity: (bgOverlayEnabled && bgOverlayOpacity > 0) ? bgOverlayOpacity : 0,
-                                  badgeTextTop: badgeTop,
-                                  badgeTextBottom: badgeBottom,
-                                  containerW: 1080, containerH: canvasH,
-                                  logoSize, logoX, logoY,
-                                  flyerFont, titleFont, subtitleFont, benefitsFont, ctaFont, contactFont,
-                                  textScale, subtitleScale, benefitsScale, titleColor, highlightColor, subtitleColor, benefitsColor, cardBgColor, ctaBgColor, ctaTextColor, textY, textAlign,
-                                  subtitleBold, benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY,
-                                  titleX, subtitleX, benefitsX, ctaX, contactX, contactColor
-                                }} />
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between', width: '100%', boxSizing: 'border-box' }}>
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 850, color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span>{t.name}</span>
-                                {active && <span style={{ background: '#7c3aed', color: '#fff', fontSize: 8, padding: '2px 6px', borderRadius: 8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Activa</span>}
-                              </div>
-                              <div style={{ fontSize: 9, color: '#64748b', marginTop: 4, lineHeight: 1.3 }}>{t.desc}</div>
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      <TemplateCatalogModal
+        isOpen={isTemplateModalOpen}
+        onClose={() => setIsTemplateModalOpen(false)}
+        canvasH={canvasH}
+        selectedTemplate={selectedTemplate}
+        onSelectTemplate={(templateId) => {
+          setSelectedTemplate(templateId);
+          setPreviewMode('template');
+          setShowFullAiResult(false);
+          setIsTemplateModalOpen(false);
+          if (templateId === 'vibrant-gradient') {
+            setBgMode('gradient');
+            toast.success('🎨 Modo Degradado Puro Activado');
+          } else {
+            setBgMode('photo');
+            toast.success('📷 Modo Foto Editorial Activado');
+          }
+        }}
+        bgPhotoUrl={bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE}
+        previewBaseData={{
+          title: manualTitle || 'TU OFERTA',
+          subtitle: manualSubtitle || '¡Aprovecha esta increíble oportunidad hoy mismo!',
+          cta: cta || 'CONTACTAR AHORA',
+          beneficios:
+            manualFeatures.filter((f) => f.trim() !== '').length > 0
+              ? manualFeatures.filter((f) => f.trim() !== '')
+              : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+          accent: colors[0] || '#0070d2',
+          logoUrl: logoPreview || null,
+          industria: companyName || 'Mi Empresa',
+          companyName,
+          phone,
+          website,
+          gradientBg: selectedGradient,
+          bgOverlayOpacity: bgOverlayEnabled && bgOverlayOpacity > 0 ? bgOverlayOpacity : 0,
+          badgeTextTop: badgeTop,
+          badgeTextBottom: badgeBottom,
+          containerW: 1080,
+          containerH: canvasH,
+          logoSize,
+          logoX,
+          logoY,
+          flyerFont,
+          titleFont,
+          subtitleFont,
+          benefitsFont,
+          ctaFont,
+          contactFont,
+          textScale,
+          subtitleScale,
+          benefitsScale,
+          titleColor,
+          highlightColor,
+          subtitleColor,
+          benefitsColor,
+          cardBgColor,
+          ctaBgColor,
+          ctaTextColor,
+          textY,
+          textAlign,
+          subtitleBold,
+          benefitsBold,
+          titleScale,
+          titleY,
+          subtitleY,
+          benefitsY,
+          ctaScale,
+          ctaY,
+          contactScale,
+          contactY,
+          titleX,
+          subtitleX,
+          benefitsX,
+          ctaX,
+          contactX,
+          contactColor,
+        }}
+      />
 
       {/* ── FREE PHOTO SELECTOR MODAL ──────────────────────────────────────── */}
-      {isFreePhotoModalOpen && freePhotosPool.length > 0 && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-          animation: 'fadeIn 0.2s ease-out'
-        }} onClick={() => setIsFreePhotoModalOpen(false)}>
-          <div style={{
-            background: '#ffffff', borderRadius: 24, border: '1px solid #e2e8f0',
-            width: '100%', maxWidth: 540, overflow: 'hidden',
-            boxShadow: '0 20px 50px rgba(15, 23, 42, 0.15)',
-            display: 'flex', flexDirection: 'column',
-            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
-          }} onClick={e => e.stopPropagation()}>
-            {/* Header */}
-            <div style={{ padding: '20px 24px 16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-              <div>
-                <span style={{ fontSize: 13, fontWeight: 900, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Generador Gratis</span>
-                <h3 style={{ fontSize: 16, fontWeight: 900, color: '#0f172a', margin: '2px 0 0 0' }}>Elige una Imagen Temática</h3>
-                <p style={{ fontSize: 10, color: '#64748b', margin: '4px 0 0 0' }}>Selecciona entre 15 fotos premium para usar en tu flyer</p>
-              </div>
-              <button 
-                onClick={() => setIsFreePhotoModalOpen(false)}
-                style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.08)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
-              >
-                <X size={14} color="#0f172a" />
-              </button>
-            </div>
-            
-            {/* Body */}
-            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
-              {/* Main Image View */}
-              <div style={{
-                width: '100%', height: 320, background: '#0f172a', borderRadius: 16,
-                position: 'relative', overflow: 'hidden', border: '1px solid #e2e8f0',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <img 
-                  src={freePhotosPool[freePhotoIndex]} 
-                  alt={`Preview ${freePhotoIndex + 1}`}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                />
-                
-                {/* Navigation Arrows */}
-                <button
-                  type="button"
-                  onClick={() => setFreePhotoIndex(prev => (prev === 0 ? freePhotosPool.length - 1 : prev - 1))}
-                  style={{
-                    position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-                    width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.9)',
-                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)', transition: 'all 0.2s', zIndex: 10
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)'; e.currentTarget.style.background = '#ffffff'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
-                >
-                  <ChevronLeft size={18} color="#0f172a" />
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => setFreePhotoIndex(prev => (prev === freePhotosPool.length - 1 ? 0 : prev + 1))}
-                  style={{
-                    position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                    width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.9)',
-                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)', transition: 'all 0.2s', zIndex: 10
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1.08)'; e.currentTarget.style.background = '#ffffff'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)'; e.currentTarget.style.background = 'rgba(255,255,255,0.9)'; }}
-                >
-                  <ChevronRight size={18} color="#0f172a" />
-                </button>
-
-                {/* Index Counter Badge */}
-                <div style={{
-                  position: 'absolute', bottom: 12, right: 12,
-                  background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)',
-                  color: '#ffffff', padding: '4px 10px', borderRadius: 20,
-                  fontSize: 10, fontWeight: 700, zIndex: 10
-                }}>
-                  Foto {freePhotoIndex + 1} de {freePhotosPool.length}
-                </div>
-              </div>
-
-              {/* Scrollable Thumbnails View */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <span style={{ fontSize: 9, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Todas las opciones ({freePhotosPool.length})</span>
-                <div className="flyer-studio-col" style={{ 
-                  display: 'flex', gap: 8, overflowX: 'auto', padding: '4px 0', 
-                  width: '100%', scrollbarWidth: 'thin'
-                }}>
-                  {freePhotosPool.map((img, idx) => {
-                    const active = idx === freePhotoIndex;
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setFreePhotoIndex(idx)}
-                        style={{
-                          width: 54,
-                          height: 54,
-                          borderRadius: 10,
-                          border: `2px solid ${active ? '#7c3aed' : '#e2e8f0'}`,
-                          padding: 0,
-                          overflow: 'hidden',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          flexShrink: 0,
-                          opacity: active ? 1 : 0.65,
-                          transform: active ? 'scale(1.05)' : 'none',
-                          boxShadow: active ? '0 4px 10px rgba(124,58,237,0.15)' : 'none'
-                        }}
-                      >
-                        <img src={img} alt={`Thumb ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div style={{ padding: '16px 24px 20px 24px', background: '#f8fafc', display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => setIsFreePhotoModalOpen(false)}
-                style={{ background: '#fff', border: '1px solid #d8dde6', borderRadius: 10, padding: '10px 16px', fontSize: 12, fontWeight: 800, color: '#475569', cursor: 'pointer', transition: 'all 0.2s' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
-                onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectFreePhoto(freePhotosPool[freePhotoIndex])}
-                style={{
-                  background: '#7c3aed', border: 'none', borderRadius: 10,
-                  padding: '10px 18px', fontSize: 12, fontWeight: 800, color: '#fff',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', transition: 'all 0.2s',
-                  boxShadow: '0 4px 12px rgba(124,58,237,0.2)'
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#6d28d9'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#7c3aed'; e.currentTarget.style.transform = 'none'; }}
-              >
-                <Plus size={14} style={{ marginRight: 6 }} />
-                Aplicar esta Foto
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <FreePhotoSelectorModal
+        isOpen={isFreePhotoModalOpen}
+        onClose={() => setIsFreePhotoModalOpen(false)}
+        photosPool={freePhotosPool}
+        photoIndex={freePhotoIndex}
+        onChangePhotoIndex={setFreePhotoIndex}
+        onApplyPhoto={handleSelectFreePhoto}
+      />
 
       {/* ── SAVE FLYER MODAL ────────────────────────────────────────────────── */}
-      {isSaveModalOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
-        }}>
-          <div style={{
-            background: '#ffffff', borderRadius: 24, border: '1px solid #e2e8f0',
-            width: '100%', maxWidth: 420, overflow: 'hidden',
-            boxShadow: '0 20px 50px rgba(15, 23, 42, 0.15)',
-            display: 'flex', flexDirection: 'column'
-          }}>
-            <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 900, color: '#0f172a', margin: 0 }}>Guardar Diseño</h3>
-                <p style={{ fontSize: 10, color: '#64748b', margin: '4px 0 0 0' }}>Dale un nombre descriptivo a tu publicidad</p>
-              </div>
-              <button 
-                onClick={() => setIsSaveModalOpen(false)}
-                style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <X size={14} color="#0f172a" />
-              </button>
-            </div>
-            
-            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nombre del diseño</label>
-                <input 
-                  type="text" 
-                  value={newDesignName}
-                  onChange={e => setNewDesignName(e.target.value)}
-                  placeholder={`Ej: Flyer Oferta Verano ${new Date().toLocaleDateString()}`}
-                  style={{ ...css.input, height: 42 }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleSaveFlyer(newDesignName, !!loadedFlyerId);
-                  }}
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div style={{ padding: '16px 24px 24px 24px', background: '#f8fafc', display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => setIsSaveModalOpen(false)}
-                style={{ background: '#fff', border: '1px solid #d8dde6', borderRadius: 10, padding: '10px 16px', fontSize: 12, fontWeight: 800, color: '#475569', cursor: 'pointer' }}
-              >
-                Cancelar
-              </button>
-              {loadedFlyerId ? (
-                <>
-                  <button
-                    onClick={() => handleSaveFlyer(newDesignName, false)}
-                    disabled={savingFlyer}
-                    style={{
-                      background: '#fff', border: '1px solid #ddd6fe', borderRadius: 10,
-                      padding: '10px 16px', fontSize: 12, fontWeight: 800, color: '#7c3aed',
-                      cursor: savingFlyer ? 'not-allowed' : 'pointer'
-                    }}
-                  >
-                    Guardar como Copia
-                  </button>
-                  <button
-                    onClick={() => handleSaveFlyer(newDesignName, true)}
-                    disabled={savingFlyer}
-                    style={{
-                      background: 'linear-gradient(135deg, #10b981, #059669)',
-                      border: 'none', borderRadius: 10,
-                      padding: '10px 16px', fontSize: 12, fontWeight: 850,
-                      color: '#fff',
-                      cursor: savingFlyer ? 'not-allowed' : 'pointer',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
-                    }}
-                  >
-                    {savingFlyer ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</> : 'Actualizar Existente'}
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => handleSaveFlyer(newDesignName, false)}
-                  disabled={savingFlyer}
-                  style={{
-                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                    border: 'none', borderRadius: 10,
-                    padding: '10px 20px', fontSize: 12, fontWeight: 850,
-                    color: '#fff',
-                    cursor: savingFlyer ? 'not-allowed' : 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    boxShadow: '0 4px 12px rgba(124, 58, 237, 0.2)'
-                  }}
-                >
-                  {savingFlyer ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</> : 'Guardar'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <SaveFlyerModal
+        isOpen={isSaveModalOpen}
+        onClose={() => setIsSaveModalOpen(false)}
+        designName={newDesignName}
+        onChangeDesignName={setNewDesignName}
+        loadedFlyerId={loadedFlyerId}
+        savingFlyer={savingFlyer}
+        onSaveFlyer={handleSaveFlyer}
+      />
 
       {/* ── GALLERY MODAL ("MIS DISEÑOS") ────────────────────────────────────── */}
-      {isGalleryModalOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
-        }}>
-          <div style={{
-            background: '#ffffff', borderRadius: 28, border: '1px solid #e2e8f0',
-            width: '100%', maxWidth: 880, maxHeight: '85vh', overflow: 'hidden',
-            boxShadow: '0 25px 60px rgba(15, 23, 42, 0.2)',
-            display: 'flex', flexDirection: 'column'
-          }}>
-            {/* Modal Header */}
-            <div style={{ padding: '24px 28px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h3 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <FolderOpen size={20} color="#7c3aed" /> Mis Diseños Guardados
-                </h3>
-                <p style={{ fontSize: 11, color: '#64748b', margin: '4px 0 0 0' }}>Historial de flyers y plantillas personalizadas de tu empresa</p>
-              </div>
-              <button 
-                onClick={() => setIsGalleryModalOpen(false)}
-                style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <X size={16} color="#0f172a" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div style={{ padding: 28, overflowY: 'auto', flex: 1, background: '#f8fafc' }}>
-              {loadingSavedFlyers ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 80, gap: 12 }}>
-                  <Loader2 size={36} color="#7c3aed" style={{ animation: 'spin 1s linear infinite' }} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>Cargando tus diseños...</span>
-                </div>
-              ) : savedFlyers.length === 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 40px', gap: 12, textAlign: 'center' }}>
-                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                    <FolderOpen size={24} color="#7c3aed" />
-                  </div>
-                  <h4 style={{ fontSize: 15, fontWeight: 900, color: '#334155', margin: 0 }}>No tienes diseños guardados</h4>
-                  <p style={{ fontSize: 12, color: '#64748b', margin: 0, maxWidth: 300 }}>Personaliza cualquier plantilla en el canvas y haz clic en "Guardar Diseño" en la barra superior.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 20 }}>
-                  {savedFlyers.map((flyer) => {
-                    const parsedDate = new Date(flyer.created_at).toLocaleDateString('es-ES', {
-                      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-                    });
-                    const aspectLabel = FORMATS.find(f => f.id === flyer.format)?.label || flyer.format;
-
-                    return (
-                      <div 
-                        key={flyer.id}
-                        style={{
-                          background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0',
-                          overflow: 'hidden', display: 'flex', flexDirection: 'column',
-                          boxShadow: '0 4px 12px rgba(15, 23, 42, 0.03)',
-                          transition: 'all 0.2s ease',
-                          position: 'relative'
-                        }}
-                      >
-                        {/* Flyer Preview Thumbnail / Placeholder */}
-                        <div style={{
-                          height: 180, background: '#f1f5f9', display: 'flex',
-                          alignItems: 'center', justifyContent: 'center',
-                          position: 'relative', overflow: 'hidden', borderBottom: '1px solid #f1f5f9'
-                        }}>
-                          {flyer.thumbnail_url ? (
-                            <img 
-                              src={flyer.thumbnail_url} 
-                              alt={flyer.name} 
-                              style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 8 }}
-                            />
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: '#94a3b8' }}>
-                              <Image size={24} />
-                              <span style={{ fontSize: 9, fontWeight: 700 }}>Sin vista previa</span>
-                            </div>
-                          )}
-                          <div style={{
-                            position: 'absolute', bottom: 8, left: 8,
-                            background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)',
-                            borderRadius: 6, padding: '3px 6px', fontSize: 8, fontWeight: 800, color: '#fff',
-                            textTransform: 'uppercase', letterSpacing: '0.05em'
-                          }}>
-                            {aspectLabel}
-                          </div>
-                        </div>
-
-                        {/* Card Info */}
-                        <div style={{ padding: 14, display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
-                          <div style={{ marginBottom: 12 }}>
-                            {editingFlyerId === flyer.id ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-                                <input
-                                  type="text"
-                                  value={editingFlyerName}
-                                  onChange={e => setEditingFlyerName(e.target.value)}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter') handleRenameFlyer(flyer.id, editingFlyerName);
-                                    if (e.key === 'Escape') setEditingFlyerId(null);
-                                  }}
-                                  style={{
-                                    fontSize: 12, fontWeight: 800, color: '#1e293b',
-                                    border: '1px solid #7c3aed', borderRadius: 6, padding: '3px 8px',
-                                    width: '100%', outline: 'none', background: '#fff', boxSizing: 'border-box'
-                                  }}
-                                  autoFocus
-                                />
-                                <button
-                                  onClick={() => handleRenameFlyer(flyer.id, editingFlyerName)}
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', color: '#10b981' }}
-                                >
-                                  <Check size={14} />
-                                </button>
-                                <button
-                                  onClick={() => setEditingFlyerId(null)}
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', color: '#ef4444' }}
-                                >
-                                  <X size={14} />
-                                </button>
-                              </div>
-                            ) : (
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 6 }}>
-                                <h4 style={{ fontSize: 13, fontWeight: 900, color: '#1e293b', margin: 0, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={flyer.name}>
-                                  {flyer.name}
-                                </h4>
-                                <button
-                                  onClick={() => {
-                                    setEditingFlyerId(flyer.id);
-                                    setEditingFlyerName(flyer.name);
-                                  }}
-                                  title="Editar nombre"
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', color: '#94a3b8', transition: 'color 0.15s ease' }}
-                                >
-                                  <Edit2 size={11} />
-                                </button>
-                              </div>
-                            )}
-                            <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600 }}>
-                              Creado: {parsedDate}
-                            </div>
-                            <div style={{ fontSize: 9, color: '#7c3aed', fontWeight: 700, marginTop: 4 }}>
-                              Plantilla: {flyer.template_id === 'A' ? 'Glow Glassmorphic' : flyer.template_id === 'B' ? 'Editorial Showcase' : flyer.template_id}
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div style={{ display: 'flex', gap: 8, borderTop: '1px solid #f1f5f9', paddingTop: 10 }}>
-                            <button
-                              onClick={() => handleLoadFlyer(flyer)}
-                              style={{
-                                flex: 1, background: '#f5f3ff', border: '1px solid #ddd6fe',
-                                borderRadius: 8, padding: '7px 0', fontSize: 11, fontWeight: 800,
-                                color: '#7c3aed', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                                justifyContent: 'center', gap: 6, transition: 'all 0.15s ease'
-                              }}
-                            >
-                              <FolderOpen size={12} />
-                              Cargar y Editar
-                            </button>
-                            <button
-                              onClick={() => handleDeleteFlyer(flyer.id)}
-                              style={{
-                                width: 28, height: 28, background: '#fef2f2', border: '1px solid #fecaca',
-                                borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                cursor: 'pointer', color: '#ef4444', transition: 'all 0.15s ease'
-                              }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div style={{ padding: '16px 28px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setIsGalleryModalOpen(false)}
-                style={{ background: '#fff', border: '1px solid #d8dde6', borderRadius: 10, padding: '8px 16px', fontSize: 11, fontWeight: 800, color: '#475569', cursor: 'pointer' }}
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <FlyerGalleryModal
+        isOpen={isGalleryModalOpen}
+        onClose={() => setIsGalleryModalOpen(false)}
+        loading={loadingSavedFlyers}
+        savedFlyers={savedFlyers}
+        editingFlyerId={editingFlyerId}
+        editingFlyerName={editingFlyerName}
+        onStartRename={(id, name) => {
+          setEditingFlyerId(id);
+          setEditingFlyerName(name);
+        }}
+        onChangeEditingName={setEditingFlyerName}
+        onCancelRename={() => setEditingFlyerId(null)}
+        onConfirmRename={handleRenameFlyer}
+        onLoadFlyer={handleLoadFlyer}
+        onDeleteFlyer={handleDeleteFlyer}
+      />
 
       {/* ── AIDA METHODOLOGY MODAL ────────────────────────────────────── */}
-      {isAidaModalOpen && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(15, 23, 42, 0.4)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'fadeIn 0.2s ease-out'
-        }} onClick={() => setIsAidaModalOpen(false)}>
-          <div style={{
-            background: '#fff',
-            border: '1px solid #e2e8f0',
-            borderRadius: 20,
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-            width: '100%',
-            maxWidth: 480,
-            display: 'flex', flexDirection: 'column',
-            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-            overflow: 'hidden'
-          }} onClick={e => e.stopPropagation()}>
-            {/* Modal Header */}
-            <div style={{
-              padding: '18px 24px',
-              borderBottom: '1px solid #f1f5f9',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: 8,
-                  background: '#eff6ff', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center'
-                }}>
-                  <BarChart3 size={15} color="#3b82f6" />
-                </div>
-                <span style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Metodología AIDA
-                </span>
-              </div>
-              <button
-                onClick={() => setIsAidaModalOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <X size={16} color="#64748b" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 18, maxHeight: '80vh', overflowY: 'auto' }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Info size={14} color="#6366f1" />
-                  Rigor y Metodología
-                </div>
-                <p style={{ margin: 0, fontSize: 11, color: '#475569', lineHeight: 1.6, textAlign: 'justify' }}>
-                  Evaluamos tu brief utilizando una fórmula matemática basada en las mejores prácticas de la industria y la psicología de conversión de la metodología AIDA. Estudios globales de publicidad digital demuestran que estructurar tus textos con estos parámetros clave (Atención, Interés, Deseo y Acción) optimiza la retención del usuario y puede incrementar la conversión en hasta un <strong>400%</strong> frente a copias sin estructura.
-                </p>
-              </div>
-
-              <div style={{ height: '1px', background: '#f1f5f9' }} />
-
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Target size={14} color="#6366f1" />
-                  Estructura del Score de Viralidad
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {/* A - Atención */}
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{
-                      width: 22, height: 22, borderRadius: 6, background: '#f0fdf4',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2
-                    }}>
-                      <Eye size={12} color="#16a34a" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: '#1f2937' }}>Atención (A - 18 pts)</div>
-                      <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
-                        Presencia de precios, descuentos claros u ofertas específicas (ej: <em>$12.95, 30% OFF</em>) para captar la mirada del usuario.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* I - Interés */}
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{
-                      width: 22, height: 22, borderRadius: 6, background: '#fef3c7',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2
-                    }}>
-                      <Zap size={12} color="#d97706" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: '#1f2937' }}>Interés (I - 20 pts)</div>
-                      <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
-                        Palabras de urgencia y disparadores de escasez (ej: <em>hoy, oferta limitada, solo esta semana</em>) para retener la atención.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* D - Deseo */}
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{
-                      width: 22, height: 22, borderRadius: 6, background: '#f5f3ff',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2
-                    }}>
-                      <Award size={12} color="#7c3aed" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: '#1f2937' }}>Deseo (D - 15 pts)</div>
-                      <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
-                        Exposición estructurada de beneficios clave y propuesta de valor clara (ej: <em>incluye, ofrece, contiene</em>).
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* A - Acción */}
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{
-                      width: 22, height: 22, borderRadius: 6, background: '#ecfdf5',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2
-                    }}>
-                      <Send size={12} color="#059669" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: '#1f2937' }}>Acción (A - 18 pts)</div>
-                      <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
-                        Llamada a la Acción (CTA) explícita (10 pts) junto con datos de contacto o URL claros (8 pts) para canalizar la conversión.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Estructura y Longitud */}
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <div style={{
-                      width: 22, height: 22, borderRadius: 6, background: '#f0f9ff',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2
-                    }}>
-                      <Type size={12} color="#0284c7" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: '#1f2937' }}>Longitud y Datos (29 pts)</div>
-                      <div style={{ fontSize: 10, color: '#4b5563', marginTop: 2 }}>
-                        Rango de caracteres óptimo (80-400 chars: 15 pts), inclusión de números o datos (9 pts) y formato estructurado (5 pts).
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Modal Footer */}
-            <div style={{
-              padding: '14px 20px',
-              background: '#f8fafc',
-              borderTop: '1px solid #f1f5f9',
-              display: 'flex',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={() => setIsAidaModalOpen(false)}
-                style={{
-                  background: '#0f172a',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 10,
-                  padding: '8px 16px',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                  transition: 'background 0.15s'
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = '#1e293b'}
-                onMouseLeave={e => e.currentTarget.style.background = '#0f172a'}
-              >
-                Entendido
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AidaMethodologyModal
+        isOpen={isAidaModalOpen}
+        onClose={() => setIsAidaModalOpen(false)}
+      />
     </div>
   );
 }

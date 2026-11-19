@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "audit:rls": "node scripts/audit-rls.cjs",
-    "test": "node scripts/test-financials.mjs"
+    "test": "node --test scripts/test-financials.mjs scripts/test-whatsapp-sync.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
