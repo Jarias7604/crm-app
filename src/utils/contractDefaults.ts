@@ -1,6 +1,7 @@
 import type { ContractClause, ContractCompanyData, ContractClientData } from '../types/contracts';
 import { format, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { getModulePlanPricing } from './quoteUtils';
 
 export interface ContractSeedData {
   company: {
@@ -122,13 +123,21 @@ export function generateContractDefaults(seed: ContractSeedData): {
     cotizacion.modulos_adicionales.forEach((m: any) => {
       const nombre = typeof m === 'string' ? m : m.nombre;
       const pagoUnico = typeof m === 'object' ? Number(m.pago_unico || 0) : 0;
-      const costoAnual = typeof m === 'object' ? Number(m.costo_anual || m.costo_mensual || 0) : 0;
+      const mp = typeof m === 'object' ? getModulePlanPricing(m, cuotas) : { amount: 0, usesExplicitMonthly: false, monthlyRate: 0, annualRate: 0 };
+      const costoRec = mp.amount;
       if (nombre) {
-        if (pagoUnico > 0 && costoAnual > 0) {
-          modulosList.push(`${nombre} ($${costoAnual.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD/año + $${pagoUnico.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD impl.)`);
+        if (pagoUnico > 0 && costoRec > 0) {
+          const recTxt = mp.usesExplicitMonthly
+            ? `$${mp.monthlyRate.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD/mes`
+            : `$${costoRec.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD/año`;
+          modulosList.push(`${nombre} (${recTxt} + $${pagoUnico.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD impl.)`);
         } else {
-          const precio = pagoUnico || costoAnual;
-          modulosList.push(precio ? `${nombre} ($${Number(precio).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD)` : nombre);
+          const precio = pagoUnico || costoRec;
+          if (mp.usesExplicitMonthly && costoRec > 0) {
+            modulosList.push(`${nombre} ($${mp.monthlyRate.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD/mes)`);
+          } else {
+            modulosList.push(precio ? `${nombre} ($${Number(precio).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD)` : nombre);
+          }
         }
       }
     });

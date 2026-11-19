@@ -5,7 +5,7 @@ import {
     Clock, Eye, Edit, Trash2, X, ChevronRight, DollarSign, Package, CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
-import { calculateQuoteFinancialsV2, parseModules } from '../utils/quoteUtils';
+import { calculateQuoteFinancialsV2, getModulePlanPricing, parseModules } from '../utils/quoteUtils';
 import type { FinancingPlan } from '../types/pricing';
 
 /* ─── Status config ──────────────────────────────────────────── */
@@ -433,13 +433,18 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                                                                 </div>
                                                             )}
                                                             {modulosArr
-                                                                .filter((mod: any) => Number(mod.costo_anual || mod.costo) > 0)
-                                                                .map((mod: any, modIdx: number) => (
-                                                                    <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
-                                                                        <span className="truncate">{mod.nombre}</span>
-                                                                        <span className="font-bold text-slate-700">${Number(mod.costo_anual || mod.costo || 0).toLocaleString()}</span>
-                                                                    </div>
-                                                                ))
+                                                                .filter((mod: any) => getModulePlanPricing(mod, pf.cuotas).amount > 0)
+                                                                .map((mod: any, modIdx: number) => {
+                                                                    const mp = getModulePlanPricing(mod, pf.cuotas);
+                                                                    return (
+                                                                        <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                                            <span className="truncate">
+                                                                                {mod.nombre}{mp.usesExplicitMonthly ? ` ($${mp.monthlyRate.toLocaleString()}/mes)` : ''}
+                                                                            </span>
+                                                                            <span className="font-bold text-slate-700">${mp.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                        </div>
+                                                                    );
+                                                                })
                                                             }
                                                             {sheet.servicio_whatsapp && Number(sheet.costo_whatsapp) > 0 && (
                                                                 <div className="flex justify-between text-[10px] text-slate-500 font-medium">
@@ -509,7 +514,7 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                                                             </div>
                                                         )}
                                                         {serviciosUnicos.map((serv: any, si: number) => {
-                                                            const isHibrido = Number(serv.costo_anual || serv.costo) > 0;
+                                                            const isHibrido = getModulePlanPricing(serv, 1).amount > 0;
                                                             return (
                                                             <div key={si} className="flex justify-between text-[10px] text-slate-600 font-medium">
                                                                 <span>{isHibrido ? `Implementación · ${serv.nombre}` : serv.nombre}</span>

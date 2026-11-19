@@ -66,7 +66,10 @@ export default function CatalogoProductos() {
 
     const [uiState, setUiState] = useState({
         frecuencia_cobro: 'unico' as 'unico' | 'recurrente',
-        intervalo: 'mensual' as 'mensual' | 'anual',
+        cobra_mensual: true,
+        cobra_anual: false,
+        precio_mensual: 0,
+        precio_anual: 0,
         precio_base: 0,
         tiene_setup: false,
         setup_fee: 0,
@@ -142,8 +145,9 @@ export default function CatalogoProductos() {
         setEditingId(item.id);
         setFormData(item);
         
-        const isRecurring = item.precio_mensual > 0 || item.precio_anual > 0;
-        const isAnnual = item.precio_anual > 0 && item.precio_mensual === 0;
+        const hasMonthly = (item.precio_mensual || 0) > 0;
+        const hasAnnual = (item.precio_anual || 0) > 0;
+        const isRecurring = hasMonthly || hasAnnual;
         const hasSetup = isRecurring && item.costo_unico > 0;
         const meta = item.metadata || {};
         const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
@@ -151,8 +155,11 @@ export default function CatalogoProductos() {
         
         setUiState({
             frecuencia_cobro: isRecurring ? 'recurrente' : 'unico',
-            intervalo: isAnnual ? 'anual' : 'mensual',
-            precio_base: isRecurring ? (isAnnual ? item.precio_anual : item.precio_mensual) : (item.precio_unitario || item.costo_unico),
+            cobra_mensual: isRecurring ? hasMonthly : true,
+            cobra_anual: isRecurring ? hasAnnual : false,
+            precio_mensual: item.precio_mensual || 0,
+            precio_anual: item.precio_anual || 0,
+            precio_base: isRecurring ? (hasAnnual ? item.precio_anual : item.precio_mensual) : (item.precio_unitario || item.costo_unico || 0),
             tiene_setup: hasSetup,
             setup_fee: hasSetup ? item.costo_unico : 0,
             unidad_medida: item.unidad || item.metadata?.unidad_medida || '',
@@ -206,25 +213,35 @@ export default function CatalogoProductos() {
             let finalUpdate = { ...baseData };
             
             if (uiState.frecuencia_cobro === 'unico') {
-                finalUpdate.costo_unico = uiState.precio_base;
+                finalUpdate.costo_unico = Number(uiState.precio_base) || 0;
                 finalUpdate.precio_mensual = 0;
                 finalUpdate.precio_anual = 0;
             } else {
-                if (uiState.intervalo === 'mensual') {
-                    finalUpdate.precio_mensual = uiState.precio_base;
-                    finalUpdate.precio_anual = 0;
-                } else {
-                    finalUpdate.precio_anual = uiState.precio_base;
-                    finalUpdate.precio_mensual = 0;
+                const pm = uiState.cobra_mensual ? (Number(uiState.precio_mensual) || 0) : 0;
+                const pa = uiState.cobra_anual ? (Number(uiState.precio_anual) || 0) : 0;
+                if (pm <= 0 && pa <= 0) {
+                    return toast.error('Ingresa al menos un precio (Mensual o Anual) mayor a 0');
                 }
-                finalUpdate.costo_unico = uiState.tiene_setup ? uiState.setup_fee : 0;
+                finalUpdate.precio_mensual = pm;
+                finalUpdate.precio_anual = pa;
+                finalUpdate.costo_unico = uiState.tiene_setup ? (Number(uiState.setup_fee) || 0) : 0;
             }
+
+            const effectiveUnitPrice = uiState.frecuencia_cobro === 'unico'
+                ? (Number(uiState.precio_base) || 0)
+                : (finalUpdate.precio_mensual > 0 ? finalUpdate.precio_mensual : finalUpdate.precio_anual);
             
             // Si controla stock o es producto físico, asegurar modelo_precio
             if (uiState.controla_stock || finalUpdate.tipo === 'equipo' || finalUpdate.tipo === 'partes' || finalUpdate.tipo === 'repuestos') {
                 finalUpdate.modelo_precio = 'por_unidad';
                 finalUpdate.unidad = uiState.unidad_medida || 'unidad';
-                finalUpdate.precio_unitario = uiState.precio_base;
+                finalUpdate.precio_unitario = effectiveUnitPrice;
+            } else if (uiState.frecuencia_cobro === 'recurrente') {
+                finalUpdate.modelo_precio = (finalUpdate.precio_mensual > 0 && finalUpdate.precio_anual > 0)
+                    ? 'suscripcion_dual'
+                    : (finalUpdate.precio_anual > 0 ? 'suscripcion_anual' : 'suscripcion_mensual');
+            } else {
+                finalUpdate.modelo_precio = 'precio_fijo';
             }
 
             // Guardar unidad de medida, stock y costos en metadata de forma segura
@@ -235,8 +252,8 @@ export default function CatalogoProductos() {
                 stock_actual: Number(uiState.stock_actual) || 0,
                 stock_minimo: Number(uiState.stock_minimo) || 0,
                 controla_stock: Boolean(uiState.controla_stock),
-                precio_unitario: uiState.precio_base,
-                modelo_precio: finalUpdate.modelo_precio || (uiState.frecuencia_cobro === 'unico' ? 'precio_fijo' : 'suscripcion_mensual')
+                precio_unitario: (uiState.frecuencia_cobro === 'unico' || uiState.controla_stock) ? effectiveUnitPrice : 0,
+                modelo_precio: finalUpdate.modelo_precio
             };
 
             if (editingId) {
@@ -290,7 +307,10 @@ export default function CatalogoProductos() {
         setShowForm(false);
         setUiState({
             frecuencia_cobro: 'unico',
-            intervalo: 'mensual',
+            cobra_mensual: true,
+            cobra_anual: false,
+            precio_mensual: 0,
+            precio_anual: 0,
             precio_base: 0,
             tiene_setup: false,
             setup_fee: 0,
@@ -807,28 +827,113 @@ export default function CatalogoProductos() {
                                             </div>
 
                                             {uiState.frecuencia_cobro === 'recurrente' && (
-                                                <div className="animate-in fade-in slide-in-from-top-2">
-                                                    <label className="text-xs font-bold text-gray-500 mb-2 block">Intervalo de Facturación</label>
-                                                    <div className="flex gap-2">
-                                                        <button type="button" onClick={() => setUiState({...uiState, intervalo: 'mensual'})} className={`px-4 py-2 rounded-lg text-sm font-bold border ${uiState.intervalo === 'mensual' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}>Mensual</button>
-                                                        <button type="button" onClick={() => setUiState({...uiState, intervalo: 'anual'})} className={`px-4 py-2 rounded-lg text-sm font-bold border ${uiState.intervalo === 'anual' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}>Anual</button>
+                                                <div className="animate-in fade-in slide-in-from-top-2 space-y-4">
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <label className="text-xs font-bold text-gray-500">Modalidades de Suscripción</label>
+                                                            <span className="text-[10px] font-semibold text-indigo-500">(Puedes activar una o ambas)</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setUiState(prev => (prev.cobra_mensual && !prev.cobra_anual) ? prev : { ...prev, cobra_mensual: !prev.cobra_mensual })}
+                                                                className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 flex items-center justify-center gap-2 transition-all ${uiState.cobra_mensual ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+                                                            >
+                                                                {uiState.cobra_mensual && <CheckCircle className="w-4 h-4" />}
+                                                                Mensual
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setUiState(prev => (prev.cobra_anual && !prev.cobra_mensual) ? prev : { ...prev, cobra_anual: !prev.cobra_anual })}
+                                                                className={`px-4 py-2.5 rounded-xl text-sm font-bold border-2 flex items-center justify-center gap-2 transition-all ${uiState.cobra_anual ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+                                                            >
+                                                                {uiState.cobra_anual && <CheckCircle className="w-4 h-4" />}
+                                                                Anual
+                                                            </button>
+                                                        </div>
                                                     </div>
+
+                                                    {uiState.cobra_mensual && uiState.cobra_anual ? (
+                                                        <div className="space-y-3">
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Mensual ($/mes)</label>
+                                                                    <div className="relative">
+                                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                                                                        <Input type="number" min="0" step="0.01" value={uiState.precio_mensual} onChange={(e) => setUiState({ ...uiState, precio_mensual: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm" />
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Anual ($/año)</label>
+                                                                    <div className="relative">
+                                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                                                                        <Input type="number" min="0" step="0.01" value={uiState.precio_anual} onChange={(e) => setUiState({ ...uiState, precio_anual: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm" />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            {uiState.precio_mensual > 0 && uiState.precio_anual > 0 && (
+                                                                uiState.precio_anual < uiState.precio_mensual * 12 ? (
+                                                                    <div className="px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700">
+                                                                        Ahorro anual: ${(uiState.precio_mensual * 12 - uiState.precio_anual).toFixed(2)} ({Math.round((1 - uiState.precio_anual / (uiState.precio_mensual * 12)) * 100)}% vs 12 pagos mensuales)
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-600">
+                                                                        Equivale a ${(uiState.precio_anual / 12).toFixed(2)}/mes pagando anual
+                                                                    </div>
+                                                                )
+                                                            )}
+                                                            <div>
+                                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">Se cobra por (Opcional)</label>
+                                                                <Input type="text" value={uiState.unidad_medida} onChange={(e) => setUiState({ ...uiState, unidad_medida: e.target.value })} placeholder="Ej: Usuario, Empresa, Paquete..." className="bg-white shadow-sm" />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div>
+                                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">
+                                                                    {uiState.cobra_anual ? 'Precio Anual ($/año)' : 'Precio Mensual ($/mes)'}
+                                                                </label>
+                                                                <div className="relative">
+                                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                                                                    <Input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        step="0.01"
+                                                                        value={uiState.cobra_anual ? uiState.precio_anual : uiState.precio_mensual}
+                                                                        onChange={(e) => setUiState({
+                                                                            ...uiState,
+                                                                            ...(uiState.cobra_anual
+                                                                                ? { precio_anual: Number(e.target.value) }
+                                                                                : { precio_mensual: Number(e.target.value) })
+                                                                        })}
+                                                                        className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm"
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">Se cobra por (Opcional)</label>
+                                                                <Input type="text" value={uiState.unidad_medida} onChange={(e) => setUiState({ ...uiState, unidad_medida: e.target.value })} placeholder="Ej: Hora, Usuario, Paquete..." className="bg-white shadow-sm" />
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
 
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Unitario ($)</label>
-                                                    <div className="relative">
-                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                                                        <Input type="number" value={uiState.precio_base} onChange={(e) => setUiState({ ...uiState, precio_base: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm" />
+                                            {uiState.frecuencia_cobro === 'unico' && (
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Unitario ($)</label>
+                                                        <div className="relative">
+                                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                                                            <Input type="number" value={uiState.precio_base} onChange={(e) => setUiState({ ...uiState, precio_base: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm" />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs font-bold text-gray-500 mb-1.5 block">Se cobra por (Opcional)</label>
+                                                        <Input type="text" value={uiState.unidad_medida} onChange={(e) => setUiState({ ...uiState, unidad_medida: e.target.value })} placeholder="Ej: Hora, Usuario, Paquete..." className="bg-white shadow-sm" />
                                                     </div>
                                                 </div>
-                                                <div>
-                                                    <label className="text-xs font-bold text-gray-500 mb-1.5 block">Se cobra por (Opcional)</label>
-                                                    <Input type="text" value={uiState.unidad_medida} onChange={(e) => setUiState({ ...uiState, unidad_medida: e.target.value })} placeholder="Ej: Hora, Usuario, Paquete..." className="bg-white shadow-sm" />
-                                                </div>
-                                            </div>
+                                            )}
 
                                             {uiState.frecuencia_cobro === 'recurrente' && (
                                                 <div className="pt-4 border-t border-gray-200">
@@ -927,31 +1032,36 @@ export default function CatalogoProductos() {
                                                 </div>
 
                                                 {/* Calculadora en vivo de margen y ganancia */}
-                                                {uiState.precio_base > 0 && (
-                                                    <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
-                                                        <div className="flex items-center justify-between text-xs">
-                                                            <span className="text-gray-500 font-medium">Ganancia por unidad:</span>
-                                                            <span className={`font-black ${uiState.precio_base - uiState.precio_compra >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                                ${(uiState.precio_base - uiState.precio_compra).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                            </span>
-                                                        </div>
-                                                        {uiState.precio_compra > 0 && (
-                                                            <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200">
-                                                                <span className="text-gray-500 font-medium">Margen bruto:</span>
-                                                                {(() => {
-                                                                    const margen = ((uiState.precio_base - uiState.precio_compra) / uiState.precio_base) * 100;
-                                                                    const isPositive = margen >= 0;
-                                                                    const colorClass = margen >= 30 ? 'bg-emerald-100 text-emerald-800' : margen >= 15 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
-                                                                    return (
-                                                                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${colorClass}`}>
-                                                                            {isPositive ? `+${margen.toFixed(1)}%` : `${margen.toFixed(1)}%`}
-                                                                        </span>
-                                                                    );
-                                                                })()}
+                                                {(() => {
+                                                    const effectiveSalePrice = uiState.frecuencia_cobro === 'unico'
+                                                        ? uiState.precio_base
+                                                        : (uiState.cobra_mensual && uiState.precio_mensual > 0 ? uiState.precio_mensual : uiState.precio_anual);
+                                                    return effectiveSalePrice > 0 ? (
+                                                        <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2">
+                                                            <div className="flex items-center justify-between text-xs">
+                                                                <span className="text-gray-500 font-medium">Ganancia por unidad:</span>
+                                                                <span className={`font-black ${effectiveSalePrice - uiState.precio_compra >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                                    ${(effectiveSalePrice - uiState.precio_compra).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                </span>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                            {uiState.precio_compra > 0 && (
+                                                                <div className="flex items-center justify-between text-xs pt-1.5 border-t border-slate-200">
+                                                                    <span className="text-gray-500 font-medium">Margen bruto:</span>
+                                                                    {(() => {
+                                                                        const margen = ((effectiveSalePrice - uiState.precio_compra) / effectiveSalePrice) * 100;
+                                                                        const isPositive = margen >= 0;
+                                                                        const colorClass = margen >= 30 ? 'bg-emerald-100 text-emerald-800' : margen >= 15 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800';
+                                                                        return (
+                                                                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${colorClass}`}>
+                                                                                {isPositive ? `+${margen.toFixed(1)}%` : `${margen.toFixed(1)}%`}
+                                                                            </span>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : null;
+                                                })()}
                                             </div>
                                         )}
                                     </div>
@@ -1043,12 +1153,18 @@ export default function CatalogoProductos() {
                                         </td>
                                         <td className="py-4 px-6">
                                             {(() => {
-                                                const isRecurring = item.precio_mensual > 0 || item.precio_anual > 0;
-                                                return isRecurring ? (
-                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-600">Suscripción</span>
-                                                ) : (
-                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-600">Pago Único</span>
-                                                );
+                                                const hasM = (item.precio_mensual || 0) > 0;
+                                                const hasA = (item.precio_anual || 0) > 0;
+                                                if (hasM && hasA) {
+                                                    return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-50 text-purple-700">Mensual / Anual</span>;
+                                                }
+                                                if (hasM) {
+                                                    return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-600">Mensual</span>;
+                                                }
+                                                if (hasA) {
+                                                    return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-600">Anual</span>;
+                                                }
+                                                return <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-600">Pago Único</span>;
                                             })()}
                                         </td>
                                         <td className="py-4 px-6 text-right">

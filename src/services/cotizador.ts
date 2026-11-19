@@ -32,6 +32,8 @@ export interface CotizadorItem {
     _orig_pago_unico?: number;
     precio_anual: number;
     precio_mensual: number;
+    precio_mensual_explicito?: boolean;
+    es_solo_mensual?: boolean;
     precio_por_dte: number;
     incluye_en_paquete: boolean;
     activo: boolean;
@@ -62,6 +64,7 @@ export interface DetalleLinea {
     unidad?: string;
     item_id?: string;
     es_setup_hibrido?: boolean;
+    usa_mensual_propio?: boolean;
 }
 
 export interface CotizacionCalculada {
@@ -289,8 +292,18 @@ class CotizadorService {
         }
     ): CotizacionCalculada {
 
+        // Resolver divisor antes del loop para elegir tarifa mensual explícita cuando va en cuotas
+        let divisor_cuotas = 1;
+        if (config.cuotas !== undefined && config.cuotas !== null && config.cuotas >= 1) {
+            divisor_cuotas = config.cuotas;
+        } else if (config.meses && config.meses > 1) {
+            divisor_cuotas = config.meses;
+        }
+        const es_financiado = divisor_cuotas > 1;
+
         let subtotal_pagos_unicos = 0;
         let subtotal_recurrente_base = 0;
+        let subtotal_financiable = 0;
         const desglose: DetalleLinea[] = [];
 
         // 1. IMPLEMENTACIÓN (Pago Único)
@@ -310,6 +323,7 @@ class CotizadorService {
 
         // 2. PAQUETE (Recurrente)
         subtotal_recurrente_base += paquete.costo_paquete_anual;
+        subtotal_financiable += paquete.costo_paquete_anual;
         desglose.push({
             es_pago_unico: false,
             tipo: 'Paquete',
@@ -360,6 +374,7 @@ class CotizadorService {
             if (tieneRecurrentePorDTE) {
                 const precio = cantidad_dtes * item.precio_por_dte;
                 subtotal_recurrente_base += precio;
+                subtotal_financiable += precio;
                 desglose.push({
                     es_pago_unico: false,
                     tipo: item.tipo === 'modulo' ? 'Módulo' : 'Servicio',
@@ -370,15 +385,27 @@ class CotizadorService {
                     item_id: item.id
                 });
             } else if (tieneRecurrenteFijo) {
-                const precio = item.precio_anual || (item.precio_mensual * 12);
+                const hasExplicitMonthly = Boolean(item.precio_mensual_explicito) && (item.precio_mensual || 0) > 0;
+                const esSoloMensual = hasExplicitMonthly && (Boolean(item.es_solo_mensual) || !(item.precio_anual > 0));
+                const usaMensualPropio = es_financiado && hasExplicitMonthly && (divisor_cuotas >= 12 || esSoloMensual);
+                const precioAnualEfectivo = (item.precio_anual || 0) > 0
+                    ? item.precio_anual
+                    : Number(((item.precio_mensual || 0) * 12).toFixed(2));
+                const precio = usaMensualPropio
+                    ? Number((item.precio_mensual * 12).toFixed(2))
+                    : precioAnualEfectivo;
                 subtotal_recurrente_base += precio;
+                if (!usaMensualPropio) {
+                    subtotal_financiable += precio;
+                }
                 desglose.push({
                     es_pago_unico: false,
                     tipo: item.tipo === 'modulo' ? 'Módulo' : (item.tipo === 'plan' ? 'Plan' : 'Suscripción'),
                     nombre: item.nombre,
                     precio_anual: precio,
                     precio_mensual: item.precio_mensual || precio / 12,
-                    descripcion: item.descripcion || (item.precio_anual > 0 ? 'Suscripción anual' : 'Suscripción mensual'),
+                    usa_mensual_propio: usaMensualPropio,
+                    descripcion: item.descripcion || (usaMensualPropio ? 'Suscripción mensual' : (item.precio_anual > 0 ? 'Suscripción anual' : 'Suscripción mensual')),
                     item_id: item.id
                 });
             }
@@ -404,7 +431,7 @@ class CotizadorService {
                 totalBaseAjustado = totalBase - descuento_monto;
                 ahorro_total = descuento_monto;
             } else if (config.tipo_ajuste === 'recharge' && config.tasa_ajuste > 0) {
-                recargo_monto = totalBase * (config.tasa_ajuste / 100);
+                recargo_monto = (subtotal_financiable + subtotal_pagos_unicos) * (config.tasa_ajuste / 100);
                 totalBaseAjustado = totalBase + recargo_monto;
             }
 
@@ -429,15 +456,6 @@ class CotizadorService {
             const precio_recurrente_final = totalFinanciadoConIVA / (1 + ivaPct);
             const iva_recurrente = totalFinanciadoConIVA - precio_recurrente_final;
 
-            // Divisor cuotas
-            let divisor_cuotas = 1;
-            if (config.cuotas !== undefined && config.cuotas !== null && config.cuotas >= 1) {
-                divisor_cuotas = config.cuotas;
-            } else if (config.meses && config.meses > 1) {
-                divisor_cuotas = config.meses;
-            }
-
-            const es_financiado = divisor_cuotas > 1;
             const frecuencia_pago = es_financiado ? 1 : config.meses;
             const cuota_periodo = totalFinanciadoConIVA / divisor_cuotas;
 
@@ -449,8 +467,8 @@ class CotizadorService {
                 subtotal_recurrente_base: Number(precio_recurrente_final.toFixed(2)),
 
                 // Mapeo legacy para compatibilidad visual
-                recargo_mensual_porcentaje: config.tipo_ajuste === 'recharge' ? config.tasa_ajuste : 0,
-                recargo_aplicado_porcentaje: config.tipo_ajuste === 'recharge' ? config.tasa_ajuste : 0,
+                recargo_mensual_porcentaje: recargo_monto > 0 ? config.tasa_ajuste : 0,
+                recargo_aplicado_porcentaje: recargo_monto > 0 ? config.tasa_ajuste : 0,
                 recargo_mensual_monto: Number(recargo_monto.toFixed(2)),
 
                 forma_pago: config.forma_pago,
@@ -518,7 +536,7 @@ class CotizadorService {
                 subtotal_pagos_unicos = subtotal_pagos_unicos - descUnico;
                 ahorro_total += descRecurrente + descUnico;
             } else if (config.tipo_ajuste === 'recharge') {
-                recargo_monto = subtotal_recurrente_base * (config.tasa_ajuste / 100);
+                recargo_monto = subtotal_financiable * (config.tasa_ajuste / 100);
                 precio_recurrente_final = subtotal_recurrente_base + recargo_monto;
             }
             
@@ -538,7 +556,7 @@ class CotizadorService {
                 precio_recurrente_final = subtotal_recurrente_base - descuento_monto;
                 ahorro_total = descuento_monto;
             } else if (config.tipo_ajuste === 'recharge') {
-                recargo_monto = subtotal_recurrente_base * (config.tasa_ajuste / 100);
+                recargo_monto = subtotal_financiable * (config.tasa_ajuste / 100);
                 precio_recurrente_final = subtotal_recurrente_base + recargo_monto;
             }
             if (config.descuento_manual && config.descuento_manual > 0) {
@@ -554,21 +572,6 @@ class CotizadorService {
         // Primero calculamos IVA Recurrente
         const iva_recurrente = (precio_recurrente_final * config.iva_porcentaje) / 100;
         const total_recurrente = precio_recurrente_final + iva_recurrente;
-
-        // Divisor: LÓGICA CORREGIDA - Respetar cuotas explícitas (incluso si es 1)
-        // Solo usar 'meses' como fallback si cuotas NO está definido o es 0
-        let divisor_cuotas = 1;
-
-        if (config.cuotas !== undefined && config.cuotas !== null && config.cuotas >= 1) {
-            // Si cuotas está explícitamente definido (incluso 1), usarlo
-            divisor_cuotas = config.cuotas;
-        } else if (config.meses && config.meses > 1) {
-            // Solo si cuotas NO está definido, usar meses como fallback
-            divisor_cuotas = config.meses;
-        }
-
-        // V4: es_financiado depende de si hay más de una cuota
-        const es_financiado = divisor_cuotas > 1;
 
         // V4: Lógica de Frecuencia Visual
         // Si son cuotas consecutivas (es_financiado), la frecuencia es siempre 1 (Mensual).
@@ -596,8 +599,8 @@ class CotizadorService {
             subtotal_recurrente_base: Number(subtotal_recurrente_base.toFixed(2)),
 
             // Mapeo legacy para compatibilidad visual
-            recargo_mensual_porcentaje: config.tipo_ajuste === 'recharge' ? config.tasa_ajuste : 0,
-            recargo_aplicado_porcentaje: config.tipo_ajuste === 'recharge' ? config.tasa_ajuste : 0,
+            recargo_mensual_porcentaje: recargo_monto > 0 ? config.tasa_ajuste : 0,
+            recargo_aplicado_porcentaje: recargo_monto > 0 ? config.tasa_ajuste : 0,
             recargo_mensual_monto: Number(recargo_monto.toFixed(2)),
 
             forma_pago: config.forma_pago, // Passthrough visual

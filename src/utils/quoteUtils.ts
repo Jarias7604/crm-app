@@ -3,8 +3,49 @@ export interface CotizacionItem {
     nombre: string;
     tipo: 'modulo' | 'servicio';
     descripcion?: string;
+    pago_unico?: number;
     costo_anual: number;
     costo_mensual: number;
+    precio_mensual_explicito?: boolean;
+    es_solo_mensual?: boolean;
+}
+
+export interface ModulePlanPricing {
+    amount: number;
+    usesExplicitMonthly: boolean;
+    monthlyRate: number;
+    annualRate: number;
+}
+
+/**
+ * Resuelve el monto recurrente anual equivalente de un módulo según el plan de Motor de Precios:
+ * - Plan de 12+ cuotas: si el ítem tiene tarifa mensual explícita, usa `costo_mensual * 12` sin doble financiamiento.
+ * - Planes de 3 / 6 cuotas: ítem dual usa su precio anual + recargo del plan; ítem solo-mensual mantiene `costo_mensual * 12` sin recargo extra.
+ * - 1 Solo Pago (cuotas <= 1): usa el precio anual (o `costo_mensual * 12` si es solo mensual).
+ */
+export function getModulePlanPricing(mod: any, cuotas: number): ModulePlanPricing {
+    const isPagoUnico = cuotas <= 1;
+    const explicitMonthly = Boolean(mod?.precio_mensual_explicito) && (Number(mod?.costo_mensual) || 0) > 0;
+    const monthlyRate = Number(mod?.costo_mensual) || 0;
+    const rawAnnual = Number(mod?.costo_anual) || Number(mod?.costo) || 0;
+    const isMonthlyOnly = explicitMonthly && (Boolean(mod?.es_solo_mensual) || rawAnnual === 0);
+    const annualRate = rawAnnual > 0 ? rawAnnual : (explicitMonthly ? Number((monthlyRate * 12).toFixed(2)) : 0);
+
+    const usesExplicitMonthly = !isPagoUnico && explicitMonthly && (cuotas >= 12 || isMonthlyOnly);
+    if (usesExplicitMonthly) {
+        return {
+            amount: Number((monthlyRate * 12).toFixed(2)),
+            usesExplicitMonthly: true,
+            monthlyRate,
+            annualRate,
+        };
+    }
+    return {
+        amount: Number(annualRate.toFixed(2)),
+        usesExplicitMonthly: false,
+        monthlyRate,
+        annualRate,
+    };
 }
 
 export interface CotizacionData {
@@ -187,19 +228,23 @@ export const calculateQuoteFinancialsV2 = (
 
     // SEPARAR: Pagos únicos vs Recurrentes en módulos/servicios
     let costoModulosRecurrentes = 0;
+    let costoModulosFinanciables = 0;
     let costoServiciosUnicos = 0;
 
     modulosAdicionales.forEach((mod: any) => {
         const pagoUnico = Number(mod.pago_unico) || 0;
-        const costoAnual = Number(mod.costo_anual) || Number(mod.costo) || 0;
+        const planPrice = getModulePlanPricing(mod, cuotas);
 
         if (pagoUnico > 0) {
             // Servicio o Setup inicial con pago único → Va al Pago Inicial
             costoServiciosUnicos += pagoUnico;
         }
-        if (costoAnual > 0) {
+        if (planPrice.amount > 0) {
             // Módulo, servicio o plan recurrente → Va al Pago Recurrente (Licencia Anual)
-            costoModulosRecurrentes += costoAnual;
+            costoModulosRecurrentes += planPrice.amount;
+            if (!planPrice.usesExplicitMonthly) {
+                costoModulosFinanciables += planPrice.amount;
+            }
         }
     });
 
@@ -208,6 +253,7 @@ export const calculateQuoteFinancialsV2 = (
 
     // LICENCIA ANUAL = Licencia base + Módulos recurrentes + WhatsApp (todos los recurrentes)
     const licenciaAnual = licenciaBase + costoModulosRecurrentes + costoWhatsApp;
+    const baseFinanciable = licenciaBase + costoModulosFinanciables + costoWhatsApp;
 
     // IMPLEMENTACIÓN = Implementación + Servicios únicos (todo lo que se paga una vez)
     const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
@@ -236,9 +282,9 @@ export const calculateQuoteFinancialsV2 = (
             totalBaseAjustado = totalBase - descuentoPlanMonto;
             ajusteLabel = `Descuento ${Math.round(ajustePct * 100)}%`;
         } else if (tipoAjuste === 'recharge' && ajustePct > 0) {
-            recargoMonto = totalBase * ajustePct;
+            recargoMonto = (baseFinanciable + implementacion) * ajustePct;
             totalBaseAjustado = totalBase + recargoMonto;
-            ajusteLabel = `Financiamiento (${Math.round(ajustePct * 100)}%)`;
+            ajusteLabel = recargoMonto > 0 ? `Financiamiento (${Math.round(ajustePct * 100)}%)` : '';
         }
 
         const descuentoManualPct = Number(cotizacion.descuento_porcentaje || 0);
@@ -304,9 +350,9 @@ export const calculateQuoteFinancialsV2 = (
         licenciaAjustada = licenciaAnual * (1 - ajustePct);
         ajusteLabel = `Descuento ${Math.round(ajustePct * 100)}%`;
     } else if (tipoAjuste === 'recharge' && ajustePct > 0) {
-        recargoMonto = licenciaAnual * ajustePct;
+        recargoMonto = baseFinanciable * ajustePct;
         licenciaAjustada = licenciaAnual + recargoMonto;
-        ajusteLabel = `Financiamiento (${Math.round(ajustePct * 100)}%)`;
+        ajusteLabel = recargoMonto > 0 ? `Financiamiento (${Math.round(ajustePct * 100)}%)` : '';
     }
 
     // 5. CÁLCULOS DE IMPLEMENTACIÓN & DESCUENTOS DE PLAN CROSS-ITEM

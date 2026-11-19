@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { Building2, Package, Download, FileText, CheckCircle2, PencilLine, Mail, Phone, Settings, MessageSquare, CreditCard, ShieldCheck, ExternalLink } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { parseModules, calculateQuoteFinancialsV2, formatUnitLabel, type CotizacionData } from '../utils/quoteUtils';
+import { parseModules, calculateQuoteFinancialsV2, getModulePlanPricing, formatUnitLabel, type CotizacionData } from '../utils/quoteUtils';
 import { pdfService } from '../services/pdfService';
 import { contractsService } from '../services/contracts';
 import type { Contract } from '../types/contracts';
@@ -484,7 +484,10 @@ export default function PublicQuoteView() {
 
                         {(cotizacion.modulos_adicionales || []).map((mod: any, idx: number) => {
                             const pagoUnicoVal = Number(mod.pago_unico) || 0;
-                            const recurrenteVal = Number(mod.costo_anual || mod.costo) || 0;
+                            const mpAnnual = getModulePlanPricing(mod, 1);
+                            const recurrenteVal = mpAnnual.amount;
+                            const hasExplicitMonthlySub = Boolean(mod.precio_mensual_explicito) && mpAnnual.monthlyRate > 0;
+                            const isMonthlyOnlySub = Boolean(mod.es_solo_mensual);
                             const esHibrido = pagoUnicoVal > 0 && recurrenteVal > 0;
                             const esPagoUnico = pagoUnicoVal > 0 && !esHibrido;
                             const monto = esHibrido ? (pagoUnicoVal + recurrenteVal) : (esPagoUnico ? pagoUnicoVal : recurrenteVal);
@@ -509,7 +512,11 @@ export default function PublicQuoteView() {
                                             {esHibrido ? (
                                                 <div className="flex items-center gap-1.5 flex-wrap mt-1">
                                                     <span className="text-[8px] font-black bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full w-fit">
-                                                        PLAN (${recurrenteVal.toLocaleString()}/año)
+                                                        {hasExplicitMonthlySub
+                                                            ? (isMonthlyOnlySub
+                                                                ? `$${mpAnnual.monthlyRate.toLocaleString()}/mes ($${recurrenteVal.toLocaleString()}/año)`
+                                                                : `$${recurrenteVal.toLocaleString()}/año · $${mpAnnual.monthlyRate.toLocaleString()}/mes`)
+                                                            : `PLAN ($${recurrenteVal.toLocaleString()}/año)`}
                                                     </span>
                                                     <span className="text-[8px] font-black bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full w-fit">
                                                         + SETUP (${pagoUnicoVal.toLocaleString()} ÚNICO)
@@ -517,6 +524,12 @@ export default function PublicQuoteView() {
                                                 </div>
                                             ) : esPagoUnico ? (
                                                 <span className="inline-block mt-1 text-[8px] font-black bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full w-fit">PAGO ÚNICO</span>
+                                            ) : hasExplicitMonthlySub ? (
+                                                <span className="inline-block mt-1 text-[8px] font-black bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full w-fit">
+                                                    {isMonthlyOnlySub
+                                                        ? `$${mpAnnual.monthlyRate.toLocaleString()}/mes ($${recurrenteVal.toLocaleString()}/año)`
+                                                        : `$${recurrenteVal.toLocaleString()}/año · $${mpAnnual.monthlyRate.toLocaleString()}/mes`}
+                                                </span>
                                             ) : (
                                                 <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tighter">MÓDULO ADICIONAL</p>
                                             )}
@@ -569,7 +582,7 @@ export default function PublicQuoteView() {
                                 const isAgentPick = plan.id === financingPlan?.id;
                                 const isDiscount = plan.tipo_ajuste === 'discount';
                                 const isServiceOnly = (Number(cotizacion.costo_plan_anual) || 0) === 0 &&
-                                    (parseModules(cotizacion.modulos_adicionales)).every((mod: any) => !(Number(mod.costo_anual || mod.costo) > 0));
+                                    (parseModules(cotizacion.modulos_adicionales)).every((mod: any) => !(getModulePlanPricing(mod, pf.cuotas).amount > 0));
                                 const displayAmt = isServiceOnly
                                     ? (pf.isPagoUnico ? pf.totalImplementacion : pf.totalImplementacion / pf.cuotas)
                                     : (pf.isPagoUnico ? pf.totalLicencia : pf.cuotaMensual);
@@ -622,15 +635,20 @@ export default function PublicQuoteView() {
                                             )}
                                             {/* Módulos adicionales recurrentes — uno por línea */}
                                             {plan.show_breakdown !== false && (cotizacion.modulos_adicionales || [])
-                                                .filter((mod: any) => Number(mod.costo_anual || mod.costo) > 0)
-                                                .map((mod: any, modIdx: number) => (
-                                                    <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
-                                                        <span className="truncate">{mod.nombre} {Number(mod.pago_unico) > 0 ? '(Suscripción)' : ''}</span>
-                                                        <span className="font-bold text-slate-700 ml-2 flex-shrink-0">
-                                                            ${Number(mod.costo_anual || mod.costo || 0).toLocaleString()}
-                                                        </span>
-                                                    </div>
-                                                ))
+                                                .filter((mod: any) => getModulePlanPricing(mod, pf.cuotas).amount > 0)
+                                                .map((mod: any, modIdx: number) => {
+                                                    const mp = getModulePlanPricing(mod, pf.cuotas);
+                                                    return (
+                                                        <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                            <span className="truncate">
+                                                                {mod.nombre}{mp.usesExplicitMonthly ? ` ($${mp.monthlyRate.toLocaleString()}/mes)` : (Number(mod.pago_unico) > 0 ? ' (Suscripción)' : '')}
+                                                            </span>
+                                                            <span className="font-bold text-slate-700 ml-2 flex-shrink-0">
+                                                                ${mp.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })
                                             }
                                             {/* Servicios o setup fees de pago único (solo en propuestas sin recurrentes; los setups híbridos van en Pago Inicial) */}
                                             {plan.show_breakdown !== false && (cotizacion.modulos_adicionales || [])
@@ -746,7 +764,7 @@ export default function PublicQuoteView() {
                                         </div>
                                     )}
                                     {serviciosUnicos.map((serv: any, idx: number) => {
-                                        const isHibrido = Number(serv.costo_anual || serv.costo) > 0;
+                                        const isHibrido = getModulePlanPricing(serv, 1).amount > 0;
                                         return (
                                         <div key={idx} className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
                                             <span className="truncate flex-1">

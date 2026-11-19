@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { Building2, Mail, Phone, Package, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CheckCircle2, Share2, Copy, Check, Eye, X, ChevronRight, Receipt } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { pdfService } from '../services/pdfService';
-import { parseModules, calculateQuoteFinancialsV2, formatUnitLabel, getBaseUnit, type CotizacionData } from '../utils/quoteUtils';
+import { parseModules, calculateQuoteFinancialsV2, getModulePlanPricing, formatUnitLabel, getBaseUnit, type CotizacionData } from '../utils/quoteUtils';
 import toast from 'react-hot-toast';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
@@ -706,7 +706,10 @@ export default function CotizacionDetalle() {
                                     {/* Módulos adicionales */}
                                     {(Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [])?.map((mod: any, idx: number) => {
                                         const pagoUnicoVal = Number(mod.pago_unico) || 0;
-                                        const recurrenteVal = Number(mod.costo_anual || mod.costo) || 0;
+                                        const mpAnnual = getModulePlanPricing(mod, 1);
+                                        const recurrenteVal = mpAnnual.amount;
+                                        const hasExplicitMonthlySub = Boolean(mod.precio_mensual_explicito) && mpAnnual.monthlyRate > 0;
+                                        const isMonthlyOnlySub = Boolean(mod.es_solo_mensual);
                                         const esHibrido = pagoUnicoVal > 0 && recurrenteVal > 0;
                                         const esPagoUnico = pagoUnicoVal > 0 && !esHibrido;
                                         const monto = esHibrido ? (pagoUnicoVal + recurrenteVal) : (esPagoUnico ? pagoUnicoVal : recurrenteVal);
@@ -725,10 +728,20 @@ export default function CotizacionDetalle() {
                                                         )}
                                                         {esHibrido ? (
                                                             <span className="bg-indigo-100 text-indigo-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter flex-shrink-0">
-                                                                PLAN (${recurrenteVal.toLocaleString()}/año) + SETUP (${pagoUnicoVal.toLocaleString()} ÚNICO)
+                                                                {hasExplicitMonthlySub
+                                                                    ? (isMonthlyOnlySub
+                                                                        ? `$${mpAnnual.monthlyRate.toLocaleString()}/mes ($${recurrenteVal.toLocaleString()}/año)`
+                                                                        : `$${recurrenteVal.toLocaleString()}/año · $${mpAnnual.monthlyRate.toLocaleString()}/mes`)
+                                                                    : `PLAN ($${recurrenteVal.toLocaleString()}/año)`} + SETUP (${pagoUnicoVal.toLocaleString()} ÚNICO)
                                                             </span>
                                                         ) : esPagoUnico ? (
                                                             <span className="bg-orange-100 text-orange-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter flex-shrink-0">PAGO ÚNICO</span>
+                                                        ) : hasExplicitMonthlySub ? (
+                                                            <span className="bg-indigo-100 text-indigo-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter flex-shrink-0">
+                                                                {isMonthlyOnlySub
+                                                                    ? `$${mpAnnual.monthlyRate.toLocaleString()}/mes ($${recurrenteVal.toLocaleString()}/año)`
+                                                                    : `$${recurrenteVal.toLocaleString()}/año · $${mpAnnual.monthlyRate.toLocaleString()}/mes`}
+                                                            </span>
                                                         ) : (
                                                             <span className="bg-purple-100 text-purple-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter flex-shrink-0">MÓDULO ADICIONAL</span>
                                                         )}
@@ -783,7 +796,7 @@ export default function CotizacionDetalle() {
                                 const serviciosUnicos = modulosArr
                                     .filter((mod: any) => (Number(mod.pago_unico) || 0) > 0)
                                     .map((mod: any) => {
-                                        const isHibrido = (Number(mod.costo_anual || mod.costo) || 0) > 0;
+                                        const isHibrido = getModulePlanPricing(mod, 1).amount > 0;
                                         return {
                                             nombre: isHibrido ? `Implementación · ${mod.nombre}` : mod.nombre,
                                             monto: Number(mod.pago_unico) || 0,
@@ -850,17 +863,22 @@ export default function CotizacionDetalle() {
                                                                             <span className="font-bold text-slate-700 ml-2 flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
                                                                         </div>
                                                                     )}
-                                                                    {/* Módulos adicionales recurrentes — uno por línea (incluye híbridos con setup + anualidad) */}
+                                                                    {/* Módulos adicionales recurrentes — uno por línea (incluye híbridos y tarifa mensual explícita) */}
                                                                     {plan.show_breakdown !== false && modulosArr
-                                                                        .filter((mod: any) => Number(mod.costo_anual || mod.costo) > 0)
-                                                                        .map((mod: any, modIdx: number) => (
-                                                                            <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
-                                                                                <span className="truncate">{mod.nombre}</span>
-                                                                                <span className="font-bold text-slate-700 ml-2 flex-shrink-0">
-                                                                                    ${Number(mod.costo_anual || mod.costo || 0).toLocaleString()}
-                                                                                </span>
-                                                                            </div>
-                                                                        ))
+                                                                        .filter((mod: any) => getModulePlanPricing(mod, pf.cuotas).amount > 0)
+                                                                        .map((mod: any, modIdx: number) => {
+                                                                            const mp = getModulePlanPricing(mod, pf.cuotas);
+                                                                            return (
+                                                                                <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                                                    <span className="truncate">
+                                                                                        {mod.nombre}{mp.usesExplicitMonthly ? ` ($${mp.monthlyRate.toLocaleString()}/mes)` : ''}
+                                                                                    </span>
+                                                                                    <span className="font-bold text-slate-700 ml-2 flex-shrink-0">
+                                                                                        ${mp.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        })
                                                                     }
                                                                     {/* WhatsApp si aplica */}
                                                                     {plan.show_breakdown !== false && cotizacion.servicio_whatsapp && Number(cotizacion.costo_whatsapp) > 0 && (

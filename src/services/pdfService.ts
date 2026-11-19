@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { supabase } from './supabase';
 import { format } from 'date-fns';
-import { calculateQuoteFinancialsV2, parseModules, formatUnitLabel, type CotizacionData } from '../utils/quoteUtils';
+import { calculateQuoteFinancialsV2, getModulePlanPricing, parseModules, formatUnitLabel, type CotizacionData } from '../utils/quoteUtils';
 import { imageCache } from '../utils/imageCache';
 
 /**
@@ -357,16 +357,26 @@ export const pdfService = {
             // ─────────────────────────────────────────────────────────────────
             modulos.forEach((m: any) => {
                 const pagoUnicoMonto = Number(m.pago_unico) || 0;
-                const costoAnual = Number(m.costo_anual) || Number(m.costo) || 0;
+                const mp = getModulePlanPricing(m, 1);
+                const costoAnual = mp.amount;
+                const descBase = m.descripcion || '';
+                const tariffNote = (m.precio_mensual_explicito && mp.monthlyRate > 0)
+                    ? (m.es_solo_mensual
+                        ? `Tarifa mensual: $${mp.monthlyRate}/mes ($${mp.annualRate}/año)`
+                        : `Tarifa mensual: $${mp.monthlyRate}/mes · Anual: $${mp.annualRate}/año`)
+                    : '';
+                const fullDesc = tariffNote
+                    ? (descBase ? `${descBase} (${tariffNote})` : tariffNote)
+                    : descBase;
                 
                 if (pagoUnicoMonto > 0 && costoAnual > 0) {
                     // Ítem Híbrido: desglosar suscripción recurrente y setup inicial de forma transparente
-                    drawRow(m.nombre, costoAnual, false, m.descripcion);
+                    drawRow(m.nombre, costoAnual, false, fullDesc);
                     drawRow(`Implementación · ${m.nombre}`, pagoUnicoMonto, true, 'Configuración inicial, capacitación (Pago único)');
                 } else if (pagoUnicoMonto > 0) {
-                    drawRow(m.nombre, pagoUnicoMonto, true, m.descripcion);
+                    drawRow(m.nombre, pagoUnicoMonto, true, descBase);
                 } else {
-                    drawRow(m.nombre, costoAnual, false, m.descripcion);
+                    drawRow(m.nombre, costoAnual, false, fullDesc);
                 }
             });
             // ─────────────────────────────────────────────────────────────────
@@ -470,7 +480,7 @@ export const pdfService = {
                 // Calcular número de items para determinar altura dinámica
                 const modulosArr = parseModules(cotizacion.modulos_adicionales);
                 const serviciosUnicos = modulosArr.filter((m: any) => (Number(m.pago_unico) || 0) > 0);
-                const serviciosRec = modulosArr.filter((m: any) => (Number(m.costo_anual) || Number(m.costo) || 0) > 0);
+                const serviciosRec = modulosArr.filter((m: any) => getModulePlanPricing(m, divisor).amount > 0);
                 const costoWhatsApp = cotizacion.servicio_whatsapp ? (Number(cotizacion.costo_whatsapp) || 0) : 0;
                 const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
 
@@ -535,7 +545,7 @@ export const pdfService = {
                     serviciosUnicos.forEach((serv: any) => {
                         const monto = Number(serv.pago_unico) || 0;
                         const qty = Number(serv.cantidad) || 1;
-                        const isHibrido = (Number(serv.costo_anual) || Number(serv.costo) || 0) > 0;
+                        const isHibrido = getModulePlanPricing(serv, 1).amount > 0;
                         const baseName = isHibrido ? `Impl. ${serv.nombre}` : serv.nombre;
                         const label = qty > 1 ? `${baseName.substring(0, 14)} (${qty}x)` : baseName.substring(0, 22);
                         doc.text(label, x + 7, lineY);
@@ -579,9 +589,10 @@ export const pdfService = {
 
                     // Módulos recurrentes
                     serviciosRec.forEach((serv: any) => {
-                        const monto = Number(serv.costo_anual) || Number(serv.costo) || 0;
-                        doc.text(serv.nombre.substring(0, 18), x + 7, lineY);
-                        doc.text(`$${monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+                        const mp = getModulePlanPricing(serv, divisor);
+                        const label = mp.usesExplicitMonthly ? `${serv.nombre} (Mensual)` : serv.nombre;
+                        doc.text(label.substring(0, 22), x + 7, lineY);
+                        doc.text(`$${mp.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
                         lineY += lineHeight;
                     });
 
@@ -674,7 +685,7 @@ export const pdfService = {
                 const colW = (totalW - 4) / numCols;
                 // Altura dinámica según número de módulos recurrentes (incluye híbridos)
                 const _modulosRecPDF = parseModules(cotizacion.modulos_adicionales)
-                    .filter((m: any) => Number(m.costo_anual || m.costo) > 0);
+                    .filter((m: any) => getModulePlanPricing(m, 1).amount > 0);
                 const _waEnabled = cotizacion.servicio_whatsapp && Number(cotizacion.costo_whatsapp) > 0;
                 const _hasAnyDiscount = allPlans.slice(0, numCols).some((p) => p.tipo_ajuste === 'discount' || Number(cotizacion.descuento_porcentaje) > 0);
                 const _extraLines = _modulosRecPDF.length + (_waEnabled ? 1 : 0) + (_modulosRecPDF.length + (_waEnabled ? 1 : 0) > 0 ? 1 : 0) + (_hasAnyDiscount ? 1 : 0); // modules + WA + subtotal + discount
@@ -778,18 +789,19 @@ export const pdfService = {
                         lineY += lineH;
                     }
 
-                    // Módulos recurrentes adicionales (incluye ítems híbridos)
+                    // Módulos recurrentes adicionales (incluye ítems híbridos y tarifa mensual explícita)
                     const _planModulosRec = parseModules(cotizacion.modulos_adicionales)
-                        .filter((m: any) => Number(m.costo_anual || m.costo) > 0);
+                        .filter((m: any) => getModulePlanPricing(m, pf.cuotas).amount > 0);
                     const _planWAEnabled = cotizacion.servicio_whatsapp && Number(cotizacion.costo_whatsapp) > 0;
                     _planModulosRec.forEach((m: any) => {
-                        const monto = Number(m.costo_anual || m.costo) || 0;
+                        const mp = getModulePlanPricing(m, pf.cuotas);
+                        const label = mp.usesExplicitMonthly ? `${m.nombre || ''} (Mensual)` : (m.nombre || '');
                         doc.setTextColor(100, 116, 139);
                         doc.setFont('helvetica', 'normal');
-                        doc.text((m.nombre || '').substring(0, 20), colX + 5, lineY);
+                        doc.text(label.substring(0, 22), colX + 5, lineY);
                         doc.setTextColor(51, 65, 85);
                         doc.setFont('helvetica', 'bold');
-                        doc.text(`$${monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
+                        doc.text(`$${mp.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
                         lineY += lineH;
                     });
                     if (_planWAEnabled) {

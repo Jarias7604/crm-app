@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { formatUnitLabel } from '../utils/quoteUtils';
+import { formatUnitLabel, getModulePlanPricing } from '../utils/quoteUtils';
 
 export interface InvoiceItem {
     tag_number?: string;
@@ -185,10 +185,14 @@ class InvoicesService {
         }
 
         if (Array.isArray(parsedModules)) {
+            const quoteQuotas = Number(quote.cuotas) || 1;
             parsedModules.forEach((m: any) => {
                 const qty = Number(m.cantidad) || 1;
-                const hybridSum = (Number(m.pago_unico) || 0) + (Number(m.costo_anual || m.costo) || 0);
-                const totalItem = Number(m.total ?? m.precio ?? (hybridSum > 0 ? hybridSum : 0));
+                const mp = getModulePlanPricing(m, quoteQuotas);
+                const hybridSum = (Number(m.pago_unico) || 0) + mp.amount;
+                const totalItem = mp.usesExplicitMonthly
+                    ? hybridSum
+                    : Number(m.total ?? m.precio ?? (hybridSum > 0 ? hybridSum : 0));
                 const unitPrice = Number(m.precio_unitario) || (qty > 0 ? totalItem / qty : totalItem);
                 const unitLabel = formatUnitLabel(m.unidad, qty, m.tipo);
 

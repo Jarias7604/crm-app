@@ -75,6 +75,7 @@ export default function CotizadorPro() {
 
     const [paqueteSugerido, setPaqueteSugerido] = useState<CotizadorPaquete | null>(null);
     const [overrides, setOverrides] = useState<Record<string, number>>({});
+    const [monthlyOverrides, setMonthlyOverrides] = useState<Record<string, number>>({});
     const [setupOverrides, setSetupOverrides] = useState<Record<string, number>>({});
     const [implementationOverride, setImplementationOverride] = useState<number | null>(null);
     const [paqueteOverride, setPaqueteOverride] = useState<number | null>(null);
@@ -151,6 +152,7 @@ export default function CotizadorPro() {
 
             const restoredQtys: Record<string, number> = {};
             const restoredOverrides: Record<string, number> = {};
+            const restoredMonthlyOverrides: Record<string, number> = {};
             const restoredSetupOverrides: Record<string, number> = {};
             modulosArr.forEach((m: any) => {
                 const found = allCatalogItems.find((item: CotizadorItem) => (m.id && item.id === m.id) || item.nombre === m.nombre);
@@ -162,16 +164,25 @@ export default function CotizadorPro() {
 
                     const isPhysical = found.tipo === 'equipo' || found.tipo === 'partes' || found.tipo === 'repuestos';
                     const tracksStock = Boolean(found.controla_stock ?? found.metadata?.controla_stock ?? isPhysical);
-                    const hasCatalogHybrid = (found.pago_unico || 0) > 0 && ((found.precio_anual || 0) > 0 || (found.precio_mensual || 0) > 0 || (found.precio_por_dte || 0) > 0);
-                    const hasSavedHybrid = (Number(m.pago_unico) || 0) > 0 && (Number(m.costo_anual) || 0) > 0;
+                    const hasCatalogRecurring = (found.precio_anual || 0) > 0 || (found.precio_mensual || 0) > 0 || (found.precio_por_dte || 0) > 0;
+                    const hasSavedRecurring = (Number(m.costo_anual) || 0) > 0 || (Number(m.costo_mensual) || 0) > 0;
+                    const hasCatalogHybrid = (found.pago_unico || 0) > 0 && hasCatalogRecurring;
+                    const hasSavedHybrid = (Number(m.pago_unico) || 0) > 0 && hasSavedRecurring;
                     const isHibrido = !isPhysical && !tracksStock && found.modelo_precio !== 'por_unidad' && (hasCatalogHybrid || hasSavedHybrid);
 
+                    const isMonthlyOnlyCatalog = !(found.precio_anual > 0) && (found.precio_mensual > 0);
+                    if (m.precio_mensual_explicito && Number(m.costo_mensual) > 0) {
+                        restoredMonthlyOverrides[found.id] = Number(m.costo_mensual);
+                    }
+
                     if (isHibrido) {
-                        if (m.costo_anual !== undefined) restoredOverrides[found.id] = Number(m.costo_anual);
+                        if (!isMonthlyOnlyCatalog && m.costo_anual !== undefined && Number(m.costo_anual) > 0) {
+                            restoredOverrides[found.id] = Number(m.costo_anual);
+                        }
                         if (m.pago_unico !== undefined) restoredSetupOverrides[found.id] = Number(m.pago_unico);
                     } else if (Number(m.pago_unico) > 0) {
                         restoredOverrides[found.id] = Number(m.pago_unico);
-                    } else if (Number(m.costo_anual) > 0) {
+                    } else if (!isMonthlyOnlyCatalog && Number(m.costo_anual) > 0) {
                         restoredOverrides[found.id] = Number(m.costo_anual);
                     }
                 }
@@ -194,6 +205,7 @@ export default function CotizadorPro() {
 
             if (Object.keys(restoredQtys).length > 0) setItemQtys(prev => ({ ...prev, ...restoredQtys }));
             if (Object.keys(restoredOverrides).length > 0) setOverrides(prev => ({ ...prev, ...restoredOverrides }));
+            if (Object.keys(restoredMonthlyOverrides).length > 0) setMonthlyOverrides(prev => ({ ...prev, ...restoredMonthlyOverrides }));
             if (Object.keys(restoredSetupOverrides).length > 0) setSetupOverrides(prev => ({ ...prev, ...restoredSetupOverrides }));
 
             // 3. Restaurar plan de financiamiento
@@ -278,6 +290,7 @@ export default function CotizadorPro() {
         formData.recargo_mensual_porcentaje,
         formData.porcentaje_anticipo,
         overrides,
+        monthlyOverrides,
         setupOverrides,
         itemQtys,
         implementationOverride,
@@ -315,6 +328,7 @@ export default function CotizadorPro() {
                     const precioCompra = Number(p.precio_compra ?? meta.precio_compra ?? 0);
                     const precioUnit = Number(p.precio_unitario ?? meta.precio_unitario ?? p.costo_unico ?? 0);
                     const unidadMedida = p.unidad || meta.unidad_medida || 'und';
+                    const isRecurringCatalog = (Number(p.precio_anual) || 0) > 0 || (Number(p.precio_mensual) || 0) > 0 || (Number(p.precio_por_dte) || 0) > 0;
 
                     return {
                         id: p.id,
@@ -322,9 +336,10 @@ export default function CotizadorPro() {
                         tipo: p.tipo,
                         nombre: p.nombre,
                         codigo: p.codigo,
-                        pago_unico: precioUnit > 0 ? precioUnit : (p.costo_unico ?? 0),
+                        pago_unico: isRecurringCatalog ? (Number(p.costo_unico) || 0) : (precioUnit > 0 ? precioUnit : (Number(p.costo_unico) || 0)),
                         precio_anual: p.precio_anual ?? 0,
                         precio_mensual: p.precio_mensual ?? 0,
+                        precio_mensual_explicito: (Number(p.precio_mensual) || 0) > 0,
                         precio_por_dte: p.precio_por_dte ?? 0,
                         incluye_en_paquete: false,
                         activo: p.activo,
@@ -440,44 +455,56 @@ export default function CotizadorPro() {
         }
     };
 
-    // Fuente única de verdad para clasificar y valorar cada ítem (recurrente, setup único, híbrido)
+    // Fuente única de verdad para clasificar y valorar cada ítem (recurrente, setup único, híbrido, mensual/dual)
     const computeQuoteItemPricing = (item: CotizadorItem) => {
         const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
         const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
         const needsQty = item.modelo_precio === 'por_unidad' || item.modelo_precio === 'por_hora' || tracksStock;
         const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
 
-        const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0 || item.precio_por_dte > 0);
+        const hasAnnual = (item.precio_anual || 0) > 0;
+        const hasMonthly = (item.precio_mensual || 0) > 0;
+        const hasRecurring = hasAnnual || hasMonthly || (item.precio_por_dte || 0) > 0;
+        const hasExplicitMonthly = hasMonthly || monthlyOverrides[item.id] !== undefined;
         const hasSetup = (item.pago_unico || 0) > 0;
         const isHibrido = hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
 
         const baseUnit = item.precio_por_dte > 0
             ? item.precio_por_dte
-            : (item.precio_mensual > 0
-                ? item.precio_mensual
-                : (item.precio_unitario || item.pago_unico || item.precio_anual || 0));
+            : hasRecurring
+                ? (hasAnnual ? item.precio_anual : item.precio_mensual)
+                : (item.precio_unitario || item.pago_unico || 0);
 
-        const defaultPrice = item.precio_por_dte > 0
-            ? (formData.volumen_dtes * item.precio_por_dte)
-            : needsQty
-                ? baseUnit * qty
-                : (isHibrido
-                    ? (item.precio_anual || (item.precio_mensual * 12))
-                    : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual));
-
-        const calculatedTotal = overrides[item.id] !== undefined ? overrides[item.id] : defaultPrice;
         const esPagoUnico = !hasRecurring && ((item.pago_unico || 0) > 0 || isPhysical || tracksStock || item.modelo_precio === 'por_unidad');
 
+        const defaultMonthly = hasMonthly ? (needsQty ? item.precio_mensual * qty : item.precio_mensual) : 0;
+        const recurringMonthly = esPagoUnico
+            ? 0
+            : (monthlyOverrides[item.id] !== undefined
+                ? monthlyOverrides[item.id]
+                : defaultMonthly);
+
+        const defaultAnnual = item.precio_por_dte > 0
+            ? (formData.volumen_dtes * item.precio_por_dte)
+            : esPagoUnico
+                ? (needsQty ? baseUnit * qty : (item.pago_unico || 0))
+                : hasAnnual
+                    ? (needsQty ? item.precio_anual * qty : item.precio_anual)
+                    : Number((recurringMonthly * 12).toFixed(2));
+
+        const calculatedTotal = overrides[item.id] !== undefined ? overrides[item.id] : defaultAnnual;
+
+        const defaultSetup = needsQty ? (item.pago_unico || 0) * qty : (item.pago_unico || 0);
         const setupVal = isHibrido
             ? (formData.incluir_implementacion
-                ? (setupOverrides[item.id] !== undefined ? setupOverrides[item.id] : (item.pago_unico || 0))
+                ? (setupOverrides[item.id] !== undefined ? setupOverrides[item.id] : defaultSetup)
                 : 0)
             : (esPagoUnico ? calculatedTotal : 0);
 
-        const recurringAnnual = isHibrido ? calculatedTotal : (esPagoUnico ? 0 : calculatedTotal);
-        const recurringMonthly = isHibrido
-            ? (overrides[item.id] !== undefined ? calculatedTotal / 12 : (item.precio_mensual || calculatedTotal / 12))
-            : (esPagoUnico ? 0 : (overrides[item.id] !== undefined ? calculatedTotal / 12 : (item.precio_mensual || calculatedTotal / 12)));
+        const recurringAnnual = esPagoUnico ? 0 : calculatedTotal;
+        const finalMonthly = esPagoUnico
+            ? 0
+            : (hasExplicitMonthly ? recurringMonthly : Number((recurringAnnual / 12).toFixed(2)));
 
         return {
             isPhysical,
@@ -486,11 +513,16 @@ export default function CotizadorPro() {
             qty,
             isHibrido,
             esPagoUnico,
+            hasAnnual,
+            hasMonthly,
+            hasExplicitMonthly,
+            isMonthlyOnly: !hasAnnual && hasExplicitMonthly,
+            hasDualPricing: hasAnnual && hasExplicitMonthly,
             baseUnit,
             calculatedTotal,
             setupVal,
             recurringAnnual,
-            recurringMonthly,
+            recurringMonthly: finalMonthly,
         };
     };
 
@@ -530,6 +562,8 @@ export default function CotizadorPro() {
                 _orig_pago_unico: p.isHibrido ? (item.pago_unico || 0) : undefined,
                 precio_anual: p.recurringAnnual,
                 precio_mensual: p.recurringMonthly,
+                precio_mensual_explicito: p.hasExplicitMonthly,
+                es_solo_mensual: p.isMonthlyOnly,
                 precio_por_dte: 0,
                 cantidad_default: p.qty,
                 precio_unitario: p.baseUnit,
@@ -707,7 +741,9 @@ export default function CotizadorPro() {
                     // Si es híbrido, guardar setup independiente en pago_unico y suscripción en costo_anual
                     pago_unico: p.setupVal,
                     costo_anual: p.recurringAnnual,
-                    costo_mensual: p.recurringMonthly
+                    costo_mensual: p.recurringMonthly,
+                    precio_mensual_explicito: p.hasExplicitMonthly,
+                    es_solo_mensual: p.isMonthlyOnly
                 };
             });
 
@@ -1110,13 +1146,20 @@ export default function CotizadorPro() {
                     {pasoActual === 3 && (() => {
                         const todosLosItems = [...modulos, ...servicios];
                         const MODELO_LABELS: Record<string, { label: string; color: string; icon: string }> = {
-                            precio_fijo:         { label: 'Fijo',      color: '#6366f1', icon: '💰' },
-                            por_hora:            { label: 'Por Hora',  color: '#f59e0b', icon: '⏱️' },
-                            por_unidad:          { label: 'Und.',      color: '#10b981', icon: '📦' },
-                            suscripcion_mensual: { label: 'Mensual',   color: '#3b82f6', icon: '🔁' },
-                            suscripcion_anual:   { label: 'Anual',     color: '#8b5cf6', icon: '📅' },
-                            implementacion:      { label: 'Setup+',    color: '#ef4444', icon: '🚀' },
-                            por_volumen:         { label: 'Volumen',   color: '#14b8a6', icon: '📊' },
+                            precio_fijo:         { label: 'Fijo',            color: '#6366f1', icon: '💰' },
+                            por_hora:            { label: 'Por Hora',        color: '#f59e0b', icon: '⏱️' },
+                            por_unidad:          { label: 'Und.',            color: '#10b981', icon: '📦' },
+                            suscripcion_mensual: { label: 'Mensual',         color: '#3b82f6', icon: '🔁' },
+                            suscripcion_anual:   { label: 'Anual',           color: '#8b5cf6', icon: '📅' },
+                            suscripcion_dual:    { label: 'Mensual / Anual', color: '#4f46e5', icon: '🔁' },
+                            implementacion:      { label: 'Setup+',          color: '#ef4444', icon: '🚀' },
+                            por_volumen:         { label: 'Volumen',         color: '#14b8a6', icon: '📊' },
+                        };
+
+                        const updateItemQty = (itemId: string, q: number) => {
+                            setItemQtys(prev => ({ ...prev, [itemId]: q }));
+                            setOverrides(prev => { const n = { ...prev }; delete n[itemId]; return n; });
+                            setMonthlyOverrides(prev => { const n = { ...prev }; delete n[itemId]; return n; });
                         };
 
                         const toggleExpand = (id: string, e: React.MouseEvent) => {
@@ -1128,28 +1171,14 @@ export default function CotizadorPro() {
                         const renderItemCard = (item: typeof todosLosItems[0], isModulo: boolean) => {
                             const isSelected = isModulo ? formData.modulos_ids.includes(item.id) : formData.servicios_ids.includes(item.id);
                             const toggle = isModulo ? () => toggleModulo(item.id) : () => toggleServicio(item.id);
-                            const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
-                            const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
-                            const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
-                            const hasSetup = (item.pago_unico || 0) > 0;
-                            const isHibrido = hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
-                            const modelo = (item as any).modelo_precio || (tracksStock || isPhysical ? 'por_unidad' : (isHibrido ? 'suscripcion_anual' : (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual')));
+                            const p = computeQuoteItemPricing(item);
+                            const modelo = (item as any).modelo_precio || (p.tracksStock || p.isPhysical ? 'por_unidad' : (p.hasDualPricing ? 'suscripcion_dual' : (p.isMonthlyOnly ? 'suscripcion_mensual' : (p.esPagoUnico ? 'precio_fijo' : 'suscripcion_anual'))));
                             const meta = MODELO_LABELS[modelo] || MODELO_LABELS.precio_fijo;
-                            const needsQty = modelo === 'por_hora' || modelo === 'por_unidad' || tracksStock;
-                            const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
+                            const { needsQty, qty } = p;
                             const stockActual = Number(item.stock_actual ?? item.metadata?.stock_actual ?? 0);
                             const unitLabel = getBaseUnit(item.unidad, item.tipo);
-
-                            const baseUnitPrice = item.precio_por_dte > 0
-                                ? item.precio_por_dte
-                                : (item.precio_mensual > 0 ? item.precio_mensual : (item.precio_unitario || item.pago_unico || item.precio_anual || 0));
-
-                            const defaultPrice = item.precio_por_dte > 0
-                                ? (formData.volumen_dtes * item.precio_por_dte)
-                                : needsQty
-                                    ? baseUnitPrice * qty
-                                    : (isHibrido ? (item.precio_anual || item.precio_mensual * 12) : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual));
-                            const currentPrice = overrides[item.id] ?? defaultPrice;
+                            const baseUnitPrice = p.baseUnit;
+                            const currentPrice = p.isMonthlyOnly ? p.recurringMonthly : p.calculatedTotal;
 
                             return (
                                 <div key={item.id} onClick={toggle}
@@ -1159,7 +1188,7 @@ export default function CotizadorPro() {
                                     <div className="flex items-start justify-between mb-2">
                                         <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>{meta.icon} {meta.label}</span>
-                                            {tracksStock && (
+                                            {p.tracksStock && (
                                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
                                                     stockActual <= 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
                                                 }`}>
@@ -1180,21 +1209,13 @@ export default function CotizadorPro() {
                                                 <button
                                                     type="button"
                                                     className="w-6 h-6 rounded flex items-center justify-center font-black text-amber-700 hover:bg-amber-100 text-xs"
-                                                    onClick={() => {
-                                                        const q = Math.max(1, qty - 1);
-                                                        setItemQtys(prev => ({ ...prev, [item.id]: q }));
-                                                        setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q }));
-                                                    }}
+                                                    onClick={() => updateItemQty(item.id, Math.max(1, qty - 1))}
                                                 >-</button>
                                                 <span className="w-7 text-center font-black text-amber-700 text-xs">{qty}</span>
                                                 <button
                                                     type="button"
                                                     className="w-6 h-6 rounded flex items-center justify-center font-black text-amber-700 hover:bg-amber-100 text-xs"
-                                                    onClick={() => {
-                                                        const q = qty + 1;
-                                                        setItemQtys(prev => ({ ...prev, [item.id]: q }));
-                                                        setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q }));
-                                                    }}
+                                                    onClick={() => updateItemQty(item.id, qty + 1)}
                                                 >+</button>
                                             </div>
                                             <div className="text-right">
@@ -1203,19 +1224,26 @@ export default function CotizadorPro() {
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="mt-auto pt-3 border-t border-gray-100 flex items-end justify-between">
+                                        <div className="mt-auto pt-3 border-t border-gray-100 flex items-end justify-between gap-2">
                                             <div>
                                                 <p className="text-[10px] text-gray-400">
                                                     {needsQty
                                                         ? `por ${unitLabel}`
-                                                        : isHibrido
-                                                            ? `${item.precio_anual > 0 ? '/año' : '/mes'} + $${item.pago_unico.toLocaleString()} setup`
-                                                            : item.pago_unico > 0
+                                                        : p.isHibrido
+                                                            ? `${p.isMonthlyOnly ? '/mes' : '/año'} + $${(item.pago_unico || 0).toLocaleString()} setup`
+                                                            : p.esPagoUnico
                                                                 ? 'Pago único'
                                                                 : item.precio_por_dte > 0
                                                                     ? 'Por volumen'
-                                                                    : '/año'}
+                                                                    : p.isMonthlyOnly
+                                                                        ? '/mes'
+                                                                        : '/año'}
                                                 </p>
+                                                {p.hasDualPricing && (
+                                                    <p className="text-[10px] font-bold text-indigo-600 mt-0.5">
+                                                        ${p.recurringMonthly.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/mes
+                                                    </p>
+                                                )}
                                             </div>
                                             <p className={`text-base font-black ${isSelected ? 'text-[#4449AA]' : 'text-gray-700'}`}>${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
                                         </div>
@@ -1253,28 +1281,14 @@ export default function CotizadorPro() {
                                 ? formData.modulos_ids.includes(item.id)
                                 : formData.servicios_ids.includes(item.id);
                             const toggle = isModulo ? () => toggleModulo(item.id) : () => toggleServicio(item.id);
-                            const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
-                            const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
-                            const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0);
-                            const hasSetup = (item.pago_unico || 0) > 0;
-                            const isHibrido = hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
-                            const modelo = (item as any).modelo_precio || (tracksStock || isPhysical ? 'por_unidad' : (isHibrido ? 'suscripcion_anual' : (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual')));
+                            const p = computeQuoteItemPricing(item);
+                            const modelo = (item as any).modelo_precio || (p.tracksStock || p.isPhysical ? 'por_unidad' : (p.hasDualPricing ? 'suscripcion_dual' : (p.isMonthlyOnly ? 'suscripcion_mensual' : (p.esPagoUnico ? 'precio_fijo' : 'suscripcion_anual'))));
                             const meta = MODELO_LABELS[modelo] || MODELO_LABELS.precio_fijo;
-                            const needsQty = modelo === 'por_hora' || modelo === 'por_unidad' || tracksStock;
-                            const qty = itemQtys[item.id] ?? (item.cantidad_default || 1);
+                            const { needsQty, qty } = p;
                             const stockActual = Number(item.stock_actual ?? item.metadata?.stock_actual ?? 0);
                             const unitLabel = getBaseUnit(item.unidad, item.tipo);
-
-                            // Precio base por unidad/hora
-                            const baseUnitPrice = item.precio_por_dte > 0
-                                ? item.precio_por_dte
-                                : (item.precio_mensual > 0 ? item.precio_mensual : (item.precio_unitario || item.pago_unico || item.precio_anual || 0));
-                            const defaultPrice = item.precio_por_dte > 0
-                                ? (formData.volumen_dtes * item.precio_por_dte)
-                                : needsQty
-                                    ? baseUnitPrice * qty
-                                    : (isHibrido ? (item.precio_anual || item.precio_mensual * 12) : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual));
-                            const currentPrice = overrides[item.id] ?? defaultPrice;
+                            const baseUnitPrice = p.baseUnit;
+                            const currentPrice = p.isMonthlyOnly ? p.recurringMonthly : p.calculatedTotal;
 
                             const isExpanded = expandedItems.has(item.id);
                             return (
@@ -1289,7 +1303,7 @@ export default function CotizadorPro() {
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <p className={`text-sm font-bold truncate ${isSelected ? 'text-[#4449AA]' : 'text-gray-800'}`}>{item.nombre}</p>
                                                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>{meta.icon} {meta.label}</span>
-                                                    {tracksStock && (
+                                                    {p.tracksStock && (
                                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                                             stockActual <= 0
                                                                 ? 'bg-rose-100 text-rose-700'
@@ -1313,31 +1327,19 @@ export default function CotizadorPro() {
                                                             <button
                                                                 type="button"
                                                                 className="w-6 h-6 rounded flex items-center justify-center font-black text-amber-700 hover:bg-amber-200/60 transition-colors text-xs"
-                                                                onClick={() => {
-                                                                    const q = Math.max(1, qty - 1);
-                                                                    setItemQtys(prev => ({ ...prev, [item.id]: q }));
-                                                                    setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q }));
-                                                                }}
+                                                                onClick={() => updateItemQty(item.id, Math.max(1, qty - 1))}
                                                             >-</button>
                                                             <input
                                                                 type="number"
                                                                 min={1}
                                                                 className="w-12 text-center font-black text-amber-800 bg-transparent outline-none text-xs"
                                                                 value={qty}
-                                                                onChange={e => {
-                                                                    const q = Math.max(1, Number(e.target.value));
-                                                                    setItemQtys(prev => ({ ...prev, [item.id]: q }));
-                                                                    setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q }));
-                                                                }}
+                                                                onChange={e => updateItemQty(item.id, Math.max(1, Number(e.target.value)))}
                                                             />
                                                             <button
                                                                 type="button"
                                                                 className="w-6 h-6 rounded flex items-center justify-center font-black text-amber-700 hover:bg-amber-200/60 transition-colors text-xs"
-                                                                onClick={() => {
-                                                                    const q = qty + 1;
-                                                                    setItemQtys(prev => ({ ...prev, [item.id]: q }));
-                                                                    setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * q }));
-                                                                }}
+                                                                onClick={() => updateItemQty(item.id, qty + 1)}
                                                             >+</button>
                                                             <span className="text-[10px] text-amber-600 font-bold pr-1.5">{unitLabel}</span>
                                                         </div>
@@ -1347,12 +1349,46 @@ export default function CotizadorPro() {
                                                         </div>
                                                     </div>
                                                 ) : isSelected && canEditPrices ? (
-                                                    <div className="flex items-center gap-1">
-                                                        <span className="text-xs text-gray-400 font-bold">$</span>
-                                                        <input type="number" className="w-24 text-right font-bold text-[#4449AA] border border-[#4449AA]/30 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-[#4449AA]/30 outline-none text-sm"
-                                                            value={overrides[item.id] ?? defaultPrice} onChange={e => setOverrides({ ...overrides, [item.id]: Number(e.target.value) })} />
-                                                        <span className="text-[10px] text-gray-400 font-bold">{isHibrido ? '/año' : (item.pago_unico > 0 ? 'único' : item.precio_por_dte > 0 ? '/vol' : '/año')}</span>
-                                                    </div>
+                                                    p.isMonthlyOnly ? (
+                                                        <div className="flex flex-col items-end gap-0.5">
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="text-xs text-gray-400 font-bold">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    className="w-24 text-right font-bold text-[#4449AA] border border-[#4449AA]/30 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-[#4449AA]/30 outline-none text-sm"
+                                                                    value={monthlyOverrides[item.id] ?? p.recurringMonthly}
+                                                                    onChange={e => {
+                                                                        const raw = Number(e.target.value);
+                                                                        const val = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+                                                                        setMonthlyOverrides(prev => ({ ...prev, [item.id]: val }));
+                                                                        setOverrides(prev => { const n = { ...prev }; delete n[item.id]; return n; });
+                                                                    }}
+                                                                />
+                                                                <span className="text-[10px] text-gray-400 font-bold">/mes</span>
+                                                            </div>
+                                                            {p.isHibrido && (
+                                                                <span className="text-[10px] text-gray-400">+ ${(item.pago_unico || 0).toLocaleString()} setup</span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-col items-end gap-0.5">
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="text-xs text-gray-400 font-bold">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    className="w-24 text-right font-bold text-[#4449AA] border border-[#4449AA]/30 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-[#4449AA]/30 outline-none text-sm"
+                                                                    value={overrides[item.id] ?? p.calculatedTotal}
+                                                                    onChange={e => setOverrides({ ...overrides, [item.id]: Number(e.target.value) })}
+                                                                />
+                                                                <span className="text-[10px] text-gray-400 font-bold">{p.esPagoUnico ? 'único' : item.precio_por_dte > 0 ? '/vol' : '/año'}</span>
+                                                            </div>
+                                                            {p.hasDualPricing && (
+                                                                <span className="text-[10px] font-bold text-indigo-600">
+                                                                    ${p.recurringMonthly.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/mes
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )
                                                 ) : (
                                                     <div className="text-right">
                                                         <p className={`text-sm font-black ${isSelected ? 'text-[#4449AA]' : 'text-gray-700'}`}>${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</p>
@@ -1360,14 +1396,21 @@ export default function CotizadorPro() {
                                                         <p className="text-[10px] text-gray-400">
                                                             {needsQty
                                                                 ? `por ${unitLabel}`
-                                                                : isHibrido
-                                                                    ? `${item.precio_anual > 0 ? '/año' : '/mes'} + $${item.pago_unico.toLocaleString()} setup`
-                                                                    : item.pago_unico > 0
+                                                                : p.isHibrido
+                                                                    ? `${p.isMonthlyOnly ? '/mes' : '/año'} + $${(item.pago_unico || 0).toLocaleString()} setup`
+                                                                    : p.esPagoUnico
                                                                         ? 'Pago único'
                                                                         : item.precio_por_dte > 0
                                                                             ? 'Por volumen'
-                                                                            : '/año'}
+                                                                            : p.isMonthlyOnly
+                                                                                ? '/mes'
+                                                                                : '/año'}
                                                         </p>
+                                                        {p.hasDualPricing && (
+                                                            <p className="text-[10px] font-bold text-indigo-600">
+                                                                ${p.recurringMonthly.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/mes
+                                                            </p>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -1383,7 +1426,7 @@ export default function CotizadorPro() {
                                         <div className={`px-5 py-4 border-t ${isSelected ? 'bg-[#4449AA]/5 border-[#4449AA]/20' : 'bg-gray-50 border-gray-100'}`}>
                                             <p className="text-sm text-gray-600 leading-relaxed">{item.descripcion}</p>
                                             <div className="flex gap-2 mt-3 flex-wrap">
-                                                {item.pago_unico > 0 && <span className="text-xs bg-purple-50 text-purple-700 font-bold px-2 py-1 rounded-lg">💳 {isHibrido ? 'Setup inicial' : 'Pago único'}: ${item.pago_unico.toLocaleString()}</span>}
+                                                {item.pago_unico > 0 && <span className="text-xs bg-purple-50 text-purple-700 font-bold px-2 py-1 rounded-lg">💳 {p.isHibrido ? 'Setup inicial' : 'Pago único'}: ${item.pago_unico.toLocaleString()}</span>}
                                                 {item.precio_mensual > 0 && <span className="text-xs bg-blue-50 text-blue-700 font-bold px-2 py-1 rounded-lg">🔁 Mensual: ${item.precio_mensual.toLocaleString()}</span>}
                                                 {item.precio_anual > 0 && <span className="text-xs bg-indigo-50 text-indigo-700 font-bold px-2 py-1 rounded-lg">📅 Anual: ${item.precio_anual.toLocaleString()}</span>}
                                             </div>
@@ -1679,6 +1722,97 @@ export default function CotizadorPro() {
                                                             : allCatalog.find(i => i.nombre === item.nombre))
                                                         : null;
                                                     const isHybridSetup = Boolean(item.es_setup_hibrido && item.item_id);
+                                                    const isRecurringCatalogItem = Boolean(
+                                                        itemOriginal &&
+                                                        !isHybridSetup &&
+                                                        item.tipo !== 'Implementación' &&
+                                                        item.tipo !== 'Paquete' &&
+                                                        !item.es_pago_unico
+                                                    );
+                                                    const isDualCatalog = Boolean(
+                                                        isRecurringCatalogItem &&
+                                                        itemOriginal &&
+                                                        (itemOriginal.precio_anual || 0) > 0 &&
+                                                        (itemOriginal.precio_mensual || 0) > 0
+                                                    );
+                                                    const isMonthlyOnlyCatalog = Boolean(
+                                                        isRecurringCatalogItem &&
+                                                        itemOriginal &&
+                                                        !(itemOriginal.precio_anual > 0) &&
+                                                        (itemOriginal.precio_mensual || 0) > 0
+                                                    );
+
+                                                    if (isDualCatalog && itemOriginal) {
+                                                        const origPricing = computeQuoteItemPricing(itemOriginal);
+                                                        const annualVal = overrides[itemOriginal.id] !== undefined ? overrides[itemOriginal.id] : origPricing.recurringAnnual;
+                                                        const monthlyVal = monthlyOverrides[itemOriginal.id] !== undefined ? monthlyOverrides[itemOriginal.id] : origPricing.recurringMonthly;
+                                                        return (
+                                                            <div className="flex flex-col items-end gap-1.5">
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-[10px] text-gray-500 font-bold">Anual $</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min={0}
+                                                                        className="w-20 sm:w-24 text-right font-bold text-sm border rounded px-2 py-1 focus:ring-2 outline-none text-purple-700 border-purple-200 bg-purple-50/30 focus:ring-purple-400"
+                                                                        value={annualVal}
+                                                                        onChange={(e) => {
+                                                                            const raw = Number(e.target.value);
+                                                                            const val = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+                                                                            setOverrides(prev => ({ ...prev, [itemOriginal.id]: val }));
+                                                                        }}
+                                                                    />
+                                                                    <span className="text-[10px] text-gray-400 font-bold w-8">/año</span>
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-[10px] text-gray-500 font-bold">Mensual $</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min={0}
+                                                                        className="w-20 sm:w-24 text-right font-bold text-sm border rounded px-2 py-1 focus:ring-2 outline-none text-indigo-700 border-indigo-200 bg-indigo-50/30 focus:ring-indigo-400"
+                                                                        value={monthlyVal}
+                                                                        onChange={(e) => {
+                                                                            const raw = Number(e.target.value);
+                                                                            const val = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+                                                                            setMonthlyOverrides(prev => ({ ...prev, [itemOriginal.id]: val }));
+                                                                        }}
+                                                                    />
+                                                                    <span className="text-[10px] text-gray-400 font-bold w-8">/mes</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    if (isMonthlyOnlyCatalog && itemOriginal) {
+                                                        const origPricing = computeQuoteItemPricing(itemOriginal);
+                                                        const monthlyVal = monthlyOverrides[itemOriginal.id] !== undefined ? monthlyOverrides[itemOriginal.id] : origPricing.recurringMonthly;
+                                                        return (
+                                                            <div className="flex flex-col items-end gap-1">
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-xs text-gray-400 font-bold">$</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.01"
+                                                                        min={0}
+                                                                        className="w-20 sm:w-28 text-right font-bold text-base border rounded px-2 py-1 focus:ring-2 outline-none text-indigo-700 border-indigo-200 bg-indigo-50/30 focus:ring-indigo-400"
+                                                                        value={monthlyVal}
+                                                                        onChange={(e) => {
+                                                                            const raw = Number(e.target.value);
+                                                                            const val = Number.isFinite(raw) ? Math.max(0, raw) : 0;
+                                                                            setMonthlyOverrides(prev => ({ ...prev, [itemOriginal.id]: val }));
+                                                                            setOverrides(prev => { const n = { ...prev }; delete n[itemOriginal.id]; return n; });
+                                                                        }}
+                                                                    />
+                                                                    <span className="text-[10px] text-gray-400 font-bold">/mes</span>
+                                                                </div>
+                                                                <span className="text-[10px] text-gray-400 font-medium">
+                                                                    = ${item.precio_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/año
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    }
+
                                                     const currentValue =
                                                         isHybridSetup && item.item_id
                                                             ? (setupOverrides[item.item_id] ?? item.precio_anual)
@@ -1746,9 +1880,16 @@ export default function CotizadorPro() {
                                                         </div>
                                                     );
                                                 })() : (
-                                                    <p className="font-black text-gray-800 text-lg">
-                                                        ${(item.precio_anual).toLocaleString()}
-                                                    </p>
+                                                    <div className="text-right">
+                                                        <p className="font-black text-gray-800 text-lg">
+                                                            ${(item.precio_anual).toLocaleString()}
+                                                        </p>
+                                                        {item.usa_mensual_propio && (
+                                                            <p className="text-[10px] font-bold text-indigo-600">
+                                                                (${item.precio_mensual.toLocaleString()}/mes)
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
@@ -2146,7 +2287,9 @@ export default function CotizadorPro() {
                                                                     <div className="space-y-1.5 mb-4 border-t border-gray-100 pt-3">
                                                                         {recurringLines.map((d, i) => (
                                                                             <div key={i} className="flex justify-between text-[10px] text-gray-500 font-medium">
-                                                                                <span className="truncate">{d.nombre}</span>
+                                                                                <span className="truncate">
+                                                                                    {d.nombre}{!isPU && d.usa_mensual_propio ? ` ($${d.precio_mensual.toLocaleString()}/mes)` : ''}
+                                                                                </span>
                                                                                 <span className="font-bold text-gray-700 ml-2 flex-shrink-0">${d.precio_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                                             </div>
                                                                         ))}
