@@ -373,7 +373,8 @@ export const calculateQuoteFinancialsV2 = (
     if (baseLicenseCost === 0) {
         if (descuentoManualPct > 0) {
             const descPct = descuentoManualPct / 100;
-            descuentoManualMonto = (licenciaAjustada + implementacionAjustada) * descPct;
+            descuentoManualMonto = licenciaAjustada * descPct;
+            descuentoImplementacionMonto += implementacionAjustada * descPct;
             licenciaConDescuento = licenciaAjustada * (1 - descPct);
             implementacionAjustada = implementacionAjustada * (1 - descPct);
         }
@@ -384,10 +385,12 @@ export const calculateQuoteFinancialsV2 = (
                 : 0;
             licenciaConDescuento = licenciaAjustada - descuentoManualMonto;
         } else if (implementacion > 0) {
-            descuentoManualMonto = descuentoManualPct > 0
+            const descImp = descuentoManualPct > 0
                 ? implementacionAjustada * (descuentoManualPct / 100)
                 : 0;
-            implementacionAjustada = implementacionAjustada - descuentoManualMonto;
+            descuentoManualMonto = descImp;
+            descuentoImplementacionMonto += descImp;
+            implementacionAjustada = implementacionAjustada - descImp;
         }
     }
 

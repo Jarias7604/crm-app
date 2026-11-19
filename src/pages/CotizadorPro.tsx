@@ -162,13 +162,11 @@ export default function CotizadorPro() {
 
                     if (m.cantidad) restoredQtys[found.id] = Number(m.cantidad);
 
-                    const isPhysical = found.tipo === 'equipo' || found.tipo === 'partes' || found.tipo === 'repuestos';
-                    const tracksStock = Boolean(found.controla_stock ?? found.metadata?.controla_stock ?? isPhysical);
                     const hasCatalogRecurring = (found.precio_anual || 0) > 0 || (found.precio_mensual || 0) > 0 || (found.precio_por_dte || 0) > 0;
                     const hasSavedRecurring = (Number(m.costo_anual) || 0) > 0 || (Number(m.costo_mensual) || 0) > 0;
                     const hasCatalogHybrid = (found.pago_unico || 0) > 0 && hasCatalogRecurring;
                     const hasSavedHybrid = (Number(m.pago_unico) || 0) > 0 && hasSavedRecurring;
-                    const isHibrido = !isPhysical && !tracksStock && found.modelo_precio !== 'por_unidad' && (hasCatalogHybrid || hasSavedHybrid);
+                    const isHibrido = hasCatalogHybrid || hasSavedHybrid;
 
                     const isMonthlyOnlyCatalog = !(found.precio_anual > 0) && (found.precio_mensual > 0);
                     if (m.precio_mensual_explicito && Number(m.costo_mensual) > 0) {
@@ -220,6 +218,7 @@ export default function CotizadorPro() {
                     Number((p as any).meses) === Number(cot.plazo_meses)
                 );
                 primaryPlanId = planByQuotas?.id ?? null;
+                if (primaryPlanId) setSelectedPlanIds([primaryPlanId]);
             }
             if (primaryPlanId) setSelectedPlanId(primaryPlanId);
 
@@ -336,7 +335,7 @@ export default function CotizadorPro() {
                         tipo: p.tipo,
                         nombre: p.nombre,
                         codigo: p.codigo,
-                        pago_unico: isRecurringCatalog ? (Number(p.costo_unico) || 0) : (precioUnit > 0 ? precioUnit : (Number(p.costo_unico) || 0)),
+                        pago_unico: isRecurringCatalog ? (Number(p.costo_unico) || 0) : ((Number(p.costo_unico) || 0) > 0 ? Number(p.costo_unico) : precioUnit),
                         precio_anual: p.precio_anual ?? 0,
                         precio_mensual: p.precio_mensual ?? 0,
                         precio_mensual_explicito: (Number(p.precio_mensual) || 0) > 0,
@@ -386,19 +385,22 @@ export default function CotizadorPro() {
                 // Priorizar plan anual con descuento (pago contado)
                 defaultPlan = plansData.find(p => p.tipo_ajuste === 'discount') || plansData[0];
                 setSelectedPlanId(defaultPlan.id);
+                if (!id) {
+                    setSelectedPlanIds([defaultPlan.id]);
+                }
             }
 
             if (settingsData || defaultPlan) {
                 // Solo aplicar defaults si NO estamos editando
                 if (!id) {
                     setFormData(prev => {
-                        const isDiscountPlan = defaultPlan?.tipo_ajuste === 'discount';
+                        const isSingleOrDiscountPlan = defaultPlan?.tipo_ajuste === 'discount' || ((defaultPlan?.cuotas ?? defaultPlan?.meses ?? 1) <= 1);
                         return {
                             ...prev,
                             iva_porcentaje: settingsData?.iva_defecto ?? 13,
                             recargo_mensual_porcentaje: settingsData?.recargo_financiamiento_base ?? 20,
                             descuento_porcentaje: 0,
-                            forma_pago: isDiscountPlan ? 'anual' : 'mensual',
+                            forma_pago: isSingleOrDiscountPlan ? 'anual' : 'mensual',
                             meses_pago: defaultPlan?.meses ?? 1
                         };
                     });
@@ -467,7 +469,7 @@ export default function CotizadorPro() {
         const hasRecurring = hasAnnual || hasMonthly || (item.precio_por_dte || 0) > 0;
         const hasExplicitMonthly = hasMonthly || monthlyOverrides[item.id] !== undefined;
         const hasSetup = (item.pago_unico || 0) > 0;
-        const isHibrido = hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
+        const isHibrido = hasRecurring && hasSetup;
 
         const baseUnit = item.precio_por_dte > 0
             ? item.precio_por_dte
@@ -586,10 +588,11 @@ export default function CotizadorPro() {
         const packageWithOverride = buildPackageWithOverride();
 
         const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
+        const isSingleOrDiscountPlan = selectedPlan?.tipo_ajuste === 'discount' || ((selectedPlan?.cuotas ?? selectedPlan?.meses ?? 1) <= 1);
 
         // MOTOR V2: Construir configuración unificada
         const config = {
-            forma_pago: (selectedPlan?.tipo_ajuste === 'discount' ? 'anual' : 'mensual') as 'anual' | 'mensual',
+            forma_pago: (isSingleOrDiscountPlan ? 'anual' : 'mensual') as 'anual' | 'mensual',
             meses: selectedPlan?.meses || 1,
             cuotas: selectedPlan?.cuotas, // V3: Inyectamos cuotas explícitas si existen
             tipo_ajuste: selectedPlan?.tipo_ajuste || 'none',
@@ -693,6 +696,11 @@ export default function CotizadorPro() {
 
             if (!totales) {
                 toast.error('Error: No se han calculado los totales');
+                return;
+            }
+
+            if (totales.subtotal_recurrente_base > 0 && financingPlans.length > 0 && !selectedPlanId) {
+                toast.error('Selecciona al menos una forma de pago');
                 return;
             }
 
@@ -1630,11 +1638,9 @@ export default function CotizadorPro() {
                             ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
                             ...servicios.filter(s => formData.servicios_ids.includes(s.id))
                         ].filter(item => {
-                            const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
-                            const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
                             const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0 || item.precio_por_dte > 0);
                             const hasSetup = (item.pago_unico || 0) > 0;
-                            return hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
+                            return hasRecurring && hasSetup;
                         });
                         const costoImpHibridos = hybridItemsSel.reduce(
                             (sum, item) => sum + (setupOverrides[item.id] ?? (item.pago_unico || 0)),
@@ -1936,49 +1942,36 @@ export default function CotizadorPro() {
                                                     type="button"
                                                     onClick={() => {
                                                         if (canChangePaymentMethod) {
-                                                            const isAnual = plan.meses === 12 && plan.interes_porcentaje === 0 && plan.titulo.toLowerCase().includes('pago');
-                                                            const isDiscountPlan = plan.tipo_ajuste === 'discount';
+                                                            const resolveFormaPago = (p: FinancingPlan): 'anual' | 'mensual' => {
+                                                                const pAnual = p.meses === 12 && p.interes_porcentaje === 0 && p.titulo.toLowerCase().includes('pago');
+                                                                const isSingle = (p.cuotas ?? p.meses ?? 1) <= 1;
+                                                                return (p.tipo_ajuste === 'discount' || pAnual || isSingle) ? 'anual' : 'mensual';
+                                                            };
 
-                                                            // Toggle en el array de comparativa (max 2)
-                                                            setSelectedPlanIds(prev => {
-                                                                if (prev.includes(plan.id)) {
-                                                                    // Si lo deseleccionamos y era el primario, el primario pasa al otro
-                                                                    const next = prev.filter(id => id !== plan.id);
-                                                                    if (selectedPlanId === plan.id && next.length > 0) {
+                                                            let next: string[];
+                                                            if (selectedPlanIds.includes(plan.id)) {
+                                                                next = selectedPlanIds.filter(pid => pid !== plan.id);
+                                                                if (selectedPlanId === plan.id) {
+                                                                    if (next.length > 0) {
                                                                         setSelectedPlanId(next[0]);
                                                                         const altPlan = financingPlans.find(p => p.id === next[0]);
                                                                         if (altPlan) {
-                                                                            const altAnual = altPlan.meses === 12 && altPlan.interes_porcentaje === 0 && altPlan.titulo.toLowerCase().includes('pago');
-                                                                            setFormData(f => ({ ...f, forma_pago: (altPlan.tipo_ajuste === 'discount' || altAnual) ? 'anual' : 'mensual', meses_pago: altPlan.meses, descuento_porcentaje: 0 }));
+                                                                            setFormData(f => ({ ...f, forma_pago: resolveFormaPago(altPlan), meses_pago: altPlan.meses, descuento_porcentaje: 0 }));
                                                                         }
-                                                                    } else if (next.length === 0) {
+                                                                    } else {
                                                                         setSelectedPlanId(null);
                                                                     }
-                                                                    return next;
-                                                                } else if (prev.length >= 2) {
-                                                                    // Max 2: reemplazar el último
-                                                                    return [prev[0], plan.id];
-                                                                } else {
-                                                                    return [...prev, plan.id];
                                                                 }
-                                                            });
-
-                                                            // El primero siempre dirige los cálculos
-                                                            if (!selectedPlanIds.includes(plan.id) && selectedPlanIds.length === 0) {
-                                                                setSelectedPlanId(plan.id);
-                                                            } else if (!selectedPlanIds.includes(plan.id) && selectedPlanIds.length > 0 && selectedPlanId === null) {
-                                                                setSelectedPlanId(plan.id);
-                                                            } else if (!selectedPlanIds.includes(plan.id) && selectedPlanIds.length === 0) {
-                                                                setSelectedPlanId(plan.id);
-                                                            }
-                                                            // Si es nuevo y es el primer seleccionado, setear como primario
-                                                            if (!selectedPlanIds.includes(plan.id)) {
-                                                                if (selectedPlanIds.length === 0) {
+                                                            } else if (selectedPlanIds.length >= 2) {
+                                                                next = [selectedPlanIds[0], plan.id];
+                                                            } else {
+                                                                next = [...selectedPlanIds, plan.id];
+                                                                if (selectedPlanIds.length === 0 || selectedPlanId === null) {
                                                                     setSelectedPlanId(plan.id);
-                                                                    setFormData(f => ({ ...f, forma_pago: (isDiscountPlan || isAnual) ? 'anual' : 'mensual', meses_pago: plan.meses, descuento_porcentaje: 0 }));
+                                                                    setFormData(f => ({ ...f, forma_pago: resolveFormaPago(plan), meses_pago: plan.meses, descuento_porcentaje: 0 }));
                                                                 }
-                                                                // Si es el 2do, NO cambia los cálculos (el 1ro manda)
                                                             }
+                                                            setSelectedPlanIds(next);
                                                         }
                                                     }}
                                                     disabled={!canChangePaymentMethod}
@@ -2271,7 +2264,7 @@ export default function CotizadorPro() {
                                                             const plan = financingPlans.find(p => p.id === planId);
                                                             if (!plan) return null;
                                                             const isMain = planId === selectedPlanId;
-                                                            const cfg = { forma_pago: (plan.tipo_ajuste === 'discount' ? 'anual' : 'mensual') as 'anual' | 'mensual', meses: plan.meses || 1, cuotas: plan.cuotas, tipo_ajuste: plan.tipo_ajuste || 'none', tasa_ajuste: plan.interes_porcentaje || 0, descuento_manual: formData.descuento_porcentaje || 0, iva_porcentaje: formData.iva_porcentaje, incluir_implementacion: formData.incluir_implementacion, metadata: { porcentaje_anticipo: formData.porcentaje_anticipo } };
+                                                            const cfg = { forma_pago: (plan.tipo_ajuste === 'discount' || ((plan.cuotas ?? plan.meses ?? 1) <= 1) ? 'anual' : 'mensual') as 'anual' | 'mensual', meses: plan.meses || 1, cuotas: plan.cuotas, tipo_ajuste: plan.tipo_ajuste || 'none', tasa_ajuste: plan.interes_porcentaje || 0, descuento_manual: formData.descuento_porcentaje || 0, iva_porcentaje: formData.iva_porcentaje, incluir_implementacion: formData.incluir_implementacion, metadata: { porcentaje_anticipo: formData.porcentaje_anticipo } };
                                                             const pt = cotizadorService.calcularCotizacion(pkgFinal, itemsSel, formData.volumen_dtes, cfg);
                                                             const numCuotas = plan.cuotas || plan.meses || 1;
                                                             const isPU = numCuotas <= 1;
@@ -2423,11 +2416,9 @@ export default function CotizadorPro() {
                                                 ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
                                                 ...servicios.filter(s => formData.servicios_ids.includes(s.id))
                                             ].filter(item => {
-                                                const isPhysical = item.tipo === 'equipo' || item.tipo === 'partes' || item.tipo === 'repuestos';
-                                                const tracksStock = Boolean(item.controla_stock ?? item.metadata?.controla_stock ?? isPhysical);
                                                 const hasRecurring = (item.precio_anual > 0 || item.precio_mensual > 0 || item.precio_por_dte > 0);
                                                 const hasSetup = (item.pago_unico || 0) > 0;
-                                                return hasRecurring && hasSetup && !isPhysical && !tracksStock && item.modelo_precio !== 'por_unidad';
+                                                return hasRecurring && hasSetup;
                                             });
                                             const costoImpHibridos = hybridItemsSel.reduce(
                                                 (sum, item) => sum + (setupOverrides[item.id] ?? (item.pago_unico || 0)),
@@ -2505,16 +2496,10 @@ export default function CotizadorPro() {
                                                 <span>Total General:</span>
                                                 <span>${totales.total_general.toLocaleString()}</span>
                                             </div>
-                                            {totales.cuotas > 1 ? (
+                                            {totales.cuotas > 1 && (
                                                 <p className="text-xs text-gray-500 text-right">
                                                     ${totales.cuota_mensual.toLocaleString()} / {totales.cuotas} cuotas
                                                 </p>
-                                            ) : (
-                                                formData.forma_pago === 'mensual' && (
-                                                    <p className="text-xs text-gray-500 text-right">
-                                                        ${totales.cuota_mensual.toLocaleString()}/mes
-                                                    </p>
-                                                )
                                             )}
                                         </div>
                                     </div>

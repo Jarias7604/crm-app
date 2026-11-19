@@ -159,10 +159,10 @@ export default function CatalogoProductos() {
             cobra_anual: isRecurring ? hasAnnual : false,
             precio_mensual: item.precio_mensual || 0,
             precio_anual: item.precio_anual || 0,
-            precio_base: isRecurring ? (hasAnnual ? item.precio_anual : item.precio_mensual) : (item.precio_unitario || item.costo_unico || 0),
+            precio_base: isRecurring ? (hasAnnual ? item.precio_anual : item.precio_mensual) : (item.costo_unico || item.precio_unitario || 0),
             tiene_setup: hasSetup,
             setup_fee: hasSetup ? item.costo_unico : 0,
-            unidad_medida: item.unidad || item.metadata?.unidad_medida || '',
+            unidad_medida: (meta.unidad_medida !== undefined ? meta.unidad_medida : item.unidad) || '',
             precio_compra: item.precio_compra ?? meta.precio_compra ?? 0,
             stock_actual: item.stock_actual ?? meta.stock_actual ?? 0,
             stock_minimo: item.stock_minimo ?? meta.stock_minimo ?? 0,
@@ -232,20 +232,26 @@ export default function CatalogoProductos() {
                 : (finalUpdate.precio_mensual > 0 ? finalUpdate.precio_mensual : finalUpdate.precio_anual);
             
             // Si controla stock o es producto físico, asegurar modelo_precio
-            if (uiState.controla_stock || finalUpdate.tipo === 'equipo' || finalUpdate.tipo === 'partes' || finalUpdate.tipo === 'repuestos') {
+            const isPhysical = finalUpdate.tipo === 'equipo' || finalUpdate.tipo === 'partes' || finalUpdate.tipo === 'repuestos';
+            const isPhysicalOrStock = uiState.controla_stock || (isPhysical && uiState.frecuencia_cobro === 'unico');
+            const trimmedUnit = (uiState.unidad_medida || '').trim();
+
+            if (isPhysicalOrStock) {
                 finalUpdate.modelo_precio = 'por_unidad';
-                finalUpdate.unidad = uiState.unidad_medida || 'unidad';
                 finalUpdate.precio_unitario = effectiveUnitPrice;
             } else if (uiState.frecuencia_cobro === 'recurrente') {
                 finalUpdate.modelo_precio = finalUpdate.precio_anual > 0 ? 'suscripcion_anual' : 'suscripcion_mensual';
+                finalUpdate.precio_unitario = 0;
             } else {
                 finalUpdate.modelo_precio = 'precio_fijo';
+                finalUpdate.precio_unitario = effectiveUnitPrice;
             }
+            finalUpdate.unidad = trimmedUnit || (isPhysicalOrStock ? 'unidad' : null);
 
             // Guardar unidad de medida, stock y costos en metadata de forma segura
             finalUpdate.metadata = {
                 ...(finalUpdate.metadata || {}),
-                unidad_medida: uiState.unidad_medida,
+                unidad_medida: trimmedUnit,
                 precio_compra: Number(uiState.precio_compra) || 0,
                 stock_actual: Number(uiState.stock_actual) || 0,
                 stock_minimo: Number(uiState.stock_minimo) || 0,
@@ -675,6 +681,8 @@ export default function CatalogoProductos() {
                                                                         setFormData({ ...formData, tipo: type.slug });
                                                                         if (isPhysical && !uiState.controla_stock) {
                                                                             setUiState(prev => ({ ...prev, controla_stock: true, unidad_medida: prev.unidad_medida || 'unidad' }));
+                                                                        } else if (!isPhysical && uiState.controla_stock && uiState.stock_actual === 0 && uiState.stock_minimo === 0 && uiState.precio_compra === 0) {
+                                                                            setUiState(prev => ({ ...prev, controla_stock: false }));
                                                                         }
                                                                         setIsDropdownOpen(false);
                                                                     }}
@@ -812,7 +820,11 @@ export default function CatalogoProductos() {
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => setUiState({...uiState, frecuencia_cobro: 'recurrente'})}
+                                                        onClick={() => setUiState(prev => ({
+                                                            ...prev,
+                                                            frecuencia_cobro: 'recurrente',
+                                                            cobra_mensual: prev.cobra_mensual || !prev.cobra_anual ? prev.cobra_mensual : true
+                                                        }))}
                                                         className={`p-3 rounded-xl border-2 text-left transition-all ${uiState.frecuencia_cobro === 'recurrente' ? 'border-indigo-500 bg-indigo-50 shadow-[0_4px_15px_-3px_rgba(99,102,241,0.2)]' : 'border-gray-200 bg-white hover:border-gray-300'}`}
                                                     >
                                                         <div className="flex justify-between items-start">

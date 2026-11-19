@@ -723,3 +723,129 @@ test('13. CatalogoProductos solo escribe valores válidos de pricing_items_model
   }
   assert.ok(!assignBlockMatch[0].includes('suscripcion_dual'), 'No debe enviarse suscripcion_dual a pricing_items');
 });
+
+test('14. Caso exacto Patricia ($42/mes, $420/año, $100 setup, IVA 13%) en los 4 planes + descuento manual 10%', () => {
+  const { cotizadorService, calculateQuoteFinancialsV2 } = loaded;
+  const patriciaItem = {
+    id: 'patricia-dual',
+    company_id: 'comp-1',
+    tipo: 'servicio',
+    nombre: 'Contabilidad Servicio',
+    pago_unico: 100,
+    _orig_pago_unico: 100,
+    precio_anual: 420,
+    precio_mensual: 42,
+    precio_mensual_explicito: true,
+    es_solo_mensual: false,
+    precio_por_dte: 0,
+    incluye_en_paquete: false,
+    activo: true,
+    orden: 1,
+    modelo_precio: 'suscripcion_anual',
+    unidad: 'servicio',
+    cantidad_default: 1,
+    metadata: null,
+    created_at: '',
+    updated_at: '',
+  };
+  const saved = {
+    costo_plan_anual: 0,
+    costo_implementacion: 0,
+    incluir_implementacion: true,
+    modulos_adicionales: [{
+      id: patriciaItem.id,
+      nombre: patriciaItem.nombre,
+      pago_unico: 100,
+      costo_anual: 420,
+      costo_mensual: 42,
+      precio_mensual_explicito: true,
+      es_solo_mensual: false,
+    }],
+    iva_porcentaje: 13,
+    descuento_porcentaje: 0,
+  };
+
+  // 1 Solo Pago (0%) -> Setup $113.00, Anual $474.60
+  const r1 = cotizadorService.calcularCotizacion(emptyPkg(), [patriciaItem], 0, {
+    forma_pago: 'anual', meses: 12, cuotas: 1, tipo_ajuste: 'none', tasa_ajuste: 0, descuento_manual: 0, iva_porcentaje: 13, incluir_implementacion: true,
+  });
+  assertClose(r1.total_pagos_unicos, 113.0, 'Patricia 1P Pago Inicial');
+  assertClose(r1.total_recurrente, 474.6, 'Patricia 1P Recurrente');
+  const v1 = calculateQuoteFinancialsV2({ ...saved, cuotas: 1 }, plan1Pago);
+  assertClose(v1.totalImplementacion, 113.0, 'V2 Patricia 1P Inicial');
+  assertClose(v1.totalLicencia, 474.6, 'V2 Patricia 1P Total');
+
+  // 3 Meses (+5%) -> $441 + IVA = $498.33 -> 3 cuotas de $166.11
+  const r3 = cotizadorService.calcularCotizacion(emptyPkg(), [patriciaItem], 0, {
+    forma_pago: 'mensual', meses: 3, cuotas: 3, tipo_ajuste: 'recharge', tasa_ajuste: 5, descuento_manual: 0, iva_porcentaje: 13, incluir_implementacion: true,
+  });
+  assertClose(r3.recargo_mensual_monto, 21.0, 'Patricia 3M Financiamiento 5%');
+  assertClose(r3.total_recurrente, 498.33, 'Patricia 3M Total');
+  assertClose(r3.cuota_mensual, 166.11, 'Patricia 3M Cuota');
+  const v3 = calculateQuoteFinancialsV2({ ...saved, cuotas: 3 }, plan3Meses);
+  assertClose(v3.totalLicencia, 498.33, 'V2 Patricia 3M Total');
+  assertClose(v3.cuotaMensual, 166.11, 'V2 Patricia 3M Cuota');
+
+  // 6 Meses (+10%) -> $462 + IVA = $522.06 -> 6 cuotas de $87.01
+  const r6 = cotizadorService.calcularCotizacion(emptyPkg(), [patriciaItem], 0, {
+    forma_pago: 'mensual', meses: 6, cuotas: 6, tipo_ajuste: 'recharge', tasa_ajuste: 10, descuento_manual: 0, iva_porcentaje: 13, incluir_implementacion: true,
+  });
+  assertClose(r6.recargo_mensual_monto, 42.0, 'Patricia 6M Financiamiento 10%');
+  assertClose(r6.total_recurrente, 522.06, 'Patricia 6M Total');
+  assertClose(r6.cuota_mensual, 87.01, 'Patricia 6M Cuota');
+  const v6 = calculateQuoteFinancialsV2({ ...saved, cuotas: 6 }, plan6Meses);
+  assertClose(v6.totalLicencia, 522.06, 'V2 Patricia 6M Total');
+  assertClose(v6.cuotaMensual, 87.01, 'V2 Patricia 6M Cuota');
+
+  // 12 Meses (plan +20%, ítem dual usa $42/mes * 12 = $504 con $0 recargo extra) -> $569.52 / $47.46
+  const r12 = cotizadorService.calcularCotizacion(emptyPkg(), [patriciaItem], 0, {
+    forma_pago: 'mensual', meses: 12, cuotas: 12, tipo_ajuste: 'recharge', tasa_ajuste: 20, descuento_manual: 0, iva_porcentaje: 13, incluir_implementacion: true,
+  });
+  assertClose(r12.subtotal_recurrente_base, 504.0, 'Patricia 12M Base mensual directo');
+  assertClose(r12.recargo_mensual_monto, 0, 'Patricia 12M Sin doble recargo');
+  assertClose(r12.total_recurrente, 569.52, 'Patricia 12M Total');
+  assertClose(r12.cuota_mensual, 47.46, 'Patricia 12M Cuota');
+  const v12 = calculateQuoteFinancialsV2({ ...saved, cuotas: 12 }, plan12Meses);
+  assertClose(v12.totalLicencia, 569.52, 'V2 Patricia 12M Total');
+  assertClose(v12.cuotaMensual, 47.46, 'V2 Patricia 12M Cuota');
+
+  // Descuento manual 10% en 12 Meses: separa limpio recurrente ($50.40 -> $512.57) vs inicial ($10.00 -> $101.70)
+  const r12Desc = cotizadorService.calcularCotizacion(emptyPkg(), [patriciaItem], 0, {
+    forma_pago: 'mensual', meses: 12, cuotas: 12, tipo_ajuste: 'recharge', tasa_ajuste: 20, descuento_manual: 10, iva_porcentaje: 13, incluir_implementacion: true,
+  });
+  assertClose(r12Desc.total_recurrente, 512.57, 'Patricia 12M Desc 10% Total');
+  assertClose(r12Desc.total_pagos_unicos, 101.7, 'Patricia 12M Desc 10% Inicial');
+
+  const v12Desc = calculateQuoteFinancialsV2({ ...saved, descuento_porcentaje: 10, cuotas: 12 }, plan12Meses);
+  assertClose(v12Desc.descuentoManualMonto, 50.4, 'V2 Descuento manual solo recurrente ($50.40)');
+  assertClose(v12Desc.descuentoImplementacionMonto, 10.0, 'V2 Descuento implementación separado ($10.00)');
+  assertClose(v12Desc.totalLicencia, 512.57, 'V2 Patricia 12M Desc 10% Total');
+  assertClose(v12Desc.cuotaMensual, 42.71, 'V2 Patricia 12M Desc 10% Cuota');
+  assertClose(v12Desc.totalImplementacion, 101.7, 'V2 Patricia 12M Desc 10% Inicial');
+});
+
+test('15. Regresión estática de CatalogoProductos y CotizadorPro (unidad, plan default, guard)', () => {
+  const catalogSrc = fs.readFileSync(path.resolve('src/pages/CatalogoProductos.tsx'), 'utf8');
+  assert.ok(!catalogSrc.includes("'suscripcion_dual'"), 'CatalogoProductos nunca debe escribir suscripcion_dual');
+  const assignBlockMatch = catalogSrc.match(/Si controla stock[\s\S]*?finalUpdate\.metadata\s*=/);
+  assert.ok(assignBlockMatch, 'Debe existir bloque finalUpdate de CatalogoProductos');
+  assert.ok(
+    assignBlockMatch[0].includes('finalUpdate.unidad = trimmedUnit || (isPhysicalOrStock ? \'unidad\' : null);'),
+    'CatalogoProductos debe persistir finalUpdate.unidad también fuera de productos físicos',
+  );
+  assert.ok(
+    assignBlockMatch[0].includes('finalUpdate.precio_unitario = 0;'),
+    'CatalogoProductos debe resetear finalUpdate.precio_unitario en suscripciones sin stock',
+  );
+
+  const wizardSrc = fs.readFileSync(path.resolve('src/pages/CotizadorPro.tsx'), 'utf8');
+  assert.ok(
+    wizardSrc.includes('if (!id) {\r\n                    setSelectedPlanIds([defaultPlan.id]);') ||
+      wizardSrc.includes('if (!id) {\n                    setSelectedPlanIds([defaultPlan.id]);'),
+    'CotizadorPro debe inicializar selectedPlanIds con defaultPlan.id para nuevas cotizaciones',
+  );
+  assert.ok(
+    wizardSrc.includes('if (totales.subtotal_recurrente_base > 0 && financingPlans.length > 0 && !selectedPlanId)'),
+    'CotizadorPro debe validar !selectedPlanId en handleGenerar cuando hay ítems recurrentes',
+  );
+});

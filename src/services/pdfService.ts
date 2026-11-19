@@ -421,13 +421,27 @@ export const pdfService = {
             // 🎯 CARGAR TODOS LOS PLANES para comparativa si no se pasaron
             let allPlans = allPlansForComparison || [];
             if (allPlans.length === 0 && companyId) {
-                const { data: plansData } = await supabase
-                    .from('financing_plans')
-                    .select('titulo, descripcion, cuotas, interes_porcentaje, tipo_ajuste, es_popular, etiqueta_ajuste')
-                    .eq('company_id', companyId)
-                    .eq('activo', true)
-                    .order('meses', { ascending: true });
-                if (plansData && plansData.length > 0) allPlans = plansData;
+                const planesComparativaIds = ((cotizacion as any).planes_comparativa || null) as string[] | null;
+                if (Array.isArray(planesComparativaIds) && planesComparativaIds.length > 0) {
+                    const { data: plansData } = await supabase
+                        .from('financing_plans')
+                        .select('id, titulo, descripcion, cuotas, meses, interes_porcentaje, tipo_ajuste, es_popular, show_breakdown, etiqueta_ajuste')
+                        .in('id', planesComparativaIds)
+                        .eq('activo', true);
+                    if (plansData && plansData.length > 0) {
+                        allPlans = planesComparativaIds
+                            .map((pid) => plansData.find((p: any) => p.id === pid))
+                            .filter(Boolean) as PlanForPDF[];
+                    }
+                } else {
+                    const { data: plansData } = await supabase
+                        .from('financing_plans')
+                        .select('id, titulo, descripcion, cuotas, meses, interes_porcentaje, tipo_ajuste, es_popular, show_breakdown, etiqueta_ajuste')
+                        .eq('company_id', companyId)
+                        .eq('activo', true)
+                        .order('orden', { ascending: true });
+                    if (plansData && plansData.length > 0) allPlans = plansData as PlanForPDF[];
+                }
             }
 
             // 🎯 USAR FUNCIÓN CENTRALIZADA PARA CÁLCULOS CON EL PLAN
@@ -938,7 +952,7 @@ export const pdfService = {
                         doc.setFontSize(iFontSize);
                         doc.setFont('helvetica', 'normal');
                         const qty = Number(serv.cantidad) || 1;
-                        const isHibrido = (Number(serv.costo_anual) || Number(serv.costo) || 0) > 0;
+                        const isHibrido = getModulePlanPricing(serv, 1).amount > 0;
                         const baseName = isHibrido ? `Implementación · ${serv.nombre || ''}` : (serv.nombre || '');
                         const label = qty > 1 
                             ? `${baseName.substring(0, 26)} (${qty} ${formatUnitLabel(serv.unidad, qty, serv.tipo)} × $${Number(serv.precio_unitario || Math.round(Number(serv.pago_unico) / qty)).toLocaleString()})`
