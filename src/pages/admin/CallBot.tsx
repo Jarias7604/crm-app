@@ -690,7 +690,7 @@ export default function CallBot() {
                                 onChange={e => upd('system_prompt', e.target.value)}
                                 rows={18}
                                 className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-violet-400 transition resize-y leading-relaxed"
-                                placeholder="Eres Sofía, ejecutiva de ventas de Arias Defense..."
+                                placeholder="Eres Sofía, ejecutiva de ventas de tu empresa..."
                             />
                         </Field>
 

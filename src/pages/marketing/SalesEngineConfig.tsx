@@ -162,7 +162,7 @@ export default function SalesEngineConfig() {
       ...c,
       wizard_done: true,
       steps: {
-        s1: { enabled: true, delay_days: 0, subject: `${name.split(' ')[0] === 'Estimado/a' ? '{nombre}' : ''} Conozca ${config.product || 'nuestra solución'}`, body: `${name},\n\nNos comunicamos desde Arias Defense Components para presentarle ${config.product || 'nuestra plataforma'}.\n\nResponda este mensaje o visítenos: ${wa}` },
+        s1: { enabled: true, delay_days: 0, subject: `${name.split(' ')[0] === 'Estimado/a' ? '{nombre}' : ''} Conozca ${config.product || 'nuestra solución'}`, body: `${name},\n\nNos comunicamos para presentarle ${config.product || 'nuestra plataforma'}.\n\nResponda este mensaje o visítenos: ${wa}` },
         s2: { enabled: true, delay_days: 3, subject: `¿Recibió nuestra información, {nombre}?`, body: `${name},\n\nHace unos días le enviamos información sobre ${config.product || 'nuestra solución'}. Queremos asegurarnos de que la recibió.\n\nContacte: ${wa}` },
         s3: { enabled: true, delay_days: 7, subject: `Oferta especial para {empresa} — 48h`, body: `${name},\n\nEste es nuestro último mensaje. Por 48 horas tenemos implementación gratuita para su empresa.\n\nReclamar: ${wa}` },
         rescue: { enabled: true, delay_days: 2, subject: `Su cotización vence pronto, {nombre}`, body: `${name},\n\nSu cotización de ${config.product || 'nuestro servicio'} está por vencer. Confirme ahora.\n\n${wa}` },

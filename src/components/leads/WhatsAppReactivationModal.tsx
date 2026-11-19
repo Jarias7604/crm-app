@@ -70,7 +70,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'Pregunta consultiva',
     subtitle: 'Ideal para prospectos que pidieron información y nunca respondieron',
     tag: 'Recomendada · Toque 1',
-    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Hace un tiempo nos solicitó información sobre nuestros servicios; ¿todavía están evaluando opciones en {empresa} o ya lo resolvieron por ahora?',
+    body: 'Hola {nombre}, le saluda {firma}. Hace un tiempo nos solicitó información sobre nuestros servicios; ¿todavía están evaluando opciones en {empresa} o ya lo resolvieron por ahora?',
   },
   {
     id: 'toque2_flyer_video',
@@ -78,7 +78,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'Valor Visual (Flyer/Video)',
     subtitle: 'Ideal para los que no respondieron al Toque 1 · Acompáñalo de un Flyer o Video corto',
     tag: 'Toque 2 · Flyer / Video',
-    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Sé que a veces los mensajes se pasan por la operación del día; le comparto un resumen visual de cómo ayudamos a empresas como {empresa} con Facturación Electrónica y control administrativo. ¿Le gustaría que le envíe una cotización o agendamos 10 minutos?',
+    body: 'Hola {nombre}, le saluda {firma}. Sé que a veces los mensajes se pasan por la operación del día; le comparto un resumen visual de cómo ayudamos a empresas como {empresa} con Facturación Electrónica y control administrativo. ¿Le gustaría que le envíe una cotización o agendamos 10 minutos?',
     forResend: true,
   },
   {
@@ -87,7 +87,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'Seguimiento breve',
     subtitle: 'Recordatorio corto y directo para quienes dejaron en visto el primer mensaje',
     tag: 'Toque 2 · Texto corto',
-    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Le escribo brevemente para dar seguimiento a mi mensaje anterior; ¿pudieron evaluar el sistema en {empresa} o prefiere que le comparta primero los planes y precios por este medio?',
+    body: 'Hola {nombre}, le saluda {firma}. Le escribo brevemente para dar seguimiento a mi mensaje anterior; ¿pudieron evaluar el sistema en {empresa} o prefiere que le comparta primero los planes y precios por este medio?',
     forResend: true,
   },
   {
@@ -96,7 +96,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'Seguimiento propuesta',
     subtitle: 'Para prospectos calificados o en seguimiento que dejaron de contestar',
     tag: 'Seguimiento comercial',
-    body: 'Hola {nombre}, le escribe Jimmy Arias de Arias Defense. Quería consultarle brevemente si tuvo oportunidad de revisar la información que conversamos o si le gustaría que ajustemos una propuesta a su necesidad actual.',
+    body: 'Hola {nombre}, le escribe {firma}. Quería consultarle brevemente si tuvo oportunidad de revisar la información que conversamos o si le gustaría que ajustemos una propuesta a su necesidad actual.',
   },
   {
     id: 'nutricion_valor',
@@ -104,7 +104,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'En Nutrición',
     subtitle: 'Para prospectos que pidieron retomar más adelante (próximo mes o próximo año)',
     tag: 'Nutrición',
-    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Recordando que más adelante retomarán el proyecto en {empresa}, le comparto brevemente esta actualización para que la tengan a mano cuando inicien. Quedo atento a cualquier consulta.',
+    body: 'Hola {nombre}, le saluda {firma}. Recordando que más adelante retomarán el proyecto en {empresa}, le comparto brevemente esta actualización para que la tengan a mano cuando inicien. Quedo atento a cualquier consulta.',
     forResend: true,
   },
   {
@@ -113,7 +113,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'Clientes (Nuevos servicios)',
     subtitle: 'Para ofrecer nuevos módulos, actualizaciones o servicios adicionales a clientes actuales',
     tag: 'Upsell Clientes',
-    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Qué gusto saludarle y gracias por su confianza. Queríamos compartirle una novedad de nuevos módulos y servicios disponibles para {empresa}. ¿Le gustaría que le comente los beneficios para clientes actuales?',
+    body: 'Hola {nombre}, le saluda {firma}. Qué gusto saludarle y gracias por su confianza. Queríamos compartirle una novedad de nuevos módulos y servicios disponibles para {empresa}. ¿Le gustaría que le comente los beneficios para clientes actuales?',
     forResend: true,
   },
   {
@@ -122,7 +122,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'Cierre amable',
     subtitle: 'Aplica psicología inversa para recuperar respuesta antes de pausar el seguimiento',
     tag: 'Toque 3 · Cierre',
-    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Para no saturar su WhatsApp dejamos en pausa su solicitud por ahora; si más adelante retoman el proyecto en {empresa}, por aquí queda mi contacto directo. ¡Muchos éxitos!',
+    body: 'Hola {nombre}, le saluda {firma}. Para no saturar su WhatsApp dejamos en pausa su solicitud por ahora; si más adelante retoman el proyecto en {empresa}, por aquí queda mi contacto directo. ¡Muchos éxitos!',
     forResend: true,
   },
   {
@@ -131,7 +131,7 @@ const DEFAULT_TEMPLATES: ReactivationTemplate[] = [
     shortLabel: 'Beneficio especial',
     subtitle: 'Para retomar negociaciones detenidas con una condición especial',
     tag: 'Promoción',
-    body: 'Hola {nombre}, le saluda Jimmy Arias de Arias Defense. Esta semana habilitamos condiciones especiales para proyectos pendientes y pensé en comentarle por si aún lo tienen en planes. ¿Le gustaría que lo revisemos?',
+    body: 'Hola {nombre}, le saluda {firma}. Esta semana habilitamos condiciones especiales para proyectos pendientes y pensé en comentarle por si aún lo tienen en planes. ¿Le gustaría que lo revisemos?',
   },
 ];
 
@@ -225,6 +225,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [productFilter, setProductFilter] = useState<string>('all');
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
+  const [companyName, setCompanyName] = useState<string>('');
   const [batchLimit, setBatchLimit] = useState<number>(30);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [hideAlreadyInCampaign, setHideAlreadyInCampaign] = useState<boolean>(true);
@@ -278,6 +279,16 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
           setProducts(data as { id: string; name: string }[]);
         }
       });
+    supabase
+      .from('companies')
+      .select('name')
+      .eq('id', companyId)
+      .maybeSingle()
+      .then(({ data: comp }) => {
+        if (!cancelled && comp?.name) {
+          setCompanyName(comp.name);
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -297,20 +308,26 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
         raw
       )
     ) {
-      return 'Jimmy Arias';
+      const email = (currentUser.email || '').toLowerCase();
+      if (email === 'jarias7604@gmail.com' || email === 'jarias@ariasdefense.com') {
+        return 'Jimmy Arias';
+      }
+      return currentUser.email?.split('@')[0] || 'Asesor Comercial';
     }
     return raw;
-  }, [currentUser.full_name]);
+  }, [currentUser.full_name, currentUser.email]);
 
   const sellerSignature = useMemo(() => {
-    if (/de\s+arias\s+defense/i.test(sellerDisplayName)) {
+    const cleanCompany = companyName.trim();
+    if (!cleanCompany) return sellerDisplayName;
+    if (sellerDisplayName.toLowerCase().includes(cleanCompany.toLowerCase())) {
       return sellerDisplayName;
     }
-    return `${sellerDisplayName} de Arias Defense`;
-  }, [sellerDisplayName]);
+    return `${sellerDisplayName} de ${cleanCompany}`;
+  }, [sellerDisplayName, companyName]);
 
   const applySellerToTemplate = (body: string) =>
-    body.replace(/Jimmy Arias de Arias Defense/gi, sellerSignature);
+    body.replace(/\{firma\}|Jimmy Arias de Arias Defense/gi, sellerSignature);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -613,10 +630,10 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       .replace(/\{nombre\}/gi, firstName ? firstName : '')
       .replace(/\{empresa\}/gi, company)
       .replace(/\{vendedor\}/gi, sellerSignature)
+      .replace(/\{firma\}/gi, sellerSignature)
       .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, sellerSignature)
       .replace(/Platform\s*Owner/gi, sellerSignature)
-      .replace(/\b(company_admin|super_admin|collaborator)\b/gi, sellerSignature)
-      .replace(/(de\s+Arias\s+Defense)\s+\1/gi, '$1');
+      .replace(/\b(company_admin|super_admin|collaborator)\b/gi, sellerSignature);
     text = text.replace(/Hola\s+,/gi, 'Hola,').replace(/[ \t]{2,}/g, ' ').trim();
     return text;
   };

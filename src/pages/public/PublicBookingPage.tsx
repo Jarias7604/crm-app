@@ -241,7 +241,7 @@ export default function PublicBookingPage() {
                                         'VERSION:2.0',
                                         'PROID:-//Arias CRM//NONSGML Booking//EN',
                                         'BEGIN:VEVENT',
-                                        `UID:${Date.now()}@ariasdefense.com`,
+                                        `UID:${Date.now()}@crm-booking.local`,
                                         `DTSTAMP:${formatICS(new Date())}`,
                                         `DTSTART:${formatICS(start)}`,
                                         `DTEND:${formatICS(end)}`,

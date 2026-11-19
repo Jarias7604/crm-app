@@ -55,9 +55,9 @@ export const LeadWhatsappThread: React.FC<Props> = ({ leadId, navigate }) => {
                 (cm || [])
                     .map((c) => {
                         const raw = String(c.body || '')
-                            .replace(/👨‍💻\s*Simulaci[oó]n:\s*[a-zA-Z0-9_-]+:/gi, '👨‍💻 Jimmy Arias:')
-                            .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Jimmy Arias de Arias Defense')
-                            .replace(/\bPlatform Owner\b/gi, 'Jimmy Arias de Arias Defense');
+                            .replace(/👨‍💻\s*Simulaci[oó]n:\s*[a-zA-Z0-9_-]+:/gi, '👨‍💻 Asesor:')
+                            .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, 'Asesor Comercial')
+                            .replace(/\bPlatform Owner\b/gi, 'Asesor Comercial');
                         const m = raw.match(/^\[[^\]]+\]\s*(👤|👨‍💻)?\s*([^:\n]+):\s*([\s\S]*)$/);
                         return {
                             id: c.id,

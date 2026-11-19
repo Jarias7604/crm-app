@@ -2927,7 +2927,7 @@ export default function Dashboard() {
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
                                                                 const cleanPhone = (item.phone || '').replace(/[^0-9]/g, '');
-                                                                const message = `Hola ${item.name}, te saludo de Arias Defense. ¿Cómo te encuentras hoy?`;
+                                                                const message = `Hola ${item.name}, te saluda ${profile?.full_name || 'tu asesor'}. ¿Cómo te encuentras hoy?`;
                                                                 window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`, '_blank');
                                                             }}
                                                             className="p-1 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"

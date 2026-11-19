@@ -550,7 +550,7 @@ export default function Facturas() {
                                                 value={empresaCliente}
                                                 onChange={(e) => setEmpresaCliente(e.target.value)}
                                                 className="w-full px-4 py-3 border border-slate-200 rounded-2xl bg-slate-50/50 text-sm focus:outline-none focus:ring-2 focus:ring-[#4449AA]/10 focus:border-[#4449AA] transition-all shadow-sm"
-                                                placeholder="Ej. Arias Defense LLC"
+                                                placeholder="Ej. Mi Empresa S.A."
                                             />
                                         </div>
                                         <div className="space-y-1.5">

@@ -142,7 +142,7 @@ export default function PublicLeadDiscoveryPage() {
           client_company: searchParams.get('company') || '',
           phone: searchParams.get('phone') || '',
           provider_name: searchParams.get('provider') || 'Equipo Comercial',
-          seller_name: searchParams.get('seller') || 'Jimmy Arias',
+          seller_name: searchParams.get('seller') || 'tu asesor comercial',
           booking_slug: searchParams.get('book') || null,
         });
         setClientName(searchParams.get('name') || '');
@@ -227,7 +227,7 @@ export default function PublicLeadDiscoveryPage() {
           <div className="space-y-1.5">
             <h1 className="text-xl font-bold text-slate-900">¡Diagnóstico recibido con éxito!</h1>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Gracias, <b>{clientName}</b>. Tu asesor <b>{ctx?.seller_name || 'Jimmy Arias'}</b> ya recibió tus respuestas en WhatsApp para prepararte la propuesta exacta según tu necesidad.
+              Gracias, <b>{clientName}</b>. Tu asesor <b>{ctx?.seller_name || 'tu asesor comercial'}</b> ya recibió tus respuestas en WhatsApp para prepararte la propuesta exacta según tu necesidad.
             </p>
           </div>
 

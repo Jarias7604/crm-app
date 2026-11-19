@@ -2801,11 +2801,11 @@ export default function PayrollManager() {
       {/* ── 7. COMPROBANTE OFICIAL DE PAGO (FORMATO CORPORATIVO INSTITUCIONAL / ADP / SAP) ── */}
       {selectedPayStub && (() => {
         const cfg = memberConfigs.find(c => c.user_id === selectedPayStub.user_id);
-        const companyLegalName = (companyInfo?.name || 'ARIAS DEFENSE TESTING, S.A. DE C.V.').toUpperCase();
-        const taxId = companyInfo?.tax_id || companyInfo?.rnc || '0614-280391-102-1';
-        const address = companyInfo?.direccion || companyInfo?.address || 'San Salvador, El Salvador, C.A.';
-        const contact = companyInfo?.email || 'rrhh@ariasdefensetesting.com';
-        const phone = companyInfo?.phone || companyInfo?.telefono || '+503 2200-0000';
+        const companyLegalName = (companyInfo?.name || 'MI EMPRESA').toUpperCase();
+        const taxId = companyInfo?.tax_id || companyInfo?.rnc || '';
+        const address = companyInfo?.direccion || companyInfo?.address || '';
+        const contact = companyInfo?.email || '';
+        const phone = companyInfo?.phone || companyInfo?.telefono || '';
         
         const voucherCode = `NOM-${new Date(startDate).getFullYear()}${String(new Date(startDate).getMonth() + 1).padStart(2, '0')}-${selectedPayStub.user_id.slice(0, 4).toUpperCase()}`;
         const totalDevengado = selectedPayStub.gross_pay;

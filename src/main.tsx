@@ -81,12 +81,18 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   handleHardReset = async () => {
     try {
       sessionStorage.clear();
-      // Keep auth token to prevent logging the user out
-      const keysToKeep = ['sb-ikofyypxphrqkncimszt-auth-token', 'supabase.auth.token'];
+      // Keep current auth token to prevent logging the user out
       const savedAuth: Record<string, string> = {};
-      for (const k of keysToKeep) {
-        const val = localStorage.getItem(k);
-        if (val) savedAuth[k] = val;
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (
+          k &&
+          (k === 'supabase.auth.token' ||
+            (k.startsWith('sb-') && k.endsWith('-auth-token') && !k.includes('ikofyypxphrqkncimszt')))
+        ) {
+          const val = localStorage.getItem(k);
+          if (val) savedAuth[k] = val;
+        }
       }
       localStorage.clear();
       for (const [k, v] of Object.entries(savedAuth)) {

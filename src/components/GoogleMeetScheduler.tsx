@@ -342,15 +342,20 @@ export default function GoogleMeetScheduler({
             if (isEditMode) {
                 if (!googleIntegration) throw new Error('No Google Calendar integration connected');
 
+                const normalizedHostEmail = (profile?.email || '').toLowerCase();
+                const fallbackHostName =
+                    normalizedHostEmail === 'jarias7604@gmail.com' || normalizedHostEmail === 'jarias@ariasdefense.com'
+                        ? 'Jimmy Arias'
+                        : (profile?.email?.split('@')[0] || 'Asesor Comercial');
                 const hostName =
                     profile?.full_name && !/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(profile.full_name)
                         ? profile.full_name
-                        : 'Jimmy Arias';
+                        : fallbackHostName;
                 const hostEmail = profile?.email || '';
                 const enrichedDescription = `${description ? description + '\n\n' : ''}---
 Organizador: ${hostName}
 Email: ${hostEmail}
-Reunión modificada desde Arias CRM.`;
+Reunión modificada desde el CRM.`;
 
                 // extract actual google event ID (from format `google-{real_id}-{group}`)
                 let rawId = initialEvent._rawEvent?.id;
@@ -447,16 +452,21 @@ Reunión modificada desde Arias CRM.`;
 
                 // Create Google Calendar event (with or without a linked follow-up)
                 if (googleIntegration && addMeetLink) {
+                    const normalizedHostEmail = (profile?.email || '').toLowerCase();
+                    const fallbackHostName =
+                        normalizedHostEmail === 'jarias7604@gmail.com' || normalizedHostEmail === 'jarias@ariasdefense.com'
+                            ? 'Jimmy Arias'
+                            : (profile?.email?.split('@')[0] || 'Asesor Comercial');
                     const hostName =
-                    profile?.full_name && !/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(profile.full_name)
-                        ? profile.full_name
-                        : 'Jimmy Arias';
+                        profile?.full_name && !/simulaci[oó]n|platform\s*owner|company_admin|super_admin|collaborator/i.test(profile.full_name)
+                            ? profile.full_name
+                            : fallbackHostName;
                     const hostEmail = profile?.email || '';
                     const suffix = count > 1 ? ` (Sesión ${occ.index} de ${count})` : '';
                     const enrichedDescription = `${description ? description + '\n\n' : ''}---
 Organizador: ${hostName}
 Email: ${hostEmail}
-Reunión programada automáticamente desde Arias CRM${suffix}.`;
+Reunión programada automáticamente desde el CRM${suffix}.`;
 
                     const result = await leadsService.createGoogleMeeting({
                         integrationId: googleIntegration.id,

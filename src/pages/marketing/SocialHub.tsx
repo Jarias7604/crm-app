@@ -1176,7 +1176,7 @@ export default function SocialHub() {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: '#050505', display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {selectedAccounts['facebook']?.account_name || 'ARIAS Defense Components'}
+                        {selectedAccounts['facebook']?.account_name || 'Tu Página de Facebook'}
                         <span style={{ color: '#1877F2', fontSize: 12 }}>✓</span>
                       </div>
                       <div style={{ fontSize: 12, color: '#65676b', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>

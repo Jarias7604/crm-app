@@ -618,7 +618,7 @@ serve(async (req: Request) => {
       if (url.searchParams.get('action') === 'bridge_sh') {
         return await handleBridgeSh(supabase, selfUrl, { resolveMainCompanyId, rescopeChats });
       }
-      return json({ ok: true, status: 'active', service: 'evolution-whatsapp-webhook', version: '2026-11-06' });
+      return json({ ok: true, status: 'active', service: 'evolution-whatsapp-webhook', version: '2026-11-18-modular' });
     }
 
     const payload = await req.json().catch(() => ({}));

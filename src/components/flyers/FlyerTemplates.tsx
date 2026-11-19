@@ -1494,7 +1494,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
     const indData = getIndustryData(data.prompt);
 
     // Dynamic scannable QR code API integration
-    const qrUrl = data.website || 'www.ariasdefense.com';
+    const qrUrl = data.website || (data.phone ? `https://wa.me/${data.phone.replace(/\D/g, '')}` : 'https://example.com');
     const formattedQrUrl = qrUrl.startsWith('http://') || qrUrl.startsWith('https://') ? qrUrl : `https://${qrUrl}`;
     const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(formattedQrUrl)}`;
 
@@ -1719,7 +1719,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 2 }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>DEMO EN VIVO</span>
                 <span style={{ fontSize: 15, fontWeight: 900, color: data.contactColor || '#ffffff', letterSpacing: '0.02em' }}>
-                  {data.phone ? `${data.phone} · ` : ''}{data.website || 'ariasdefense.com'}
+                  {[data.phone, data.website].filter(Boolean).join(' · ')}
                 </span>
               </div>
             </div>
@@ -1804,7 +1804,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
     const indData = getIndustryData(data.prompt);
 
     // Dynamic scannable QR code API integration
-    const qrUrl = data.website || 'www.ariasdefense.com';
+    const qrUrl = data.website || (data.phone ? `https://wa.me/${data.phone.replace(/\D/g, '')}` : 'https://example.com');
     const formattedQrUrl = qrUrl.startsWith('http://') || qrUrl.startsWith('https://') ? qrUrl : `https://${qrUrl}`;
     const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(formattedQrUrl)}`;
 
@@ -2039,7 +2039,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 2 }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>DEMO EN VIVO</span>
                 <span style={{ fontSize: 15, fontWeight: 900, color: data.contactColor || '#ffffff', letterSpacing: '0.02em' }}>
-                  {data.phone ? `${data.phone} · ` : ''}{data.website || 'ariasdefense.com'}
+                  {[data.phone, data.website].filter(Boolean).join(' · ')}
                 </span>
               </div>
             </div>
