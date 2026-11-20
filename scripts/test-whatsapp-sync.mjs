@@ -513,3 +513,70 @@ test('9. Multi-filter helpers support combinable Bandejas + Estados without conf
   assert.equal(matchesCircleBucketAndTray(spamItem, [], null), false);
   assert.equal(matchesCircleBucketAndTray(spamItem, [], 'spam'), true);
 });
+
+test('10. extractChatReadUpdates parses CHATS_UPDATE payloads and skips invalid or broadcast entries', () => {
+  const { extractChatReadUpdates } = loaded.messageParsing;
+
+  const updates = extractChatReadUpdates({
+    event: 'chats.update',
+    data: [
+      { remoteJid: '50370001111@s.whatsapp.net', unreadCount: 0 },
+      { id: '120363000111@g.us', unreadMessages: -1 },
+      { remoteJid: 'status@broadcast', unreadCount: 0 },
+      { id: '12345@newsletter', unreadCount: 0 },
+      { remoteJid: '50370002222@s.whatsapp.net', lastMsgTimestamp: 1700000000 }, // no numeric unreadCount
+    ],
+  });
+  assert.deepEqual(updates, [
+    { jid: '50370001111@s.whatsapp.net', altJid: '', unreadCount: 0 },
+    { jid: '120363000111@g.us', altJid: '', unreadCount: -1 },
+  ]);
+
+  // Single-object payload variant with alt JID
+  const single = extractChatReadUpdates({
+    remoteJid: '999888777@lid',
+    remoteJidAlt: '50371112222@s.whatsapp.net',
+    unreadCount: 0,
+  });
+  assert.deepEqual(single, [
+    { jid: '999888777@lid', altJid: '50371112222@s.whatsapp.net', unreadCount: 0 },
+  ]);
+});
+
+test('11. computeCircleTeamActivity shows WhatsApp external reader without hiding named CRM teammates', () => {
+  const { computeCircleTeamActivity, WA_EXTERNAL_READER_KEY } = loaded.waHelpers;
+  const tMsg = '2026-11-20T18:00:00.000Z';
+  const tRead = '2026-11-20T18:01:00.000Z';
+  const agentMap = new Map([['u-patty', 'Patricia López']]);
+
+  // Opened only on WhatsApp phone/Web
+  const waOnly = computeCircleTeamActivity({
+    lastFrom: 'client',
+    lastMessageAt: tMsg,
+    unreadOrWaitingReply: true,
+    isManuallyAttended: false,
+    isCourtesyClosing: false,
+    readByMap: { [WA_EXTERNAL_READER_KEY]: tRead },
+    currentUserId: 'u-jimmy',
+    currentUserName: 'Jimmy Arias',
+    agentMap,
+  });
+  assert.equal(waOnly.teamStatus, 'seen_waiting');
+  assert.equal(waOnly.seenByMe, false);
+  assert.deepEqual(waOnly.seenByOtherNames, ['WhatsApp']);
+
+  // Opened on WhatsApp phone AND by Patricia in CRM -> Patricia listed first
+  const waAndPatty = computeCircleTeamActivity({
+    lastFrom: 'client',
+    lastMessageAt: tMsg,
+    unreadOrWaitingReply: true,
+    isManuallyAttended: false,
+    isCourtesyClosing: false,
+    readByMap: { [WA_EXTERNAL_READER_KEY]: tRead, 'u-patty': tRead },
+    currentUserId: 'u-jimmy',
+    currentUserName: 'Jimmy Arias',
+    agentMap,
+  });
+  assert.equal(waAndPatty.teamStatus, 'seen_waiting');
+  assert.deepEqual(waAndPatty.seenByOtherNames, ['Patricia', 'WhatsApp']);
+});

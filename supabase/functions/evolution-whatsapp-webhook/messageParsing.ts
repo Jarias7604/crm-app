@@ -101,3 +101,32 @@ export function cleanMeta(meta: Record<string, any>): Record<string, any> {
   }
   return m;
 }
+
+export interface ChatReadUpdate {
+  jid: string;
+  altJid: string;
+  unreadCount: number;
+}
+
+export function extractChatReadUpdates(payload: any): ChatReadUpdate[] {
+  const rawData = payload?.data ?? payload;
+  const entries: any[] = Array.isArray(rawData)
+    ? rawData
+    : Array.isArray(rawData?.chats)
+    ? rawData.chats
+    : rawData && typeof rawData === 'object'
+    ? [rawData]
+    : [];
+
+  const out: ChatReadUpdate[] = [];
+  for (const item of entries) {
+    if (!item || typeof item !== 'object') continue;
+    const jid = String(item.remoteJid || item.id || item.jid || '').trim();
+    if (!jid || jid === 'status@broadcast' || jid.endsWith('@newsletter')) continue;
+    const rawUnread = item.unreadCount ?? item.unreadMessages ?? item.unread_count;
+    if (typeof rawUnread !== 'number' || !Number.isFinite(rawUnread)) continue;
+    const altJid = String(item.remoteJidAlt || item.phoneNumber || item.pn || '').trim();
+    out.push({ jid, altJid, unreadCount: rawUnread });
+  }
+  return out;
+}

@@ -546,6 +546,8 @@ export interface CircleTeamActivityResult {
   teamStatus: CircleTeamStatus;
 }
 
+export const WA_EXTERNAL_READER_KEY = '__whatsapp__';
+
 export function computeCircleTeamActivity(input: CircleTeamActivityInput): CircleTeamActivityResult {
   const myShort = extractShortAgentName(input.currentUserName);
   const myReadTs = input.currentUserId ? input.readByMap[input.currentUserId] : undefined;
@@ -562,13 +564,21 @@ export function computeCircleTeamActivity(input: CircleTeamActivityInput): Circl
 
   const seenNamesSet = new Set<string>();
   const seenByOtherNames: string[] = [];
+  let hasExternalWhatsapp = false;
   for (const [uid] of otherEntries) {
+    if (uid === WA_EXTERNAL_READER_KEY) {
+      hasExternalWhatsapp = true;
+      continue;
+    }
     const short = extractShortAgentName(input.agentMap.get(uid)) || 'Equipo';
     const key = short.toLowerCase();
     if (!seenNamesSet.has(key)) {
       seenNamesSet.add(key);
       seenByOtherNames.push(short);
     }
+  }
+  if (hasExternalWhatsapp) {
+    seenByOtherNames.push('WhatsApp');
   }
 
   let repliedByShortName: string | null = null;

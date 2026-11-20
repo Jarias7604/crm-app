@@ -123,7 +123,11 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             </span>
           ) : circle.teamStatus === 'seen_waiting' && circle.seenByOtherNames.length > 0 ? (
             <span
-              title={`Visto por ${circle.seenByOtherNames.join(', ')} · Sin responder aún`}
+              title={
+                circle.seenByOtherNames.length === 1 && circle.seenByOtherNames[0] === 'WhatsApp'
+                  ? 'Visto en WhatsApp (celular/Web) · Sin responder aún'
+                  : `Visto por ${circle.seenByOtherNames.join(', ')} · Sin responder aún`
+              }
               className="px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 text-[10px] font-semibold leading-none shrink-0 inline-flex items-center gap-0.5"
             >
               <Eye className="w-2.5 h-2.5" />

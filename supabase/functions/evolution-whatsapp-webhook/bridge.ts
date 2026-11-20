@@ -23,6 +23,9 @@ import { cleanMeta } from './messageParsing.ts';
 // or reduced to [A-Za-z0-9_-] before reaching the shell.
 // =============================================================================
 
+export const WEBHOOK_EVENTS = ['MESSAGES_UPSERT', 'CHATS_UPDATE'];
+export const WEBHOOK_EVENTS_VERSION = '2026-11-20-chats-update';
+
 export interface BridgeShDeps {
   resolveMainCompanyId: (supabase: any, companyIdParam: string | null) => Promise<string | null>;
   rescopeChats: (supabase: any, companyId: string) => Promise<{ checked: number; changed: any[] }>;
@@ -257,7 +260,7 @@ export async function handleBridgeSh(
             url: selfUrl,
             webhookByEvents: false,
             webhookBase64: true,
-            events: ['MESSAGES_UPSERT'],
+            events: WEBHOOK_EVENTS,
           },
         })
       );
@@ -277,6 +280,40 @@ export async function handleBridgeSh(
         `(B0=$(curl -s "${evo}/instance/fetchInstances" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B1=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); B2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); R1=$(curl -s "${evo}/instance/connect/${inst}" -H "apikey: ${safeKey}"); B3=$(printf '%s' "$R1" | base64 | tr -d '\\n'); sleep 8; B4=$(curl -s "${evo}/instance/connectionState/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"evo_info":"%s","state_before":"%s","webhook":"%s","restart":"%s","state_after":"%s"}' "$B0" "$B1" "$B2" "$B3" "$B4" | curl -s -X POST "${healUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`
       );
     }
+  }
+
+  // 6b. Ensure Evolution instance is subscribed to CHATS_UPDATE (no restart needed).
+  const whSync = await getBridgeState(supabase, 'webhook_events_sync');
+  const lastSyncReq = whSync.requested_at ? new Date(whSync.requested_at).getTime() : 0;
+  if (
+    heal.status !== 'requested' &&
+    heal.status !== 'dispatched' &&
+    whSync.version !== WEBHOOK_EVENTS_VERSION &&
+    now.getTime() - lastSyncReq > 90 * 1000
+  ) {
+    const inst = shellSafe(instance);
+    const syncToken = crypto.randomUUID().replace(/-/g, '');
+    const whBody = b64Utf8(
+      JSON.stringify({
+        webhook: {
+          enabled: true,
+          url: selfUrl,
+          webhookByEvents: false,
+          webhookBase64: true,
+          events: WEBHOOK_EVENTS,
+        },
+      }),
+    );
+    const ackUrl = `${selfUrl}?action=ack_webhook_events&token=${shellSafe(syncToken)}`;
+    lines.push(
+      `(echo "${whBody}" | base64 -d | curl -s -X POST "${evo}/webhook/set/${inst}" -H "Content-Type: application/json" -H "apikey: ${safeKey}" -d @- >/dev/null 2>&1; W2=$(curl -s "${evo}/webhook/find/${inst}" -H "apikey: ${safeKey}" | base64 | tr -d '\\n'); printf '{"webhook":"%s"}' "$W2" | curl -s -X POST "${ackUrl}" -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1) &`,
+    );
+    await setBridgeState(supabase, 'webhook_events_sync', {
+      ...whSync,
+      token: syncToken,
+      target_version: WEBHOOK_EVENTS_VERSION,
+      requested_at: now.toISOString(),
+    });
   }
 
   // 7. Sequential multi-page catchup of missed text + media messages (chronological order).
@@ -382,7 +419,7 @@ export async function handleBridgeAck(supabase: any, url: URL, payload: any): Pr
 }
 
 export async function handleBridgeStatus(supabase: any): Promise<Response> {
-  const [poll, ack, gs, wd, heal, mc, lastWh, { count: pendingMedia }, { count: failedMedia }, { count: pendingOut }, { count: errorOut }] =
+  const [poll, ack, gs, wd, heal, mc, lastWh, whSync, { count: pendingMedia }, { count: failedMedia }, { count: pendingOut }, { count: errorOut }] =
     await Promise.all([
       getBridgeState(supabase, 'bridge_last_poll'),
       getBridgeState(supabase, 'bridge_last_ack'),
@@ -391,6 +428,7 @@ export async function handleBridgeStatus(supabase: any): Promise<Response> {
       getBridgeState(supabase, 'evo_heal'),
       getBridgeState(supabase, 'message_catchup'),
       getBridgeState(supabase, 'last_webhook_in'),
+      getBridgeState(supabase, 'webhook_events_sync'),
       supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).in('media_status', ['pending', 'requested']),
       supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('media_status', 'failed'),
       supabase.from('whatsapp_outbox').select('id', { count: 'exact', head: true }).in('status', ['pending', 'dispatched']),
@@ -407,6 +445,7 @@ export async function handleBridgeStatus(supabase: any): Promise<Response> {
     bridge_last_ack: ack.at || null,
     bridge_last_error: ack.error || null,
     last_webhook_in: lastWh.at || null,
+    webhook_events_version: whSync.version || null,
     evo_connection_state: wd.connection_state || heal.connection_after || null,
     evo_watchdog_checked_at: wd.checked_at || null,
     evo_watchdog_recovered_total: wd.recovered_total || 0,

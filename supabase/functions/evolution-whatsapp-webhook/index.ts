@@ -77,6 +77,7 @@ import {
   guessExt,
   mediaTypeForSend,
   cleanMeta,
+  extractChatReadUpdates,
 } from './messageParsing.ts';
 import {
   handleBridgeSh,
@@ -618,7 +619,7 @@ serve(async (req: Request) => {
       if (url.searchParams.get('action') === 'bridge_sh') {
         return await handleBridgeSh(supabase, selfUrl, { resolveMainCompanyId, rescopeChats });
       }
-      return json({ ok: true, status: 'active', service: 'evolution-whatsapp-webhook', version: '2026-11-18-modular' });
+      return json({ ok: true, status: 'active', service: 'evolution-whatsapp-webhook', version: '2026-11-20-chats-update' });
     }
 
     const payload = await req.json().catch(() => ({}));
@@ -633,6 +634,7 @@ serve(async (req: Request) => {
     if (action === 'report_evo_heal') return await handleReportEvoHeal(supabase, url, payload);
     if (action === 'catchup_messages') return await handleCatchupMessages(supabase, url, payload);
     if (action === 'watchdog_check') return await handleWatchdogCheck(supabase, url, payload);
+    if (action === 'ack_webhook_events') return await handleAckWebhookEvents(supabase, url, payload);
 
     // ── Actions from the CRM UI (require a logged-in user) ──
     const uiActions = [
@@ -716,7 +718,8 @@ serve(async (req: Request) => {
 
 async function handleIncomingMessage(req: Request, supabase: any, url: URL, payload: any): Promise<Response> {
   const eventType = String(payload?.event || payload?.type || 'messages.upsert').toLowerCase();
-  if (!/messages[._]upsert|send[._]message/.test(eventType)) {
+  const isChatsUpdate = /chats[._]update/.test(eventType);
+  if (!isChatsUpdate && !/messages[._]upsert|send[._]message/.test(eventType)) {
     return json({ ok: true, ignored: true, reason: `event ${eventType} not handled` });
   }
 
@@ -729,6 +732,10 @@ async function handleIncomingMessage(req: Request, supabase: any, url: URL, payl
 
   const companyId = await resolveMainCompanyId(supabase, url.searchParams.get('company_id'));
   if (!companyId) return json({ ok: false, error: 'No company_id resolved' }, 400);
+
+  if (isChatsUpdate) {
+    return await handleChatsUpdate(supabase, companyId, payload);
+  }
 
   // Remember Evolution credentials/instance server-side (never in tickets).
   if (incomingKey || instanceName) {
@@ -2099,6 +2106,122 @@ async function handleWatchdogCheck(supabase: any, url: URL, payload: any): Promi
   });
 
   return json({ ok: true, connection_state: connState, recovered, auto_heal: autoHealTriggered });
+}
+
+function capExternalReadBy(rawMap: unknown, maxUsers = 25): Record<string, string> {
+  if (!rawMap || typeof rawMap !== 'object' || Array.isArray(rawMap)) return {};
+  const entries = Object.entries(rawMap as Record<string, unknown>)
+    .map(([k, v]) => [String(k).trim(), String(v || '').trim()] as const)
+    .filter(([k, v]) => Boolean(k) && Boolean(v))
+    .sort((a, b) => Date.parse(b[1] || '') - Date.parse(a[1] || ''));
+  const waEntry = entries.find(([k]) => k === '__whatsapp__');
+  const sliced = entries.slice(0, maxUsers);
+  if (waEntry && !sliced.some(([k]) => k === '__whatsapp__')) {
+    sliced[sliced.length - 1] = waEntry;
+  }
+  return Object.fromEntries(sliced);
+}
+
+async function handleAckWebhookEvents(supabase: any, url: URL, payload: any): Promise<Response> {
+  const whSync = await getBridgeState(supabase, 'webhook_events_sync');
+  const token = shellSafe(url.searchParams.get('token') || '');
+  if (!whSync.token || token !== whSync.token) {
+    return json({ ok: false, error: 'invalid token' }, 401);
+  }
+  const webhookCfg = fromB64Json(payload?.webhook);
+  const hasChatsUpdate = JSON.stringify(webhookCfg || {}).toUpperCase().includes('CHATS_UPDATE');
+  const nowIso = new Date().toISOString();
+  await setBridgeState(supabase, 'webhook_events_sync', {
+    ...whSync,
+    ...(hasChatsUpdate ? { version: whSync.target_version || '2026-11-20-chats-update', synced_at: nowIso } : {}),
+    last_ack_at: nowIso,
+    webhook: webhookCfg,
+  });
+  return json({ ok: true, has_chats_update: hasChatsUpdate });
+}
+
+async function handleChatsUpdate(supabase: any, companyId: string, payload: any): Promise<Response> {
+  const updates = extractChatReadUpdates(payload).slice(0, 30);
+  if (updates.length === 0) {
+    return json({ ok: true, ignored: true, reason: 'no chat read updates' });
+  }
+
+  let updated = 0;
+  for (const upd of updates) {
+    if (upd.unreadCount !== 0 && upd.unreadCount !== -1) continue;
+    const isGroup = upd.jid.endsWith('@g.us');
+    const phone = isGroup ? '' : jidPhone(upd.altJid) || jidPhone(upd.jid);
+    const canonicalJid = isGroup ? upd.jid : phone ? `${phone}@s.whatsapp.net` : upd.jid;
+
+    const { data: primaryRows } = await supabase
+      .from('tickets')
+      .select('id, status, metadata, updated_at, created_at')
+      .eq('company_id', companyId)
+      .eq('metadata->>source', 'whatsapp_evolution')
+      .eq('metadata->>whatsapp_jid', canonicalJid)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    let rows = (primaryRows || []) as any[];
+    if (rows.length === 0 && !isGroup && upd.jid !== canonicalJid) {
+      const { data: legacyRows } = await supabase
+        .from('tickets')
+        .select('id, status, metadata, updated_at, created_at')
+        .eq('company_id', companyId)
+        .eq('metadata->>source', 'whatsapp_evolution')
+        .eq('metadata->>whatsapp_jid', upd.jid)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      rows = (legacyRows || []) as any[];
+    }
+    if (rows.length === 0 && !isGroup && phone.length >= 8) {
+      const { data: phoneRows } = await supabase
+        .from('tickets')
+        .select('id, status, metadata, updated_at, created_at')
+        .eq('company_id', companyId)
+        .eq('metadata->>source', 'whatsapp_evolution')
+        .eq('metadata->>whatsapp_phone', phone)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      rows = (phoneRows || []) as any[];
+    }
+    if (rows.length === 0) continue;
+
+    const ticket = rows.find((t) => ['new', 'open', 'pending'].includes(t.status)) || rows[0];
+    const meta = cleanMeta(ticket.metadata || {});
+    const rawReadBy =
+      meta.wa_read_by && typeof meta.wa_read_by === 'object' && !Array.isArray(meta.wa_read_by)
+        ? { ...meta.wa_read_by }
+        : {};
+
+    if (upd.unreadCount === 0) {
+      const readAt = String(meta.last_whatsapp_at || ticket.updated_at || ticket.created_at || new Date().toISOString());
+      if (rawReadBy.__whatsapp__ === readAt) continue;
+      rawReadBy.__whatsapp__ = readAt;
+      const capped = capExternalReadBy(rawReadBy, 25);
+      const { error: updErr } = await supabase
+        .from('tickets')
+        .update({ metadata: { ...meta, wa_read_by: capped } })
+        .eq('id', ticket.id);
+      if (!updErr) updated++;
+    } else if (upd.unreadCount === -1 && rawReadBy.__whatsapp__) {
+      delete rawReadBy.__whatsapp__;
+      const nextMeta: Record<string, any> = { ...meta };
+      if (Object.keys(rawReadBy).length > 0) {
+        nextMeta.wa_read_by = capExternalReadBy(rawReadBy, 25);
+      } else {
+        delete nextMeta.wa_read_by;
+      }
+      const { error: updErr } = await supabase
+        .from('tickets')
+        .update({ metadata: nextMeta })
+        .eq('id', ticket.id);
+      if (!updErr) updated++;
+    }
+  }
+
+  await setBridgeState(supabase, 'last_webhook_in', { at: new Date().toISOString() });
+  return json({ ok: true, processed: updates.length, updated });
 }
 
 // =============================================================================
