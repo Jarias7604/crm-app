@@ -56,9 +56,18 @@ import {
   Target,
   Video,
   RotateCcw,
+  Activity,
+  Bug,
   Ticket as TicketIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import {
+  SUPPORT_ROOT_CAUSE_META,
+  appendRootCauseMetadataPatch,
+  extractRootCauseEntries,
+  countChatMessagesLast24h,
+  type SupportRootCauseType,
+} from './supportPulse';
 import { LiveDemoHUDModal, parseAriasAnswersFromNotes } from '../../components/leads/LiveDemoHUDModal';
 import { WhatsAppReactivationModal, type ReactivationTouchInfo } from '../../components/leads/WhatsAppReactivationModal';
 import type { Lead } from '../../types';
@@ -439,11 +448,22 @@ export const SupportChatCircles: React.FC = () => {
   const [showMeetSchedulerModal, setShowMeetSchedulerModal] = useState<boolean>(false);
   const [showStagePopover, setShowStagePopover] = useState<boolean>(false);
   const [showResendReactivationModal, setShowResendReactivationModal] = useState<boolean>(false);
+  const [showRootCausePopover, setShowRootCausePopover] = useState<boolean>(false);
+  const [rootCauseType, setRootCauseType] = useState<SupportRootCauseType>('system_bug');
+  const [rootCauseNote, setRootCauseNote] = useState<string>('');
+  const [rootCauseMarkAttended, setRootCauseMarkAttended] = useState<boolean>(true);
+  const [savingRootCause, setSavingRootCause] = useState<boolean>(false);
+  const [dismissedPingPongCircleMap, setDismissedPingPongCircleMap] = useState<Record<string, boolean>>({});
 
-  // Handle return from CotizadorPro with active chat & newly generated quote
+  // Handle return from CotizadorPro or SupportIntelligence with active chat & newly generated quote
   useEffect(() => {
     const st = (location.state || {}) as { waCircleId?: string; newWaQuoteId?: string };
     if (st.waCircleId) {
+      setSpecialTray(null);
+      setStateFilters([]);
+      setSelectedBuckets([]);
+      setOwnerFilter('all');
+      setChannelFilter('all');
       setSelectedCircleId(st.waCircleId);
     }
     if (st.newWaQuoteId) {
@@ -2281,6 +2301,94 @@ export const SupportChatCircles: React.FC = () => {
     }
   };
 
+  const activeChatMsgs24h = useMemo(() => countChatMessagesLast24h(comments), [comments]);
+  const activeRootCauseEntries = useMemo(
+    () => (activeCircle ? extractRootCauseEntries(activeCircle.activeTicket.metadata as Record<string, any>) : []),
+    [activeCircle],
+  );
+  const latestActiveRootCause = activeRootCauseEntries[0] || null;
+
+  useEffect(() => {
+    setShowRootCausePopover(false);
+    setRootCauseNote('');
+  }, [activeCircle?.circleId]);
+
+  const handleSaveRootCauseTag = async () => {
+    if (!activeCircle || !activeCompanyId) return;
+    const t = activeCircle.activeTicket;
+    setSavingRootCause(true);
+    try {
+      const { data: latestRow } = await supabase
+        .from('tickets')
+        .select('metadata')
+        .eq('id', t.id)
+        .maybeSingle();
+
+      const freshMeta = ((latestRow?.metadata || t.metadata || {}) as Record<string, any>);
+      const nowIso = new Date().toISOString();
+      const rawStaff = String(profile?.full_name || 'Equipo Soporte').trim();
+      const cleanStaffName = /simulaci[oó]n|platform\s*owner/i.test(rawStaff) ? 'Jimmy Arias' : rawStaff;
+      const entryId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+      const nextMeta = appendRootCauseMetadataPatch(freshMeta, {
+        id: entryId,
+        at: nowIso,
+        by: profile?.id || null,
+        by_name: cleanStaffName,
+        type: rootCauseType,
+        note: rootCauseNote.trim() || undefined,
+        msg_count_24h: activeChatMsgs24h,
+      });
+
+      const { error: updErr } = await supabase
+        .from('tickets')
+        .update({ metadata: nextMeta, updated_at: nowIso })
+        .eq('id', t.id);
+      if (updErr) throw updErr;
+
+      setTickets((prev) =>
+        prev.map((row) => (row.id === t.id ? { ...row, metadata: nextMeta, updated_at: nowIso } : row)),
+      );
+
+      const rcMeta = SUPPORT_ROOT_CAUSE_META[rootCauseType];
+      const auditBody = `🏷️ Causa Raíz: ${rcMeta.label}${rootCauseNote.trim() ? ` — ${rootCauseNote.trim()}` : ''}`;
+      const { data: noteRow } = await supabase
+        .from('ticket_comments')
+        .insert({
+          ticket_id: t.id,
+          company_id: activeCompanyId,
+          author_id: profile?.id || null,
+          body: auditBody,
+          is_internal: true,
+        })
+        .select('*')
+        .single();
+      if (noteRow) {
+        setComments((prev) => [...prev, noteRow as TicketComment]);
+      }
+
+      if (rootCauseMarkAttended && activeCircle.unreadOrWaitingReply) {
+        await handleMarkCircleAttended(activeCircle);
+      }
+
+      toast.success(
+        rcMeta.escalatesToAdmin
+          ? `${rcMeta.shortLabel} escalado a Jimmy en Control`
+          : `Marcado como ${rcMeta.shortLabel}`,
+      );
+      setShowRootCausePopover(false);
+      setRootCauseNote('');
+      loadSupportData(true);
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudo guardar la causa raíz');
+    } finally {
+      setSavingRootCause(false);
+    }
+  };
+
   const canModifyComment = (b: ChatItem) =>
     (b.kind === 'staff' || b.kind === 'system') &&
     !b.id.startsWith('temp-') &&
@@ -3111,6 +3219,17 @@ export const SupportChatCircles: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {(scopes.all || scopes.soporte) && (
+            <button
+              type="button"
+              onClick={() => navigate('/support/intelligence')}
+              title="Ver Pulso Diario, Chats Ping-Pong y Bugs escalados a Jimmy"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200/80 text-[12.5px] font-semibold transition"
+            >
+              <Activity className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Control</span>
+            </button>
+          )}
           {/* Quick sound toggle */}
           <button
             type="button"
@@ -4017,6 +4136,28 @@ export const SupportChatCircles: React.FC = () => {
                       >
                         <CheckCircle2 className="w-2.5 h-2.5" />
                         <span>Atendido</span>
+                      </button>
+                    )}
+                    {activeCircle.scope === 'soporte' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRootCauseMarkAttended(activeCircle.unreadOrWaitingReply);
+                          setShowRootCausePopover((v) => !v);
+                        }}
+                        title="Clasificar Causa Raíz o escalar Bug de sistema a Jimmy"
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border transition shrink-0 ${
+                          latestActiveRootCause && !latestActiveRootCause.dev_resolved_at
+                            ? SUPPORT_ROOT_CAUSE_META[latestActiveRootCause.type].badgeClass
+                            : 'bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border-slate-200/80'
+                        }`}
+                      >
+                        <Bug className="w-2.5 h-2.5" />
+                        <span>
+                          {latestActiveRootCause && !latestActiveRootCause.dev_resolved_at
+                            ? SUPPORT_ROOT_CAUSE_META[latestActiveRootCause.type].shortLabel
+                            : 'Causa'}
+                        </span>
                       </button>
                     )}
                     <button
@@ -5040,6 +5181,141 @@ export const SupportChatCircles: React.FC = () => {
                   </button>
                 </div>
               )}
+
+            {/* Regla 6+ mensajes: aviso automático para frenar chats de 30-40 mensajes */}
+            {activeCircle.scope === 'soporte' &&
+              activeChatMsgs24h >= 8 &&
+              !dismissedPingPongCircleMap[activeCircle.circleId] && (
+                <div className="bg-amber-50/90 border-t border-amber-200 px-4 py-1.5 flex items-center justify-between gap-2 text-xs shrink-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span className="font-semibold text-amber-950 truncate">
+                      {activeChatMsgs24h} mensajes en 24h (Regla 6+): si no se resuelve rápido, llamada/AnyDesk 5 min o escala Bug a Jimmy.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRootCauseType('system_bug');
+                        setRootCauseMarkAttended(activeCircle.unreadOrWaitingReply);
+                        setShowRootCausePopover(true);
+                      }}
+                      className="px-2 py-0.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] transition"
+                    >
+                      Escalar Bug
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDismissedPingPongCircleMap((prev) => ({
+                          ...prev,
+                          [activeCircle.circleId]: true,
+                        }))
+                      }
+                      title="Ocultar aviso en este chat"
+                      className="p-0.5 rounded text-amber-700/70 hover:text-amber-950"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+            {/* Modal limpio de Causa Raíz (1 clic para escalar Bug/Parche a Jimmy) */}
+            {showRootCausePopover && activeCircle.scope === 'soporte' && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-[1px] p-4"
+                onClick={() => setShowRootCausePopover(false)}
+              >
+                <div
+                  className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 space-y-3"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bug className="w-4 h-4 text-rose-600" />
+                      <h4 className="text-sm font-black text-slate-900">
+                        Clasificar Causa Raíz · {activeCircle.clientName}
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowRootCausePopover(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {(Object.keys(SUPPORT_ROOT_CAUSE_META) as SupportRootCauseType[]).map((key) => {
+                      const rcMeta = SUPPORT_ROOT_CAUSE_META[key];
+                      const selected = rootCauseType === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setRootCauseType(key)}
+                          className={`w-full text-left px-3 py-2 rounded-xl border text-xs transition ${
+                            selected
+                              ? `${rcMeta.activeClass} font-bold shadow-2xs`
+                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800 font-semibold'
+                          }`}
+                        >
+                          <div>{rcMeta.label}</div>
+                          <div
+                            className={`text-[10.5px] font-normal mt-0.5 ${
+                              selected ? 'text-white/90' : 'text-slate-500'
+                            }`}
+                          >
+                            {rcMeta.hint}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <input
+                    type="text"
+                    value={rootCauseNote}
+                    onChange={(e) => setRootCauseNote(e.target.value)}
+                    placeholder="Nota corta (ej: Error al anular CCF, falta stock...)"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                  />
+
+                  {activeCircle.unreadOrWaitingReply && (
+                    <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={rootCauseMarkAttended}
+                        onChange={(e) => setRootCauseMarkAttended(e.target.checked)}
+                        className="rounded border-slate-300 text-indigo-600"
+                      />
+                      <span>También marcar conversación como Atendido</span>
+                    </label>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowRootCausePopover(false)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={savingRootCause}
+                      onClick={handleSaveRootCauseTag}
+                      className="px-4 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50 transition"
+                    >
+                      {savingRootCause ? 'Guardando...' : 'Guardar Causa'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Single-Row Clean Composer (Isolated from parent re-renders for zero typing lag) */}
             <ChatComposer

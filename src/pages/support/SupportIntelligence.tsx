@@ -13,6 +13,10 @@ import {
   AlertTriangle,
   Sparkles,
   MicOff,
+  Activity,
+  Bug,
+  BookOpen,
+  Flame,
   Ticket as TicketIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -27,6 +31,18 @@ import {
 } from '../../services/tickets';
 import { TicketPanel } from './components/TicketPanel';
 import { isSupportTicket } from '../../lib/whatsappScopes';
+import {
+  computeSupportWhatsAppPulse,
+  SUPPORT_ROOT_CAUSE_META,
+  SUPPORT_OPERATING_RULES,
+  SUPPORT_OPERATING_RULES_COPY_TEXT,
+  markRootCauseDevResolvedPatch,
+  type SupportPulseResult,
+  type SupportRootCauseType,
+  type PulseWaMessageInput,
+  type PulseCommentInput,
+  type PulseProfileInput,
+} from './supportPulse';
 
 type WorkBucket = 'text_reply' | 'implementation' | 'troubleshooting' | 'development';
 
@@ -333,6 +349,27 @@ function resolveSupportEngineerName(rawName: string, titleText: string): string 
   return 'Sin asignar';
 }
 
+async function fetchPagedSupportRows<T>(
+  queryFactory: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+  pageSize = 1000,
+  maxPages = 5,
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let page = 0; page < maxPages; page++) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error } = await queryFactory(from, to);
+    if (error) {
+      console.warn('[SupportIntelligence] paged fetch warning:', error.message);
+      break;
+    }
+    const rows = (data || []) as T[];
+    all.push(...rows);
+    if (rows.length < pageSize) break;
+  }
+  return all;
+}
+
 export const SupportIntelligence: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -341,16 +378,22 @@ export const SupportIntelligence: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<UnifiedSupportRecord[]>([]);
   const [rawTicketsList, setRawTicketsList] = useState<Ticket[]>([]);
+  const [rootCauseTicketsList, setRootCauseTicketsList] = useState<Ticket[]>([]);
   const [categoriesList, setCategoriesList] = useState<TicketCategory[]>([]);
   const [agentsList, setAgentsList] = useState<CompanyAgent[]>([]);
   const [leadsList, setLeadsList] = useState<TicketLead[]>([]);
+  const [waMessagesList, setWaMessagesList] = useState<PulseWaMessageInput[]>([]);
+  const [waCommentsList, setWaCommentsList] = useState<PulseCommentInput[]>([]);
+  const [profilesPulseList, setProfilesPulseList] = useState<PulseProfileInput[]>([]);
 
   const [selectedTicketForDrawer, setSelectedTicketForDrawer] = useState<Ticket | null>(null);
+  const [showRulesPanel, setShowRulesPanel] = useState<boolean>(false);
+  const [resolvingEntryKey, setResolvingEntryKey] = useState<string | null>(null);
 
   // Clean Single-Row Filters
   const [activeFilterPill, setActiveFilterPill] = useState<string>('all'); // 'all' | 'P1' | 'P2' | 'P3' | 'FAQ' | 'P4' | 'inflated' | 'repeat' | 'missing_time'
   const [selectedTechFilter, setSelectedTechFilter] = useState<string>('all');
-  const [daysRange, setDaysRange] = useState<number>(60);
+  const [daysRange, setDaysRange] = useState<number>(15);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Accordion state (Corporación Argoz open by default)
@@ -371,10 +414,19 @@ export const SupportIntelligence: React.FC = () => {
       cutoffDate.setDate(cutoffDate.getDate() - daysRange);
       const cutoffIso = cutoffDate.toISOString();
 
-      const [profsRes, leadsRes, catsRes, ticketsRes, projectsRes] = await Promise.all([
+      const [
+        profsRes,
+        leadsRes,
+        catsRes,
+        ticketsRes,
+        taggedTicketsRes,
+        projectsRes,
+        waMsgsRows,
+        commentRows,
+      ] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, full_name, email, role, avatar_url')
+          .select('id, full_name, email, role, avatar_url, phone')
           .eq('company_id', activeCompanyId),
         supabase
           .from('leads')
@@ -391,26 +443,65 @@ export const SupportIntelligence: React.FC = () => {
           .select('*')
           .eq('company_id', activeCompanyId)
           .or('metadata->>wa_scope.is.null,metadata->>wa_scope.eq.soporte')
-          .gte('created_at', cutoffIso)
-          .order('created_at', { ascending: false })
-          .limit(500),
+          .gte('updated_at', cutoffIso)
+          .order('updated_at', { ascending: false })
+          .limit(1000),
+        supabase
+          .from('tickets')
+          .select('*')
+          .eq('company_id', activeCompanyId)
+          .or('metadata->>wa_scope.is.null,metadata->>wa_scope.eq.soporte')
+          .not('metadata->>wa_root_cause_last', 'is', null)
+          .order('updated_at', { ascending: false })
+          .limit(200),
         supabase
           .from('crm_projects')
           .select('id, name')
           .eq('company_id', activeCompanyId),
+        fetchPagedSupportRows<PulseWaMessageInput>((from, to) =>
+          supabase
+            .from('whatsapp_messages')
+            .select('id, ticket_id, comment_id, from_me, sender_phone, sender_name, message_ts, message_type, body')
+            .eq('company_id', activeCompanyId)
+            .gte('message_ts', cutoffIso)
+            .order('message_ts', { ascending: true })
+            .range(from, to),
+        ),
+        fetchPagedSupportRows<PulseCommentInput>((from, to) =>
+          supabase
+            .from('ticket_comments')
+            .select('id, ticket_id, author_id, body, is_internal, created_at')
+            .eq('company_id', activeCompanyId)
+            .eq('is_internal', false)
+            .gte('created_at', cutoffIso)
+            .order('created_at', { ascending: true })
+            .range(from, to),
+        ),
       ]);
 
-      const profs = (profsRes.data || []) as CompanyAgent[];
+      const profs = (profsRes.data || []) as (CompanyAgent & { phone?: string | null })[];
       const leads = (leadsRes.data || []) as TicketLead[];
       const cats = (catsRes.data || []) as TicketCategory[];
       // Lead / unclassified WhatsApp chats are sales conversations, not support work.
       const rawTickets = ((ticketsRes.data || []) as Ticket[]).filter((t) => isSupportTicket(t));
+      const taggedTickets = ((taggedTicketsRes.data || []) as Ticket[]).filter((t) => isSupportTicket(t));
       const projects = projectsRes.data || [];
 
       setAgentsList(profs);
+      setProfilesPulseList(
+        profs.map((p) => ({
+          id: p.id,
+          full_name: p.full_name,
+          email: p.email,
+          phone: p.phone || null,
+        })),
+      );
       setLeadsList(leads);
       setCategoriesList(cats);
       setRawTicketsList(rawTickets);
+      setRootCauseTicketsList(taggedTickets);
+      setWaMessagesList(waMsgsRows);
+      setWaCommentsList(commentRows);
 
       const profileMap = new Map<string, string>();
       profs.forEach((p: any) => profileMap.set(p.id, p.full_name || p.email || ''));
@@ -471,6 +562,7 @@ export const SupportIntelligence: React.FC = () => {
           t.title || '',
           t.description || '',
           catInfo.label,
+          Number(t.estimated_hours) || 0,
           reportedHours
         );
 
@@ -560,6 +652,7 @@ export const SupportIntelligence: React.FC = () => {
           ct.title || '',
           ct.description || '',
           catInfo.label,
+          Number(ct.estimated_hours) || 0,
           reportedHours
         );
 
@@ -861,6 +954,67 @@ export const SupportIntelligence: React.FC = () => {
     };
   }, [filteredRecords]);
 
+  const pulse = useMemo<SupportPulseResult>(() => {
+    const mergedMap = new Map<string, Ticket>();
+    for (const t of rawTicketsList) mergedMap.set(t.id, t);
+    for (const t of rootCauseTicketsList) {
+      if (!mergedMap.has(t.id)) mergedMap.set(t.id, t);
+    }
+    return computeSupportWhatsAppPulse({
+      tickets: Array.from(mergedMap.values()),
+      waMessages: waMessagesList,
+      comments: waCommentsList,
+      profiles: profilesPulseList,
+      options: { daysRange, pingPongThreshold: 12 },
+    });
+  }, [rawTicketsList, rootCauseTicketsList, waMessagesList, waCommentsList, profilesPulseList, daysRange]);
+
+  const handleMarkDevResolved = async (item: SupportPulseResult['rootCauseQueue']['pendingForDev'][number]) => {
+    const key = `${item.ticketId}:${item.entryId}`;
+    setResolvingEntryKey(key);
+    try {
+      const { data: row, error: readErr } = await supabase
+        .from('tickets')
+        .select('metadata')
+        .eq('id', item.ticketId)
+        .maybeSingle();
+      if (readErr) throw readErr;
+
+      const rawUser = String(profile?.full_name || 'Jimmy Arias').trim();
+      const resolverName = /simulaci[oó]n|platform\s*owner/i.test(rawUser) ? 'Jimmy Arias' : rawUser;
+      const nowIso = new Date().toISOString();
+      const nextMeta = markRootCauseDevResolvedPatch(
+        (row?.metadata || {}) as Record<string, any>,
+        item.entryId,
+        resolverName,
+        nowIso,
+      );
+
+      const { error: updErr } = await supabase
+        .from('tickets')
+        .update({ metadata: nextMeta, updated_at: nowIso })
+        .eq('id', item.ticketId);
+      if (updErr) throw updErr;
+
+      if (activeCompanyId) {
+        await supabase.from('ticket_comments').insert({
+          ticket_id: item.ticketId,
+          company_id: activeCompanyId,
+          author_id: profile?.id || null,
+          body: `✅ Causa raíz resuelta definitivamente por ${resolverName}${item.note ? ` (${item.note})` : ''}`,
+          is_internal: true,
+        });
+      }
+
+      toast.success(`Marcado como resuelto de raíz (${item.clientName})`);
+      await loadIntelligenceData();
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudo marcar como resuelto');
+    } finally {
+      setResolvingEntryKey(null);
+    }
+  };
+
   const copyOfficialNoAudioPolicy = () => {
     const message =
       `📢 *Aviso de Soporte Técnico (+503 7971-8911)*\n\n` +
@@ -868,6 +1022,11 @@ export const SupportIntelligence: React.FC = () => {
       `✅ *Incluya:* 1) Empresa · 2) Qué error aparece · 3) Captura de pantalla.`;
     navigator.clipboard.writeText(message);
     toast.success('Mensaje oficial "Solo Texto + Captura" copiado');
+  };
+
+  const copyOperatingRules = () => {
+    navigator.clipboard.writeText(SUPPORT_OPERATING_RULES_COPY_TEXT);
+    toast.success('3 Reglas Operativas copiadas para enviar a Melvin');
   };
 
   return (
@@ -885,6 +1044,20 @@ export const SupportIntelligence: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowRulesPanel((v) => !v)}
+              title="Ver las 3 reglas operativas para cortar chats largos y escalar bugs"
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                showRulesPanel
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Reglas del Equipo
+            </button>
+
             <button
               onClick={copyOfficialNoAudioPolicy}
               title="Copiar mensaje para pedir texto en vez de audios a los clientes"
@@ -915,6 +1088,7 @@ export const SupportIntelligence: React.FC = () => {
               onChange={(e) => setDaysRange(Number(e.target.value))}
               className="px-2.5 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-xl text-slate-700"
             >
+              <option value={7}>7 días</option>
               <option value={15}>15 días</option>
               <option value={30}>30 días</option>
               <option value={60}>60 días</option>
@@ -932,6 +1106,324 @@ export const SupportIntelligence: React.FC = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 pt-5 space-y-5">
+        {/* ── COLLAPSIBLE OPERATING RULES CARD ── */}
+        {showRulesPanel && (
+          <div className="bg-white rounded-2xl border border-indigo-200 p-4 shadow-2xs space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-black text-slate-900">
+                  Proceso Operativo de Soporte (3 Reglas para cortar chats de 40 mensajes)
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Cuando un chat pasa de 8 mensajes en 24h en el CRM, aparece automáticamente el recordatorio de la Regla 1 y el botón + Causa para escalarte el bug.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={copyOperatingRules}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  Copiar reglas para Melvin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowRulesPanel(false)}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {SUPPORT_OPERATING_RULES.map((rule) => (
+                <div
+                  key={rule.id}
+                  className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 space-y-1"
+                >
+                  <p className="text-xs font-black text-indigo-900">{rule.title}</p>
+                  <p className="text-[11px] font-semibold text-slate-500">{rule.trigger}</p>
+                  <p className="text-xs text-slate-700 pt-0.5">{rule.action}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── 0. PULSO DIARIO DE WHATSAPP SOPORTE (Datos Reales de Mensajes) ── */}
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-indigo-600" />
+              <h2 className="text-sm font-black text-slate-900 tracking-tight">
+                Pulso Diario de WhatsApp Soporte (Últimos {daysRange} días)
+              </h2>
+            </div>
+            <span className="text-[11px] font-semibold text-slate-500">
+              {pulse.summary.uniqueClientsInPeriod} clientes/grupos únicos · Tiempo estimado automático por bloques activos de chat
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80">
+              <p className="text-[11px] font-bold text-slate-400 uppercase">Clientes / Día</p>
+              <p className="text-2xl font-black text-slate-900 mt-0.5">
+                {pulse.summary.avgClientsPerDay}
+                <span className="text-xs font-bold text-slate-400"> /día</span>
+              </p>
+              <p className="text-[11px] font-semibold text-emerald-700">
+                Hoy: {pulse.summary.todayClients} clientes activos
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80">
+              <p className="text-[11px] font-bold text-slate-400 uppercase">Mensajes WhatsApp</p>
+              <p className="text-2xl font-black text-slate-900 mt-0.5">
+                {pulse.summary.totalMessages}
+                <span className="text-xs font-bold text-indigo-600">
+                  {' '}
+                  · {pulse.summary.avgMessagesPerClientDay} /cliente
+                </span>
+              </p>
+              <p className="text-[11px] font-semibold text-slate-500">
+                Equipo {pulse.summary.staffMessages} · Clientes {pulse.summary.clientMessages}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80">
+              <p className="text-[11px] font-bold text-slate-400 uppercase">
+                Chats Ping-Pong (≥12/día)
+              </p>
+              <p className="text-2xl font-black text-slate-900 mt-0.5">
+                {pulse.summary.pingPongCount}
+              </p>
+              <p
+                className={`text-[11px] font-semibold ${
+                  pulse.summary.pingPongCount > 0 ? 'text-rose-600' : 'text-emerald-700'
+                }`}
+              >
+                {pulse.summary.pingPongCount > 0
+                  ? 'Chats largos donde se quema tiempo'
+                  : 'Sin chats excesivamente largos'}
+              </p>
+            </div>
+
+            <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80">
+              <p className="text-[11px] font-bold text-slate-400 uppercase">
+                Tiempo en Chat · Bugs Jimmy
+              </p>
+              <p className="text-2xl font-black text-slate-900 mt-0.5">
+                ~{pulse.summary.estTotalStaffHours}h
+              </p>
+              <p
+                className={`text-[11px] font-semibold ${
+                  pulse.summary.pendingDevCount > 0 ? 'text-rose-600' : 'text-emerald-700'
+                }`}
+              >
+                {pulse.summary.pendingDevCount > 0
+                  ? `${pulse.summary.pendingDevCount} bugs/parches por resolver de raíz`
+                  : '0 bugs escalados pendientes'}
+              </p>
+            </div>
+          </div>
+
+          {/* Daily Strip (last 14 days visible for fast scan) */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 overflow-x-auto">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-black uppercase text-slate-400">
+                Actividad diaria (clientes · mensajes · horas en chat)
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Últimos {Math.min(14, pulse.dailySeries.length)} días
+              </span>
+            </div>
+            <div className="grid grid-cols-7 sm:grid-cols-14 gap-1.5 min-w-[640px]">
+              {(() => {
+                const visibleDays = pulse.dailySeries.slice(-14);
+                const maxMsgs = Math.max(1, ...visibleDays.map((d) => d.totalMessages));
+                return visibleDays.map((d) => {
+                  const pct = d.totalMessages > 0 ? Math.max(12, Math.round((d.totalMessages / maxMsgs) * 100)) : 4;
+                  return (
+                    <div
+                      key={d.dayKey}
+                      title={`${d.label}: ${d.activeClients} clientes · ${d.totalMessages} msgs (Equipo ${d.staffMessages} / Cliente ${d.clientMessages}) · ~${d.estStaffHours}h · ${d.pingPongChats} ping-pong`}
+                      className="flex flex-col items-center justify-end rounded-xl bg-slate-50/80 border border-slate-100 p-1.5 text-center"
+                    >
+                      <span className="text-[10px] font-black text-slate-800">{d.totalMessages}</span>
+                      <div className="w-full h-10 flex items-end justify-center my-1">
+                        <div
+                          style={{ height: `${pct}%` }}
+                          className={`w-4 rounded-t-md ${
+                            d.pingPongChats > 0
+                              ? 'bg-rose-500'
+                              : d.totalMessages > 0
+                              ? 'bg-indigo-500'
+                              : 'bg-slate-200'
+                          }`}
+                        />
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-700">{d.activeClients}c</span>
+                      <span className="text-[9.5px] text-slate-400 whitespace-nowrap">{d.label}</span>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+
+          {/* 2-Column Command Section: Ping-Pong Alerts & Jimmy Root-Cause Queue */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Left: Ping-Pong Chats */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col">
+              <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-rose-600" />
+                  <h3 className="text-xs font-black uppercase tracking-wide text-slate-800">
+                    Chats Ping-Pong (≥{pulse.summary.pingPongThreshold} mensajes en un día)
+                  </h3>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-50 text-rose-700 border border-rose-200">
+                  {pulse.pingPongAlerts.length}
+                </span>
+              </div>
+
+              {pulse.pingPongAlerts.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 font-semibold">
+                  Sin chats ping-pong en los últimos {daysRange} días.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto mt-1">
+                  {pulse.pingPongAlerts.slice(0, 12).map((alert) => {
+                    const rcMeta = alert.lastRootCause ? SUPPORT_ROOT_CAUSE_META[alert.lastRootCause.type] : null;
+                    return (
+                      <div key={alert.ticketId} className="py-2.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-black text-slate-900 truncate">
+                              {alert.clientName}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-700">
+                              {alert.peakDayMessages} msgs ({alert.peakDayLabel})
+                            </span>
+                            {rcMeta && (
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${rcMeta.badgeClass}`}
+                              >
+                                {rcMeta.shortLabel}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {alert.primaryTech} · ~{alert.estMinutes} min · Total período: {alert.totalPeriodMessages} msgs (Equipo {alert.staffMsgs} / Cliente {alert.clientMsgs})
+                          </p>
+                        </div>
+                        {alert.circleId && (
+                          <button
+                            type="button"
+                            onClick={() => navigate('/support/chat', { state: { waCircleId: alert.circleId } })}
+                            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] transition"
+                          >
+                            Abrir chat →
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Right: Root-Cause Escalation Queue for Jimmy */}
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col">
+              <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Bug className="w-4 h-4 text-rose-600" />
+                  <h3 className="text-xs font-black uppercase tracking-wide text-slate-800">
+                    Cola de Causa Raíz para Jimmy (Arreglar de raíz)
+                  </h3>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-slate-100 text-slate-700">
+                  {pulse.rootCauseQueue.pendingForDev.length} pendientes
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap py-2.5 border-b border-slate-100">
+                {(['system_bug', 'temp_patch', 'client_training', 'external_mh'] as SupportRootCauseType[]).map(
+                  (rcType) => {
+                    const meta = SUPPORT_ROOT_CAUSE_META[rcType];
+                    return (
+                      <span
+                        key={rcType}
+                        className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${meta.badgeClass}`}
+                      >
+                        {meta.shortLabel}: {pulse.rootCauseQueue.counts[rcType] || 0}
+                      </span>
+                    );
+                  },
+                )}
+              </div>
+
+              {pulse.rootCauseQueue.pendingForDev.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 font-semibold">
+                  No hay bugs ni parches escalados pendientes. Usa el botón &quot;Causa&quot; dentro de cualquier chat para escalar.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 max-h-60 overflow-y-auto mt-1">
+                  {pulse.rootCauseQueue.pendingForDev.map((item) => {
+                    const rcMeta = SUPPORT_ROOT_CAUSE_META[item.type];
+                    const itemKey = `${item.ticketId}:${item.entryId}`;
+                    const isSaving = resolvingEntryKey === itemKey;
+                    return (
+                      <div key={itemKey} className="py-2.5 flex items-start justify-between gap-2.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-black border ${rcMeta.badgeClass}`}
+                            >
+                              {rcMeta.shortLabel}
+                            </span>
+                            <span className="text-xs font-black text-slate-900 truncate">
+                              {item.clientName}
+                            </span>
+                            <span className="text-[10.5px] text-slate-400">
+                              · {new Date(item.at).toLocaleDateString('es-SV', { day: '2-digit', month: 'short' })} por {item.byName.split(' ')[0]}
+                            </span>
+                          </div>
+                          {item.note && (
+                            <p className="text-xs font-medium text-slate-700 mt-0.5 line-clamp-2">
+                              {item.note}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {item.circleId && (
+                            <button
+                              type="button"
+                              onClick={() => navigate('/support/chat', { state: { waCircleId: item.circleId } })}
+                              className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition"
+                            >
+                              Abrir chat
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={isSaving}
+                            onClick={() => handleMarkDevResolved(item)}
+                            className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] disabled:opacity-50 transition"
+                          >
+                            {isSaving ? '...' : '✓ Resuelto de raíz'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
         {/* ── 1. ULTRA-CLEAN 4-KPI STRIP (Linear/Stripe Style) ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80 flex items-center justify-between">
@@ -1122,6 +1614,26 @@ export const SupportIntelligence: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* WhatsApp Chat Real Activity Strip */}
+                {(() => {
+                  const chatStats = pulse.techChatMetrics[tech.techName];
+                  return (
+                    <div className="mt-2.5 px-3 py-2 rounded-xl bg-indigo-50/60 border border-indigo-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                      <span className="font-bold text-indigo-900">
+                        💬 WhatsApp ({daysRange}d):{' '}
+                        <strong>{chatStats ? chatStats.staffMessages : 0}</strong> msgs ·{' '}
+                        <strong>{chatStats ? chatStats.uniqueClientsHelped : 0}</strong> clientes
+                      </span>
+                      <span className="font-bold text-slate-700">
+                        ~{chatStats ? chatStats.estChatHours : 0}h en chat ·{' '}
+                        <span className={chatStats && chatStats.pingPongChatsCount > 0 ? 'text-rose-600' : 'text-emerald-700'}>
+                          {chatStats ? chatStats.pingPongChatsCount : 0} ping-pong
+                        </span>
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 {/* Row 3: Compact Footer (Quality 1st time + AI Time Audit) */}
                 <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
