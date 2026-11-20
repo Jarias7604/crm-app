@@ -22,7 +22,7 @@ const LOCAL_QR_V2_PREFIX = 'crm_wa_quick_replies_v2_';
 const LOCAL_QR_V1_PREFIX = 'crm_wa_quick_replies_';
 const pendingTicketSyncs = new Map<string, Promise<boolean>>();
 
-function compareTimestamps(a: string, b: string): number {
+export function compareIsoTimestamps(a: string, b: string): number {
   const msA = Date.parse(a);
   const msB = Date.parse(b);
   if (Number.isFinite(msA) && Number.isFinite(msB)) {
@@ -30,6 +30,8 @@ function compareTimestamps(a: string, b: string): number {
   }
   return a === b ? 0 : a > b ? 1 : -1;
 }
+
+const compareTimestamps = compareIsoTimestamps;
 
 export function maxIsoTimestamp(a?: string | null, b?: string | null): string {
   const ca = String(a || '').trim();
@@ -137,8 +139,12 @@ export function buildReadStateMetadataPatch(
   if (mode === 'attended') {
     const prevAttended = typeof nextMeta.wa_attended_at === 'string' ? nextMeta.wa_attended_at : '';
     nextMeta.wa_attended_at = maxIsoTimestamp(prevAttended, cleanTs);
+    if (cleanUserId) {
+      nextMeta.wa_attended_by = cleanUserId;
+    }
   } else if (mode === 'unread') {
     delete nextMeta.wa_attended_at;
+    delete nextMeta.wa_attended_by;
   }
 
   const cappedReadBy = capStringTimestampMap(waReadBy, maxUsers);

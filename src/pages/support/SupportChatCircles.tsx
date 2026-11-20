@@ -111,7 +111,9 @@ import type {
   OutboxRow,
   ChatItem,
   WaGroupRow,
-  CircleFilter,
+  CircleBucket,
+  SpecialTray,
+  CircleStateFilter,
 } from './whatsapp/types';
 import {
   TZ,
@@ -141,6 +143,11 @@ import {
   SCOPE_STYLE,
   parseChatLine,
   getCachedTicketDescStats,
+  computeCircleTeamActivity,
+  toggleBucketSelection,
+  toggleStateFilterSelection,
+  matchesCircleBucketAndTray,
+  matchesCircleStateFilters,
 } from './whatsapp/helpers';
 import { ActiveSessionTimer, CircleListRow } from './whatsapp/CircleListRow';
 import { ChatComposer, type ChatComposerHandle } from './whatsapp/ChatComposer';
@@ -357,17 +364,19 @@ export const SupportChatCircles: React.FC = () => {
   };
 
   const [searchQuery, setSearchQuery] = useState('');
-  const defaultFilter: CircleFilter =
+  const defaultBuckets: CircleBucket[] =
     searchParams.get('filter') === 'reactivados'
-      ? 'reactivados'
+      ? ['reactivados']
       : scopes.all
-      ? 'all'
+      ? []
       : scopes.soporte && !scopes.leads
-      ? 'soporte'
+      ? ['soporte']
       : scopes.leads && !scopes.soporte
-      ? 'por_clasificar'
-      : 'all';
-  const [circleFilter, setCircleFilter] = useState<CircleFilter>(defaultFilter);
+      ? ['por_clasificar']
+      : [];
+  const [selectedBuckets, setSelectedBuckets] = useState<CircleBucket[]>(defaultBuckets);
+  const [stateFilters, setStateFilters] = useState<CircleStateFilter[]>([]);
+  const [specialTray, setSpecialTray] = useState<SpecialTray | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<OwnerSubFilter>('all');
   const [channelFilter, setChannelFilter] = useState<'all' | SupportChannelType>('all');
   const [leadSubFilter, setLeadSubFilter] = useState<LeadStageSubFilter>('activos');
@@ -906,7 +915,10 @@ export const SupportChatCircles: React.FC = () => {
       lastMessageText = lastMessageText
         .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, staffDisplayName)
         .replace(/Platform\s*Owner/gi, staffDisplayName);
-      const lastFrom: string = meta.last_message_from || (parsed ? (parsed.icon === '👨‍💻' ? 'staff' : 'client') : 'client');
+      const lastFromNormalized: 'client' | 'staff' =
+        (meta.last_message_from || (parsed ? (parsed.icon === '👨‍💻' ? 'staff' : 'client') : 'client')) === 'staff'
+          ? 'staff'
+          : 'client';
       const isOpen = ['new', 'open', 'pending'].includes(activeTicket.status);
       const lastMessageAt = String(meta.last_whatsapp_at || latest.updated_at || latest.created_at);
 
@@ -934,7 +946,7 @@ export const SupportChatCircles: React.FC = () => {
       const metaLeadStatus = String(meta.wa_lead_status || activeMeta.wa_lead_status || '').trim() || null;
       const isNonWaError =
         !hasClientLine &&
-        lastFrom !== 'client' &&
+        lastFromNormalized !== 'client' &&
         (metaLeadStatus === 'Erróneo' ||
           Boolean(meta.wa_delivery_error || activeMeta.wa_delivery_error) ||
           nonWaTicketIds.has(activeTicket.id) ||
@@ -942,12 +954,23 @@ export const SupportChatCircles: React.FC = () => {
 
       const resolvedLeadStatus = isNonWaError ? 'Erróneo' : lead?.status || metaLeadStatus;
       const isDiscardedLead = resolvedLeadStatus === 'Perdido' || resolvedLeadStatus === 'Erróneo';
-      const syncedReadAt = profile?.id
-        ? maxIsoTimestamp(
-            (meta.wa_read_by as Record<string, string> | undefined)?.[profile.id],
-            (activeMeta.wa_read_by as Record<string, string> | undefined)?.[profile.id],
-          ) || null
-        : null;
+      const mergedReadByMap: Record<string, string> = {};
+      for (const srcMap of [meta.wa_read_by, activeMeta.wa_read_by]) {
+        if (srcMap && typeof srcMap === 'object' && !Array.isArray(srcMap)) {
+          for (const [uid, ts] of Object.entries(srcMap as Record<string, unknown>)) {
+            const cleanUid = String(uid || '').trim();
+            const cleanTs = String(ts || '').trim();
+            if (cleanUid && cleanTs) {
+              mergedReadByMap[cleanUid] = maxIsoTimestamp(mergedReadByMap[cleanUid], cleanTs);
+            }
+          }
+        }
+      }
+      if (profile?.id && readCirclesMap[key]) {
+        mergedReadByMap[profile.id] = maxIsoTimestamp(mergedReadByMap[profile.id], readCirclesMap[key]);
+      }
+
+      const syncedReadAt = profile?.id ? mergedReadByMap[profile.id] || null : null;
       const syncedForcedUnreadAt = profile?.id
         ? String(
             (activeMeta.wa_forced_unread_by as Record<string, string> | undefined)?.[profile.id] ||
@@ -960,14 +983,13 @@ export const SupportChatCircles: React.FC = () => {
         (syncedForcedUnreadAt === lastMessageAt && readCirclesMap[key] !== lastMessageAt);
 
       const unreadOrWaitingReply =
-        isForcedUnread ||
-        (lastFrom === 'client' &&
-          scope !== 'interno' &&
-          scope !== 'spam' &&
-          !isDiscardedLead &&
-          !isManuallyAttended &&
-          !isCourtesyClosing &&
-          (scope !== 'soporte' || isOpen || activeMeta.is_technical_ticket === false));
+        lastFromNormalized === 'client' &&
+        scope !== 'interno' &&
+        scope !== 'spam' &&
+        !isDiscardedLead &&
+        !isManuallyAttended &&
+        !isCourtesyClosing &&
+        (scope !== 'soporte' || isOpen || activeMeta.is_technical_ticket === false);
 
       const catObj = activeTicket.category_id ? catMap.get(activeTicket.category_id) : undefined;
       const catInfo = detectShortCategory(catObj?.name || '', activeTicket.title || '');
@@ -990,7 +1012,7 @@ export const SupportChatCircles: React.FC = () => {
         : 0;
       const reactivationReplied =
         isReactivation &&
-        (lastFrom === 'client' || hasClientLine || Boolean(meta.wa_reactivation_replied || activeMeta.wa_reactivation_replied));
+        (lastFromNormalized === 'client' || hasClientLine || Boolean(meta.wa_reactivation_replied || activeMeta.wa_reactivation_replied));
       const hasActiveConversation =
         !isDiscardedLead &&
         (Boolean(
@@ -1000,6 +1022,24 @@ export const SupportChatCircles: React.FC = () => {
             )
         ) ||
           (hasClientLine && staffLineCount >= 2));
+
+      const teamActivity = computeCircleTeamActivity({
+        lastFrom: lastFromNormalized,
+        lastMessageAt,
+        unreadOrWaitingReply,
+        isManuallyAttended,
+        isCourtesyClosing,
+        readByMap: mergedReadByMap,
+        currentUserId: profile?.id,
+        currentUserName: profile?.full_name,
+        agentMap,
+        lastStaffReplyBy: String(meta.last_staff_reply_by || activeMeta.last_staff_reply_by || ''),
+        lastMessageSender,
+        clientName,
+        attendedByUserId: String(activeMeta.wa_attended_by || meta.wa_attended_by || ''),
+        isReactivation,
+        reactivationReplied,
+      });
 
       // Strict per-role scope & alert isolation (enforced both here and in DB RLS):
       // - Técnicos only see 'soporte' (never sales leads or unclassified pool).
@@ -1046,10 +1086,18 @@ export const SupportChatCircles: React.FC = () => {
         leadOwnerName: leadOwnerId ? agentMap.get(leadOwnerId) || null : null,
         activeTicket,
         allClientTickets: sorted,
+        lastFrom: lastFromNormalized,
         unreadOrWaitingReply,
         waitMinutes,
         syncedReadAt,
         syncedForcedUnreadAt,
+        seenByOtherNames: teamActivity.seenByOtherNames,
+        seenByMe: teamActivity.seenByMe,
+        isManuallyAttended,
+        attendedByShortName: teamActivity.attendedByShortName,
+        repliedByShortName: teamActivity.repliedByShortName,
+        isForcedUnread,
+        teamStatus: teamActivity.teamStatus,
         lastMessageText,
         lastMessageSender,
         lastMessageAt,
@@ -1235,6 +1283,22 @@ export const SupportChatCircles: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [circles, readCirclesMap, forcedUnreadMap, profile?.id]);
 
+  const contextCounts = useMemo(() => {
+    const base = circles.filter((c) => matchesCircleBucketAndTray(c, selectedBuckets, specialTray));
+    const waitingList = base.filter((c) => c.unreadOrWaitingReply);
+    return {
+      total: base.length,
+      unopened: base.filter((c) => c.teamStatus === 'unopened').length,
+      unread: base.filter((c) => isUnread(c)).length,
+      waiting: waitingList.length,
+      replied: base.filter((c) => c.teamStatus === 'replied' || c.teamStatus === 'attended').length,
+      mine: base.filter((c) => isMine(c)).length,
+      unassigned: base.filter((c) => isUnassigned(c)).length,
+      urgent: waitingList.filter((c) => c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60).length,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [circles, selectedBuckets, specialTray, readCirclesMap, forcedUnreadMap, profile?.id]);
+
   // Real-time sound + desktop notification + bell shake when new incoming message arrives
   useEffect(() => {
     const waCircles = circles.filter((c) => c.isWhatsApp && c.scope !== 'spam');
@@ -1334,38 +1398,35 @@ export const SupportChatCircles: React.FC = () => {
     };
   }, [counts.waiting, counts.por_clasificar]);
 
-  const filterTabs = useMemo(() => {
-    const tabs: { id: CircleFilter; label: string; icon: React.ElementType; alert?: boolean }[] = [
-      { id: 'all', label: `Todos (${counts.all})`, icon: MessageSquare },
-      { id: 'unread', label: `No leídos (${counts.unread})`, icon: MessageSquare, alert: counts.unread > 0 },
-      { id: 'waiting', label: `Sin contestar (${counts.waiting})`, icon: Clock, alert: counts.waiting > 0 },
-    ];
-    if (scopes.soporte) tabs.push({ id: 'soporte', label: `Soporte (${counts.soporte})`, icon: Building2 });
+  const singleBucket: CircleBucket | null =
+    specialTray === null && selectedBuckets.length === 1 ? selectedBuckets[0] : null;
+
+  const bucketTabs = useMemo(() => {
+    const tabs: { id: CircleBucket; label: string; alert?: boolean }[] = [];
+    if (scopes.soporte) {
+      tabs.push({ id: 'soporte', label: `Soporte (${counts.soporte})` });
+    }
     if (scopes.leads) {
       if (scopes.leadsPool) {
-        tabs.push({ id: 'por_clasificar', label: `Por tomar (${counts.por_clasificar})`, icon: HelpCircle, alert: counts.por_clasificar > 0 });
+        tabs.push({ id: 'por_clasificar', label: `Por tomar (${counts.por_clasificar})`, alert: counts.por_clasificar > 0 });
       }
-      tabs.push({ id: 'lead', label: `${scopes.all ? 'Leads' : 'Mis leads'} (${counts.lead})`, icon: UserPlus });
-      if (counts.reactivatedTotal > 0 || circleFilter === 'reactivados') {
+      tabs.push({ id: 'lead', label: `${scopes.all ? 'Leads' : 'Mis leads'} (${counts.lead})` });
+      if (counts.reactivatedTotal > 0 || selectedBuckets.includes('reactivados')) {
         tabs.push({
           id: 'reactivados',
           label: `Reactivados (${counts.reactivatedReplied}/${counts.reactivatedTotal})`,
-          icon: Sparkles,
           alert: counts.reactivatedReplied > 0,
         });
       }
     }
-    if (circleFilter === 'interno') tabs.push({ id: 'interno', label: `Equipo (${counts.interno})`, icon: ShieldCheck });
-    if (circleFilter === 'spam') tabs.push({ id: 'spam', label: `Spam (${counts.spam})`, icon: Ban });
-    if (circleFilter === 'tickets') tabs.push({ id: 'tickets', label: `Tickets (${counts.tickets})`, icon: FileText });
     return tabs;
-  }, [counts, scopes, circleFilter]);
+  }, [counts, scopes, selectedBuckets]);
 
   const leadSubCounts = useMemo(() => {
     const base = circles.filter((c) => {
       if (!c.isWhatsApp) return false;
-      if (circleFilter === 'reactivados') return c.isReactivation;
-      if (circleFilter === 'lead') return c.scope === 'lead';
+      if (singleBucket === 'reactivados') return c.isReactivation;
+      if (singleBucket === 'lead') return c.scope === 'lead';
       return false;
     });
     let activos = 0;
@@ -1381,7 +1442,7 @@ export const SupportChatCircles: React.FC = () => {
       if (isPerdido) perdidos++;
       else if (isErroneo) erroneos++;
       else {
-        if (circleFilter === 'reactivados') {
+        if (singleBucket === 'reactivados') {
           if (c.reactivationReplied) {
             activos++;
           } else {
@@ -1400,7 +1461,7 @@ export const SupportChatCircles: React.FC = () => {
     }
     const minHoursUntil48h = sinResponder > 0 && readyForResend48h === 0 ? Math.max(1, 48 - maxHoursUnder48) : 0;
     return { activos, sinResponder, readyForResend48h, minHoursUntil48h, conversando, perdidos, erroneos, todos: base.length };
-  }, [circles, circleFilter]);
+  }, [circles, singleBucket]);
 
   const { resendLeadsPool, resendTouchInfoMap } = useMemo(() => {
     const pool: Lead[] = [];
@@ -1449,30 +1510,22 @@ export const SupportChatCircles: React.FC = () => {
   const filteredCircles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const res = circles.filter((c) => {
-      if (circleFilter === 'tickets') {
-        if (c.isWhatsApp) return false;
-      } else if (!c.isWhatsApp) {
-        return false;
-      }
-      if (circleFilter === 'all' && c.scope === 'spam') return false;
-      if (circleFilter === 'unread' && (c.scope === 'spam' || !isUnread(c))) return false;
-      if (circleFilter === 'waiting' && (c.scope === 'spam' || !c.unreadOrWaitingReply)) return false;
-      if (circleFilter === 'reactivados' && !c.isReactivation) return false;
-      if (!['all', 'unread', 'waiting', 'reactivados', 'tickets'].includes(circleFilter) && c.scope !== circleFilter) return false;
+      if (!matchesCircleBucketAndTray(c, selectedBuckets, specialTray)) return false;
+      if (!matchesCircleStateFilters(c, stateFilters, isUnread(c))) return false;
 
       if (ownerFilter === 'mine' && !isMine(c)) return false;
       if (ownerFilter === 'unassigned' && !isUnassigned(c)) return false;
       if (ownerFilter === 'urgent' && !(c.unreadOrWaitingReply && c.waitMinutes >= 15 && c.waitMinutes <= 24 * 60)) return false;
 
-      if (circleFilter === 'soporte' && channelFilter !== 'all' && c.supportChannel !== channelFilter) return false;
+      if (channelFilter !== 'all' && c.scope === 'soporte' && c.supportChannel !== channelFilter) return false;
 
-      // Apply Lead / Reactivados sub-filter when not actively searching
-      if (!q && (circleFilter === 'reactivados' || circleFilter === 'lead')) {
+      // Apply Lead / Reactivados sub-filter when viewing that single bucket and not actively searching
+      if (!q && (singleBucket === 'reactivados' || singleBucket === 'lead')) {
         const isPerdido = c.leadStatus === 'Perdido';
         const isErroneo = c.leadStatus === 'Erróneo';
         if (leadSubFilter === 'activos') {
           if (isPerdido || isErroneo) return false;
-          if (circleFilter === 'reactivados' && !c.reactivationReplied) return false;
+          if (singleBucket === 'reactivados' && !c.reactivationReplied) return false;
         } else if (leadSubFilter === 'sin_responder') {
           if (isPerdido || isErroneo || c.reactivationReplied) return false;
         } else if (leadSubFilter === 'conversando') {
@@ -1499,27 +1552,33 @@ export const SupportChatCircles: React.FC = () => {
       return true;
     });
 
-    if (circleFilter === 'reactivados' || circleFilter === 'lead') {
+    if (singleBucket === 'reactivados' || singleBucket === 'lead') {
       return [...res].sort((a, b) => {
-        if (circleFilter === 'reactivados' && leadSubFilter === 'sin_responder') {
+        if (singleBucket === 'reactivados' && leadSubFilter === 'sin_responder') {
           return b.hoursSinceReactivation - a.hoursSinceReactivation;
         }
-        if (circleFilter === 'reactivados' && a.reactivationReplied !== b.reactivationReplied) {
+        if (singleBucket === 'reactivados' && a.reactivationReplied !== b.reactivationReplied) {
           return a.reactivationReplied ? -1 : 1;
+        }
+        if (stateFilters.includes('waiting') || stateFilters.includes('unopened') || ownerFilter === 'urgent') {
+          if (b.waitMinutes !== a.waitMinutes) return b.waitMinutes - a.waitMinutes;
         }
         return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
       });
     }
-    if (circleFilter === 'waiting' || ownerFilter === 'urgent') {
-      return [...res].sort((a, b) => b.waitMinutes - a.waitMinutes);
+    if (stateFilters.includes('waiting') || stateFilters.includes('unopened') || ownerFilter === 'urgent') {
+      return [...res].sort((a, b) => {
+        if (b.waitMinutes !== a.waitMinutes) return b.waitMinutes - a.waitMinutes;
+        return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime();
+      });
     }
     return res;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [circles, circleFilter, ownerFilter, channelFilter, leadSubFilter, searchQuery, readCirclesMap, forcedUnreadMap, profile?.id]);
+  }, [circles, selectedBuckets, stateFilters, specialTray, singleBucket, ownerFilter, channelFilter, leadSubFilter, searchQuery, readCirclesMap, forcedUnreadMap, profile?.id]);
 
   useEffect(() => {
     setVisibleCircleLimit(80);
-  }, [circleFilter, ownerFilter, channelFilter, leadSubFilter, searchQuery]);
+  }, [selectedBuckets, stateFilters, specialTray, ownerFilter, channelFilter, leadSubFilter, searchQuery]);
 
   const visibleCircles = useMemo(() => {
     if (filteredCircles.length <= visibleCircleLimit) return filteredCircles;
@@ -3212,7 +3271,9 @@ export const SupportChatCircles: React.FC = () => {
                                     setSearchQuery('');
                                     setOwnerFilter('all');
                                     setChannelFilter('all');
-                                    setCircleFilter('por_clasificar');
+                                    setSpecialTray(null);
+                                    setStateFilters([]);
+                                    setSelectedBuckets(['por_clasificar']);
                                     setSelectedCircleId(c.circleId);
                                     setShowAlertsPopover(false);
                                   }}
@@ -3261,7 +3322,9 @@ export const SupportChatCircles: React.FC = () => {
                                         setSearchQuery('');
                                         setOwnerFilter('all');
                                         setChannelFilter('all');
-                                        setCircleFilter('all');
+                                        setSpecialTray(null);
+                                        setStateFilters([]);
+                                        setSelectedBuckets([]);
                                         setSelectedCircleId(c.circleId);
                                         setShowAlertsPopover(false);
                                       }}
@@ -3317,7 +3380,9 @@ export const SupportChatCircles: React.FC = () => {
                                       setSearchQuery('');
                                       setOwnerFilter('all');
                                       setChannelFilter('all');
-                                      setCircleFilter('all');
+                                      setSpecialTray(null);
+                                      setStateFilters([]);
+                                      setSelectedBuckets([]);
                                       setSelectedCircleId(c.circleId);
                                       setShowAlertsPopover(false);
                                     }}
@@ -3357,7 +3422,9 @@ export const SupportChatCircles: React.FC = () => {
               type="button"
               onClick={() => {
                 setAdminPreviewMode(null);
-                setCircleFilter('all');
+                setSpecialTray(null);
+                setStateFilters([]);
+                setSelectedBuckets([]);
                 toast.success('Volviste a la vista completa de Administrador');
               }}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition"
@@ -3386,7 +3453,7 @@ export const SupportChatCircles: React.FC = () => {
               </button>
               <button
                 onClick={() => {
-                  if (circleFilter === 'reactivados' || pendingResolvedCircles.length > 0) {
+                  if (selectedBuckets.includes('reactivados') || pendingResolvedCircles.length > 0) {
                     setActivePromptTab('ya_resolvimos');
                   }
                   setShowAiPromptModal(true);
@@ -3454,19 +3521,33 @@ export const SupportChatCircles: React.FC = () => {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setShowFilterMenu((v) => !v)}
-                className={`px-2.5 py-1.5 rounded-xl border text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
-                  ownerFilter !== 'all' || channelFilter !== 'all' || ['interno', 'spam', 'tickets'].includes(circleFilter)
-                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
-                }`}
-              >
-                <Filter className="w-3.5 h-3.5 text-slate-500" />
-                <span>Filtros</span>
-                <ChevronDown className="w-3 h-3 text-slate-400" />
-              </button>
+              {(() => {
+                const extraFilterCount =
+                  (ownerFilter !== 'all' ? 1 : 0) +
+                  (channelFilter !== 'all' ? 1 : 0) +
+                  (stateFilters.includes('replied') ? 1 : 0) +
+                  (specialTray !== null ? 1 : 0);
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setShowFilterMenu((v) => !v)}
+                    className={`px-2.5 py-1.5 rounded-xl border text-[12.5px] font-semibold inline-flex items-center gap-1.5 shrink-0 transition ${
+                      extraFilterCount > 0
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
+                    }`}
+                  >
+                    <Filter className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Filtros</span>
+                    {extraFilterCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[10px] font-bold leading-tight">
+                        {extraFilterCount}
+                      </span>
+                    )}
+                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                  </button>
+                );
+              })()}
 
               <button
                 onClick={() => loadSupportData(false, true)}
@@ -3479,65 +3560,81 @@ export const SupportChatCircles: React.FC = () => {
 
             {/* Clean Filter Dropdown Menu */}
             {showFilterMenu && (
-              <div className="absolute right-4 top-11 w-60 bg-white border border-slate-200 rounded-2xl shadow-xl p-1.5 z-30 space-y-1 text-xs">
+              <div className="absolute right-4 top-11 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-1.5 z-30 space-y-1 text-xs">
                 <div className="px-2.5 py-1 text-[11px] font-semibold text-slate-400 flex items-center justify-between">
-                  <span>Filtrar conversaciones</span>
+                  <span>Refinar conversaciones</span>
                   <button type="button" onClick={() => setShowFilterMenu(false)} className="text-slate-400 hover:text-slate-600">
                     <X className="w-3 h-3" />
                   </button>
                 </div>
-                {(
-                  [
-                    { id: 'all', label: 'Todas las conversaciones', count: counts.all },
-                    { id: 'mine', label: 'Asignadas a mí', count: counts.mine },
-                    { id: 'unassigned', label: 'Sin asignar', count: counts.unassigned },
-                    { id: 'urgent', label: 'Espera > 15 min', count: counts.slaCritical, urgent: true },
-                  ] as { id: OwnerSubFilter; label: string; count: number; urgent?: boolean }[]
-                ).map((sf) => {
-                  const active = ownerFilter === sf.id && !['interno', 'spam', 'tickets'].includes(circleFilter);
-                  return (
-                    <button
-                      key={sf.id}
-                      type="button"
-                      onClick={() => {
-                        if (['interno', 'spam', 'tickets'].includes(circleFilter)) setCircleFilter('all');
-                        setOwnerFilter(sf.id);
-                        setShowFilterMenu(false);
-                      }}
-                      className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition ${
-                        active
-                          ? 'bg-indigo-50 text-indigo-700 font-semibold'
-                          : sf.urgent && sf.count > 0
-                          ? 'text-rose-600 hover:bg-rose-50/60 font-medium'
-                          : 'text-slate-700 hover:bg-slate-50 font-medium'
-                      }`}
-                    >
-                      <span>{sf.label}</span>
-                      <span className="text-slate-400">{sf.count}</span>
-                    </button>
-                  );
-                })}
+
+                {/* Estado adicional combinable */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
+                    setStateFilters((prev) => toggleStateFilterSelection(prev, 'replied'));
+                    setShowFilterMenu(false);
+                  }}
+                  className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition ${
+                    stateFilters.includes('replied')
+                      ? 'bg-emerald-50 text-emerald-700 font-semibold'
+                      : 'text-slate-700 hover:bg-slate-50 font-medium'
+                  }`}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    Ya respondidos / atendidos
+                  </span>
+                  <span className="text-slate-400">{contextCounts.replied}</span>
+                </button>
+
+                <div className="pt-1 mt-1 border-t border-slate-100 space-y-0.5">
+                  <div className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Responsable / SLA</div>
+                  {(
+                    [
+                      { id: 'all', label: 'Todos los agentes', count: contextCounts.total },
+                      { id: 'mine', label: 'Asignados a mí', count: contextCounts.mine },
+                      { id: 'unassigned', label: 'Sin asignar', count: contextCounts.unassigned },
+                      { id: 'urgent', label: 'Espera > 15 min', count: contextCounts.urgent, urgent: true },
+                    ] as { id: OwnerSubFilter; label: string; count: number; urgent?: boolean }[]
+                  ).map((sf) => {
+                    const active = ownerFilter === sf.id && specialTray === null;
+                    return (
+                      <button
+                        key={sf.id}
+                        type="button"
+                        onClick={() => {
+                          if (specialTray !== null) setSpecialTray(null);
+                          setOwnerFilter(sf.id);
+                          setShowFilterMenu(false);
+                        }}
+                        className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition ${
+                          active
+                            ? 'bg-indigo-50 text-indigo-700 font-semibold'
+                            : sf.urgent && sf.count > 0
+                            ? 'text-rose-600 hover:bg-rose-50/60 font-medium'
+                            : 'text-slate-700 hover:bg-slate-50 font-medium'
+                        }`}
+                      >
+                        <span>{sf.label}</span>
+                        <span className="text-slate-400">{sf.count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
 
                 {scopes.all && (
                   <div className="pt-1.5 mt-1 border-t border-slate-100 space-y-0.5">
                     <div className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Otras bandejas</div>
                     {(
                       [
-                        ...(counts.reactivatedTotal > 0
-                          ? [
-                              {
-                                id: 'reactivados' as CircleFilter,
-                                label: `Reactivados WhatsApp (${counts.reactivatedReplied}/${counts.reactivatedTotal})`,
-                                count: counts.reactivatedTotal,
-                              },
-                            ]
-                          : []),
-                        { id: 'interno' as CircleFilter, label: 'Equipo interno', count: counts.interno },
-                        { id: 'spam' as CircleFilter, label: 'Spam / bloqueados', count: counts.spam },
-                        ...(counts.tickets > 0 ? [{ id: 'tickets' as CircleFilter, label: 'Otros tickets (no WhatsApp)', count: counts.tickets }] : []),
+                        { id: 'interno' as SpecialTray, label: 'Equipo interno', count: counts.interno },
+                        { id: 'spam' as SpecialTray, label: 'Spam / bloqueados', count: counts.spam },
+                        ...(counts.tickets > 0 ? [{ id: 'tickets' as SpecialTray, label: 'Otros tickets (no WhatsApp)', count: counts.tickets }] : []),
                       ]
                     ).map((sec) => {
-                      const active = circleFilter === sec.id;
+                      const active = specialTray === sec.id;
                       return (
                         <button
                           key={sec.id}
@@ -3546,7 +3643,8 @@ export const SupportChatCircles: React.FC = () => {
                             setSearchQuery('');
                             setOwnerFilter('all');
                             setChannelFilter('all');
-                            setCircleFilter(sec.id);
+                            setSelectedBuckets([]);
+                            setSpecialTray(active ? null : sec.id);
                             setShowFilterMenu(false);
                           }}
                           className={`w-full px-2.5 py-1.5 rounded-xl flex items-center justify-between transition ${
@@ -3561,7 +3659,7 @@ export const SupportChatCircles: React.FC = () => {
                   </div>
                 )}
 
-                {circleFilter === 'soporte' && (
+                {scopes.soporte && (selectedBuckets.length === 0 || selectedBuckets.includes('soporte')) && (
                   <div className="pt-1.5 mt-1 border-t border-slate-100 px-2 pb-1 space-y-1">
                     <span className="text-[11px] font-semibold text-slate-400">Área de soporte</span>
                     <select
@@ -3582,42 +3680,135 @@ export const SupportChatCircles: React.FC = () => {
               </div>
             )}
 
-            {/* Single clean row of primary scope tabs (compact height, resets stuck search/subfilters on switch) */}
+            {/* Row 1: Bandejas (multi-selección combinable) */}
             <div className="flex items-center gap-1 flex-wrap">
-              {filterTabs.map((tab) => {
-                const active = circleFilter === tab.id;
-                const isUnreadTab = tab.id === 'unread';
+              <button
+                type="button"
+                onClick={() => {
+                  setSpecialTray(null);
+                  setSelectedBuckets([]);
+                  setLeadSubFilter('activos');
+                }}
+                className={`px-2 py-1 rounded-lg text-[12px] whitespace-nowrap transition ${
+                  specialTray === null && selectedBuckets.length === 0
+                    ? 'bg-indigo-50 text-indigo-700 font-bold'
+                    : 'text-slate-600 hover:bg-slate-50 font-medium'
+                }`}
+              >
+                Todos ({counts.all})
+              </button>
+              {bucketTabs.map((tab) => {
+                const active = specialTray === null && selectedBuckets.includes(tab.id);
                 return (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => {
-                      setSearchQuery('');
-                      setOwnerFilter('all');
-                      setChannelFilter('all');
+                      setSpecialTray(null);
                       setLeadSubFilter('activos');
-                      setCircleFilter(isUnreadTab && active ? 'all' : tab.id);
+                      setSelectedBuckets((prev) => toggleBucketSelection(prev, tab.id));
                     }}
-                    className={`px-2 py-1 rounded-lg text-[12.5px] whitespace-nowrap transition inline-flex items-center gap-1 ${
+                    className={`px-2 py-1 rounded-lg text-[12px] whitespace-nowrap transition inline-flex items-center gap-1 ${
                       active
-                        ? isUnreadTab
-                          ? 'bg-indigo-600 text-white font-bold shadow-2xs'
-                          : 'bg-indigo-50 text-indigo-700 font-bold'
-                        : isUnreadTab && counts.unread > 0
-                        ? 'bg-indigo-50/70 text-indigo-700 border border-indigo-200/80 hover:bg-indigo-100/70 font-semibold'
+                        ? 'bg-indigo-50 text-indigo-700 font-bold ring-1 ring-indigo-200/80'
                         : 'text-slate-600 hover:bg-slate-50 font-medium'
                     }`}
                   >
-                    {tab.alert && !active && <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />}
+                    {tab.alert && !active && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />}
                     <span>{tab.label}</span>
                   </button>
                 );
               })}
+              {specialTray !== null && (
+                <button
+                  type="button"
+                  onClick={() => setSpecialTray(null)}
+                  className="px-2 py-1 rounded-lg text-[12px] whitespace-nowrap bg-indigo-50 text-indigo-700 font-bold inline-flex items-center gap-1"
+                >
+                  <span>
+                    {specialTray === 'interno'
+                      ? `Equipo (${counts.interno})`
+                      : specialTray === 'spam'
+                      ? `Spam (${counts.spam})`
+                      : `Tickets (${counts.tickets})`}
+                  </span>
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
 
-            {(circleFilter === 'reactivados' || circleFilter === 'lead') && (
+            {/* Row 2: Estados de atención combinables (contadores del contexto actual) */}
+            <div className="flex items-center gap-1 flex-wrap">
+              {(
+                [
+                  { id: 'unopened' as CircleStateFilter, label: `Sin abrir (${contextCounts.unopened})`, count: contextCounts.unopened, primary: true },
+                  { id: 'unread' as CircleStateFilter, label: `No leídos (${contextCounts.unread})`, count: contextCounts.unread },
+                  { id: 'waiting' as CircleStateFilter, label: `Sin contestar (${contextCounts.waiting})`, count: contextCounts.waiting },
+                ]
+              ).map((st) => {
+                const active = stateFilters.includes(st.id);
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    onClick={() => {
+                      if (leadSubFilter === 'sin_responder') setLeadSubFilter('activos');
+                      setStateFilters((prev) => toggleStateFilterSelection(prev, st.id));
+                    }}
+                    className={`px-2 py-0.5 rounded-lg text-[11.5px] whitespace-nowrap transition inline-flex items-center gap-1 ${
+                      active
+                        ? st.primary
+                          ? 'bg-indigo-600 text-white font-semibold shadow-2xs'
+                          : 'bg-slate-800 text-white font-semibold shadow-2xs'
+                        : st.primary && st.count > 0
+                        ? 'bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100/70 font-medium'
+                        : 'text-slate-500 hover:bg-slate-100/80 font-medium'
+                    }`}
+                  >
+                    {st.primary && st.count > 0 && !active && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />
+                    )}
+                    <span>{st.label}</span>
+                  </button>
+                );
+              })}
+
+              {stateFilters.includes('replied') && (
+                <button
+                  type="button"
+                  onClick={() => setStateFilters((prev) => prev.filter((f) => f !== 'replied'))}
+                  className="px-2 py-0.5 rounded-lg text-[11.5px] whitespace-nowrap bg-emerald-600 text-white font-semibold inline-flex items-center gap-1"
+                >
+                  <span>Respondidos ({contextCounts.replied})</span>
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+
+              {(selectedBuckets.length > 0 ||
+                stateFilters.length > 0 ||
+                ownerFilter !== 'all' ||
+                channelFilter !== 'all' ||
+                specialTray !== null) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedBuckets([]);
+                    setStateFilters([]);
+                    setSpecialTray(null);
+                    setOwnerFilter('all');
+                    setChannelFilter('all');
+                    setLeadSubFilter('activos');
+                  }}
+                  className="ml-auto px-1.5 py-0.5 text-[11.5px] font-medium text-slate-400 hover:text-indigo-600 transition whitespace-nowrap"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+
+            {(singleBucket === 'reactivados' || singleBucket === 'lead') && (
               <div className="pt-1 border-t border-slate-100 space-y-1.5">
-                {circleFilter === 'reactivados' && counts.reactivatedTotal > 0 && (
+                {singleBucket === 'reactivados' && counts.reactivatedTotal > 0 && (
                   <div className="px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2 text-[11.5px] text-slate-600">
                     <div className="min-w-0 truncate">
                       <span>
@@ -3656,13 +3847,13 @@ export const SupportChatCircles: React.FC = () => {
                     [
                       {
                         id: 'activos' as LeadStageSubFilter,
-                        label: circleFilter === 'reactivados' ? `Interesados (${leadSubCounts.activos})` : `Activos (${leadSubCounts.activos})`,
+                        label: singleBucket === 'reactivados' ? `Interesados (${leadSubCounts.activos})` : `Activos (${leadSubCounts.activos})`,
                         show: true,
                       },
                       {
                         id: 'sin_responder' as LeadStageSubFilter,
                         label: `Sin responder (${leadSubCounts.sinResponder})`,
-                        show: circleFilter === 'reactivados',
+                        show: singleBucket === 'reactivados',
                       },
                       { id: 'conversando' as LeadStageSubFilter, label: `Seguimiento / Demo (${leadSubCounts.conversando})`, show: true },
                       { id: 'perdidos' as LeadStageSubFilter, label: `Perdidos (${leadSubCounts.perdidos})`, show: true },
@@ -3698,16 +3889,24 @@ export const SupportChatCircles: React.FC = () => {
               <div className="p-8 text-center text-[13px] text-slate-400 font-medium">Cargando chats…</div>
             ) : filteredCircles.length === 0 ? (
               <div className="p-8 text-center space-y-2.5">
-                <p className="text-[13px] text-slate-400 font-medium">No hay conversaciones en esta vista.</p>
-                {(searchQuery || ownerFilter !== 'all' || channelFilter !== 'all' || leadSubFilter !== 'todos' || circleFilter === 'unread') && (
+                <p className="text-[13px] text-slate-400 font-medium">No hay conversaciones con estos filtros.</p>
+                {(searchQuery ||
+                  selectedBuckets.length > 0 ||
+                  stateFilters.length > 0 ||
+                  specialTray !== null ||
+                  ownerFilter !== 'all' ||
+                  channelFilter !== 'all' ||
+                  (singleBucket !== null && leadSubFilter !== 'todos')) && (
                   <button
                     type="button"
                     onClick={() => {
                       setSearchQuery('');
+                      setSelectedBuckets([]);
+                      setStateFilters([]);
+                      setSpecialTray(null);
                       setOwnerFilter('all');
                       setChannelFilter('all');
                       setLeadSubFilter('todos');
-                      if (circleFilter === 'unread') setCircleFilter('all');
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition"
                   >
@@ -5298,7 +5497,11 @@ export const SupportChatCircles: React.FC = () => {
         adminPreviewMode={adminPreviewMode}
         onChangeAdminPreviewMode={(mode, nextFilter) => {
           setAdminPreviewMode(mode);
-          setCircleFilter(nextFilter);
+          setSpecialTray(null);
+          setStateFilters([]);
+          setSelectedBuckets(
+            nextFilter === 'soporte' || nextFilter === 'por_clasificar' ? [nextFilter] : [],
+          );
         }}
         loadingTeamAccess={loadingTeamAccess}
         teamAccessList={teamAccessList}

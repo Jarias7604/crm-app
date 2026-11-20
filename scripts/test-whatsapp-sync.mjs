@@ -13,6 +13,7 @@ const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'crm-wa-sync-tests-'));
 
 async function loadModules() {
   const syncOut = path.join(tmpDir, 'whatsappSync.mjs');
+  const helpersOut = path.join(tmpDir, 'waHelpers.mjs');
   const classOut = path.join(tmpDir, 'classification.mjs');
   const aiOut = path.join(tmpDir, 'aiHelpers.mjs');
   const msgOut = path.join(tmpDir, 'messageParsing.mjs');
@@ -29,6 +30,31 @@ async function loadModules() {
         setup(build) {
           build.onResolve({ filter: /^\.\/supabase$/ }, () => ({ path: 'mock-supabase', namespace: 'mock' }));
           build.onLoad({ filter: /.*/, namespace: 'mock' }, () => ({
+            contents: 'export const supabase = {};',
+            loader: 'js',
+          }));
+        },
+      },
+    ],
+  });
+
+  await esbuild.build({
+    entryPoints: [path.resolve('src/pages/support/whatsapp/helpers.ts')],
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    outfile: helpersOut,
+    plugins: [
+      {
+        name: 'mock-wa-helpers-deps',
+        setup(build) {
+          build.onResolve({ filter: /^lucide-react$/ }, () => ({ path: 'mock-lucide', namespace: 'mock' }));
+          build.onResolve({ filter: /(?:^|[\\/])supabase(?:\.ts)?$/ }, () => ({ path: 'mock-supa2', namespace: 'mock' }));
+          build.onLoad({ filter: /mock-lucide/, namespace: 'mock' }, () => ({
+            contents: 'export const Building2 = {}; export const HelpCircle = {}; export const UserPlus = {}; export const ShieldCheck = {}; export const Ban = {};',
+            loader: 'js',
+          }));
+          build.onLoad({ filter: /mock-supa2/, namespace: 'mock' }, () => ({
             contents: 'export const supabase = {};',
             loader: 'js',
           }));
@@ -61,14 +87,15 @@ async function loadModules() {
     }),
   ]);
 
-  const [waSync, classification, aiHelpers, messageParsing] = await Promise.all([
+  const [waSync, waHelpers, classification, aiHelpers, messageParsing] = await Promise.all([
     import(pathToFileURL(syncOut).href),
+    import(pathToFileURL(helpersOut).href),
     import(pathToFileURL(classOut).href),
     import(pathToFileURL(aiOut).href),
     import(pathToFileURL(msgOut).href),
   ]);
 
-  return { waSync, classification, aiHelpers, messageParsing };
+  return { waSync, waHelpers, classification, aiHelpers, messageParsing };
 }
 
 let loaded;
@@ -291,4 +318,198 @@ test('6. Extracted webhook Deno helpers preserve classification, AI closed-lead,
   assert.equal(sanitized.evolution_apikey, undefined);
   assert.equal(sanitized.pending_audio_jobs, undefined);
   assert.deepEqual(sanitized.wa_read_by, { u1: '2026-11-18T12:00:00.000Z' });
+});
+
+test('7. buildReadStateMetadataPatch tracks wa_attended_by on attended and clears it on unread', () => {
+  const { buildReadStateMetadataPatch } = loaded.waSync;
+  const afterAttended = buildReadStateMetadataPatch(
+    { source: 'whatsapp_evolution' },
+    'user-melvin',
+    'attended',
+    '2026-11-20T14:00:00.000Z',
+  );
+  assert.equal(afterAttended.wa_attended_at, '2026-11-20T14:00:00.000Z');
+  assert.equal(afterAttended.wa_attended_by, 'user-melvin');
+
+  const afterUnread = buildReadStateMetadataPatch(
+    afterAttended,
+    'user-melvin',
+    'unread',
+    '2026-11-20T14:00:00.000Z',
+  );
+  assert.equal(afterUnread.wa_attended_at, undefined);
+  assert.equal(afterUnread.wa_attended_by, undefined);
+});
+
+test('8. computeCircleTeamActivity distinguishes unopened, seen by teammate, replied by team, attended, and idle', () => {
+  const { computeCircleTeamActivity } = loaded.waHelpers;
+  const tMsg = '2026-11-20T15:00:00.000Z';
+  const tOldRead = '2026-11-20T14:00:00.000Z';
+  const tNewRead = '2026-11-20T15:02:00.000Z';
+  const agentMap = new Map([
+    ['u-jimmy', 'Jimmy Arias'],
+    ['u-patty', 'Patricia López'],
+    ['u-melvin', 'Melvin Sorto'],
+  ]);
+
+  // 1) Unopened: Patricia opened an older message, nobody opened tMsg
+  const unopened = computeCircleTeamActivity({
+    lastFrom: 'client',
+    lastMessageAt: tMsg,
+    unreadOrWaitingReply: true,
+    isManuallyAttended: false,
+    isCourtesyClosing: false,
+    readByMap: { 'u-patty': tOldRead },
+    currentUserId: 'u-jimmy',
+    currentUserName: 'Jimmy Arias',
+    agentMap,
+  });
+  assert.equal(unopened.teamStatus, 'unopened');
+  assert.equal(unopened.seenByMe, false);
+  assert.deepEqual(unopened.seenByOtherNames, []);
+
+  // 2) Seen waiting by teammate: Patricia opened tMsg, Jimmy did not
+  const seenByPatty = computeCircleTeamActivity({
+    lastFrom: 'client',
+    lastMessageAt: tMsg,
+    unreadOrWaitingReply: true,
+    isManuallyAttended: false,
+    isCourtesyClosing: false,
+    readByMap: { 'u-patty': tNewRead },
+    currentUserId: 'u-jimmy',
+    currentUserName: 'Jimmy Arias',
+    agentMap,
+  });
+  assert.equal(seenByPatty.teamStatus, 'seen_waiting');
+  assert.equal(seenByPatty.seenByMe, false);
+  assert.deepEqual(seenByPatty.seenByOtherNames, ['Patricia']);
+
+  // 3) Seen waiting by current user only
+  const seenByMeOnly = computeCircleTeamActivity({
+    lastFrom: 'client',
+    lastMessageAt: tMsg,
+    unreadOrWaitingReply: true,
+    isManuallyAttended: false,
+    isCourtesyClosing: false,
+    readByMap: { 'u-jimmy': tNewRead },
+    currentUserId: 'u-jimmy',
+    currentUserName: 'Jimmy Arias',
+    agentMap,
+  });
+  assert.equal(seenByMeOnly.teamStatus, 'seen_waiting');
+  assert.equal(seenByMeOnly.seenByMe, true);
+  assert.deepEqual(seenByMeOnly.seenByOtherNames, []);
+
+  // 4) Replied by teammate & replied by current user
+  const repliedByPatty = computeCircleTeamActivity({
+    lastFrom: 'staff',
+    lastMessageAt: tMsg,
+    unreadOrWaitingReply: false,
+    isManuallyAttended: false,
+    isCourtesyClosing: false,
+    readByMap: {},
+    currentUserId: 'u-jimmy',
+    currentUserName: 'Jimmy Arias',
+    agentMap,
+    lastStaffReplyBy: 'Patricia López',
+  });
+  assert.equal(repliedByPatty.teamStatus, 'replied');
+  assert.equal(repliedByPatty.repliedByShortName, 'Patricia');
+
+  const repliedByMe = computeCircleTeamActivity({
+    lastFrom: 'staff',
+    lastMessageAt: tMsg,
+    unreadOrWaitingReply: false,
+    isManuallyAttended: false,
+    isCourtesyClosing: false,
+    readByMap: {},
+    currentUserId: 'u-jimmy',
+    currentUserName: 'Jimmy Arias',
+    agentMap,
+    lastStaffReplyBy: 'Jimmy Arias',
+  });
+  assert.equal(repliedByMe.teamStatus, 'replied');
+  assert.equal(repliedByMe.repliedByShortName, 'Tú');
+
+  // 5) Manually attended by Melvin
+  const attended = computeCircleTeamActivity({
+    lastFrom: 'client',
+    lastMessageAt: tMsg,
+    unreadOrWaitingReply: false,
+    isManuallyAttended: true,
+    isCourtesyClosing: false,
+    readByMap: { 'u-melvin': tNewRead },
+    currentUserId: 'u-jimmy',
+    currentUserName: 'Jimmy Arias',
+    agentMap,
+    attendedByUserId: 'u-melvin',
+  });
+  assert.equal(attended.teamStatus, 'attended');
+  assert.equal(attended.attendedByShortName, 'Melvin');
+
+  // 6) Unanswered outbound reactivation stays idle
+  const idleReact = computeCircleTeamActivity({
+    lastFrom: 'staff',
+    lastMessageAt: tMsg,
+    unreadOrWaitingReply: false,
+    isManuallyAttended: false,
+    isCourtesyClosing: false,
+    readByMap: {},
+    currentUserId: 'u-jimmy',
+    currentUserName: 'Jimmy Arias',
+    agentMap,
+    isReactivation: true,
+    reactivationReplied: false,
+  });
+  assert.equal(idleReact.teamStatus, 'idle');
+});
+
+test('9. Multi-filter helpers support combinable Bandejas + Estados without conflicts', () => {
+  const {
+    toggleBucketSelection,
+    toggleStateFilterSelection,
+    matchesCircleBucketAndTray,
+    matchesCircleStateFilters,
+  } = loaded.waHelpers;
+
+  // Toggle buckets cleanly
+  let buckets = toggleBucketSelection([], 'reactivados');
+  assert.deepEqual(buckets, ['reactivados']);
+  buckets = toggleBucketSelection(buckets, 'soporte');
+  assert.deepEqual(buckets, ['reactivados', 'soporte']);
+  buckets = toggleBucketSelection(buckets, 'reactivados');
+  assert.deepEqual(buckets, ['soporte']);
+
+  // State toggle resolves mutual exclusions cleanly
+  let states = toggleStateFilterSelection([], 'unopened');
+  states = toggleStateFilterSelection(states, 'unread');
+  assert.deepEqual(states, ['unopened', 'unread']);
+  states = toggleStateFilterSelection(states, 'replied');
+  assert.deepEqual(states, ['unread', 'replied']);
+  states = toggleStateFilterSelection(states, 'waiting');
+  assert.deepEqual(states, ['unread', 'waiting']);
+
+  // Matching Reactivados + Sin abrir excludes already-seen or replied reactivated leads
+  const reactUnopened = { isWhatsApp: true, scope: 'lead', isReactivation: true, teamStatus: 'unopened', unreadOrWaitingReply: true };
+  const reactSeenByPatty = { isWhatsApp: true, scope: 'lead', isReactivation: true, teamStatus: 'seen_waiting', unreadOrWaitingReply: true };
+  const soporteUnopened = { isWhatsApp: true, scope: 'soporte', isReactivation: false, teamStatus: 'unopened', unreadOrWaitingReply: true };
+  const spamItem = { isWhatsApp: true, scope: 'spam', isReactivation: false, teamStatus: 'unopened', unreadOrWaitingReply: true };
+
+  assert.equal(
+    matchesCircleBucketAndTray(reactUnopened, ['reactivados'], null) &&
+      matchesCircleStateFilters(reactUnopened, ['unopened'], true),
+    true,
+  );
+  assert.equal(
+    matchesCircleBucketAndTray(reactSeenByPatty, ['reactivados'], null) &&
+      matchesCircleStateFilters(reactSeenByPatty, ['unopened'], true),
+    false,
+  );
+  assert.equal(
+    matchesCircleBucketAndTray(soporteUnopened, ['soporte', 'por_clasificar'], null) &&
+      matchesCircleStateFilters(soporteUnopened, ['unopened'], true),
+    true,
+  );
+  assert.equal(matchesCircleBucketAndTray(spamItem, [], null), false);
+  assert.equal(matchesCircleBucketAndTray(spamItem, [], 'spam'), true);
 });

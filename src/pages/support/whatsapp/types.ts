@@ -21,6 +21,14 @@ export type LeadStageSubFilter =
   | 'erroneos'
   | 'todos';
 
+export type CircleBucket = 'soporte' | 'por_clasificar' | 'lead' | 'reactivados';
+
+export type SpecialTray = 'interno' | 'spam' | 'tickets';
+
+export type CircleStateFilter = 'unopened' | 'unread' | 'waiting' | 'replied';
+
+export type CircleTeamStatus = 'unopened' | 'seen_waiting' | 'replied' | 'attended' | 'idle';
+
 export interface SupportCircle {
   circleId: string;
   clientName: string;
@@ -39,10 +47,18 @@ export interface SupportCircle {
   leadOwnerName: string | null;
   activeTicket: Ticket;
   allClientTickets: Ticket[];
+  lastFrom: 'client' | 'staff';
   unreadOrWaitingReply: boolean;
   waitMinutes: number;
   syncedReadAt?: string | null;
   syncedForcedUnreadAt?: string | null;
+  seenByOtherNames: string[];
+  seenByMe: boolean;
+  isManuallyAttended: boolean;
+  attendedByShortName: string | null;
+  repliedByShortName: string | null;
+  isForcedUnread: boolean;
+  teamStatus: CircleTeamStatus;
   lastMessageText: string;
   lastMessageSender: string;
   lastMessageAt: string;

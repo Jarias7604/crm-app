@@ -2,10 +2,16 @@ import type React from 'react';
 import { Building2, HelpCircle, UserPlus, ShieldCheck, Ban } from 'lucide-react';
 import type { Ticket } from '../../../services/tickets';
 import type { WaScope } from '../../../lib/whatsappScopes';
+import { compareIsoTimestamps } from '../../../services/whatsappSync';
 import type {
   CachedTicketDescStats,
+  CircleBucket,
+  CircleStateFilter,
+  CircleTeamStatus,
   QuickReplyTemplate,
+  SpecialTray,
   SupportChannelType,
+  SupportCircle,
 } from './types';
 
 // ─── Helpers (Cached Intl & String Formatters for 60fps UI) ─────────────────
@@ -498,4 +504,168 @@ export function getCachedTicketDescStats(
   if (ticketDescStatsCache.size > 3500) ticketDescStatsCache.clear();
   ticketDescStatsCache.set(ticket.id, computed);
   return computed;
+}
+
+// ─── Shared Inbox Filter & Team Activity Helpers ────────────────────────────
+
+export function extractShortAgentName(rawName?: string | null): string {
+  const cleaned = stripEmojis(String(rawName || ''))
+    .replace(/Simulaci[oó]n:\s*[a-zA-Z0-9_-]+/gi, '')
+    .replace(/Platform\s*Owner/gi, '')
+    .replace(/\([^)]*\)/g, '')
+    .trim();
+  if (!cleaned) return '';
+  const first = cleaned.split(/\s+/).filter(Boolean)[0] || '';
+  if (!first) return '';
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
+export interface CircleTeamActivityInput {
+  lastFrom: 'client' | 'staff';
+  lastMessageAt: string;
+  unreadOrWaitingReply: boolean;
+  isManuallyAttended: boolean;
+  isCourtesyClosing: boolean;
+  readByMap: Record<string, string>;
+  currentUserId?: string | null;
+  currentUserName?: string | null;
+  agentMap: Map<string, string>;
+  lastStaffReplyBy?: string | null;
+  lastMessageSender?: string | null;
+  clientName?: string | null;
+  attendedByUserId?: string | null;
+  isReactivation?: boolean;
+  reactivationReplied?: boolean;
+}
+
+export interface CircleTeamActivityResult {
+  seenByMe: boolean;
+  seenByOtherNames: string[];
+  repliedByShortName: string | null;
+  attendedByShortName: string | null;
+  teamStatus: CircleTeamStatus;
+}
+
+export function computeCircleTeamActivity(input: CircleTeamActivityInput): CircleTeamActivityResult {
+  const myShort = extractShortAgentName(input.currentUserName);
+  const myReadTs = input.currentUserId ? input.readByMap[input.currentUserId] : undefined;
+  const seenByMe = Boolean(
+    myReadTs && input.lastMessageAt && compareIsoTimestamps(myReadTs, input.lastMessageAt) >= 0,
+  );
+
+  const otherEntries = Object.entries(input.readByMap || {})
+    .filter(([uid, ts]) => {
+      if (!uid || !ts || uid === input.currentUserId) return false;
+      return Boolean(input.lastMessageAt && compareIsoTimestamps(ts, input.lastMessageAt) >= 0);
+    })
+    .sort((a, b) => compareIsoTimestamps(b[1], a[1]));
+
+  const seenNamesSet = new Set<string>();
+  const seenByOtherNames: string[] = [];
+  for (const [uid] of otherEntries) {
+    const short = extractShortAgentName(input.agentMap.get(uid)) || 'Equipo';
+    const key = short.toLowerCase();
+    if (!seenNamesSet.has(key)) {
+      seenNamesSet.add(key);
+      seenByOtherNames.push(short);
+    }
+  }
+
+  let repliedByShortName: string | null = null;
+  if (input.lastFrom === 'staff') {
+    const candidateRaw =
+      (input.lastStaffReplyBy && String(input.lastStaffReplyBy).trim()) ||
+      (input.lastMessageSender &&
+      input.lastMessageSender !== input.clientName &&
+      !/^(\+?\d+|cliente|contacto whatsapp)$/i.test(input.lastMessageSender)
+        ? input.lastMessageSender
+        : '');
+    const short = extractShortAgentName(candidateRaw);
+    if (short) {
+      repliedByShortName = myShort && short.toLowerCase() === myShort.toLowerCase() ? 'Tú' : short;
+    } else {
+      repliedByShortName = 'Equipo';
+    }
+  }
+
+  let attendedByShortName: string | null = null;
+  if (input.attendedByUserId) {
+    if (input.currentUserId && input.attendedByUserId === input.currentUserId) {
+      attendedByShortName = 'Tú';
+    } else {
+      attendedByShortName = extractShortAgentName(input.agentMap.get(input.attendedByUserId)) || null;
+    }
+  }
+
+  let teamStatus: CircleTeamStatus;
+  if (input.unreadOrWaitingReply) {
+    teamStatus = !seenByMe && seenByOtherNames.length === 0 ? 'unopened' : 'seen_waiting';
+  } else if (input.lastFrom === 'staff') {
+    teamStatus = input.isReactivation && !input.reactivationReplied ? 'idle' : 'replied';
+  } else if (input.isManuallyAttended) {
+    teamStatus = 'attended';
+  } else {
+    teamStatus = input.isCourtesyClosing ? 'idle' : 'idle';
+  }
+
+  return {
+    seenByMe,
+    seenByOtherNames,
+    repliedByShortName,
+    attendedByShortName,
+    teamStatus,
+  };
+}
+
+export function toggleBucketSelection(current: CircleBucket[], bucket: CircleBucket): CircleBucket[] {
+  if (current.includes(bucket)) {
+    return current.filter((b) => b !== bucket);
+  }
+  return [...current, bucket];
+}
+
+export function toggleStateFilterSelection(
+  current: CircleStateFilter[],
+  flag: CircleStateFilter,
+): CircleStateFilter[] {
+  if (current.includes(flag)) {
+    return current.filter((f) => f !== flag);
+  }
+  if (flag === 'replied') {
+    return [...current.filter((f) => f !== 'unopened' && f !== 'waiting'), 'replied'];
+  }
+  if (flag === 'unopened' || flag === 'waiting') {
+    return [...current.filter((f) => f !== 'replied'), flag];
+  }
+  return [...current, flag];
+}
+
+export function matchesCircleBucketAndTray(
+  c: Pick<SupportCircle, 'isWhatsApp' | 'scope' | 'isReactivation'>,
+  selectedBuckets: CircleBucket[],
+  specialTray: SpecialTray | null,
+): boolean {
+  if (specialTray === 'tickets') {
+    return !c.isWhatsApp;
+  }
+  if (!c.isWhatsApp) return false;
+  if (specialTray === 'interno') return c.scope === 'interno';
+  if (specialTray === 'spam') return c.scope === 'spam';
+  if (c.scope === 'spam') return false;
+  if (selectedBuckets.length === 0) return true;
+  return selectedBuckets.some((b) => (b === 'reactivados' ? c.isReactivation : c.scope === b));
+}
+
+export function matchesCircleStateFilters(
+  c: Pick<SupportCircle, 'teamStatus' | 'unreadOrWaitingReply'>,
+  stateFilters: CircleStateFilter[],
+  unreadForMe: boolean,
+): boolean {
+  for (const f of stateFilters) {
+    if (f === 'unopened' && c.teamStatus !== 'unopened') return false;
+    if (f === 'unread' && !unreadForMe) return false;
+    if (f === 'waiting' && !c.unreadOrWaitingReply) return false;
+    if (f === 'replied' && c.teamStatus !== 'replied' && c.teamStatus !== 'attended') return false;
+  }
+  return true;
 }

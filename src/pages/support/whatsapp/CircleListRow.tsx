@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { Users, Clock } from 'lucide-react';
+import { Users, Clock, Eye, Check, CheckCheck } from 'lucide-react';
 import type { SupportCircle } from './types';
 import { initials, formatWaitDuration, listTimeLabel } from './helpers';
 
@@ -89,13 +89,9 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
             {circle.isReactivation && (
               <span
                 title={circle.reactivationCampaign || 'Campaña de reactivación WhatsApp'}
-                className={`text-[11px] font-medium shrink-0 ${
-                  circle.reactivationReplied
-                    ? 'px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200/80'
-                    : 'text-slate-400'
-                }`}
+                className="text-[11px] font-normal text-slate-400 shrink-0"
               >
-                {circle.reactivationReplied ? 'Respondió' : `· Toque ${circle.reactivationTouch || 1}`}
+                {circle.reactivationReplied ? '· React.' : `· Toque ${circle.reactivationTouch || 1}`}
               </span>
             )}
           </div>
@@ -118,11 +114,53 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
           <p className={`text-[13px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
             {circle.lastMessageSender}: {circle.lastMessageText}
           </p>
-          {unread && (
-            <span className="px-2 py-0.5 rounded-full bg-indigo-600 text-white text-[10.5px] font-bold leading-none shrink-0">
-              Nuevo
+          {circle.teamStatus === 'unopened' ? (
+            <span
+              title="Nadie del equipo ha abierto este mensaje"
+              className="px-1.5 py-0.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold leading-none shrink-0"
+            >
+              Sin abrir
             </span>
-          )}
+          ) : circle.teamStatus === 'seen_waiting' && circle.seenByOtherNames.length > 0 ? (
+            <span
+              title={`Visto por ${circle.seenByOtherNames.join(', ')} · Sin responder aún`}
+              className="px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/80 text-[10px] font-semibold leading-none shrink-0 inline-flex items-center gap-0.5"
+            >
+              <Eye className="w-2.5 h-2.5" />
+              {circle.seenByOtherNames[0]}
+              {circle.seenByOtherNames.length > 1 ? ` +${circle.seenByOtherNames.length - 1}` : ''}
+            </span>
+          ) : circle.teamStatus === 'seen_waiting' ? (
+            <span
+              title="Ya abierto por ti · Pendiente de responder"
+              className="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 text-[10px] font-semibold leading-none shrink-0"
+            >
+              Sin contestar
+            </span>
+          ) : circle.teamStatus === 'replied' ? (
+            <span
+              title={`Última respuesta enviada por ${circle.repliedByShortName || 'Equipo'}`}
+              className="text-[10.5px] font-medium text-emerald-700 leading-none shrink-0 inline-flex items-center gap-0.5"
+            >
+              <CheckCheck className="w-3 h-3 text-emerald-600" />
+              {circle.repliedByShortName || 'Equipo'}
+            </span>
+          ) : circle.teamStatus === 'attended' ? (
+            <span
+              title={`Marcado como atendido${circle.attendedByShortName ? ` por ${circle.attendedByShortName}` : ''}`}
+              className="text-[10.5px] font-medium text-slate-500 leading-none shrink-0 inline-flex items-center gap-0.5"
+            >
+              <Check className="w-3 h-3 text-slate-400" />
+              {circle.attendedByShortName ? `Atendido · ${circle.attendedByShortName}` : 'Atendido'}
+            </span>
+          ) : unread ? (
+            <span
+              title="Recordatorio personal (marcado como no leído)"
+              className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 text-[10px] font-semibold leading-none shrink-0"
+            >
+              Recordatorio
+            </span>
+          ) : null}
         </div>
       </div>
     </button>
