@@ -619,7 +619,7 @@ serve(async (req: Request) => {
       if (url.searchParams.get('action') === 'bridge_sh') {
         return await handleBridgeSh(supabase, selfUrl, { resolveMainCompanyId, rescopeChats });
       }
-      return json({ ok: true, status: 'active', service: 'evolution-whatsapp-webhook', version: '2026-11-20-chats-update' });
+      return json({ ok: true, status: 'active', service: 'evolution-whatsapp-webhook', version: '2026-11-20-chats-update-v2' });
     }
 
     const payload = await req.json().catch(() => ({}));
@@ -1203,6 +1203,7 @@ async function ingestWhatsAppEntry(
 
   // Optional AI text auto-reply (OFF by default). Never for catchup, staff, team, spam or audio.
   let aiReplied = false;
+  let aiReplyAuthor = '';
   let autoResolvedMetaPatch: Record<string, any> = {};
   if (!isCatchup && !isStaff && !media && ['soporte', 'lead', 'por_clasificar'].includes(scope) && currentMeta.ai_auto_reply_text_enabled !== false) {
     const aiCfg = await getAiCfg();
@@ -1226,6 +1227,7 @@ async function ingestWhatsAppEntry(
           number: chatJid, kind: 'text', payload: { text: reply },
         });
         aiReplied = true;
+        aiReplyAuthor = aiBotLabel(supportChannel);
       }
     }
 
@@ -1270,6 +1272,7 @@ async function ingestWhatsAppEntry(
           payload: { text: resolvedReply },
         });
         aiReplied = true;
+        aiReplyAuthor = senderTag;
         autoResolvedMetaPatch = {
           auto_resolved_replied_at: nowIso,
           wa_attended_at: nowIso,
@@ -1310,6 +1313,11 @@ async function ingestWhatsAppEntry(
       `📌 PROBLEMA REPORTADO (${classification.category}):\n${displayText}`
     );
   }
+  const inboundStaffReplyBy = aiReplied
+    ? aiReplyAuthor || aiBotLabel(supportChannel)
+    : isStaff
+    ? staffByName?.full_name || staffByPhone?.name || (fromMe ? 'WhatsApp' : pushName || 'Equipo')
+    : '';
   const updated: Record<string, any> = {
     description,
     updated_at: isNewerOrEqual ? (isCatchup ? msgDate.toISOString() : new Date().toISOString()) : targetTicket.updated_at || new Date().toISOString(),
@@ -1324,6 +1332,12 @@ async function ingestWhatsAppEntry(
       last_whatsapp_message: isNewerOrEqual ? lastPreview : currentMeta.last_whatsapp_message,
       last_whatsapp_at: isNewerOrEqual ? msgDate.toISOString() : prevLastIso,
       last_message_from: isNewerOrEqual ? (aiReplied || isStaff ? 'staff' : 'client') : currentMeta.last_message_from,
+      ...(isNewerOrEqual && (aiReplied || isStaff)
+        ? {
+            last_staff_reply_at: msgDate.toISOString(),
+            last_staff_reply_by: inboundStaffReplyBy,
+          }
+        : {}),
       ...(scopeChanged ? { wa_scope_changed_at: new Date().toISOString(), wa_scope_previous: prevScope } : {}),
       ai_category:
         scope !== 'soporte'
@@ -1531,15 +1545,19 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
             instance: normalizeInstance(meta.evolution_instance),
             number: meta.whatsapp_jid || meta.whatsapp_phone, kind: 'text', payload: { text: reply },
           });
+          const aiReplyIso = new Date().toISOString();
           await supabase
             .from('tickets')
             .update({
-              updated_at: new Date().toISOString(),
+              updated_at: aiReplyIso,
               metadata: {
                 ...meta,
                 last_whatsapp_message: reply.slice(0, 200),
-                last_whatsapp_at: new Date().toISOString(),
+                last_whatsapp_at: aiReplyIso,
                 last_message_from: 'staff',
+                last_staff_reply_at: aiReplyIso,
+                last_staff_reply_by: aiBotLabel(ch),
+                wa_attended_at: aiReplyIso,
               },
             })
             .eq('id', t.id);
@@ -2151,6 +2169,7 @@ async function handleChatsUpdate(supabase: any, companyId: string, payload: any)
     if (upd.unreadCount !== 0 && upd.unreadCount !== -1) continue;
     const isGroup = upd.jid.endsWith('@g.us');
     const phone = isGroup ? '' : jidPhone(upd.altJid) || jidPhone(upd.jid);
+    const lid = isGroup ? '' : jidLid(upd.jid) || jidLid(upd.altJid);
     const canonicalJid = isGroup ? upd.jid : phone ? `${phone}@s.whatsapp.net` : upd.jid;
 
     const { data: primaryRows } = await supabase
@@ -2184,6 +2203,17 @@ async function handleChatsUpdate(supabase: any, companyId: string, payload: any)
         .order('created_at', { ascending: false })
         .limit(5);
       rows = (phoneRows || []) as any[];
+    }
+    if (rows.length === 0 && !isGroup && lid) {
+      const { data: lidRows } = await supabase
+        .from('tickets')
+        .select('id, status, metadata, updated_at, created_at')
+        .eq('company_id', companyId)
+        .eq('metadata->>source', 'whatsapp_evolution')
+        .eq('metadata->>whatsapp_lid', lid)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      rows = (lidRows || []) as any[];
     }
     if (rows.length === 0) continue;
 
@@ -2842,17 +2872,21 @@ async function handleSendMedia(supabase: any, caller: Caller, payload: any): Pro
   const mediaDesc = String(t.description || '').includes('💬 Historial de WhatsApp:')
     ? `${t.description}\n${line}`
     : `${t.description || ''}\n\n💬 Historial de WhatsApp:\n${line}`;
+  const nowIso = new Date().toISOString();
   await supabase
     .from('tickets')
     .update({
       description: mediaDesc,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso,
       metadata: {
         ...meta,
         whatsapp_message_count: Number(meta.whatsapp_message_count || 0) + 1,
         last_whatsapp_message: `${label}${caption ? ` ${caption}` : ''}`.slice(0, 200),
-        last_whatsapp_at: new Date().toISOString(),
+        last_whatsapp_at: nowIso,
         last_message_from: 'staff',
+        last_staff_reply_at: nowIso,
+        last_staff_reply_by: authorName,
+        wa_attended_at: nowIso,
       },
     })
     .eq('id', ticketId);

@@ -679,3 +679,28 @@ export function matchesCircleStateFilters(
   }
   return true;
 }
+
+const COURTESY_BLOCK_RE =
+  /\b(pero|consulta|pregunta|duda|error|falla|problema|no\s+puedo|no\s+me|no\s+nos|no\s+funciona|no\s+deja|aun\s+no|todavia|pendiente|cuando|como|donde|cuanto|precio|cotiz\w*|factura|dte|hacienda|favor|puede\w*|necesit\w*|urgente|revis\w*|confirma\w*|envi\w*|manda\w*|esperando)\b/i;
+
+const COURTESY_THANKS_RE =
+  /^(?:(?:ah\s+vaya|vaya|bueno|ok|okay|okey|si|perfecto|esta\s+bien|entendido|de\s+acuerdo|listo|excelente|genial|va|dale|super|claro)\s+){0,2}(?:muchisimas\s+gracias?|muchas\s+gracias?|mil\s+gracias?|gracias?|de\s+nada|denada|con\s+(?:mucho\s+)?gusto|a\s+la\s+orden|para\s+servirle)(?:\s+(?:por\s+.+|muy\s+amable|muy\s+fino|a\s+usted(?:es)?|a\s+todos|amigo|equipo|ingeniero|ing|lic|don\s+\w+|feliz\s+(?:dia|tarde|noche)))?$/i;
+
+const COURTESY_ACK_RE =
+  /^(?:ah\s+vaya|vaya|bueno|ok|okay|okey|si|perfecto|esta\s+bien|entendido|de\s+acuerdo|listo|excelente|genial|va|dale|super|claro)(?:\s+(?:esta\s+bien|entendido|de\s+acuerdo|listo|perfecto))?$/i;
+
+export function isCourtesyClosingMessage(text: string): boolean {
+  const raw = String(text || '').trim();
+  if (!raw || raw.length > 75) return false;
+  if (/[?¿]/.test(raw)) return false;
+  const norm = raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[¡!¿?.,;:👍🙏👌✅🙌😊🤝]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!norm || norm.length > 70) return false;
+  if (COURTESY_BLOCK_RE.test(norm)) return false;
+  return COURTESY_THANKS_RE.test(norm) || COURTESY_ACK_RE.test(norm);
+}

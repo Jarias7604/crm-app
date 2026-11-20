@@ -580,3 +580,33 @@ test('11. computeCircleTeamActivity shows WhatsApp external reader without hidin
   assert.equal(waAndPatty.teamStatus, 'seen_waiting');
   assert.deepEqual(waAndPatty.seenByOtherNames, ['Patricia', 'WhatsApp']);
 });
+
+test('12. isCourtesyClosingMessage catches polite closings without swallowing real support requests', () => {
+  const { isCourtesyClosingMessage } = loaded.waHelpers;
+
+  // Should be detected as courtesy closings
+  for (const msg of [
+    'Está bien, gracias por la observación',
+    'Bueno, muchas gracias.',
+    'Muchísimas gracias',
+    'Ah vaya está bien gracias',
+    'Gracia muy fino',
+    'Muchas gracias por su ayuda',
+    'Ok, perfecto',
+    'Listo gracias',
+  ]) {
+    assert.equal(isCourtesyClosingMessage(msg), true, `Expected true for: ${msg}`);
+  }
+
+  // Should NOT be suppressed (real pending requests / follow-ups)
+  for (const msg of [
+    'Ok.hay me confirma, gracias',
+    'gracias estamos al pendiente, aun no hemos realizado el pago',
+    'Ya confirme',
+    'Está bien, pero tengo un error al facturar',
+    'Gracias, ¿me puede revisar?',
+    'Buenos días, necesito cotización',
+  ]) {
+    assert.equal(isCourtesyClosingMessage(msg), false, `Expected false for: ${msg}`);
+  }
+});

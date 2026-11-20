@@ -148,6 +148,7 @@ import {
   toggleStateFilterSelection,
   matchesCircleBucketAndTray,
   matchesCircleStateFilters,
+  isCourtesyClosingMessage,
 } from './whatsapp/helpers';
 import { ActiveSessionTimer, CircleListRow } from './whatsapp/CircleListRow';
 import { ChatComposer, type ChatComposerHandle } from './whatsapp/ChatComposer';
@@ -922,20 +923,9 @@ export const SupportChatCircles: React.FC = () => {
       const isOpen = ['new', 'open', 'pending'].includes(activeTicket.status);
       const lastMessageAt = String(meta.last_whatsapp_at || latest.updated_at || latest.created_at);
 
-      // Detect polite closing messages ("Muchas gracias", "Gracias por resolverme el problema", "Ok", "Está bien", etc.)
-      // and internal team chats so they don't trigger false red SLA alarms
-      const normMsg = lastMessageText
-        .toLowerCase()
-        .replace(/[¡!¿?.,;:👍🙏👌✅🙌😊🤝]+/g, '')
-        .trim();
-      const isCourtesyClosing =
-        scope !== 'por_clasificar' &&
-        normMsg.length > 0 &&
-        normMsg.length <= 65 &&
-        (/^(ok|okay|okey|si|sí|gracias|muchas gracias|mil gracias|denada|de nada|con gusto|con mucho gusto|a la orden|para servirle|perfecto|esta bien|está bien|entendido|de acuerdo|listo|excelente|bueno|va|dale|super|súper|gracias muy amable|muchas gracias muy amable|ok gracias|ok muchas gracias|perfecto gracias|esta bien gracias|está bien gracias|listo gracias)$/i.test(
-          normMsg
-        ) ||
-          /^(muchas\s+gracias|mil\s+gracias|gracias|de\s+nada|denada)\s+(por\s+|muy\s+amable|amigo|equipo|ingeniero|lic)/i.test(normMsg));
+      // Detect polite closing messages ("Muchas gracias", "Está bien, gracias por la observación", "Bueno, muchas gracias", etc.)
+      // so they don't trigger false red SLA alarms or clutter Sin abrir.
+      const isCourtesyClosing = scope !== 'por_clasificar' && isCourtesyClosingMessage(lastMessageText);
 
       const attendedAt = String(meta.wa_attended_at || activeMeta.wa_attended_at || '');
       const isManuallyAttended =
