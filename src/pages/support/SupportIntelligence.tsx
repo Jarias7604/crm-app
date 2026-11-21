@@ -14,10 +14,24 @@ import {
   Bug,
   BookOpen,
   Flame,
-  Layers,
   ShieldAlert,
   Ticket as TicketIcon,
+  Target,
+  Filter,
+  X,
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+  Cell,
+} from 'recharts';
 import toast from 'react-hot-toast';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../auth/AuthProvider';
@@ -33,17 +47,75 @@ import { isSupportTicket, isWhatsappTicket } from '../../lib/whatsappScopes';
 import {
   computeSupportWhatsAppPulse,
   buildExecutiveSupportOverview,
+  buildSupportParetoAnalysis,
   normalizeSupportClientName,
   SUPPORT_ROOT_CAUSE_META,
   SUPPORT_OPERATING_RULES,
   SUPPORT_OPERATING_RULES_COPY_TEXT,
   markRootCauseDevResolvedPatch,
   type SupportPulseResult,
-  type SupportErrorModuleKey,
+  type SupportErrorPatternKey,
+  type SupportParetoMetric,
+  type SupportParetoItem,
   type PulseWaMessageInput,
   type PulseCommentInput,
   type PulseProfileInput,
 } from './supportPulse';
+
+interface ParetoChartRow extends SupportParetoItem {
+  barValue: number;
+}
+
+const ParetoTooltipCard: React.FC<{
+  active?: boolean;
+  payload?: Array<{ payload?: ParetoChartRow }>;
+  metric: SupportParetoMetric;
+}> = ({ active, payload, metric }) => {
+  const row = active && payload && payload[0]?.payload;
+  if (!row) return null;
+
+  return (
+    <div className="bg-white/95 backdrop-blur-xs border border-slate-200 rounded-xl shadow-lg px-3.5 py-2.5 text-xs max-w-xs space-y-1.5">
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-bold text-slate-900 leading-snug">{row.label}</p>
+        <span
+          className={`px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+            row.isVitalFew80
+              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+              : 'bg-slate-100 text-slate-600'
+          }`}
+        >
+          {row.isVitalFew80 ? 'Prioridad 80%' : 'Resto 20%'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-600 pt-0.5">
+        <span>
+          Tiempo:{' '}
+          <strong className={metric === 'hours' ? 'text-slate-900' : 'text-slate-700'}>
+            {row.reactiveHours}h
+          </strong>
+        </span>
+        <span>
+          Clientes:{' '}
+          <strong className={metric === 'clients' ? 'text-slate-900' : 'text-slate-700'}>
+            {row.clientCount}
+          </strong>
+        </span>
+        <span>
+          Peso individual: <strong className="text-slate-900">{row.sharePct}%</strong>
+        </span>
+        <span>
+          Acumulado: <strong className="text-indigo-700">{row.cumulativePct}%</strong>
+        </span>
+      </div>
+
+      <p className="text-[10.5px] text-slate-400 pt-1 border-t border-slate-100">
+        Clic en la barra para ver clientes y mensajes reales
+      </p>
+    </div>
+  );
+};
 
 type WorkBucket = 'text_reply' | 'implementation' | 'troubleshooting' | 'development';
 type HealthFilter = 'all' | 'critical' | 'open' | 'stable';
@@ -299,7 +371,10 @@ export const SupportIntelligence: React.FC = () => {
   // Unified filters
   const [selectedTechFilter, setSelectedTechFilter] = useState<string>('all');
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('all');
-  const [selectedModuleFilter, setSelectedModuleFilter] = useState<SupportErrorModuleKey | null>(null);
+  const [paretoMetric, setParetoMetric] = useState<SupportParetoMetric>('hours');
+  const [selectedPatternKey, setSelectedPatternKey] = useState<SupportErrorPatternKey | null>(null);
+  const [tablePatternFilter, setTablePatternFilter] = useState<SupportErrorPatternKey | null>(null);
+  const [showAllParetoItems, setShowAllParetoItems] = useState<boolean>(false);
   const [daysRange, setDaysRange] = useState<number>(15);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedClientKey, setExpandedClientKey] = useState<string | null>(null);
@@ -632,6 +707,43 @@ export const SupportIntelligence: React.FC = () => {
     [pulse, records, selectedTechFilter],
   );
 
+  const pareto = useMemo(
+    () =>
+      buildSupportParetoAnalysis<Ticket>({
+        pulse,
+        records,
+        techFilter: selectedTechFilter,
+        metric: paretoMetric,
+        daysRange,
+      }),
+    [pulse, records, selectedTechFilter, paretoMetric, daysRange],
+  );
+
+  const selectedParetoItem = useMemo(
+    () => pareto.items.find((i) => i.patternKey === selectedPatternKey) || null,
+    [pareto.items, selectedPatternKey],
+  );
+
+  const activeTablePattern = useMemo(
+    () => pareto.items.find((i) => i.patternKey === tablePatternFilter) || null,
+    [pareto.items, tablePatternFilter],
+  );
+
+  const paretoHasHours = pareto.totalReactiveHours > 0;
+  const paretoChartData = useMemo<ParetoChartRow[]>(
+    () =>
+      pareto.items.slice(0, 8).map((item) => ({
+        ...item,
+        barValue:
+          paretoMetric === 'clients'
+            ? item.clientCount
+            : paretoHasHours
+            ? item.reactiveHours
+            : item.messageCount + item.ticketCount,
+      })),
+    [pareto.items, paretoMetric, paretoHasHours],
+  );
+
   const clientHealthCounts = useMemo(() => {
     const list = overview.unifiedClients;
     return {
@@ -644,11 +756,12 @@ export const SupportIntelligence: React.FC = () => {
 
   const visibleClients = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    const patternClientSet = activeTablePattern ? new Set(activeTablePattern.clientKeys) : null;
     return overview.unifiedClients.filter((c) => {
       if (healthFilter === 'critical' && c.health !== 'critical') return false;
       if (healthFilter === 'open' && c.openTickets <= 0) return false;
       if (healthFilter === 'stable' && c.health !== 'stable') return false;
-      if (selectedModuleFilter && c.primaryModuleKey !== selectedModuleFilter) return false;
+      if (patternClientSet && !patternClientSet.has(c.clientKey)) return false;
       if (q) {
         return (
           c.clientName.toLowerCase().includes(q) ||
@@ -659,7 +772,7 @@ export const SupportIntelligence: React.FC = () => {
       }
       return true;
     });
-  }, [overview.unifiedClients, healthFilter, selectedModuleFilter, searchQuery]);
+  }, [overview.unifiedClients, healthFilter, activeTablePattern, searchQuery]);
 
   const handleMarkDevResolved = async (
     item: SupportPulseResult['rootCauseQueue']['pendingForDev'][number],
@@ -725,19 +838,39 @@ export const SupportIntelligence: React.FC = () => {
     toast.success('3 Reglas Operativas copiadas para enviar a Melvin');
   };
 
+  const copyParetoPlan = () => {
+    navigator.clipboard.writeText(pareto.copyPlanText);
+    toast.success('Plan Pareto 80/20 copiado para el equipo');
+  };
+
+  const handleFilterClientsByPattern = (patternKey: SupportErrorPatternKey) => {
+    setTablePatternFilter((prev) => (prev === patternKey ? null : patternKey));
+    setHealthFilter('all');
+    setTimeout(() => {
+      document.getElementById('client-health-section')?.scrollIntoView({ behavior: 'smooth' });
+    }, 60);
+  };
+
   const { totals } = overview;
   const verdictStyles =
     totals.verdictTone === 'good'
       ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
       : totals.verdictTone === 'warn'
-      ? 'bg-amber-50 border-amber-200 text-amber-950'
-      : totals.verdictTone === 'critical'
-      ? 'bg-rose-50 border-rose-200 text-rose-950'
-      : 'bg-slate-50 border-slate-200 text-slate-800';
+        ? 'bg-amber-50 border-amber-200 text-amber-950'
+        : totals.verdictTone === 'critical'
+          ? 'bg-rose-50 border-rose-200 text-rose-950'
+          : 'bg-slate-50 border-slate-200 text-slate-800';
 
-  const maxModuleClients = Math.max(1, ...overview.moduleHotspots.map((m) => m.clientCount));
   const visibleDays = pulse.dailySeries.slice(-14);
   const maxDayMsgs = Math.max(1, ...visibleDays.map((d) => d.totalMessages));
+
+  const vitalItems = pareto.items.filter((item) => item.isVitalFew80);
+  const displayedPriorityItems = showAllParetoItems
+    ? pareto.items
+    : vitalItems.length >= 3
+    ? vitalItems
+    : pareto.items.slice(0, 3);
+  const maxPriorityShare = Math.max(1, ...pareto.items.map((item) => item.sharePct));
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16">
@@ -765,11 +898,10 @@ export const SupportIntelligence: React.FC = () => {
                       setSelectedTechFilter(opt.id);
                       setExpandedClientKey(null);
                     }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
-                      active
-                        ? 'bg-white text-indigo-700 shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${active
+                      ? 'bg-white text-indigo-700 shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                      }`}
                   >
                     {opt.label}
                   </button>
@@ -782,11 +914,10 @@ export const SupportIntelligence: React.FC = () => {
             <button
               type="button"
               onClick={() => setShowRulesPanel((v) => !v)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
-                showRulesPanel
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${showRulesPanel
+                ? 'bg-indigo-600 text-white border-indigo-600'
+                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
             >
               <BookOpen className="w-3.5 h-3.5" />
               Reglas
@@ -888,9 +1019,8 @@ export const SupportIntelligence: React.FC = () => {
                     <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                   ) : (
                     <AlertTriangle
-                      className={`w-5 h-5 shrink-0 ${
-                        totals.verdictTone === 'critical' ? 'text-rose-600' : 'text-amber-600'
-                      }`}
+                      className={`w-5 h-5 shrink-0 ${totals.verdictTone === 'critical' ? 'text-rose-600' : 'text-amber-600'
+                        }`}
                     />
                   )}
                   <h2 className="text-base font-black tracking-tight">{totals.verdictTitle}</h2>
@@ -980,13 +1110,12 @@ export const SupportIntelligence: React.FC = () => {
                     setSelectedTechFilter(next);
                     setExpandedClientKey(null);
                   }}
-                  className={`text-left bg-white rounded-2xl p-4 border transition ${
-                    isSelected
-                      ? 'border-indigo-600 ring-2 ring-indigo-500/15'
-                      : selectedTechFilter !== 'all'
+                  className={`text-left bg-white rounded-2xl p-4 border transition ${isSelected
+                    ? 'border-indigo-600 ring-2 ring-indigo-500/15'
+                    : selectedTechFilter !== 'all'
                       ? 'border-slate-200/80 opacity-60 hover:opacity-100'
                       : 'border-slate-200/80 hover:border-slate-300'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5">
@@ -1045,78 +1174,451 @@ export const SupportIntelligence: React.FC = () => {
         </section>
 
         {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* BLOQUE 2 · ¿DÓNDE ARREGLAR DE RAÍZ? (MÓDULOS + BUGS ESCALADOS)       */}
+        {/* BLOQUE 2A · PARETO 80/20: QUÉ RESOLVER DE RAÍZ PRIMERO               */}
         {/* ════════════════════════════════════════════════════════════════════ */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left: Automatic Module Hotspots */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col">
-            <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4 text-rose-600" />
-                <h3 className="text-xs font-black uppercase tracking-wide text-slate-800">
-                  Módulos donde regresan más clientes (Automático)
+        <section className="bg-white rounded-2xl border border-slate-200/75 p-5 sm:p-6 shadow-2xs space-y-5">
+          {/* Header row: clean title + metric toggle + copy action */}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                  Pareto 80/20 · Qué errores resolver de raíz primero
                 </h3>
+                {selectedTechFilter !== 'all' && (
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/70">
+                    Solo {selectedTechFilter.split(' ')[0]}
+                  </span>
+                )}
               </div>
-              {selectedModuleFilter && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedModuleFilter(null)}
-                  className="text-[11px] font-bold text-indigo-600 hover:underline"
-                >
-                  Ver todos los módulos ×
-                </button>
-              )}
+              <p className="text-xs text-slate-500">
+                Patrones reales de WhatsApp y tickets en los últimos {daysRange} días
+              </p>
             </div>
 
-            {overview.moduleHotspots.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400 font-semibold">
-                Sin fallas detectadas en los últimos {daysRange} días.
-              </div>
-            ) : (
-              <div className="space-y-2.5 pt-3">
-                {overview.moduleHotspots.map((mod) => {
-                  const barPct = Math.max(8, Math.round((mod.clientCount / maxModuleClients) * 100));
-                  const isModActive = selectedModuleFilter === mod.moduleKey;
-                  const sampleClients = mod.clientNames.slice(0, 3).join(', ');
-                  const extraClients = mod.clientNames.length > 3 ? ` +${mod.clientNames.length - 3}` : '';
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="inline-flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
+                {[
+                  { id: 'hours' as SupportParetoMetric, label: 'Por horas' },
+                  { id: 'clients' as SupportParetoMetric, label: 'Por clientes' },
+                ].map((opt) => {
+                  const active = paretoMetric === opt.id;
                   return (
                     <button
-                      key={mod.moduleKey}
+                      key={opt.id}
                       type="button"
-                      onClick={() =>
-                        setSelectedModuleFilter(isModActive ? null : mod.moduleKey)
-                      }
-                      className={`w-full text-left rounded-xl p-2.5 border transition ${
-                        isModActive
-                          ? 'bg-indigo-50/70 border-indigo-400'
-                          : 'bg-slate-50/70 hover:bg-slate-100/70 border-slate-100'
+                      onClick={() => setParetoMetric(opt.id)}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
+                        active
+                          ? 'bg-white text-slate-900 shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-800'
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-2 text-xs">
-                        <span className="font-black text-slate-900">{mod.label}</span>
-                        <span className="font-bold text-slate-700 shrink-0">
-                          {mod.clientCount} clientes · {mod.reactiveHours}h · {mod.messageCount} msgs
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full rounded-full bg-slate-200/80 overflow-hidden my-1.5">
-                        <div style={{ width: `${barPct}%` }} className={`h-full ${mod.barColor}`} />
-                      </div>
-                      <p className="text-[11px] text-slate-500 truncate">
-                        Afectados: {sampleClients}
-                        {extraClients}
-                      </p>
+                      {opt.label}
                     </button>
                   );
                 })}
               </div>
-            )}
+
+              {pareto.items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={copyParetoPlan}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition"
+                >
+                  <Copy className="w-3.5 h-3.5 text-indigo-600" />
+                  Copiar plan 80/20
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Right: Daily Spark Strip + Root-Cause Escalation Queue */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col justify-between gap-4">
-            {/* Compact daily rhythm */}
+          {pareto.items.length === 0 ? (
+            <div className="py-10 text-center text-xs text-slate-400 font-medium">
+              Sin fallas reactivas registradas en los últimos {daysRange} días.
+            </div>
+          ) : (
+            <>
+              {/* 2-second Executive Headline Strip */}
+              <div className="rounded-xl bg-gradient-to-r from-rose-50/75 via-slate-50/60 to-indigo-50/50 border border-slate-200/80 px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-rose-100/90 text-rose-600 flex items-center justify-center shrink-0">
+                    <Target className="w-4 h-4" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-900 leading-snug">
+                    {pareto.headline}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] font-bold shrink-0 flex-wrap">
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/80 text-rose-700">
+                    {pareto.vitalFewCount} foco{pareto.vitalFewCount === 1 ? '' : 's'} clave (80%)
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/80 text-slate-700">
+                    ~{pareto.vitalFewHoursSaved}h recuperables
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/80 text-slate-700">
+                    {pareto.vitalFewClientsImpacted} cliente{pareto.vitalFewClientsImpacted === 1 ? '' : 's'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Minimalist Composed Pareto Chart */}
+              <div className="space-y-2">
+                <div className="w-full h-[265px] min-w-0">
+                  <ResponsiveContainer width="100%" height={265}>
+                    <ComposedChart
+                      data={paretoChartData}
+                      margin={{ top: 14, right: 12, left: -8, bottom: 6 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                      <XAxis
+                        dataKey="shortLabel"
+                        axisLine={false}
+                        tickLine={false}
+                        interval={0}
+                        height={34}
+                        tick={{ fill: '#475569', fontSize: 11, fontWeight: 600 }}
+                      />
+                      <YAxis
+                        yAxisId="left"
+                        axisLine={false}
+                        tickLine={false}
+                        width={42}
+                        tick={{ fill: '#94A3B8', fontSize: 11 }}
+                        tickFormatter={(v) =>
+                          paretoMetric === 'clients' || !paretoHasHours ? `${v}` : `${v}h`
+                        }
+                      />
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        domain={[0, 100]}
+                        ticks={[0, 20, 40, 60, 80, 100]}
+                        axisLine={false}
+                        tickLine={false}
+                        width={40}
+                        tick={{ fill: '#6366F1', fontSize: 11 }}
+                        tickFormatter={(v) => `${v}%`}
+                      />
+                      <ReferenceLine
+                        yAxisId="right"
+                        y={80}
+                        stroke="#4F46E5"
+                        strokeDasharray="5 5"
+                        strokeOpacity={0.55}
+                        label={{
+                          value: 'Corte 80%',
+                          position: 'insideTopRight',
+                          fill: '#4F46E5',
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      />
+                      <Tooltip
+                        cursor={{ fill: '#F8FAFC' }}
+                        content={(props) => (
+                          <ParetoTooltipCard
+                            active={props.active}
+                            payload={props.payload as Array<{ payload?: ParetoChartRow }>}
+                            metric={paretoMetric}
+                          />
+                        )}
+                      />
+                      <Bar
+                        yAxisId="left"
+                        dataKey="barValue"
+                        radius={[8, 8, 0, 0]}
+                        maxBarSize={52}
+                        className="cursor-pointer"
+                        onClick={(_barData, index) => {
+                          const target = paretoChartData[index];
+                          if (target) {
+                            setSelectedPatternKey((prev) =>
+                              prev === target.patternKey ? null : target.patternKey,
+                            );
+                          }
+                        }}
+                      >
+                        {paretoChartData.map((entry) => {
+                          const isSelected = selectedPatternKey === entry.patternKey;
+                          const dimmed =
+                            Boolean(selectedPatternKey) && selectedPatternKey !== entry.patternKey;
+                          const fill = isSelected
+                            ? entry.isVitalFew80
+                              ? '#BE123C'
+                              : '#475569'
+                            : entry.isVitalFew80
+                            ? '#F43F5E'
+                            : '#CBD5E1';
+                          return (
+                            <Cell
+                              key={entry.patternKey}
+                              fill={fill}
+                              fillOpacity={dimmed ? 0.45 : 1}
+                            />
+                          );
+                        })}
+                      </Bar>
+                      <Line
+                        yAxisId="right"
+                        type="monotone"
+                        dataKey="cumulativePct"
+                        stroke="#4F46E5"
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: '#FFFFFF', stroke: '#4F46E5', strokeWidth: 2 }}
+                        activeDot={{ r: 5.5, fill: '#4F46E5', stroke: '#FFFFFF', strokeWidth: 2 }}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 px-1">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-rose-500 inline-block" />
+                      Prioridad 80% (resolver primero)
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-slate-300 inline-block" />
+                      Cola restante (20%)
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-indigo-700">
+                      <span className="w-3 h-0.5 bg-indigo-600 inline-block" />
+                      % Acumulado
+                    </span>
+                  </div>
+                  <span className="text-slate-400">
+                    Haz clic en cualquier barra o tarjeta para ver evidencia real
+                  </span>
+                </div>
+              </div>
+
+              {/* Clean Priority Cards Grid */}
+              <div className="space-y-2.5">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {displayedPriorityItems.map((item) => {
+                    const rank = pareto.items.findIndex((i) => i.patternKey === item.patternKey) + 1;
+                    const isSelected = selectedPatternKey === item.patternKey;
+                    const widthPct = Math.max(8, Math.round((item.sharePct / maxPriorityShare) * 100));
+                    return (
+                      <button
+                        key={item.patternKey}
+                        type="button"
+                        onClick={() =>
+                          setSelectedPatternKey((prev) =>
+                            prev === item.patternKey ? null : item.patternKey,
+                          )
+                        }
+                        className={`text-left rounded-xl p-3.5 border transition ${
+                          isSelected
+                            ? 'bg-rose-50/50 border-rose-300 ring-2 ring-rose-500/15'
+                            : 'bg-slate-50/60 hover:bg-slate-50 border-slate-200/70 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={`w-5 h-5 rounded-md text-[10.5px] font-black flex items-center justify-center shrink-0 ${
+                                item.isVitalFew80
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : 'bg-slate-200/80 text-slate-600'
+                              }`}
+                            >
+                              {rank}
+                            </span>
+                            <span className="text-xs font-bold text-slate-900 truncate">
+                              {item.label}
+                            </span>
+                          </div>
+                          <span className="text-xs font-black text-slate-800 shrink-0">
+                            {item.sharePct}%
+                          </span>
+                        </div>
+
+                        <div className="h-1 w-full rounded-full bg-slate-200/75 overflow-hidden my-2.5">
+                          <div
+                            style={{ width: `${widthPct}%` }}
+                            className={`h-full rounded-full ${
+                              item.isVitalFew80 ? 'bg-rose-500' : 'bg-slate-400'
+                            }`}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                          <span>
+                            <strong className="text-slate-700">{item.reactiveHours}h</strong> ·{' '}
+                            {item.clientCount} cliente{item.clientCount === 1 ? '' : 's'} ·{' '}
+                            {item.messageCount + item.ticketCount} rep.
+                          </span>
+                          <span className="text-indigo-600 font-semibold">
+                            Acum. {item.cumulativePct}%
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {pareto.items.length > displayedPriorityItems.length || showAllParetoItems ? (
+                  pareto.items.length > 3 && pareto.items.length > vitalItems.length && (
+                    <div className="flex justify-center pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowAllParetoItems((v) => !v)}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition"
+                      >
+                        {showAllParetoItems
+                          ? 'Mostrar solo focos principales'
+                          : `Ver todas las categorías (${pareto.items.length})`}
+                      </button>
+                    </div>
+                  )
+                ) : null}
+              </div>
+
+              {/* 1-Click Drill-Down Evidence Panel */}
+              {selectedParetoItem && (
+                <div className="rounded-xl bg-slate-50/90 border border-slate-200/85 p-4 sm:p-5 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
+                          selectedParetoItem.isVitalFew80
+                            ? 'bg-rose-100 text-rose-700'
+                            : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {selectedParetoItem.isVitalFew80 ? 'Prioridad 80%' : 'Resto 20%'}
+                      </span>
+                      <h4 className="text-sm font-black text-slate-900">
+                        {selectedParetoItem.label}
+                      </h4>
+                      <span className="text-xs text-slate-500 font-medium">
+                        {selectedParetoItem.reactiveHours}h · {selectedParetoItem.clientCount}{' '}
+                        clientes · {selectedParetoItem.messageCount} msgs ·{' '}
+                        {selectedParetoItem.ticketCount} tickets
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleFilterClientsByPattern(selectedParetoItem.patternKey)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                          tablePatternFilter === selectedParetoItem.patternKey
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+                        }`}
+                      >
+                        <Filter className="w-3.5 h-3.5" />
+                        {tablePatternFilter === selectedParetoItem.patternKey
+                          ? 'Quitando filtro abajo'
+                          : 'Ver estos clientes abajo'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPatternKey(null)}
+                        title="Cerrar evidencia"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-white transition"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                    {/* Affected Clients */}
+                    <div className="lg:col-span-5 space-y-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                        Clientes afectados ({selectedParetoItem.clients.length})
+                      </p>
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        {selectedParetoItem.clients.slice(0, 8).map((c) => (
+                          <div
+                            key={c.clientKey}
+                            className="bg-white border border-slate-200/75 rounded-xl px-3 py-2 flex items-center justify-between gap-2"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-900 truncate">
+                                {c.clientName}
+                              </p>
+                              <p className="text-[11px] text-slate-500">
+                                {c.reactiveHours}h · {c.messages} msgs
+                                {c.tickets > 0 ? ` · ${c.tickets} ticket(s)` : ''}
+                              </p>
+                            </div>
+                            {c.circleId && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  navigate('/support/chat', { state: { waCircleId: c.circleId } })
+                                }
+                                className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] shrink-0 transition"
+                              >
+                                Chat →
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Real Evidence Quotes */}
+                    <div className="lg:col-span-7 space-y-2">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                        Reportes reales recientes
+                      </p>
+                      {selectedParetoItem.examples.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic py-4">
+                          Sin extractos de texto detallados en este período.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {selectedParetoItem.examples.map((ex, idx) => (
+                            <div
+                              key={`${ex.clientName}-${idx}`}
+                              className="bg-white border border-slate-200/75 rounded-xl p-3 space-y-1"
+                            >
+                              <div className="flex items-center justify-between gap-2 text-[11px]">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-bold text-slate-900 truncate">
+                                    {ex.clientName}
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold shrink-0">
+                                    {ex.source === 'whatsapp' ? 'WhatsApp' : 'Ticket'}
+                                  </span>
+                                </div>
+                                <span className="text-slate-400 shrink-0">
+                                  {new Date(ex.at).toLocaleDateString('es-SV', {
+                                    day: '2-digit',
+                                    month: 'short',
+                                  })}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-700 leading-relaxed">
+                                &ldquo;{ex.text}&rdquo;
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* BLOQUE 2B · RITMO DIARIO WHATSAPP + BUGS ESCALADOS A JIMMY          */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Left: Daily Rhythm */}
+          <div className="bg-white rounded-2xl border border-slate-200/75 p-4 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between pb-2">
+              <div className="flex items-center justify-between pb-2.5">
                 <span className="text-xs font-black uppercase tracking-wide text-slate-800">
                   Ritmo diario WhatsApp ({visibleDays.length}d)
                 </span>
@@ -1129,7 +1631,10 @@ export const SupportIntelligence: React.FC = () => {
                 style={{ gridTemplateColumns: `repeat(${Math.max(1, visibleDays.length)}, minmax(0, 1fr))` }}
               >
                 {visibleDays.map((d) => {
-                  const hPct = d.totalMessages > 0 ? Math.max(14, Math.round((d.totalMessages / maxDayMsgs) * 100)) : 5;
+                  const hPct =
+                    d.totalMessages > 0
+                      ? Math.max(14, Math.round((d.totalMessages / maxDayMsgs) * 100))
+                      : 5;
                   return (
                     <div
                       key={d.dayKey}
@@ -1140,13 +1645,12 @@ export const SupportIntelligence: React.FC = () => {
                       <div className="w-full h-9 flex items-end justify-center my-0.5">
                         <div
                           style={{ height: `${hPct}%` }}
-                          className={`w-2.5 rounded-t ${
-                            d.pingPongChats > 0
-                              ? 'bg-rose-500'
-                              : d.totalMessages > 0
+                          className={`w-2.5 rounded-t ${d.pingPongChats > 0
+                            ? 'bg-rose-500'
+                            : d.totalMessages > 0
                               ? 'bg-indigo-500'
                               : 'bg-slate-200'
-                          }`}
+                            }`}
                         />
                       </div>
                       <span className="text-[9px] font-bold text-emerald-700">{d.activeClients}c</span>
@@ -1158,83 +1662,86 @@ export const SupportIntelligence: React.FC = () => {
                 })}
               </div>
             </div>
+          </div>
 
-            {/* Jimmy's Escalation Queue */}
-            <div className="border-t border-slate-100 pt-3">
-              <div className="flex items-center justify-between gap-2 pb-2">
-                <div className="flex items-center gap-1.5">
-                  <Bug className="w-4 h-4 text-rose-600" />
-                  <h3 className="text-xs font-black uppercase tracking-wide text-slate-800">
-                    Bugs escalados para Jimmy (Botón &quot;Causa&quot; en chat)
-                  </h3>
-                </div>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-slate-100 text-slate-700">
-                  {pulse.rootCauseQueue.pendingForDev.length} pendientes
-                </span>
+          {/* Right: Jimmy's Escalation Queue */}
+          <div className="bg-white rounded-2xl border border-slate-200/75 p-4 flex flex-col">
+            <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+              <div className="flex items-center gap-1.5">
+                <Bug className="w-4 h-4 text-rose-600" />
+                <h3 className="text-xs font-black uppercase tracking-wide text-slate-800">
+                  Bugs escalados para Jimmy (Botón &quot;Causa&quot; en chat)
+                </h3>
               </div>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-slate-100 text-slate-700">
+                {pulse.rootCauseQueue.pendingForDev.length} pendientes
+              </span>
+            </div>
 
-              {pulse.rootCauseQueue.pendingForDev.length === 0 ? (
-                <p className="text-xs text-slate-400 font-medium py-3">
-                  Sin bugs escalados manualmente todavía. Usa el botón <strong>Causa</strong> en el Chat WhatsApp cuando un error de sistema requiera arreglo definitivo.
-                </p>
-              ) : (
-                <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto">
-                  {pulse.rootCauseQueue.pendingForDev.map((item) => {
-                    const rcMeta = SUPPORT_ROOT_CAUSE_META[item.type];
-                    const itemKey = `${item.ticketId}:${item.entryId}`;
-                    const isSaving = resolvingEntryKey === itemKey;
-                    return (
-                      <div key={itemKey} className="py-2 flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-black border ${rcMeta.badgeClass}`}
-                            >
-                              {rcMeta.shortLabel}
-                            </span>
-                            <span className="text-xs font-black text-slate-900 truncate">
-                              {item.clientName}
-                            </span>
-                            <span className="text-[10.5px] text-slate-400">
-                              · {item.byName.split(' ')[0]}
-                            </span>
-                          </div>
-                          {item.note && (
-                            <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-2">{item.note}</p>
-                          )}
+            {pulse.rootCauseQueue.pendingForDev.length === 0 ? (
+              <p className="text-xs text-slate-400 font-medium py-5">
+                Sin bugs escalados manualmente todavía. Usa el botón <strong>Causa</strong> en el Chat WhatsApp cuando un error de sistema requiera arreglo definitivo.
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto pt-1">
+                {pulse.rootCauseQueue.pendingForDev.map((item) => {
+                  const rcMeta = SUPPORT_ROOT_CAUSE_META[item.type];
+                  const itemKey = `${item.ticketId}:${item.entryId}`;
+                  const isSaving = resolvingEntryKey === itemKey;
+                  return (
+                    <div key={itemKey} className="py-2 flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-black border ${rcMeta.badgeClass}`}
+                          >
+                            {rcMeta.shortLabel}
+                          </span>
+                          <span className="text-xs font-black text-slate-900 truncate">
+                            {item.clientName}
+                          </span>
+                          <span className="text-[10.5px] text-slate-400">
+                            · {item.byName.split(' ')[0]}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {item.circleId && (
-                            <button
-                              type="button"
-                              onClick={() => navigate('/support/chat', { state: { waCircleId: item.circleId } })}
-                              className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]"
-                            >
-                              Chat
-                            </button>
-                          )}
+                        {item.note && (
+                          <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-2">{item.note}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {item.circleId && (
                           <button
                             type="button"
-                            disabled={isSaving}
-                            onClick={() => handleMarkDevResolved(item)}
-                            className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] disabled:opacity-50"
+                            onClick={() => navigate('/support/chat', { state: { waCircleId: item.circleId } })}
+                            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]"
                           >
-                            {isSaving ? '...' : '✓ Resuelto'}
+                            Chat
                           </button>
-                        </div>
+                        )}
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => handleMarkDevResolved(item)}
+                          className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] disabled:opacity-50"
+                        >
+                          {isSaving ? '...' : '✓ Resuelto'}
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </section>
 
         {/* ════════════════════════════════════════════════════════════════════ */}
         {/* BLOQUE 3 · 1 SOLA TABLA UNIFICADA DE CLIENTES (CHAT + TICKETS)       */}
         {/* ════════════════════════════════════════════════════════════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
+        <section
+          id="client-health-section"
+          className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden"
+        >
           <div className="p-4 border-b border-slate-200/80 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             <div className="flex items-center gap-1.5 flex-wrap">
               {[
@@ -1249,24 +1756,23 @@ export const SupportIntelligence: React.FC = () => {
                     key={pill.id}
                     type="button"
                     onClick={() => setHealthFilter(pill.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                      active
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${active
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
                   >
                     {pill.label}
                   </button>
                 );
               })}
 
-              {selectedModuleFilter && (
+              {activeTablePattern && (
                 <button
                   type="button"
-                  onClick={() => setSelectedModuleFilter(null)}
+                  onClick={() => setTablePatternFilter(null)}
                   className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200"
                 >
-                  Módulo: {overview.moduleHotspots.find((m) => m.moduleKey === selectedModuleFilter)?.shortLabel} ×
+                  Error: {activeTablePattern.shortLabel} ×
                 </button>
               )}
             </div>
@@ -1295,14 +1801,13 @@ export const SupportIntelligence: React.FC = () => {
                   client.health === 'critical'
                     ? 'bg-rose-100 text-rose-700 border-rose-200'
                     : client.health === 'watch'
-                    ? 'bg-amber-50 text-amber-800 border-amber-200'
-                    : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                      ? 'bg-amber-50 text-amber-800 border-amber-200'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200';
                 return (
                   <div key={client.clientKey}>
                     <div
-                      className={`px-5 py-3 flex flex-wrap items-center justify-between gap-3 transition ${
-                        isExpanded ? 'bg-indigo-50/40' : 'hover:bg-slate-50'
-                      }`}
+                      className={`px-5 py-3 flex flex-wrap items-center justify-between gap-3 transition ${isExpanded ? 'bg-indigo-50/40' : 'hover:bg-slate-50'
+                        }`}
                     >
                       <button
                         type="button"
@@ -1323,8 +1828,8 @@ export const SupportIntelligence: React.FC = () => {
                           {client.health === 'critical'
                             ? 'Reincidente'
                             : client.health === 'watch'
-                            ? 'Atención'
-                            : 'Estable'}
+                              ? 'Atención'
+                              : 'Estable'}
                         </span>
 
                         <span className="text-sm font-black text-slate-900 truncate">
@@ -1430,11 +1935,10 @@ export const SupportIntelligence: React.FC = () => {
                                         })}
                                       </span>
                                       <span
-                                        className={`ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
-                                          rec.status === 'resolved'
-                                            ? 'bg-emerald-50 text-emerald-700'
-                                            : 'bg-red-50 text-red-600'
-                                        }`}
+                                        className={`ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${rec.status === 'resolved'
+                                          ? 'bg-emerald-50 text-emerald-700'
+                                          : 'bg-red-50 text-red-600'
+                                          }`}
                                       >
                                         {rec.status === 'resolved' ? 'Cerrado' : 'Abierto'}
                                       </span>
@@ -1563,7 +2067,7 @@ export const SupportIntelligence: React.FC = () => {
                 loadIntelligenceData();
               }}
               onSelectTicket={(t) => setSelectedTicketForDrawer(t)}
-              onCreateSubticket={() => {}}
+              onCreateSubticket={() => { }}
             />
           </div>
         </div>
