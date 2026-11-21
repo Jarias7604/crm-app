@@ -363,3 +363,147 @@ test('7. computeTicketAiTimeBenchmark evaluates actualHours when passed as 5th a
   assert.equal(res.reportedHours, 1.0);
   assert.equal(res.status, 'fair');
 });
+
+test('8. Merges multiple tickets sharing the same WhatsApp group JID without duplicate ping-pong rows', () => {
+  const { computeSupportWhatsAppPulse } = loaded.supportPulse;
+  const nowMs = Date.parse('2026-11-20T20:00:00.000Z');
+  const tickets = [
+    {
+      id: 't-old-closed',
+      lead_name: 'Corporación Argoz',
+      status: 'closed',
+      updated_at: '2026-11-10T10:00:00.000Z',
+      metadata: { source: 'whatsapp_evolution', whatsapp_jid: 'argoz-group@g.us' },
+    },
+    {
+      id: 't-new-open',
+      lead_name: 'Soporte tecnico Arias - Corp Argoz',
+      status: 'open',
+      updated_at: '2026-11-20T18:00:00.000Z',
+      metadata: { source: 'whatsapp_evolution', whatsapp_jid: 'argoz-group@g.us' },
+    },
+  ];
+  const profiles = [{ id: 'u-gerson', full_name: 'Gerson Gutierrez' }];
+
+  const comments = [];
+  for (let i = 0; i < 8; i++) {
+    comments.push({
+      id: `o-${i}`,
+      ticket_id: 't-old-closed',
+      author_id: i % 2 === 0 ? null : 'u-gerson',
+      body: `old ${i}`,
+      created_at: `2026-11-20T15:${String(i).padStart(2, '0')}:00.000Z`,
+    });
+  }
+  for (let i = 0; i < 8; i++) {
+    comments.push({
+      id: `n-${i}`,
+      ticket_id: 't-new-open',
+      author_id: i % 2 === 0 ? null : 'u-gerson',
+      body: `new ${i}`,
+      created_at: `2026-11-20T16:${String(i).padStart(2, '0')}:00.000Z`,
+    });
+  }
+
+  const pulse = computeSupportWhatsAppPulse({
+    tickets,
+    waMessages: [],
+    comments,
+    profiles,
+    options: { daysRange: 7, pingPongThreshold: 12, nowMs },
+  });
+
+  // Both tickets merge into 1 single Argoz conversation (16 msgs total, NOT 2 rows)
+  assert.equal(pulse.summary.todayClients, 1);
+  assert.equal(pulse.pingPongAlerts.length, 1);
+  assert.equal(pulse.pingPongAlerts[0].ticketId, 't-new-open');
+  assert.equal(pulse.pingPongAlerts[0].peakDayMessages, 16);
+});
+
+test('9. techFilter excludes conversations handled primarily by another technician even with stray replies', () => {
+  const { computeSupportWhatsAppPulse } = loaded.supportPulse;
+  const nowMs = Date.parse('2026-11-20T22:00:00.000Z');
+  const tickets = [
+    {
+      id: 't-argoz',
+      lead_name: 'Soporte tecnico Arias - Corp Argoz',
+      status: 'open',
+      metadata: { source: 'whatsapp_evolution', whatsapp_jid: 'argoz@g.us' },
+    },
+    {
+      id: 't-med',
+      lead_name: 'Soporte Tecnico Medicina Popular',
+      status: 'open',
+      metadata: { source: 'whatsapp_evolution', whatsapp_jid: 'med@g.us' },
+    },
+  ];
+  const profiles = [
+    { id: 'u-melvin', full_name: 'Melvin Rodriguez' },
+    { id: 'u-gerson', full_name: 'Gerson Gutierrez' },
+  ];
+
+  const comments = [];
+  // Argoz: 10 client msgs + 9 Gerson msgs + 1 stray Melvin msg => primaryTech = Gerson
+  for (let i = 0; i < 10; i++) {
+    comments.push({
+      id: `ac-${i}`,
+      ticket_id: 't-argoz',
+      author_id: null,
+      body: `cliente argoz ${i}`,
+      created_at: `2026-11-20T15:${String(i).padStart(2, '0')}:00.000Z`,
+    });
+  }
+  for (let i = 0; i < 9; i++) {
+    comments.push({
+      id: `ag-${i}`,
+      ticket_id: 't-argoz',
+      author_id: 'u-gerson',
+      body: `gerson argoz ${i}`,
+      created_at: `2026-11-20T16:${String(i).padStart(2, '0')}:00.000Z`,
+    });
+  }
+  comments.push({
+    id: 'am-stray',
+    ticket_id: 't-argoz',
+    author_id: 'u-melvin',
+    body: 'saludo rapido de Melvin',
+    created_at: '2026-11-20T16:30:00.000Z',
+  });
+
+  // Medicina Popular: 8 client msgs + 7 Melvin msgs => primaryTech = Melvin
+  for (let i = 0; i < 8; i++) {
+    comments.push({
+      id: `mc-${i}`,
+      ticket_id: 't-med',
+      author_id: null,
+      body: `cliente med ${i}`,
+      created_at: `2026-11-20T17:${String(i).padStart(2, '0')}:00.000Z`,
+    });
+  }
+  for (let i = 0; i < 7; i++) {
+    comments.push({
+      id: `mm-${i}`,
+      ticket_id: 't-med',
+      author_id: 'u-melvin',
+      body: `melvin med ${i}`,
+      created_at: `2026-11-20T18:${String(i).padStart(2, '0')}:00.000Z`,
+    });
+  }
+
+  const pulseMelvin = computeSupportWhatsAppPulse({
+    tickets,
+    waMessages: [],
+    comments,
+    profiles,
+    options: { daysRange: 7, pingPongThreshold: 12, nowMs, techFilter: 'Melvin Rodriguez' },
+  });
+
+  // Filtered view shows ONLY Medicina Popular (NOT Gerson's Argoz chat!)
+  assert.equal(pulseMelvin.pingPongAlerts.length, 1);
+  assert.equal(pulseMelvin.pingPongAlerts[0].ticketId, 't-med');
+  assert.equal(pulseMelvin.summary.todayClients, 1);
+  assert.equal(pulseMelvin.summary.totalMessages, 15);
+  // Global techChatMetrics still keeps both Melvin & Gerson for side-by-side comparison cards
+  assert.equal(pulseMelvin.techChatMetrics['Gerson Gutierrez'].pingPongChatsCount, 1);
+  assert.equal(pulseMelvin.techChatMetrics['Melvin Rodriguez'].pingPongChatsCount, 1);
+});

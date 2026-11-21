@@ -349,25 +349,37 @@ function resolveSupportEngineerName(rawName: string, titleText: string): string 
   return 'Sin asignar';
 }
 
-async function fetchPagedSupportRows<T>(
-  queryFactory: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+async function fetchChunkedSupportRows<T>(
+  ticketIds: string[],
+  chunkQueryFactory: (chunkIds: string[], from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+  chunkSize = 60,
   pageSize = 1000,
-  maxPages = 5,
+  maxPagesPerChunk = 3,
 ): Promise<T[]> {
-  const all: T[] = [];
-  for (let page = 0; page < maxPages; page++) {
-    const from = page * pageSize;
-    const to = from + pageSize - 1;
-    const { data, error } = await queryFactory(from, to);
-    if (error) {
-      console.warn('[SupportIntelligence] paged fetch warning:', error.message);
-      break;
-    }
-    const rows = (data || []) as T[];
-    all.push(...rows);
-    if (rows.length < pageSize) break;
+  if (ticketIds.length === 0) return [];
+  const chunks: string[][] = [];
+  for (let i = 0; i < ticketIds.length; i += chunkSize) {
+    chunks.push(ticketIds.slice(i, i + chunkSize));
   }
-  return all;
+  const results = await Promise.all(
+    chunks.map(async (chunk) => {
+      const rowsAcc: T[] = [];
+      for (let page = 0; page < maxPagesPerChunk; page++) {
+        const from = page * pageSize;
+        const to = from + pageSize - 1;
+        const { data, error } = await chunkQueryFactory(chunk, from, to);
+        if (error) {
+          console.warn('[SupportIntelligence] chunked fetch warning:', error.message);
+          break;
+        }
+        const rows = (data || []) as T[];
+        rowsAcc.push(...rows);
+        if (rows.length < pageSize) break;
+      }
+      return rowsAcc;
+    }),
+  );
+  return results.flat();
 }
 
 export const SupportIntelligence: React.FC = () => {
@@ -421,8 +433,6 @@ export const SupportIntelligence: React.FC = () => {
         ticketsRes,
         taggedTicketsRes,
         projectsRes,
-        waMsgsRows,
-        commentRows,
       ] = await Promise.all([
         supabase
           .from('profiles')
@@ -458,25 +468,6 @@ export const SupportIntelligence: React.FC = () => {
           .from('crm_projects')
           .select('id, name')
           .eq('company_id', activeCompanyId),
-        fetchPagedSupportRows<PulseWaMessageInput>((from, to) =>
-          supabase
-            .from('whatsapp_messages')
-            .select('id, ticket_id, comment_id, from_me, sender_phone, sender_name, message_ts, message_type, body')
-            .eq('company_id', activeCompanyId)
-            .gte('message_ts', cutoffIso)
-            .order('message_ts', { ascending: true })
-            .range(from, to),
-        ),
-        fetchPagedSupportRows<PulseCommentInput>((from, to) =>
-          supabase
-            .from('ticket_comments')
-            .select('id, ticket_id, author_id, body, is_internal, created_at')
-            .eq('company_id', activeCompanyId)
-            .eq('is_internal', false)
-            .gte('created_at', cutoffIso)
-            .order('created_at', { ascending: true })
-            .range(from, to),
-        ),
       ]);
 
       const profs = (profsRes.data || []) as (CompanyAgent & { phone?: string | null })[];
@@ -486,6 +477,34 @@ export const SupportIntelligence: React.FC = () => {
       const rawTickets = ((ticketsRes.data || []) as Ticket[]).filter((t) => isSupportTicket(t));
       const taggedTickets = ((taggedTicketsRes.data || []) as Ticket[]).filter((t) => isSupportTicket(t));
       const projects = projectsRes.data || [];
+
+      const supportTicketIds = Array.from(
+        new Set([...rawTickets.map((t) => t.id), ...taggedTickets.map((t) => t.id)]),
+      );
+
+      const [waMsgsRows, commentRows] = await Promise.all([
+        fetchChunkedSupportRows<PulseWaMessageInput>(supportTicketIds, (chunkIds, from, to) =>
+          supabase
+            .from('whatsapp_messages')
+            .select('id, ticket_id, comment_id, from_me, sender_phone, sender_name, message_ts, message_type, body')
+            .eq('company_id', activeCompanyId)
+            .in('ticket_id', chunkIds)
+            .gte('message_ts', cutoffIso)
+            .order('message_ts', { ascending: false })
+            .range(from, to),
+        ),
+        fetchChunkedSupportRows<PulseCommentInput>(supportTicketIds, (chunkIds, from, to) =>
+          supabase
+            .from('ticket_comments')
+            .select('id, ticket_id, author_id, body, is_internal, created_at')
+            .eq('company_id', activeCompanyId)
+            .eq('is_internal', false)
+            .in('ticket_id', chunkIds)
+            .gte('created_at', cutoffIso)
+            .order('created_at', { ascending: false })
+            .range(from, to),
+        ),
+      ]);
 
       setAgentsList(profs);
       setProfilesPulseList(
@@ -718,8 +737,8 @@ export const SupportIntelligence: React.FC = () => {
     }
   };
 
-  // Filtered records
-  const filteredRecords = useMemo(() => {
+  // Base records before technician filter (so both Melvin & Gerson comparison cards keep real totals)
+  const recordsBeforeTechFilter = useMemo(() => {
     return records.filter((r) => {
       if (activeFilterPill !== 'all') {
         if (['P1', 'P2', 'P3', 'P4', 'FAQ'].includes(activeFilterPill)) {
@@ -732,9 +751,6 @@ export const SupportIntelligence: React.FC = () => {
           return false;
         }
       }
-      if (selectedTechFilter !== 'all' && r.techName !== selectedTechFilter) {
-        return false;
-      }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -745,7 +761,13 @@ export const SupportIntelligence: React.FC = () => {
       }
       return true;
     });
-  }, [records, activeFilterPill, selectedTechFilter, searchQuery]);
+  }, [records, activeFilterPill, searchQuery]);
+
+  // Filtered records (including selectedTechFilter)
+  const filteredRecords = useMemo(() => {
+    if (selectedTechFilter === 'all') return recordsBeforeTechFilter;
+    return recordsBeforeTechFilter.filter((r) => r.techName === selectedTechFilter);
+  }, [recordsBeforeTechFilter, selectedTechFilter]);
 
   // Pill counts
   const pillCounts = useMemo(() => {
@@ -771,7 +793,7 @@ export const SupportIntelligence: React.FC = () => {
   const mainTechCards = useMemo<TechExecutiveCard[]>(() => {
     const targetNames = ['Melvin Rodriguez', 'Gerson Gutierrez'];
     return targetNames.map((techName) => {
-      const recs = filteredRecords.filter((r) => r.techName === techName);
+      const recs = recordsBeforeTechFilter.filter((r) => r.techName === techName);
       const openTickets = recs.filter((r) => r.status !== 'resolved').length;
       const resolvedTickets = recs.filter((r) => r.status === 'resolved').length;
 
@@ -965,9 +987,9 @@ export const SupportIntelligence: React.FC = () => {
       waMessages: waMessagesList,
       comments: waCommentsList,
       profiles: profilesPulseList,
-      options: { daysRange, pingPongThreshold: 12 },
+      options: { daysRange, pingPongThreshold: 12, techFilter: selectedTechFilter },
     });
-  }, [rawTicketsList, rootCauseTicketsList, waMessagesList, waCommentsList, profilesPulseList, daysRange]);
+  }, [rawTicketsList, rootCauseTicketsList, waMessagesList, waCommentsList, profilesPulseList, daysRange, selectedTechFilter]);
 
   const handleMarkDevResolved = async (item: SupportPulseResult['rootCauseQueue']['pendingForDev'][number]) => {
     const key = `${item.ticketId}:${item.entryId}`;
@@ -1154,11 +1176,25 @@ export const SupportIntelligence: React.FC = () => {
         {/* ── 0. PULSO DIARIO DE WHATSAPP SOPORTE (Datos Reales de Mensajes) ── */}
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Activity className="w-4 h-4 text-indigo-600" />
               <h2 className="text-sm font-black text-slate-900 tracking-tight">
                 Pulso Diario de WhatsApp Soporte (Últimos {daysRange} días)
               </h2>
+              {selectedTechFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedTechFilter('all');
+                    setExpandedClientName('Corporación Argoz');
+                  }}
+                  title="Quitar filtro de técnico y ver todo el equipo"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition"
+                >
+                  <span>Solo: {selectedTechFilter}</span>
+                  <span>· Ver todos ×</span>
+                </button>
+              )}
             </div>
             <span className="text-[11px] font-semibold text-slate-500">
               {pulse.summary.uniqueClientsInPeriod} clientes/grupos únicos · Tiempo estimado automático por bloques activos de chat
@@ -1510,6 +1546,8 @@ export const SupportIntelligence: React.FC = () => {
                 className={`bg-white rounded-2xl p-4 border transition ${
                   isSelected
                     ? 'border-indigo-600 ring-2 ring-indigo-500/15'
+                    : selectedTechFilter !== 'all'
+                    ? 'border-slate-200/80 opacity-65 hover:opacity-100 hover:border-slate-300'
                     : 'border-slate-200/80 hover:border-slate-300'
                 }`}
               >
@@ -1536,9 +1574,11 @@ export const SupportIntelligence: React.FC = () => {
                   </div>
 
                   <button
-                    onClick={() =>
-                      setSelectedTechFilter(isSelected ? 'all' : tech.techName)
-                    }
+                    onClick={() => {
+                      const nextTech = isSelected ? 'all' : tech.techName;
+                      setSelectedTechFilter(nextTech);
+                      setExpandedClientName(nextTech === 'all' ? 'Corporación Argoz' : null);
+                    }}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                       isSelected
                         ? 'bg-indigo-600 text-white'

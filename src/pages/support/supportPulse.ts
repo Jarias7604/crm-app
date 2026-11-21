@@ -242,6 +242,7 @@ export interface PulseTicketInput {
   id: string;
   title?: string | null;
   lead_name?: string | null;
+  status?: string | null;
   assigned_to?: string | null;
   metadata?: Record<string, any> | null;
   updated_at?: string | null;
@@ -348,6 +349,7 @@ export interface SupportPulseResult {
   dailySeries: DailyPulseRow[];
   pingPongAlerts: PingPongChatAlert[];
   techChatMetrics: Record<string, TechChatMetrics>;
+  primaryTechByTicketId: Record<string, string>;
   rootCauseQueue: {
     counts: Record<SupportRootCauseType, number>;
     pendingForDev: RootCauseQueueItem[];
@@ -409,11 +411,20 @@ export function computeSupportWhatsAppPulse(input: {
   waMessages: PulseWaMessageInput[];
   comments: PulseCommentInput[];
   profiles: PulseProfileInput[];
-  options?: { daysRange?: number; pingPongThreshold?: number; nowMs?: number };
+  options?: {
+    daysRange?: number;
+    pingPongThreshold?: number;
+    nowMs?: number;
+    techFilter?: string;
+  };
 }): SupportPulseResult {
   const nowMs = input.options?.nowMs ?? Date.now();
   const daysRange = Math.max(1, input.options?.daysRange ?? 15);
   const pingPongThreshold = Math.max(4, input.options?.pingPongThreshold ?? 12);
+  const activeTechFilter =
+    input.options?.techFilter && input.options.techFilter !== 'all'
+      ? input.options.techFilter
+      : null;
 
   // Start at midnight El Salvador time (UTC-6 year round) for (daysRange - 1) days ago
   const todayKey = toDayKey(nowMs);
@@ -422,17 +433,7 @@ export function computeSupportWhatsAppPulse(input: {
   const cutoffMs = todayMidnightSvUtcMs - (daysRange - 1) * 24 * 60 * 60 * 1000;
   const maxAllowedMs = nowMs + 60 * 1000;
 
-  // Map canonical support tickets
-  const ticketMap = new Map<string, PulseTicketInput>();
-  for (const t of input.tickets || []) {
-    if (!t?.id) continue;
-    const meta = (t.metadata || {}) as Record<string, any>;
-    if (meta.merged_into) continue;
-    if (/^\s*jornada\s+(melvin|gerson)/i.test(String(t.title || ''))) continue;
-    ticketMap.set(t.id, t);
-  }
-
-  // Profile indexes
+  // Profile indexes (built before grouping so fallback assigned_to works)
   const profileNameById = new Map<string, string>();
   const profileNameByLast8 = new Map<string, string>();
   const profileFirstWordMap = new Map<string, string>();
@@ -450,6 +451,55 @@ export function computeSupportWhatsAppPulse(input: {
     const l8 = last8Digits(p.phone);
     if (l8 && resolvedName) {
       profileNameByLast8.set(l8, resolvedName);
+    }
+  }
+
+  // Group tickets into unified conversations (merges duplicate tickets for the same WhatsApp group)
+  interface ConvGroup {
+    convKey: string;
+    representative: PulseTicketInput;
+    tickets: PulseTicketInput[];
+    primaryTech: string;
+  }
+  const ticketMap = new Map<string, PulseTicketInput>();
+  const ticketIdToConvKey = new Map<string, string>();
+  const convMap = new Map<string, ConvGroup>();
+
+  const ticketFreshnessScore = (t: PulseTicketInput) => {
+    const isOpen = ['new', 'open', 'pending'].includes(String(t.status || '')) ? 1 : 0;
+    const ts = Date.parse(String(t.updated_at || t.created_at || '')) || 0;
+    return { isOpen, ts };
+  };
+
+  for (const t of input.tickets || []) {
+    if (!t?.id) continue;
+    const meta = (t.metadata || {}) as Record<string, any>;
+    if (meta.merged_into) continue;
+    if (/^\s*jornada\s+(melvin|gerson)/i.test(String(t.title || ''))) continue;
+
+    ticketMap.set(t.id, t);
+    const circleId = deriveCircleId(t);
+    const convKey = circleId || `ticket:${t.id}`;
+    ticketIdToConvKey.set(t.id, convKey);
+
+    const existing = convMap.get(convKey);
+    if (!existing) {
+      convMap.set(convKey, {
+        convKey,
+        representative: t,
+        tickets: [t],
+        primaryTech: 'WhatsApp Soporte',
+      });
+    } else {
+      existing.tickets.push(t);
+      const curScore = ticketFreshnessScore(existing.representative);
+      const candScore = ticketFreshnessScore(t);
+      if (
+        candScore.isOpen > curScore.isOpen ||
+        (candScore.isOpen === curScore.isOpen && candScore.ts > curScore.ts)
+      ) {
+        existing.representative = t;
+      }
     }
   }
 
@@ -488,6 +538,7 @@ export function computeSupportWhatsAppPulse(input: {
 
   interface UnifiedMsgEvent {
     ticketId: string;
+    convKey: string;
     ms: number;
     dayKey: string;
     isStaff: boolean;
@@ -496,18 +547,19 @@ export function computeSupportWhatsAppPulse(input: {
 
   const events: UnifiedMsgEvent[] = [];
   const usedCommentIds = new Set<string>();
-  const outboundWaMsByTicket = new Map<string, number[]>();
+  const outboundWaMsByConv = new Map<string, number[]>();
 
   // 1. Primary pass: whatsapp_messages
   for (const m of input.waMessages || []) {
     if (!m || !ticketMap.has(m.ticket_id)) continue;
     const ms = Date.parse(String(m.message_ts || ''));
     if (!Number.isFinite(ms) || ms < cutoffMs || ms > maxAllowedMs) continue;
+    const convKey = ticketIdToConvKey.get(m.ticket_id)!;
 
     if (m.from_me) {
-      const arr = outboundWaMsByTicket.get(m.ticket_id) || [];
+      const arr = outboundWaMsByConv.get(convKey) || [];
       arr.push(ms);
-      outboundWaMsByTicket.set(m.ticket_id, arr);
+      outboundWaMsByConv.set(convKey, arr);
     }
 
     const linkedComment = m.comment_id ? commentById.get(m.comment_id) : undefined;
@@ -540,7 +592,8 @@ export function computeSupportWhatsAppPulse(input: {
     }
 
     const commentHasStaffIcon = Boolean(linkedComment?.body?.includes('👨‍💻'));
-    const isStaff = Boolean(staffName) || Boolean(m.from_me) || Boolean(linkedComment?.author_id) || commentHasStaffIcon;
+    const isStaff =
+      Boolean(staffName) || Boolean(m.from_me) || Boolean(linkedComment?.author_id) || commentHasStaffIcon;
 
     let finalStaffName: string | null = null;
     if (isStaff && !isBot) {
@@ -549,6 +602,7 @@ export function computeSupportWhatsAppPulse(input: {
 
     events.push({
       ticketId: m.ticket_id,
+      convKey,
       ms,
       dayKey: toDayKey(ms),
       isStaff,
@@ -562,6 +616,7 @@ export function computeSupportWhatsAppPulse(input: {
     if (!ticketMap.has(c.ticket_id)) continue;
     const ms = Date.parse(String(c.created_at || ''));
     if (!Number.isFinite(ms) || ms < cutoffMs || ms > maxAllowedMs) continue;
+    const convKey = ticketIdToConvKey.get(c.ticket_id)!;
 
     const body = String(c.body || '');
     const { isBot, staffName } = resolveStaffFromComment(c);
@@ -569,7 +624,7 @@ export function computeSupportWhatsAppPulse(input: {
 
     // Echo guard: skip CRM-written outgoing comment if a matching from_me waMessage occurred within +-15s
     if (hasStaffMarker) {
-      const outArr = outboundWaMsByTicket.get(c.ticket_id);
+      const outArr = outboundWaMsByConv.get(convKey);
       if (outArr && outArr.some((waMs) => Math.abs(waMs - ms) <= OUTBOUND_ECHO_WINDOW_MS)) {
         continue;
       }
@@ -582,6 +637,7 @@ export function computeSupportWhatsAppPulse(input: {
 
     events.push({
       ticketId: c.ticket_id,
+      convKey,
       ms,
       dayKey: toDayKey(ms),
       isStaff: hasStaffMarker,
@@ -589,36 +645,9 @@ export function computeSupportWhatsAppPulse(input: {
     });
   }
 
-  // Initialize daily calendar buckets (chronological oldest -> newest)
-  const dailyMap = new Map<
-    string,
-    {
-      dayKey: string;
-      clients: Set<string>;
-      totalMessages: number;
-      clientMessages: number;
-      staffMessages: number;
-      estStaffMinutes: number;
-      msgsByTicket: Map<string, number>;
-    }
-  >();
-
-  for (let i = daysRange - 1; i >= 0; i--) {
-    const dk = toDayKey(nowMs - i * 24 * 60 * 60 * 1000);
-    dailyMap.set(dk, {
-      dayKey: dk,
-      clients: new Set<string>(),
-      totalMessages: 0,
-      clientMessages: 0,
-      staffMessages: 0,
-      estStaffMinutes: 0,
-      msgsByTicket: new Map<string, number>(),
-    });
-  }
-
-  // Per-ticket & per-staff aggregations
-  interface TicketAgg {
-    ticketId: string;
+  // Per-conversation & per-staff aggregations across ALL support conversations
+  interface ConvAgg {
+    convKey: string;
     totalMessages: number;
     clientMsgs: number;
     staffMsgs: number;
@@ -626,46 +655,18 @@ export function computeSupportWhatsAppPulse(input: {
     dayCounts: Map<string, number>;
     staffCounts: Map<string, number>;
     staffTimestamps: number[];
+    isPingPong: boolean;
+    peakDayKey: string;
+    peakDayMessages: number;
   }
-  const ticketAggMap = new Map<string, TicketAgg>();
-  const staffEventsMap = new Map<string, Array<{ ms: number; dayKey: string; ticketId: string }>>();
-  const uniqueClientsInPeriod = new Set<string>();
-
-  let totalMessages = 0;
-  let clientMessages = 0;
-  let staffMessages = 0;
+  const convAggMap = new Map<string, ConvAgg>();
+  const globalStaffEventsMap = new Map<string, Array<{ ms: number; dayKey: string; convKey: string }>>();
 
   for (const ev of events) {
-    totalMessages += 1;
-    if (ev.isStaff) staffMessages += 1;
-    else clientMessages += 1;
-    uniqueClientsInPeriod.add(ev.ticketId);
-
-    // Daily bucket
-    let dBucket = dailyMap.get(ev.dayKey);
-    if (!dBucket) {
-      dBucket = {
-        dayKey: ev.dayKey,
-        clients: new Set<string>(),
-        totalMessages: 0,
-        clientMessages: 0,
-        staffMessages: 0,
-        estStaffMinutes: 0,
-        msgsByTicket: new Map<string, number>(),
-      };
-      dailyMap.set(ev.dayKey, dBucket);
-    }
-    dBucket.clients.add(ev.ticketId);
-    dBucket.totalMessages += 1;
-    if (ev.isStaff) dBucket.staffMessages += 1;
-    else dBucket.clientMessages += 1;
-    dBucket.msgsByTicket.set(ev.ticketId, (dBucket.msgsByTicket.get(ev.ticketId) || 0) + 1);
-
-    // Ticket bucket
-    let tAgg = ticketAggMap.get(ev.ticketId);
-    if (!tAgg) {
-      tAgg = {
-        ticketId: ev.ticketId,
+    let cAgg = convAggMap.get(ev.convKey);
+    if (!cAgg) {
+      cAgg = {
+        convKey: ev.convKey,
         totalMessages: 0,
         clientMsgs: 0,
         staffMsgs: 0,
@@ -673,118 +674,91 @@ export function computeSupportWhatsAppPulse(input: {
         dayCounts: new Map<string, number>(),
         staffCounts: new Map<string, number>(),
         staffTimestamps: [],
+        isPingPong: false,
+        peakDayKey: '',
+        peakDayMessages: 0,
       };
-      ticketAggMap.set(ev.ticketId, tAgg);
+      convAggMap.set(ev.convKey, cAgg);
     }
-    tAgg.totalMessages += 1;
-    if (ev.isStaff) tAgg.staffMsgs += 1;
-    else tAgg.clientMsgs += 1;
-    if (ev.ms > tAgg.lastMsgMs) tAgg.lastMsgMs = ev.ms;
-    tAgg.dayCounts.set(ev.dayKey, (tAgg.dayCounts.get(ev.dayKey) || 0) + 1);
+    cAgg.totalMessages += 1;
+    if (ev.isStaff) cAgg.staffMsgs += 1;
+    else cAgg.clientMsgs += 1;
+    if (ev.ms > cAgg.lastMsgMs) cAgg.lastMsgMs = ev.ms;
+    cAgg.dayCounts.set(ev.dayKey, (cAgg.dayCounts.get(ev.dayKey) || 0) + 1);
 
     if (ev.isStaff && ev.staffName) {
-      tAgg.staffCounts.set(ev.staffName, (tAgg.staffCounts.get(ev.staffName) || 0) + 1);
-      tAgg.staffTimestamps.push(ev.ms);
+      cAgg.staffCounts.set(ev.staffName, (cAgg.staffCounts.get(ev.staffName) || 0) + 1);
+      cAgg.staffTimestamps.push(ev.ms);
 
-      const sList = staffEventsMap.get(ev.staffName) || [];
-      sList.push({ ms: ev.ms, dayKey: ev.dayKey, ticketId: ev.ticketId });
-      staffEventsMap.set(ev.staffName, sList);
+      const sList = globalStaffEventsMap.get(ev.staffName) || [];
+      sList.push({ ms: ev.ms, dayKey: ev.dayKey, convKey: ev.convKey });
+      globalStaffEventsMap.set(ev.staffName, sList);
     }
   }
 
-  // Burst-based active chat time per technician & per day
+  // Assign primaryTech and peak/pingPong flags for every conversation
+  const primaryTechByTicketId: Record<string, string> = {};
+  for (const conv of convMap.values()) {
+    const cAgg = convAggMap.get(conv.convKey);
+    let primaryTech = '';
+    if (cAgg) {
+      let bestTechCount = -1;
+      for (const [name, cnt] of cAgg.staffCounts.entries()) {
+        const bonus = name === 'WhatsApp Soporte' || name === 'Equipo Soporte' ? 0 : 0.5;
+        if (cnt + bonus > bestTechCount) {
+          bestTechCount = cnt + bonus;
+          primaryTech = name;
+        }
+      }
+      for (const [dk, cnt] of cAgg.dayCounts.entries()) {
+        if (cnt > cAgg.peakDayMessages || (cnt === cAgg.peakDayMessages && dk > cAgg.peakDayKey)) {
+          cAgg.peakDayMessages = cnt;
+          cAgg.peakDayKey = dk;
+        }
+      }
+      cAgg.isPingPong = cAgg.peakDayMessages >= pingPongThreshold;
+    }
+
+    if (!primaryTech && conv.representative.assigned_to && profileNameById.has(conv.representative.assigned_to)) {
+      primaryTech = profileNameById.get(conv.representative.assigned_to)!;
+    }
+    if (!primaryTech) {
+      const assignedTicket = conv.tickets.find((t) => t.assigned_to && profileNameById.has(t.assigned_to));
+      if (assignedTicket?.assigned_to) {
+        primaryTech = profileNameById.get(assignedTicket.assigned_to)!;
+      }
+    }
+    conv.primaryTech = primaryTech || 'WhatsApp Soporte';
+
+    for (const t of conv.tickets) {
+      primaryTechByTicketId[t.id] = conv.primaryTech;
+    }
+  }
+
+  // Global per-tech metrics across ALL conversations (always stays populated for comparison cards)
   const techChatMetrics: Record<string, TechChatMetrics> = {};
-  const ticketPingPongSet = new Set<string>();
-
-  // Identify ping-pong tickets first
-  const pingPongAlerts: PingPongChatAlert[] = [];
-  for (const tAgg of ticketAggMap.values()) {
-    let peakDayKey = '';
-    let peakDayMessages = 0;
-    for (const [dk, cnt] of tAgg.dayCounts.entries()) {
-      if (cnt > peakDayMessages || (cnt === peakDayMessages && dk > peakDayKey)) {
-        peakDayMessages = cnt;
-        peakDayKey = dk;
-      }
-    }
-    if (peakDayMessages < pingPongThreshold) continue;
-
-    ticketPingPongSet.add(tAgg.ticketId);
-    const ticket = ticketMap.get(tAgg.ticketId)!;
-
-    // Pick primary technician
-    let primaryTech = 'WhatsApp Soporte';
-    let bestTechCount = -1;
-    for (const [name, cnt] of tAgg.staffCounts.entries()) {
-      if (cnt > bestTechCount) {
-        bestTechCount = cnt;
-        primaryTech = name;
-      }
-    }
-
-    // Burst minutes inside this ticket
-    const sortedTs = [...tAgg.staffTimestamps].sort((a, b) => a - b);
-    let ticketBurstMin = 0;
-    let prevMs: number | null = null;
-    for (const ts of sortedTs) {
-      if (prevMs === null || ts - prevMs > BURST_GAP_MS) {
-        ticketBurstMin += BURST_BASE_MIN;
-      } else {
-        ticketBurstMin += Math.max(0, (ts - prevMs) / 60000);
-      }
-      prevMs = ts;
-    }
-
-    const entries = extractRootCauseEntries(ticket.metadata);
-    pingPongAlerts.push({
-      ticketId: tAgg.ticketId,
-      circleId: deriveCircleId(ticket),
-      clientName: deriveTicketClientName(ticket),
-      peakDayKey,
-      peakDayLabel: toDayLabel(peakDayKey),
-      peakDayMessages,
-      totalPeriodMessages: tAgg.totalMessages,
-      clientMsgs: tAgg.clientMsgs,
-      staffMsgs: tAgg.staffMsgs,
-      primaryTech,
-      estMinutes: Math.round(ticketBurstMin),
-      lastRootCause: entries[0] || null,
-      lastMessageAt: new Date(tAgg.lastMsgMs).toISOString(),
-    });
-  }
-
-  pingPongAlerts.sort(
-    (a, b) =>
-      b.peakDayMessages - a.peakDayMessages ||
-      b.totalPeriodMessages - a.totalPeriodMessages,
-  );
-
-  // Build per-tech metrics & credit estStaffMinutes to dailyMap
-  let estTotalStaffMinutes = 0;
-  for (const [techName, sEvents] of staffEventsMap.entries()) {
+  for (const [techName, sEvents] of globalStaffEventsMap.entries()) {
     const sorted = [...sEvents].sort((a, b) => a.ms - b.ms);
     let techMinutes = 0;
     let prevMs: number | null = null;
-    const uniqueClients = new Set<string>();
+    const uniqueConvs = new Set<string>();
     const activeDaysSet = new Set<string>();
-    const techPingPongTickets = new Set<string>();
+    const techPingPongConvs = new Set<string>();
 
     for (const ev of sorted) {
-      uniqueClients.add(ev.ticketId);
+      uniqueConvs.add(ev.convKey);
       activeDaysSet.add(ev.dayKey);
-      if (ticketPingPongSet.has(ev.ticketId)) {
-        techPingPongTickets.add(ev.ticketId);
+      const conv = convMap.get(ev.convKey);
+      const cAgg = convAggMap.get(ev.convKey);
+      if (cAgg?.isPingPong && conv?.primaryTech === techName) {
+        techPingPongConvs.add(ev.convKey);
       }
       const deltaMin =
         prevMs === null || ev.ms - prevMs > BURST_GAP_MS
           ? BURST_BASE_MIN
           : Math.max(0, (ev.ms - prevMs) / 60000);
       prevMs = ev.ms;
-
       techMinutes += deltaMin;
-      estTotalStaffMinutes += deltaMin;
-      const dBucket = dailyMap.get(ev.dayKey);
-      if (dBucket) dBucket.estStaffMinutes += deltaMin;
     }
 
     const estChatHours = +(techMinutes / 60).toFixed(1);
@@ -792,9 +766,9 @@ export function computeSupportWhatsAppPulse(input: {
     techChatMetrics[techName] = {
       techName,
       staffMessages: sorted.length,
-      uniqueClientsHelped: uniqueClients.size,
-      avgMsgsPerClient: uniqueClients.size > 0 ? +(sorted.length / uniqueClients.size).toFixed(1) : 0,
-      pingPongChatsCount: techPingPongTickets.size,
+      uniqueClientsHelped: uniqueConvs.size,
+      avgMsgsPerClient: uniqueConvs.size > 0 ? +(sorted.length / uniqueConvs.size).toFixed(1) : 0,
+      pingPongChatsCount: techPingPongConvs.size,
       estChatHours,
       activeDays,
       avgChatHoursPerActiveDay: activeDays > 0 ? +(estChatHours / activeDays).toFixed(1) : 0,
@@ -807,7 +781,144 @@ export function computeSupportWhatsAppPulse(input: {
     };
   }
 
-  // Root-cause queue & counts across all tickets
+  // Initialize daily calendar buckets (filtered when techFilter is active)
+  const dailyMap = new Map<
+    string,
+    {
+      dayKey: string;
+      clients: Set<string>;
+      totalMessages: number;
+      clientMessages: number;
+      staffMessages: number;
+      estStaffMinutes: number;
+      msgsByConv: Map<string, number>;
+    }
+  >();
+
+  for (let i = daysRange - 1; i >= 0; i--) {
+    const dk = toDayKey(nowMs - i * 24 * 60 * 60 * 1000);
+    dailyMap.set(dk, {
+      dayKey: dk,
+      clients: new Set<string>(),
+      totalMessages: 0,
+      clientMessages: 0,
+      staffMessages: 0,
+      estStaffMinutes: 0,
+      msgsByConv: new Map<string, number>(),
+    });
+  }
+
+  const includedConvKeys = new Set<string>();
+  for (const conv of convMap.values()) {
+    if (!activeTechFilter || conv.primaryTech === activeTechFilter) {
+      includedConvKeys.add(conv.convKey);
+    }
+  }
+
+  const uniqueClientsInPeriod = new Set<string>();
+  let totalMessages = 0;
+  let clientMessages = 0;
+  let staffMessages = 0;
+  const filteredStaffEventsByTech = new Map<string, Array<{ ms: number; dayKey: string }>>();
+
+  for (const ev of events) {
+    if (!includedConvKeys.has(ev.convKey)) continue;
+    totalMessages += 1;
+    if (ev.isStaff) staffMessages += 1;
+    else clientMessages += 1;
+    uniqueClientsInPeriod.add(ev.convKey);
+
+    let dBucket = dailyMap.get(ev.dayKey);
+    if (!dBucket) {
+      dBucket = {
+        dayKey: ev.dayKey,
+        clients: new Set<string>(),
+        totalMessages: 0,
+        clientMessages: 0,
+        staffMessages: 0,
+        estStaffMinutes: 0,
+        msgsByConv: new Map<string, number>(),
+      };
+      dailyMap.set(ev.dayKey, dBucket);
+    }
+    dBucket.clients.add(ev.convKey);
+    dBucket.totalMessages += 1;
+    if (ev.isStaff) dBucket.staffMessages += 1;
+    else dBucket.clientMessages += 1;
+    dBucket.msgsByConv.set(ev.convKey, (dBucket.msgsByConv.get(ev.convKey) || 0) + 1);
+
+    if (ev.isStaff && ev.staffName) {
+      if (!activeTechFilter || ev.staffName === activeTechFilter) {
+        const sArr = filteredStaffEventsByTech.get(ev.staffName) || [];
+        sArr.push({ ms: ev.ms, dayKey: ev.dayKey });
+        filteredStaffEventsByTech.set(ev.staffName, sArr);
+      }
+    }
+  }
+
+  // Burst time for displayed summary + dailySeries
+  let estTotalStaffMinutes = 0;
+  for (const sEvents of filteredStaffEventsByTech.values()) {
+    const sorted = [...sEvents].sort((a, b) => a.ms - b.ms);
+    let prevMs: number | null = null;
+    for (const ev of sorted) {
+      const deltaMin =
+        prevMs === null || ev.ms - prevMs > BURST_GAP_MS
+          ? BURST_BASE_MIN
+          : Math.max(0, (ev.ms - prevMs) / 60000);
+      prevMs = ev.ms;
+      estTotalStaffMinutes += deltaMin;
+      const dBucket = dailyMap.get(ev.dayKey);
+      if (dBucket) dBucket.estStaffMinutes += deltaMin;
+    }
+  }
+
+  // Ping-pong alerts (deduplicated per conversation & respecting techFilter)
+  const pingPongAlerts: PingPongChatAlert[] = [];
+  for (const cAgg of convAggMap.values()) {
+    if (!cAgg.isPingPong || !includedConvKeys.has(cAgg.convKey)) continue;
+    const conv = convMap.get(cAgg.convKey)!;
+
+    const sortedTs = [...cAgg.staffTimestamps].sort((a, b) => a - b);
+    let convBurstMin = 0;
+    let prevMs: number | null = null;
+    for (const ts of sortedTs) {
+      if (prevMs === null || ts - prevMs > BURST_GAP_MS) {
+        convBurstMin += BURST_BASE_MIN;
+      } else {
+        convBurstMin += Math.max(0, (ts - prevMs) / 60000);
+      }
+      prevMs = ts;
+    }
+
+    const combinedEntries = conv.tickets
+      .flatMap((t) => extractRootCauseEntries(t.metadata))
+      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+
+    pingPongAlerts.push({
+      ticketId: conv.representative.id,
+      circleId: deriveCircleId(conv.representative),
+      clientName: deriveTicketClientName(conv.representative),
+      peakDayKey: cAgg.peakDayKey,
+      peakDayLabel: toDayLabel(cAgg.peakDayKey),
+      peakDayMessages: cAgg.peakDayMessages,
+      totalPeriodMessages: cAgg.totalMessages,
+      clientMsgs: cAgg.clientMsgs,
+      staffMsgs: cAgg.staffMsgs,
+      primaryTech: conv.primaryTech,
+      estMinutes: Math.round(convBurstMin),
+      lastRootCause: combinedEntries[0] || null,
+      lastMessageAt: new Date(cAgg.lastMsgMs).toISOString(),
+    });
+  }
+
+  pingPongAlerts.sort(
+    (a, b) =>
+      b.peakDayMessages - a.peakDayMessages ||
+      b.totalPeriodMessages - a.totalPeriodMessages,
+  );
+
+  // Root-cause queue & counts (deduplicated across tickets of the same conversation)
   const rcCounts: Record<SupportRootCauseType, number> = {
     system_bug: 0,
     temp_patch: 0,
@@ -818,46 +929,58 @@ export function computeSupportWhatsAppPulse(input: {
   let resolvedByDevCount = 0;
   let totalTagged = 0;
 
-  for (const ticket of ticketMap.values()) {
-    const entries = extractRootCauseEntries(ticket.metadata);
-    if (entries.length === 0) continue;
-    const clientName = deriveTicketClientName(ticket);
-    const circleId = deriveCircleId(ticket);
-    const tAgg = ticketAggMap.get(ticket.id);
-    const periodMessages = tAgg?.totalMessages || 0;
+  for (const conv of convMap.values()) {
+    const cAgg = convAggMap.get(conv.convKey);
+    const periodMessages = cAgg?.totalMessages || 0;
+    const clientName = deriveTicketClientName(conv.representative);
+    const circleId = deriveCircleId(conv.representative);
 
-    for (const entry of entries) {
-      const entryMs = Date.parse(entry.at);
-      const inRange = Number.isFinite(entryMs) && entryMs >= cutoffMs && entryMs <= maxAllowedMs;
-      const isEscalatedDev = entry.type === 'system_bug' || entry.type === 'temp_patch';
-      const isPendingDev = isEscalatedDev && !entry.dev_resolved_at;
+    const seenEntryIds = new Set<string>();
+    for (const ticket of conv.tickets) {
+      const entries = extractRootCauseEntries(ticket.metadata);
+      for (const entry of entries) {
+        if (seenEntryIds.has(entry.id)) continue;
+        seenEntryIds.add(entry.id);
 
-      if (inRange) {
-        rcCounts[entry.type] += 1;
-        totalTagged += 1;
-        if (entry.dev_resolved_at) resolvedByDevCount += 1;
+        const entryMs = Date.parse(entry.at);
+        const inRange = Number.isFinite(entryMs) && entryMs >= cutoffMs && entryMs <= maxAllowedMs;
+        const normAuthor = normalizeStaffDisplayName(entry.by_name);
 
-        const normTech = normalizeStaffDisplayName(entry.by_name);
-        if (normTech && techChatMetrics[normTech]) {
-          techChatMetrics[normTech].rootCauseCounts[entry.type] += 1;
+        if (inRange && normAuthor && techChatMetrics[normAuthor]) {
+          techChatMetrics[normAuthor].rootCauseCounts[entry.type] += 1;
         }
-      }
 
-      if (isPendingDev) {
-        pendingForDev.push({
-          entryId: entry.id,
-          ticketId: ticket.id,
-          circleId,
-          clientName,
-          type: entry.type,
-          note: entry.note || null,
-          byName: entry.by_name,
-          at: entry.at,
-          msgCount24h: entry.msg_count_24h || 0,
-          periodMessages,
-          devResolvedAt: entry.dev_resolved_at || null,
-          devResolvedBy: entry.dev_resolved_by || null,
-        });
+        const matchesTechFilter =
+          !activeTechFilter ||
+          conv.primaryTech === activeTechFilter ||
+          normAuthor === activeTechFilter;
+        if (!matchesTechFilter) continue;
+
+        const isEscalatedDev = entry.type === 'system_bug' || entry.type === 'temp_patch';
+        const isPendingDev = isEscalatedDev && !entry.dev_resolved_at;
+
+        if (inRange) {
+          rcCounts[entry.type] += 1;
+          totalTagged += 1;
+          if (entry.dev_resolved_at) resolvedByDevCount += 1;
+        }
+
+        if (isPendingDev) {
+          pendingForDev.push({
+            entryId: entry.id,
+            ticketId: ticket.id,
+            circleId,
+            clientName,
+            type: entry.type,
+            note: entry.note || null,
+            byName: entry.by_name,
+            at: entry.at,
+            msgCount24h: entry.msg_count_24h || 0,
+            periodMessages,
+            devResolvedAt: entry.dev_resolved_at || null,
+            devResolvedBy: entry.dev_resolved_by || null,
+          });
+        }
       }
     }
   }
@@ -874,7 +997,7 @@ export function computeSupportWhatsAppPulse(input: {
     .sort((a, b) => a.dayKey.localeCompare(b.dayKey))
     .map((d) => {
       let dayPingPong = 0;
-      for (const cnt of d.msgsByTicket.values()) {
+      for (const cnt of d.msgsByConv.values()) {
         if (cnt >= pingPongThreshold) dayPingPong += 1;
       }
       return {
@@ -920,6 +1043,7 @@ export function computeSupportWhatsAppPulse(input: {
     dailySeries,
     pingPongAlerts,
     techChatMetrics,
+    primaryTechByTicketId,
     rootCauseQueue: {
       counts: rcCounts,
       pendingForDev,
