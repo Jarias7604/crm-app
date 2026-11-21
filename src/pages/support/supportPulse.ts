@@ -1681,6 +1681,7 @@ export interface ExecutiveTicketRecordInput<T = any> {
   expectedAiHours: number;
   diffAiHours?: number;
   aiTimeStatus: 'missing_time' | 'inflated' | 'fair' | 'fast';
+  rootCause?: string;
   solution?: string;
   isRepeatForSameClient: boolean;
   createdAt: string;
