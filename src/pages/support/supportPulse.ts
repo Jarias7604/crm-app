@@ -2371,128 +2371,128 @@ export const SUPPORT_PATTERN_SENIOR_PLAYBOOKS: Record<
 > = {
   dte_signer_mh: {
     idealRootCauseFix:
-      'Centralizar la generación y validación de JSON DTE en un único DtePayloadBuilder (compartido por Ventas, Compras, NC/ND y Retornos) con validador de esquema previo por tipo DTE antes de invocar al firmador.',
+      'Unificar el envío a Hacienda en un solo proceso compartido para Ventas, Compras y Notas de Crédito/Débito, validando automáticamente todos los campos obligatorios antes de enviar para evitar rechazos.',
     checklist: [
-      '¿Ventas, Compras y NC/ND comparten un solo builder en vez de corregir esquema por pantalla?',
-      '¿El pre-validador bloquea ivaItem > 0 sin venta gravada y pagos vacíos antes de Hacienda?',
-      '¿Existen pruebas automatizadas por tipo DTE (01, 03, 04, 05, 06, 14) tras cambios al esquema?',
+      '¿Ventas, Compras y Notas usan una misma regla o se arregló solo en una pantalla?',
+      '¿El sistema valida montos, IVA y forma de pago antes de enviarlo a Hacienda?',
+      '¿Ya se probó en vivo con todos los tipos de documento fiscal afectados?',
     ],
   },
   dte_invalidation: {
     idealRootCauseFix:
-      'Unificar reglas de plazo e invalidación en un servicio backend autoritativo (eliminando banderas temporales tipo false && en UI) y leer teléfono/correo reales de Sucursal con validación previa.',
+      'Eliminar permisos temporales en pantalla, controlar los plazos de anulación desde una sola regla oficial en el servidor y asegurar que siempre tome teléfono y correo reales de la sucursal.',
     checklist: [
-      '¿Ya se eliminaron bloqueos o bypass temporales (false &&) en tableCrud / frontend?',
-      '¿Los datos del emisor al invalidar salen siempre de Sucursal validada y no vacíos?',
-      '¿El evento de invalidación revierte stock y Kárdex atómicamente tras aceptación de MH?',
+      '¿Ya se quitaron bloqueos o pruebas temporales que habían quedado en el sistema?',
+      '¿Al anular toma automáticamente los datos de contacto de cada sucursal?',
+      '¿La anulación o retorno devuelve correctamente el producto al inventario?',
     ],
   },
   dte_contingency: {
     idealRootCauseFix:
-      'Implementar cola asíncrona de reintentos en backend con idempotencia por codigoGeneracion, backoff automático ante caídas de MH y tablero visible de documentos pendientes.',
+      'Automatizar el reenvío de facturas pendientes cuando Hacienda regresa en línea, evitando duplicados y mostrando una alerta clara si algún documento sigue sin transmitirse.',
     checklist: [
-      '¿Los DTE en contingencia se reenvían en cola automática sin intervención manual?',
-      '¿Se garantiza que un reintento no duplique correlativo ni doble transmisión en Hacienda?',
-      '¿Hay alerta automática cuando un DTE lleva >30 min en contingencia?',
+      '¿Los documentos en contingencia se reenvían solos o el cliente sigue pidiendo ayuda?',
+      '¿El sistema evita enviar dos veces la misma factura al reintentar?',
+      '¿Hay aviso temprano cuando quedan facturas pendientes por más de 30 minutos?',
     ],
   },
   dte_fiscal_data: {
     idealRootCauseFix:
-      'Reservar correlativos a nivel de base de datos con bloqueo atómico por sucursal/tipo, activar alerta automática al 85% del rango autorizado y validar NIT/NRC/actividad económica al guardar cliente.',
+      'Garantizar que cada documento tome su correlativo en orden estricto sin saltos ni repetidos, alertando con tiempo cuando falte poco para agotar el rango autorizado.',
     checklist: [
-      '¿La asignación de número de control y correlativo es atómica en backend (sin race conditions)?',
-      '¿Se alerta al equipo antes de que se agote el rango de correlativos de un cliente?',
-      '¿Los catálogos oficiales de Hacienda (actividad económica, municipio) están actualizados?',
+      '¿Se aseguró que dos usuarios facturando al mismo tiempo no se salten ni repitan correlativos?',
+      '¿El sistema avisa antes de que se acabe el rango autorizado de un cliente?',
+      '¿Los catálogos fiscales (actividades económicas y municipios) están al día?',
     ],
   },
   dte_general: {
     idealRootCauseFix:
-      'Unificar emisión/edición en un solo flujo con mapeo defensivo al reabrir facturas (formasPago por defecto válidas) y bloqueo idempotente anti doble clic en Emitir/Enviar.',
+      'Unificar la emisión y edición de facturas en un solo flujo estable, bloqueando el doble clic en Enviar y corrigiendo automáticamente datos incompletos al reabrir facturas guardadas.',
     checklist: [
-      '¿El botón Emitir/Enviar tiene bloqueo idempotente en frontend y en endpoint backend?',
-      '¿Al editar facturas viejas o a crédito se sanitizan formas de pago y atributos obsoletos?',
-      '¿Están cubiertos los flujos especiales (sujeto excluido, nota de remisión, lote)?',
+      '¿El botón Emitir/Enviar bloquea el doble clic mientras termina el proceso?',
+      '¿Se probó reabrir, editar y emitir facturas guardadas a crédito sin errores?',
+      '¿Quedaron probados los casos especiales como notas de remisión y sujeto excluido?',
     ],
   },
   inv_stock_sync: {
     idealRootCauseFix:
-      'Enrutar toda salida o ingreso (Venta, Anulación, Nota de Crédito, Evento de Retorno y Traslados) a un único servicio transaccional de Kárdex/Stock con bloqueo idempotente.',
+      'Conectar todas las salidas, devoluciones, anulaciones y traslados a un único control central de inventario para que las existencias siempre cuadren sin ajustes manuales.',
     checklist: [
-      '¿Todos los flujos fiscales (incluido EventoRetorno y Anulación) llaman al mismo KardexController?',
-      '¿Las consultas de reabastecimiento usan comparación SQL entre columnas reales y no strings fijos?',
-      '¿Las operaciones de stock corren dentro de DB::transaction() para evitar descuadres parciales?',
+      '¿Toda venta, anulación y devolución actualiza el inventario en el mismo momento?',
+      '¿Los filtros de stock bajo comparan correctamente la existencia actual contra el mínimo?',
+      '¿Se probó el ciclo completo de venta + anulación verificando el saldo en bodega?',
     ],
   },
   inv_catalog: {
     idealRootCauseFix:
-      'Indexar búsqueda de productos/servicios en backend (insensible a tildes y coincidencia parcial con índice trigram/SQL) con feedback claro en UI ante resultados vacíos o error de red.',
+      'Unificar el buscador de productos y servicios para que responda rápido, encuentre coincidencias sin importar tildes o espacios y muestre un aviso claro si algo falla.',
     checklist: [
-      '¿El buscador de Bienes/Servicios filtra en servidor con límite e índice en nombre/código?',
-      '¿Todas las pantallas (POS, Factura, Inventario) reutilizan el mismo componente de búsqueda?',
-      '¿El endpoint maneja tildes, espacios múltiples y códigos parciales sin quedarse colgado?',
+      '¿El buscador de productos funciona igual en facturación, punto de venta e inventario?',
+      '¿Encuentra productos al escribir parte del nombre o código sin quedarse cargando?',
+      '¿Se probó con catálogos grandes de clientes como farmacias o ferreterías?',
     ],
   },
   pdf_print: {
     idealRootCauseFix:
-      'Consolidar los distintos componentes de impresión (Factura normal, Crédito, Ticket térmico y PDF) en una sola plantilla/servicio compartido con sanitización central de comillas/caracteres.',
+      'Consolidar las distintas pantallas de impresión (Factura, Crédito, Ticket térmico y PDF) en una sola plantilla compartida y probar en impresora real antes de liberar cada cambio.',
     checklist: [
-      '¿Ya comparten una misma lógica Factura normal, Factura a crédito y Nota de remisión?',
-      '¿La sanitización de comillas y caracteres especiales ocurre en un helper único, no componente por componente?',
-      '¿Se verifica ancho de corte/espacio en blanco en impresoras térmicas de 80mm/58mm antes de liberar?',
+      '¿Factura normal, Factura a crédito y Nota de remisión ya usan la misma plantilla?',
+      '¿Cualquier carácter especial o comilla en el nombre del producto se imprime completo?',
+      '¿Se validó en impresora térmica física que no corte mal ni deje espacio en blanco?',
     ],
   },
   reports_export: {
     idealRootCauseFix:
-      'Mover cálculos de libros IVA, cuentas por cobrar y Excel a consultas SQL dedicadas con contratos fijos de columnas, zona horaria explícita y límite paginado o descarga asíncrona.',
+      'Estandarizar los cálculos y exportaciones de libros IVA, cuentas por cobrar y Excel en reportes confiables que coincidan al centavo con los saldos reales y respeten fechas locales.',
     checklist: [
-      '¿Los totales de Excel/Reportes coinciden 1:1 con el saldo matemático contable?',
-      '¿Se optimizó la consulta SQL para no agotar memoria o tiempo en empresas de alto volumen?',
-      '¿Todos los filtros por fecha respetan la zona horaria local de El Salvador?',
+      '¿El reporte y el Excel exportado coinciden exactamente con los cobros y saldos reales?',
+      '¿Los filtros por fecha respetan la hora local de El Salvador sin correr días?',
+      '¿Se optimizó la descarga para clientes con miles de facturas al mes?',
     ],
   },
   calc_tax_totals: {
     idealRootCauseFix:
-      'Extraer el motor fiscal (IVA 13%, umbral $100 retención 1%, percepción y precisión decimal por línea vs total) a un módulo de dominio único en backend y frontend con batería de pruebas unitarias.',
+      'Reunir todas las reglas de impuestos (IVA 13%, umbral de retención $100 y redondeos decimales) en una sola regla oficial compartida para que cambiar algo no rompa otra pantalla.',
     checklist: [
-      '¿La regla de retención/percepción vive en 1 módulo central o sigue copiada en múltiples pantallas?',
-      '¿Coinciden los decimales de precio unitario × cantidad con ventaGravada antes de enviar a MH?',
-      '¿Existen tests fijos para casos límite ($99.99 vs $100.00, 4+ decimales, exentos + gravados)?',
+      '¿La regla de retención 1% e IVA vive en un solo lugar en vez de varias pantallas?',
+      '¿Coinciden los totales con 4 decimales cuando hay precios pequeños o grandes volúmenes?',
+      '¿Se probaron notas de crédito y débito por debajo y por encima de $100?',
     ],
   },
   calc_cash_close: {
     idealRootCauseFix:
-      'Derivar estados de pago (Pagado/Pendiente) estrictamente desde saldo_pendiente/abonos en transacción SQL y desacoplar validaciones contables opcionales cuando la empresa no usa contabilidad.',
+      'Calcular el estado Pagado o Pendiente únicamente a partir de los abonos reales registrados y no exigir datos contables obligatorios a empresas que no tienen contabilidad activa.',
     checklist: [
-      '¿El estado "Pagado" se calcula solo desde abonos confirmados sin discrepancia entre UI y backend?',
-      '¿Las validaciones de cuenta bancaria respetan si la empresa tiene o no módulo contable activo?',
-      '¿El cierre de caja cuadra automáticamente efectivo, transferencia, tarjeta y crédito?',
+      '¿El estado de cada factura a crédito refleja exactamente la suma real de sus abonos?',
+      '¿Las empresas sin módulo contable pueden facturar por transferencia sin bloqueos?',
+      '¿El cierre de caja cuadra automáticamente efectivo, transferencias y crédito?',
     ],
   },
   auth_permissions: {
     idealRootCauseFix:
-      'Configurar invalidación automática de caché SPA al desplegar nueva versión (headers no-cache en index.html + reset de sesión por versión) y habilitar auto-gestión guiada de usuarios y sucursales.',
+      'Hacer que el sistema actualice automáticamente la versión en el navegador del cliente tras cada mejora (sin pedir Ctrl+Shift+R) y simplificar la creación de usuarios y permisos.',
     checklist: [
-      '¿Cuando hay deploy nuevo, el sistema recarga la app automáticamente sin pedir Ctrl+Shift+R al cliente?',
-      '¿El cliente/admin puede crear usuarios, roles y permisos sin requerir intervención del equipo técnico?',
-      '¿Los tokens y permisos de sucursal se refrescan limpio ante cambios de rol?',
+      '¿Al subir cambios nuevos, los clientes ven la última versión sin limpiar caché a mano?',
+      '¿Los administradores pueden crear usuarios y permisos fácilmente desde el sistema?',
+      '¿Los permisos por sucursal se aplican al instante sin cerrar y abrir sesión?',
     ],
   },
   perf_loading: {
     idealRootCauseFix:
-      'Agregar timeouts explícitos, manejo de errores visibles con botón Reintentar (nunca spinner infinito) e índices SQL en listados de facturación, productos y clientes.',
+      'Evitar pantallas colgadas mostrando un mensaje claro y opción de Reintentar si tarda una consulta, y acelerar los listados más pesados en horas de mayor facturación.',
     checklist: [
-      '¿La pantalla muestra mensaje claro y botón Reintentar si falla una petición en vez de quedar "cargando"?',
-      '¿Se revisaron las consultas lentas (>1s) e índices en los endpoints más usados en horas pico?',
-      '¿Los botones de acción previenen doble ejecución mientras hay una petición en curso?',
+      '¿Si falla la conexión o tarda Hacienda, el usuario ve un aviso claro en vez de esperar?',
+      '¿Se identificó qué pantalla o consulta lenta se repite en horas pico?',
+      '¿La carga inicial de facturas y productos responde en menos de 2 segundos?',
     ],
   },
   usage_general: {
     idealRootCauseFix:
-      'Documentar causa raíz técnica real en cada cierre (sin textos genéricos) y agregar guías rápidas / tooltips contextuales en las pantallas donde nacen dudas operativas repetidas.',
+      'Exigir causa raíz real al cerrar cada caso (sin poner "Soporte técnico") y publicar guías cortas de 1 minuto dentro del sistema para eliminar dudas operativas repetidas.',
     checklist: [
-      '¿Se capacitó con guía corta o video de 60s para evitar repetir la misma duda operativa?',
-      '¿Los tickets cerrados registran qué falló, por qué ocurrió y cómo quedó validado en código?',
-      '¿La pantalla ofrece validaciones claras que guíen al usuario antes de equivocarse?',
+      '¿Se creó una guía rápida para evitar que varios clientes pregunten lo mismo cada semana?',
+      '¿Los tickets cerrados explican claramente qué falló y qué quedó corregido?',
+      '¿La pantalla guía al usuario con mensajes claros antes de que cometa el error?',
     ],
   },
 };
@@ -2534,7 +2534,7 @@ export function assessTicketSolutionQuality(ticket: {
     return {
       verdict: 'undocumented',
       verdictLabel: 'Sin causa raíz',
-      seniorFlag: 'Cerrado sin documentar causa raíz ni solución técnica real.',
+      seniorFlag: 'Cerrado sin documentar causa raíz ni solución real.',
       hasRootCause,
       hasSolution,
     };
@@ -2555,7 +2555,7 @@ export function assessTicketSolutionQuality(ticket: {
       verdict: 'partial_or_risky',
       verdictLabel: 'Temporal / Sin validar',
       seniorFlag:
-        '⚠️ Solución temporal o sin validar en producción (riesgo alto de regresión).',
+        'Solución temporal o sin probar en vivo — alto riesgo de que vuelva a fallar.',
       hasRootCause,
       hasSolution,
     };
@@ -2571,7 +2571,7 @@ export function assessTicketSolutionQuality(ticket: {
       verdict: 'partial_or_risky',
       verdictLabel: 'Parche manual',
       seniorFlag:
-        '⚠️ Parche manual al cliente (caché/driver/workaround); falta blindaje en sistema.',
+        'Parche manual al cliente (caché, driver o ajuste puntual); falta corregir el sistema.',
       hasRootCause,
       hasSolution,
     };
@@ -2585,9 +2585,9 @@ export function assessTicketSolutionQuality(ticket: {
   ) {
     return {
       verdict: 'partial_or_risky',
-      verdictLabel: 'Duplicado / Puntual',
+      verdictLabel: 'Lógica duplicada',
       seniorFlag:
-        '⚠️ Lógica duplicada en múltiples archivos/componentes o revert puntual — requiere refactor central.',
+        'Lógica duplicada en varias pantallas o reversión puntual — requiere unificación central.',
       hasRootCause,
       hasSolution,
     };
@@ -2602,7 +2602,7 @@ export function assessTicketSolutionQuality(ticket: {
   if (hasCodeFixEvidence) {
     return {
       verdict: 'root_cause_fix',
-      verdictLabel: 'Raíz en código',
+      verdictLabel: 'Resuelto de raíz',
       seniorFlag: null,
       hasRootCause,
       hasSolution,
@@ -2613,7 +2613,7 @@ export function assessTicketSolutionQuality(ticket: {
     verdict: 'partial_or_risky',
     verdictLabel: 'Revisión parcial',
     seniorFlag:
-      'Documentado, pero sin detallar cambio estructural o validación definitiva en código.',
+      'Documentado sin confirmar cambio definitivo en el sistema.',
     hasRootCause,
     hasSolution,
   };
@@ -3069,35 +3069,35 @@ export function buildSupportParetoAnalysis<T = any>(input: {
       .slice(0, 6);
 
     let auditVerdict: CategoryAuditVerdict = 'firefighting_only';
-    let auditVerdictLabel = 'Sin raíz · Apagafuegos';
+    let auditVerdictLabel = 'Sin solución de raíz';
     if (rootFixCount === 0 && partialOrRiskyCount === 0) {
       auditVerdict = 'firefighting_only';
-      auditVerdictLabel = 'Sin raíz · Apagafuegos';
+      auditVerdictLabel = 'Sin solución de raíz';
     } else if (
       partialOrRiskyCount > 0 ||
       undocumentedCount > rootFixCount ||
       bucket.messageCount >= 4
     ) {
       auditVerdict = 'partial_patch';
-      auditVerdictLabel = 'Parcial / Con parches';
+      auditVerdictLabel = 'Solo parches';
     } else {
       auditVerdict = 'root_fixed';
-      auditVerdictLabel = 'Raíz documentada';
+      auditVerdictLabel = 'Resuelto de raíz';
     }
 
     let auditSummary =
-      'Solo actividad en WhatsApp (sin tickets técnicos con causa raíz documentada en el período).';
+      'Solo conversaciones de WhatsApp en este período (sin tickets técnicos documentados).';
     if (bucket.ticketAudits.length > 0) {
       const summaryParts: string[] = [];
       if (rootFixCount > 0) {
-        summaryParts.push(`${rootFixCount} con solución en código`);
+        summaryParts.push(`${rootFixCount} resueltos de raíz`);
       }
       if (partialOrRiskyCount > 0) {
-        summaryParts.push(`${partialOrRiskyCount} con riesgo/parche`);
+        summaryParts.push(`${partialOrRiskyCount} con parches o riesgo`);
       }
       if (undocumentedCount > 0) {
         summaryParts.push(
-          `${undocumentedCount} sin documentar (${undocumentedHours}h)`,
+          `${undocumentedCount} sin explicar (${undocumentedHours}h)`,
         );
       }
       auditSummary = summaryParts.join(' · ');

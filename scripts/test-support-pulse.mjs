@@ -1324,7 +1324,7 @@ test('22. buildSupportParetoAnalysis attaches audit verdict, prioritizes risky f
   assert.equal(pdfItem.audit.undocumentedCount, 1);
   assert.equal(pdfItem.audit.partialOrRiskyCount, 1); // flagged due to "seis componentes"
   assert.equal(pdfItem.audit.verdict, 'partial_patch');
-  assert.ok(pdfItem.audit.recommendedRootCauseFix.includes('plantilla/servicio compartido'));
+  assert.ok(pdfItem.audit.recommendedRootCauseFix.includes('una sola plantilla compartida'));
 
   const invItem = pareto.items.find((i) => i.patternKey === 'dte_invalidation');
   assert.ok(invItem, 'Expected dte_invalidation item');

@@ -344,14 +344,13 @@ export const SupportIntelligence: React.FC = () => {
   const [showRulesPanel, setShowRulesPanel] = useState<boolean>(false);
   const [resolvingEntryKey, setResolvingEntryKey] = useState<string | null>(null);
 
-  // Unified filters
+  // Unified filters & clean 3-tab navigation
+  const [activeTab, setActiveTab] = useState<'resumen' | 'pareto' | 'clientes'>('resumen');
   const [selectedTechFilter, setSelectedTechFilter] = useState<string>('all');
   const [healthFilter, setHealthFilter] = useState<HealthFilter>('all');
   const [paretoMetric, setParetoMetric] = useState<SupportParetoMetric>('hours');
   const [selectedPatternKey, setSelectedPatternKey] = useState<SupportErrorPatternKey | null>(null);
   const [tablePatternFilter, setTablePatternFilter] = useState<SupportErrorPatternKey | null>(null);
-  const [showAllParetoItems, setShowAllParetoItems] = useState<boolean>(false);
-  const [evidenceTab, setEvidenceTab] = useState<'audit' | 'clients'>('audit');
   const [daysRange, setDaysRange] = useState<number>(15);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedClientKey, setExpandedClientKey] = useState<string | null>(null);
@@ -826,54 +825,34 @@ export const SupportIntelligence: React.FC = () => {
     toast.success('Plan Pareto 80/20 copiado para el equipo');
   };
 
-  const handleFilterClientsByPattern = (patternKey: SupportErrorPatternKey) => {
-    setTablePatternFilter((prev) => (prev === patternKey ? null : patternKey));
+  const handleOpenClientsFromPareto = (patternKey: SupportErrorPatternKey) => {
+    setTablePatternFilter(patternKey);
     setHealthFilter('all');
-    setTimeout(() => {
-      document.getElementById('client-health-section')?.scrollIntoView({ behavior: 'smooth' });
-    }, 60);
+    setSelectedPatternKey(null);
+    setActiveTab('clientes');
   };
 
   const { totals } = overview;
-  const verdictStyles =
-    totals.verdictTone === 'good'
-      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-      : totals.verdictTone === 'warn'
-        ? 'bg-amber-50 border-amber-200 text-amber-950'
-        : totals.verdictTone === 'critical'
-          ? 'bg-rose-50 border-rose-200 text-rose-950'
-          : 'bg-slate-50 border-slate-200 text-slate-800';
-
   const visibleDays = pulse.dailySeries.slice(-14);
   const maxDayMsgs = Math.max(1, ...visibleDays.map((d) => d.totalMessages));
-
-  const vitalItems = pareto.items.filter((item) => item.isVitalFew80);
-  const displayedPriorityItems = showAllParetoItems
-    ? pareto.items
-    : vitalItems.length >= 3
-      ? vitalItems
-      : pareto.items.slice(0, 3);
-  const maxPriorityShare = Math.max(1, ...pareto.items.map((item) => item.sharePct));
-
-  const bannerSubtitle =
-    totals.hasLoggedTickets && totals.verdictTone !== 'good' && pareto.items[0]
-      ? `Foco #1 (Pareto): ${pareto.items[0].label} (${pareto.items[0].reactiveHours}h${pareto.items[0].clientCount > 0 ? ` · ${pareto.items[0].clientCount} clientes` : ''}).`
-      : totals.verdictDetail;
+  const top3Problems = pareto.items.slice(0, 3);
+  const urgentClientsBadge =
+    totals.returningClientsCount + pulse.rootCauseQueue.pendingForDev.length;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16">
-      {/* ── CLEAN 1-ROW HEADER WITH TOP TECH FILTER ── */}
-      <header className="bg-white border-b border-slate-200/80 px-6 py-3.5 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      {/* ── CLEAN EXECUTIVE HEADER + 3 NAVIGATION TABS ── */}
+      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-20">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-base font-black text-slate-900 tracking-tight">
-              Control de Soporte &amp; Producto
+            <h1 className="text-base font-bold text-slate-900 tracking-tight">
+              Control de Operaciones
             </h1>
 
             {/* Segmented Technician Switcher */}
-            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/70">
+            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/70">
               {[
-                { id: 'all', label: 'Todo el equipo' },
+                { id: 'all', label: 'Equipo' },
                 { id: 'Melvin Rodriguez', label: 'Melvin' },
                 { id: 'Gerson Gutierrez', label: 'Gerson' },
               ].map((opt) => {
@@ -886,10 +865,11 @@ export const SupportIntelligence: React.FC = () => {
                       setSelectedTechFilter(opt.id);
                       setExpandedClientKey(null);
                     }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${active
-                      ? 'bg-white text-indigo-700 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                      }`}
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition ${
+                      active
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
                   >
                     {opt.label}
                   </button>
@@ -899,40 +879,10 @@ export const SupportIntelligence: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setShowRulesPanel((v) => !v)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${showRulesPanel
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              Reglas
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate('/support/chat')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 transition"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              Chat WhatsApp
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate('/support/tickets')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition"
-            >
-              <TicketIcon className="w-3.5 h-3.5" />
-              Tickets
-            </button>
-
             <select
               value={daysRange}
               onChange={(e) => setDaysRange(Number(e.target.value))}
-              className="px-2.5 py-1.5 text-xs font-bold bg-white border border-slate-200 rounded-xl text-slate-700"
+              className="px-2.5 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700"
             >
               <option value={7}>7 días</option>
               <option value={15}>15 días</option>
@@ -943,40 +893,116 @@ export const SupportIntelligence: React.FC = () => {
 
             <button
               type="button"
+              onClick={() => setShowRulesPanel((v) => !v)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                showRulesPanel
+                  ? 'bg-slate-900 text-white border-slate-900'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              Reglas
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/support/chat')}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Chat
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate('/support/tickets')}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition"
+            >
+              <TicketIcon className="w-3.5 h-3.5" />
+              Tickets
+            </button>
+
+            <button
+              type="button"
               onClick={loadIntelligenceData}
               title="Actualizar datos"
-              className="p-1.5 rounded-xl text-slate-500 hover:bg-slate-100 border border-slate-200 bg-white transition"
+              className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 border border-slate-200 bg-white transition"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
+
+        {/* Clean 3-Tab Navigation Bar */}
+        <div className="max-w-6xl mx-auto px-6 flex items-center gap-6 border-t border-slate-100 overflow-x-auto">
+          {[
+            { id: 'resumen' as const, label: 'Resumen' },
+            {
+              id: 'pareto' as const,
+              label: 'Qué arreglar (80/20)',
+              pill: pareto.vitalFewCount > 0 ? `${pareto.vitalFewCount} focos` : undefined,
+            },
+            {
+              id: 'clientes' as const,
+              label: `Clientes (${clientHealthCounts.all})`,
+              alertDot: urgentClientsBadge > 0,
+            },
+          ].map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative py-2.5 text-xs font-semibold inline-flex items-center gap-2 whitespace-nowrap border-b-2 transition ${
+                  active
+                    ? 'border-slate-900 text-slate-900'
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span>{tab.label}</span>
+                {tab.pill && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                      active ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {tab.pill}
+                  </span>
+                )}
+                {tab.alertDot && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 pt-5 space-y-5">
+      <main className="max-w-6xl mx-auto px-6 pt-6 space-y-6">
         {/* ── COLLAPSIBLE OPERATING RULES ── */}
         {showRulesPanel && (
-          <div className="bg-white rounded-2xl border border-indigo-200 p-4 shadow-2xs space-y-3">
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-black text-slate-900">
-                Reglas Operativas (Cortar chats largos + Escalar bugs a Jimmy)
+              <h2 className="text-sm font-bold text-slate-900">
+                Reglas Operativas del Equipo
               </h2>
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={copyOfficialNoAudioPolicy}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition"
                 >
-                  <MicOff className="w-3.5 h-3.5 text-purple-600" />
+                  <MicOff className="w-3.5 h-3.5 text-slate-600" />
                   Copiar Regla Sin Audios
                 </button>
                 <button
                   type="button"
                   onClick={copyOperatingRules}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white transition"
                 >
                   <Copy className="w-3.5 h-3.5" />
-                  Copiar 3 reglas para Melvin
+                  Copiar 3 reglas para equipo
                 </button>
               </div>
             </div>
@@ -984,11 +1010,11 @@ export const SupportIntelligence: React.FC = () => {
               {SUPPORT_OPERATING_RULES.map((rule) => (
                 <div
                   key={rule.id}
-                  className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 space-y-1"
+                  className="rounded-xl bg-slate-50 border border-slate-200/70 p-3.5 space-y-1"
                 >
-                  <p className="text-xs font-black text-indigo-900">{rule.title}</p>
-                  <p className="text-[11px] font-semibold text-slate-500">{rule.trigger}</p>
-                  <p className="text-xs text-slate-700 pt-0.5">{rule.action}</p>
+                  <p className="text-xs font-bold text-slate-900">{rule.title}</p>
+                  <p className="text-[11px] font-medium text-slate-500">{rule.trigger}</p>
+                  <p className="text-xs text-slate-700 pt-0.5 leading-relaxed">{rule.action}</p>
                 </div>
               ))}
             </div>
@@ -996,70 +1022,112 @@ export const SupportIntelligence: React.FC = () => {
         )}
 
         {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* BLOQUE 1 · SEMÁFORO 2 SEGUNDOS: ¿MEJORANDO PRODUCTO O APAGANDO FUEGOS? */}
+        {/* TAB 1 · RESUMEN GERENCIAL (¿CÓMO VAMOS?)                             */}
         {/* ════════════════════════════════════════════════════════════════════ */}
-        <section className="space-y-3">
-          <div className={`rounded-2xl border p-5 shadow-2xs space-y-4 ${verdictStyles}`}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {totals.verdictTone === 'good' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                  ) : (
-                    <AlertTriangle
-                      className={`w-5 h-5 shrink-0 ${totals.verdictTone === 'critical' ? 'text-rose-600' : 'text-amber-600'
-                        }`}
-                    />
-                  )}
-                  <h2 className="text-base font-black tracking-tight">{totals.verdictTitle}</h2>
+        {activeTab === 'resumen' && (
+          <div className="space-y-6">
+            {/* 3 Clean Executive KPI Cards */}
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* KPI 1: Tiempo en mejoras */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500">
+                    Tiempo en mejoras
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
+                      !totals.hasLoggedTickets
+                        ? 'bg-amber-50 text-amber-800'
+                        : totals.buildPct >= totals.targetBuildPct
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-rose-50 text-rose-700'
+                    }`}
+                  >
+                    {!totals.hasLoggedTickets
+                      ? 'Sin tickets'
+                      : `Meta ${totals.targetBuildPct}%`}
+                  </span>
                 </div>
-                <p className="text-xs opacity-85">{bannerSubtitle}</p>
-              </div>
-
-              <div className="text-right shrink-0">
-                <p className="text-[11px] font-bold uppercase opacity-70">Meta ideal</p>
-                <p className="text-xs font-black">
-                  🟢 {totals.targetBuildPct}–90% Mejoras · 🔴 ≤{totals.targetReactivePct}% Errores
+                <p className="text-3xl font-bold text-slate-900 tracking-tight">
+                  {totals.hasLoggedTickets ? `${totals.buildPct}%` : '—'}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {totals.hasLoggedTickets
+                    ? `${totals.buildHours}h construyendo producto y Go-Live`
+                    : 'No hay tickets de mejora registrados en este período'}
                 </p>
               </div>
-            </div>
 
-            {/* Unified 2-color progress meter (with 80% target line) */}
-            <div className="bg-white/90 rounded-xl p-3.5 border border-black/5 space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-black">
-                {totals.hasLoggedTickets ? (
-                  <>
-                    <span className="text-emerald-700">
-                      🟢 Construyendo / Mejoras P4 + Go-Live: {totals.buildPct}% ({totals.buildHours}h)
+              {/* KPI 2: Tiempo en fallas y chats */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500">
+                    Tiempo en fallas y chats
+                  </span>
+                  {totals.reclassifiedP4BugHours > 0 && (
+                    <span className="px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-amber-50 text-amber-800">
+                      Incl. {totals.reclassifiedP4BugHours}h bugs en P4
                     </span>
-                    <span className="text-rose-700">
-                      🔴 Resolviendo Errores + Chat: {totals.reactivePct}% ({totals.totalReactiveHours}h)
-                      <span className="font-semibold text-slate-500">
-                        {' '}
-                        ({totals.ticketReactiveHours}h tickets
-                        {totals.reclassifiedP4BugHours > 0
-                          ? ` incl. ${totals.reclassifiedP4BugHours}h bugs en P4`
-                          : ''}
-                        {' '}· ~{totals.unloggedChatHours}h WA sin ticket)
-                      </span>
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-amber-800">
-                      ⚠️ Sin tickets ni horas de mejoras registradas en este período
-                    </span>
-                    <span className="text-slate-700">
-                      💬 Solo chats WhatsApp visibles: ~{totals.unloggedChatHours}h
-                    </span>
-                  </>
-                )}
+                  )}
+                </div>
+                <p className="text-3xl font-bold text-slate-900 tracking-tight">
+                  {totals.hasLoggedTickets
+                    ? `${totals.reactivePct}%`
+                    : `~${totals.unloggedChatHours}h`}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {totals.hasLoggedTickets
+                    ? `${totals.totalReactiveHours}h (${totals.ticketReactiveHours}h tickets + ~${totals.unloggedChatHours}h chat WA)`
+                    : 'Solo actividad visible en WhatsApp'}
+                </p>
               </div>
 
-              <div className="relative h-4 w-full rounded-full bg-slate-100 overflow-hidden flex">
+              {/* KPI 3: Clientes reincidentes */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500">
+                    Clientes que regresan
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    {pulse.summary.avgClientsPerDay} clientes/día
+                  </span>
+                </div>
+                <p className="text-3xl font-bold text-slate-900 tracking-tight">
+                  {totals.returningClientsCount}{' '}
+                  <span className="text-base font-semibold text-slate-400">
+                    de {totals.activeClientsCount}
+                  </span>
+                </p>
+                <p className="text-xs text-slate-500">
+                  {totals.returningPct}% volvió varios días · {pulse.summary.pingPongCount} chats largos
+                </p>
+              </div>
+            </section>
+
+            {/* Clean Balance Meter */}
+            <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {totals.verdictTone === 'good' ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertTriangle
+                      className={`w-4 h-4 shrink-0 ${
+                        totals.verdictTone === 'critical' ? 'text-rose-600' : 'text-amber-600'
+                      }`}
+                    />
+                  )}
+                  <h2 className="text-sm font-bold text-slate-900">{totals.verdictTitle}</h2>
+                </div>
+                <span className="text-xs text-slate-500 font-medium">
+                  Objetivo recomendado: 80–90% Mejoras · ≤5% Fallas
+                </span>
+              </div>
+
+              <div className="relative h-3 w-full rounded-full bg-slate-100 overflow-hidden flex">
                 {!totals.hasLoggedTickets ? (
                   totals.unloggedChatHours > 0 && (
-                    <div className="h-full w-full bg-amber-400/75 transition-all" />
+                    <div className="h-full w-full bg-amber-400/75" />
                   )
                 ) : (
                   <>
@@ -1077,1180 +1145,1092 @@ export const SupportIntelligence: React.FC = () => {
                     )}
                     <div
                       style={{ left: `${totals.targetBuildPct}%` }}
-                      title={`Meta: ${totals.targetBuildPct}% construyendo producto`}
-                      className="absolute top-0 bottom-0 w-0.5 bg-slate-900/70"
+                      title={`Meta: ${totals.targetBuildPct}% mejoras`}
+                      className="absolute top-0 bottom-0 w-0.5 bg-slate-900/75"
                     />
                   </>
                 )}
               </div>
+            </section>
 
-              {/* 3 minimal clarity metrics below the bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
-                <span className="font-semibold text-slate-700">
-                  🔄 Clientes que regresan:{' '}
-                  <strong className={totals.returningClientsCount > 0 ? 'text-rose-700' : 'text-emerald-700'}>
-                    {totals.returningClientsCount} de {totals.activeClientsCount} ({totals.returningPct}%)
-                  </strong>
-                </span>
-                <span className="font-semibold text-slate-700">
-                  💬 WhatsApp ({daysRange}d):{' '}
-                  <strong>{pulse.summary.avgClientsPerDay} clientes/día</strong> · Hoy:{' '}
-                  <strong>{pulse.summary.todayClients}</strong> ·{' '}
-                  <strong className={pulse.summary.pingPongCount > 0 ? 'text-rose-700' : 'text-slate-800'}>
-                    {pulse.summary.pingPongCount} ping-pong (≥12 msgs/día)
-                  </strong>
-                </span>
-                <span className="font-semibold text-slate-700">
-                  🐛 Escalados para Jimmy:{' '}
-                  <strong className={pulse.summary.pendingDevCount > 0 ? 'text-rose-700' : 'text-emerald-700'}>
-                    {pulse.summary.pendingDevCount} pendientes
-                  </strong>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Compact Side-by-Side: Melvin vs. Gerson (Always shows true numbers) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {overview.techSummaries.map((tech) => {
-              const isSelected = selectedTechFilter === tech.techName;
-              return (
-                <button
-                  key={tech.techName}
-                  type="button"
-                  onClick={() => {
-                    const next = isSelected ? 'all' : tech.techName;
-                    setSelectedTechFilter(next);
-                    setExpandedClientKey(null);
-                  }}
-                  className={`text-left bg-white rounded-2xl p-4 border transition ${isSelected
-                    ? 'border-indigo-600 ring-2 ring-indigo-500/15'
-                    : selectedTechFilter !== 'all'
-                      ? 'border-slate-200/80 opacity-60 hover:opacity-100'
-                      : 'border-slate-200/80 hover:border-slate-300'
-                    }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-xl bg-slate-900 text-white font-black text-xs flex items-center justify-center">
-                        {tech.techName
-                          .split(' ')
-                          .map((w) => w[0])
-                          .join('')}
-                      </div>
-                      <div>
-                        <p className="text-sm font-black text-slate-900">{tech.techName}</p>
-                        <p className="text-[11px] font-semibold text-slate-500">
-                          WA: {tech.waClients} clientes propios · {tech.waMessages} msgs · Tickets: {tech.totalTickets} ({tech.openTickets} abiertos)
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      {!tech.hasLoggedTickets ? (
-                        <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                          Sin tickets registrados
-                        </span>
-                      ) : (
-                        <p className="text-xs font-black">
-                          <span className="text-emerald-700">{tech.buildPct}% Mejoras</span>
-                          <span className="text-slate-300 mx-1">·</span>
-                          <span className={tech.reactivePct > 20 ? 'text-rose-600' : 'text-slate-700'}>
-                            {tech.reactivePct}% Errores
-                          </span>
-                        </p>
-                      )}
-                      <p className="text-[10.5px] font-semibold text-slate-400 mt-0.5">
-                        {isSelected ? '✓ Filtrando toda la vista' : 'Clic para filtrar'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Mini split bar */}
-                  <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden flex mt-3">
-                    {!tech.hasLoggedTickets ? (
-                      tech.totalReactiveHours > 0 && (
-                        <div className="bg-amber-400/75 h-full w-full" />
-                      )
-                    ) : (
-                      <>
-                        {tech.buildPct > 0 && (
-                          <div style={{ width: `${tech.buildPct}%` }} className="bg-emerald-500 h-full" />
-                        )}
-                        {tech.reactivePct > 0 && (
-                          <div style={{ width: `${tech.reactivePct}%` }} className="bg-rose-500 h-full" />
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-slate-600">
-                    {!tech.hasLoggedTickets ? (
-                      <span>
-                        💬 WhatsApp visible:{' '}
-                        <strong className="text-slate-900">~{tech.totalReactiveHours}h</strong>{' '}
-                        <span className="text-slate-400">(sin tickets ni horas de mejoras)</span>
-                      </span>
-                    ) : (
-                      <span>
-                        🟢 Mejoras: <strong className="text-slate-900">{tech.buildHours}h</strong> · 🔴 Errores/Chat:{' '}
-                        <strong className="text-slate-900">{tech.totalReactiveHours}h</strong>
-                      </span>
-                    )}
-                    <span>
-                      🔄 <strong className={tech.returningClientsCount > 0 ? 'text-rose-700' : 'text-emerald-700'}>{tech.returningClientsCount}</strong> reincidentes · 🔥{' '}
-                      <strong className={tech.pingPongCount > 0 ? 'text-rose-700' : 'text-slate-800'}>{tech.pingPongCount}</strong> ping-pong
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* BLOQUE 2A · PARETO 80/20: QUÉ RESOLVER DE RAÍZ PRIMERO               */}
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        <section className="bg-white rounded-2xl border border-slate-200/75 p-5 sm:p-6 shadow-2xs space-y-5">
-          {/* Header row: clean title + metric toggle + copy action */}
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-sm font-black text-slate-900 tracking-tight">
-                  Pareto 80/20 · Qué errores resolver de raíz primero
-                </h3>
-                {selectedTechFilter !== 'all' && (
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/70">
-                    Solo {selectedTechFilter.split(' ')[0]}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500">
-                Patrones reales de WhatsApp y tickets en los últimos {daysRange} días
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="inline-flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
-                {[
-                  { id: 'hours' as SupportParetoMetric, label: 'Por horas' },
-                  { id: 'clients' as SupportParetoMetric, label: 'Por clientes' },
-                ].map((opt) => {
-                  const active = paretoMetric === opt.id;
+            {/* Equipo: Melvin vs. Gerson (Clean Side-by-Side) */}
+            <section className="space-y-2.5">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Desempeño por técnico
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {overview.techSummaries.map((tech) => {
+                  const isSelected = selectedTechFilter === tech.techName;
                   return (
                     <button
-                      key={opt.id}
+                      key={tech.techName}
                       type="button"
-                      onClick={() => setParetoMetric(opt.id)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${active
-                        ? 'bg-white text-slate-900 shadow-2xs'
-                        : 'text-slate-500 hover:text-slate-800'
-                        }`}
+                      onClick={() => {
+                        setSelectedTechFilter(isSelected ? 'all' : tech.techName);
+                        setExpandedClientKey(null);
+                      }}
+                      className={`text-left bg-white rounded-2xl p-5 border transition shadow-2xs ${
+                        isSelected
+                          ? 'border-indigo-600 ring-2 ring-indigo-500/15'
+                          : selectedTechFilter !== 'all'
+                          ? 'border-slate-200/80 opacity-60 hover:opacity-100'
+                          : 'border-slate-200/80 hover:border-slate-300'
+                      }`}
                     >
-                      {opt.label}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-slate-900 text-white font-bold text-xs flex items-center justify-center">
+                            {tech.techName
+                              .split(' ')
+                              .map((w) => w[0])
+                              .join('')}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">{tech.techName}</p>
+                            <p className="text-xs text-slate-500">
+                              {tech.waClients} clientes WA · {tech.totalTickets} tickets
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          {!tech.hasLoggedTickets ? (
+                            <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              Sin tickets
+                            </span>
+                          ) : (
+                            <p className="text-xs font-bold">
+                              <span className="text-emerald-700">{tech.buildPct}% Mejoras</span>
+                              <span className="text-slate-300 mx-1">·</span>
+                              <span className="text-rose-600">{tech.reactivePct}% Fallas</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden flex mt-3.5">
+                        {!tech.hasLoggedTickets ? (
+                          tech.totalReactiveHours > 0 && (
+                            <div className="bg-amber-400/75 h-full w-full" />
+                          )
+                        ) : (
+                          <>
+                            {tech.buildPct > 0 && (
+                              <div
+                                style={{ width: `${tech.buildPct}%` }}
+                                className="bg-emerald-500 h-full"
+                              />
+                            )}
+                            {tech.reactivePct > 0 && (
+                              <div
+                                style={{ width: `${tech.reactivePct}%` }}
+                                className="bg-rose-500 h-full"
+                              />
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between text-xs text-slate-600">
+                        {!tech.hasLoggedTickets ? (
+                          <span>
+                            Solo <strong className="text-slate-900">~{tech.totalReactiveHours}h</strong> visibles en chat WA
+                          </span>
+                        ) : (
+                          <span>
+                            Mejoras: <strong className="text-slate-900">{tech.buildHours}h</strong> · Fallas:{' '}
+                            <strong className="text-slate-900">{tech.totalReactiveHours}h</strong>
+                          </span>
+                        )}
+                        <span>
+                          <strong className={tech.returningClientsCount > 0 ? 'text-rose-600' : 'text-slate-900'}>
+                            {tech.returningClientsCount}
+                          </strong>{' '}
+                          reincidentes
+                        </span>
+                      </div>
                     </button>
                   );
                 })}
               </div>
+            </section>
 
-              {pareto.items.length > 0 && (
-                <button
-                  type="button"
-                  onClick={copyParetoPlan}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition"
-                >
-                  <Copy className="w-3.5 h-3.5 text-indigo-600" />
-                  Copiar plan 80/20
-                </button>
-              )}
-            </div>
-          </div>
+            {/* Bottom Summary Row: Top 3 Problems + Daily WhatsApp Rhythm */}
+            <section className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Top 3 focos que más tiempo consumen
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('pareto')}
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition"
+                  >
+                    Ver plan 80/20 →
+                  </button>
+                </div>
 
-          {pareto.items.length === 0 ? (
-            <div className="py-10 text-center text-xs text-slate-400 font-medium">
-              Sin fallas reactivas registradas en los últimos {daysRange} días.
-            </div>
-          ) : (
-            <>
-              {/* 2-second Executive Headline Strip */}
-              <div className="rounded-xl bg-gradient-to-r from-rose-50/75 via-slate-50/60 to-indigo-50/50 border border-slate-200/80 px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-rose-100/90 text-rose-600 flex items-center justify-center shrink-0">
-                    <Target className="w-4 h-4" />
+                {top3Problems.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-4">
+                    Sin fallas registradas en este período.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {top3Problems.map((item, idx) => (
+                      <button
+                        key={item.patternKey}
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('pareto');
+                          setSelectedPatternKey(item.patternKey);
+                        }}
+                        className="w-full py-2.5 flex items-center justify-between gap-3 text-left hover:bg-slate-50/70 rounded-lg px-2 -mx-2 transition"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-700 text-[11px] font-bold flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                          <span className="text-xs font-bold text-slate-900 truncate">
+                            {item.label}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0 text-xs">
+                          <span className="font-bold text-slate-800">{item.reactiveHours}h</span>
+                          <span className="text-slate-400 hidden sm:inline">
+                            {item.clientCount} clientes
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10.5px] font-semibold ${
+                              item.audit.verdict === 'root_fixed'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : item.audit.verdict === 'partial_patch'
+                                ? 'bg-amber-50 text-amber-800'
+                                : 'bg-rose-50 text-rose-700'
+                            }`}
+                          >
+                            {item.audit.verdictLabel}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                  <p className="text-sm font-bold text-slate-900 leading-snug">
-                    {pareto.headline}
+                )}
+              </div>
+
+              <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs flex flex-col justify-between space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Ritmo diario WhatsApp ({visibleDays.length}d)
+                  </h3>
+                  <span className="text-[11px] text-slate-400">
+                    Hoy: {pulse.summary.todayClients} clientes
+                  </span>
+                </div>
+
+                <div
+                  className="grid gap-1"
+                  style={{ gridTemplateColumns: `repeat(${Math.max(1, visibleDays.length)}, minmax(0, 1fr))` }}
+                >
+                  {visibleDays.map((d) => {
+                    const hPct =
+                      d.totalMessages > 0
+                        ? Math.max(14, Math.round((d.totalMessages / maxDayMsgs) * 100))
+                        : 5;
+                    return (
+                      <div
+                        key={d.dayKey}
+                        title={`${d.label}: ${d.activeClients} clientes · ${d.totalMessages} msgs · ~${d.estStaffHours}h`}
+                        className="flex flex-col items-center justify-end rounded-lg bg-slate-50 py-1.5 px-0.5"
+                      >
+                        <span className="text-[9.5px] font-bold text-slate-700">{d.totalMessages}</span>
+                        <div className="w-full h-10 flex items-end justify-center my-0.5">
+                          <div
+                            style={{ height: `${hPct}%` }}
+                            className={`w-2 rounded-t ${
+                              d.pingPongChats > 0
+                                ? 'bg-rose-500'
+                                : d.totalMessages > 0
+                                ? 'bg-indigo-500'
+                                : 'bg-slate-200'
+                            }`}
+                          />
+                        </div>
+                        <span className="text-[8.5px] text-slate-400 truncate max-w-full">
+                          {d.label.split(' ')[0]}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* TAB 2 · QUÉ ARREGLAR (PARETO 80/20 + TABLA EJECUTIVA)                */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'pareto' && (
+          <div className="space-y-5">
+            <section className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-5">
+              {/* Header + Metric Toggle + Copy Plan */}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Target className="w-4 h-4 text-rose-600" />
+                    <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                      {pareto.headline}
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Haz clic en cualquier barra o fila para ver qué hizo el equipo y la solución definitiva recomendada
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 text-[11px] font-bold shrink-0 flex-wrap">
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/80 text-rose-700">
-                    {pareto.vitalFewCount} foco{pareto.vitalFewCount === 1 ? '' : 's'} clave (80%)
-                  </span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/80 text-slate-700">
-                    ~{pareto.vitalFewHoursSaved}h recuperables
-                  </span>
-                  <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/80 text-slate-700">
-                    {pareto.vitalFewClientsImpacted} cliente{pareto.vitalFewClientsImpacted === 1 ? '' : 's'}
-                  </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/70">
+                    {[
+                      { id: 'hours' as SupportParetoMetric, label: 'Por horas' },
+                      { id: 'clients' as SupportParetoMetric, label: 'Por clientes' },
+                    ].map((opt) => {
+                      const active = paretoMetric === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setParetoMetric(opt.id)}
+                          className={`px-3 py-1 rounded-md text-xs font-semibold transition ${
+                            active
+                              ? 'bg-white text-slate-900 shadow-2xs'
+                              : 'text-slate-500 hover:text-slate-900'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {pareto.items.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={copyParetoPlan}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition"
+                    >
+                      <Copy className="w-3.5 h-3.5 text-indigo-600" />
+                      Copiar plan 80/20
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Minimalist Composed Pareto Chart */}
-              <div className="space-y-2">
-                <div className="w-full h-[265px] min-w-0 outline-none [&_.recharts-wrapper]:outline-none [&_svg]:outline-none">
-                  <ResponsiveContainer width="100%" height={265}>
-                    <ComposedChart
-                      data={paretoChartData}
-                      margin={{ top: 14, right: 12, left: -8, bottom: 6 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                      <XAxis
-                        dataKey="shortLabel"
-                        axisLine={false}
-                        tickLine={false}
-                        interval={0}
-                        height={34}
-                        tick={{ fill: '#475569', fontSize: 11, fontWeight: 600 }}
-                      />
-                      <YAxis
-                        yAxisId="left"
-                        axisLine={false}
-                        tickLine={false}
-                        width={42}
-                        tick={{ fill: '#94A3B8', fontSize: 11 }}
-                        tickFormatter={(v) =>
-                          paretoMetric === 'clients' || !paretoHasHours ? `${v}` : `${v}h`
-                        }
-                      />
-                      <YAxis
-                        yAxisId="right"
-                        orientation="right"
-                        domain={[0, 100]}
-                        ticks={[0, 20, 40, 60, 80, 100]}
-                        axisLine={false}
-                        tickLine={false}
-                        width={40}
-                        tick={{ fill: '#6366F1', fontSize: 11 }}
-                        tickFormatter={(v) => `${v}%`}
-                      />
-                      <ReferenceLine
-                        yAxisId="right"
-                        y={80}
-                        stroke="#4F46E5"
-                        strokeDasharray="5 5"
-                        strokeOpacity={0.55}
-                        label={{
-                          value: 'Corte 80%',
-                          position: 'insideTopRight',
-                          fill: '#4F46E5',
-                          fontSize: 11,
-                          fontWeight: 700,
-                        }}
-                      />
-                      <Tooltip
-                        cursor={{ fill: '#F8FAFC' }}
-                        content={(props) => (
-                          <ParetoTooltipCard
-                            active={props.active}
-                            payload={props.payload as Array<{ payload?: ParetoChartRow }>}
-                            metric={paretoMetric}
-                          />
-                        )}
-                      />
-                      <Bar
-                        yAxisId="left"
-                        dataKey="barValue"
-                        radius={[8, 8, 0, 0]}
-                        maxBarSize={52}
-                        className="cursor-pointer outline-none"
-                        onClick={(_barData, index) => {
-                          const target = paretoChartData[index];
-                          if (target) {
-                            setSelectedPatternKey((prev) =>
-                              prev === target.patternKey ? null : target.patternKey,
-                            );
-                          }
-                        }}
-                      >
-                        {paretoChartData.map((entry) => {
-                          const isSelected = selectedPatternKey === entry.patternKey;
-                          const dimmed =
-                            Boolean(selectedPatternKey) && selectedPatternKey !== entry.patternKey;
-                          const fill = isSelected
-                            ? entry.isVitalFew80
-                              ? '#BE123C'
-                              : '#475569'
-                            : entry.isVitalFew80
-                              ? '#F43F5E'
-                              : '#CBD5E1';
-                          return (
-                            <Cell
-                              key={entry.patternKey}
-                              fill={fill}
-                              fillOpacity={dimmed ? 0.45 : 1}
-                            />
-                          );
-                        })}
-                      </Bar>
-                      <Line
-                        yAxisId="right"
-                        type="monotone"
-                        dataKey="cumulativePct"
-                        stroke="#4F46E5"
-                        strokeWidth={2.5}
-                        dot={{ r: 3.5, fill: '#FFFFFF', stroke: '#4F46E5', strokeWidth: 2 }}
-                        activeDot={{ r: 5.5, fill: '#4F46E5', stroke: '#FFFFFF', strokeWidth: 2 }}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
+              {pareto.items.length === 0 ? (
+                <div className="py-12 text-center text-xs text-slate-400">
+                  Sin fallas registradas en los últimos {daysRange} días.
                 </div>
+              ) : (
+                <>
+                  {/* Clean Pareto Chart */}
+                  <div className="w-full h-[255px] min-w-0 outline-none [&_.recharts-wrapper]:outline-none [&_svg]:outline-none">
+                    <ResponsiveContainer width="100%" height={255}>
+                      <ComposedChart
+                        data={paretoChartData}
+                        margin={{ top: 12, right: 12, left: -8, bottom: 4 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                        <XAxis
+                          dataKey="shortLabel"
+                          axisLine={false}
+                          tickLine={false}
+                          interval={0}
+                          height={32}
+                          tick={{ fill: '#475569', fontSize: 11, fontWeight: 600 }}
+                        />
+                        <YAxis
+                          yAxisId="left"
+                          axisLine={false}
+                          tickLine={false}
+                          width={42}
+                          tick={{ fill: '#94A3B8', fontSize: 11 }}
+                          tickFormatter={(v) =>
+                            paretoMetric === 'clients' || !paretoHasHours ? `${v}` : `${v}h`
+                          }
+                        />
+                        <YAxis
+                          yAxisId="right"
+                          orientation="right"
+                          domain={[0, 100]}
+                          ticks={[0, 20, 40, 60, 80, 100]}
+                          axisLine={false}
+                          tickLine={false}
+                          width={40}
+                          tick={{ fill: '#6366F1', fontSize: 11 }}
+                          tickFormatter={(v) => `${v}%`}
+                        />
+                        <ReferenceLine
+                          yAxisId="right"
+                          y={80}
+                          stroke="#4F46E5"
+                          strokeDasharray="5 5"
+                          strokeOpacity={0.5}
+                          label={{
+                            value: 'Corte 80%',
+                            position: 'insideTopRight',
+                            fill: '#4F46E5',
+                            fontSize: 11,
+                            fontWeight: 700,
+                          }}
+                        />
+                        <Tooltip
+                          cursor={{ fill: '#F8FAFC' }}
+                          content={(props) => (
+                            <ParetoTooltipCard
+                              active={props.active}
+                              payload={props.payload as Array<{ payload?: ParetoChartRow }>}
+                              metric={paretoMetric}
+                            />
+                          )}
+                        />
+                        <Bar
+                          yAxisId="left"
+                          dataKey="barValue"
+                          radius={[7, 7, 0, 0]}
+                          maxBarSize={48}
+                          className="cursor-pointer outline-none"
+                          onClick={(_barData, index) => {
+                            const target = paretoChartData[index];
+                            if (target) setSelectedPatternKey(target.patternKey);
+                          }}
+                        >
+                          {paretoChartData.map((entry) => {
+                            const isSelected = selectedPatternKey === entry.patternKey;
+                            const fill = isSelected
+                              ? entry.isVitalFew80
+                                ? '#BE123C'
+                                : '#475569'
+                              : entry.isVitalFew80
+                                ? '#F43F5E'
+                                : '#CBD5E1';
+                            return <Cell key={entry.patternKey} fill={fill} />;
+                          })}
+                        </Bar>
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="cumulativePct"
+                          stroke="#4F46E5"
+                          strokeWidth={2.5}
+                          dot={{ r: 3.5, fill: '#FFFFFF', stroke: '#4F46E5', strokeWidth: 2 }}
+                          activeDot={{ r: 5.5, fill: '#4F46E5', stroke: '#FFFFFF', strokeWidth: 2 }}
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 px-1">
-                  <div className="flex items-center gap-4 flex-wrap">
+                  {/* Minimal Chart Legend */}
+                  <div className="flex flex-wrap items-center gap-5 text-[11px] text-slate-500 px-1">
                     <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700">
                       <span className="w-2.5 h-2.5 rounded-xs bg-rose-500 inline-block" />
-                      Prioridad 80% (resolver primero)
+                      Prioridad 80%
                     </span>
                     <span className="inline-flex items-center gap-1.5">
                       <span className="w-2.5 h-2.5 rounded-xs bg-slate-300 inline-block" />
-                      Cola restante (20%)
+                      Resto 20%
                     </span>
                     <span className="inline-flex items-center gap-1.5 font-semibold text-indigo-700">
                       <span className="w-3 h-0.5 bg-indigo-600 inline-block" />
                       % Acumulado
                     </span>
                   </div>
-                  <span className="text-slate-400">
-                    Haz clic en cualquier barra o tarjeta para ver auditoría y evidencia real
+                </>
+              )}
+            </section>
+
+            {/* Clean Executive Table (replaces multi-card grid) */}
+            {pareto.items.length > 0 && (
+              <section className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-2xs">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wide text-slate-400 bg-slate-50/60">
+                        <th className="py-3 px-4 w-10">#</th>
+                        <th className="py-3 px-4">Problema</th>
+                        <th className="py-3 px-4">Tiempo</th>
+                        <th className="py-3 px-4">Clientes</th>
+                        <th className="py-3 px-4">Estado de solución</th>
+                        <th className="py-3 px-4 text-right">Detalle</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {pareto.items.map((item, idx) => {
+                        const isSelected = selectedPatternKey === item.patternKey;
+                        const statusPillCls =
+                          item.audit.verdict === 'root_fixed'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : item.audit.verdict === 'partial_patch'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-rose-50 text-rose-700 border-rose-200';
+                        return (
+                          <tr
+                            key={item.patternKey}
+                            onClick={() => setSelectedPatternKey(item.patternKey)}
+                            className={`cursor-pointer transition ${
+                              isSelected ? 'bg-indigo-50/50' : 'hover:bg-slate-50/80'
+                            }`}
+                          >
+                            <td className="py-3.5 px-4">
+                              <span
+                                className={`w-6 h-6 rounded-md text-[11px] font-bold flex items-center justify-center ${
+                                  item.isVitalFew80
+                                    ? 'bg-rose-100 text-rose-700'
+                                    : 'bg-slate-100 text-slate-600'
+                                }`}
+                              >
+                                {idx + 1}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <p className="font-bold text-slate-900">{item.label}</p>
+                              <p className="text-[11px] text-slate-400">
+                                {item.sharePct}% del total · Acumulado {item.cumulativePct}%
+                              </p>
+                            </td>
+                            <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+                              {item.reactiveHours}h
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-700 font-medium whitespace-nowrap">
+                              {item.clientCount} cliente{item.clientCount === 1 ? '' : 's'}
+                            </td>
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${statusPillCls}`}
+                              >
+                                {item.audit.verdictLabel}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                              <span className="text-indigo-600 font-semibold hover:underline">
+                                Ver detalle →
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* TAB 3 · CLIENTES Y ESCALACIONES                                      */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {activeTab === 'clientes' && (
+          <div className="space-y-5">
+            {/* Escalated Bugs Queue (ONLY shown when pending > 0) */}
+            {pulse.rootCauseQueue.pendingForDev.length > 0 && (
+              <section className="bg-white rounded-2xl border border-rose-200/80 p-5 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Bug className="w-4 h-4 text-rose-600" />
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Bugs escalados desde WhatsApp pendientes de resolver
+                    </h3>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-rose-50 text-rose-700">
+                    {pulse.rootCauseQueue.pendingForDev.length} pendientes
                   </span>
                 </div>
-              </div>
 
-              {/* Clean Priority Cards Grid */}
-              <div className="space-y-2.5">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {displayedPriorityItems.map((item) => {
-                    const rank = pareto.items.findIndex((i) => i.patternKey === item.patternKey) + 1;
-                    const isSelected = selectedPatternKey === item.patternKey;
-                    const widthPct = Math.max(8, Math.round((item.sharePct / maxPriorityShare) * 100));
-                    const auditTag =
-                      item.audit.verdict === 'root_fixed'
-                        ? { label: '🟢 Raíz', cls: 'text-emerald-700' }
-                        : item.audit.verdict === 'partial_patch'
-                        ? { label: '🟡 Parcial', cls: 'text-amber-700' }
-                        : { label: '🔴 Sin raíz', cls: 'text-rose-700' };
+                <div className="divide-y divide-slate-100">
+                  {pulse.rootCauseQueue.pendingForDev.map((item) => {
+                    const rcMeta = SUPPORT_ROOT_CAUSE_META[item.type];
+                    const itemKey = `${item.ticketId}:${item.entryId}`;
+                    const isSaving = resolvingEntryKey === itemKey;
                     return (
-                      <button
-                        key={item.patternKey}
-                        type="button"
-                        onClick={() =>
-                          setSelectedPatternKey((prev) =>
-                            prev === item.patternKey ? null : item.patternKey,
-                          )
-                        }
-                        className={`text-left rounded-xl p-3.5 border transition ${isSelected
-                          ? 'bg-rose-50/50 border-rose-300 ring-2 ring-rose-500/15'
-                          : 'bg-slate-50/60 hover:bg-slate-50 border-slate-200/70 hover:border-slate-300'
-                          }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
+                      <div key={itemKey} className="py-2.5 flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span
-                              className={`w-5 h-5 rounded-md text-[10.5px] font-black flex items-center justify-center shrink-0 ${item.isVitalFew80
-                                ? 'bg-rose-100 text-rose-700'
-                                : 'bg-slate-200/80 text-slate-600'
-                                }`}
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${rcMeta.badgeClass}`}
                             >
-                              {rank}
+                              {rcMeta.shortLabel}
                             </span>
-                            <span className="text-xs font-bold text-slate-900 truncate">
-                              {item.label}
+                            <span className="text-xs font-bold text-slate-900">
+                              {item.clientName}
                             </span>
-                          </div>
-                          <span className="text-xs font-black text-slate-800 shrink-0">
-                            {item.sharePct}%
-                          </span>
-                        </div>
-
-                        <div className="h-1 w-full rounded-full bg-slate-200/75 overflow-hidden my-2.5">
-                          <div
-                            style={{ width: `${widthPct}%` }}
-                            className={`h-full rounded-full ${item.isVitalFew80 ? 'bg-rose-500' : 'bg-slate-400'
-                              }`}
-                          />
-                        </div>
-
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium gap-1.5">
-                          <span className="truncate">
-                            <strong className="text-slate-700">{item.reactiveHours}h</strong> ·{' '}
-                            {item.clientCount} cliente{item.clientCount === 1 ? '' : 's'}
-                          </span>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className={`font-bold ${auditTag.cls}`}>{auditTag.label}</span>
-                            <span className="text-indigo-600 font-semibold">
-                              Acum. {item.cumulativePct}%
+                            <span className="text-[11px] text-slate-400">
+                              · {item.byName.split(' ')[0]}
                             </span>
                           </div>
+                          {item.note && (
+                            <p className="text-xs text-slate-600 mt-1">{item.note}</p>
+                          )}
                         </div>
-                      </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {item.circleId && (
+                            <button
+                              type="button"
+                              onClick={() => navigate('/support/chat', { state: { waCircleId: item.circleId } })}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs"
+                            >
+                              Chat
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={isSaving}
+                            onClick={() => handleMarkDevResolved(item)}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold text-xs disabled:opacity-50"
+                          >
+                            {isSaving ? '...' : 'Marcar resuelto'}
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
+              </section>
+            )}
 
-                {pareto.items.length > displayedPriorityItems.length || showAllParetoItems ? (
-                  pareto.items.length > 3 && pareto.items.length > vitalItems.length && (
-                    <div className="flex justify-center pt-1">
+            {/* Clean Unified Client Health Table */}
+            <section
+              id="client-health-section"
+              className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-2xs"
+            >
+              <div className="p-4 border-b border-slate-200/80 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {[
+                    { id: 'all' as HealthFilter, label: `Todos (${clientHealthCounts.all})` },
+                    { id: 'critical' as HealthFilter, label: `Reincidentes (${clientHealthCounts.critical})` },
+                    { id: 'open' as HealthFilter, label: `Con abiertos (${clientHealthCounts.open})` },
+                    { id: 'stable' as HealthFilter, label: `Estables (${clientHealthCounts.stable})` },
+                  ].map((pill) => {
+                    const active = healthFilter === pill.id;
+                    return (
                       <button
+                        key={pill.id}
                         type="button"
-                        onClick={() => setShowAllParetoItems((v) => !v)}
-                        className="text-xs font-semibold text-slate-500 hover:text-slate-900 transition"
-                      >
-                        {showAllParetoItems
-                          ? 'Mostrar solo focos principales'
-                          : `Ver todas las categorías (${pareto.items.length})`}
-                      </button>
-                    </div>
-                  )
-                ) : null}
-              </div>
-
-              {/* 1-Click Drill-Down: Senior Root-Cause Audit + Client Evidence */}
-              {selectedParetoItem && (
-                <div className="rounded-xl bg-slate-50/90 border border-slate-200/85 p-4 sm:p-5 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold ${selectedParetoItem.isVitalFew80
-                          ? 'bg-rose-100 text-rose-700'
-                          : 'bg-slate-200 text-slate-700'
-                          }`}
-                      >
-                        {selectedParetoItem.isVitalFew80 ? 'Prioridad 80%' : 'Resto 20%'}
-                      </span>
-                      <h4 className="text-sm font-black text-slate-900">
-                        {selectedParetoItem.label}
-                      </h4>
-                      <span className="text-xs text-slate-500 font-medium">
-                        {selectedParetoItem.reactiveHours}h · {selectedParetoItem.clientCount}{' '}
-                        clientes · {selectedParetoItem.messageCount} msgs ·{' '}
-                        {selectedParetoItem.ticketCount} tickets
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => handleFilterClientsByPattern(selectedParetoItem.patternKey)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${tablePatternFilter === selectedParetoItem.patternKey
-                          ? 'bg-indigo-600 text-white border-indigo-600'
-                          : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
-                          }`}
-                      >
-                        <Filter className="w-3.5 h-3.5" />
-                        {tablePatternFilter === selectedParetoItem.patternKey
-                          ? 'Quitando filtro abajo'
-                          : 'Ver estos clientes abajo'}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPatternKey(null)}
-                        title="Cerrar evidencia"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-white transition"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Senior Audit Verdict Strip + Sub-View Tabs */}
-                  <div className="bg-white rounded-xl border border-slate-200/80 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-                      <span
-                        className={`px-2 py-0.5 rounded-md text-[11px] font-black border shrink-0 ${
-                          selectedParetoItem.audit.verdict === 'root_fixed'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : selectedParetoItem.audit.verdict === 'partial_patch'
-                            ? 'bg-amber-50 text-amber-800 border-amber-200'
-                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                        onClick={() => setHealthFilter(pill.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                          active
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        {selectedParetoItem.audit.verdictLabel}
-                      </span>
-                      <p className="text-xs font-medium text-slate-700">
-                        {selectedParetoItem.audit.summary}
-                      </p>
-                    </div>
+                        {pill.label}
+                      </button>
+                    );
+                  })}
 
-                    <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/70 shrink-0">
-                      {[
-                        {
-                          id: 'audit' as const,
-                          label: `Auditoría y soluciones (${selectedParetoItem.audit.documentedSolutions.length})`,
-                        },
-                        {
-                          id: 'clients' as const,
-                          label: `Clientes y mensajes (${selectedParetoItem.clientCount})`,
-                        },
-                      ].map((tab) => {
-                        const active = evidenceTab === tab.id;
-                        return (
-                          <button
-                            key={tab.id}
-                            type="button"
-                            onClick={() => setEvidenceTab(tab.id)}
-                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${
-                              active
-                                ? 'bg-white text-slate-900 shadow-2xs'
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            {tab.label}
-                          </button>
-                        );
-                      })}
-                    </div>
+                  {activeTablePattern && (
+                    <button
+                      type="button"
+                      onClick={() => setTablePatternFilter(null)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200"
+                    >
+                      <Filter className="w-3 h-3" />
+                      {activeTablePattern.shortLabel} ×
+                    </button>
+                  )}
+                </div>
+
+                <div className="relative w-full lg:w-64">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar cliente, técnico o error..."
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="divide-y divide-slate-100">
+                {visibleClients.length === 0 ? (
+                  <div className="p-10 text-center text-xs text-slate-400 font-medium">
+                    No hay clientes con este filtro.
                   </div>
+                ) : (
+                  visibleClients.map((client) => {
+                    const isExpanded = expandedClientKey === client.clientKey;
+                    const badgeClass =
+                      client.health === 'critical'
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : client.health === 'watch'
+                        ? 'bg-amber-50 text-amber-800 border-amber-200'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                    return (
+                      <div key={client.clientKey}>
+                        <div
+                          className={`px-5 py-3 flex flex-wrap items-center justify-between gap-3 transition ${
+                            isExpanded ? 'bg-indigo-50/40' : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedClientKey(isExpanded ? null : client.clientKey)
+                            }
+                            className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 text-indigo-600 shrink-0" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                            )}
 
-                  {evidenceTab === 'audit' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                      {/* Left: What the technicians did + flags */}
-                      <div className="lg:col-span-7 space-y-2.5">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                          Qué hicieron los técnicos (notas de raíz y solución)
-                        </p>
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold border shrink-0 ${badgeClass}`}
+                            >
+                              {client.health === 'critical'
+                                ? 'Reincidente'
+                                : client.health === 'watch'
+                                ? 'Atención'
+                                : 'Estable'}
+                            </span>
 
-                        {selectedParetoItem.audit.documentedSolutions.length === 0 ? (
-                          <div className="bg-white border border-slate-200/75 rounded-xl p-4 text-xs text-slate-500 leading-relaxed">
-                            Ningún ticket de esta categoría documenta solución de raíz en código
-                            todavía. Hasta ahora se ha atendido por chat o cierres genéricos.
-                          </div>
-                        ) : (
-                          <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                            {selectedParetoItem.audit.documentedSolutions.map((sol) => (
-                              <div
-                                key={sol.ticketId}
-                                className="bg-white border border-slate-200/80 rounded-xl p-3.5 space-y-1.5"
+                            <span className="text-sm font-bold text-slate-900 truncate">
+                              {client.clientName}
+                            </span>
+
+                            <span className="px-2 py-0.5 rounded-md text-[10.5px] font-medium bg-slate-100 text-slate-600 shrink-0">
+                              {client.primaryModuleLabel}
+                            </span>
+
+                            {client.isPingPong && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold shrink-0">
+                                <Flame className="w-3 h-3" />
+                                {client.peakDayMessages} msgs
+                              </span>
+                            )}
+
+                            {client.distinctDaysReported >= 2 && (
+                              <span className="text-[11px] font-medium text-rose-700 shrink-0 hidden md:inline">
+                                · Volvió {client.distinctDaysReported} días
+                              </span>
+                            )}
+                          </button>
+
+                          <div className="flex items-center gap-3 text-xs shrink-0">
+                            <span className="text-slate-500 font-medium hidden sm:inline">
+                              {client.primaryTech.split(' ')[0]}
+                            </span>
+
+                            <span
+                              title={`${client.ticketReactiveHours}h en tickets + ~${client.unloggedChatHours}h chat WA sin ticket`}
+                              className="font-bold text-slate-900"
+                            >
+                              {client.totalReactiveHours}h
+                            </span>
+
+                            {client.openTickets > 0 && (
+                              <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-rose-600 text-white">
+                                {client.openTickets} abiertos
+                              </span>
+                            )}
+
+                            {client.circleId && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  navigate('/support/chat', { state: { waCircleId: client.circleId } })
+                                }
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-[11px] transition"
                               >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex items-center gap-2 flex-wrap min-w-0">
-                                    <span
-                                      className={`px-1.5 py-0.5 rounded text-[10px] font-black border shrink-0 ${
-                                        sol.verdict === 'root_cause_fix'
-                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                          : 'bg-amber-50 text-amber-800 border-amber-200'
-                                      }`}
-                                    >
-                                      {sol.verdictLabel}
-                                    </span>
-                                    <p className="text-xs font-bold text-slate-900 leading-snug">
-                                      {sol.title}
-                                    </p>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 shrink-0 text-[11px]">
-                                    <span className="text-slate-500 font-semibold">
-                                      {sol.techName.split(' ')[0]} · {sol.hours}h
-                                    </span>
-                                    {sol.rawTicket && (
-                                      <button
-                                        type="button"
-                                        onClick={() => setSelectedTicketForDrawer(sol.rawTicket!)}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold"
-                                      >
-                                        Ticket <ExternalLink className="w-3 h-3" />
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {sol.rootCause && (
-                                  <p className="text-[11.5px] text-slate-600 leading-relaxed">
-                                    <strong className="text-slate-800">Causa raíz:</strong>{' '}
-                                    {sol.rootCause}
-                                  </p>
-                                )}
-
-                                {sol.solution && (
-                                  <p className="text-[11.5px] text-slate-600 leading-relaxed">
-                                    <strong className="text-slate-800">Solución tomada:</strong>{' '}
-                                    {sol.solution}
-                                  </p>
-                                )}
-
-                                {sol.seniorFlag && (
-                                  <div className="rounded-lg bg-amber-50/90 border border-amber-200/80 px-2.5 py-1.5 text-[11px] font-semibold text-amber-900">
-                                    {sol.seniorFlag}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {selectedParetoItem.audit.undocumentedCount > 0 && (
-                          <div className="rounded-xl bg-rose-50/75 border border-rose-200/80 px-3.5 py-2.5 text-[11.5px] text-rose-900 font-medium">
-                            <strong>
-                              {selectedParetoItem.audit.undocumentedCount} ticket(s) (
-                              {selectedParetoItem.audit.undocumentedHours}h)
-                            </strong>{' '}
-                            cerrados como &ldquo;Soporte técnico&rdquo; o sin causa raíz documentada.
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Right: Senior Recommended Root-Cause Fix + Team Checklist */}
-                      <div className="lg:col-span-5 space-y-2.5">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">
-                          Solución de raíz recomendada (Arquitectura Senior)
-                        </p>
-
-                        <div className="bg-white border border-indigo-200/75 rounded-xl p-4 space-y-3">
-                          <p className="text-xs text-slate-800 font-medium leading-relaxed">
-                            {selectedParetoItem.audit.recommendedRootCauseFix}
-                          </p>
-
-                          <div className="border-t border-slate-100 pt-3 space-y-1.5">
-                            <p className="text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
-                              Qué validar con Melvin y Gerson
-                            </p>
-                            <ul className="space-y-1.5">
-                              {selectedParetoItem.audit.seniorChecklist.map((q, qIdx) => (
-                                <li
-                                  key={qIdx}
-                                  className="flex items-start gap-2 text-[11.5px] text-slate-700 leading-snug"
-                                >
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
-                                  <span>{q}</span>
-                                </li>
-                              ))}
-                            </ul>
+                                Abrir chat →
+                              </button>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                      {/* Affected Clients */}
-                      <div className="lg:col-span-5 space-y-2">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                          Clientes afectados ({selectedParetoItem.clients.length})
-                        </p>
-                        <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                          {selectedParetoItem.clients.slice(0, 8).map((c) => (
-                            <div
-                              key={c.clientKey}
-                              className="bg-white border border-slate-200/75 rounded-xl px-3 py-2 flex items-center justify-between gap-2"
-                            >
-                              <div className="min-w-0">
-                                <p className="text-xs font-bold text-slate-900 truncate">
-                                  {c.clientName}
-                                </p>
-                                <p className="text-[11px] text-slate-500">
-                                  {c.reactiveHours}h · {c.messages} msgs
-                                  {c.tickets > 0 ? ` · ${c.tickets} ticket(s)` : ''}
-                                </p>
+
+                        {isExpanded && (
+                          <div className="bg-slate-50/70 px-5 py-3.5 border-t border-slate-100 space-y-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                              <span>
+                                <strong>Detalle:</strong> {client.healthReason} · WA:{' '}
+                                {client.waMessages} mensajes (~{client.waEstHours}h)
+                              </span>
+                              {client.buildHours > 0 && (
+                                <span className="font-semibold text-emerald-700">
+                                  + {client.buildHours}h en Mejoras / Go-Live
+                                </span>
+                              )}
+                            </div>
+
+                            {client.records.length === 0 ? (
+                              <p className="text-xs text-slate-400 italic">
+                                Solo conversaciones por WhatsApp en este período.
+                              </p>
+                            ) : (
+                              <div className="bg-white rounded-xl border border-slate-200/80 overflow-x-auto">
+                                <table className="w-full text-left border-collapse text-xs">
+                                  <thead>
+                                    <tr className="border-b border-slate-200/80 text-[10px] font-bold uppercase text-slate-400 bg-slate-50/50">
+                                      <th className="py-2 px-3">Fecha</th>
+                                      <th className="py-2 px-3">Tipo</th>
+                                      <th className="py-2 px-3">Caso</th>
+                                      <th className="py-2 px-3">Técnico</th>
+                                      <th className="py-2 px-3">Tiempo</th>
+                                      <th className="py-2 px-3 text-right">Detalle</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {client.records.map((rec) => (
+                                      <tr key={rec.id} className="hover:bg-slate-50/80">
+                                        <td className="py-2 px-3 whitespace-nowrap">
+                                          <span className="font-semibold text-slate-700">
+                                            {new Date(rec.createdAt).toLocaleDateString('es-SV', {
+                                              day: '2-digit',
+                                              month: 'short',
+                                            })}
+                                          </span>
+                                          <span
+                                            className={`ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                              rec.status === 'resolved'
+                                                ? 'bg-emerald-50 text-emerald-700'
+                                                : 'bg-rose-50 text-rose-700'
+                                            }`}
+                                          >
+                                            {rec.status === 'resolved' ? 'Cerrado' : 'Abierto'}
+                                          </span>
+                                        </td>
+                                        <td className="py-2 px-3 whitespace-nowrap">
+                                          <span
+                                            className="px-2 py-0.5 rounded text-[10px] font-bold text-white"
+                                            style={{ backgroundColor: rec.ticketCategoryColor }}
+                                          >
+                                            {rec.ticketCategoryCode}
+                                          </span>
+                                        </td>
+                                        <td className="py-2 px-3 max-w-sm">
+                                          <p className="font-semibold text-slate-900 truncate">{rec.title}</p>
+                                          {rec.solution && (
+                                            <p className="text-[11px] text-slate-500 truncate">
+                                              {rec.solution}
+                                            </p>
+                                          )}
+                                        </td>
+                                        <td className="py-2 px-3 whitespace-nowrap text-slate-700">
+                                          {rec.techName.split(' ')[0]}
+                                        </td>
+                                        <td className="py-2 px-3 whitespace-nowrap font-bold text-slate-800">
+                                          {rec.reportedHours}h
+                                        </td>
+                                        <td className="py-2 px-3 text-right whitespace-nowrap">
+                                          {rec.rawTicket && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setSelectedTicketForDrawer(rec.rawTicket!)}
+                                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-[11px]"
+                                            >
+                                              Ver <ExternalLink className="w-3 h-3" />
+                                            </button>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
                               </div>
-                              {c.circleId && (
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+
+                {overview.internalDev.count > 0 && (
+                  <div className="bg-slate-50/70">
+                    <button
+                      type="button"
+                      onClick={() => setShowInternalTasks((v) => !v)}
+                      className="w-full text-left px-5 py-3 flex items-center justify-between text-xs font-semibold text-slate-600 hover:text-slate-900"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <ShieldAlert className="w-3.5 h-3.5 text-emerald-600" />
+                        Mejoras internas de producto (P4 · {overview.internalDev.count} tareas ·{' '}
+                        {overview.internalDev.totalHours}h)
+                      </span>
+                      <span>{showInternalTasks ? 'Ocultar' : 'Ver'}</span>
+                    </button>
+                    {showInternalTasks && (
+                      <div className="px-5 pb-4 space-y-1.5">
+                        {overview.internalDev.records.map((rec) => (
+                          <div
+                            key={rec.id}
+                            className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-slate-200/70 text-xs"
+                          >
+                            <span className="font-medium text-slate-800 truncate">
+                              {rec.title}{' '}
+                              <span className="text-slate-400">({rec.techName.split(' ')[0]})</span>
+                            </span>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="font-bold text-emerald-700">{rec.reportedHours}h</span>
+                              {rec.rawTicket && (
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    navigate('/support/chat', { state: { waCircleId: c.circleId } })
-                                  }
-                                  className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] shrink-0 transition"
+                                  onClick={() => setSelectedTicketForDrawer(rec.rawTicket!)}
+                                  className="text-indigo-600 font-semibold"
                                 >
-                                  Chat →
+                                  Ver →
                                 </button>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Real Evidence Quotes */}
-                      <div className="lg:col-span-7 space-y-2">
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                          Reportes reales recientes
-                        </p>
-                        {selectedParetoItem.examples.length === 0 ? (
-                          <p className="text-xs text-slate-400 italic py-4">
-                            Sin extractos de texto detallados en este período.
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            {selectedParetoItem.examples.map((ex, idx) => (
-                              <div
-                                key={`${ex.clientName}-${idx}`}
-                                className="bg-white border border-slate-200/75 rounded-xl p-3 space-y-1"
-                              >
-                                <div className="flex items-center justify-between gap-2 text-[11px]">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <span className="font-bold text-slate-900 truncate">
-                                      {ex.clientName}
-                                    </span>
-                                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold shrink-0">
-                                      {ex.source === 'whatsapp' ? 'WhatsApp' : 'Ticket'}
-                                    </span>
-                                  </div>
-                                  <span className="text-slate-400 shrink-0">
-                                    {new Date(ex.at).toLocaleDateString('es-SV', {
-                                      day: '2-digit',
-                                      month: 'short',
-                                    })}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-slate-700 leading-relaxed">
-                                  &ldquo;{ex.text}&rdquo;
-                                </p>
-                              </div>
-                            ))}
                           </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+      </main>
+
+      {/* Slide-Over Detail Drawer for Selected Pareto Problem */}
+      {selectedParetoItem && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedPatternKey(null);
+          }}
+          className="fixed inset-0 z-40 flex justify-end bg-slate-900/35 backdrop-blur-xs"
+        >
+          <div className="w-full max-w-2xl bg-white h-full shadow-2xl overflow-hidden flex flex-col">
+            {/* Drawer Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-start justify-between gap-3 bg-white">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10.5px] font-bold ${
+                      selectedParetoItem.isVitalFew80
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {selectedParetoItem.isVitalFew80 ? 'Prioridad 80%' : 'Resto 20%'}
+                  </span>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {selectedParetoItem.label}
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-500">
+                  {selectedParetoItem.reactiveHours}h perdidas · {selectedParetoItem.clientCount}{' '}
+                  cliente{selectedParetoItem.clientCount === 1 ? '' : 's'} ·{' '}
+                  {selectedParetoItem.sharePct}% del soporte reactivo
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedPatternKey(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Drawer Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#F8FAFC]">
+              {/* Section 1: Manager Recommendation */}
+              <div className="bg-white rounded-2xl border border-indigo-200/75 p-5 space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs font-bold uppercase tracking-wide text-indigo-700">
+                    Qué pedirle al equipo
+                  </span>
+                  <span
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-semibold border ${
+                      selectedParetoItem.audit.verdict === 'root_fixed'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : selectedParetoItem.audit.verdict === 'partial_patch'
+                        ? 'bg-amber-50 text-amber-800 border-amber-200'
+                        : 'bg-rose-50 text-rose-700 border-rose-200'
+                    }`}
+                  >
+                    {selectedParetoItem.audit.verdictLabel}
+                  </span>
+                </div>
+
+                <p className="text-xs text-slate-500 font-medium">
+                  {selectedParetoItem.audit.summary}
+                </p>
+
+                <p className="text-sm text-slate-900 font-medium leading-relaxed">
+                  {selectedParetoItem.audit.recommendedRootCauseFix}
+                </p>
+
+                <div className="border-t border-slate-100 pt-3 space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                    Preguntas para validar en reunión
+                  </p>
+                  <ul className="space-y-1.5">
+                    {selectedParetoItem.audit.seniorChecklist.map((q, qIdx) => (
+                      <li key={qIdx} className="flex items-start gap-2 text-xs text-slate-700">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                        <span>{q}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Section 2: What the Team Actually Did */}
+              <div className="space-y-2.5">
+                <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Qué ha hecho el equipo en tickets recientes
+                </h4>
+
+                {selectedParetoItem.audit.documentedSolutions.length === 0 ? (
+                  <div className="bg-white rounded-xl border border-slate-200/80 p-4 text-xs text-slate-500">
+                    No hay soluciones técnicas documentadas para este problema en el período; todo se atendió por WhatsApp o cierres genéricos.
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {selectedParetoItem.audit.documentedSolutions.map((sol) => (
+                      <div
+                        key={sol.ticketId}
+                        className="bg-white rounded-xl border border-slate-200/80 p-4 space-y-2"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                sol.verdict === 'root_cause_fix'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-amber-50 text-amber-800 border-amber-200'
+                              }`}
+                            >
+                              {sol.verdictLabel}
+                            </span>
+                            <p className="text-xs font-bold text-slate-900">{sol.title}</p>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0 text-[11px]">
+                            <span className="text-slate-500">
+                              {sol.techName.split(' ')[0]} · {sol.hours}h
+                            </span>
+                            {sol.rawTicket && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedTicketForDrawer(sol.rawTicket!)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold"
+                              >
+                                Ticket <ExternalLink className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {sol.rootCause && (
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            <strong className="text-slate-800">Por qué falló:</strong> {sol.rootCause}
+                          </p>
+                        )}
+                        {sol.solution && (
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            <strong className="text-slate-800">Qué aplicaron:</strong> {sol.solution}
+                          </p>
+                        )}
+                        {sol.seniorFlag && (
+                          <p className="rounded-lg bg-amber-50 border border-amber-200/80 px-2.5 py-1.5 text-[11px] font-medium text-amber-900">
+                            {sol.seniorFlag}
+                          </p>
                         )}
                       </div>
-                    </div>
+                    ))}
+                  </div>
+                )}
+
+                {selectedParetoItem.audit.undocumentedCount > 0 && (
+                  <p className="text-xs text-rose-700 font-medium px-1">
+                    {selectedParetoItem.audit.undocumentedCount} ticket(s) (
+                    {selectedParetoItem.audit.undocumentedHours}h) fueron cerrados sin explicar causa raíz.
+                  </p>
+                )}
+              </div>
+
+              {/* Section 3: Affected Clients & Sample Messages */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Clientes afectados ({selectedParetoItem.clients.length})
+                  </h4>
+                  {selectedParetoItem.clientCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenClientsFromPareto(selectedParetoItem.patternKey)}
+                      className="text-xs font-semibold text-indigo-600 hover:underline"
+                    >
+                      Ver en pestaña Clientes →
+                    </button>
                   )}
                 </div>
-              )}
-            </>
-          )}
-        </section>
 
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* BLOQUE 2B · RITMO DIARIO WHATSAPP + BUGS ESCALADOS A JIMMY          */}
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Left: Daily Rhythm */}
-          <div className="bg-white rounded-2xl border border-slate-200/75 p-4 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between pb-2.5">
-                <span className="text-xs font-black uppercase tracking-wide text-slate-800">
-                  Ritmo diario WhatsApp ({visibleDays.length}d)
-                </span>
-                <span className="text-[11px] font-semibold text-slate-400">
-                  Rojo = día con chat ping-pong
-                </span>
-              </div>
-              <div
-                className="grid gap-1"
-                style={{ gridTemplateColumns: `repeat(${Math.max(1, visibleDays.length)}, minmax(0, 1fr))` }}
-              >
-                {visibleDays.map((d) => {
-                  const hPct =
-                    d.totalMessages > 0
-                      ? Math.max(14, Math.round((d.totalMessages / maxDayMsgs) * 100))
-                      : 5;
-                  return (
-                    <div
-                      key={d.dayKey}
-                      title={`${d.label}: ${d.activeClients} clientes · ${d.totalMessages} msgs · ~${d.estStaffHours}h`}
-                      className="flex flex-col items-center justify-end rounded-lg bg-slate-50 border border-slate-100 py-1 px-0.5"
-                    >
-                      <span className="text-[9.5px] font-black text-slate-700">{d.totalMessages}</span>
-                      <div className="w-full h-9 flex items-end justify-center my-0.5">
-                        <div
-                          style={{ height: `${hPct}%` }}
-                          className={`w-2.5 rounded-t ${d.pingPongChats > 0
-                            ? 'bg-rose-500'
-                            : d.totalMessages > 0
-                              ? 'bg-indigo-500'
-                              : 'bg-slate-200'
-                            }`}
-                        />
-                      </div>
-                      <span className="text-[9px] font-bold text-emerald-700">{d.activeClients}c</span>
-                      <span className="text-[8.5px] text-slate-400 truncate max-w-full">
-                        {d.label.split(' ')[0]}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Jimmy's Escalation Queue */}
-          <div className="bg-white rounded-2xl border border-slate-200/75 p-4 flex flex-col">
-            <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
-              <div className="flex items-center gap-1.5">
-                <Bug className="w-4 h-4 text-rose-600" />
-                <h3 className="text-xs font-black uppercase tracking-wide text-slate-800">
-                  Bugs escalados para Jimmy (Botón &quot;Causa&quot; en chat)
-                </h3>
-              </div>
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-slate-100 text-slate-700">
-                {pulse.rootCauseQueue.pendingForDev.length} pendientes
-              </span>
-            </div>
-
-            {pulse.rootCauseQueue.pendingForDev.length === 0 ? (
-              <p className="text-xs text-slate-400 font-medium py-5">
-                Sin bugs escalados manualmente todavía. Usa el botón <strong>Causa</strong> en el Chat WhatsApp cuando un error de sistema requiera arreglo definitivo.
-              </p>
-            ) : (
-              <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto pt-1">
-                {pulse.rootCauseQueue.pendingForDev.map((item) => {
-                  const rcMeta = SUPPORT_ROOT_CAUSE_META[item.type];
-                  const itemKey = `${item.ticketId}:${item.entryId}`;
-                  const isSaving = resolvingEntryKey === itemKey;
-                  return (
-                    <div key={itemKey} className="py-2 flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-black border ${rcMeta.badgeClass}`}
-                          >
-                            {rcMeta.shortLabel}
-                          </span>
-                          <span className="text-xs font-black text-slate-900 truncate">
-                            {item.clientName}
-                          </span>
-                          <span className="text-[10.5px] text-slate-400">
-                            · {item.byName.split(' ')[0]}
-                          </span>
+                {selectedParetoItem.clients.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {selectedParetoItem.clients.slice(0, 6).map((c) => (
+                      <div
+                        key={c.clientKey}
+                        className="bg-white border border-slate-200/80 rounded-xl px-3 py-2 flex items-center justify-between gap-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">{c.clientName}</p>
+                          <p className="text-[11px] text-slate-500">
+                            {c.reactiveHours}h · {c.messages} msgs
+                          </p>
                         </div>
-                        {item.note && (
-                          <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-2">{item.note}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {item.circleId && (
+                        {c.circleId && (
                           <button
                             type="button"
-                            onClick={() => navigate('/support/chat', { state: { waCircleId: item.circleId } })}
-                            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]"
+                            onClick={() =>
+                              navigate('/support/chat', { state: { waCircleId: c.circleId } })
+                            }
+                            className="px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-[11px] shrink-0"
                           >
                             Chat
                           </button>
                         )}
-                        <button
-                          type="button"
-                          disabled={isSaving}
-                          onClick={() => handleMarkDevResolved(item)}
-                          className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] disabled:opacity-50"
-                        >
-                          {isSaving ? '...' : '✓ Resuelto'}
-                        </button>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        {/* BLOQUE 3 · 1 SOLA TABLA UNIFICADA DE CLIENTES (CHAT + TICKETS)       */}
-        {/* ════════════════════════════════════════════════════════════════════ */}
-        <section
-          id="client-health-section"
-          className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden"
-        >
-          <div className="p-4 border-b border-slate-200/80 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {[
-                { id: 'all' as HealthFilter, label: `Todos los Clientes (${clientHealthCounts.all})` },
-                { id: 'critical' as HealthFilter, label: `🔴 Reincidentes (${clientHealthCounts.critical})` },
-                { id: 'open' as HealthFilter, label: `🔥 Con Abiertos (${clientHealthCounts.open})` },
-                { id: 'stable' as HealthFilter, label: `🟢 Estables (${clientHealthCounts.stable})` },
-              ].map((pill) => {
-                const active = healthFilter === pill.id;
-                return (
-                  <button
-                    key={pill.id}
-                    type="button"
-                    onClick={() => setHealthFilter(pill.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${active
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                  >
-                    {pill.label}
-                  </button>
-                );
-              })}
-
-              {activeTablePattern && (
-                <button
-                  type="button"
-                  onClick={() => setTablePatternFilter(null)}
-                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200"
-                >
-                  Error: {activeTablePattern.shortLabel} ×
-                </button>
-              )}
-            </div>
-
-            <div className="relative w-full lg:w-64">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar cliente, técnico o error..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 font-medium"
-              />
-            </div>
-          </div>
-
-          <div className="divide-y divide-slate-100">
-            {visibleClients.length === 0 ? (
-              <div className="p-10 text-center text-xs text-slate-400 font-semibold">
-                No hay clientes con este filtro.
-              </div>
-            ) : (
-              visibleClients.map((client) => {
-                const isExpanded = expandedClientKey === client.clientKey;
-                const badgeClass =
-                  client.health === 'critical'
-                    ? 'bg-rose-100 text-rose-700 border-rose-200'
-                    : client.health === 'watch'
-                      ? 'bg-amber-50 text-amber-800 border-amber-200'
-                      : 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                return (
-                  <div key={client.clientKey}>
-                    <div
-                      className={`px-5 py-3 flex flex-wrap items-center justify-between gap-3 transition ${isExpanded ? 'bg-indigo-50/40' : 'hover:bg-slate-50'
-                        }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setExpandedClientKey(isExpanded ? null : client.clientKey)
-                        }
-                        className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="w-4 h-4 text-indigo-600 shrink-0" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-                        )}
-
-                        <span
-                          className={`px-2 py-0.5 rounded-md text-[10.5px] font-black border shrink-0 ${badgeClass}`}
-                        >
-                          {client.health === 'critical'
-                            ? 'Reincidente'
-                            : client.health === 'watch'
-                              ? 'Atención'
-                              : 'Estable'}
-                        </span>
-
-                        <span className="text-sm font-black text-slate-900 truncate">
-                          {client.clientName}
-                        </span>
-
-                        <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-slate-100 text-slate-600 shrink-0">
-                          {client.primaryModuleLabel}
-                        </span>
-
-                        {client.isPingPong && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black shrink-0">
-                            <Flame className="w-3 h-3" />
-                            {client.peakDayMessages} msgs ({client.peakDayLabel})
-                          </span>
-                        )}
-
-                        {client.distinctDaysReported >= 2 && (
-                          <span className="text-[11px] font-bold text-rose-700 shrink-0 hidden md:inline">
-                            · Volvió {client.distinctDaysReported} días
-                          </span>
-                        )}
-                      </button>
-
-                      <div className="flex items-center gap-3 text-xs shrink-0">
-                        <span className="text-slate-500 font-semibold hidden sm:inline">
-                          {client.primaryTech.split(' ')[0]}
-                        </span>
-
-                        {client.waMessages > 0 && (
-                          <span className="text-slate-600 font-semibold">
-                            {client.waMessages} msgs
-                          </span>
-                        )}
-
-                        <span
-                          title={`${client.ticketReactiveHours}h en tickets + ~${client.unloggedChatHours}h chat WA sin ticket`}
-                          className="font-black text-slate-900"
-                        >
-                          {client.totalReactiveHours}h{' '}
-                          <span className="text-[10.5px] font-normal text-slate-400">soporte</span>
-                        </span>
-
-                        {client.openTickets > 0 && (
-                          <span className="px-2 py-0.5 rounded-md text-[10.5px] font-black bg-red-600 text-white">
-                            {client.openTickets} abiertos
-                          </span>
-                        )}
-
-                        {client.circleId && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate('/support/chat', { state: { waCircleId: client.circleId } })
-                            }
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] transition"
-                          >
-                            Abrir chat →
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="bg-slate-50/70 px-5 py-3.5 border-t border-slate-100 space-y-2.5">
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
-                          <span>
-                            <strong>Diagnóstico:</strong> {client.healthReason} · Mensajes WA:{' '}
-                            {client.waMessages} (Cliente {client.waClientMsgs} / Equipo {client.waStaffMsgs}) · Tiempo chat ~{client.waEstHours}h
-                          </span>
-                          {client.buildHours > 0 && (
-                            <span className="font-bold text-emerald-700">
-                              + {client.buildHours}h en Mejoras / Go-Live
-                            </span>
-                          )}
-                        </div>
-
-                        {client.records.length === 0 ? (
-                          <p className="text-xs text-slate-400 italic">
-                            Solo conversaciones por WhatsApp (sin tickets formales registrados en el período).
-                          </p>
-                        ) : (
-                          <div className="bg-white rounded-xl border border-slate-200/80 overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-xs">
-                              <thead>
-                                <tr className="border-b border-slate-200/80 text-[10px] font-black uppercase text-slate-400 bg-slate-50/50">
-                                  <th className="py-2 px-3">Fecha</th>
-                                  <th className="py-2 px-3">Tipo</th>
-                                  <th className="py-2 px-3">Caso</th>
-                                  <th className="py-2 px-3">Técnico</th>
-                                  <th className="py-2 px-3">Tiempo</th>
-                                  <th className="py-2 px-3 text-right">Detalle</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {client.records.map((rec) => (
-                                  <tr key={rec.id} className="hover:bg-slate-50/80">
-                                    <td className="py-2 px-3 whitespace-nowrap">
-                                      <span className="font-bold text-slate-700">
-                                        {new Date(rec.createdAt).toLocaleDateString('es-SV', {
-                                          day: '2-digit',
-                                          month: 'short',
-                                        })}
-                                      </span>
-                                      <span
-                                        className={`ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${rec.status === 'resolved'
-                                          ? 'bg-emerald-50 text-emerald-700'
-                                          : 'bg-red-50 text-red-600'
-                                          }`}
-                                      >
-                                        {rec.status === 'resolved' ? 'Cerrado' : 'Abierto'}
-                                      </span>
-                                    </td>
-                                    <td className="py-2 px-3 whitespace-nowrap">
-                                      <span
-                                        className="px-2 py-0.5 rounded text-[10px] font-black text-white"
-                                        style={{ backgroundColor: rec.ticketCategoryColor }}
-                                      >
-                                        {rec.ticketCategoryCode}
-                                      </span>
-                                      <span className="ml-1.5 text-[11px] text-slate-500">
-                                        {rec.workBucketLabel}
-                                      </span>
-                                    </td>
-                                    <td className="py-2 px-3 max-w-sm">
-                                      <p className="font-bold text-slate-900 truncate">{rec.title}</p>
-                                      {rec.solution && (
-                                        <p className="text-[11px] text-slate-500 truncate">
-                                          {rec.solution}
-                                        </p>
-                                      )}
-                                    </td>
-                                    <td className="py-2 px-3 whitespace-nowrap font-semibold text-slate-700">
-                                      {rec.techName.split(' ')[0]}
-                                    </td>
-                                    <td className="py-2 px-3 whitespace-nowrap font-bold text-slate-800">
-                                      {rec.reportedHours}h
-                                      {rec.aiTimeStatus === 'inflated' && (
-                                        <span className="ml-1.5 px-1 py-0.5 rounded text-[9.5px] bg-rose-100 text-rose-700">
-                                          +{rec.diffAiHours}h vs IA
-                                        </span>
-                                      )}
-                                    </td>
-                                    <td className="py-2 px-3 text-right whitespace-nowrap">
-                                      {rec.rawTicket && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setSelectedTicketForDrawer(rec.rawTicket!)}
-                                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px]"
-                                        >
-                                          Ver <ExternalLink className="w-3 h-3" />
-                                        </button>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    ))}
                   </div>
-                );
-              })
-            )}
+                )}
 
-            {/* Collapsible Internal P4 Dev Tasks */}
-            {overview.internalDev.count > 0 && (
-              <div className="bg-slate-50/70">
-                <button
-                  type="button"
-                  onClick={() => setShowInternalTasks((v) => !v)}
-                  className="w-full text-left px-5 py-3 flex items-center justify-between text-xs font-bold text-slate-600 hover:text-slate-900"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <ShieldAlert className="w-3.5 h-3.5 text-emerald-600" />
-                    Desarrollo Interno &amp; Mejoras P4 (Sin cliente · incluidas en 🟢 Mejoras):{' '}
-                    {overview.internalDev.count} tareas · {overview.internalDev.totalHours}h
-                  </span>
-                  <span>{showInternalTasks ? 'Ocultar' : 'Ver'}</span>
-                </button>
-                {showInternalTasks && (
-                  <div className="px-5 pb-4 space-y-1.5">
-                    {overview.internalDev.records.map((rec) => (
+                {selectedParetoItem.examples.length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    {selectedParetoItem.examples.slice(0, 3).map((ex, idx) => (
                       <div
-                        key={rec.id}
-                        className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-slate-200/70 text-xs"
+                        key={`${ex.clientName}-${idx}`}
+                        className="bg-white border border-slate-200/80 rounded-xl p-3 space-y-1"
                       >
-                        <span className="font-semibold text-slate-800 truncate">
-                          {rec.title}{' '}
-                          <span className="text-slate-400">({rec.techName.split(' ')[0]})</span>
-                        </span>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="font-bold text-emerald-700">{rec.reportedHours}h</span>
-                          {rec.rawTicket && (
-                            <button
-                              type="button"
-                              onClick={() => setSelectedTicketForDrawer(rec.rawTicket!)}
-                              className="text-indigo-600 font-bold"
-                            >
-                              Ver →
-                            </button>
-                          )}
+                        <div className="flex items-center justify-between text-[11px] text-slate-500">
+                          <span className="font-bold text-slate-900">{ex.clientName}</span>
+                          <span>
+                            {ex.source === 'whatsapp' ? 'WhatsApp' : 'Ticket'} ·{' '}
+                            {new Date(ex.at).toLocaleDateString('es-SV', {
+                              day: '2-digit',
+                              month: 'short',
+                            })}
+                          </span>
                         </div>
+                        <p className="text-xs text-slate-700">&ldquo;{ex.text}&rdquo;</p>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
-        </section>
-      </div>
+        </div>
+      )}
 
-      {/* Ticket Drawer */}
+      {/* Ticket Drawer (z-50 sits cleanly above Pareto Slide-Over) */}
       {selectedTicketForDrawer && activeCompanyId && (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-xs">
           <div className="w-full max-w-xl bg-white h-full shadow-2xl overflow-hidden flex flex-col">
@@ -2272,7 +2252,7 @@ export const SupportIntelligence: React.FC = () => {
                 loadIntelligenceData();
               }}
               onSelectTicket={(t) => setSelectedTicketForDrawer(t)}
-              onCreateSubticket={() => { }}
+              onCreateSubticket={() => {}}
             />
           </div>
         </div>
