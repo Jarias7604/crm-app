@@ -324,8 +324,8 @@ export const SUPPORT_ERROR_PATTERNS: Record<
     moduleKey: 'dte',
   },
   dte_fiscal_data: {
-    label: 'Datos Fiscales (NIT / NRC / Correlativo)',
-    shortLabel: 'Datos Fiscales',
+    label: 'Datos Fiscales / Correlativos',
+    shortLabel: 'Correlativos/NIT',
     moduleKey: 'dte',
   },
   inv_stock_sync: {
@@ -334,8 +334,8 @@ export const SUPPORT_ERROR_PATTERNS: Record<
     moduleKey: 'inventario',
   },
   inv_catalog: {
-    label: 'Productos / Precios / Códigos',
-    shortLabel: 'Productos',
+    label: 'Productos / Buscador / Precios',
+    shortLabel: 'Productos/Busc.',
     moduleKey: 'inventario',
   },
   pdf_print: {
@@ -482,6 +482,59 @@ export function cleanSupportMessageSnippet(text: string, maxLen = 130): string {
   return `${clean.slice(0, Math.max(1, maxLen - 1)).trimEnd()}…`;
 }
 
+export type SupportWorkBucket =
+  | 'text_reply'
+  | 'implementation'
+  | 'troubleshooting'
+  | 'development';
+
+export function classifySupportWorkBucket(
+  title: string,
+  description: string,
+  categoryCode: string,
+): { bucket: SupportWorkBucket; label: string; reclassifiedFromP4: boolean } {
+  const normTitle = String(title || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+  const normText = `${title || ''} ${description || ''}`
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  if (
+    categoryCode === 'FAQ' ||
+    /^pregunta\s+frecuente/i.test(normTitle) ||
+    /\b(consulta|duda|respondiendo\s+texto)\b/i.test(normText)
+  ) {
+    return { bucket: 'text_reply', label: '💬 Consulta', reclassifiedFromP4: false };
+  }
+
+  if (
+    /^go\s*live|^capacitacion|^implementacion/i.test(normTitle) ||
+    /\b(go\s*live|capacitacion|implementacion|entrenamiento)\b/i.test(normText)
+  ) {
+    return { bucket: 'implementation', label: '🚀 Go-Live', reclassifiedFromP4: false };
+  }
+
+  if (categoryCode === 'P4') {
+    const isBugFixInP4 =
+      /\b(rechaz\w*|error(?:es)?|falla\w*|bug\w*|correc\w*|correg\w*|incorrect\w*|no\s+(?:carga|guarda|envia|imprime|descarga|deja|funciona|calcula|muestra|aparece|busca)|falta\s+(?:la\s+|el\s+)?(?:linea|campo|iva|dato)|retiro\s+de\s+la\s+herencia|revision\s+de\s+plazos\s+de\s+anulaci\w*|fix|repar\w*|arregl\w*|descuadre|roto|duplicad\w*)\b/i.test(
+        normTitle,
+      );
+    if (isBugFixInP4) {
+      return {
+        bucket: 'troubleshooting',
+        label: '🐛 Bug (en P4)',
+        reclassifiedFromP4: true,
+      };
+    }
+    return { bucket: 'development', label: '⚙️ Mejora P4', reclassifiedFromP4: false };
+  }
+
+  return { bucket: 'troubleshooting', label: '🛠️ Falla', reclassifiedFromP4: false };
+}
+
 export function detectSupportErrorPattern(text: string): SupportErrorPatternKey | null {
   const clean = stripSupportMessageMetadata(text);
   if (!clean || clean.length < 8) return null;
@@ -499,8 +552,39 @@ export function detectSupportErrorPattern(text: string): SupportErrorPatternKey 
     return null;
   }
 
+  const isResolvedConfirmation =
+    /^(?:ya\s+(?:realice|hice|probe|funciono|quedo|me\s+funciono|aparecio|lo\s+revisamos|se\s+envio)|ahora\s+si\s+(?:me\s+)?(?:aparecio|funciono|dejo|salio)|listo,?\s*(?:ya|gracias))/.test(
+      norm,
+    ) &&
+    /\b(si\s+me\s+funciono|ya\s+(?:me\s+)?funciono|ya\s+quedo|se\s+equivoco|mil\s+disculpas|muchas\s+gracias|ahora\s+si\s+me\s+aparecio)\b/.test(
+      norm,
+    );
+  if (isResolvedConfirmation) {
+    return null;
+  }
+
+  const hasExplicitSymptom =
+    /\b(error(?:es)?|falla\w*|bug\w*|rechaz\w*|invalida\w*|anula\w*|no\s+(?:deja|me\s+deja|puedo|carga|sale|imprime|descarga|aparece|guarda|lo\s+busca|me\s+deja\s+buscar|cuadra|genera|funciona|permite|hace|se\s+puede|se\s+envio)|sin\s+buscar|problema|inconveniente|descuadre|correlativo\w*|saltad\w*|falta\s+(?:el\s+|la\s+|tambien)?|bloquead\w*|cargando|pantalla\s+en\s+blanco|lento|caido|contingencia|pendiente\s+de\s+envio|cuartas\s+en\s+blanco|incorrect\w*|correc\w*|retiro\s+de\s+la\s+herencia|ayuda|consulta|como\s+(?:hago|se\s+hace))\b/i.test(
+      norm,
+    );
+
+  const isCourtesyOrFollowup =
+    /^(?:ya\s+(?:realice|hice|probe|funciono|quedo|me\s+funciono|aparecio|lo\s+revisamos|se\s+envio)|ahora\s+si\s+(?:me\s+)?(?:aparecio|funciono|dejo|salio)|muchas\s+gracias|esta\s+bien\b.*gracias|gracias\b|mil\s+disculpas|entendido\b|bueno,?\s*(?:muchas\s+)?gracias|buen(?:os|as)\s+(?:dias|tardes|noches),?\s*(?:muchas\s+)?gracias|ahorita\s+voy\s+a\s+probar|de\s+acuerdo\b|perfecto\b|excelente\b|saludos\b)/i.test(
+      norm,
+    ) ||
+    (/\b(gracias|agradezco|disculp\w*|entendido|quedamos\s+atentos|si\s+me\s+funciono|ya\s+me\s+funciono|ya\s+quedo)\b/i.test(
+      norm,
+    ) &&
+      !hasExplicitSymptom);
+
+  if (isCourtesyOrFollowup && !hasExplicitSymptom) {
+    return null;
+  }
+
   if (
-    /\b(invalida\w*|anula\w*|evento\s+de\s+invalidacion|nota\s+de\s+credito)\b/i.test(norm)
+    /\b(invalida\w*|anula\w*|evento\s+de\s+invalidacion|plazos\s+de\s+anulaci\w*)\b/i.test(
+      norm,
+    )
   ) {
     return 'dte_invalidation';
   }
@@ -512,41 +596,49 @@ export function detectSupportErrorPattern(text: string): SupportErrorPatternKey 
     return 'dte_contingency';
   }
   if (
-    /\b(nit|nrc|dui|correlativo|numero\s+de\s+control|codigo\s+de\s+generacion|actividad\s+economica|punto\s+de\s+venta|establecimiento)\b/i.test(
+    /\b(nit|nrc|dui|correlativo\w*|numero\s+de\s+control|codigo\s+de\s+generacion|actividad\s+economica|punto\s+de\s+venta|establecimiento)\b/i.test(
       norm,
     )
   ) {
     return 'dte_fiscal_data';
   }
   if (
-    /\b(hacienda|mh|firmador|firma\s+electronica|sello|rechaz\w*|timbr\w*|certificado|transmit\w*|json)\b/i.test(
+    /\b(hacienda|mh|firmador|firma\s+electronica|sello|rechaz\w*|timbr\w*|certificado|transmit\w*|json|ivaitem)\b/i.test(
       norm,
     )
   ) {
     return 'dte_signer_mh';
   }
   if (
-    /\b(descarg\w*\s+(?:de\s+|del\s+)?inventario|descuent[ao]\s+de\s+inventario|inventario|stock|kardex|existencia\w*|bodega|traslado|lote|reconciliaci\w*)\b/i.test(
+    /\b(descarg\w*\s+(?:de\s+|del\s+)?inventario|descuent[ao]\s+de\s+inventario|inventario|stock|kardex|existencia\w*|bodega|traslado\s+de|reconciliaci\w*|reabastecimiento)\b/i.test(
       norm,
     )
   ) {
     return 'inv_stock_sync';
   }
-  if (/\b(imprim\w*|impresion|impresora|termica|pdf|ticket\s+de\s+venta|logo|formato)\b/i.test(norm)) {
+  if (
+    /\b(imprim\w*|impresion|impresora|termica|pdf|ticket\s+(?:de\s+venta|impreso|de\s+impresion)|formato\s+de\s+(?:impresion|pdf|ticket)|cuartas\s+en\s+blanco)\b/i.test(
+      norm,
+    )
+  ) {
     return 'pdf_print';
   }
   if (
-    /\b(reporte\w*|excel|exportar|descargar|libro\s+de\s+(?:iva|ventas|compras)|anexo\w*|filtro\w*)\b/i.test(
+    /\b(reporte\w*|excel|exportar|descargar\s+(?:reporte|excel|libro|archivo|anexo)|libro\s+de\s+(?:iva|ventas|compras)|anexo\w*|filtro\w*)\b/i.test(
       norm,
     )
   ) {
     return 'reports_export';
   }
-  if (/\b(iva|retencion|percepcion|calculo\w*|centavo\w*|subtotal|redondeo)\b/i.test(norm)) {
+  if (
+    /\b(iva|retencion|percepcion|calculo\w*|centavo\w*|subtotal|redondeo|impuesto\w*|tributo\w*|isr)\b/i.test(
+      norm,
+    )
+  ) {
     return 'calc_tax_totals';
   }
   if (
-    /\b(cierre\s+de\s+caja|corte\s+z|arqueo|cuadr\w*|descuadre|planilla|contab\w*|asiento|partida|balance|saldo|abono|cxp|cxc)\b/i.test(
+    /\b(cierre\s+de\s+caja|corte\s+z|arqueo|descuadre|no\s+cuadra|cuadr\w*\s+(?:caja|contab|balance)|planilla|contab\w*|asiento|partida|balance|cuenta\s+bancaria|cxp|cxc)\b/i.test(
       norm,
     )
   ) {
@@ -559,24 +651,31 @@ export function detectSupportErrorPattern(text: string): SupportErrorPatternKey 
   ) {
     return 'perf_loading';
   }
-  if (/\b(acceso|permiso\w*|usuario\w*|contrasena|clave|login|sesion|bloqueado|rol)\b/i.test(norm)) {
+  if (
+    /\b(acceso|permiso\w*|usuario\w*|contrasena|clave|login|sesion|bloqueado|rol)\b/i.test(
+      norm,
+    )
+  ) {
     return 'auth_permissions';
   }
-  if (/\b(producto\w*|codigo\s+de\s+barra|serie|mercaderia|catalogo|precio\w*)\b/i.test(norm)) {
+  if (
+    /\b(no\s+(?:(?:lo|la|los|las|me)\s+)?(?:deja\s+)?busc\w*|sin\s+buscar|buscador|bienes\s+y\s+servicios|producto\w*|codigo\s+de\s+barra|mercaderia|catalogo|precio\w*)\b/i.test(
+      norm,
+    )
+  ) {
     return 'inv_catalog';
   }
   if (
-    /\b(dte|ccf|factura\s+electronica|credito\s+fiscal|consumidor\s+final|sujeto\s+excluido|factur\w*)\b/i.test(
+    /\b(dte|ccf|factura\s+electronica|credito\s+fiscal|consumidor\s+final|sujeto\s+excluido|nota\s+de\s+remision|factur\w*)\b/i.test(
       norm,
     )
   ) {
     return 'dte_general';
   }
   if (
-    /\b(error|falla|bug|no\s+deja|no\s+me\s+deja|no\s+puedo|no\s+funciona|problema|ayuda|consulta|como\s+(?:hago|se)|revisar|captura|no\s+aparece|no\s+sale|no\s+guarda)\b/i.test(
+    /\b(error(?:es)?|falla\w*|bug\w*|no\s+(?:deja|me\s+deja|puedo|funciona|aparece|sale|guarda|genera|permite|hace)|problema|inconveniente|no\s+se\s+como|como\s+(?:hago|se\s+hace))\b/i.test(
       norm,
-    ) ||
-    norm.length >= 22
+    )
   ) {
     return 'usage_general';
   }
@@ -1153,8 +1252,10 @@ export function computeSupportWhatsAppPulse(input: {
     }
   }
 
-  // Global per-tech metrics across ALL conversations (always stays populated for comparison cards)
+  // Global per-tech metrics + single-timeline burst allocation across conversations (prevents simultaneous-chat inflation)
   const techChatMetrics: Record<string, TechChatMetrics> = {};
+  const convAllocatedMinutes = new Map<string, number>();
+
   for (const [techName, sEvents] of globalStaffEventsMap.entries()) {
     const sorted = [...sEvents].sort((a, b) => a.ms - b.ms);
     let techMinutes = 0;
@@ -1177,6 +1278,10 @@ export function computeSupportWhatsAppPulse(input: {
           : Math.max(0, (ev.ms - prevMs) / 60000);
       prevMs = ev.ms;
       techMinutes += deltaMin;
+      convAllocatedMinutes.set(
+        ev.convKey,
+        (convAllocatedMinutes.get(ev.convKey) || 0) + deltaMin,
+      );
     }
 
     const estChatHours = +(techMinutes / 60).toFixed(1);
@@ -1297,17 +1402,7 @@ export function computeSupportWhatsAppPulse(input: {
     if (!cAgg.isPingPong || !includedConvKeys.has(cAgg.convKey)) continue;
     const conv = convMap.get(cAgg.convKey)!;
 
-    const sortedTs = [...cAgg.staffTimestamps].sort((a, b) => a - b);
-    let convBurstMin = 0;
-    let prevMs: number | null = null;
-    for (const ts of sortedTs) {
-      if (prevMs === null || ts - prevMs > BURST_GAP_MS) {
-        convBurstMin += BURST_BASE_MIN;
-      } else {
-        convBurstMin += Math.max(0, (ts - prevMs) / 60000);
-      }
-      prevMs = ts;
-    }
+    const convBurstMin = convAllocatedMinutes.get(cAgg.convKey) || 0;
 
     const combinedEntries = conv.tickets
       .flatMap((t) => extractRootCauseEntries(t.metadata))
@@ -1456,17 +1551,7 @@ export function computeSupportWhatsAppPulse(input: {
     const conv = convMap.get(convKey);
     if (!conv) continue;
 
-    const sortedTs = [...cAgg.staffTimestamps].sort((a, b) => a - b);
-    let convBurstMin = 0;
-    let prevMs: number | null = null;
-    for (const ts of sortedTs) {
-      if (prevMs === null || ts - prevMs > BURST_GAP_MS) {
-        convBurstMin += BURST_BASE_MIN;
-      } else {
-        convBurstMin += Math.max(0, (ts - prevMs) / 60000);
-      }
-      prevMs = ts;
-    }
+    const convBurstMin = convAllocatedMinutes.get(convKey) || 0;
 
     let primaryModuleKey: SupportErrorModuleKey = 'general';
     let bestModCount = 0;
@@ -1589,13 +1674,13 @@ export interface ExecutiveTicketRecordInput<T = any> {
   status: 'open' | 'pending' | 'resolved' | 'closed';
   ticketCategoryCode: string;
   ticketCategoryColor?: string;
-  workBucket: 'text_reply' | 'implementation' | 'troubleshooting' | 'development';
+  workBucket: SupportWorkBucket;
   workBucketLabel?: string;
+  reclassifiedFromP4?: boolean;
   reportedHours: number;
   expectedAiHours: number;
   diffAiHours?: number;
   aiTimeStatus: 'missing_time' | 'inflated' | 'fair' | 'fast';
-  rootCause?: string;
   solution?: string;
   isRepeatForSameClient: boolean;
   createdAt: string;
@@ -1605,6 +1690,8 @@ export interface ExecutiveTicketRecordInput<T = any> {
 
 export interface ExecutiveTechSummary {
   techName: string;
+  hasLoggedTickets: boolean;
+  reclassifiedP4BugHours: number;
   buildHours: number;
   ticketReactiveHours: number;
   unloggedChatHours: number;
@@ -1668,6 +1755,8 @@ export interface UnifiedClientHealthRow<T = any> {
 
 export interface ExecutiveSupportOverview<T = any> {
   totals: {
+    hasLoggedTickets: boolean;
+    reclassifiedP4BugHours: number;
     buildHours: number;
     ticketReactiveHours: number;
     unloggedChatHours: number;
@@ -1725,6 +1814,10 @@ export function buildExecutiveSupportOverview<T = any>(input: {
     const ticketReactiveHours = +reactiveRecords
       .reduce((acc, r) => acc + r.reportedHours, 0)
       .toFixed(1);
+    const reclassifiedP4BugHours = +reactiveRecords
+      .filter((r) => r.reclassifiedFromP4)
+      .reduce((acc, r) => acc + r.reportedHours, 0)
+      .toFixed(1);
 
     const waLoggedByClient = new Map<string, number>();
     for (const r of reactiveRecords) {
@@ -1755,6 +1848,8 @@ export function buildExecutiveSupportOverview<T = any>(input: {
     const reactivePct = totalHours > 0 ? 100 - buildPct : 0;
 
     return {
+      hasLoggedTickets: scopedRecords.length > 0,
+      reclassifiedP4BugHours,
       buildHours,
       ticketReactiveHours,
       unloggedChatHours,
@@ -2127,6 +2222,8 @@ export function buildExecutiveSupportOverview<T = any>(input: {
 
     return {
       techName,
+      hasLoggedTickets: split.hasLoggedTickets,
+      reclassifiedP4BugHours: split.reclassifiedP4BugHours,
       buildHours: split.buildHours,
       ticketReactiveHours: split.ticketReactiveHours,
       unloggedChatHours: split.unloggedChatHours,
@@ -2142,7 +2239,7 @@ export function buildExecutiveSupportOverview<T = any>(input: {
       ).length,
       totalTickets: tRecs.length,
       waMessages: waStats?.staffMessages || 0,
-      waClients: waStats?.uniqueClientsHelped || 0,
+      waClients: tConvs.length,
       pingPongCount: tConvs.filter((c) => c.isPingPong).length,
       returningClientsCount: tClients.filter((c) => c.health === 'critical')
         .length,
@@ -2165,7 +2262,12 @@ export function buildExecutiveSupportOverview<T = any>(input: {
   let verdictDetail = 'Cambia el rango de días para ver métricas.';
 
   if (scopeSplit.totalHours > 0) {
-    if (scopeSplit.buildPct >= targetBuildPct) {
+    if (!scopeSplit.hasLoggedTickets) {
+      verdictTone = 'warn';
+      verdictTitle = `Sin tickets registrados · Solo ~${scopeSplit.unloggedChatHours}h visibles en WhatsApp`;
+      verdictDetail =
+        'No hay tickets ni horas de mejoras registradas en este período (solo chats WhatsApp).';
+    } else if (scopeSplit.buildPct >= targetBuildPct) {
       verdictTone = 'good';
       verdictTitle = `En meta: ${scopeSplit.buildPct}% en Mejoras y ${scopeSplit.reactivePct}% en errores`;
       verdictDetail = `El equipo dedicó ${scopeSplit.buildHours}h a construir/mejorar vs ${scopeSplit.totalReactiveHours}h en soporte y chats.`;
@@ -2184,13 +2286,19 @@ export function buildExecutiveSupportOverview<T = any>(input: {
     }
   }
 
-  const internalRecords = scopedRecords.filter((r) => r.isInternalSystemTask);
+  const internalRecords = scopedRecords.filter(
+    (r) =>
+      r.isInternalSystemTask &&
+      (r.workBucket === 'development' || r.workBucket === 'implementation'),
+  );
   const internalHours = +internalRecords
     .reduce((acc, r) => acc + r.reportedHours, 0)
     .toFixed(1);
 
   return {
     totals: {
+      hasLoggedTickets: scopeSplit.hasLoggedTickets,
+      reclassifiedP4BugHours: scopeSplit.reclassifiedP4BugHours,
       buildHours: scopeSplit.buildHours,
       ticketReactiveHours: scopeSplit.ticketReactiveHours,
       unloggedChatHours: scopeSplit.unloggedChatHours,
@@ -2309,7 +2417,7 @@ export function formatParetoActionPlanText(
       .join(', ');
     lines.push(
       `${idx + 1}. *${item.label}* — ${item.sharePct}% (${item.reactiveHours}h · ${item.clientCount} cliente${item.clientCount === 1 ? '' : 's'})` +
-        (sampleClients ? `\n   Clientes: ${sampleClients}` : ''),
+      (sampleClients ? `\n   Clientes: ${sampleClients}` : ''),
     );
   });
 
@@ -2391,14 +2499,36 @@ export function buildSupportParetoAnalysis<T = any>(input: {
   };
 
   const reactiveRecords = scopedRecords.filter(
-    (r) =>
-      !r.isInternalSystemTask &&
-      (r.workBucket === 'troubleshooting' || r.workBucket === 'text_reply'),
+    (r) => r.workBucket === 'troubleshooting' || r.workBucket === 'text_reply',
   );
 
   const waLoggedByClient = new Map<string, number>();
 
   for (const r of reactiveRecords) {
+    const pat =
+      detectSupportErrorPattern(
+        `${r.title || ''} ${r.description || ''} ${r.rootCause || ''}`,
+      ) || 'usage_general';
+    const bucket = ensureBucket(pat);
+
+    if (r.isInternalSystemTask) {
+      bucket.ticketCount += 1;
+      bucket.reactiveHours += r.reportedHours;
+
+      const rawTicketText = r.rootCause ? `${r.title} — ${r.rootCause}` : r.title;
+      const snippet = cleanSupportMessageSnippet(rawTicketText, 130);
+      if (snippet.length >= 8) {
+        bucket.examples.push({
+          clientName: 'Sistema (Bug interno)',
+          circleId: null,
+          text: snippet,
+          at: r.createdAt || new Date().toISOString(),
+          source: 'ticket',
+        });
+      }
+      continue;
+    }
+
     const cleanName = normalizeSupportClientName(r.clientName);
     const ck = supportClientMergeKey(cleanName);
     if (!ck) continue;
@@ -2407,11 +2537,6 @@ export function buildSupportParetoAnalysis<T = any>(input: {
       waLoggedByClient.set(ck, (waLoggedByClient.get(ck) || 0) + r.reportedHours);
     }
 
-    const pat =
-      detectSupportErrorPattern(
-        `${r.title || ''} ${r.description || ''} ${r.rootCause || ''}`,
-      ) || 'usage_general';
-    const bucket = ensureBucket(pat);
     const circleId = circleByClientKey.get(ck) || null;
     const ref = ensureClientRef(bucket, ck, cleanName, circleId);
 
@@ -2420,16 +2545,18 @@ export function buildSupportParetoAnalysis<T = any>(input: {
     ref.tickets += 1;
     ref.reactiveHours += r.reportedHours;
 
-    const rawTicketText = r.rootCause ? `${r.title} — ${r.rootCause}` : r.title;
-    const snippet = cleanSupportMessageSnippet(rawTicketText, 130);
-    if (snippet.length >= 8) {
-      bucket.examples.push({
-        clientName: cleanName,
-        circleId,
-        text: snippet,
-        at: r.createdAt || new Date().toISOString(),
-        source: 'ticket',
-      });
+    if (!/^\[WhatsApp/i.test(r.title || '')) {
+      const rawTicketText = r.rootCause ? `${r.title} — ${r.rootCause}` : r.title;
+      const snippet = cleanSupportMessageSnippet(rawTicketText, 130);
+      if (snippet.length >= 8) {
+        bucket.examples.push({
+          clientName: cleanName,
+          circleId,
+          text: snippet,
+          at: r.createdAt || new Date().toISOString(),
+          source: 'ticket',
+        });
+      }
     }
   }
 
@@ -2597,8 +2724,8 @@ export function buildSupportParetoAnalysis<T = any>(input: {
     metric === 'clients'
       ? x.item.clientCount
       : totalExactHours > 0
-      ? x.exactHours
-      : x.item.messageCount + x.item.ticketCount;
+        ? x.exactHours
+        : x.item.messageCount + x.item.ticketCount;
 
   rawList.sort(
     (a, b) =>
@@ -2650,17 +2777,19 @@ export function buildSupportParetoAnalysis<T = any>(input: {
     .toFixed(1);
 
   let headline = 'Sin fallas reactivas detectadas en este período.';
+  const clientsSuffix =
+    vitalFewClientsImpacted > 0 ? ` · ${vitalFewClientsImpacted} clientes` : '';
   if (vitalFewCount === 1) {
     const top = vitalItems[0];
     headline =
       metric === 'clients'
         ? `Resolviendo 1 error (${top.label}) proteges a ${vitalFewClientsImpacted} de ${totalUniqueClients} clientes (${vitalFewCoveragePct}%)`
-        : `Resolviendo 1 error (${top.label}) eliminas el ${vitalFewCoveragePct}% del soporte reactivo (~${vitalFewHoursSaved}h · ${vitalFewClientsImpacted} clientes)`;
+        : `Resolviendo 1 error (${top.label}) eliminas el ${vitalFewCoveragePct}% del soporte reactivo (~${vitalFewHoursSaved}h${clientsSuffix})`;
   } else if (vitalFewCount > 1) {
     headline =
       metric === 'clients'
         ? `Resolviendo estos ${vitalFewCount} errores de raíz cubres el ${vitalFewCoveragePct}% de reportes (${vitalFewClientsImpacted} clientes · ~${vitalFewHoursSaved}h)`
-        : `Resolviendo estos ${vitalFewCount} errores de raíz eliminas el ${vitalFewCoveragePct}% del soporte reactivo (~${vitalFewHoursSaved}h ahorradas · ${vitalFewClientsImpacted} clientes)`;
+        : `Resolviendo estos ${vitalFewCount} errores de raíz eliminas el ${vitalFewCoveragePct}% del soporte reactivo (~${vitalFewHoursSaved}h ahorradas${clientsSuffix})`;
   }
 
   const partialResult = {

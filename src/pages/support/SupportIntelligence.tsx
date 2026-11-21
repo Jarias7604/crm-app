@@ -48,6 +48,7 @@ import {
   computeSupportWhatsAppPulse,
   buildExecutiveSupportOverview,
   buildSupportParetoAnalysis,
+  classifySupportWorkBucket,
   normalizeSupportClientName,
   SUPPORT_ROOT_CAUSE_META,
   SUPPORT_OPERATING_RULES,
@@ -57,6 +58,7 @@ import {
   type SupportErrorPatternKey,
   type SupportParetoMetric,
   type SupportParetoItem,
+  type SupportWorkBucket,
   type PulseWaMessageInput,
   type PulseCommentInput,
   type PulseProfileInput,
@@ -79,11 +81,10 @@ const ParetoTooltipCard: React.FC<{
       <div className="flex items-start justify-between gap-2">
         <p className="font-bold text-slate-900 leading-snug">{row.label}</p>
         <span
-          className={`px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${
-            row.isVitalFew80
-              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-              : 'bg-slate-100 text-slate-600'
-          }`}
+          className={`px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${row.isVitalFew80
+            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+            : 'bg-slate-100 text-slate-600'
+            }`}
         >
           {row.isVitalFew80 ? 'Prioridad 80%' : 'Resto 20%'}
         </span>
@@ -117,7 +118,6 @@ const ParetoTooltipCard: React.FC<{
   );
 };
 
-type WorkBucket = 'text_reply' | 'implementation' | 'troubleshooting' | 'development';
 type HealthFilter = 'all' | 'critical' | 'open' | 'stable';
 
 interface UnifiedSupportRecord {
@@ -137,8 +137,9 @@ interface UnifiedSupportRecord {
   ticketCategoryCode: string;
   ticketCategoryName: string;
   ticketCategoryColor: string;
-  workBucket: WorkBucket;
+  workBucket: SupportWorkBucket;
   workBucketLabel: string;
+  reclassifiedFromP4: boolean;
   reportedHours: number;
   expectedAiHours: number;
   maxReasonableAiHours: number;
@@ -254,31 +255,6 @@ function detectCategoryCode(
     return { code: 'P2', label: 'P2 · Errores', color: '#F97316' };
   }
   return { code: 'P3', label: 'P3 · Soporte', color: '#F59E0B' };
-}
-
-function classifyWorkBucket(
-  title: string,
-  description: string,
-  categoryCode: string,
-): { bucket: WorkBucket; label: string } {
-  const text = `${title} ${description}`.toLowerCase();
-  if (
-    categoryCode === 'FAQ' ||
-    /^pregunta\s+frecuente/i.test(title) ||
-    /consulta|duda|respondiendo\s+texto/i.test(text)
-  ) {
-    return { bucket: 'text_reply', label: '💬 Consulta' };
-  }
-  if (
-    /^go\s*live|^capacitaci[oó]n|^implementaci[oó]n/i.test(title) ||
-    /go\s*live|capacitaci[oó]n|implementaci[oó]n|entrenamiento/i.test(text)
-  ) {
-    return { bucket: 'implementation', label: '🚀 Go-Live' };
-  }
-  if (categoryCode === 'P4') {
-    return { bucket: 'development', label: '⚙️ Mejora P4' };
-  }
-  return { bucket: 'troubleshooting', label: '🛠️ Falla' };
 }
 
 function classifyProblemTopic(
@@ -517,6 +493,11 @@ export const SupportIntelligence: React.FC = () => {
         seenIds.add(t.id);
         if (/^\s*jornada\s+(melvin|gerson)/i.test(t.title || '')) return;
 
+        const isWa = isWhatsappTicket(t);
+        const reportedHours = +(Number(t.actual_hours) || 0).toFixed(2);
+        // Zero-hour WhatsApp wrapper tickets are already tracked accurately by computeSupportWhatsAppPulse
+        if (isWa && reportedHours <= 0) return;
+
         const catObj = t.category_id ? categoryMap.get(t.category_id) : undefined;
         const catInfo = detectCategoryCode(catObj?.name || '', t.title || '', t.description || '');
         const rawAssigned = (t.assigned_to && profileMap.get(t.assigned_to)) || '';
@@ -533,9 +514,8 @@ export const SupportIntelligence: React.FC = () => {
         );
 
         const topic = classifyProblemTopic(t.title || '', t.description || '');
-        const workInfo = classifyWorkBucket(t.title || '', t.description || '', catInfo.code);
+        const workInfo = classifySupportWorkBucket(t.title || '', t.description || '', catInfo.code);
 
-        const reportedHours = +(Number(t.actual_hours) || 0).toFixed(2);
         const aiAudit = computeTicketAiTimeBenchmark(
           t.title || '',
           t.description || '',
@@ -569,6 +549,7 @@ export const SupportIntelligence: React.FC = () => {
           ticketCategoryColor: catObj?.color || catInfo.color,
           workBucket: workInfo.bucket,
           workBucketLabel: workInfo.label,
+          reclassifiedFromP4: workInfo.reclassifiedFromP4,
           reportedHours,
           expectedAiHours: aiAudit.expectedHours,
           maxReasonableAiHours: aiAudit.maxReasonableHours,
@@ -582,7 +563,7 @@ export const SupportIntelligence: React.FC = () => {
           solution: String(t.solution || '').trim(),
           isRepeatForSameClient: false,
           repeatSequenceNumber: 1,
-          isWhatsapp: isWhatsappTicket(t),
+          isWhatsapp: isWa,
         });
       });
 
@@ -606,9 +587,9 @@ export const SupportIntelligence: React.FC = () => {
         );
 
         const topic = classifyProblemTopic(ct.title || '', ct.description || '');
-        const workInfo = classifyWorkBucket(ct.title || '', ct.description || '', catInfo.code);
+        const workInfo = classifySupportWorkBucket(ct.title || '', ct.description || '', catInfo.code);
 
-        const reportedHours = +(Number(ct.actual_hours) || (isDone ? 1 : 0)).toFixed(2);
+        const reportedHours = +(Number(ct.actual_hours) || 0).toFixed(2);
         const aiAudit = computeTicketAiTimeBenchmark(
           ct.title || '',
           ct.description || '',
@@ -635,6 +616,7 @@ export const SupportIntelligence: React.FC = () => {
           ticketCategoryColor: catInfo.color,
           workBucket: workInfo.bucket,
           workBucketLabel: workInfo.label,
+          reclassifiedFromP4: workInfo.reclassifiedFromP4,
           reportedHours,
           expectedAiHours: aiAudit.expectedHours,
           maxReasonableAiHours: aiAudit.maxReasonableHours,
@@ -738,8 +720,8 @@ export const SupportIntelligence: React.FC = () => {
           paretoMetric === 'clients'
             ? item.clientCount
             : paretoHasHours
-            ? item.reactiveHours
-            : item.messageCount + item.ticketCount,
+              ? item.reactiveHours
+              : item.messageCount + item.ticketCount,
       })),
     [pareto.items, paretoMetric, paretoHasHours],
   );
@@ -868,9 +850,14 @@ export const SupportIntelligence: React.FC = () => {
   const displayedPriorityItems = showAllParetoItems
     ? pareto.items
     : vitalItems.length >= 3
-    ? vitalItems
-    : pareto.items.slice(0, 3);
+      ? vitalItems
+      : pareto.items.slice(0, 3);
   const maxPriorityShare = Math.max(1, ...pareto.items.map((item) => item.sharePct));
+
+  const bannerSubtitle =
+    totals.hasLoggedTickets && totals.verdictTone !== 'good' && pareto.items[0]
+      ? `Foco #1 (Pareto): ${pareto.items[0].label} (${pareto.items[0].reactiveHours}h${pareto.items[0].clientCount > 0 ? ` · ${pareto.items[0].clientCount} clientes` : ''}).`
+      : totals.verdictDetail;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16">
@@ -1025,7 +1012,7 @@ export const SupportIntelligence: React.FC = () => {
                   )}
                   <h2 className="text-base font-black tracking-tight">{totals.verdictTitle}</h2>
                 </div>
-                <p className="text-xs opacity-85">{totals.verdictDetail}</p>
+                <p className="text-xs opacity-85">{bannerSubtitle}</p>
               </div>
 
               <div className="text-right shrink-0">
@@ -1039,36 +1026,61 @@ export const SupportIntelligence: React.FC = () => {
             {/* Unified 2-color progress meter (with 80% target line) */}
             <div className="bg-white/90 rounded-xl p-3.5 border border-black/5 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-black">
-                <span className="text-emerald-700">
-                  🟢 Construyendo / Mejoras P4 + Go-Live: {totals.buildPct}% ({totals.buildHours}h)
-                </span>
-                <span className="text-rose-700">
-                  🔴 Resolviendo Errores + Chat: {totals.reactivePct}% ({totals.totalReactiveHours}h)
-                  <span className="font-semibold text-slate-500">
-                    {' '}
-                    ({totals.ticketReactiveHours}h tickets + ~{totals.unloggedChatHours}h WA sin ticket)
-                  </span>
-                </span>
+                {totals.hasLoggedTickets ? (
+                  <>
+                    <span className="text-emerald-700">
+                      🟢 Construyendo / Mejoras P4 + Go-Live: {totals.buildPct}% ({totals.buildHours}h)
+                    </span>
+                    <span className="text-rose-700">
+                      🔴 Resolviendo Errores + Chat: {totals.reactivePct}% ({totals.totalReactiveHours}h)
+                      <span className="font-semibold text-slate-500">
+                        {' '}
+                        ({totals.ticketReactiveHours}h tickets
+                        {totals.reclassifiedP4BugHours > 0
+                          ? ` incl. ${totals.reclassifiedP4BugHours}h bugs en P4`
+                          : ''}
+                        {' '}· ~{totals.unloggedChatHours}h WA sin ticket)
+                      </span>
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-amber-800">
+                      ⚠️ Sin tickets ni horas de mejoras registradas en este período
+                    </span>
+                    <span className="text-slate-700">
+                      💬 Solo chats WhatsApp visibles: ~{totals.unloggedChatHours}h
+                    </span>
+                  </>
+                )}
               </div>
 
               <div className="relative h-4 w-full rounded-full bg-slate-100 overflow-hidden flex">
-                {totals.buildPct > 0 && (
-                  <div
-                    style={{ width: `${totals.buildPct}%` }}
-                    className="h-full bg-emerald-500 transition-all"
-                  />
+                {!totals.hasLoggedTickets ? (
+                  totals.unloggedChatHours > 0 && (
+                    <div className="h-full w-full bg-amber-400/75 transition-all" />
+                  )
+                ) : (
+                  <>
+                    {totals.buildPct > 0 && (
+                      <div
+                        style={{ width: `${totals.buildPct}%` }}
+                        className="h-full bg-emerald-500 transition-all"
+                      />
+                    )}
+                    {totals.reactivePct > 0 && (
+                      <div
+                        style={{ width: `${totals.reactivePct}%` }}
+                        className="h-full bg-rose-500 transition-all"
+                      />
+                    )}
+                    <div
+                      style={{ left: `${totals.targetBuildPct}%` }}
+                      title={`Meta: ${totals.targetBuildPct}% construyendo producto`}
+                      className="absolute top-0 bottom-0 w-0.5 bg-slate-900/70"
+                    />
+                  </>
                 )}
-                {totals.reactivePct > 0 && (
-                  <div
-                    style={{ width: `${totals.reactivePct}%` }}
-                    className="h-full bg-rose-500 transition-all"
-                  />
-                )}
-                <div
-                  style={{ left: `${totals.targetBuildPct}%` }}
-                  title={`Meta: ${totals.targetBuildPct}% construyendo producto`}
-                  className="absolute top-0 bottom-0 w-0.5 bg-slate-900/70"
-                />
               </div>
 
               {/* 3 minimal clarity metrics below the bar */}
@@ -1128,40 +1140,62 @@ export const SupportIntelligence: React.FC = () => {
                       <div>
                         <p className="text-sm font-black text-slate-900">{tech.techName}</p>
                         <p className="text-[11px] font-semibold text-slate-500">
-                          WA: {tech.waClients} clientes · {tech.waMessages} msgs · Tickets: {tech.totalTickets} ({tech.openTickets} abiertos)
+                          WA: {tech.waClients} clientes propios · {tech.waMessages} msgs · Tickets: {tech.totalTickets} ({tech.openTickets} abiertos)
                         </p>
                       </div>
                     </div>
 
                     <div className="text-right shrink-0">
-                      <p className="text-xs font-black">
-                        <span className="text-emerald-700">{tech.buildPct}% Mejoras</span>
-                        <span className="text-slate-300 mx-1">·</span>
-                        <span className={tech.reactivePct > 20 ? 'text-rose-600' : 'text-slate-700'}>
-                          {tech.reactivePct}% Errores
+                      {!tech.hasLoggedTickets ? (
+                        <span className="inline-block px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          Sin tickets registrados
                         </span>
-                      </p>
-                      <p className="text-[10.5px] font-semibold text-slate-400">
+                      ) : (
+                        <p className="text-xs font-black">
+                          <span className="text-emerald-700">{tech.buildPct}% Mejoras</span>
+                          <span className="text-slate-300 mx-1">·</span>
+                          <span className={tech.reactivePct > 20 ? 'text-rose-600' : 'text-slate-700'}>
+                            {tech.reactivePct}% Errores
+                          </span>
+                        </p>
+                      )}
+                      <p className="text-[10.5px] font-semibold text-slate-400 mt-0.5">
                         {isSelected ? '✓ Filtrando toda la vista' : 'Clic para filtrar'}
                       </p>
                     </div>
                   </div>
 
-                  {/* Mini 2-color split bar */}
+                  {/* Mini split bar */}
                   <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden flex mt-3">
-                    {tech.buildPct > 0 && (
-                      <div style={{ width: `${tech.buildPct}%` }} className="bg-emerald-500 h-full" />
-                    )}
-                    {tech.reactivePct > 0 && (
-                      <div style={{ width: `${tech.reactivePct}%` }} className="bg-rose-500 h-full" />
+                    {!tech.hasLoggedTickets ? (
+                      tech.totalReactiveHours > 0 && (
+                        <div className="bg-amber-400/75 h-full w-full" />
+                      )
+                    ) : (
+                      <>
+                        {tech.buildPct > 0 && (
+                          <div style={{ width: `${tech.buildPct}%` }} className="bg-emerald-500 h-full" />
+                        )}
+                        {tech.reactivePct > 0 && (
+                          <div style={{ width: `${tech.reactivePct}%` }} className="bg-rose-500 h-full" />
+                        )}
+                      </>
                     )}
                   </div>
 
                   <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-slate-600">
-                    <span>
-                      🟢 Mejoras: <strong className="text-slate-900">{tech.buildHours}h</strong> · 🔴 Errores/Chat:{' '}
-                      <strong className="text-slate-900">{tech.totalReactiveHours}h</strong>
-                    </span>
+                    {!tech.hasLoggedTickets ? (
+                      <span>
+                        💬 WhatsApp visible:{' '}
+                        <strong className="text-slate-900">~{tech.totalReactiveHours}h</strong>{' '}
+                        <span className="text-slate-400">(sin tickets ni horas de mejoras)</span>
+                      </span>
+                    ) : (
+                      <span>
+                        🟢 Mejoras: <strong className="text-slate-900">{tech.buildHours}h</strong> · 🔴 Errores/Chat:{' '}
+                        <strong className="text-slate-900">{tech.totalReactiveHours}h</strong>
+                      </span>
+                    )}
                     <span>
                       🔄 <strong className={tech.returningClientsCount > 0 ? 'text-rose-700' : 'text-emerald-700'}>{tech.returningClientsCount}</strong> reincidentes · 🔥{' '}
                       <strong className={tech.pingPongCount > 0 ? 'text-rose-700' : 'text-slate-800'}>{tech.pingPongCount}</strong> ping-pong
@@ -1207,11 +1241,10 @@ export const SupportIntelligence: React.FC = () => {
                       key={opt.id}
                       type="button"
                       onClick={() => setParetoMetric(opt.id)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                        active
-                          ? 'bg-white text-slate-900 shadow-2xs'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${active
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                        }`}
                     >
                       {opt.label}
                     </button>
@@ -1348,8 +1381,8 @@ export const SupportIntelligence: React.FC = () => {
                               ? '#BE123C'
                               : '#475569'
                             : entry.isVitalFew80
-                            ? '#F43F5E'
-                            : '#CBD5E1';
+                              ? '#F43F5E'
+                              : '#CBD5E1';
                           return (
                             <Cell
                               key={entry.patternKey}
@@ -1409,20 +1442,18 @@ export const SupportIntelligence: React.FC = () => {
                             prev === item.patternKey ? null : item.patternKey,
                           )
                         }
-                        className={`text-left rounded-xl p-3.5 border transition ${
-                          isSelected
-                            ? 'bg-rose-50/50 border-rose-300 ring-2 ring-rose-500/15'
-                            : 'bg-slate-50/60 hover:bg-slate-50 border-slate-200/70 hover:border-slate-300'
-                        }`}
+                        className={`text-left rounded-xl p-3.5 border transition ${isSelected
+                          ? 'bg-rose-50/50 border-rose-300 ring-2 ring-rose-500/15'
+                          : 'bg-slate-50/60 hover:bg-slate-50 border-slate-200/70 hover:border-slate-300'
+                          }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <span
-                              className={`w-5 h-5 rounded-md text-[10.5px] font-black flex items-center justify-center shrink-0 ${
-                                item.isVitalFew80
-                                  ? 'bg-rose-100 text-rose-700'
-                                  : 'bg-slate-200/80 text-slate-600'
-                              }`}
+                              className={`w-5 h-5 rounded-md text-[10.5px] font-black flex items-center justify-center shrink-0 ${item.isVitalFew80
+                                ? 'bg-rose-100 text-rose-700'
+                                : 'bg-slate-200/80 text-slate-600'
+                                }`}
                             >
                               {rank}
                             </span>
@@ -1438,9 +1469,8 @@ export const SupportIntelligence: React.FC = () => {
                         <div className="h-1 w-full rounded-full bg-slate-200/75 overflow-hidden my-2.5">
                           <div
                             style={{ width: `${widthPct}%` }}
-                            className={`h-full rounded-full ${
-                              item.isVitalFew80 ? 'bg-rose-500' : 'bg-slate-400'
-                            }`}
+                            className={`h-full rounded-full ${item.isVitalFew80 ? 'bg-rose-500' : 'bg-slate-400'
+                              }`}
                           />
                         </div>
 
@@ -1482,11 +1512,10 @@ export const SupportIntelligence: React.FC = () => {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
-                        className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
-                          selectedParetoItem.isVitalFew80
-                            ? 'bg-rose-100 text-rose-700'
-                            : 'bg-slate-200 text-slate-700'
-                        }`}
+                        className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold ${selectedParetoItem.isVitalFew80
+                          ? 'bg-rose-100 text-rose-700'
+                          : 'bg-slate-200 text-slate-700'
+                          }`}
                       >
                         {selectedParetoItem.isVitalFew80 ? 'Prioridad 80%' : 'Resto 20%'}
                       </span>
@@ -1504,11 +1533,10 @@ export const SupportIntelligence: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleFilterClientsByPattern(selectedParetoItem.patternKey)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
-                          tablePatternFilter === selectedParetoItem.patternKey
-                            ? 'bg-indigo-600 text-white border-indigo-600'
-                            : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
-                        }`}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition ${tablePatternFilter === selectedParetoItem.patternKey
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+                          }`}
                       >
                         <Filter className="w-3.5 h-3.5" />
                         {tablePatternFilter === selectedParetoItem.patternKey

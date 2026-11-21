@@ -953,3 +953,191 @@ test('16. Pareto extracts real WhatsApp/ticket quotes, respects techFilter, and 
   assert.ok(paretoMelvin.copyPlanText.includes('Firmador / Sello / Rechazo Hacienda'));
   assert.ok(paretoMelvin.copyPlanText.includes('Medicina Popular'));
 });
+
+test('17. classifySupportWorkBucket reclassifies P4 bug fixes as troubleshooting while keeping real P4 features', () => {
+  const { classifySupportWorkBucket } = loaded.supportPulse;
+
+  const bug1 = classifySupportWorkBucket(
+    'Rechazo 003 en factura por ivaItem en ítems sin venta gravada',
+    '',
+    'P4',
+  );
+  assert.equal(bug1.bucket, 'troubleshooting');
+  assert.equal(bug1.reclassifiedFromP4, true);
+
+  const bug2 = classifySupportWorkBucket(
+    'Falta la línea de IVA (13%) en el ticket impreso de venta',
+    '',
+    'P4',
+  );
+  assert.equal(bug2.bucket, 'troubleshooting');
+  assert.equal(bug2.reclassifiedFromP4, true);
+
+  const bug3 = classifySupportWorkBucket(
+    'Filtro de reabastecimiento incorrecto y conteos por estado en productos',
+    '',
+    'P4',
+  );
+  assert.equal(bug3.bucket, 'troubleshooting');
+  assert.equal(bug3.reclassifiedFromP4, true);
+
+  const feature1 = classifySupportWorkBucket(
+    'Reportes de inventario: nuevo flujo guiado, diseño unificado',
+    'Mejora UX',
+    'P4',
+  );
+  assert.equal(feature1.bucket, 'development');
+  assert.equal(feature1.reclassifiedFromP4, false);
+
+  const feature2 = classifySupportWorkBucket(
+    'Columna Cliente en el reporte de cierre de caja',
+    'Agregar columna nueva',
+    'P4',
+  );
+  assert.equal(feature2.bucket, 'development');
+  assert.equal(feature2.reclassifiedFromP4, false);
+});
+
+test('18. detectSupportErrorPattern ignores courtesy/resolved confirmations, supports correlativos & product search', () => {
+  const { detectSupportErrorPattern } = loaded.supportPulse;
+
+  // Courtesy & resolved confirmations must be ignored regardless of length
+  assert.equal(detectSupportErrorPattern('Está bien, gracias por la observación'), null);
+  assert.equal(
+    detectSupportErrorPattern(
+      'Ya lo revisamos El cliente se equivocó con un número Mil disculpas Y muchas gracias!!',
+    ),
+    null,
+  );
+  assert.equal(
+    detectSupportErrorPattern(
+      'Ya realicé otra prueba de impresión y si me funcionó, si tenemos inconveniente nuevamente le solicitaremos su ayuda',
+    ),
+    null,
+  );
+  assert.equal(detectSupportErrorPattern('Ahora si me aparecio para impresion'), null);
+  assert.equal(
+    detectSupportErrorPattern(
+      'Buenos días, muchas gracias por su respuesta. Quedamos atentos a su retroalimentación',
+    ),
+    null,
+  );
+
+  // Real issues must map accurately
+  assert.equal(
+    detectSupportErrorPattern('Hay 2 correlativos q se han saltado del 715 se pasa al 716'),
+    'dte_fiscal_data',
+  );
+  assert.equal(detectSupportErrorPattern('Ejemplo cuando dígito aceta.... No lo busca'), 'inv_catalog');
+  assert.equal(
+    detectSupportErrorPattern('si pongo Cinta aislante se queda sin buscar nada'),
+    'inv_catalog',
+  );
+  // Real-estate "lote" must NOT map to inventory stock
+  assert.equal(
+    detectSupportErrorPattern('No se genera la factura por comision de lote chemita'),
+    'dte_general',
+  );
+  // Hacienda rejection on NC must map to dte_signer_mh (not dte_invalidation)
+  assert.equal(
+    detectSupportErrorPattern('Rechazo 020 de Hacienda en Notas de Crédito y Débito con retención'),
+    'dte_signer_mh',
+  );
+});
+
+test('19. Single-timeline WA burst prevents multi-chat inflation, honest zero-ticket state, and internal P4 bugs in Pareto', () => {
+  const {
+    computeSupportWhatsAppPulse,
+    buildExecutiveSupportOverview,
+    buildSupportParetoAnalysis,
+  } = loaded.supportPulse;
+  const nowMs = Date.parse('2026-11-20T22:00:00.000Z');
+
+  // Same technician (Gerson) sends 3 messages across 3 different chats within 6 minutes total:
+  // 16:00 Chat A (base 2.5m), 16:03 Chat B (+3m), 16:06 Chat C (+3m) => 8.5m total clock time (0.14h, NOT 3 * 2.5m inflated differently!)
+  // Wait: make a clearer overlapping burst:
+  // 16:00 Chat A (2.5m), 16:02 Chat B (+2m), 16:08 Chat A (+6m), 16:10 Chat B (+2m) => single timeline total = 12.5m (0.2h).
+  // Old overlapping per-conv calculation would do Chat A (2.5+8=10.5m) + Chat B (2.5+8=10.5m) = 21m (0.4h)!
+  const tickets = [
+    {
+      id: 't-a',
+      lead_name: 'Cliente A',
+      status: 'open',
+      metadata: { source: 'whatsapp_evolution', whatsapp_jid: 'a@g.us' },
+    },
+    {
+      id: 't-b',
+      lead_name: 'Cliente B',
+      status: 'open',
+      metadata: { source: 'whatsapp_evolution', whatsapp_jid: 'b@g.us' },
+    },
+  ];
+  const profiles = [{ id: 'u-gerson', full_name: 'Gerson Gutierrez' }];
+  const comments = [
+    { id: 'c-a1', ticket_id: 't-a', author_id: null, body: 'Error factura PDF A', created_at: '2026-11-20T15:59:00.000Z' },
+    { id: 'c-b1', ticket_id: 't-b', author_id: null, body: 'No descarga PDF B', created_at: '2026-11-20T15:59:30.000Z' },
+    { id: 'g-1', ticket_id: 't-a', author_id: 'u-gerson', body: 'Viendo A', created_at: '2026-11-20T16:00:00.000Z' },
+    { id: 'g-2', ticket_id: 't-b', author_id: 'u-gerson', body: 'Viendo B', created_at: '2026-11-20T16:02:00.000Z' },
+    { id: 'g-3', ticket_id: 't-a', author_id: 'u-gerson', body: 'Prueba A', created_at: '2026-11-20T16:08:00.000Z' },
+    { id: 'g-4', ticket_id: 't-b', author_id: 'u-gerson', body: 'Prueba B', created_at: '2026-11-20T16:10:00.000Z' },
+  ];
+
+  const pulse = computeSupportWhatsAppPulse({
+    tickets,
+    waMessages: [],
+    comments,
+    profiles,
+    options: { daysRange: 7, nowMs },
+  });
+
+  const sumConvMinutes = pulse.convMetrics.reduce((s, c) => s + c.estStaffMinutes, 0);
+  // 2.5 + 2 + 6 + 2 = 12.5 min total (approx 12 or 13 rounded across convs, NOT 21 min!)
+  assert.ok(sumConvMinutes <= 14, `Expected single-timeline minutes <= 14, got ${sumConvMinutes}`);
+  assert.equal(pulse.techChatMetrics['Gerson Gutierrez'].estChatHours, 0.2);
+
+  // Zero formal tickets + only WA chats -> verdictTone 'warn' + hasLoggedTickets = false
+  const overviewNoTix = buildExecutiveSupportOverview({
+    pulse,
+    records: [],
+    techFilter: 'Gerson Gutierrez',
+  });
+  assert.equal(overviewNoTix.totals.hasLoggedTickets, false);
+  assert.equal(overviewNoTix.totals.verdictTone, 'warn');
+  assert.ok(overviewNoTix.totals.verdictTitle.includes('Sin tickets'));
+
+  // Internal P4 bug ticket enters Pareto hours/examples without inflating clientCount
+  const recordsWithInternalBug = [
+    {
+      id: 'rec-int-bug',
+      source: 'ticket',
+      title: 'Rechazo 003 en factura por ivaItem',
+      description: 'Error Hacienda',
+      clientName: 'Tareas Internas de Desarrollo (P4 / Sin cliente)',
+      isInternalSystemTask: true,
+      techName: 'Melvin Rodriguez',
+      status: 'resolved',
+      ticketCategoryCode: 'P4',
+      workBucket: 'troubleshooting',
+      reclassifiedFromP4: true,
+      reportedHours: 2.0,
+      expectedAiHours: 1.0,
+      aiTimeStatus: 'fair',
+      isRepeatForSameClient: false,
+      createdAt: '2026-11-20T14:00:00.000Z',
+      resolvedAt: '2026-11-20T16:00:00.000Z',
+      isWhatsapp: false,
+    },
+  ];
+  const paretoWithBug = buildSupportParetoAnalysis({
+    pulse,
+    records: recordsWithInternalBug,
+    techFilter: 'all',
+    metric: 'hours',
+    daysRange: 7,
+  });
+  const mhItem = paretoWithBug.items.find((i) => i.patternKey === 'dte_signer_mh');
+  assert.ok(mhItem, 'Expected dte_signer_mh item from reclassified P4 bug');
+  assert.equal(mhItem.reactiveHours, 2.0);
+  assert.equal(mhItem.clientCount, 0);
+  assert.equal(mhItem.examples[0].clientName, 'Sistema (Bug interno)');
+});
