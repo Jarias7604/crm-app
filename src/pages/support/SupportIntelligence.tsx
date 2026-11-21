@@ -351,6 +351,7 @@ export const SupportIntelligence: React.FC = () => {
   const [selectedPatternKey, setSelectedPatternKey] = useState<SupportErrorPatternKey | null>(null);
   const [tablePatternFilter, setTablePatternFilter] = useState<SupportErrorPatternKey | null>(null);
   const [showAllParetoItems, setShowAllParetoItems] = useState<boolean>(false);
+  const [evidenceTab, setEvidenceTab] = useState<'audit' | 'clients'>('audit');
   const [daysRange, setDaysRange] = useState<number>(15);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedClientKey, setExpandedClientKey] = useState<string | null>(null);
@@ -1297,7 +1298,7 @@ export const SupportIntelligence: React.FC = () => {
 
               {/* Minimalist Composed Pareto Chart */}
               <div className="space-y-2">
-                <div className="w-full h-[265px] min-w-0">
+                <div className="w-full h-[265px] min-w-0 outline-none [&_.recharts-wrapper]:outline-none [&_svg]:outline-none">
                   <ResponsiveContainer width="100%" height={265}>
                     <ComposedChart
                       data={paretoChartData}
@@ -1362,7 +1363,7 @@ export const SupportIntelligence: React.FC = () => {
                         dataKey="barValue"
                         radius={[8, 8, 0, 0]}
                         maxBarSize={52}
-                        className="cursor-pointer"
+                        className="cursor-pointer outline-none"
                         onClick={(_barData, index) => {
                           const target = paretoChartData[index];
                           if (target) {
@@ -1421,7 +1422,7 @@ export const SupportIntelligence: React.FC = () => {
                     </span>
                   </div>
                   <span className="text-slate-400">
-                    Haz clic en cualquier barra o tarjeta para ver evidencia real
+                    Haz clic en cualquier barra o tarjeta para ver auditoría y evidencia real
                   </span>
                 </div>
               </div>
@@ -1433,6 +1434,12 @@ export const SupportIntelligence: React.FC = () => {
                     const rank = pareto.items.findIndex((i) => i.patternKey === item.patternKey) + 1;
                     const isSelected = selectedPatternKey === item.patternKey;
                     const widthPct = Math.max(8, Math.round((item.sharePct / maxPriorityShare) * 100));
+                    const auditTag =
+                      item.audit.verdict === 'root_fixed'
+                        ? { label: '🟢 Raíz', cls: 'text-emerald-700' }
+                        : item.audit.verdict === 'partial_patch'
+                        ? { label: '🟡 Parcial', cls: 'text-amber-700' }
+                        : { label: '🔴 Sin raíz', cls: 'text-rose-700' };
                     return (
                       <button
                         key={item.patternKey}
@@ -1474,15 +1481,17 @@ export const SupportIntelligence: React.FC = () => {
                           />
                         </div>
 
-                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                          <span>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium gap-1.5">
+                          <span className="truncate">
                             <strong className="text-slate-700">{item.reactiveHours}h</strong> ·{' '}
-                            {item.clientCount} cliente{item.clientCount === 1 ? '' : 's'} ·{' '}
-                            {item.messageCount + item.ticketCount} rep.
+                            {item.clientCount} cliente{item.clientCount === 1 ? '' : 's'}
                           </span>
-                          <span className="text-indigo-600 font-semibold">
-                            Acum. {item.cumulativePct}%
-                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`font-bold ${auditTag.cls}`}>{auditTag.label}</span>
+                            <span className="text-indigo-600 font-semibold">
+                              Acum. {item.cumulativePct}%
+                            </span>
+                          </div>
                         </div>
                       </button>
                     );
@@ -1506,7 +1515,7 @@ export const SupportIntelligence: React.FC = () => {
                 ) : null}
               </div>
 
-              {/* 1-Click Drill-Down Evidence Panel */}
+              {/* 1-Click Drill-Down: Senior Root-Cause Audit + Client Evidence */}
               {selectedParetoItem && (
                 <div className="rounded-xl bg-slate-50/90 border border-slate-200/85 p-4 sm:p-5 space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1529,7 +1538,7 @@ export const SupportIntelligence: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <button
                         type="button"
                         onClick={() => handleFilterClientsByPattern(selectedParetoItem.patternKey)}
@@ -1555,84 +1564,252 @@ export const SupportIntelligence: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                    {/* Affected Clients */}
-                    <div className="lg:col-span-5 space-y-2">
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                        Clientes afectados ({selectedParetoItem.clients.length})
+                  {/* Senior Audit Verdict Strip + Sub-View Tabs */}
+                  <div className="bg-white rounded-xl border border-slate-200/80 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                      <span
+                        className={`px-2 py-0.5 rounded-md text-[11px] font-black border shrink-0 ${
+                          selectedParetoItem.audit.verdict === 'root_fixed'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : selectedParetoItem.audit.verdict === 'partial_patch'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                        }`}
+                      >
+                        {selectedParetoItem.audit.verdictLabel}
+                      </span>
+                      <p className="text-xs font-medium text-slate-700">
+                        {selectedParetoItem.audit.summary}
                       </p>
-                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                        {selectedParetoItem.clients.slice(0, 8).map((c) => (
-                          <div
-                            key={c.clientKey}
-                            className="bg-white border border-slate-200/75 rounded-xl px-3 py-2 flex items-center justify-between gap-2"
-                          >
-                            <div className="min-w-0">
-                              <p className="text-xs font-bold text-slate-900 truncate">
-                                {c.clientName}
-                              </p>
-                              <p className="text-[11px] text-slate-500">
-                                {c.reactiveHours}h · {c.messages} msgs
-                                {c.tickets > 0 ? ` · ${c.tickets} ticket(s)` : ''}
-                              </p>
-                            </div>
-                            {c.circleId && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  navigate('/support/chat', { state: { waCircleId: c.circleId } })
-                                }
-                                className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] shrink-0 transition"
-                              >
-                                Chat →
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
                     </div>
 
-                    {/* Real Evidence Quotes */}
-                    <div className="lg:col-span-7 space-y-2">
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                        Reportes reales recientes
-                      </p>
-                      {selectedParetoItem.examples.length === 0 ? (
-                        <p className="text-xs text-slate-400 italic py-4">
-                          Sin extractos de texto detallados en este período.
+                    <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200/70 shrink-0">
+                      {[
+                        {
+                          id: 'audit' as const,
+                          label: `Auditoría y soluciones (${selectedParetoItem.audit.documentedSolutions.length})`,
+                        },
+                        {
+                          id: 'clients' as const,
+                          label: `Clientes y mensajes (${selectedParetoItem.clientCount})`,
+                        },
+                      ].map((tab) => {
+                        const active = evidenceTab === tab.id;
+                        return (
+                          <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setEvidenceTab(tab.id)}
+                            className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${
+                              active
+                                ? 'bg-white text-slate-900 shadow-2xs'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            {tab.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {evidenceTab === 'audit' ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                      {/* Left: What the technicians did + flags */}
+                      <div className="lg:col-span-7 space-y-2.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                          Qué hicieron los técnicos (notas de raíz y solución)
                         </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {selectedParetoItem.examples.map((ex, idx) => (
-                            <div
-                              key={`${ex.clientName}-${idx}`}
-                              className="bg-white border border-slate-200/75 rounded-xl p-3 space-y-1"
-                            >
-                              <div className="flex items-center justify-between gap-2 text-[11px]">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="font-bold text-slate-900 truncate">
-                                    {ex.clientName}
-                                  </span>
-                                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold shrink-0">
-                                    {ex.source === 'whatsapp' ? 'WhatsApp' : 'Ticket'}
-                                  </span>
+
+                        {selectedParetoItem.audit.documentedSolutions.length === 0 ? (
+                          <div className="bg-white border border-slate-200/75 rounded-xl p-4 text-xs text-slate-500 leading-relaxed">
+                            Ningún ticket de esta categoría documenta solución de raíz en código
+                            todavía. Hasta ahora se ha atendido por chat o cierres genéricos.
+                          </div>
+                        ) : (
+                          <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                            {selectedParetoItem.audit.documentedSolutions.map((sol) => (
+                              <div
+                                key={sol.ticketId}
+                                className="bg-white border border-slate-200/80 rounded-xl p-3.5 space-y-1.5"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-black border shrink-0 ${
+                                        sol.verdict === 'root_cause_fix'
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                                      }`}
+                                    >
+                                      {sol.verdictLabel}
+                                    </span>
+                                    <p className="text-xs font-bold text-slate-900 leading-snug">
+                                      {sol.title}
+                                    </p>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0 text-[11px]">
+                                    <span className="text-slate-500 font-semibold">
+                                      {sol.techName.split(' ')[0]} · {sol.hours}h
+                                    </span>
+                                    {sol.rawTicket && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedTicketForDrawer(sol.rawTicket!)}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold"
+                                      >
+                                        Ticket <ExternalLink className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                                <span className="text-slate-400 shrink-0">
-                                  {new Date(ex.at).toLocaleDateString('es-SV', {
-                                    day: '2-digit',
-                                    month: 'short',
-                                  })}
-                                </span>
+
+                                {sol.rootCause && (
+                                  <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                                    <strong className="text-slate-800">Causa raíz:</strong>{' '}
+                                    {sol.rootCause}
+                                  </p>
+                                )}
+
+                                {sol.solution && (
+                                  <p className="text-[11.5px] text-slate-600 leading-relaxed">
+                                    <strong className="text-slate-800">Solución tomada:</strong>{' '}
+                                    {sol.solution}
+                                  </p>
+                                )}
+
+                                {sol.seniorFlag && (
+                                  <div className="rounded-lg bg-amber-50/90 border border-amber-200/80 px-2.5 py-1.5 text-[11px] font-semibold text-amber-900">
+                                    {sol.seniorFlag}
+                                  </div>
+                                )}
                               </div>
-                              <p className="text-xs text-slate-700 leading-relaxed">
-                                &ldquo;{ex.text}&rdquo;
-                              </p>
+                            ))}
+                          </div>
+                        )}
+
+                        {selectedParetoItem.audit.undocumentedCount > 0 && (
+                          <div className="rounded-xl bg-rose-50/75 border border-rose-200/80 px-3.5 py-2.5 text-[11.5px] text-rose-900 font-medium">
+                            <strong>
+                              {selectedParetoItem.audit.undocumentedCount} ticket(s) (
+                              {selectedParetoItem.audit.undocumentedHours}h)
+                            </strong>{' '}
+                            cerrados como &ldquo;Soporte técnico&rdquo; o sin causa raíz documentada.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right: Senior Recommended Root-Cause Fix + Team Checklist */}
+                      <div className="lg:col-span-5 space-y-2.5">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">
+                          Solución de raíz recomendada (Arquitectura Senior)
+                        </p>
+
+                        <div className="bg-white border border-indigo-200/75 rounded-xl p-4 space-y-3">
+                          <p className="text-xs text-slate-800 font-medium leading-relaxed">
+                            {selectedParetoItem.audit.recommendedRootCauseFix}
+                          </p>
+
+                          <div className="border-t border-slate-100 pt-3 space-y-1.5">
+                            <p className="text-[10.5px] font-bold uppercase tracking-wide text-slate-400">
+                              Qué validar con Melvin y Gerson
+                            </p>
+                            <ul className="space-y-1.5">
+                              {selectedParetoItem.audit.seniorChecklist.map((q, qIdx) => (
+                                <li
+                                  key={qIdx}
+                                  className="flex items-start gap-2 text-[11.5px] text-slate-700 leading-snug"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                                  <span>{q}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                      {/* Affected Clients */}
+                      <div className="lg:col-span-5 space-y-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                          Clientes afectados ({selectedParetoItem.clients.length})
+                        </p>
+                        <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                          {selectedParetoItem.clients.slice(0, 8).map((c) => (
+                            <div
+                              key={c.clientKey}
+                              className="bg-white border border-slate-200/75 rounded-xl px-3 py-2 flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-slate-900 truncate">
+                                  {c.clientName}
+                                </p>
+                                <p className="text-[11px] text-slate-500">
+                                  {c.reactiveHours}h · {c.messages} msgs
+                                  {c.tickets > 0 ? ` · ${c.tickets} ticket(s)` : ''}
+                                </p>
+                              </div>
+                              {c.circleId && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    navigate('/support/chat', { state: { waCircleId: c.circleId } })
+                                  }
+                                  className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] shrink-0 transition"
+                                >
+                                  Chat →
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>
-                      )}
+                      </div>
+
+                      {/* Real Evidence Quotes */}
+                      <div className="lg:col-span-7 space-y-2">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                          Reportes reales recientes
+                        </p>
+                        {selectedParetoItem.examples.length === 0 ? (
+                          <p className="text-xs text-slate-400 italic py-4">
+                            Sin extractos de texto detallados en este período.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {selectedParetoItem.examples.map((ex, idx) => (
+                              <div
+                                key={`${ex.clientName}-${idx}`}
+                                className="bg-white border border-slate-200/75 rounded-xl p-3 space-y-1"
+                              >
+                                <div className="flex items-center justify-between gap-2 text-[11px]">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="font-bold text-slate-900 truncate">
+                                      {ex.clientName}
+                                    </span>
+                                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold shrink-0">
+                                      {ex.source === 'whatsapp' ? 'WhatsApp' : 'Ticket'}
+                                    </span>
+                                  </div>
+                                  <span className="text-slate-400 shrink-0">
+                                    {new Date(ex.at).toLocaleDateString('es-SV', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                    })}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-700 leading-relaxed">
+                                  &ldquo;{ex.text}&rdquo;
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </>

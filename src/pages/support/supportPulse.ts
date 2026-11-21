@@ -610,14 +610,14 @@ export function detectSupportErrorPattern(text: string): SupportErrorPatternKey 
     return 'dte_signer_mh';
   }
   if (
-    /\b(descarg\w*\s+(?:de\s+|del\s+)?inventario|descuent[ao]\s+de\s+inventario|inventario|stock|kardex|existencia\w*|bodega|traslado\s+de|reconciliaci\w*|reabastecimiento)\b/i.test(
+    /\b(descarg\w*\s+(?:de\s+|del\s+)?inventario|descuent[ao]\s+de\s+inventario|inventario|stock|kardex|existencia\w*|bodega|traslado\s+de|reconciliaci\w*|reabastec\w*)\b/i.test(
       norm,
     )
   ) {
     return 'inv_stock_sync';
   }
   if (
-    /\b(imprim\w*|impresion|impresora|termica|pdf|ticket\s+(?:de\s+venta|impreso|de\s+impresion)|formato\s+de\s+(?:impresion|pdf|ticket)|cuartas\s+en\s+blanco)\b/i.test(
+    /\b(imprim\w*|impresion|impresora|termic[ao]s?|pdf|ticket\s+(?:de\s+venta|impreso|de\s+impresion)|formato\s+de\s+(?:impresion|pdf|ticket)|cuartas\s+en\s+blanco)\b/i.test(
       norm,
     )
   ) {
@@ -1681,6 +1681,7 @@ export interface ExecutiveTicketRecordInput<T = any> {
   expectedAiHours: number;
   diffAiHours?: number;
   aiTimeStatus: 'missing_time' | 'inflated' | 'fair' | 'fast';
+  findings?: string;
   rootCause?: string;
   solution?: string;
   isRepeatForSameClient: boolean;
@@ -2349,7 +2350,306 @@ export interface SupportParetoExample {
   source: 'whatsapp' | 'ticket';
 }
 
-export interface SupportParetoItem {
+export type TicketSolutionVerdict =
+  | 'root_cause_fix'
+  | 'partial_or_risky'
+  | 'undocumented';
+
+export type CategoryAuditVerdict =
+  | 'root_fixed'
+  | 'partial_patch'
+  | 'firefighting_only';
+
+export interface SeniorPatternPlaybook {
+  idealRootCauseFix: string;
+  checklist: string[];
+}
+
+export const SUPPORT_PATTERN_SENIOR_PLAYBOOKS: Record<
+  SupportErrorPatternKey,
+  SeniorPatternPlaybook
+> = {
+  dte_signer_mh: {
+    idealRootCauseFix:
+      'Centralizar la generación y validación de JSON DTE en un único DtePayloadBuilder (compartido por Ventas, Compras, NC/ND y Retornos) con validador de esquema previo por tipo DTE antes de invocar al firmador.',
+    checklist: [
+      '¿Ventas, Compras y NC/ND comparten un solo builder en vez de corregir esquema por pantalla?',
+      '¿El pre-validador bloquea ivaItem > 0 sin venta gravada y pagos vacíos antes de Hacienda?',
+      '¿Existen pruebas automatizadas por tipo DTE (01, 03, 04, 05, 06, 14) tras cambios al esquema?',
+    ],
+  },
+  dte_invalidation: {
+    idealRootCauseFix:
+      'Unificar reglas de plazo e invalidación en un servicio backend autoritativo (eliminando banderas temporales tipo false && en UI) y leer teléfono/correo reales de Sucursal con validación previa.',
+    checklist: [
+      '¿Ya se eliminaron bloqueos o bypass temporales (false &&) en tableCrud / frontend?',
+      '¿Los datos del emisor al invalidar salen siempre de Sucursal validada y no vacíos?',
+      '¿El evento de invalidación revierte stock y Kárdex atómicamente tras aceptación de MH?',
+    ],
+  },
+  dte_contingency: {
+    idealRootCauseFix:
+      'Implementar cola asíncrona de reintentos en backend con idempotencia por codigoGeneracion, backoff automático ante caídas de MH y tablero visible de documentos pendientes.',
+    checklist: [
+      '¿Los DTE en contingencia se reenvían en cola automática sin intervención manual?',
+      '¿Se garantiza que un reintento no duplique correlativo ni doble transmisión en Hacienda?',
+      '¿Hay alerta automática cuando un DTE lleva >30 min en contingencia?',
+    ],
+  },
+  dte_fiscal_data: {
+    idealRootCauseFix:
+      'Reservar correlativos a nivel de base de datos con bloqueo atómico por sucursal/tipo, activar alerta automática al 85% del rango autorizado y validar NIT/NRC/actividad económica al guardar cliente.',
+    checklist: [
+      '¿La asignación de número de control y correlativo es atómica en backend (sin race conditions)?',
+      '¿Se alerta al equipo antes de que se agote el rango de correlativos de un cliente?',
+      '¿Los catálogos oficiales de Hacienda (actividad económica, municipio) están actualizados?',
+    ],
+  },
+  dte_general: {
+    idealRootCauseFix:
+      'Unificar emisión/edición en un solo flujo con mapeo defensivo al reabrir facturas (formasPago por defecto válidas) y bloqueo idempotente anti doble clic en Emitir/Enviar.',
+    checklist: [
+      '¿El botón Emitir/Enviar tiene bloqueo idempotente en frontend y en endpoint backend?',
+      '¿Al editar facturas viejas o a crédito se sanitizan formas de pago y atributos obsoletos?',
+      '¿Están cubiertos los flujos especiales (sujeto excluido, nota de remisión, lote)?',
+    ],
+  },
+  inv_stock_sync: {
+    idealRootCauseFix:
+      'Enrutar toda salida o ingreso (Venta, Anulación, Nota de Crédito, Evento de Retorno y Traslados) a un único servicio transaccional de Kárdex/Stock con bloqueo idempotente.',
+    checklist: [
+      '¿Todos los flujos fiscales (incluido EventoRetorno y Anulación) llaman al mismo KardexController?',
+      '¿Las consultas de reabastecimiento usan comparación SQL entre columnas reales y no strings fijos?',
+      '¿Las operaciones de stock corren dentro de DB::transaction() para evitar descuadres parciales?',
+    ],
+  },
+  inv_catalog: {
+    idealRootCauseFix:
+      'Indexar búsqueda de productos/servicios en backend (insensible a tildes y coincidencia parcial con índice trigram/SQL) con feedback claro en UI ante resultados vacíos o error de red.',
+    checklist: [
+      '¿El buscador de Bienes/Servicios filtra en servidor con límite e índice en nombre/código?',
+      '¿Todas las pantallas (POS, Factura, Inventario) reutilizan el mismo componente de búsqueda?',
+      '¿El endpoint maneja tildes, espacios múltiples y códigos parciales sin quedarse colgado?',
+    ],
+  },
+  pdf_print: {
+    idealRootCauseFix:
+      'Consolidar los distintos componentes de impresión (Factura normal, Crédito, Ticket térmico y PDF) en una sola plantilla/servicio compartido con sanitización central de comillas/caracteres.',
+    checklist: [
+      '¿Ya comparten una misma lógica Factura normal, Factura a crédito y Nota de remisión?',
+      '¿La sanitización de comillas y caracteres especiales ocurre en un helper único, no componente por componente?',
+      '¿Se verifica ancho de corte/espacio en blanco en impresoras térmicas de 80mm/58mm antes de liberar?',
+    ],
+  },
+  reports_export: {
+    idealRootCauseFix:
+      'Mover cálculos de libros IVA, cuentas por cobrar y Excel a consultas SQL dedicadas con contratos fijos de columnas, zona horaria explícita y límite paginado o descarga asíncrona.',
+    checklist: [
+      '¿Los totales de Excel/Reportes coinciden 1:1 con el saldo matemático contable?',
+      '¿Se optimizó la consulta SQL para no agotar memoria o tiempo en empresas de alto volumen?',
+      '¿Todos los filtros por fecha respetan la zona horaria local de El Salvador?',
+    ],
+  },
+  calc_tax_totals: {
+    idealRootCauseFix:
+      'Extraer el motor fiscal (IVA 13%, umbral $100 retención 1%, percepción y precisión decimal por línea vs total) a un módulo de dominio único en backend y frontend con batería de pruebas unitarias.',
+    checklist: [
+      '¿La regla de retención/percepción vive en 1 módulo central o sigue copiada en múltiples pantallas?',
+      '¿Coinciden los decimales de precio unitario × cantidad con ventaGravada antes de enviar a MH?',
+      '¿Existen tests fijos para casos límite ($99.99 vs $100.00, 4+ decimales, exentos + gravados)?',
+    ],
+  },
+  calc_cash_close: {
+    idealRootCauseFix:
+      'Derivar estados de pago (Pagado/Pendiente) estrictamente desde saldo_pendiente/abonos en transacción SQL y desacoplar validaciones contables opcionales cuando la empresa no usa contabilidad.',
+    checklist: [
+      '¿El estado "Pagado" se calcula solo desde abonos confirmados sin discrepancia entre UI y backend?',
+      '¿Las validaciones de cuenta bancaria respetan si la empresa tiene o no módulo contable activo?',
+      '¿El cierre de caja cuadra automáticamente efectivo, transferencia, tarjeta y crédito?',
+    ],
+  },
+  auth_permissions: {
+    idealRootCauseFix:
+      'Configurar invalidación automática de caché SPA al desplegar nueva versión (headers no-cache en index.html + reset de sesión por versión) y habilitar auto-gestión guiada de usuarios y sucursales.',
+    checklist: [
+      '¿Cuando hay deploy nuevo, el sistema recarga la app automáticamente sin pedir Ctrl+Shift+R al cliente?',
+      '¿El cliente/admin puede crear usuarios, roles y permisos sin requerir intervención del equipo técnico?',
+      '¿Los tokens y permisos de sucursal se refrescan limpio ante cambios de rol?',
+    ],
+  },
+  perf_loading: {
+    idealRootCauseFix:
+      'Agregar timeouts explícitos, manejo de errores visibles con botón Reintentar (nunca spinner infinito) e índices SQL en listados de facturación, productos y clientes.',
+    checklist: [
+      '¿La pantalla muestra mensaje claro y botón Reintentar si falla una petición en vez de quedar "cargando"?',
+      '¿Se revisaron las consultas lentas (>1s) e índices en los endpoints más usados en horas pico?',
+      '¿Los botones de acción previenen doble ejecución mientras hay una petición en curso?',
+    ],
+  },
+  usage_general: {
+    idealRootCauseFix:
+      'Documentar causa raíz técnica real en cada cierre (sin textos genéricos) y agregar guías rápidas / tooltips contextuales en las pantallas donde nacen dudas operativas repetidas.',
+    checklist: [
+      '¿Se capacitó con guía corta o video de 60s para evitar repetir la misma duda operativa?',
+      '¿Los tickets cerrados registran qué falló, por qué ocurrió y cómo quedó validado en código?',
+      '¿La pantalla ofrece validaciones claras que guíen al usuario antes de equivocarse?',
+    ],
+  },
+};
+
+export function isMeaningfulTechNote(text?: string | null): boolean {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean || clean.length < 18) return false;
+  const norm = clean
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  if (
+    /^(?:soporte\s+tecnico|consulta(?:\s+tecnica(?:\s+sobre\s+[^.]+)?)?|consulta\s+de\s+(?:pago|proceso)|ajuste|reunion|hacienda|configuracion(?:\s+de\s+(?:impresora|usuario|nuevo\s+cliente(?:\s+y\s+pruebas\s+de\s+hacienda)?))?|importacion\s+de\s+inventario(?:\s+y\s+clientes)?|soporte|error|pendiente|listo|resuelto|ok|n\/?a)[.\s-]*$/i.test(
+      norm,
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function assessTicketSolutionQuality(ticket: {
+  title?: string;
+  rootCause?: string | null;
+  solution?: string | null;
+  findings?: string | null;
+}): {
+  verdict: TicketSolutionVerdict;
+  verdictLabel: string;
+  seniorFlag: string | null;
+  hasRootCause: boolean;
+  hasSolution: boolean;
+} {
+  const hasRootCause = isMeaningfulTechNote(ticket.rootCause);
+  const hasSolution = isMeaningfulTechNote(ticket.solution);
+
+  if (!hasRootCause && !hasSolution) {
+    return {
+      verdict: 'undocumented',
+      verdictLabel: 'Sin causa raíz',
+      seniorFlag: 'Cerrado sin documentar causa raíz ni solución técnica real.',
+      hasRootCause,
+      hasSolution,
+    };
+  }
+
+  const combinedNorm = `${ticket.rootCause || ''} ${ticket.solution || ''} ${ticket.findings || ''}`
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  // 1. Highest severity: explicit temporary code, disabled validation, or unverified fix
+  if (
+    /\b(todavia\s+no\s+hay\s+solucion\s+definitiva|false\s*&&|temporal\b|solo\s+para\s+revision|no\s+se\s+ha\s+reproducido|falta\s+la\s+prueba|sin\s+confirmar)\b/i.test(
+      combinedNorm,
+    )
+  ) {
+    return {
+      verdict: 'partial_or_risky',
+      verdictLabel: 'Temporal / Sin validar',
+      seniorFlag:
+        '⚠️ Solución temporal o sin validar en producción (riesgo alto de regresión).',
+      hasRootCause,
+      hasSolution,
+    };
+  }
+
+  // 2. Manual user/client patch or workaround instead of system fix
+  if (
+    /\b(limpieza\s+(?:completa\s+)?de\s+(?:la\s+)?(?:memoria\s+)?cache|ctrl\s*\+\s*shift|guia\s+para\s+reinstalar|reinstalar|driver\s+del\s+fabricante|inmediata:\s*emitir|de\s+forma\s+manual|reiniciar\s+el\s+equipo)\b/i.test(
+      combinedNorm,
+    )
+  ) {
+    return {
+      verdict: 'partial_or_risky',
+      verdictLabel: 'Parche manual',
+      seniorFlag:
+        '⚠️ Parche manual al cliente (caché/driver/workaround); falta blindaje en sistema.',
+      hasRootCause,
+      hasSolution,
+    };
+  }
+
+  // 3. Architectural duplication across N files/components or targeted revert
+  if (
+    /\b(\d+\s+archivos|seis\s+componentes|varios\s+componentes|se\s+replico|mismo\s+vacio|reverti\s+ese\s+commit|copia\s+vieja)\b/i.test(
+      combinedNorm,
+    )
+  ) {
+    return {
+      verdict: 'partial_or_risky',
+      verdictLabel: 'Duplicado / Puntual',
+      seniorFlag:
+        '⚠️ Lógica duplicada en múltiples archivos/componentes o revert puntual — requiere refactor central.',
+      hasRootCause,
+      hasSolution,
+    };
+  }
+
+  // 4. Genuine permanent fix referencing code, controller, validation, migration, etc.
+  const hasCodeFixEvidence =
+    /\b(controller|component|\.ts\b|\.php\b|wherecolumn|migracion|backend|frontend|validacion|saneamiento|se\s+reemplazo|se\s+elimino|se\s+agrego|se\s+reestructuro|se\s+blindo|se\s+implemento|se\s+incorporo|payload|servicio|endpoint|kardex|envia\s+en\s+0|convierte\s+a\s+bruto|valor\s+por\s+defecto|bloqueo)\b/i.test(
+      combinedNorm,
+    );
+
+  if (hasCodeFixEvidence) {
+    return {
+      verdict: 'root_cause_fix',
+      verdictLabel: 'Raíz en código',
+      seniorFlag: null,
+      hasRootCause,
+      hasSolution,
+    };
+  }
+
+  return {
+    verdict: 'partial_or_risky',
+    verdictLabel: 'Revisión parcial',
+    seniorFlag:
+      'Documentado, pero sin detallar cambio estructural o validación definitiva en código.',
+    hasRootCause,
+    hasSolution,
+  };
+}
+
+export interface SupportParetoTicketAuditRow<T = any> {
+  ticketId: string;
+  rawTicket?: T;
+  title: string;
+  clientName: string;
+  techName: string;
+  hours: number;
+  at: string;
+  verdict: TicketSolutionVerdict;
+  verdictLabel: string;
+  rootCause: string | null;
+  solution: string | null;
+  findings: string | null;
+  seniorFlag: string | null;
+}
+
+export interface SupportParetoCategoryAudit<T = any> {
+  verdict: CategoryAuditVerdict;
+  verdictLabel: string;
+  summary: string;
+  totalTickets: number;
+  rootFixCount: number;
+  partialOrRiskyCount: number;
+  undocumentedCount: number;
+  undocumentedHours: number;
+  documentedSolutions: SupportParetoTicketAuditRow<T>[];
+  recommendedRootCauseFix: string;
+  seniorChecklist: string[];
+}
+
+export interface SupportParetoItem<T = any> {
   patternKey: SupportErrorPatternKey;
   label: string;
   shortLabel: string;
@@ -2365,11 +2665,12 @@ export interface SupportParetoItem {
   clients: SupportParetoClientRef[];
   clientKeys: string[];
   examples: SupportParetoExample[];
+  audit: SupportParetoCategoryAudit<T>;
 }
 
-export interface SupportParetoResult {
+export interface SupportParetoResult<T = any> {
   metric: SupportParetoMetric;
-  items: SupportParetoItem[];
+  items: SupportParetoItem<T>[];
   totalReactiveHours: number;
   totalUniqueClients: number;
   vitalFewCount: number;
@@ -2380,9 +2681,9 @@ export interface SupportParetoResult {
   copyPlanText: string;
 }
 
-export function formatParetoActionPlanText(
+export function formatParetoActionPlanText<T = any>(
   pareto: Pick<
-    SupportParetoResult,
+    SupportParetoResult<T>,
     | 'metric'
     | 'items'
     | 'vitalFewCount'
@@ -2417,8 +2718,9 @@ export function formatParetoActionPlanText(
       .map((c) => c.clientName)
       .join(', ');
     lines.push(
-      `${idx + 1}. *${item.label}* — ${item.sharePct}% (${item.reactiveHours}h · ${item.clientCount} cliente${item.clientCount === 1 ? '' : 's'})` +
-      (sampleClients ? `\n   Clientes: ${sampleClients}` : ''),
+      `${idx + 1}. *${item.label}* — ${item.sharePct}% (${item.reactiveHours}h · ${item.clientCount} cliente${item.clientCount === 1 ? '' : 's'}) · [${item.audit.verdictLabel}]` +
+      (sampleClients ? `\n   Clientes: ${sampleClients}` : '') +
+      `\n   Recomendación: ${item.audit.recommendedRootCauseFix}`,
     );
   });
 
@@ -2431,7 +2733,7 @@ export function buildSupportParetoAnalysis<T = any>(input: {
   techFilter?: string;
   metric?: SupportParetoMetric;
   daysRange?: number;
-}): SupportParetoResult {
+}): SupportParetoResult<T> {
   const metric: SupportParetoMetric = input.metric === 'clients' ? 'clients' : 'hours';
   const activeTech =
     input.techFilter && input.techFilter !== 'all' ? input.techFilter : null;
@@ -2457,6 +2759,7 @@ export function buildSupportParetoAnalysis<T = any>(input: {
     ticketCount: number;
     clients: Map<string, SupportParetoClientRef>;
     examples: SupportParetoExample[];
+    ticketAudits: SupportParetoTicketAuditRow<T>[];
   }
 
   const buckets = new Map<SupportErrorPatternKey, PatternBucket>();
@@ -2470,6 +2773,7 @@ export function buildSupportParetoAnalysis<T = any>(input: {
         ticketCount: 0,
         clients: new Map<string, SupportParetoClientRef>(),
         examples: [],
+        ticketAudits: [],
       };
       buckets.set(patternKey, b);
     }
@@ -2506,17 +2810,52 @@ export function buildSupportParetoAnalysis<T = any>(input: {
   const waLoggedByClient = new Map<string, number>();
 
   for (const r of reactiveRecords) {
+    // Prioritize specific title classification so secondary keywords in description/notes don't misroute
+    const titlePat = detectSupportErrorPattern(r.title || '');
     const pat =
+      (titlePat && titlePat !== 'usage_general' ? titlePat : null) ||
       detectSupportErrorPattern(
         `${r.title || ''} ${r.description || ''} ${r.rootCause || ''}`,
-      ) || 'usage_general';
+      ) ||
+      'usage_general';
     const bucket = ensureBucket(pat);
+
+    const quality = assessTicketSolutionQuality({
+      title: r.title,
+      rootCause: r.rootCause,
+      solution: r.solution,
+      findings: r.findings,
+    });
+
+    const auditClientName = r.isInternalSystemTask
+      ? 'Sistema'
+      : normalizeSupportClientName(r.clientName);
+
+    bucket.ticketAudits.push({
+      ticketId: r.id,
+      rawTicket: r.rawTicket,
+      title: r.title,
+      clientName: auditClientName,
+      techName: r.techName || 'Sin asignar',
+      hours: r.reportedHours,
+      at: r.createdAt || new Date().toISOString(),
+      verdict: quality.verdict,
+      verdictLabel: quality.verdictLabel,
+      rootCause: quality.hasRootCause ? String(r.rootCause || '').trim() : null,
+      solution: quality.hasSolution ? String(r.solution || '').trim() : null,
+      findings: isMeaningfulTechNote(r.findings)
+        ? String(r.findings || '').trim()
+        : null,
+      seniorFlag: quality.seniorFlag,
+    });
 
     if (r.isInternalSystemTask) {
       bucket.ticketCount += 1;
       bucket.reactiveHours += r.reportedHours;
 
-      const rawTicketText = r.rootCause ? `${r.title} — ${r.rootCause}` : r.title;
+      const rawTicketText = quality.hasRootCause
+        ? `${r.title} — ${r.rootCause}`
+        : r.title;
       const snippet = cleanSupportMessageSnippet(rawTicketText, 130);
       if (snippet.length >= 8) {
         bucket.examples.push({
@@ -2547,7 +2886,9 @@ export function buildSupportParetoAnalysis<T = any>(input: {
     ref.reactiveHours += r.reportedHours;
 
     if (!/^\[WhatsApp/i.test(r.title || '')) {
-      const rawTicketText = r.rootCause ? `${r.title} — ${r.rootCause}` : r.title;
+      const rawTicketText = quality.hasRootCause
+        ? `${r.title} — ${r.rootCause}`
+        : r.title;
       const snippet = cleanSupportMessageSnippet(rawTicketText, 130);
       if (snippet.length >= 8) {
         bucket.examples.push({
@@ -2646,7 +2987,7 @@ export function buildSupportParetoAnalysis<T = any>(input: {
 
   // Finalize buckets into sortable items
   const rawList: Array<{
-    item: Omit<SupportParetoItem, 'sharePct' | 'cumulativePct' | 'isVitalFew80'>;
+    item: Omit<SupportParetoItem<T>, 'sharePct' | 'cumulativePct' | 'isVitalFew80'>;
     exactHours: number;
   }> = [];
 
@@ -2660,6 +3001,7 @@ export function buildSupportParetoAnalysis<T = any>(input: {
     }
     const meta = SUPPORT_ERROR_PATTERNS[bucket.patternKey];
     const modMeta = SUPPORT_ERROR_MODULES[meta.moduleKey];
+    const playbook = SUPPORT_PATTERN_SENIOR_PLAYBOOKS[bucket.patternKey];
 
     const clientsList = Array.from(bucket.clients.values())
       .map((c) => ({ ...c, reactiveHours: +c.reactiveHours.toFixed(1) }))
@@ -2701,6 +3043,66 @@ export function buildSupportParetoAnalysis<T = any>(input: {
       }
     }
 
+    // Build Senior Root-Cause Category Audit
+    const rootFixCount = bucket.ticketAudits.filter(
+      (a) => a.verdict === 'root_cause_fix',
+    ).length;
+    const partialOrRiskyCount = bucket.ticketAudits.filter(
+      (a) => a.verdict === 'partial_or_risky',
+    ).length;
+    const undocumentedRows = bucket.ticketAudits.filter(
+      (a) => a.verdict === 'undocumented',
+    );
+    const undocumentedCount = undocumentedRows.length;
+    const undocumentedHours = +undocumentedRows
+      .reduce((acc, a) => acc + a.hours, 0)
+      .toFixed(1);
+
+    const documentedSolutions = bucket.ticketAudits
+      .filter((a) => a.verdict !== 'undocumented')
+      .sort((a, b) => {
+        if (a.verdict !== b.verdict) {
+          return a.verdict === 'partial_or_risky' ? -1 : 1;
+        }
+        return Date.parse(b.at) - Date.parse(a.at) || b.hours - a.hours;
+      })
+      .slice(0, 6);
+
+    let auditVerdict: CategoryAuditVerdict = 'firefighting_only';
+    let auditVerdictLabel = 'Sin raíz · Apagafuegos';
+    if (rootFixCount === 0 && partialOrRiskyCount === 0) {
+      auditVerdict = 'firefighting_only';
+      auditVerdictLabel = 'Sin raíz · Apagafuegos';
+    } else if (
+      partialOrRiskyCount > 0 ||
+      undocumentedCount > rootFixCount ||
+      bucket.messageCount >= 4
+    ) {
+      auditVerdict = 'partial_patch';
+      auditVerdictLabel = 'Parcial / Con parches';
+    } else {
+      auditVerdict = 'root_fixed';
+      auditVerdictLabel = 'Raíz documentada';
+    }
+
+    let auditSummary =
+      'Solo actividad en WhatsApp (sin tickets técnicos con causa raíz documentada en el período).';
+    if (bucket.ticketAudits.length > 0) {
+      const summaryParts: string[] = [];
+      if (rootFixCount > 0) {
+        summaryParts.push(`${rootFixCount} con solución en código`);
+      }
+      if (partialOrRiskyCount > 0) {
+        summaryParts.push(`${partialOrRiskyCount} con riesgo/parche`);
+      }
+      if (undocumentedCount > 0) {
+        summaryParts.push(
+          `${undocumentedCount} sin documentar (${undocumentedHours}h)`,
+        );
+      }
+      auditSummary = summaryParts.join(' · ');
+    }
+
     rawList.push({
       exactHours: bucket.reactiveHours,
       item: {
@@ -2716,6 +3118,19 @@ export function buildSupportParetoAnalysis<T = any>(input: {
         clients: clientsList,
         clientKeys: clientsList.map((c) => c.clientKey),
         examples: pickedExamples,
+        audit: {
+          verdict: auditVerdict,
+          verdictLabel: auditVerdictLabel,
+          summary: auditSummary,
+          totalTickets: bucket.ticketAudits.length,
+          rootFixCount,
+          partialOrRiskyCount,
+          undocumentedCount,
+          undocumentedHours,
+          documentedSolutions,
+          recommendedRootCauseFix: playbook.idealRootCauseFix,
+          seniorChecklist: playbook.checklist,
+        },
       },
     });
   }
@@ -2739,7 +3154,7 @@ export function buildSupportParetoAnalysis<T = any>(input: {
   const totalWeight = rawList.reduce((acc, x) => acc + weightOf(x), 0);
   let runningWeight = 0;
 
-  const items: SupportParetoItem[] = rawList.map((entry, idx) => {
+  const items: SupportParetoItem<T>[] = rawList.map((entry, idx) => {
     const w = weightOf(entry);
     const prevPct = totalWeight > 0 ? (runningWeight / totalWeight) * 100 : 100;
     runningWeight += w;

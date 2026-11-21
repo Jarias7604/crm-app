@@ -1141,3 +1141,197 @@ test('19. Single-timeline WA burst prevents multi-chat inflation, honest zero-ti
   assert.equal(mhItem.clientCount, 0);
   assert.equal(mhItem.examples[0].clientName, 'Sistema (Bug interno)');
 });
+
+test('20. isMeaningfulTechNote filters generic closures and keeps real technical notes', () => {
+  const { isMeaningfulTechNote } = loaded.supportPulse;
+
+  assert.equal(isMeaningfulTechNote('Soporte tecnico'), false);
+  assert.equal(isMeaningfulTechNote('HACIENDA'), false);
+  assert.equal(isMeaningfulTechNote('Ajuste'), false);
+  assert.equal(isMeaningfulTechNote('Configuracion de impresora'), false);
+  assert.equal(isMeaningfulTechNote('Consulta tecnica sobre un error al emitir factura'), false);
+  assert.equal(isMeaningfulTechNote(''), false);
+  assert.equal(isMeaningfulTechNote(null), false);
+
+  assert.equal(
+    isMeaningfulTechNote('DteHaciendaV2 enviaba el ivaItem en lugar de 0 en ítems exentos.'),
+    true,
+  );
+  assert.equal(
+    isMeaningfulTechNote(
+      'Cambié la comparación a whereColumn para comparar contra la columna real.',
+    ),
+    true,
+  );
+});
+
+test('21. assessTicketSolutionQuality distinguishes code root fixes, risky/manual patches, and undocumented tickets', () => {
+  const { assessTicketSolutionQuality } = loaded.supportPulse;
+
+  const tempBypass = assessTicketSolutionQuality({
+    title: 'Revisión de plazos de anulación',
+    rootCause: 'Se desactivó para poder revisar los plazos.',
+    solution:
+      'Todavía no hay solución definitiva. Antes de subir a producción hay que restaurar la validación, quitando el false && de tableCrud.component.ts.',
+  });
+  assert.equal(tempBypass.verdict, 'partial_or_risky');
+  assert.ok(tempBypass.seniorFlag && tempBypass.seniorFlag.includes('temporal'));
+
+  const cacheWorkaround = assessTicketSolutionQuality({
+    title: 'Reporte de error panel',
+    rootCause: 'Conflicto por memoria caché y datos residuales almacenados en el navegador local.',
+    solution:
+      'Realizar una limpieza completa de la memoria caché y recarga con Ctrl + Shift + R.',
+  });
+  assert.equal(cacheWorkaround.verdict, 'partial_or_risky');
+  assert.ok(cacheWorkaround.seniorFlag && cacheWorkaround.seniorFlag.includes('Parche manual'));
+
+  const duplicatedTax = assessTicketSolutionQuality({
+    title: 'Retiro herencia retención 1%',
+    rootCause: 'Un cambio agregó retencionHeredada ignorando el umbral de $100.',
+    solution: 'Revertí ese commit puntual en rama backup.',
+    findings: 'La regla estaba en 12 archivos de notaCredito y notaDebito.',
+  });
+  assert.equal(duplicatedTax.verdict, 'partial_or_risky');
+  assert.ok(duplicatedTax.seniorFlag && duplicatedTax.seniorFlag.includes('duplicada'));
+
+  const realFix = assessTicketSolutionQuality({
+    title: 'Rechazo 003 ivaItem',
+    rootCause: 'DteHaciendaV2 enviaba el ivaItem tal cual sin validar venta gravada.',
+    solution: 'En DteHaciendaV2 el ivaItem se envía en 0 cuando la venta gravada del ítem es 0.',
+  });
+  assert.equal(realFix.verdict, 'root_cause_fix');
+  assert.equal(realFix.seniorFlag, null);
+
+  const lazy = assessTicketSolutionQuality({
+    title: 'Soporte técnico: Go Party',
+    rootCause: 'Soporte tecnico',
+    solution: 'Soporte tecnico',
+  });
+  assert.equal(lazy.verdict, 'undocumented');
+});
+
+test('22. buildSupportParetoAnalysis attaches audit verdict, prioritizes risky fixes first, and classifies tickets title-first', () => {
+  const { computeSupportWhatsAppPulse, buildSupportParetoAnalysis } = loaded.supportPulse;
+  const nowMs = Date.parse('2026-11-20T22:00:00.000Z');
+  const pulse = computeSupportWhatsAppPulse({
+    tickets: [],
+    waMessages: [],
+    comments: [],
+    profiles: [],
+    options: { daysRange: 15, nowMs },
+  });
+
+  const records = [
+    // Title is explicitly about printed ticket -> must stay pdf_print despite IVA mention in text
+    {
+      id: 't-print-real',
+      source: 'ticket',
+      title: 'Falta la línea de IVA (13%) en el ticket impreso de venta',
+      description: 'Personalización de ticket térmico',
+      clientName: 'Tareas Internas de Desarrollo (P4 / Sin cliente)',
+      isInternalSystemTask: true,
+      techName: 'Melvin Rodriguez',
+      status: 'resolved',
+      ticketCategoryCode: 'P4',
+      workBucket: 'troubleshooting',
+      reclassifiedFromP4: true,
+      reportedHours: 1.5,
+      expectedAiHours: 1,
+      aiTimeStatus: 'fair',
+      rootCause: 'El catálogo de líneas configurables nunca incluyó IVA.',
+      solution:
+        'Se agregó la línea IVA en el componente de empresa y en los seis componentes de impresión.',
+      isRepeatForSameClient: false,
+      createdAt: '2026-11-16T10:00:00.000Z',
+    },
+    // Title is about invalidation, with a risky temp bypass (false &&)
+    {
+      id: 't-inv-risky',
+      source: 'ticket',
+      title: 'Revisión de plazos de anulación (CCF, NC y ND)',
+      description: '',
+      clientName: 'Tareas Internas de Desarrollo (P4 / Sin cliente)',
+      isInternalSystemTask: true,
+      techName: 'Sin asignar',
+      status: 'resolved',
+      ticketCategoryCode: 'P4',
+      workBucket: 'troubleshooting',
+      reclassifiedFromP4: true,
+      reportedHours: 1.0,
+      expectedAiHours: 1,
+      aiTimeStatus: 'fair',
+      rootCause: 'Se desactivó para poder revisar los plazos.',
+      solution: 'Todavía no hay solución definitiva: quitar el false && de tableCrud.component.ts.',
+      isRepeatForSameClient: false,
+      createdAt: '2026-11-19T10:00:00.000Z',
+    },
+    // Clean code fix in invalidation
+    {
+      id: 't-inv-clean',
+      source: 'ticket',
+      title: 'Evento de retorno, error 096 al invalidar',
+      description: '',
+      clientName: 'Tareas Internas de Desarrollo (P4 / Sin cliente)',
+      isInternalSystemTask: true,
+      techName: 'Melvin Rodriguez',
+      status: 'resolved',
+      ticketCategoryCode: 'P4',
+      workBucket: 'troubleshooting',
+      reclassifiedFromP4: true,
+      reportedHours: 1.0,
+      expectedAiHours: 1,
+      aiTimeStatus: 'fair',
+      rootCause: 'EventoRetornoHacienda no tomaba el teléfono y correo de la sucursal.',
+      solution:
+        'En HaciendaController se localiza Sucursal::find y se pasa teléfono y correo validados al payload.',
+      isRepeatForSameClient: false,
+      createdAt: '2026-11-18T10:00:00.000Z',
+    },
+    // Undocumented ticket on pdf_print
+    {
+      id: 't-print-lazy',
+      source: 'ticket',
+      title: 'Soporte técnico: Go Party impresora',
+      description: 'Impresión térmica',
+      clientName: 'Go Party',
+      isInternalSystemTask: false,
+      techName: 'Melvin Rodriguez',
+      status: 'resolved',
+      ticketCategoryCode: 'P3',
+      workBucket: 'troubleshooting',
+      reclassifiedFromP4: false,
+      reportedHours: 0.5,
+      expectedAiHours: 0.5,
+      aiTimeStatus: 'fair',
+      rootCause: 'Soporte tecnico',
+      solution: 'Soporte tecnico',
+      isRepeatForSameClient: false,
+      createdAt: '2026-11-17T10:00:00.000Z',
+    },
+  ];
+
+  const pareto = buildSupportParetoAnalysis({
+    pulse,
+    records,
+    techFilter: 'all',
+    metric: 'hours',
+    daysRange: 15,
+  });
+
+  const pdfItem = pareto.items.find((i) => i.patternKey === 'pdf_print');
+  assert.ok(pdfItem, 'Expected pdf_print item');
+  assert.equal(pdfItem.audit.undocumentedCount, 1);
+  assert.equal(pdfItem.audit.partialOrRiskyCount, 1); // flagged due to "seis componentes"
+  assert.equal(pdfItem.audit.verdict, 'partial_patch');
+  assert.ok(pdfItem.audit.recommendedRootCauseFix.includes('plantilla/servicio compartido'));
+
+  const invItem = pareto.items.find((i) => i.patternKey === 'dte_invalidation');
+  assert.ok(invItem, 'Expected dte_invalidation item');
+  assert.equal(invItem.audit.partialOrRiskyCount, 1);
+  assert.equal(invItem.audit.rootFixCount, 1);
+  // Risky/temp bypass ticket surfaces first for founder visibility!
+  assert.equal(invItem.audit.documentedSolutions[0].verdict, 'partial_or_risky');
+  assert.equal(invItem.audit.documentedSolutions[1].verdict, 'root_cause_fix');
+  assert.ok(pareto.copyPlanText.includes('Recomendación:'));
+});
