@@ -24,6 +24,7 @@ import {
 import toast from 'react-hot-toast';
 import { numberToWordsSpanish } from '../../utils/numberToWords';
 import TeamAiAuditorModule from '../../components/payroll/TeamAiAuditorModule';
+import { computeTimesheetTasksSummary } from '../../utils/timesheetValidation';
 
 export default function PayrollManager() {
   const { profile, simulatedCompanyId } = useAuth();
@@ -2300,7 +2301,9 @@ export default function PayrollManager() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {filteredApprovals.map((entry) => (
+              {filteredApprovals.map((entry) => {
+                const vInfo = computeTimesheetTasksSummary(entry);
+                return (
                 <div
                   key={entry.id}
                   className="bg-white border border-slate-200/90 rounded-xl p-4 shadow-xs space-y-3"
@@ -2318,7 +2321,7 @@ export default function PayrollManager() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
                       <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
                         {entry.regular_hours}h reg.
                       </span>
@@ -2331,6 +2334,16 @@ export default function PayrollManager() {
                           Sin overtime
                         </span>
                       )}
+                      {vInfo.hasSignificantVariance && (
+                        <span
+                          title={`Jornada total: ${vInfo.totalWorkdayHours}h vs Tareas vinculadas: ${vInfo.linkedTaskHours}h`}
+                          className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
+                        >
+                          {vInfo.linkedTaskCount === 0
+                            ? 'Sin tareas vinculadas'
+                            : `Tareas ${vInfo.linkedTaskHours}h / ${vInfo.totalWorkdayHours}h`}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -2340,6 +2353,15 @@ export default function PayrollManager() {
                         Motivo del tiempo extra:
                       </span>
                       <p className="italic text-slate-700 leading-snug">"{entry.overtime_reason || 'Sin justificación'}"</p>
+                    </div>
+                  )}
+
+                  {vInfo.justification && (
+                    <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-lg p-2.5 text-xs text-indigo-950 space-y-1">
+                      <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">
+                        Justificación diferencia de horas ({vInfo.linkedTaskHours}h en tareas vs {vInfo.totalWorkdayHours}h jornada):
+                      </span>
+                      <p className="italic text-indigo-900 leading-snug">"{vInfo.justification}"</p>
                     </div>
                   )}
 
@@ -2371,7 +2393,8 @@ export default function PayrollManager() {
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -2663,7 +2686,9 @@ export default function PayrollManager() {
                             Reporte de Jornada del Colaborador ({conf.timesheets.length})
                           </h4>
                           <div className="grid grid-cols-1 gap-2">
-                            {conf.timesheets.map((ts) => (
+                            {conf.timesheets.map((ts) => {
+                              const vInfo = computeTimesheetTasksSummary(ts);
+                              return (
                               <div
                                 key={ts.id}
                                 className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
@@ -2681,10 +2706,22 @@ export default function PayrollManager() {
                                         +{ts.overtime_hours}h extras {ts.overtime_start_time && ts.overtime_end_time ? `(${ts.overtime_start_time} a ${ts.overtime_end_time})` : ''}
                                       </span>
                                     )}
+                                    {vInfo.hasSignificantVariance && (
+                                      <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                        {vInfo.linkedTaskCount === 0
+                                          ? 'Sin tareas vinculadas'
+                                          : `Tareas ${vInfo.linkedTaskHours}h / ${vInfo.totalWorkdayHours}h`}
+                                      </span>
+                                    )}
                                   </div>
                                   <p className="text-slate-700 leading-relaxed">
                                     <strong>Entregable reportado:</strong> {ts.work_summary}
                                   </p>
+                                  {vInfo.justification && (
+                                    <p className="text-[11px] text-indigo-900 bg-indigo-50/70 border border-indigo-200/80 rounded-lg px-2 py-1 italic">
+                                      <strong>Justificación diferencia de horas:</strong> "{vInfo.justification}"
+                                    </p>
+                                  )}
                                   {ts.overtime_hours > 0 && ts.overtime_reason && (
                                     <p className="text-[11px] text-amber-900 italic">
                                       <strong>Motivo horas extras:</strong> {ts.overtime_reason}
@@ -2692,7 +2729,8 @@ export default function PayrollManager() {
                                   )}
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -4347,13 +4385,15 @@ export default function PayrollManager() {
                   </p>
                 </div>
               ) : (
-                memberDailyTimesheets.map((entry) => (
+                memberDailyTimesheets.map((entry) => {
+                  const vInfo = computeTimesheetTasksSummary(entry);
+                  return (
                   <div
                     key={entry.id}
                     className="p-3.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition shadow-2xs space-y-2"
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-bold text-slate-900">
                           📅 {new Date(entry.work_date + 'T00:00:00').toLocaleDateString('es-ES', {
                             weekday: 'short',
@@ -4368,6 +4408,16 @@ export default function PayrollManager() {
                         {entry.overtime_hours > 0 && (
                           <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
                             +{entry.overtime_hours}h extra
+                          </span>
+                        )}
+                        {vInfo.hasSignificantVariance && (
+                          <span
+                            title={`Jornada total: ${vInfo.totalWorkdayHours}h vs Tareas vinculadas: ${vInfo.linkedTaskHours}h`}
+                            className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md"
+                          >
+                            {vInfo.linkedTaskCount === 0
+                              ? 'Sin tareas vinculadas'
+                              : `Tareas ${vInfo.linkedTaskHours}h / ${vInfo.totalWorkdayHours}h`}
                           </span>
                         )}
                         <span className={`text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-md border ${
@@ -4423,13 +4473,21 @@ export default function PayrollManager() {
                       </p>
                     )}
 
+                    {vInfo.justification && (
+                      <div className="bg-indigo-50/70 border border-indigo-200/80 rounded-lg p-2 text-[11px] text-indigo-950">
+                        <strong>Justificación diferencia de horas ({vInfo.linkedTaskHours}h / {vInfo.totalWorkdayHours}h):</strong>{' '}
+                        <em>"{vInfo.justification}"</em>
+                      </div>
+                    )}
+
                     {entry.overtime_hours > 0 && entry.overtime_reason && (
                       <div className="bg-amber-50/70 border border-amber-200/70 rounded-lg p-2 text-[11px] text-amber-900">
                         <strong>Motivo overtime:</strong> <em>"{entry.overtime_reason}"</em>
                       </div>
                     )}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
 

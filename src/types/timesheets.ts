@@ -31,6 +31,7 @@ export interface TimesheetEntry {
   ticket_id?: string | null;
   ticket_title?: string | null;
   linked_tasks?: TimesheetLinkedTask[];
+  hours_variance_justification?: string | null;
   status: TimesheetStatus;
   reviewed_by?: string | null;
   reviewed_name?: string | null;

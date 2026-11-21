@@ -7,6 +7,11 @@ import type {
   PayrollRun,
   CustomDeductionRule
 } from '../types/timesheets';
+import {
+  evaluateTimesheetHoursVariance,
+  parseWorkSummaryMeta,
+  serializeWorkSummaryWithMeta,
+} from '../utils/timesheetValidation';
 
 // ================================================================
 // CALCULADORA FISCAL DINÁMICA MULTI-PAÍS (SV, USA, LATAM)
@@ -144,22 +149,13 @@ export const timesheetsService = {
           }
         }
 
-        // Extraer metadatos de múltiples proyectos y múltiples tareas/tickets si vienen embebidos en work_summary
-        let rawSummary = String(row.work_summary || '');
-        let parsedProjectIds: string[] = [];
-        let parsedLinkedTasks: TimesheetLinkedTask[] = [];
-
-        const metaMatch = rawSummary.match(/\n?<!--TS_META:([\s\S]*?)-->/);
-        if (metaMatch) {
-          rawSummary = rawSummary.replace(metaMatch[0], '').trim();
-          try {
-            const parsed = JSON.parse(metaMatch[1]);
-            if (Array.isArray(parsed.p)) parsedProjectIds = parsed.p.filter(Boolean);
-            if (Array.isArray(parsed.t)) parsedLinkedTasks = parsed.t;
-          } catch (e) {
-            // Ignore malformed meta
-          }
-        }
+        // Extraer metadatos de múltiples proyectos, tareas/tickets y justificación de diferencia si vienen en work_summary
+        const {
+          cleanSummary: rawSummary,
+          projectIds: parsedProjectIds,
+          linkedTasks: parsedLinkedTasks,
+          hoursVarianceJustification,
+        } = parseWorkSummaryMeta(row.work_summary);
 
         if (row.project_id && !parsedProjectIds.includes(row.project_id)) {
           parsedProjectIds.unshift(row.project_id);
@@ -190,6 +186,7 @@ export const timesheetsService = {
           task_id: row.task_id || parsedLinkedTasks.find(t => t.type === 'task')?.id || null,
           ticket_id: row.ticket_id || parsedLinkedTasks.find(t => t.type === 'ticket')?.id || null,
           linked_tasks: parsedLinkedTasks,
+          hours_variance_justification: hoursVarianceJustification,
           status: row.status,
           reviewed_by: row.reviewed_by,
           reviewed_name: row.reviewer?.full_name || null,
@@ -220,6 +217,7 @@ export const timesheetsService = {
     taskId?: string | null;
     ticketId?: string | null;
     linkedTasks?: TimesheetLinkedTask[];
+    hoursVarianceJustification?: string | null;
     isAdmin?: boolean;
   }): Promise<{ success: boolean; data?: any; error?: string }> {
     try {
@@ -237,7 +235,6 @@ export const timesheetsService = {
       }
 
       // Preparar proyectos y tareas vinculadas (soporte multi-selección sin romper columnas UUID existentes)
-      const cleanSummary = (payload.workSummary || '').replace(/\n?<!--TS_META:[\s\S]*?-->/g, '').trim();
       const finalProjectIds = payload.projectIds && payload.projectIds.length > 0
         ? payload.projectIds.filter(Boolean)
         : (payload.projectId ? [payload.projectId] : []);
@@ -245,14 +242,36 @@ export const timesheetsService = {
         ? payload.linkedTasks
         : [];
 
+      const linkedTaskHours = finalLinkedTasks.reduce((sum, t) => sum + Number(t.hours || 0), 0);
+      const varianceEval = evaluateTimesheetHoursVariance({
+        regularHours: payload.regularHours,
+        overtimeHours: payload.overtimeHours,
+        linkedTaskHours,
+        linkedTaskCount: finalLinkedTasks.length,
+        justification: payload.hoursVarianceJustification,
+      });
+
+      if (varianceEval.status === 'invalid_total') {
+        return { success: false, error: 'Las horas trabajadas deben ser mayores a 0.' };
+      }
+
+      if (!payload.isAdmin && varianceEval.requiresJustification && !varianceEval.isJustificationValid) {
+        return {
+          success: false,
+          error: 'Cuando la diferencia supera 30 min o no vinculas tareas/tickets, es obligatorio escribir una justificación clara (mín. 8 caracteres).'
+        };
+      }
+
       const primaryProjectId = payload.projectId || finalProjectIds[0] || null;
       const primaryTicketId = payload.ticketId || finalLinkedTasks.find(t => t.type === 'ticket')?.id || null;
       const primaryTaskId = payload.taskId || finalLinkedTasks.find(t => t.type === 'task')?.id || null;
 
-      const shouldEmbedMeta = finalProjectIds.length > 0 || finalLinkedTasks.length > 0;
-      const serializedWorkSummary = shouldEmbedMeta
-        ? `${cleanSummary}\n<!--TS_META:${JSON.stringify({ p: finalProjectIds, t: finalLinkedTasks })}-->`
-        : cleanSummary;
+      const serializedWorkSummary = serializeWorkSummaryWithMeta({
+        workSummary: payload.workSummary,
+        projectIds: finalProjectIds,
+        linkedTasks: finalLinkedTasks,
+        hoursVarianceJustification: varianceEval.trimmedJustification || null,
+      });
 
       // 1. Verificar si ya existe registro para ese colaborador en esa fecha
       const { data: existing } = await supabase

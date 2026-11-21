@@ -11,6 +11,10 @@ import {
   FolderGit2, Lock, Unlock, ShieldCheck, Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import {
+  evaluateTimesheetHoursVariance,
+  TIMESHEET_JUSTIFICATION_MIN_CHARS,
+} from '../../utils/timesheetValidation';
 
 // Helper de fechas timezone-safe
 function formatDateISO(d: Date): string {
@@ -42,6 +46,8 @@ export default function MyTimesheet() {
   const [regularHours, setRegularHours] = useState<number>(8);
   const [overtimeHours, setOvertimeHours] = useState<number>(0);
   const [overtimeReason, setOvertimeReason] = useState<string>('');
+  const [hoursVarianceJustification, setHoursVarianceJustification] = useState<string>('');
+  const [showOptionalVarianceNote, setShowOptionalVarianceNote] = useState<boolean>(false);
   const [workSummary, setWorkSummary] = useState<string>('');
   const [projectId, setProjectId] = useState<string>('');
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
@@ -260,6 +266,8 @@ export default function MyTimesheet() {
       setOvertimeReason(selectedDayEntry.overtime_reason || '');
       setOvertimeStartTime(selectedDayEntry.overtime_start_time || '17:00');
       setOvertimeEndTime(selectedDayEntry.overtime_end_time || '21:00');
+      setHoursVarianceJustification(selectedDayEntry.hours_variance_justification || '');
+      setShowOptionalVarianceNote(Boolean(selectedDayEntry.hours_variance_justification));
       setWorkSummary(selectedDayEntry.work_summary || '');
       const pIds = selectedDayEntry.project_ids && selectedDayEntry.project_ids.length > 0
         ? selectedDayEntry.project_ids
@@ -287,6 +295,8 @@ export default function MyTimesheet() {
       setOvertimeReason('');
       setOvertimeStartTime('17:00');
       setOvertimeEndTime('21:00');
+      setHoursVarianceJustification('');
+      setShowOptionalVarianceNote(false);
       setWorkSummary('');
       setProjectId('');
       setSelectedProjectIds([]);
@@ -449,11 +459,23 @@ export default function MyTimesheet() {
     return +(totalWorkdayHours - totalSelectedTasksHours).toFixed(2);
   }, [totalWorkdayHours, totalSelectedTasksHours]);
 
-  const isHoursMatched = useMemo(() => {
-    if (totalWorkdayHours <= 0) return false;
-    if (selectedTaskIds.length === 0) return false;
-    return Math.abs(totalWorkdayHours - totalSelectedTasksHours) < 0.01;
-  }, [totalWorkdayHours, selectedTaskIds.length, totalSelectedTasksHours]);
+  const varianceEval = useMemo(
+    () =>
+      evaluateTimesheetHoursVariance({
+        regularHours,
+        overtimeHours,
+        linkedTaskHours: totalSelectedTasksHours,
+        linkedTaskCount: selectedTaskIds.length,
+        justification: hoursVarianceJustification,
+      }),
+    [
+      regularHours,
+      overtimeHours,
+      totalSelectedTasksHours,
+      selectedTaskIds.length,
+      hoursVarianceJustification,
+    ],
+  );
 
   // Manejo del Envío
   const handleSubmit = async (e: React.FormEvent) => {
@@ -489,15 +511,13 @@ export default function MyTimesheet() {
       }
     }
 
-    if (selectedTaskIds.length === 0) {
-      toast.error(`Debes seleccionar los tickets o tareas de proyecto que respalden tus ${totalWorkdayHours}h trabajadas.`);
+    if (varianceEval.status === 'invalid_total') {
+      toast.error('Ingresa tus horas trabajadas antes de enviar.');
       return;
     }
 
-    if (!isHoursMatched) {
-      toast.error(
-        `Las horas de tus tareas/tickets (${totalSelectedTasksHours}h) no coinciden con las horas trabajadas (${totalWorkdayHours}h). Ajusta las horas antes de enviar.`
-      );
+    if (!adminOverrideUnlocked && varianceEval.requiresJustification && !varianceEval.isJustificationValid) {
+      toast.error('Explica la diferencia de horas (mín. 8 caracteres reales) o ajusta las horas de tus tareas.');
       return;
     }
 
@@ -530,6 +550,7 @@ export default function MyTimesheet() {
       ticketId: linkedTasksPayload.find((t) => t.type === 'ticket')?.id || ticketId || null,
       taskId: linkedTasksPayload.find((t) => t.type === 'task')?.id || null,
       linkedTasks: linkedTasksPayload,
+      hoursVarianceJustification: varianceEval.trimmedJustification || undefined,
       isAdmin: Boolean(isAdmin && adminOverrideUnlocked),
     });
     setSubmitting(false);
@@ -1002,7 +1023,7 @@ export default function MyTimesheet() {
                 <div className="relative flex-1 min-w-[90px]">
                   <input
                     type="number"
-                    step="0.5"
+                    step="0.01"
                     min="0"
                     max="24"
                     disabled={isFormDisabled}
@@ -1029,7 +1050,7 @@ export default function MyTimesheet() {
               <div className="relative">
                 <input
                   type="number"
-                  step="0.5"
+                  step="0.01"
                   min="0"
                   max="16"
                   disabled={isFormDisabled}
@@ -1209,7 +1230,7 @@ export default function MyTimesheet() {
                               type="number"
                               min={0}
                               max={24}
-                              step={0.25}
+                              step="0.01"
                               disabled={isFormDisabled}
                               placeholder="Horas"
                               value={taskHoursMap[id] !== undefined ? taskHoursMap[id] : (item?.defaultHours ?? 0)}
@@ -1245,66 +1266,139 @@ export default function MyTimesheet() {
               </div>
             )}
 
-            {/* Validador Estricto: Horas en Tareas/Tickets vs. Horas Trabajadas */}
+            {/* Validación Flexible de Horas: Tolerancia de 30 min o Justificación Clara */}
             <div
-              className={`rounded-xl p-3 border text-xs transition-all ${
-                isHoursMatched
-                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
-                  : selectedTaskIds.length === 0
-                  ? 'bg-amber-50/70 border-amber-200 text-amber-900'
-                  : 'bg-rose-50/80 border-rose-300 text-rose-900 ring-1 ring-rose-500/10'
+              className={`rounded-xl p-3 border text-xs transition-all space-y-2.5 ${
+                varianceEval.status === 'matched' || varianceEval.status === 'justified'
+                  ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
+                  : varianceEval.status === 'minor_tolerance'
+                  ? 'bg-sky-50/70 border-sky-200 text-sky-950'
+                  : 'bg-amber-50/80 border-amber-300 text-amber-950'
               }`}
             >
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="font-extrabold uppercase tracking-wider text-[10px] flex items-center gap-1.5">
-                  {isHoursMatched ? (
+                  {varianceEval.status === 'matched' ? (
                     <>
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       Horas Verificadas y Cuadradas
                     </>
+                  ) : varianceEval.status === 'minor_tolerance' ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-sky-600" />
+                      Diferencia menor ({varianceEval.absDifferenceMinutes} min) — Permitido
+                    </>
+                  ) : varianceEval.status === 'justified' ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      Diferencia justificada — Listo para enviar
+                    </>
+                  ) : varianceEval.status === 'invalid_total' ? (
+                    <>
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      Ingresa tus horas trabajadas
+                    </>
                   ) : (
                     <>
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                      Validación Obligatoria: Horas Jornada vs. Tareas
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      Diferencia de horas — Requiere justificación
                     </>
                   )}
                 </span>
-                <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
+                <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold flex-wrap">
                   <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-800">
                     Jornada: {totalWorkdayHours}h
                   </span>
                   <span>vs</span>
                   <span
                     className={`px-2 py-0.5 rounded border ${
-                      isHoursMatched
+                      varianceEval.status === 'matched' || varianceEval.status === 'justified'
                         ? 'bg-emerald-600 text-white border-emerald-600'
-                        : 'bg-rose-600 text-white border-rose-600'
+                        : varianceEval.status === 'minor_tolerance'
+                        ? 'bg-sky-600 text-white border-sky-600'
+                        : 'bg-amber-600 text-white border-amber-600'
                     }`}
                   >
                     Tareas: {totalSelectedTasksHours}h
                   </span>
+                  {varianceEval.absDifferenceHours >= 0.01 && (
+                    <span className="bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-700">
+                      Diferencia: {hoursDifference > 0 ? `+${hoursDifference}h sin tarea` : `${Math.abs(hoursDifference)}h extra en tareas`}
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <p className="text-[11px] mt-1.5 leading-snug font-medium">
-                {isHoursMatched ? (
-                  <>
-                    ✓ Las horas de tus <strong>{selectedTaskIds.length} tareas/tickets ({totalSelectedTasksHours}h)</strong> coinciden exactamente con tus <strong>{totalWorkdayHours}h trabajadas</strong>. Puedes enviar tu jornada.
-                  </>
-                ) : selectedTaskIds.length === 0 ? (
-                  <>
-                    ⚠️ Debes seleccionar los tickets o tareas de proyecto realizados hoy y sus horas deben sumar exactamente las <strong>{totalWorkdayHours}h</strong> trabajadas para poder enviar.
-                  </>
-                ) : hoursDifference > 0 ? (
-                  <>
-                    ❌ <strong>No coincide:</strong> Estás reportando <strong>{totalWorkdayHours}h</strong> trabajadas, pero tus {selectedTaskIds.length} tareas seleccionadas solo suman <strong>{totalSelectedTasksHours}h</strong>. <strong>Faltan {hoursDifference}h por justificar en tareas</strong> para poder enviar la jornada.
-                  </>
-                ) : (
-                  <>
-                    ❌ <strong>No coincide:</strong> La suma de tus tareas seleccionadas (<strong>{totalSelectedTasksHours}h</strong>) supera las horas trabajadas reportadas (<strong>{totalWorkdayHours}h</strong>) por <strong>{Math.abs(hoursDifference)}h</strong>. Ajusta las horas para poder enviar.
-                  </>
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <p className="text-[11px] leading-snug font-medium flex-1">
+                  {varianceEval.status === 'matched' ? (
+                    <>
+                      ✓ Las horas de tus <strong>{selectedTaskIds.length} tareas/tickets ({totalSelectedTasksHours}h)</strong> coinciden con tus <strong>{totalWorkdayHours}h trabajadas</strong>.
+                    </>
+                  ) : varianceEval.status === 'minor_tolerance' ? (
+                    <>
+                      ✓ Diferencia menor de <strong>{varianceEval.absDifferenceMinutes} min</strong> (≤ 30 min por redondeo). No bloquea el envío.
+                    </>
+                  ) : varianceEval.status === 'justified' ? (
+                    <>
+                      ✓ Se enviará tu jornada de <strong>{totalWorkdayHours}h</strong> junto con la justificación para revisión en Nómina.
+                    </>
+                  ) : varianceEval.status === 'invalid_total' ? (
+                    <>
+                      Ingresa tus horas regulares o extras mayores a 0 para registrar el día.
+                    </>
+                  ) : selectedTaskIds.length === 0 ? (
+                    <>
+                      No has vinculado tareas/tickets para respaldar tus <strong>{totalWorkdayHours}h</strong>. Puedes vincularlas arriba o explicar qué trabajaste para poder enviar.
+                    </>
+                  ) : hoursDifference > 0 ? (
+                    <>
+                      Tus tareas suman <strong>{totalSelectedTasksHours}h</strong> vs <strong>{totalWorkdayHours}h</strong> de jornada (diferencia de <strong>{hoursDifference}h</strong>). Ajusta las horas o justifica la diferencia para enviar.
+                    </>
+                  ) : (
+                    <>
+                      Tus tareas suman <strong>{totalSelectedTasksHours}h</strong> vs <strong>{totalWorkdayHours}h</strong> de jornada (<strong>{Math.abs(hoursDifference)}h</strong> extra en tareas). Ajusta las horas o justifica la diferencia para enviar.
+                    </>
+                  )}
+                </p>
+
+                {varianceEval.status === 'minor_tolerance' && !isFormDisabled && (
+                  <button
+                    type="button"
+                    onClick={() => setShowOptionalVarianceNote((prev) => !prev)}
+                    className="text-[11px] font-bold text-sky-700 hover:text-sky-900 underline underline-offset-2 shrink-0 cursor-pointer"
+                  >
+                    {showOptionalVarianceNote ? 'Ocultar nota' : 'Agregar nota opcional'}
+                  </button>
                 )}
-              </p>
+              </div>
+
+              {(varianceEval.requiresJustification || showOptionalVarianceNote) && (
+                <div className="space-y-1 pt-0.5">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                    {varianceEval.requiresJustification
+                      ? 'Justificación de la diferencia de horas (Obligatorio)'
+                      : 'Nota aclaratoria de horas (Opcional)'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    disabled={isFormDisabled}
+                    placeholder={
+                      varianceEval.requiresJustification
+                        ? 'Ej: 1.5h en chats de WhatsApp sin ticket, reunión interna y soporte telefónico...'
+                        : 'Nota opcional sobre el redondeo o detalle adicional...'
+                    }
+                    value={hoursVarianceJustification}
+                    onChange={(e) => setHoursVarianceJustification(e.target.value)}
+                    className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder:text-slate-400 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-slate-100"
+                  />
+                  {varianceEval.requiresJustification && !varianceEval.isJustificationValid && (
+                    <p className="text-[10.5px] font-medium text-amber-800">
+                      Escribe un motivo real (mín. {TIMESHEET_JUSTIFICATION_MIN_CHARS} caracteres) o ajusta las horas de tus tareas arriba.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Notas y Entregables del Día */}
@@ -1334,8 +1428,14 @@ export default function MyTimesheet() {
             ) : (
               <button
                 type="submit"
-                disabled={submitting || !isHoursMatched}
-                title={!isHoursMatched ? `Las horas en tareas (${totalSelectedTasksHours}h) deben coincidir con las horas trabajadas (${totalWorkdayHours}h)` : undefined}
+                disabled={submitting || (!adminOverrideUnlocked && !varianceEval.canSubmit)}
+                title={
+                  !adminOverrideUnlocked && !varianceEval.canSubmit
+                    ? varianceEval.status === 'invalid_total'
+                      ? 'Ingresa tus horas trabajadas'
+                      : 'Justifica la diferencia de horas o ajusta tus tareas'
+                    : undefined
+                }
                 className={`w-full py-2.5 px-4 font-bold rounded-xl text-xs shadow-md flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer text-white ${
                   adminOverrideUnlocked
                     ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20'
@@ -1357,7 +1457,17 @@ export default function MyTimesheet() {
                 ) : (
                   <>
                     <Send className="w-3.5 h-3.5" />
-                    {!isHoursMatched ? `No coincide: Tareas (${totalSelectedTasksHours}h) vs Jornada (${totalWorkdayHours}h)` : submitting ? 'Guardando...' : selectedDayEntry ? 'Actualizar Reporte del Día' : 'Enviar Reporte de Jornada'}
+                    {submitting
+                      ? 'Guardando...'
+                      : varianceEval.status === 'invalid_total'
+                      ? 'Ingresa las horas trabajadas'
+                      : varianceEval.requiresJustification && !varianceEval.isJustificationValid
+                      ? 'Justifica la diferencia de horas para enviar'
+                      : varianceEval.status === 'justified'
+                      ? 'Enviar Jornada con Justificación'
+                      : selectedDayEntry
+                      ? 'Actualizar Reporte del Día'
+                      : 'Enviar Reporte de Jornada'}
                   </>
                 )}
               </button>
@@ -1515,6 +1625,14 @@ export default function MyTimesheet() {
                             </span>
                           );
                         })}
+                      </div>
+                    )}
+
+                    {/* Justificación por diferencia de horas vs. tareas */}
+                    {entry.hours_variance_justification && (
+                      <div className="bg-indigo-50/70 border border-indigo-200/70 rounded-lg p-2 text-[11px] text-indigo-950 space-y-0.5">
+                        <span className="font-bold block">Justificación diferencia de horas:</span>
+                        <p className="italic">"{entry.hours_variance_justification}"</p>
                       </div>
                     )}
 
