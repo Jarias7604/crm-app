@@ -26,3 +26,8 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/evolution-whatsapp-webhook/index.ts"
 
+[functions.google-sheets-lead-intake]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/google-sheets-lead-intake/index.ts"
+
