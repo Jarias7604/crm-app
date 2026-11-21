@@ -238,6 +238,229 @@ export function countChatMessagesLast24h(
   return count;
 }
 
+export type SupportErrorModuleKey =
+  | 'dte'
+  | 'inventario'
+  | 'reportes'
+  | 'calculos'
+  | 'acceso'
+  | 'general';
+
+export const SUPPORT_ERROR_MODULES: Record<
+  SupportErrorModuleKey,
+  { label: string; shortLabel: string; barColor: string; badgeClass: string }
+> = {
+  dte: {
+    label: 'Facturación DTE / Hacienda',
+    shortLabel: 'DTE / Hacienda',
+    barColor: 'bg-rose-500',
+    badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
+  },
+  inventario: {
+    label: 'Inventario / Stock',
+    shortLabel: 'Inventario',
+    barColor: 'bg-amber-500',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+  },
+  reportes: {
+    label: 'Reportes / PDF / Impresión',
+    shortLabel: 'Reportes / PDF',
+    barColor: 'bg-indigo-500',
+    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  },
+  calculos: {
+    label: 'Cálculos / IVA / Planilla',
+    shortLabel: 'Cálculos / IVA',
+    barColor: 'bg-violet-500',
+    badgeClass: 'bg-violet-50 text-violet-700 border-violet-200',
+  },
+  acceso: {
+    label: 'Acceso / Permisos / Carga',
+    shortLabel: 'Acceso / Carga',
+    barColor: 'bg-sky-500',
+    badgeClass: 'bg-sky-50 text-sky-700 border-sky-200',
+  },
+  general: {
+    label: 'Uso General / Otros',
+    shortLabel: 'General',
+    barColor: 'bg-slate-400',
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
+  },
+};
+
+const KNOWN_CLIENT_ALIASES: Array<{ pattern: RegExp; canonical: string }> = [
+  { pattern: /arg[oó]z|argos/i, canonical: 'Corporación Argoz' },
+  { pattern: /\bgo\s*party\b/i, canonical: 'Go Party' },
+  { pattern: /cartopaq|cartopack/i, canonical: 'Cartopaq' },
+  { pattern: /don\s+carret[oó]n/i, canonical: 'Don Carretón' },
+  { pattern: /la\s+econ[oó]mica/i, canonical: 'La Económica' },
+  { pattern: /medicina\s+popular/i, canonical: 'Medicina Popular' },
+  { pattern: /conta\s*ohs/i, canonical: 'Conta OHS' },
+  { pattern: /salinera\s+san\s+jorge/i, canonical: 'Salinera San Jorge' },
+  { pattern: /moda\s+[ií]ntima/i, canonical: 'Moda Íntima' },
+  { pattern: /udp\s+volea/i, canonical: 'UDP Volea' },
+  { pattern: /lupitas?\s+accesorios/i, canonical: 'Lupitas Accesorios' },
+  { pattern: /ferreter[ií]a\s+bersab[eé]/i, canonical: 'Ferretería Bersabe' },
+  { pattern: /pablo\s+g[oó]mez/i, canonical: 'Pablo Gómez' },
+  { pattern: /lumen\s*2000/i, canonical: 'Lumen 2000' },
+  { pattern: /suministros\s+diesel/i, canonical: 'Suministros Diesel' },
+  { pattern: /ak\s+constructora/i, canonical: 'AK Constructora' },
+  { pattern: /inmalux/i, canonical: 'Inmalux' },
+  { pattern: /rolando\s+velasco/i, canonical: 'Arias (Rolando Velasco)' },
+  { pattern: /marisela\s+lino/i, canonical: 'Marisela Lino' },
+  { pattern: /labelimend/i, canonical: 'Labelimend' },
+  { pattern: /wilfredo\s+valiente/i, canonical: 'Wilfredo Valiente' },
+  { pattern: /gaco\s+y\s+jeco/i, canonical: 'Gaco y Jeco' },
+  { pattern: /transportes\s+rivera/i, canonical: 'Transportes Rivera' },
+  { pattern: /corpo\s+auto/i, canonical: 'Corpo Auto' },
+  { pattern: /texaco\s+el\s+triunfo|gasolinera\s+el\s+triunfo/i, canonical: 'Texaco El Triunfo' },
+  { pattern: /multiservicios\s+integrales/i, canonical: 'Multiservicios Integrales' },
+  { pattern: /inversiones\s+diversas\s+del\s+mar/i, canonical: 'Inversiones Diversas del Mar' },
+  { pattern: /comercial\s+m[eé]ndez/i, canonical: 'Comercial Méndez' },
+  { pattern: /prisma\s+hielo/i, canonical: 'Prisma Hielo' },
+  { pattern: /panader[ií]a\s+santa\s+eduviges/i, canonical: 'Panadería Santa Eduviges' },
+  { pattern: /erp\s*-\s*gasolineras/i, canonical: 'ERP - Gasolineras' },
+  { pattern: /facturaci[oó]n\s+clientes\s+varios/i, canonical: 'Facturación Clientes Varios' },
+];
+
+export function normalizeSupportClientName(raw: string): string {
+  let clean = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return 'Cliente WhatsApp';
+
+  if (/^\[WhatsApp[^\]]*\]/i.test(clean)) {
+    clean = clean.replace(/^\[WhatsApp[^\]]*\]\s*/i, '');
+    const colonIdx = clean.indexOf(':');
+    if (colonIdx > 1) clean = clean.slice(0, colonIdx);
+  }
+
+  clean = clean
+    .replace(/^(?:arias\s+)?soporte\s+t[eé]cnico(?:\s+arias)?(?:\s*[-:|]\s*|\s+)/i, '')
+    .replace(
+      /^(?:error\s+reportado|capacitaci[oó]n(?:\s+presencial|\s+virtual)?|pregunta\s+frecuente|implementaci[oó]n|go\s*live|solicitud(?:\s+de\s+cliente)?|configuraci[oó]n|migraci[oó]n|revisi[oó]n|soporte)\s*[-:|]\s*/i,
+      '',
+    )
+    .replace(/\(\+?\d[\d\s-]*\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!clean) return 'Cliente WhatsApp';
+
+  for (const alias of KNOWN_CLIENT_ALIASES) {
+    if (alias.pattern.test(clean)) return alias.canonical;
+  }
+  if (/^(gp|grupo\s+gp)$/i.test(clean)) return 'GP';
+
+  return clean
+    .split(' ')
+    .map((w) => {
+      if (w.length <= 2 && /^[A-Z0-9]+$/.test(w)) return w;
+      return w.length > 2 ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+    })
+    .join(' ');
+}
+
+export function supportClientMergeKey(raw: string): string {
+  return normalizeSupportClientName(raw)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+export function detectSupportErrorModule(text: string): SupportErrorModuleKey | null {
+  let clean = String(text || '')
+    .replace(/^\[[^\]]+\]\s*(?:👤|👨‍💻)?\s*[^:\n]{1,40}:\s*/i, '')
+    .replace(/\[(?:Imagen|Nota de voz|Video|Sticker|Documento)[^\]]*\]/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean || clean.length < 8) return null;
+
+  const norm = clean
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  if (
+    /^(?:buen(?:os|as)\s+(?:dias|tardes|noches)|hola+|ok+|okay|okey|si+|gracias+|muchas\s+gracias|mil\s+gracias|muchisimas\s+gracias|listo+|entendido|esta\s+bien|perfecto|saludos|excelente|va+|dale|de\s+acuerdo|con\s+gusto|para\s+servirle)[¡!.,\s👍🙏👌✅🙌😊🤝]*$/i.test(
+      norm,
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    /\b(dte|hacienda|mh|firmador|sello|invalidaci[oó]n|anula\w*|contingencia|ccf|factura\s+electronica|json|credito\s+fiscal|consumidor\s+final|sujeto\s+excluido|nit|nrc|correlativo|timbr\w*|transmit\w*)\b/i.test(
+      norm,
+    )
+  ) {
+    return 'dte';
+  }
+  if (
+    /\b(inventario|stock|kardex|existencia\w*|bodega|traslado|lote|producto\w*|codigo\s+de\s+barra|serie|mercaderia|descarg\w*\s+(?:de\s+|del\s+)?inventario|descuent[ao]\s+de\s+inventario)\b/i.test(
+      norm,
+    )
+  ) {
+    return 'inventario';
+  }
+  if (
+    /\b(reporte\w*|pdf|excel|imprim\w*|impresion|impresora|termica|formato|descargar|exportar|logo|ticket\s+de\s+venta)\b/i.test(
+      norm,
+    )
+  ) {
+    return 'reportes';
+  }
+  if (
+    /\b(iva|retencion|percepcion|calculo|cuadr\w*|descuadre|centavo|subtotal|planilla|contab\w*|asiento|partida|balance|cierre\s+de\s+caja|corte\s+z|saldo|abono|cxp|cxc)\b/i.test(
+      norm,
+    )
+  ) {
+    return 'calculos';
+  }
+  if (
+    /\b(acceso|permiso|usuario|contrasena|clave|login|sesion|no\s+carga|pantalla\s+en\s+blanco|cargando|lento|caido|bloqueado|rol)\b/i.test(
+      norm,
+    )
+  ) {
+    return 'acceso';
+  }
+  if (/\bfactur\w*\b/i.test(norm)) {
+    return 'dte';
+  }
+
+  if (
+    /\b(error|falla|bug|no\s+deja|no\s+me\s+deja|no\s+puedo|no\s+funciona|problema|ayuda|consulta|como\s+(?:hago|se)|revisar|captura|no\s+aparece|no\s+sale|no\s+guarda)\b/i.test(
+      norm,
+    ) ||
+    norm.length >= 22
+  ) {
+    return 'general';
+  }
+  return null;
+}
+
+export interface ConvPulseSummary {
+  convKey: string;
+  ticketId: string;
+  ticketIds: string[];
+  circleId: string | null;
+  clientName: string;
+  clientKey: string;
+  primaryTech: string;
+  distinctClientDays: number;
+  totalMessages: number;
+  clientMsgs: number;
+  staffMsgs: number;
+  peakDayKey: string;
+  peakDayLabel: string;
+  peakDayMessages: number;
+  isPingPong: boolean;
+  estStaffMinutes: number;
+  moduleCounts: Record<SupportErrorModuleKey, number>;
+  primaryModuleKey: SupportErrorModuleKey;
+  lastRootCause: SupportRootCauseEntry | null;
+  lastMessageAt: string;
+}
+
 export interface PulseTicketInput {
   id: string;
   title?: string | null;
@@ -348,6 +571,7 @@ export interface SupportPulseResult {
   };
   dailySeries: DailyPulseRow[];
   pingPongAlerts: PingPongChatAlert[];
+  convMetrics: ConvPulseSummary[];
   techChatMetrics: Record<string, TechChatMetrics>;
   primaryTechByTicketId: Record<string, string>;
   rootCauseQueue: {
@@ -543,6 +767,7 @@ export function computeSupportWhatsAppPulse(input: {
     dayKey: string;
     isStaff: boolean;
     staffName: string | null; // null if client or automated bot
+    body: string;
   }
 
   const events: UnifiedMsgEvent[] = [];
@@ -607,6 +832,7 @@ export function computeSupportWhatsAppPulse(input: {
       dayKey: toDayKey(ms),
       isStaff,
       staffName: finalStaffName,
+      body: String(m.body || linkedComment?.body || ''),
     });
   }
 
@@ -642,6 +868,7 @@ export function computeSupportWhatsAppPulse(input: {
       dayKey: toDayKey(ms),
       isStaff: hasStaffMarker,
       staffName: finalStaffName,
+      body,
     });
   }
 
@@ -652,9 +879,11 @@ export function computeSupportWhatsAppPulse(input: {
     clientMsgs: number;
     staffMsgs: number;
     lastMsgMs: number;
+    clientDays: Set<string>;
     dayCounts: Map<string, number>;
     staffCounts: Map<string, number>;
     staffTimestamps: number[];
+    moduleCounts: Record<SupportErrorModuleKey, number>;
     isPingPong: boolean;
     peakDayKey: string;
     peakDayMessages: number;
@@ -671,9 +900,18 @@ export function computeSupportWhatsAppPulse(input: {
         clientMsgs: 0,
         staffMsgs: 0,
         lastMsgMs: ev.ms,
+        clientDays: new Set<string>(),
         dayCounts: new Map<string, number>(),
         staffCounts: new Map<string, number>(),
         staffTimestamps: [],
+        moduleCounts: {
+          dte: 0,
+          inventario: 0,
+          reportes: 0,
+          calculos: 0,
+          acceso: 0,
+          general: 0,
+        },
         isPingPong: false,
         peakDayKey: '',
         peakDayMessages: 0,
@@ -681,8 +919,16 @@ export function computeSupportWhatsAppPulse(input: {
       convAggMap.set(ev.convKey, cAgg);
     }
     cAgg.totalMessages += 1;
-    if (ev.isStaff) cAgg.staffMsgs += 1;
-    else cAgg.clientMsgs += 1;
+    if (ev.isStaff) {
+      cAgg.staffMsgs += 1;
+    } else {
+      cAgg.clientMsgs += 1;
+      cAgg.clientDays.add(ev.dayKey);
+      const detectedMod = detectSupportErrorModule(ev.body);
+      if (detectedMod) {
+        cAgg.moduleCounts[detectedMod] += 1;
+      }
+    }
     if (ev.ms > cAgg.lastMsgMs) cAgg.lastMsgMs = ev.ms;
     cAgg.dayCounts.set(ev.dayKey, (cAgg.dayCounts.get(ev.dayKey) || 0) + 1);
 
@@ -1025,6 +1271,81 @@ export function computeSupportWhatsAppPulse(input: {
     totalClientDays > 0 ? +(totalMessages / totalClientDays).toFixed(1) : 0;
   const todayClients = dailyMap.get(todayKey)?.clients.size || 0;
 
+  // Build unified per-conversation summary across ALL support conversations
+  const specificModules: SupportErrorModuleKey[] = [
+    'dte',
+    'inventario',
+    'reportes',
+    'calculos',
+    'acceso',
+  ];
+  const convMetrics: ConvPulseSummary[] = [];
+  for (const [convKey, cAgg] of convAggMap.entries()) {
+    const conv = convMap.get(convKey);
+    if (!conv) continue;
+
+    const sortedTs = [...cAgg.staffTimestamps].sort((a, b) => a - b);
+    let convBurstMin = 0;
+    let prevMs: number | null = null;
+    for (const ts of sortedTs) {
+      if (prevMs === null || ts - prevMs > BURST_GAP_MS) {
+        convBurstMin += BURST_BASE_MIN;
+      } else {
+        convBurstMin += Math.max(0, (ts - prevMs) / 60000);
+      }
+      prevMs = ts;
+    }
+
+    let primaryModuleKey: SupportErrorModuleKey = 'general';
+    let bestModCount = 0;
+    for (const mk of specificModules) {
+      if (cAgg.moduleCounts[mk] > bestModCount) {
+        bestModCount = cAgg.moduleCounts[mk];
+        primaryModuleKey = mk;
+      }
+    }
+    if (bestModCount === 0) {
+      const fromTicket = detectSupportErrorModule(
+        `${conv.representative.title || ''} ${(conv.representative as any).description || ''}`,
+      );
+      if (fromTicket) primaryModuleKey = fromTicket;
+    }
+
+    const combinedEntries = conv.tickets
+      .flatMap((t) => extractRootCauseEntries(t.metadata))
+      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+
+    const clientName = normalizeSupportClientName(deriveTicketClientName(conv.representative));
+    convMetrics.push({
+      convKey,
+      ticketId: conv.representative.id,
+      ticketIds: conv.tickets.map((t) => t.id),
+      circleId: deriveCircleId(conv.representative),
+      clientName,
+      clientKey: supportClientMergeKey(clientName),
+      primaryTech: conv.primaryTech,
+      distinctClientDays: cAgg.clientDays.size,
+      totalMessages: cAgg.totalMessages,
+      clientMsgs: cAgg.clientMsgs,
+      staffMsgs: cAgg.staffMsgs,
+      peakDayKey: cAgg.peakDayKey,
+      peakDayLabel: toDayLabel(cAgg.peakDayKey),
+      peakDayMessages: cAgg.peakDayMessages,
+      isPingPong: cAgg.isPingPong,
+      estStaffMinutes: Math.round(convBurstMin),
+      moduleCounts: { ...cAgg.moduleCounts },
+      primaryModuleKey,
+      lastRootCause: combinedEntries[0] || null,
+      lastMessageAt: new Date(cAgg.lastMsgMs).toISOString(),
+    });
+  }
+
+  convMetrics.sort(
+    (a, b) =>
+      b.peakDayMessages - a.peakDayMessages ||
+      b.totalMessages - a.totalMessages,
+  );
+
   return {
     summary: {
       daysRange,
@@ -1042,6 +1363,7 @@ export function computeSupportWhatsAppPulse(input: {
     },
     dailySeries,
     pingPongAlerts,
+    convMetrics,
     techChatMetrics,
     primaryTechByTicketId,
     rootCauseQueue: {
@@ -1049,6 +1371,649 @@ export function computeSupportWhatsAppPulse(input: {
       pendingForDev,
       resolvedByDevCount,
       totalTagged,
+    },
+  };
+}
+
+export interface ExecutiveTicketRecordInput<T = any> {
+  id: string;
+  source: 'ticket' | 'task';
+  rawTicket?: T;
+  title: string;
+  description?: string | null;
+  clientName: string;
+  isInternalSystemTask: boolean;
+  techName: string;
+  status: 'open' | 'pending' | 'resolved' | 'closed';
+  ticketCategoryCode: string;
+  ticketCategoryColor?: string;
+  workBucket: 'text_reply' | 'implementation' | 'troubleshooting' | 'development';
+  workBucketLabel?: string;
+  reportedHours: number;
+  expectedAiHours: number;
+  diffAiHours?: number;
+  aiTimeStatus: 'missing_time' | 'inflated' | 'fair' | 'fast';
+  solution?: string;
+  isRepeatForSameClient: boolean;
+  createdAt: string;
+  resolvedAt?: string | null;
+  isWhatsapp?: boolean;
+}
+
+export interface ExecutiveTechSummary {
+  techName: string;
+  buildHours: number;
+  ticketReactiveHours: number;
+  unloggedChatHours: number;
+  totalReactiveHours: number;
+  totalHours: number;
+  buildPct: number;
+  reactivePct: number;
+  openTickets: number;
+  closedTickets: number;
+  totalTickets: number;
+  waMessages: number;
+  waClients: number;
+  pingPongCount: number;
+  returningClientsCount: number;
+  inflatedCount: number;
+}
+
+export interface ErrorModuleHotspot {
+  moduleKey: SupportErrorModuleKey;
+  label: string;
+  shortLabel: string;
+  barColor: string;
+  badgeClass: string;
+  clientCount: number;
+  clientNames: string[];
+  messageCount: number;
+  ticketCount: number;
+  reactiveHours: number;
+}
+
+export type UnifiedClientHealthStatus = 'critical' | 'watch' | 'stable';
+
+export interface UnifiedClientHealthRow<T = any> {
+  clientKey: string;
+  clientName: string;
+  health: UnifiedClientHealthStatus;
+  healthLabel: string;
+  healthReason: string;
+  distinctDaysReported: number;
+  peakDayMessages: number;
+  peakDayLabel: string;
+  isPingPong: boolean;
+  waMessages: number;
+  waClientMsgs: number;
+  waStaffMsgs: number;
+  waEstHours: number;
+  ticketCount: number;
+  openTickets: number;
+  ticketReactiveHours: number;
+  unloggedChatHours: number;
+  totalReactiveHours: number;
+  buildHours: number;
+  primaryTech: string;
+  primaryModuleKey: SupportErrorModuleKey;
+  primaryModuleLabel: string;
+  circleId: string | null;
+  latestRootCause: SupportRootCauseEntry | null;
+  lastActivityAt: string;
+  records: ExecutiveTicketRecordInput<T>[];
+}
+
+export interface ExecutiveSupportOverview<T = any> {
+  totals: {
+    buildHours: number;
+    ticketReactiveHours: number;
+    unloggedChatHours: number;
+    totalReactiveHours: number;
+    totalHours: number;
+    buildPct: number;
+    reactivePct: number;
+    targetBuildPct: number;
+    targetReactivePct: number;
+    verdictTone: 'good' | 'warn' | 'critical' | 'neutral';
+    verdictTitle: string;
+    verdictDetail: string;
+    returningClientsCount: number;
+    activeClientsCount: number;
+    returningPct: number;
+    openTicketsCount: number;
+  };
+  techSummaries: ExecutiveTechSummary[];
+  moduleHotspots: ErrorModuleHotspot[];
+  unifiedClients: UnifiedClientHealthRow<T>[];
+  internalDev: {
+    count: number;
+    totalHours: number;
+    records: ExecutiveTicketRecordInput<T>[];
+  };
+}
+
+export function buildExecutiveSupportOverview<T = any>(input: {
+  pulse: SupportPulseResult;
+  records: ExecutiveTicketRecordInput<T>[];
+  techFilter?: string;
+  targetBuildPct?: number;
+  targetReactivePct?: number;
+}): ExecutiveSupportOverview<T> {
+  const activeTech =
+    input.techFilter && input.techFilter !== 'all' ? input.techFilter : null;
+  const targetBuildPct = input.targetBuildPct ?? 80;
+  const targetReactivePct = input.targetReactivePct ?? 5;
+
+  const computeScopeMetrics = (
+    scopedRecords: ExecutiveTicketRecordInput<T>[],
+    scopedConvs: ConvPulseSummary[],
+  ) => {
+    const buildHours = +scopedRecords
+      .filter(
+        (r) =>
+          r.workBucket === 'development' || r.workBucket === 'implementation',
+      )
+      .reduce((acc, r) => acc + r.reportedHours, 0)
+      .toFixed(1);
+
+    const reactiveRecords = scopedRecords.filter(
+      (r) => r.workBucket === 'troubleshooting' || r.workBucket === 'text_reply',
+    );
+    const ticketReactiveHours = +reactiveRecords
+      .reduce((acc, r) => acc + r.reportedHours, 0)
+      .toFixed(1);
+
+    const waLoggedByClient = new Map<string, number>();
+    for (const r of reactiveRecords) {
+      if (!r.isWhatsapp) continue;
+      const ck = supportClientMergeKey(r.clientName);
+      waLoggedByClient.set(ck, (waLoggedByClient.get(ck) || 0) + r.reportedHours);
+    }
+
+    const waEstByClient = new Map<string, number>();
+    for (const c of scopedConvs) {
+      waEstByClient.set(
+        c.clientKey,
+        (waEstByClient.get(c.clientKey) || 0) + c.estStaffMinutes / 60,
+      );
+    }
+
+    let unloggedChatHours = 0;
+    for (const [ck, waHrs] of waEstByClient.entries()) {
+      const loggedHrs = waLoggedByClient.get(ck) || 0;
+      unloggedChatHours += Math.max(0, +(waHrs - loggedHrs).toFixed(1));
+    }
+    unloggedChatHours = +unloggedChatHours.toFixed(1);
+
+    const totalReactiveHours = +(ticketReactiveHours + unloggedChatHours).toFixed(1);
+    const totalHours = +(buildHours + totalReactiveHours).toFixed(1);
+    const buildPct =
+      totalHours > 0 ? Math.round((buildHours / totalHours) * 100) : 0;
+    const reactivePct = totalHours > 0 ? 100 - buildPct : 0;
+
+    return {
+      buildHours,
+      ticketReactiveHours,
+      unloggedChatHours,
+      totalReactiveHours,
+      totalHours,
+      buildPct,
+      reactivePct,
+      reactiveRecords,
+    };
+  };
+
+  // Build unified client health list & hotspots for a given scope
+  const buildClientsForScope = (
+    scopedRecords: ExecutiveTicketRecordInput<T>[],
+    scopedConvs: ConvPulseSummary[],
+  ) => {
+    const clientBuckets = new Map<
+      string,
+      {
+        clientName: string;
+        records: ExecutiveTicketRecordInput<T>[];
+        convs: ConvPulseSummary[];
+      }
+    >();
+
+    for (const r of scopedRecords) {
+      if (r.isInternalSystemTask) continue;
+      const cleanName = normalizeSupportClientName(r.clientName);
+      const ck = supportClientMergeKey(cleanName);
+      if (!ck) continue;
+      let bucket = clientBuckets.get(ck);
+      if (!bucket) {
+        bucket = { clientName: cleanName, records: [], convs: [] };
+        clientBuckets.set(ck, bucket);
+      }
+      bucket.records.push(r);
+    }
+
+    for (const c of scopedConvs) {
+      let bucket = clientBuckets.get(c.clientKey);
+      if (!bucket) {
+        bucket = { clientName: c.clientName, records: [], convs: [] };
+        clientBuckets.set(c.clientKey, bucket);
+      }
+      bucket.convs.push(c);
+    }
+
+    const unifiedClients: UnifiedClientHealthRow<T>[] = [];
+
+    for (const [clientKey, b] of clientBuckets.entries()) {
+      const distinctDaysReported = b.convs.reduce(
+        (maxD, c) => Math.max(maxD, c.distinctClientDays),
+        0,
+      );
+      let peakDayMessages = 0;
+      let peakDayLabel = '';
+      let isPingPong = false;
+      let waMessages = 0;
+      let waClientMsgs = 0;
+      let waStaffMsgs = 0;
+      let waEstMinutes = 0;
+      let circleId: string | null = null;
+      let latestRootCause: SupportRootCauseEntry | null = null;
+      let lastActivityMs = 0;
+
+      const techCounts = new Map<string, number>();
+      const modScores: Record<SupportErrorModuleKey, number> = {
+        dte: 0,
+        inventario: 0,
+        reportes: 0,
+        calculos: 0,
+        acceso: 0,
+        general: 0,
+      };
+
+      for (const c of b.convs) {
+        waMessages += c.totalMessages;
+        waClientMsgs += c.clientMsgs;
+        waStaffMsgs += c.staffMsgs;
+        waEstMinutes += c.estStaffMinutes;
+        if (c.isPingPong) isPingPong = true;
+        if (c.peakDayMessages > peakDayMessages) {
+          peakDayMessages = c.peakDayMessages;
+          peakDayLabel = c.peakDayLabel;
+        }
+        if (!circleId && c.circleId) circleId = c.circleId;
+        if (
+          c.lastRootCause &&
+          (!latestRootCause ||
+            Date.parse(c.lastRootCause.at) > Date.parse(latestRootCause.at))
+        ) {
+          latestRootCause = c.lastRootCause;
+        }
+        const lmMs = Date.parse(c.lastMessageAt) || 0;
+        if (lmMs > lastActivityMs) lastActivityMs = lmMs;
+        if (c.primaryTech && c.primaryTech !== 'WhatsApp Soporte') {
+          techCounts.set(
+            c.primaryTech,
+            (techCounts.get(c.primaryTech) || 0) + Math.max(1, c.staffMsgs),
+          );
+        }
+        for (const mk of Object.keys(modScores) as SupportErrorModuleKey[]) {
+          modScores[mk] += c.moduleCounts[mk] || 0;
+        }
+      }
+
+      let openTickets = 0;
+      let repeatTicketCount = 0;
+      let ticketReactiveHours = 0;
+      let waLoggedReactiveHours = 0;
+      let buildHours = 0;
+
+      for (const r of b.records) {
+        if (r.status !== 'resolved' && r.status !== 'closed') openTickets += 1;
+        if (r.isRepeatForSameClient) repeatTicketCount += 1;
+        const isBuild =
+          r.workBucket === 'development' || r.workBucket === 'implementation';
+        if (isBuild) {
+          buildHours += r.reportedHours;
+        } else {
+          ticketReactiveHours += r.reportedHours;
+          if (r.isWhatsapp) waLoggedReactiveHours += r.reportedHours;
+          const rMod =
+            detectSupportErrorModule(`${r.title} ${r.description || ''}`) ||
+            'general';
+          modScores[rMod] += 2;
+        }
+        if (r.techName && r.techName !== 'Sin asignar') {
+          techCounts.set(r.techName, (techCounts.get(r.techName) || 0) + 2);
+        }
+        const rMs = Date.parse(r.createdAt) || 0;
+        if (rMs > lastActivityMs) lastActivityMs = rMs;
+      }
+
+      const waEstHours = +(waEstMinutes / 60).toFixed(1);
+      ticketReactiveHours = +ticketReactiveHours.toFixed(1);
+      buildHours = +buildHours.toFixed(1);
+      const unloggedChatHours = Math.max(
+        0,
+        +(waEstHours - waLoggedReactiveHours).toFixed(1),
+      );
+      const totalReactiveHours = +(
+        ticketReactiveHours + unloggedChatHours
+      ).toFixed(1);
+
+      let primaryTech = b.convs[0]?.primaryTech || 'Sin asignar';
+      let bestTechScore = -1;
+      for (const [tName, sc] of techCounts.entries()) {
+        if (sc > bestTechScore) {
+          bestTechScore = sc;
+          primaryTech = tName;
+        }
+      }
+
+      let primaryModuleKey: SupportErrorModuleKey = 'general';
+      let bestModScore = 0;
+      for (const mk of [
+        'dte',
+        'inventario',
+        'reportes',
+        'calculos',
+        'acceso',
+      ] as SupportErrorModuleKey[]) {
+        if (modScores[mk] > bestModScore) {
+          bestModScore = modScores[mk];
+          primaryModuleKey = mk;
+        }
+      }
+      if (bestModScore === 0 && b.convs[0]?.primaryModuleKey) {
+        primaryModuleKey = b.convs[0].primaryModuleKey;
+      }
+
+      let health: UnifiedClientHealthStatus = 'stable';
+      let healthLabel = 'Estable';
+      let healthReason = 'Sin regresos ni chat excesivo';
+
+      if (distinctDaysReported >= 2 || isPingPong || repeatTicketCount >= 1) {
+        health = 'critical';
+        healthLabel = 'Reincidente';
+        const parts: string[] = [];
+        if (distinctDaysReported >= 2)
+          parts.push(`Volvió ${distinctDaysReported} días`);
+        if (isPingPong)
+          parts.push(`Pico ${peakDayMessages} msgs (${peakDayLabel})`);
+        if (repeatTicketCount >= 1)
+          parts.push(`${repeatTicketCount} ticket(s) repetido(s)`);
+        healthReason = parts.join(' · ');
+      } else if (openTickets > 0 || totalReactiveHours > 0 || waMessages > 0) {
+        health = 'watch';
+        healthLabel = openTickets > 0 ? 'Con caso abierto' : 'Atención';
+        healthReason =
+          openTickets > 0
+            ? `${openTickets} caso(s) sin cerrar`
+            : `${waMessages} msgs · ${totalReactiveHours}h soporte`;
+      }
+
+      unifiedClients.push({
+        clientKey,
+        clientName: b.clientName,
+        health,
+        healthLabel,
+        healthReason,
+        distinctDaysReported,
+        peakDayMessages,
+        peakDayLabel,
+        isPingPong,
+        waMessages,
+        waClientMsgs,
+        waStaffMsgs,
+        waEstHours,
+        ticketCount: b.records.length,
+        openTickets,
+        ticketReactiveHours,
+        unloggedChatHours,
+        totalReactiveHours,
+        buildHours,
+        primaryTech,
+        primaryModuleKey,
+        primaryModuleLabel: SUPPORT_ERROR_MODULES[primaryModuleKey].shortLabel,
+        circleId,
+        latestRootCause,
+        lastActivityAt: lastActivityMs
+          ? new Date(lastActivityMs).toISOString()
+          : '',
+        records: [...b.records].sort(
+          (a, b2) => Date.parse(b2.createdAt) - Date.parse(a.createdAt),
+        ),
+      });
+    }
+
+    const healthRank: Record<UnifiedClientHealthStatus, number> = {
+      critical: 0,
+      watch: 1,
+      stable: 2,
+    };
+    unifiedClients.sort(
+      (a, b) =>
+        healthRank[a.health] - healthRank[b.health] ||
+        (b.isPingPong ? 1 : 0) - (a.isPingPong ? 1 : 0) ||
+        b.distinctDaysReported - a.distinctDaysReported ||
+        b.totalReactiveHours - a.totalReactiveHours ||
+        b.waMessages - a.waMessages,
+    );
+
+    return unifiedClients;
+  };
+
+  // Scope filtered by activeTech for main view
+  const scopedRecords = activeTech
+    ? input.records.filter((r) => r.techName === activeTech)
+    : input.records;
+  const scopedConvs = activeTech
+    ? input.pulse.convMetrics.filter((c) => c.primaryTech === activeTech)
+    : input.pulse.convMetrics;
+
+  const scopeSplit = computeScopeMetrics(scopedRecords, scopedConvs);
+  const unifiedClients = buildClientsForScope(scopedRecords, scopedConvs);
+
+  // Module hotspots across filtered scope
+  const hotspotMap = new Map<
+    SupportErrorModuleKey,
+    {
+      clients: Map<string, string>;
+      messageCount: number;
+      ticketCount: number;
+      reactiveHours: number;
+    }
+  >();
+  for (const mk of Object.keys(SUPPORT_ERROR_MODULES) as SupportErrorModuleKey[]) {
+    hotspotMap.set(mk, {
+      clients: new Map<string, string>(),
+      messageCount: 0,
+      ticketCount: 0,
+      reactiveHours: 0,
+    });
+  }
+
+  for (const r of scopeSplit.reactiveRecords) {
+    if (r.isInternalSystemTask) continue;
+    const mk =
+      detectSupportErrorModule(`${r.title} ${r.description || ''}`) || 'general';
+    const entry = hotspotMap.get(mk)!;
+    const cleanName = normalizeSupportClientName(r.clientName);
+    entry.clients.set(supportClientMergeKey(cleanName), cleanName);
+    entry.ticketCount += 1;
+    entry.reactiveHours += r.reportedHours;
+  }
+
+  // Attribute unlogged chat hours + WA client messages to hotspots without double counting
+  const waLoggedReactiveByConvClient = new Map<string, number>();
+  for (const r of scopeSplit.reactiveRecords) {
+    if (!r.isWhatsapp) continue;
+    const ck = supportClientMergeKey(r.clientName);
+    waLoggedReactiveByConvClient.set(
+      ck,
+      (waLoggedReactiveByConvClient.get(ck) || 0) + r.reportedHours,
+    );
+  }
+  const seenUnloggedClient = new Set<string>();
+  for (const c of scopedConvs) {
+    let anyModAdded = false;
+    for (const mk of Object.keys(SUPPORT_ERROR_MODULES) as SupportErrorModuleKey[]) {
+      const cnt = c.moduleCounts[mk] || 0;
+      if (cnt > 0) {
+        const entry = hotspotMap.get(mk)!;
+        entry.clients.set(c.clientKey, c.clientName);
+        entry.messageCount += cnt;
+        anyModAdded = true;
+      }
+    }
+    if (!anyModAdded && c.clientMsgs > 0) {
+      const entry = hotspotMap.get(c.primaryModuleKey)!;
+      entry.clients.set(c.clientKey, c.clientName);
+      entry.messageCount += c.clientMsgs;
+    }
+
+    if (!seenUnloggedClient.has(c.clientKey)) {
+      seenUnloggedClient.add(c.clientKey);
+      const waTotalHrs = scopedConvs
+        .filter((x) => x.clientKey === c.clientKey)
+        .reduce((acc, x) => acc + x.estStaffMinutes / 60, 0);
+      const unlogged = Math.max(
+        0,
+        waTotalHrs - (waLoggedReactiveByConvClient.get(c.clientKey) || 0),
+      );
+      if (unlogged > 0) {
+        hotspotMap.get(c.primaryModuleKey)!.reactiveHours += unlogged;
+      }
+    }
+  }
+
+  const moduleHotspots: ErrorModuleHotspot[] = [];
+  for (const [mk, h] of hotspotMap.entries()) {
+    if (h.clients.size === 0 && h.ticketCount === 0 && h.messageCount === 0) {
+      continue;
+    }
+    const meta = SUPPORT_ERROR_MODULES[mk];
+    moduleHotspots.push({
+      moduleKey: mk,
+      label: meta.label,
+      shortLabel: meta.shortLabel,
+      barColor: meta.barColor,
+      badgeClass: meta.badgeClass,
+      clientCount: h.clients.size,
+      clientNames: Array.from(h.clients.values()),
+      messageCount: h.messageCount,
+      ticketCount: h.ticketCount,
+      reactiveHours: +h.reactiveHours.toFixed(1),
+    });
+  }
+  moduleHotspots.sort(
+    (a, b) =>
+      b.clientCount - a.clientCount ||
+      b.reactiveHours - a.reactiveHours ||
+      b.messageCount - a.messageCount,
+  );
+
+  // Per-technician summaries ALWAYS across full team data
+  const techSummaries: ExecutiveTechSummary[] = [
+    'Melvin Rodriguez',
+    'Gerson Gutierrez',
+  ].map((techName) => {
+    const tRecs = input.records.filter((r) => r.techName === techName);
+    const tConvs = input.pulse.convMetrics.filter(
+      (c) => c.primaryTech === techName,
+    );
+    const split = computeScopeMetrics(tRecs, tConvs);
+    const tClients = buildClientsForScope(tRecs, tConvs);
+    const waStats = input.pulse.techChatMetrics[techName];
+
+    return {
+      techName,
+      buildHours: split.buildHours,
+      ticketReactiveHours: split.ticketReactiveHours,
+      unloggedChatHours: split.unloggedChatHours,
+      totalReactiveHours: split.totalReactiveHours,
+      totalHours: split.totalHours,
+      buildPct: split.buildPct,
+      reactivePct: split.reactivePct,
+      openTickets: tRecs.filter(
+        (r) => r.status !== 'resolved' && r.status !== 'closed',
+      ).length,
+      closedTickets: tRecs.filter(
+        (r) => r.status === 'resolved' || r.status === 'closed',
+      ).length,
+      totalTickets: tRecs.length,
+      waMessages: waStats?.staffMessages || 0,
+      waClients: waStats?.uniqueClientsHelped || 0,
+      pingPongCount: tConvs.filter((c) => c.isPingPong).length,
+      returningClientsCount: tClients.filter((c) => c.health === 'critical')
+        .length,
+      inflatedCount: tRecs.filter((r) => r.aiTimeStatus === 'inflated').length,
+    };
+  });
+
+  const activeClientsCount = unifiedClients.length;
+  const returningClientsCount = unifiedClients.filter(
+    (c) => c.health === 'critical',
+  ).length;
+  const returningPct =
+    activeClientsCount > 0
+      ? Math.round((returningClientsCount / activeClientsCount) * 100)
+      : 0;
+
+  const topHotspot = moduleHotspots[0];
+  let verdictTone: ExecutiveSupportOverview['totals']['verdictTone'] = 'neutral';
+  let verdictTitle = 'Sin actividad registrada en este período.';
+  let verdictDetail = 'Cambia el rango de días para ver métricas.';
+
+  if (scopeSplit.totalHours > 0) {
+    if (scopeSplit.buildPct >= targetBuildPct) {
+      verdictTone = 'good';
+      verdictTitle = `En meta: ${scopeSplit.buildPct}% en Mejoras y ${scopeSplit.reactivePct}% en errores`;
+      verdictDetail = `El equipo dedicó ${scopeSplit.buildHours}h a construir/mejorar vs ${scopeSplit.totalReactiveHours}h en soporte y chats.`;
+    } else if (scopeSplit.buildPct >= 60) {
+      verdictTone = 'warn';
+      verdictTitle = `Atención: ${scopeSplit.reactivePct}% del tiempo se va en errores y chats (${scopeSplit.totalReactiveHours}h)`;
+      verdictDetail = topHotspot
+        ? `Mayor foco de fallas: ${topHotspot.label} (${topHotspot.clientCount} clientes). Meta recomendada: ≤${targetReactivePct}% errores.`
+        : `Todavía debajo de la meta del ${targetBuildPct}% construyendo producto.`;
+    } else {
+      verdictTone = 'critical';
+      verdictTitle = `Alerta: ${scopeSplit.reactivePct}% del tiempo se pierde apagando fuegos (${scopeSplit.totalReactiveHours}h)`;
+      verdictDetail = topHotspot
+        ? `Solo ${scopeSplit.buildPct}% en mejoras (${scopeSplit.buildHours}h). Resolver de raíz: ${topHotspot.label} (${topHotspot.clientCount} clientes).`
+        : `Solo ${scopeSplit.buildPct}% en mejoras (${scopeSplit.buildHours}h). Hay que frenar regresos post Go-Live.`;
+    }
+  }
+
+  const internalRecords = scopedRecords.filter((r) => r.isInternalSystemTask);
+  const internalHours = +internalRecords
+    .reduce((acc, r) => acc + r.reportedHours, 0)
+    .toFixed(1);
+
+  return {
+    totals: {
+      buildHours: scopeSplit.buildHours,
+      ticketReactiveHours: scopeSplit.ticketReactiveHours,
+      unloggedChatHours: scopeSplit.unloggedChatHours,
+      totalReactiveHours: scopeSplit.totalReactiveHours,
+      totalHours: scopeSplit.totalHours,
+      buildPct: scopeSplit.buildPct,
+      reactivePct: scopeSplit.reactivePct,
+      targetBuildPct,
+      targetReactivePct,
+      verdictTone,
+      verdictTitle,
+      verdictDetail,
+      returningClientsCount,
+      activeClientsCount,
+      returningPct,
+      openTicketsCount: scopedRecords.filter(
+        (r) => r.status !== 'resolved' && r.status !== 'closed',
+      ).length,
+    },
+    techSummaries,
+    moduleHotspots,
+    unifiedClients,
+    internalDev: {
+      count: internalRecords.length,
+      totalHours: internalHours,
+      records: internalRecords,
     },
   };
 }

@@ -507,3 +507,191 @@ test('9. techFilter excludes conversations handled primarily by another technici
   assert.equal(pulseMelvin.techChatMetrics['Gerson Gutierrez'].pingPongChatsCount, 1);
   assert.equal(pulseMelvin.techChatMetrics['Melvin Rodriguez'].pingPongChatsCount, 1);
 });
+
+test('10. normalizeSupportClientName and supportClientMergeKey unify group names and client names', () => {
+  const { normalizeSupportClientName, supportClientMergeKey } = loaded.supportPulse;
+
+  assert.equal(normalizeSupportClientName('Soporte Técnico Go Party'), 'Go Party');
+  assert.equal(normalizeSupportClientName('GO Party'), 'Go Party');
+  assert.equal(
+    supportClientMergeKey('Soporte Técnico Go Party'),
+    supportClientMergeKey('GO Party'),
+  );
+
+  assert.equal(normalizeSupportClientName('Soporte tecnico Arias - Corp Argoz'), 'Corporación Argoz');
+  assert.equal(
+    supportClientMergeKey('Soporte tecnico Arias - Corp Argoz'),
+    supportClientMergeKey('Corporación Argoz'),
+  );
+
+  assert.equal(normalizeSupportClientName('Soporte Tecnico Medicina Popular'), 'Medicina Popular');
+  assert.equal(
+    supportClientMergeKey('Soporte Tecnico Medicina Popular'),
+    supportClientMergeKey('Medicina Popular'),
+  );
+});
+
+test('11. detectSupportErrorModule classifies technical areas and ignores greetings/thanks', () => {
+  const { detectSupportErrorModule } = loaded.supportPulse;
+
+  assert.equal(detectSupportErrorModule('Error al invalidar CCF en Hacienda MH'), 'dte');
+  assert.equal(detectSupportErrorModule('No descarga del inventario cuando facturamos'), 'inventario');
+  assert.equal(detectSupportErrorModule('No puedo imprimir el reporte en PDF'), 'reportes');
+  assert.equal(detectSupportErrorModule('El calculo de retencion de IVA no cuadra'), 'calculos');
+  assert.equal(detectSupportErrorModule('Se queda cargando la pantalla y sin acceso'), 'acceso');
+
+  assert.equal(detectSupportErrorModule('Buenos días equipo!'), null);
+  assert.equal(detectSupportErrorModule('Muchas gracias'), null);
+  assert.equal(detectSupportErrorModule('Ok'), null);
+});
+
+test('12. buildExecutiveSupportOverview prevents double counting and computes honest build vs reactive pct', () => {
+  const { computeSupportWhatsAppPulse, buildExecutiveSupportOverview } = loaded.supportPulse;
+  const nowMs = Date.parse('2026-11-20T20:00:00.000Z');
+
+  const tickets = [
+    {
+      id: 't-goparty-wa',
+      lead_name: 'Soporte Técnico Go Party',
+      status: 'open',
+      metadata: { source: 'whatsapp_evolution', whatsapp_jid: 'goparty@g.us' },
+    },
+    {
+      id: 't-dev-1',
+      lead_name: null,
+      status: 'resolved',
+      metadata: {},
+    },
+  ];
+  const profiles = [{ id: 'u-melvin', full_name: 'Melvin Rodriguez' }];
+
+  // 40 min gap? No, let's produce ~30 min = 0.5h WA chat burst: 14:00 -> 14:27.5 with <=10m steps (base 2.5 + 10 + 10 + 7.5 = 30m = 0.5h)
+  const comments = [
+    { id: 'c1', ticket_id: 't-goparty-wa', author_id: null, body: 'Error DTE al firmar factura', created_at: '2026-11-20T14:00:00.000Z' },
+    { id: 'c2', ticket_id: 't-goparty-wa', author_id: 'u-melvin', body: 'Revisando DTE', created_at: '2026-11-20T14:02:00.000Z' },
+    { id: 'c3', ticket_id: 't-goparty-wa', author_id: 'u-melvin', body: 'Prueba', created_at: '2026-11-20T14:12:00.000Z' },
+    { id: 'c4', ticket_id: 't-goparty-wa', author_id: 'u-melvin', body: 'Otra prueba', created_at: '2026-11-20T14:22:00.000Z' },
+    { id: 'c5', ticket_id: 't-goparty-wa', author_id: 'u-melvin', body: 'Listo', created_at: '2026-11-20T14:29:30.000Z' },
+  ];
+
+  const pulse = computeSupportWhatsAppPulse({
+    tickets,
+    waMessages: [],
+    comments,
+    profiles,
+    options: { daysRange: 7, nowMs },
+  });
+
+  const records = [
+    // Formal ticket logged 0.2h on Go Party WA -> remaining unlogged chat is 0.5 - 0.2 = 0.3h (NOT 0.2 + 0.5 = 0.7h!)
+    {
+      id: 't-goparty-wa',
+      source: 'ticket',
+      title: 'DTE no timbra',
+      description: 'Error al timbrar DTE',
+      clientName: 'GO Party',
+      isInternalSystemTask: false,
+      techName: 'Melvin Rodriguez',
+      status: 'open',
+      ticketCategoryCode: 'P1',
+      workBucket: 'troubleshooting',
+      reportedHours: 0.2,
+      expectedAiHours: 0.8,
+      aiTimeStatus: 'fast',
+      isRepeatForSameClient: false,
+      createdAt: '2026-11-20T14:00:00.000Z',
+      resolvedAt: null,
+      isWhatsapp: true,
+    },
+    // Internal P4 build work = 2.0h
+    {
+      id: 't-dev-1',
+      source: 'ticket',
+      title: 'P4: Nuevo módulo PDF',
+      description: 'Mejora de reportes',
+      clientName: 'Tareas Internas de Desarrollo (P4 / Sin cliente)',
+      isInternalSystemTask: true,
+      techName: 'Melvin Rodriguez',
+      status: 'resolved',
+      ticketCategoryCode: 'P4',
+      workBucket: 'development',
+      reportedHours: 2.0,
+      expectedAiHours: 2.0,
+      aiTimeStatus: 'fair',
+      isRepeatForSameClient: false,
+      createdAt: '2026-11-20T12:00:00.000Z',
+      resolvedAt: '2026-11-20T13:00:00.000Z',
+      isWhatsapp: false,
+    },
+  ];
+
+  const overview = buildExecutiveSupportOverview({ pulse, records, techFilter: 'all' });
+
+  // Go Party WA + GO Party ticket merged into 1 single client row
+  assert.equal(overview.unifiedClients.length, 1);
+  assert.equal(overview.unifiedClients[0].clientName, 'Go Party');
+  assert.equal(overview.totals.buildHours, 2.0);
+  assert.equal(overview.totals.ticketReactiveHours, 0.2);
+  assert.equal(overview.totals.unloggedChatHours, 0.3);
+  assert.equal(overview.totals.totalReactiveHours, 0.5); // no double count!
+  assert.equal(overview.totals.buildPct, 80); // 2.0 / 2.5 = 80%
+  assert.equal(overview.totals.verdictTone, 'good');
+  assert.equal(overview.moduleHotspots[0].moduleKey, 'dte');
+});
+
+test('13. Multi-day WhatsApp return flags client Reincidente even with 1 ticket, and respects techFilter', () => {
+  const { computeSupportWhatsAppPulse, buildExecutiveSupportOverview } = loaded.supportPulse;
+  const nowMs = Date.parse('2026-11-20T22:00:00.000Z');
+
+  const tickets = [
+    {
+      id: 't-lumen',
+      lead_name: 'Lumen 2000',
+      status: 'open',
+      metadata: { source: 'whatsapp_evolution', whatsapp_jid: 'lumen@g.us' },
+    },
+    {
+      id: 't-argoz',
+      lead_name: 'Corporación Argoz',
+      status: 'open',
+      metadata: { source: 'whatsapp_evolution', whatsapp_jid: 'argoz@g.us' },
+    },
+  ];
+  const profiles = [
+    { id: 'u-melvin', full_name: 'Melvin Rodriguez' },
+    { id: 'u-gerson', full_name: 'Gerson Gutierrez' },
+  ];
+
+  // Lumen client returned on 3 different days, attended by Melvin
+  const comments = [
+    { id: 'l1', ticket_id: 't-lumen', author_id: null, body: 'Error inventario dia 1', created_at: '2026-11-18T16:00:00.000Z' },
+    { id: 'l2', ticket_id: 't-lumen', author_id: 'u-melvin', body: 'Ya vi', created_at: '2026-11-18T16:05:00.000Z' },
+    { id: 'l3', ticket_id: 't-lumen', author_id: null, body: 'Volvio a fallar el stock dia 2', created_at: '2026-11-19T16:00:00.000Z' },
+    { id: 'l4', ticket_id: 't-lumen', author_id: 'u-melvin', body: 'Parche aplicado', created_at: '2026-11-19T16:05:00.000Z' },
+    { id: 'l5', ticket_id: 't-lumen', author_id: null, body: 'Sigue con error bodega hoy', created_at: '2026-11-20T16:00:00.000Z' },
+    // Argoz handled by Gerson
+    { id: 'a1', ticket_id: 't-argoz', author_id: null, body: 'Error PDF', created_at: '2026-11-20T15:00:00.000Z' },
+    { id: 'a2', ticket_id: 't-argoz', author_id: 'u-gerson', body: 'Revisando PDF', created_at: '2026-11-20T15:05:00.000Z' },
+  ];
+
+  const pulseMelvin = computeSupportWhatsAppPulse({
+    tickets,
+    waMessages: [],
+    comments,
+    profiles,
+    options: { daysRange: 7, nowMs, techFilter: 'Melvin Rodriguez' },
+  });
+
+  const overviewMelvin = buildExecutiveSupportOverview({
+    pulse: pulseMelvin,
+    records: [],
+    techFilter: 'Melvin Rodriguez',
+  });
+
+  // Only Lumen shows for Melvin (Argoz is excluded), and Lumen is marked 'critical' due to 3 distinct return days
+  assert.equal(overviewMelvin.unifiedClients.length, 1);
+  assert.equal(overviewMelvin.unifiedClients[0].clientName, 'Lumen 2000');
+  assert.equal(overviewMelvin.unifiedClients[0].distinctDaysReported, 3);
+  assert.equal(overviewMelvin.unifiedClients[0].health, 'critical');
+  assert.equal(overviewMelvin.totals.returningClientsCount, 1);
+});

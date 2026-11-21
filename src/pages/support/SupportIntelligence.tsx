@@ -9,14 +9,13 @@ import {
   ChevronDown,
   MessageSquare,
   CheckCircle2,
-  Clock,
   AlertTriangle,
-  Sparkles,
   MicOff,
-  Activity,
   Bug,
   BookOpen,
   Flame,
+  Layers,
+  ShieldAlert,
   Ticket as TicketIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -30,21 +29,24 @@ import {
   type TicketLead,
 } from '../../services/tickets';
 import { TicketPanel } from './components/TicketPanel';
-import { isSupportTicket } from '../../lib/whatsappScopes';
+import { isSupportTicket, isWhatsappTicket } from '../../lib/whatsappScopes';
 import {
   computeSupportWhatsAppPulse,
+  buildExecutiveSupportOverview,
+  normalizeSupportClientName,
   SUPPORT_ROOT_CAUSE_META,
   SUPPORT_OPERATING_RULES,
   SUPPORT_OPERATING_RULES_COPY_TEXT,
   markRootCauseDevResolvedPatch,
   type SupportPulseResult,
-  type SupportRootCauseType,
+  type SupportErrorModuleKey,
   type PulseWaMessageInput,
   type PulseCommentInput,
   type PulseProfileInput,
 } from './supportPulse';
 
 type WorkBucket = 'text_reply' | 'implementation' | 'troubleshooting' | 'development';
+type HealthFilter = 'all' | 'critical' | 'open' | 'stable';
 
 interface UnifiedSupportRecord {
   id: string;
@@ -60,7 +62,7 @@ interface UnifiedSupportRecord {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   createdAt: string;
   resolvedAt: string | null;
-  ticketCategoryCode: string; // 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'FAQ'
+  ticketCategoryCode: string;
   ticketCategoryName: string;
   ticketCategoryColor: string;
   workBucket: WorkBucket;
@@ -71,98 +73,14 @@ interface UnifiedSupportRecord {
   diffAiHours: number;
   aiTimeStatus: 'missing_time' | 'inflated' | 'fair' | 'fast';
   aiTimeVerdictLabel: string;
-  timeJustification: string;
   categoryKey: string;
   categoryLabel: string;
-  hasVoiceNote: boolean;
   findings: string;
   rootCause: string;
   solution: string;
-  hasResolutionReport: boolean;
-  closedWithoutResolution: boolean;
-  closedWithoutTime: boolean;
   isRepeatForSameClient: boolean;
   repeatSequenceNumber: number;
-}
-
-interface ClientAccordionSummary {
-  clientName: string;
-  isInternalGroup: boolean;
-  totalTickets: number;
-  openTickets: number;
-  resolvedTickets: number;
-  repeatReturnsCount: number;
-  firstTimeRightPct: number;
-  totalReportedHours: number;
-  totalExpectedAiHours: number;
-  totalDiffAiHours: number;
-  inflatedCount: number;
-  missingTimeCount: number;
-  textReplyHours: number;
-  implementationHours: number;
-  troubleshootingHours: number;
-  developmentHours: number;
-  categoryPills: { code: string; count: number; color: string }[];
-  techSummaryText: string;
-  records: UnifiedSupportRecord[];
-}
-
-interface TechExecutiveCard {
-  techName: string;
-  totalTickets: number;
-  openTickets: number;
-  resolvedTickets: number;
-  textReplyHours: number;
-  textReplyCount: number;
-  implementationHours: number;
-  implementationCount: number;
-  troubleshootingHours: number;
-  troubleshootingCount: number;
-  developmentHours: number;
-  developmentCount: number;
-  firstTimeRightPct: number;
-  clientReturnedCount: number;
-  totalReportedHours: number;
-  totalExpectedAiHours: number;
-  totalDiffAiHours: number;
-  inflatedTicketsCount: number;
-  missingTimeClosedCount: number;
-}
-
-function normalizeClientDisplayName(raw: string): string {
-  const clean = raw.replace(/\s+/g, ' ').trim();
-  if (!clean) return '';
-  const lower = clean.toLowerCase();
-
-  if (/arg[oó]z|argos/i.test(lower)) return 'Corporación Argoz';
-  if (/cartopaq|cartopack/i.test(lower)) return 'Cartopaq';
-  if (/don\s+carret[oó]n/i.test(lower)) return 'Don Carretón';
-  if (/la\s+econ[oó]mica/i.test(lower)) return 'La Económica';
-  if (/medicina\s+popular/i.test(lower)) return 'Medicina Popular';
-  if (/conta\s*ohs/i.test(lower)) return 'Conta OHS';
-  if (/salinera\s+san\s+jorge/i.test(lower)) return 'Salinera San Jorge';
-  if (/moda\s+[ií]ntima/i.test(lower)) return 'Moda Íntima';
-  if (/udp\s+volea/i.test(lower)) return 'UDP Volea';
-  if (/marisela\s+lino/i.test(lower)) return 'Marisela Lino';
-  if (/labelimend/i.test(lower)) return 'Labelimend';
-  if (/wilfredo\s+valiente/i.test(lower)) return 'Wilfredo Valiente';
-  if (/gaco\s+y\s+jeco/i.test(lower)) return 'Gaco y Jeco';
-  if (/transportes\s+rivera/i.test(lower)) return 'Transportes Rivera';
-  if (/corpo\s+auto/i.test(lower)) return 'Corpo Auto';
-  if (/texaco\s+el\s+triunfo|gasolinera\s+el\s+triunfo/i.test(lower)) return 'Texaco El Triunfo';
-  if (/multiservicios\s+integrales/i.test(lower)) return 'Multiservicios Integrales';
-  if (/inversiones\s+diversas\s+del\s+mar/i.test(lower)) return 'Inversiones Diversas del Mar';
-  if (/comercial\s+mendez/i.test(lower)) return 'Comercial Méndez';
-  if (/prisma\s+hielo/i.test(lower)) return 'Prisma Hielo';
-  if (/panader[ií]a\s+santa\s+eduviges/i.test(lower)) return 'Panadería Santa Eduviges';
-  if (/erp\s*-\s*gasolineras/i.test(lower)) return 'ERP - Gasolineras';
-  if (/inmalux/i.test(lower)) return 'Inmalux';
-  if (/facturaci[oó]n\s+clientes\s+varios/i.test(lower)) return 'Facturación Clientes Varios';
-
-  return clean
-    .split(' ')
-    .map((w) => (w.length > 2 ? w.charAt(0).toUpperCase() + w.slice(1) : w))
-    .join(' ');
+  isWhatsapp: boolean;
 }
 
 function inferClientAndScope(
@@ -171,7 +89,7 @@ function inferClientAndScope(
   title?: string,
   description?: string,
   categoryCode?: string,
-  knownLeads: string[] = []
+  knownLeads: string[] = [],
 ): { clientName: string; isInternalSystemTask: boolean } {
   const combined = `${title || ''} ${description || ''} ${projectName || ''} ${leadName || ''}`;
 
@@ -181,26 +99,26 @@ function inferClientAndScope(
 
   if (leadName && leadName.trim().length > 1 && !/general|interno|sin cliente/i.test(leadName)) {
     return {
-      clientName: normalizeClientDisplayName(leadName.replace(/\(\+\d+\)/g, '').trim()),
+      clientName: normalizeSupportClientName(leadName),
       isInternalSystemTask: false,
     };
   }
 
   if (title) {
     const colonPrefixMatch = title.match(
-      /^(?:soporte\s+t[eé]cnico|error\s+reportado|capacitaci[oó]n(?:\s+presencial|\s+virtual)?|pregunta\s+frecuente|implementaci[oó]n|go\s*live|solicitud(?:\s+de\s+cliente)?|configuraci[oó]n|migraci[oó]n|revisi[oó]n|dte|facturaci[oó]n)\s*:\s*([^-\n(|]+)/i
+      /^(?:soporte\s+t[eé]cnico|error\s+reportado|capacitaci[oó]n(?:\s+presencial|\s+virtual)?|pregunta\s+frecuente|implementaci[oó]n|go\s*live|solicitud(?:\s+de\s+cliente)?|configuraci[oó]n|migraci[oó]n|revisi[oó]n|dte|facturaci[oó]n)\s*:\s*([^-\n(|]+)/i,
     );
-    if (colonPrefixMatch && colonPrefixMatch[1]) {
+    if (colonPrefixMatch?.[1]) {
       const extracted = colonPrefixMatch[1].trim();
       if (extracted.length >= 2 && !/^(general|interno|sistema|error|prueba)$/i.test(extracted)) {
-        return { clientName: normalizeClientDisplayName(extracted), isInternalSystemTask: false };
+        return { clientName: normalizeSupportClientName(extracted), isInternalSystemTask: false };
       }
     }
 
-    const waMatch = title.match(/\[WhatsApp[^\]]*\]\s*([^:(]+?)(?:\s*\(\+\d+\))?\s*:/i);
-    if (waMatch && waMatch[1] && waMatch[1].trim().length > 2) {
+    const waMatch = title.match(/\[WhatsApp[^\]]*\]\s*([^:(]+?)(?:\s*\(\+?\d+\))?\s*:/i);
+    if (waMatch?.[1] && waMatch[1].trim().length > 2) {
       return {
-        clientName: normalizeClientDisplayName(waMatch[1].trim()),
+        clientName: normalizeSupportClientName(waMatch[1]),
         isInternalSystemTask: false,
       };
     }
@@ -212,42 +130,15 @@ function inferClientAndScope(
     !/^(general|interno|soporte|crm|tareas)$/i.test(projectName.trim())
   ) {
     return {
-      clientName: normalizeClientDisplayName(projectName.trim()),
+      clientName: normalizeSupportClientName(projectName),
       isInternalSystemTask: false,
     };
   }
 
   for (const lead of knownLeads) {
     if (lead && lead.length >= 4 && combined.toLowerCase().includes(lead.toLowerCase())) {
-      return { clientName: normalizeClientDisplayName(lead), isInternalSystemTask: false };
+      return { clientName: normalizeSupportClientName(lead), isInternalSystemTask: false };
     }
-  }
-
-  const knownClientRegexes = [
-    /don\s+carret[oó]n/i,
-    /la\s+econ[oó]mica/i,
-    /medicina\s+popular/i,
-    /conta\s*ohs/i,
-    /salinera\s+san\s+jorge/i,
-    /moda\s+[ií]ntima/i,
-    /udp\s+volea/i,
-    /marisela\s+lino/i,
-    /labelimend/i,
-    /wilfredo\s+valiente/i,
-    /gaco\s+y\s+jeco/i,
-    /transportes\s+rivera/i,
-    /corpo\s+auto/i,
-    /texaco\s+el\s+triunfo/i,
-    /multiservicios\s+integrales/i,
-    /inversiones\s+diversas\s+del\s+mar/i,
-    /comercial\s+mendez/i,
-    /prisma\s+hielo/i,
-    /panader[ií]a\s+santa\s+eduviges/i,
-    /inmalux/i,
-  ];
-  for (const rx of knownClientRegexes) {
-    const m = combined.match(rx);
-    if (m) return { clientName: normalizeClientDisplayName(m[0]), isInternalSystemTask: false };
   }
 
   if (categoryCode === 'P5') return { clientName: 'Inmalux', isInternalSystemTask: false };
@@ -261,7 +152,7 @@ function inferClientAndScope(
 function detectCategoryCode(
   categoryName: string,
   title: string,
-  description: string
+  description: string,
 ): { code: string; label: string; color: string } {
   const catLower = (categoryName || '').toLowerCase();
   const text = `${categoryName} ${title} ${description}`.toLowerCase();
@@ -296,7 +187,7 @@ function detectCategoryCode(
 function classifyWorkBucket(
   title: string,
   description: string,
-  categoryCode: string
+  categoryCode: string,
 ): { bucket: WorkBucket; label: string } {
   const text = `${title} ${description}`.toLowerCase();
   if (
@@ -304,24 +195,24 @@ function classifyWorkBucket(
     /^pregunta\s+frecuente/i.test(title) ||
     /consulta|duda|respondiendo\s+texto/i.test(text)
   ) {
-    return { bucket: 'text_reply', label: '💬 Textos / Consultas' };
+    return { bucket: 'text_reply', label: '💬 Consulta' };
   }
   if (
     /^go\s*live|^capacitaci[oó]n|^implementaci[oó]n/i.test(title) ||
     /go\s*live|capacitaci[oó]n|implementaci[oó]n|entrenamiento/i.test(text)
   ) {
-    return { bucket: 'implementation', label: '🚀 Implementación / Go-Live' };
+    return { bucket: 'implementation', label: '🚀 Go-Live' };
   }
   if (categoryCode === 'P4') {
-    return { bucket: 'development', label: '⚙️ Desarrollo P4' };
+    return { bucket: 'development', label: '⚙️ Mejora P4' };
   }
-  return { bucket: 'troubleshooting', label: '🛠️ Solución de Falla' };
+  return { bucket: 'troubleshooting', label: '🛠️ Falla' };
 }
 
-function classifyProblemTopic(title: string, description: string): {
-  categoryKey: string;
-  categoryLabel: string;
-} {
+function classifyProblemTopic(
+  title: string,
+  description: string,
+): { categoryKey: string; categoryLabel: string } {
   const text = `${title} ${description}`.toLowerCase();
   if (/dte|factura|hacienda|mh|invalidaci|ccf|firmador|sello|json/i.test(text)) {
     return { categoryKey: 'dte', categoryLabel: 'Facturación DTE' };
@@ -341,7 +232,6 @@ function classifyProblemTopic(title: string, description: string): {
   return { categoryKey: 'soporte', categoryLabel: 'Soporte Sistema' };
 }
 
-// Normalize technician name so ONLY real support engineers (Melvin, Gerson) or "Sin asignar" appear
 function resolveSupportEngineerName(rawName: string, titleText: string): string {
   const combined = `${rawName} ${titleText}`.toLowerCase();
   if (combined.includes('melvin')) return 'Melvin Rodriguez';
@@ -351,7 +241,11 @@ function resolveSupportEngineerName(rawName: string, titleText: string): string 
 
 async function fetchChunkedSupportRows<T>(
   ticketIds: string[],
-  chunkQueryFactory: (chunkIds: string[], from: number, to: number) => PromiseLike<{ data: T[] | null; error: any }>,
+  chunkQueryFactory: (
+    chunkIds: string[],
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: any }>,
   chunkSize = 60,
   pageSize = 1000,
   maxPagesPerChunk = 3,
@@ -402,15 +296,14 @@ export const SupportIntelligence: React.FC = () => {
   const [showRulesPanel, setShowRulesPanel] = useState<boolean>(false);
   const [resolvingEntryKey, setResolvingEntryKey] = useState<string | null>(null);
 
-  // Clean Single-Row Filters
-  const [activeFilterPill, setActiveFilterPill] = useState<string>('all'); // 'all' | 'P1' | 'P2' | 'P3' | 'FAQ' | 'P4' | 'inflated' | 'repeat' | 'missing_time'
+  // Unified filters
   const [selectedTechFilter, setSelectedTechFilter] = useState<string>('all');
+  const [healthFilter, setHealthFilter] = useState<HealthFilter>('all');
+  const [selectedModuleFilter, setSelectedModuleFilter] = useState<SupportErrorModuleKey | null>(null);
   const [daysRange, setDaysRange] = useState<number>(15);
   const [searchQuery, setSearchQuery] = useState<string>('');
-
-  // Accordion state (Corporación Argoz open by default)
-  const [expandedClientName, setExpandedClientName] = useState<string | null>('Corporación Argoz');
-  const [showInternalTasksAccordion, setShowInternalTasksAccordion] = useState<boolean>(false);
+  const [expandedClientKey, setExpandedClientKey] = useState<string | null>(null);
+  const [showInternalTasks, setShowInternalTasks] = useState<boolean>(false);
 
   useEffect(() => {
     if (activeCompanyId) {
@@ -426,56 +319,48 @@ export const SupportIntelligence: React.FC = () => {
       cutoffDate.setDate(cutoffDate.getDate() - daysRange);
       const cutoffIso = cutoffDate.toISOString();
 
-      const [
-        profsRes,
-        leadsRes,
-        catsRes,
-        ticketsRes,
-        taggedTicketsRes,
-        projectsRes,
-      ] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id, full_name, email, role, avatar_url, phone')
-          .eq('company_id', activeCompanyId),
-        supabase
-          .from('leads')
-          .select('id, name, email, phone')
-          .eq('company_id', activeCompanyId)
-          .limit(400),
-        supabase
-          .from('ticket_categories')
-          .select('*')
-          .eq('company_id', activeCompanyId)
-          .order('name'),
-        supabase
-          .from('tickets')
-          .select('*')
-          .eq('company_id', activeCompanyId)
-          .or('metadata->>wa_scope.is.null,metadata->>wa_scope.eq.soporte')
-          .gte('updated_at', cutoffIso)
-          .order('updated_at', { ascending: false })
-          .limit(1000),
-        supabase
-          .from('tickets')
-          .select('*')
-          .eq('company_id', activeCompanyId)
-          .or('metadata->>wa_scope.is.null,metadata->>wa_scope.eq.soporte')
-          .not('metadata->>wa_root_cause_last', 'is', null)
-          .order('updated_at', { ascending: false })
-          .limit(200),
-        supabase
-          .from('crm_projects')
-          .select('id, name')
-          .eq('company_id', activeCompanyId),
-      ]);
+      const [profsRes, leadsRes, catsRes, ticketsRes, taggedTicketsRes, projectsRes] =
+        await Promise.all([
+          supabase
+            .from('profiles')
+            .select('id, full_name, email, role, avatar_url, phone')
+            .eq('company_id', activeCompanyId),
+          supabase
+            .from('leads')
+            .select('id, name, email, phone')
+            .eq('company_id', activeCompanyId)
+            .limit(400),
+          supabase
+            .from('ticket_categories')
+            .select('*')
+            .eq('company_id', activeCompanyId)
+            .order('name'),
+          supabase
+            .from('tickets')
+            .select('*')
+            .eq('company_id', activeCompanyId)
+            .or('metadata->>wa_scope.is.null,metadata->>wa_scope.eq.soporte')
+            .gte('updated_at', cutoffIso)
+            .order('updated_at', { ascending: false })
+            .limit(1000),
+          supabase
+            .from('tickets')
+            .select('*')
+            .eq('company_id', activeCompanyId)
+            .or('metadata->>wa_scope.is.null,metadata->>wa_scope.eq.soporte')
+            .not('metadata->>wa_root_cause_last', 'is', null)
+            .order('updated_at', { ascending: false })
+            .limit(200),
+          supabase.from('crm_projects').select('id, name').eq('company_id', activeCompanyId),
+        ]);
 
       const profs = (profsRes.data || []) as (CompanyAgent & { phone?: string | null })[];
       const leads = (leadsRes.data || []) as TicketLead[];
       const cats = (catsRes.data || []) as TicketCategory[];
-      // Lead / unclassified WhatsApp chats are sales conversations, not support work.
       const rawTickets = ((ticketsRes.data || []) as Ticket[]).filter((t) => isSupportTicket(t));
-      const taggedTickets = ((taggedTicketsRes.data || []) as Ticket[]).filter((t) => isSupportTicket(t));
+      const taggedTickets = ((taggedTicketsRes.data || []) as Ticket[]).filter((t) =>
+        isSupportTicket(t),
+      );
       const projects = projectsRes.data || [];
 
       const supportTicketIds = Array.from(
@@ -486,7 +371,9 @@ export const SupportIntelligence: React.FC = () => {
         fetchChunkedSupportRows<PulseWaMessageInput>(supportTicketIds, (chunkIds, from, to) =>
           supabase
             .from('whatsapp_messages')
-            .select('id, ticket_id, comment_id, from_me, sender_phone, sender_name, message_ts, message_type, body')
+            .select(
+              'id, ticket_id, comment_id, from_me, sender_phone, sender_name, message_ts, message_type, body',
+            )
             .eq('company_id', activeCompanyId)
             .in('ticket_id', chunkIds)
             .gte('message_ts', cutoffIso)
@@ -540,7 +427,7 @@ export const SupportIntelligence: React.FC = () => {
           .select('*')
           .in(
             'project_id',
-            projects.map((p: any) => p.id)
+            projects.map((p: any) => p.id),
           )
           .gte('created_at', cutoffIso)
           .order('created_at', { ascending: false })
@@ -551,17 +438,14 @@ export const SupportIntelligence: React.FC = () => {
       const unified: UnifiedSupportRecord[] = [];
       const seenIds = new Set<string>();
 
-      // 1. Formal Tickets
       rawTickets.forEach((t: any) => {
         seenIds.add(t.id);
         if (/^\s*jornada\s+(melvin|gerson)/i.test(t.title || '')) return;
 
         const catObj = t.category_id ? categoryMap.get(t.category_id) : undefined;
         const catInfo = detectCategoryCode(catObj?.name || '', t.title || '', t.description || '');
-
         const rawAssigned = (t.assigned_to && profileMap.get(t.assigned_to)) || '';
         const techName = resolveSupportEngineerName(rawAssigned, t.title || '');
-
         const isClosedOrResolved = t.status === 'resolved' || t.status === 'closed';
 
         const { clientName, isInternalSystemTask } = inferClientAndScope(
@@ -570,7 +454,7 @@ export const SupportIntelligence: React.FC = () => {
           t.title || '',
           t.description || '',
           catInfo.code,
-          knownLeadNames
+          knownLeadNames,
         );
 
         const topic = classifyProblemTopic(t.title || '', t.description || '');
@@ -582,20 +466,8 @@ export const SupportIntelligence: React.FC = () => {
           t.description || '',
           catInfo.label,
           Number(t.estimated_hours) || 0,
-          reportedHours
+          reportedHours,
         );
-
-        const meta = t.metadata || {};
-        const findingsStr = String(t.findings || '').trim();
-        const rootCauseStr = String(t.root_cause || '').trim();
-        const solutionStr = String(t.solution || '').trim();
-        const hasResReport =
-          findingsStr.length >= 3 && rootCauseStr.length >= 3 && solutionStr.length >= 3;
-
-        const hasAudio =
-          /\[Audio\s*\/\s*Nota\s+de\s+voz\]|nota\s+de\s+voz|audioMessage/i.test(
-            `${t.title || ''} ${t.description || ''}`
-          ) || Boolean(meta.has_audio);
 
         unified.push({
           id: t.id,
@@ -628,22 +500,17 @@ export const SupportIntelligence: React.FC = () => {
           diffAiHours: aiAudit.differenceHours,
           aiTimeStatus: aiAudit.status,
           aiTimeVerdictLabel: aiAudit.verdictLabel,
-          timeJustification: String(meta.time_justification || ''),
           categoryKey: topic.categoryKey,
           categoryLabel: topic.categoryLabel,
-          hasVoiceNote: hasAudio,
-          findings: findingsStr,
-          rootCause: rootCauseStr,
-          solution: solutionStr,
-          hasResolutionReport: hasResReport,
-          closedWithoutResolution: isClosedOrResolved && !hasResReport,
-          closedWithoutTime: isClosedOrResolved && reportedHours <= 0,
+          findings: String(t.findings || '').trim(),
+          rootCause: String(t.root_cause || '').trim(),
+          solution: String(t.solution || '').trim(),
           isRepeatForSameClient: false,
           repeatSequenceNumber: 1,
+          isWhatsapp: isWhatsappTicket(t),
         });
       });
 
-      // 2. Project Tasks (e.g., lotificaciones ARGOZ, ERP - Gasolineras)
       projectTasks.forEach((ct: any) => {
         if (seenIds.has(ct.id)) return;
         seenIds.add(ct.id);
@@ -660,7 +527,7 @@ export const SupportIntelligence: React.FC = () => {
           ct.title || '',
           ct.description || '',
           catInfo.code,
-          knownLeadNames
+          knownLeadNames,
         );
 
         const topic = classifyProblemTopic(ct.title || '', ct.description || '');
@@ -672,7 +539,7 @@ export const SupportIntelligence: React.FC = () => {
           ct.description || '',
           catInfo.label,
           Number(ct.estimated_hours) || 0,
-          reportedHours
+          reportedHours,
         );
 
         unified.push({
@@ -699,24 +566,19 @@ export const SupportIntelligence: React.FC = () => {
           diffAiHours: aiAudit.differenceHours,
           aiTimeStatus: aiAudit.status,
           aiTimeVerdictLabel: aiAudit.verdictLabel,
-          timeJustification: '',
           categoryKey: topic.categoryKey,
           categoryLabel: topic.categoryLabel,
-          hasVoiceNote: false,
           findings: '',
           rootCause: '',
           solution: ct.description || '',
-          hasResolutionReport: Boolean(ct.description && ct.description.trim().length > 8),
-          closedWithoutResolution: false,
-          closedWithoutTime: isDone && reportedHours <= 0,
           isRepeatForSameClient: false,
           repeatSequenceNumber: 1,
+          isWhatsapp: false,
         });
       });
 
-      // 3. Detect repeats per client
       const sortedChron = [...unified].sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       );
       const clientPatternCounter = new Map<string, number>();
       sortedChron.forEach((r) => {
@@ -737,245 +599,6 @@ export const SupportIntelligence: React.FC = () => {
     }
   };
 
-  // Base records before technician filter (so both Melvin & Gerson comparison cards keep real totals)
-  const recordsBeforeTechFilter = useMemo(() => {
-    return records.filter((r) => {
-      if (activeFilterPill !== 'all') {
-        if (['P1', 'P2', 'P3', 'P4', 'FAQ'].includes(activeFilterPill)) {
-          if (r.ticketCategoryCode !== activeFilterPill) return false;
-        } else if (activeFilterPill === 'inflated' && r.aiTimeStatus !== 'inflated') {
-          return false;
-        } else if (activeFilterPill === 'repeat' && !r.isRepeatForSameClient) {
-          return false;
-        } else if (activeFilterPill === 'missing_time' && r.reportedHours > 0) {
-          return false;
-        }
-      }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          r.clientName.toLowerCase().includes(q) ||
-          r.title.toLowerCase().includes(q) ||
-          r.techName.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [records, activeFilterPill, searchQuery]);
-
-  // Filtered records (including selectedTechFilter)
-  const filteredRecords = useMemo(() => {
-    if (selectedTechFilter === 'all') return recordsBeforeTechFilter;
-    return recordsBeforeTechFilter.filter((r) => r.techName === selectedTechFilter);
-  }, [recordsBeforeTechFilter, selectedTechFilter]);
-
-  // Pill counts
-  const pillCounts = useMemo(() => {
-    const c: Record<string, number> = {
-      all: records.length,
-      P1: 0,
-      P2: 0,
-      P3: 0,
-      FAQ: 0,
-      P4: 0,
-      inflated: 0,
-      repeat: 0,
-    };
-    records.forEach((r) => {
-      c[r.ticketCategoryCode] = (c[r.ticketCategoryCode] || 0) + 1;
-      if (r.aiTimeStatus === 'inflated') c.inflated += 1;
-      if (r.isRepeatForSameClient) c.repeat += 1;
-    });
-    return c;
-  }, [records]);
-
-  // ONLY Melvin Rodriguez & Gerson Gutierrez in the Technician Comparison (Clean, Zero Noise!)
-  const mainTechCards = useMemo<TechExecutiveCard[]>(() => {
-    const targetNames = ['Melvin Rodriguez', 'Gerson Gutierrez'];
-    return targetNames.map((techName) => {
-      const recs = recordsBeforeTechFilter.filter((r) => r.techName === techName);
-      const openTickets = recs.filter((r) => r.status !== 'resolved').length;
-      const resolvedTickets = recs.filter((r) => r.status === 'resolved').length;
-
-      const sumHrs = (arr: UnifiedSupportRecord[]) =>
-        +arr.reduce((acc, x) => acc + x.reportedHours, 0).toFixed(1);
-
-      const textRecs = recs.filter((r) => r.workBucket === 'text_reply');
-      const impRecs = recs.filter((r) => r.workBucket === 'implementation');
-      const trbRecs = recs.filter((r) => r.workBucket === 'troubleshooting');
-      const devRecs = recs.filter((r) => r.workBucket === 'development');
-
-      const clientRecs = recs.filter((r) => !r.isInternalSystemTask);
-      const clientReturnedCount = clientRecs.filter((r) => r.isRepeatForSameClient).length;
-      const firstTimeRightPct =
-        clientRecs.length > 0
-          ? Math.round(((clientRecs.length - clientReturnedCount) / clientRecs.length) * 100)
-          : 100;
-
-      const totalReportedHours = sumHrs(recs);
-      const totalExpectedAiHours = +recs
-        .reduce((acc, x) => acc + x.expectedAiHours, 0)
-        .toFixed(1);
-      const totalDiffAiHours = +(totalReportedHours - totalExpectedAiHours).toFixed(1);
-
-      return {
-        techName,
-        totalTickets: recs.length,
-        openTickets,
-        resolvedTickets,
-        textReplyHours: sumHrs(textRecs),
-        textReplyCount: textRecs.length,
-        implementationHours: sumHrs(impRecs),
-        implementationCount: impRecs.length,
-        troubleshootingHours: sumHrs(trbRecs),
-        troubleshootingCount: trbRecs.length,
-        developmentHours: sumHrs(devRecs),
-        developmentCount: devRecs.length,
-        firstTimeRightPct,
-        clientReturnedCount,
-        totalReportedHours,
-        totalExpectedAiHours,
-        totalDiffAiHours,
-        inflatedTicketsCount: recs.filter((r) => r.aiTimeStatus === 'inflated').length,
-        missingTimeClosedCount: recs.filter((r) => r.closedWithoutTime).length,
-      };
-    });
-  }, [filteredRecords]);
-
-  // Client Accordions
-  const { clientAccordions, internalSystemAccordion } = useMemo(() => {
-    const map = new Map<string, UnifiedSupportRecord[]>();
-    filteredRecords.forEach((r) => {
-      if (!map.has(r.clientName)) map.set(r.clientName, []);
-      map.get(r.clientName)!.push(r);
-    });
-
-    const buildSummary = (
-      clientName: string,
-      recs: UnifiedSupportRecord[]
-    ): ClientAccordionSummary => {
-      const sorted = [...recs].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      const isInternalGroup = recs.every((r) => r.isInternalSystemTask);
-      const openTickets = sorted.filter((r) => r.status !== 'resolved').length;
-      const resolvedTickets = sorted.filter((r) => r.status === 'resolved').length;
-      const repeatReturnsCount = sorted.filter((r) => r.isRepeatForSameClient).length;
-      const firstTimeRightPct =
-        sorted.length > 0
-          ? Math.round(((sorted.length - repeatReturnsCount) / sorted.length) * 100)
-          : 100;
-
-      const sumHrs = (arr: UnifiedSupportRecord[]) =>
-        +arr.reduce((acc, x) => acc + x.reportedHours, 0).toFixed(1);
-
-      const totalReportedHours = sumHrs(sorted);
-      const totalExpectedAiHours = +sorted
-        .reduce((acc, x) => acc + x.expectedAiHours, 0)
-        .toFixed(1);
-      const totalDiffAiHours = +(totalReportedHours - totalExpectedAiHours).toFixed(1);
-
-      const catMap = new Map<string, { code: string; count: number; color: string }>();
-      sorted.forEach((r) => {
-        const cur = catMap.get(r.ticketCategoryCode) || {
-          code: r.ticketCategoryCode,
-          count: 0,
-          color: r.ticketCategoryColor,
-        };
-        cur.count += 1;
-        catMap.set(r.ticketCategoryCode, cur);
-      });
-
-      const techCounts = new Map<string, number>();
-      sorted.forEach((r) => {
-        const shortName = r.techName.split(' ')[0];
-        techCounts.set(shortName, (techCounts.get(shortName) || 0) + 1);
-      });
-      const techSummaryText = Array.from(techCounts.entries())
-        .map(([n, c]) => `${n} (${c})`)
-        .join(', ');
-
-      return {
-        clientName,
-        isInternalGroup,
-        totalTickets: sorted.length,
-        openTickets,
-        resolvedTickets,
-        repeatReturnsCount,
-        firstTimeRightPct,
-        totalReportedHours,
-        totalExpectedAiHours,
-        totalDiffAiHours,
-        inflatedCount: sorted.filter((r) => r.aiTimeStatus === 'inflated').length,
-        missingTimeCount: sorted.filter((r) => r.closedWithoutTime).length,
-        textReplyHours: sumHrs(sorted.filter((r) => r.workBucket === 'text_reply')),
-        implementationHours: sumHrs(sorted.filter((r) => r.workBucket === 'implementation')),
-        troubleshootingHours: sumHrs(sorted.filter((r) => r.workBucket === 'troubleshooting')),
-        developmentHours: sumHrs(sorted.filter((r) => r.workBucket === 'development')),
-        categoryPills: Array.from(catMap.values()).sort((a, b) => b.count - a.count),
-        techSummaryText,
-        records: sorted,
-      };
-    };
-
-    const clients: ClientAccordionSummary[] = [];
-    let internalGroup = null as ClientAccordionSummary | null;
-
-    map.forEach((recs, clientName) => {
-      const summary = buildSummary(clientName, recs);
-      if (summary.isInternalGroup) {
-        internalGroup = summary;
-      } else {
-        clients.push(summary);
-      }
-    });
-
-    clients.sort((a, b) => b.totalTickets - a.totalTickets);
-    return { clientAccordions: clients, internalSystemAccordion: internalGroup };
-  }, [filteredRecords]);
-
-  // Global Minimalist Strip Metrics
-  const kpis = useMemo(() => {
-    const clientOnly = filteredRecords.filter((r) => !r.isInternalSystemTask);
-    const openCount = filteredRecords.filter((r) => r.status !== 'resolved').length;
-    const repeatCount = clientOnly.filter((r) => r.isRepeatForSameClient).length;
-    const firstTimePct =
-      clientOnly.length > 0
-        ? Math.round(((clientOnly.length - repeatCount) / clientOnly.length) * 100)
-        : 100;
-
-    const reported = +filteredRecords.reduce((a, r) => a + r.reportedHours, 0).toFixed(1);
-    const expected = +filteredRecords.reduce((a, r) => a + r.expectedAiHours, 0).toFixed(1);
-    const diff = +(reported - expected).toFixed(1);
-    const inflated = filteredRecords.filter((r) => r.aiTimeStatus === 'inflated').length;
-
-    const textHours = +filteredRecords
-      .filter((r) => r.workBucket === 'text_reply')
-      .reduce((a, r) => a + r.reportedHours, 0)
-      .toFixed(1);
-    const impHours = +filteredRecords
-      .filter((r) => r.workBucket === 'implementation')
-      .reduce((a, r) => a + r.reportedHours, 0)
-      .toFixed(1);
-    const fixHours = +filteredRecords
-      .filter((r) => r.workBucket === 'troubleshooting')
-      .reduce((a, r) => a + r.reportedHours, 0)
-      .toFixed(1);
-
-    return {
-      openCount,
-      repeatCount,
-      firstTimePct,
-      reported,
-      expected,
-      diff,
-      inflated,
-      textHours,
-      impHours,
-      fixHours,
-    };
-  }, [filteredRecords]);
-
   const pulse = useMemo<SupportPulseResult>(() => {
     const mergedMap = new Map<string, Ticket>();
     for (const t of rawTicketsList) mergedMap.set(t.id, t);
@@ -989,9 +612,58 @@ export const SupportIntelligence: React.FC = () => {
       profiles: profilesPulseList,
       options: { daysRange, pingPongThreshold: 12, techFilter: selectedTechFilter },
     });
-  }, [rawTicketsList, rootCauseTicketsList, waMessagesList, waCommentsList, profilesPulseList, daysRange, selectedTechFilter]);
+  }, [
+    rawTicketsList,
+    rootCauseTicketsList,
+    waMessagesList,
+    waCommentsList,
+    profilesPulseList,
+    daysRange,
+    selectedTechFilter,
+  ]);
 
-  const handleMarkDevResolved = async (item: SupportPulseResult['rootCauseQueue']['pendingForDev'][number]) => {
+  const overview = useMemo(
+    () =>
+      buildExecutiveSupportOverview<Ticket>({
+        pulse,
+        records,
+        techFilter: selectedTechFilter,
+      }),
+    [pulse, records, selectedTechFilter],
+  );
+
+  const clientHealthCounts = useMemo(() => {
+    const list = overview.unifiedClients;
+    return {
+      all: list.length,
+      critical: list.filter((c) => c.health === 'critical').length,
+      open: list.filter((c) => c.openTickets > 0).length,
+      stable: list.filter((c) => c.health === 'stable').length,
+    };
+  }, [overview.unifiedClients]);
+
+  const visibleClients = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return overview.unifiedClients.filter((c) => {
+      if (healthFilter === 'critical' && c.health !== 'critical') return false;
+      if (healthFilter === 'open' && c.openTickets <= 0) return false;
+      if (healthFilter === 'stable' && c.health !== 'stable') return false;
+      if (selectedModuleFilter && c.primaryModuleKey !== selectedModuleFilter) return false;
+      if (q) {
+        return (
+          c.clientName.toLowerCase().includes(q) ||
+          c.primaryModuleLabel.toLowerCase().includes(q) ||
+          c.primaryTech.toLowerCase().includes(q) ||
+          c.records.some((r) => r.title.toLowerCase().includes(q))
+        );
+      }
+      return true;
+    });
+  }, [overview.unifiedClients, healthFilter, selectedModuleFilter, searchQuery]);
+
+  const handleMarkDevResolved = async (
+    item: SupportPulseResult['rootCauseQueue']['pendingForDev'][number],
+  ) => {
     const key = `${item.ticketId}:${item.entryId}`;
     setResolvingEntryKey(key);
     try {
@@ -1003,7 +675,9 @@ export const SupportIntelligence: React.FC = () => {
       if (readErr) throw readErr;
 
       const rawUser = String(profile?.full_name || 'Jimmy Arias').trim();
-      const resolverName = /simulaci[oó]n|platform\s*owner/i.test(rawUser) ? 'Jimmy Arias' : rawUser;
+      const resolverName = /simulaci[oó]n|platform\s*owner/i.test(rawUser)
+        ? 'Jimmy Arias'
+        : rawUser;
       const nowIso = new Date().toISOString();
       const nextMeta = markRootCauseDevResolvedPatch(
         (row?.metadata || {}) as Record<string, any>,
@@ -1051,53 +725,84 @@ export const SupportIntelligence: React.FC = () => {
     toast.success('3 Reglas Operativas copiadas para enviar a Melvin');
   };
 
+  const { totals } = overview;
+  const verdictStyles =
+    totals.verdictTone === 'good'
+      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+      : totals.verdictTone === 'warn'
+      ? 'bg-amber-50 border-amber-200 text-amber-950'
+      : totals.verdictTone === 'critical'
+      ? 'bg-rose-50 border-rose-200 text-rose-950'
+      : 'bg-slate-50 border-slate-200 text-slate-800';
+
+  const maxModuleClients = Math.max(1, ...overview.moduleHotspots.map((m) => m.clientCount));
+  const visibleDays = pulse.dailySeries.slice(-14);
+  const maxDayMsgs = Math.max(1, ...visibleDays.map((d) => d.totalMessages));
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16">
-      {/* ── MINIMALIST SINGLE-ROW TOP BAR (56px, Zero Clutter) ── */}
-      <header className="bg-white border-b border-slate-200/80 px-6 py-3.5">
+      {/* ── CLEAN 1-ROW HEADER WITH TOP TECH FILTER ── */}
+      <header className="bg-white border-b border-slate-200/80 px-6 py-3.5 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-base font-black text-slate-900 tracking-tight">
-              Control de Soporte, Tiempos & IA
+              Control de Soporte &amp; Producto
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              WhatsApp +503 7971-8911
-            </span>
+
+            {/* Segmented Technician Switcher */}
+            <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/70">
+              {[
+                { id: 'all', label: 'Todo el equipo' },
+                { id: 'Melvin Rodriguez', label: 'Melvin' },
+                { id: 'Gerson Gutierrez', label: 'Gerson' },
+              ].map((opt) => {
+                const active = selectedTechFilter === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTechFilter(opt.id);
+                      setExpandedClientKey(null);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                      active
+                        ? 'bg-white text-indigo-700 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
               onClick={() => setShowRulesPanel((v) => !v)}
-              title="Ver las 3 reglas operativas para cortar chats largos y escalar bugs"
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
                 showRulesPanel
                   ? 'bg-indigo-600 text-white border-indigo-600'
-                  : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
               }`}
             >
               <BookOpen className="w-3.5 h-3.5" />
-              Reglas del Equipo
+              Reglas
             </button>
 
             <button
-              onClick={copyOfficialNoAudioPolicy}
-              title="Copiar mensaje para pedir texto en vez de audios a los clientes"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition"
-            >
-              <MicOff className="w-3.5 h-3.5 text-purple-600" />
-              Copiar Regla: Sin Audios
-            </button>
-
-            <button
+              type="button"
               onClick={() => navigate('/support/chat')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 shadow-2xs transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 transition"
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              Chat Soporte (Circles)
+              Chat WhatsApp
             </button>
 
             <button
+              type="button"
               onClick={() => navigate('/support/tickets')}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition"
             >
@@ -1118,7 +823,9 @@ export const SupportIntelligence: React.FC = () => {
             </select>
 
             <button
+              type="button"
               onClick={loadIntelligenceData}
+              title="Actualizar datos"
               className="p-1.5 rounded-xl text-slate-500 hover:bg-slate-100 border border-slate-200 bg-white transition"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -1128,33 +835,29 @@ export const SupportIntelligence: React.FC = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 pt-5 space-y-5">
-        {/* ── COLLAPSIBLE OPERATING RULES CARD ── */}
+        {/* ── COLLAPSIBLE OPERATING RULES ── */}
         {showRulesPanel && (
           <div className="bg-white rounded-2xl border border-indigo-200 p-4 shadow-2xs space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h2 className="text-sm font-black text-slate-900">
-                  Proceso Operativo de Soporte (3 Reglas para cortar chats de 40 mensajes)
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Cuando un chat pasa de 8 mensajes en 24h en el CRM, aparece automáticamente el recordatorio de la Regla 1 y el botón + Causa para escalarte el bug.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
+              <h2 className="text-sm font-black text-slate-900">
+                Reglas Operativas (Cortar chats largos + Escalar bugs a Jimmy)
+              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={copyOfficialNoAudioPolicy}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition"
+                >
+                  <MicOff className="w-3.5 h-3.5 text-purple-600" />
+                  Copiar Regla Sin Audios
+                </button>
                 <button
                   type="button"
                   onClick={copyOperatingRules}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition"
                 >
                   <Copy className="w-3.5 h-3.5" />
-                  Copiar reglas para Melvin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowRulesPanel(false)}
-                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100"
-                >
-                  Cerrar
+                  Copiar 3 reglas para Melvin
                 </button>
               </div>
             </div>
@@ -1173,124 +876,271 @@ export const SupportIntelligence: React.FC = () => {
           </div>
         )}
 
-        {/* ── 0. PULSO DIARIO DE WHATSAPP SOPORTE (Datos Reales de Mensajes) ── */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* BLOQUE 1 · SEMÁFORO 2 SEGUNDOS: ¿MEJORANDO PRODUCTO O APAGANDO FUEGOS? */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
         <section className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Activity className="w-4 h-4 text-indigo-600" />
-              <h2 className="text-sm font-black text-slate-900 tracking-tight">
-                Pulso Diario de WhatsApp Soporte (Últimos {daysRange} días)
-              </h2>
-              {selectedTechFilter !== 'all' && (
+          <div className={`rounded-2xl border p-5 shadow-2xs space-y-4 ${verdictStyles}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {totals.verdictTone === 'good' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertTriangle
+                      className={`w-5 h-5 shrink-0 ${
+                        totals.verdictTone === 'critical' ? 'text-rose-600' : 'text-amber-600'
+                      }`}
+                    />
+                  )}
+                  <h2 className="text-base font-black tracking-tight">{totals.verdictTitle}</h2>
+                </div>
+                <p className="text-xs opacity-85">{totals.verdictDetail}</p>
+              </div>
+
+              <div className="text-right shrink-0">
+                <p className="text-[11px] font-bold uppercase opacity-70">Meta ideal</p>
+                <p className="text-xs font-black">
+                  🟢 {totals.targetBuildPct}–90% Mejoras · 🔴 ≤{totals.targetReactivePct}% Errores
+                </p>
+              </div>
+            </div>
+
+            {/* Unified 2-color progress meter (with 80% target line) */}
+            <div className="bg-white/90 rounded-xl p-3.5 border border-black/5 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-black">
+                <span className="text-emerald-700">
+                  🟢 Construyendo / Mejoras P4 + Go-Live: {totals.buildPct}% ({totals.buildHours}h)
+                </span>
+                <span className="text-rose-700">
+                  🔴 Resolviendo Errores + Chat: {totals.reactivePct}% ({totals.totalReactiveHours}h)
+                  <span className="font-semibold text-slate-500">
+                    {' '}
+                    ({totals.ticketReactiveHours}h tickets + ~{totals.unloggedChatHours}h WA sin ticket)
+                  </span>
+                </span>
+              </div>
+
+              <div className="relative h-4 w-full rounded-full bg-slate-100 overflow-hidden flex">
+                {totals.buildPct > 0 && (
+                  <div
+                    style={{ width: `${totals.buildPct}%` }}
+                    className="h-full bg-emerald-500 transition-all"
+                  />
+                )}
+                {totals.reactivePct > 0 && (
+                  <div
+                    style={{ width: `${totals.reactivePct}%` }}
+                    className="h-full bg-rose-500 transition-all"
+                  />
+                )}
+                <div
+                  style={{ left: `${totals.targetBuildPct}%` }}
+                  title={`Meta: ${totals.targetBuildPct}% construyendo producto`}
+                  className="absolute top-0 bottom-0 w-0.5 bg-slate-900/70"
+                />
+              </div>
+
+              {/* 3 minimal clarity metrics below the bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs">
+                <span className="font-semibold text-slate-700">
+                  🔄 Clientes que regresan:{' '}
+                  <strong className={totals.returningClientsCount > 0 ? 'text-rose-700' : 'text-emerald-700'}>
+                    {totals.returningClientsCount} de {totals.activeClientsCount} ({totals.returningPct}%)
+                  </strong>
+                </span>
+                <span className="font-semibold text-slate-700">
+                  💬 WhatsApp ({daysRange}d):{' '}
+                  <strong>{pulse.summary.avgClientsPerDay} clientes/día</strong> · Hoy:{' '}
+                  <strong>{pulse.summary.todayClients}</strong> ·{' '}
+                  <strong className={pulse.summary.pingPongCount > 0 ? 'text-rose-700' : 'text-slate-800'}>
+                    {pulse.summary.pingPongCount} ping-pong (≥12 msgs/día)
+                  </strong>
+                </span>
+                <span className="font-semibold text-slate-700">
+                  🐛 Escalados para Jimmy:{' '}
+                  <strong className={pulse.summary.pendingDevCount > 0 ? 'text-rose-700' : 'text-emerald-700'}>
+                    {pulse.summary.pendingDevCount} pendientes
+                  </strong>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Compact Side-by-Side: Melvin vs. Gerson (Always shows true numbers) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {overview.techSummaries.map((tech) => {
+              const isSelected = selectedTechFilter === tech.techName;
+              return (
                 <button
+                  key={tech.techName}
                   type="button"
                   onClick={() => {
-                    setSelectedTechFilter('all');
-                    setExpandedClientName('Corporación Argoz');
+                    const next = isSelected ? 'all' : tech.techName;
+                    setSelectedTechFilter(next);
+                    setExpandedClientKey(null);
                   }}
-                  title="Quitar filtro de técnico y ver todo el equipo"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition"
+                  className={`text-left bg-white rounded-2xl p-4 border transition ${
+                    isSelected
+                      ? 'border-indigo-600 ring-2 ring-indigo-500/15'
+                      : selectedTechFilter !== 'all'
+                      ? 'border-slate-200/80 opacity-60 hover:opacity-100'
+                      : 'border-slate-200/80 hover:border-slate-300'
+                  }`}
                 >
-                  <span>Solo: {selectedTechFilter}</span>
-                  <span>· Ver todos ×</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-slate-900 text-white font-black text-xs flex items-center justify-center">
+                        {tech.techName
+                          .split(' ')
+                          .map((w) => w[0])
+                          .join('')}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-slate-900">{tech.techName}</p>
+                        <p className="text-[11px] font-semibold text-slate-500">
+                          WA: {tech.waClients} clientes · {tech.waMessages} msgs · Tickets: {tech.totalTickets} ({tech.openTickets} abiertos)
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-black">
+                        <span className="text-emerald-700">{tech.buildPct}% Mejoras</span>
+                        <span className="text-slate-300 mx-1">·</span>
+                        <span className={tech.reactivePct > 20 ? 'text-rose-600' : 'text-slate-700'}>
+                          {tech.reactivePct}% Errores
+                        </span>
+                      </p>
+                      <p className="text-[10.5px] font-semibold text-slate-400">
+                        {isSelected ? '✓ Filtrando toda la vista' : 'Clic para filtrar'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Mini 2-color split bar */}
+                  <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden flex mt-3">
+                    {tech.buildPct > 0 && (
+                      <div style={{ width: `${tech.buildPct}%` }} className="bg-emerald-500 h-full" />
+                    )}
+                    {tech.reactivePct > 0 && (
+                      <div style={{ width: `${tech.reactivePct}%` }} className="bg-rose-500 h-full" />
+                    )}
+                  </div>
+
+                  <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold text-slate-600">
+                    <span>
+                      🟢 Mejoras: <strong className="text-slate-900">{tech.buildHours}h</strong> · 🔴 Errores/Chat:{' '}
+                      <strong className="text-slate-900">{tech.totalReactiveHours}h</strong>
+                    </span>
+                    <span>
+                      🔄 <strong className={tech.returningClientsCount > 0 ? 'text-rose-700' : 'text-emerald-700'}>{tech.returningClientsCount}</strong> reincidentes · 🔥{' '}
+                      <strong className={tech.pingPongCount > 0 ? 'text-rose-700' : 'text-slate-800'}>{tech.pingPongCount}</strong> ping-pong
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* BLOQUE 2 · ¿DÓNDE ARREGLAR DE RAÍZ? (MÓDULOS + BUGS ESCALADOS)       */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Left: Automatic Module Hotspots */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col">
+            <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-rose-600" />
+                <h3 className="text-xs font-black uppercase tracking-wide text-slate-800">
+                  Módulos donde regresan más clientes (Automático)
+                </h3>
+              </div>
+              {selectedModuleFilter && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedModuleFilter(null)}
+                  className="text-[11px] font-bold text-indigo-600 hover:underline"
+                >
+                  Ver todos los módulos ×
                 </button>
               )}
             </div>
-            <span className="text-[11px] font-semibold text-slate-500">
-              {pulse.summary.uniqueClientsInPeriod} clientes/grupos únicos · Tiempo estimado automático por bloques activos de chat
-            </span>
+
+            {overview.moduleHotspots.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400 font-semibold">
+                Sin fallas detectadas en los últimos {daysRange} días.
+              </div>
+            ) : (
+              <div className="space-y-2.5 pt-3">
+                {overview.moduleHotspots.map((mod) => {
+                  const barPct = Math.max(8, Math.round((mod.clientCount / maxModuleClients) * 100));
+                  const isModActive = selectedModuleFilter === mod.moduleKey;
+                  const sampleClients = mod.clientNames.slice(0, 3).join(', ');
+                  const extraClients = mod.clientNames.length > 3 ? ` +${mod.clientNames.length - 3}` : '';
+                  return (
+                    <button
+                      key={mod.moduleKey}
+                      type="button"
+                      onClick={() =>
+                        setSelectedModuleFilter(isModActive ? null : mod.moduleKey)
+                      }
+                      className={`w-full text-left rounded-xl p-2.5 border transition ${
+                        isModActive
+                          ? 'bg-indigo-50/70 border-indigo-400'
+                          : 'bg-slate-50/70 hover:bg-slate-100/70 border-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <span className="font-black text-slate-900">{mod.label}</span>
+                        <span className="font-bold text-slate-700 shrink-0">
+                          {mod.clientCount} clientes · {mod.reactiveHours}h · {mod.messageCount} msgs
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-slate-200/80 overflow-hidden my-1.5">
+                        <div style={{ width: `${barPct}%` }} className={`h-full ${mod.barColor}`} />
+                      </div>
+                      <p className="text-[11px] text-slate-500 truncate">
+                        Afectados: {sampleClients}
+                        {extraClients}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80">
-              <p className="text-[11px] font-bold text-slate-400 uppercase">Clientes / Día</p>
-              <p className="text-2xl font-black text-slate-900 mt-0.5">
-                {pulse.summary.avgClientsPerDay}
-                <span className="text-xs font-bold text-slate-400"> /día</span>
-              </p>
-              <p className="text-[11px] font-semibold text-emerald-700">
-                Hoy: {pulse.summary.todayClients} clientes activos
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80">
-              <p className="text-[11px] font-bold text-slate-400 uppercase">Mensajes WhatsApp</p>
-              <p className="text-2xl font-black text-slate-900 mt-0.5">
-                {pulse.summary.totalMessages}
-                <span className="text-xs font-bold text-indigo-600">
-                  {' '}
-                  · {pulse.summary.avgMessagesPerClientDay} /cliente
+          {/* Right: Daily Spark Strip + Root-Cause Escalation Queue */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col justify-between gap-4">
+            {/* Compact daily rhythm */}
+            <div>
+              <div className="flex items-center justify-between pb-2">
+                <span className="text-xs font-black uppercase tracking-wide text-slate-800">
+                  Ritmo diario WhatsApp ({visibleDays.length}d)
                 </span>
-              </p>
-              <p className="text-[11px] font-semibold text-slate-500">
-                Equipo {pulse.summary.staffMessages} · Clientes {pulse.summary.clientMessages}
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80">
-              <p className="text-[11px] font-bold text-slate-400 uppercase">
-                Chats Ping-Pong (≥12/día)
-              </p>
-              <p className="text-2xl font-black text-slate-900 mt-0.5">
-                {pulse.summary.pingPongCount}
-              </p>
-              <p
-                className={`text-[11px] font-semibold ${
-                  pulse.summary.pingPongCount > 0 ? 'text-rose-600' : 'text-emerald-700'
-                }`}
+                <span className="text-[11px] font-semibold text-slate-400">
+                  Rojo = día con chat ping-pong
+                </span>
+              </div>
+              <div
+                className="grid gap-1"
+                style={{ gridTemplateColumns: `repeat(${Math.max(1, visibleDays.length)}, minmax(0, 1fr))` }}
               >
-                {pulse.summary.pingPongCount > 0
-                  ? 'Chats largos donde se quema tiempo'
-                  : 'Sin chats excesivamente largos'}
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80">
-              <p className="text-[11px] font-bold text-slate-400 uppercase">
-                Tiempo en Chat · Bugs Jimmy
-              </p>
-              <p className="text-2xl font-black text-slate-900 mt-0.5">
-                ~{pulse.summary.estTotalStaffHours}h
-              </p>
-              <p
-                className={`text-[11px] font-semibold ${
-                  pulse.summary.pendingDevCount > 0 ? 'text-rose-600' : 'text-emerald-700'
-                }`}
-              >
-                {pulse.summary.pendingDevCount > 0
-                  ? `${pulse.summary.pendingDevCount} bugs/parches por resolver de raíz`
-                  : '0 bugs escalados pendientes'}
-              </p>
-            </div>
-          </div>
-
-          {/* Daily Strip (last 14 days visible for fast scan) */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 overflow-x-auto">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-black uppercase text-slate-400">
-                Actividad diaria (clientes · mensajes · horas en chat)
-              </span>
-              <span className="text-[11px] text-slate-400">
-                Últimos {Math.min(14, pulse.dailySeries.length)} días
-              </span>
-            </div>
-            <div className="grid grid-cols-7 sm:grid-cols-14 gap-1.5 min-w-[640px]">
-              {(() => {
-                const visibleDays = pulse.dailySeries.slice(-14);
-                const maxMsgs = Math.max(1, ...visibleDays.map((d) => d.totalMessages));
-                return visibleDays.map((d) => {
-                  const pct = d.totalMessages > 0 ? Math.max(12, Math.round((d.totalMessages / maxMsgs) * 100)) : 4;
+                {visibleDays.map((d) => {
+                  const hPct = d.totalMessages > 0 ? Math.max(14, Math.round((d.totalMessages / maxDayMsgs) * 100)) : 5;
                   return (
                     <div
                       key={d.dayKey}
-                      title={`${d.label}: ${d.activeClients} clientes · ${d.totalMessages} msgs (Equipo ${d.staffMessages} / Cliente ${d.clientMessages}) · ~${d.estStaffHours}h · ${d.pingPongChats} ping-pong`}
-                      className="flex flex-col items-center justify-end rounded-xl bg-slate-50/80 border border-slate-100 p-1.5 text-center"
+                      title={`${d.label}: ${d.activeClients} clientes · ${d.totalMessages} msgs · ~${d.estStaffHours}h`}
+                      className="flex flex-col items-center justify-end rounded-lg bg-slate-50 border border-slate-100 py-1 px-0.5"
                     >
-                      <span className="text-[10px] font-black text-slate-800">{d.totalMessages}</span>
-                      <div className="w-full h-10 flex items-end justify-center my-1">
+                      <span className="text-[9.5px] font-black text-slate-700">{d.totalMessages}</span>
+                      <div className="w-full h-9 flex items-end justify-center my-0.5">
                         <div
-                          style={{ height: `${pct}%` }}
-                          className={`w-4 rounded-t-md ${
+                          style={{ height: `${hPct}%` }}
+                          className={`w-2.5 rounded-t ${
                             d.pingPongChats > 0
                               ? 'bg-rose-500'
                               : d.totalMessages > 0
@@ -1299,84 +1149,23 @@ export const SupportIntelligence: React.FC = () => {
                           }`}
                         />
                       </div>
-                      <span className="text-[10px] font-bold text-emerald-700">{d.activeClients}c</span>
-                      <span className="text-[9.5px] text-slate-400 whitespace-nowrap">{d.label}</span>
+                      <span className="text-[9px] font-bold text-emerald-700">{d.activeClients}c</span>
+                      <span className="text-[8.5px] text-slate-400 truncate max-w-full">
+                        {d.label.split(' ')[0]}
+                      </span>
                     </div>
                   );
-                });
-              })()}
-            </div>
-          </div>
-
-          {/* 2-Column Command Section: Ping-Pong Alerts & Jimmy Root-Cause Queue */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Left: Ping-Pong Chats */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col">
-              <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <Flame className="w-4 h-4 text-rose-600" />
-                  <h3 className="text-xs font-black uppercase tracking-wide text-slate-800">
-                    Chats Ping-Pong (≥{pulse.summary.pingPongThreshold} mensajes en un día)
-                  </h3>
-                </div>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-50 text-rose-700 border border-rose-200">
-                  {pulse.pingPongAlerts.length}
-                </span>
+                })}
               </div>
-
-              {pulse.pingPongAlerts.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400 font-semibold">
-                  Sin chats ping-pong en los últimos {daysRange} días.
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto mt-1">
-                  {pulse.pingPongAlerts.slice(0, 12).map((alert) => {
-                    const rcMeta = alert.lastRootCause ? SUPPORT_ROOT_CAUSE_META[alert.lastRootCause.type] : null;
-                    return (
-                      <div key={alert.ticketId} className="py-2.5 flex items-center justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-black text-slate-900 truncate">
-                              {alert.clientName}
-                            </span>
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-700">
-                              {alert.peakDayMessages} msgs ({alert.peakDayLabel})
-                            </span>
-                            {rcMeta && (
-                              <span
-                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${rcMeta.badgeClass}`}
-                              >
-                                {rcMeta.shortLabel}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-slate-500 mt-0.5">
-                            {alert.primaryTech} · ~{alert.estMinutes} min · Total período: {alert.totalPeriodMessages} msgs (Equipo {alert.staffMsgs} / Cliente {alert.clientMsgs})
-                          </p>
-                        </div>
-                        {alert.circleId && (
-                          <button
-                            type="button"
-                            onClick={() => navigate('/support/chat', { state: { waCircleId: alert.circleId } })}
-                            className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] transition"
-                          >
-                            Abrir chat →
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
 
-            {/* Right: Root-Cause Escalation Queue for Jimmy */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col">
-              <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
+            {/* Jimmy's Escalation Queue */}
+            <div className="border-t border-slate-100 pt-3">
+              <div className="flex items-center justify-between gap-2 pb-2">
+                <div className="flex items-center gap-1.5">
                   <Bug className="w-4 h-4 text-rose-600" />
                   <h3 className="text-xs font-black uppercase tracking-wide text-slate-800">
-                    Cola de Causa Raíz para Jimmy (Arreglar de raíz)
+                    Bugs escalados para Jimmy (Botón &quot;Causa&quot; en chat)
                   </h3>
                 </div>
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-slate-100 text-slate-700">
@@ -1384,34 +1173,18 @@ export const SupportIntelligence: React.FC = () => {
                 </span>
               </div>
 
-              <div className="flex items-center gap-1.5 flex-wrap py-2.5 border-b border-slate-100">
-                {(['system_bug', 'temp_patch', 'client_training', 'external_mh'] as SupportRootCauseType[]).map(
-                  (rcType) => {
-                    const meta = SUPPORT_ROOT_CAUSE_META[rcType];
-                    return (
-                      <span
-                        key={rcType}
-                        className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${meta.badgeClass}`}
-                      >
-                        {meta.shortLabel}: {pulse.rootCauseQueue.counts[rcType] || 0}
-                      </span>
-                    );
-                  },
-                )}
-              </div>
-
               {pulse.rootCauseQueue.pendingForDev.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400 font-semibold">
-                  No hay bugs ni parches escalados pendientes. Usa el botón &quot;Causa&quot; dentro de cualquier chat para escalar.
-                </div>
+                <p className="text-xs text-slate-400 font-medium py-3">
+                  Sin bugs escalados manualmente todavía. Usa el botón <strong>Causa</strong> en el Chat WhatsApp cuando un error de sistema requiera arreglo definitivo.
+                </p>
               ) : (
-                <div className="divide-y divide-slate-100 max-h-60 overflow-y-auto mt-1">
+                <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto">
                   {pulse.rootCauseQueue.pendingForDev.map((item) => {
                     const rcMeta = SUPPORT_ROOT_CAUSE_META[item.type];
                     const itemKey = `${item.ticketId}:${item.entryId}`;
                     const isSaving = resolvingEntryKey === itemKey;
                     return (
-                      <div key={itemKey} className="py-2.5 flex items-start justify-between gap-2.5">
+                      <div key={itemKey} className="py-2 flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span
@@ -1423,32 +1196,30 @@ export const SupportIntelligence: React.FC = () => {
                               {item.clientName}
                             </span>
                             <span className="text-[10.5px] text-slate-400">
-                              · {new Date(item.at).toLocaleDateString('es-SV', { day: '2-digit', month: 'short' })} por {item.byName.split(' ')[0]}
+                              · {item.byName.split(' ')[0]}
                             </span>
                           </div>
                           {item.note && (
-                            <p className="text-xs font-medium text-slate-700 mt-0.5 line-clamp-2">
-                              {item.note}
-                            </p>
+                            <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-2">{item.note}</p>
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1 shrink-0">
                           {item.circleId && (
                             <button
                               type="button"
                               onClick={() => navigate('/support/chat', { state: { waCircleId: item.circleId } })}
-                              className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition"
+                              className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px]"
                             >
-                              Abrir chat
+                              Chat
                             </button>
                           )}
                           <button
                             type="button"
                             disabled={isSaving}
                             onClick={() => handleMarkDevResolved(item)}
-                            className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] disabled:opacity-50 transition"
+                            className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] disabled:opacity-50"
                           >
-                            {isSaving ? '...' : '✓ Resuelto de raíz'}
+                            {isSaving ? '...' : '✓ Resuelto'}
                           </button>
                         </div>
                       </div>
@@ -1460,280 +1231,27 @@ export const SupportIntelligence: React.FC = () => {
           </div>
         </section>
 
-        {/* ── 1. ULTRA-CLEAN 4-KPI STRIP (Linear/Stripe Style) ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase">Bien a la 1ª Vez</p>
-              <p className="text-2xl font-black text-slate-900 mt-0.5">{kpis.firstTimePct}%</p>
-              <p className="text-[11px] font-semibold text-rose-600">
-                {kpis.repeatCount} regresos del cliente
-              </p>
-            </div>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase">
-                Tiempo Real vs. IA
-              </p>
-              <p className="text-2xl font-black text-slate-900 mt-0.5">
-                {kpis.reported}h{' '}
-                <span className="text-xs font-bold text-indigo-600">vs {kpis.expected}h IA</span>
-              </p>
-              <p className="text-[11px] font-semibold text-rose-600">
-                {kpis.inflated} tickets con tiempo inflado
-              </p>
-            </div>
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <Clock className="w-5 h-5" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase">Uso del Tiempo</p>
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-xs font-black text-emerald-700">
-                  💬 Textos {kpis.textHours}h
-                </span>
-                <span className="text-xs font-black text-violet-700">
-                  🚀 Go-Live {kpis.impHours}h
-                </span>
-                <span className="text-xs font-black text-amber-700">
-                  🛠️ Fallas {kpis.fixHours}h
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Textos vs. Implementaciones vs. Fallas
-              </p>
-            </div>
-            <div className="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
-              <Sparkles className="w-5 h-5" />
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl px-4 py-3.5 border border-slate-200/80 flex items-center justify-between">
-            <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase">Pendientes Hoy</p>
-              <p className="text-2xl font-black text-slate-900 mt-0.5">{kpis.openCount}</p>
-              <p className="text-[11px] font-semibold text-slate-500">
-                Tickets esperando cierre
-              </p>
-            </div>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-          </div>
-        </div>
-
-        {/* ── 2. SLEEK SIDE-BY-SIDE: MELVIN RODRIGUEZ VS. GERSON GUTIERREZ ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {mainTechCards.map((tech) => {
-            const isSelected = selectedTechFilter === tech.techName;
-            const totalH = Math.max(tech.totalReportedHours, 0.1);
-            const wText = Math.round((tech.textReplyHours / totalH) * 100);
-            const wImp = Math.round((tech.implementationHours / totalH) * 100);
-            const wTrb = Math.round((tech.troubleshootingHours / totalH) * 100);
-            const wDev = Math.max(0, 100 - wText - wImp - wTrb);
-
-            return (
-              <div
-                key={tech.techName}
-                className={`bg-white rounded-2xl p-4 border transition ${
-                  isSelected
-                    ? 'border-indigo-600 ring-2 ring-indigo-500/15'
-                    : selectedTechFilter !== 'all'
-                    ? 'border-slate-200/80 opacity-65 hover:opacity-100 hover:border-slate-300'
-                    : 'border-slate-200/80 hover:border-slate-300'
-                }`}
-              >
-                {/* Row 1: Name + Key Stats + Filter Toggle */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-900 text-white font-black text-xs flex items-center justify-center">
-                      {tech.techName
-                        .split(' ')
-                        .map((w) => w[0])
-                        .join('')}
-                    </div>
-                    <div>
-                      <h2 className="text-sm font-black text-slate-900">{tech.techName}</h2>
-                      <p className="text-xs text-slate-500 font-medium">
-                        <strong>{tech.totalTickets} casos</strong> ({tech.resolvedTickets} cerrados
-                        ·{' '}
-                        <span className="text-rose-600 font-bold">
-                          {tech.openTickets} abiertos
-                        </span>
-                        )
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      const nextTech = isSelected ? 'all' : tech.techName;
-                      setSelectedTechFilter(nextTech);
-                      setExpandedClientName(nextTech === 'all' ? 'Corporación Argoz' : null);
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                      isSelected
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    {isSelected ? '✓ Filtrado' : 'Ver solo él'}
-                  </button>
-                </div>
-
-                {/* Row 2: Clean Segmented Bar of Time Breakdown */}
-                <div className="mt-3.5 space-y-2">
-                  <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden flex">
-                    {wText > 0 && (
-                      <div
-                        style={{ width: `${wText}%` }}
-                        className="bg-emerald-500 h-full"
-                        title={`Textos: ${tech.textReplyHours}h`}
-                      />
-                    )}
-                    {wImp > 0 && (
-                      <div
-                        style={{ width: `${wImp}%` }}
-                        className="bg-violet-500 h-full"
-                        title={`Implementaciones: ${tech.implementationHours}h`}
-                      />
-                    )}
-                    {wTrb > 0 && (
-                      <div
-                        style={{ width: `${wTrb}%` }}
-                        className="bg-amber-500 h-full"
-                        title={`Fallas: ${tech.troubleshootingHours}h`}
-                      />
-                    )}
-                    {wDev > 0 && (
-                      <div
-                        style={{ width: `${wDev}%` }}
-                        className="bg-blue-500 h-full"
-                        title={`Mejoras P4: ${tech.developmentHours}h`}
-                      />
-                    )}
-                  </div>
-
-                  {/* 4 Minimalist Pills */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px]">
-                    <div className="px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                      <span className="text-slate-500 font-semibold block">💬 Textos</span>
-                      <strong className="text-slate-900 font-black">
-                        {tech.textReplyHours}h
-                      </strong>{' '}
-                      <span className="text-slate-400">({tech.textReplyCount})</span>
-                    </div>
-                    <div className="px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                      <span className="text-slate-500 font-semibold block">🚀 Go-Live</span>
-                      <strong className="text-slate-900 font-black">
-                        {tech.implementationHours}h
-                      </strong>{' '}
-                      <span className="text-slate-400">({tech.implementationCount})</span>
-                    </div>
-                    <div className="px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                      <span className="text-slate-500 font-semibold block">🛠️ Fallas</span>
-                      <strong className="text-slate-900 font-black">
-                        {tech.troubleshootingHours}h
-                      </strong>{' '}
-                      <span className="text-slate-400">({tech.troubleshootingCount})</span>
-                    </div>
-                    <div className="px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                      <span className="text-slate-500 font-semibold block">⚙️ Mejoras P4</span>
-                      <strong className="text-slate-900 font-black">
-                        {tech.developmentHours}h
-                      </strong>{' '}
-                      <span className="text-slate-400">({tech.developmentCount})</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* WhatsApp Chat Real Activity Strip */}
-                {(() => {
-                  const chatStats = pulse.techChatMetrics[tech.techName];
-                  return (
-                    <div className="mt-2.5 px-3 py-2 rounded-xl bg-indigo-50/60 border border-indigo-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                      <span className="font-bold text-indigo-900">
-                        💬 WhatsApp ({daysRange}d):{' '}
-                        <strong>{chatStats ? chatStats.staffMessages : 0}</strong> msgs ·{' '}
-                        <strong>{chatStats ? chatStats.uniqueClientsHelped : 0}</strong> clientes
-                      </span>
-                      <span className="font-bold text-slate-700">
-                        ~{chatStats ? chatStats.estChatHours : 0}h en chat ·{' '}
-                        <span className={chatStats && chatStats.pingPongChatsCount > 0 ? 'text-rose-600' : 'text-emerald-700'}>
-                          {chatStats ? chatStats.pingPongChatsCount : 0} ping-pong
-                        </span>
-                      </span>
-                    </div>
-                  );
-                })()}
-
-                {/* Row 3: Compact Footer (Quality 1st time + AI Time Audit) */}
-                <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-md font-black bg-emerald-50 text-emerald-700">
-                      🎯 {tech.firstTimeRightPct}% bien a la 1ª
-                    </span>
-                    {tech.clientReturnedCount > 0 && (
-                      <span className="text-rose-600 font-bold">
-                        🔄 {tech.clientReturnedCount} regresaron
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-700">
-                      ⏱️ {tech.totalReportedHours}h{' '}
-                      <span className="text-slate-400 font-normal">
-                        vs {tech.totalExpectedAiHours}h IA
-                      </span>
-                    </span>
-                    {tech.inflatedTicketsCount > 0 ? (
-                      <span className="px-2 py-0.5 rounded-md font-black bg-rose-100 text-rose-700">
-                        🚨 {tech.inflatedTicketsCount} inflados
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-md font-bold bg-slate-100 text-slate-600">
-                        ✓ Tiempo OK
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ── 3. ACORDEÓN MINIMALISTA DE EMPRESAS (Visible inmediatamente) ── */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
-          {/* Single Clean Filter & Search Bar */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* BLOQUE 3 · 1 SOLA TABLA UNIFICADA DE CLIENTES (CHAT + TICKETS)       */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        <section className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden">
           <div className="p-4 border-b border-slate-200/80 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             <div className="flex items-center gap-1.5 flex-wrap">
               {[
-                { id: 'all', label: `Todas las Empresas (${pillCounts.all || 0})` },
-                { id: 'P1', label: `🔥 P1 Hacienda (${pillCounts.P1 || 0})` },
-                { id: 'P2', label: `🚨 P2 Errores (${pillCounts.P2 || 0})` },
-                { id: 'P3', label: `🛠️ P3 Soporte (${pillCounts.P3 || 0})` },
-                { id: 'FAQ', label: `💬 Consultas (${pillCounts.FAQ || 0})` },
-                { id: 'P4', label: `⚙️ P4 Mejoras (${pillCounts.P4 || 0})` },
-                { id: 'inflated', label: `🚨 Tiempo Inflado (${pillCounts.inflated || 0})` },
-                { id: 'repeat', label: `🔄 Reincidentes (${pillCounts.repeat || 0})` },
+                { id: 'all' as HealthFilter, label: `Todos los Clientes (${clientHealthCounts.all})` },
+                { id: 'critical' as HealthFilter, label: `🔴 Reincidentes (${clientHealthCounts.critical})` },
+                { id: 'open' as HealthFilter, label: `🔥 Con Abiertos (${clientHealthCounts.open})` },
+                { id: 'stable' as HealthFilter, label: `🟢 Estables (${clientHealthCounts.stable})` },
               ].map((pill) => {
-                const active = activeFilterPill === pill.id;
+                const active = healthFilter === pill.id;
                 return (
                   <button
                     key={pill.id}
-                    onClick={() => setActiveFilterPill(pill.id)}
+                    type="button"
+                    onClick={() => setHealthFilter(pill.id)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                       active
-                        ? 'bg-slate-900 text-white shadow-2xs'
+                        ? 'bg-slate-900 text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -1741,6 +1259,16 @@ export const SupportIntelligence: React.FC = () => {
                   </button>
                 );
               })}
+
+              {selectedModuleFilter && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedModuleFilter(null)}
+                  className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200"
+                >
+                  Módulo: {overview.moduleHotspots.find((m) => m.moduleKey === selectedModuleFilter)?.shortLabel} ×
+                </button>
+              )}
             </div>
 
             <div className="relative w-full lg:w-64">
@@ -1749,208 +1277,215 @@ export const SupportIntelligence: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar empresa (ej. Argoz)..."
+                placeholder="Buscar cliente, técnico o error..."
                 className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/30 font-medium"
               />
             </div>
           </div>
 
-          {/* Accordion List */}
           <div className="divide-y divide-slate-100">
-            {clientAccordions.length === 0 ? (
+            {visibleClients.length === 0 ? (
               <div className="p-10 text-center text-xs text-slate-400 font-semibold">
-                No hay registros con este filtro.
+                No hay clientes con este filtro.
               </div>
             ) : (
-              clientAccordions.map((client) => {
-                const isExpanded = expandedClientName === client.clientName;
+              visibleClients.map((client) => {
+                const isExpanded = expandedClientKey === client.clientKey;
+                const badgeClass =
+                  client.health === 'critical'
+                    ? 'bg-rose-100 text-rose-700 border-rose-200'
+                    : client.health === 'watch'
+                    ? 'bg-amber-50 text-amber-800 border-amber-200'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200';
                 return (
-                  <div key={client.clientName}>
-                    {/* Clean Accordion Header Row */}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExpandedClientName(isExpanded ? null : client.clientName)
-                      }
-                      className={`w-full text-left px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 transition ${
-                        isExpanded ? 'bg-indigo-50/50' : 'hover:bg-slate-50'
+                  <div key={client.clientKey}>
+                    <div
+                      className={`px-5 py-3 flex flex-wrap items-center justify-between gap-3 transition ${
+                        isExpanded ? 'bg-indigo-50/40' : 'hover:bg-slate-50'
                       }`}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedClientKey(isExpanded ? null : client.clientKey)
+                        }
+                        className="flex items-center gap-2.5 min-w-0 flex-1 text-left"
+                      >
                         {isExpanded ? (
                           <ChevronDown className="w-4 h-4 text-indigo-600 shrink-0" />
                         ) : (
                           <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
                         )}
 
-                        <span className="text-sm font-black text-slate-900">
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10.5px] font-black border shrink-0 ${badgeClass}`}
+                        >
+                          {client.health === 'critical'
+                            ? 'Reincidente'
+                            : client.health === 'watch'
+                            ? 'Atención'
+                            : 'Estable'}
+                        </span>
+
+                        <span className="text-sm font-black text-slate-900 truncate">
                           {client.clientName}
                         </span>
 
-                        <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-700">
-                          {client.totalTickets} tickets
+                        <span className="px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-slate-100 text-slate-600 shrink-0">
+                          {client.primaryModuleLabel}
                         </span>
 
-                        {client.categoryPills.map((cp) => (
-                          <span
-                            key={cp.code}
-                            className="px-1.5 py-0.5 rounded text-[10px] font-black text-white"
-                            style={{ backgroundColor: cp.color }}
-                          >
-                            {cp.code}: {cp.count}
-                          </span>
-                        ))}
-
-                        {client.repeatReturnsCount > 0 && (
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                            🔄 {client.repeatReturnsCount} reincidentes
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-4 text-xs">
-                        <span className="text-slate-500 font-medium hidden sm:inline">
-                          👨‍💻 {client.techSummaryText}
-                        </span>
-
-                        <div className="font-bold text-slate-800">
-                          {client.totalReportedHours}h{' '}
-                          <span className="text-slate-400 font-normal">
-                            / IA {client.totalExpectedAiHours}h
-                          </span>
-                        </div>
-
-                        {client.inflatedCount > 0 && (
-                          <span className="px-2 py-0.5 rounded-md text-[11px] font-black bg-rose-100 text-rose-700">
-                            🚨 {client.inflatedCount} inflados
+                        {client.isPingPong && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black shrink-0">
+                            <Flame className="w-3 h-3" />
+                            {client.peakDayMessages} msgs ({client.peakDayLabel})
                           </span>
                         )}
 
-                        {client.openTickets > 0 ? (
-                          <span className="px-2.5 py-1 rounded-lg text-[11px] font-black bg-red-600 text-white">
+                        {client.distinctDaysReported >= 2 && (
+                          <span className="text-[11px] font-bold text-rose-700 shrink-0 hidden md:inline">
+                            · Volvió {client.distinctDaysReported} días
+                          </span>
+                        )}
+                      </button>
+
+                      <div className="flex items-center gap-3 text-xs shrink-0">
+                        <span className="text-slate-500 font-semibold hidden sm:inline">
+                          {client.primaryTech.split(' ')[0]}
+                        </span>
+
+                        {client.waMessages > 0 && (
+                          <span className="text-slate-600 font-semibold">
+                            {client.waMessages} msgs
+                          </span>
+                        )}
+
+                        <span
+                          title={`${client.ticketReactiveHours}h en tickets + ~${client.unloggedChatHours}h chat WA sin ticket`}
+                          className="font-black text-slate-900"
+                        >
+                          {client.totalReactiveHours}h{' '}
+                          <span className="text-[10.5px] font-normal text-slate-400">soporte</span>
+                        </span>
+
+                        {client.openTickets > 0 && (
+                          <span className="px-2 py-0.5 rounded-md text-[10.5px] font-black bg-red-600 text-white">
                             {client.openTickets} abiertos
                           </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 text-emerald-700">
-                            Al día
-                          </span>
+                        )}
+
+                        {client.circleId && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate('/support/chat', { state: { waCircleId: client.circleId } })
+                            }
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] transition"
+                          >
+                            Abrir chat →
+                          </button>
                         )}
                       </div>
-                    </button>
+                    </div>
 
-                    {/* Clean Expanded Ticket Table */}
                     {isExpanded && (
-                      <div className="bg-slate-50/70 px-5 py-4 border-t border-slate-100">
-                        <div className="bg-white rounded-xl border border-slate-200/80 overflow-x-auto">
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                              <tr className="border-b border-slate-200/80 text-[10px] font-black uppercase text-slate-400 bg-slate-50/50">
-                                <th className="py-2.5 px-3">Fecha</th>
-                                <th className="py-2.5 px-3">Tipo</th>
-                                <th className="py-2.5 px-3">Problema</th>
-                                <th className="py-2.5 px-3">Técnico</th>
-                                <th className="py-2.5 px-3">Tiempo vs. IA</th>
-                                <th className="py-2.5 px-3">Solución</th>
-                                <th className="py-2.5 px-3 text-right">Detalle</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {client.records.map((rec) => (
-                                <tr key={rec.id} className="hover:bg-slate-50/80">
-                                  <td className="py-2.5 px-3 whitespace-nowrap">
-                                    <span className="font-bold text-slate-700">
-                                      {new Date(rec.createdAt).toLocaleDateString('es-SV', {
-                                        day: '2-digit',
-                                        month: 'short',
-                                      })}
-                                    </span>
-                                    <span
-                                      className={`ml-2 px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
-                                        rec.status === 'resolved'
-                                          ? 'bg-emerald-50 text-emerald-700'
-                                          : 'bg-red-50 text-red-600'
-                                      }`}
-                                    >
-                                      {rec.status === 'resolved' ? 'Cerrado' : 'Abierto'}
-                                    </span>
-                                  </td>
-
-                                  <td className="py-2.5 px-3 whitespace-nowrap">
-                                    <span
-                                      className="px-2 py-0.5 rounded text-[10px] font-black text-white"
-                                      style={{ backgroundColor: rec.ticketCategoryColor }}
-                                    >
-                                      {rec.ticketCategoryCode}
-                                    </span>
-                                    <span className="ml-1.5 text-[11px] text-slate-500 font-medium">
-                                      {rec.workBucketLabel}
-                                    </span>
-                                  </td>
-
-                                  <td className="py-2.5 px-3 max-w-sm">
-                                    <p className="font-bold text-slate-900 truncate">
-                                      {rec.title}
-                                    </p>
-                                    {rec.isRepeatForSameClient && (
-                                      <span className="inline-block mt-0.5 text-[10px] font-bold text-rose-600">
-                                        🔄 Regreso #{rec.repeatSequenceNumber} por{' '}
-                                        {rec.categoryLabel}
-                                      </span>
-                                    )}
-                                  </td>
-
-                                  <td className="py-2.5 px-3 whitespace-nowrap font-semibold text-slate-700">
-                                    {rec.techName.split(' ')[0]}
-                                  </td>
-
-                                  <td className="py-2.5 px-3 whitespace-nowrap">
-                                    <span className="font-black text-slate-900">
-                                      {rec.reportedHours}h
-                                    </span>{' '}
-                                    <span className="text-slate-400">
-                                      / IA {rec.expectedAiHours}h
-                                    </span>
-                                    <span
-                                      className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-black ${
-                                        rec.aiTimeStatus === 'inflated'
-                                          ? 'bg-rose-100 text-rose-700'
-                                          : rec.aiTimeStatus === 'missing_time'
-                                          ? 'bg-amber-100 text-amber-800'
-                                          : 'bg-emerald-50 text-emerald-700'
-                                      }`}
-                                    >
-                                      {rec.aiTimeStatus === 'inflated'
-                                        ? `🚨 +${rec.diffAiHours}h`
-                                        : rec.aiTimeStatus === 'missing_time'
-                                        ? '❌ 0h'
-                                        : '✓ OK'}
-                                    </span>
-                                  </td>
-
-                                  <td className="py-2.5 px-3 max-w-xs truncate text-slate-600">
-                                    {rec.solution || rec.rootCause || (
-                                      <span className="text-slate-300">—</span>
-                                    )}
-                                  </td>
-
-                                  <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                                    {rec.rawTicket && (
-                                      <button
-                                        onClick={() =>
-                                          setSelectedTicketForDrawer(rec.rawTicket!)
-                                        }
-                                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px] transition"
-                                      >
-                                        Ver
-                                        <ExternalLink className="w-3 h-3" />
-                                      </button>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                      <div className="bg-slate-50/70 px-5 py-3.5 border-t border-slate-100 space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                          <span>
+                            <strong>Diagnóstico:</strong> {client.healthReason} · Mensajes WA:{' '}
+                            {client.waMessages} (Cliente {client.waClientMsgs} / Equipo {client.waStaffMsgs}) · Tiempo chat ~{client.waEstHours}h
+                          </span>
+                          {client.buildHours > 0 && (
+                            <span className="font-bold text-emerald-700">
+                              + {client.buildHours}h en Mejoras / Go-Live
+                            </span>
+                          )}
                         </div>
+
+                        {client.records.length === 0 ? (
+                          <p className="text-xs text-slate-400 italic">
+                            Solo conversaciones por WhatsApp (sin tickets formales registrados en el período).
+                          </p>
+                        ) : (
+                          <div className="bg-white rounded-xl border border-slate-200/80 overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="border-b border-slate-200/80 text-[10px] font-black uppercase text-slate-400 bg-slate-50/50">
+                                  <th className="py-2 px-3">Fecha</th>
+                                  <th className="py-2 px-3">Tipo</th>
+                                  <th className="py-2 px-3">Caso</th>
+                                  <th className="py-2 px-3">Técnico</th>
+                                  <th className="py-2 px-3">Tiempo</th>
+                                  <th className="py-2 px-3 text-right">Detalle</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {client.records.map((rec) => (
+                                  <tr key={rec.id} className="hover:bg-slate-50/80">
+                                    <td className="py-2 px-3 whitespace-nowrap">
+                                      <span className="font-bold text-slate-700">
+                                        {new Date(rec.createdAt).toLocaleDateString('es-SV', {
+                                          day: '2-digit',
+                                          month: 'short',
+                                        })}
+                                      </span>
+                                      <span
+                                        className={`ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase ${
+                                          rec.status === 'resolved'
+                                            ? 'bg-emerald-50 text-emerald-700'
+                                            : 'bg-red-50 text-red-600'
+                                        }`}
+                                      >
+                                        {rec.status === 'resolved' ? 'Cerrado' : 'Abierto'}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 px-3 whitespace-nowrap">
+                                      <span
+                                        className="px-2 py-0.5 rounded text-[10px] font-black text-white"
+                                        style={{ backgroundColor: rec.ticketCategoryColor }}
+                                      >
+                                        {rec.ticketCategoryCode}
+                                      </span>
+                                      <span className="ml-1.5 text-[11px] text-slate-500">
+                                        {rec.workBucketLabel}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 px-3 max-w-sm">
+                                      <p className="font-bold text-slate-900 truncate">{rec.title}</p>
+                                      {rec.solution && (
+                                        <p className="text-[11px] text-slate-500 truncate">
+                                          {rec.solution}
+                                        </p>
+                                      )}
+                                    </td>
+                                    <td className="py-2 px-3 whitespace-nowrap font-semibold text-slate-700">
+                                      {rec.techName.split(' ')[0]}
+                                    </td>
+                                    <td className="py-2 px-3 whitespace-nowrap font-bold text-slate-800">
+                                      {rec.reportedHours}h
+                                      {rec.aiTimeStatus === 'inflated' && (
+                                        <span className="ml-1.5 px-1 py-0.5 rounded text-[9.5px] bg-rose-100 text-rose-700">
+                                          +{rec.diffAiHours}h vs IA
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-2 px-3 text-right whitespace-nowrap">
+                                      {rec.rawTicket && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedTicketForDrawer(rec.rawTicket!)}
+                                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px]"
+                                        >
+                                          Ver <ExternalLink className="w-3 h-3" />
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1958,24 +1493,24 @@ export const SupportIntelligence: React.FC = () => {
               })
             )}
 
-            {/* Collapsible Internal Dev Tasks at the bottom */}
-            {internalSystemAccordion && (
-              <div className="bg-slate-50/60">
+            {/* Collapsible Internal P4 Dev Tasks */}
+            {overview.internalDev.count > 0 && (
+              <div className="bg-slate-50/70">
                 <button
                   type="button"
-                  onClick={() => setShowInternalTasksAccordion(!showInternalTasksAccordion)}
-                  className="w-full text-left px-5 py-3 flex items-center justify-between text-xs font-bold text-slate-500 hover:text-slate-800"
+                  onClick={() => setShowInternalTasks((v) => !v)}
+                  className="w-full text-left px-5 py-3 flex items-center justify-between text-xs font-bold text-slate-600 hover:text-slate-900"
                 >
-                  <span>
-                    ⚙️ {internalSystemAccordion.clientName} (
-                    {internalSystemAccordion.totalTickets} tareas ·{' '}
-                    {internalSystemAccordion.totalReportedHours}h)
+                  <span className="inline-flex items-center gap-2">
+                    <ShieldAlert className="w-3.5 h-3.5 text-emerald-600" />
+                    Desarrollo Interno &amp; Mejoras P4 (Sin cliente · incluidas en 🟢 Mejoras):{' '}
+                    {overview.internalDev.count} tareas · {overview.internalDev.totalHours}h
                   </span>
-                  <span>{showInternalTasksAccordion ? 'Ocultar' : 'Ver'}</span>
+                  <span>{showInternalTasks ? 'Ocultar' : 'Ver'}</span>
                 </button>
-                {showInternalTasksAccordion && (
+                {showInternalTasks && (
                   <div className="px-5 pb-4 space-y-1.5">
-                    {internalSystemAccordion.records.map((rec) => (
+                    {overview.internalDev.records.map((rec) => (
                       <div
                         key={rec.id}
                         className="flex items-center justify-between bg-white px-3 py-2 rounded-lg border border-slate-200/70 text-xs"
@@ -1985,9 +1520,10 @@ export const SupportIntelligence: React.FC = () => {
                           <span className="text-slate-400">({rec.techName.split(' ')[0]})</span>
                         </span>
                         <div className="flex items-center gap-3 shrink-0">
-                          <span className="font-bold text-slate-600">{rec.reportedHours}h</span>
+                          <span className="font-bold text-emerald-700">{rec.reportedHours}h</span>
                           {rec.rawTicket && (
                             <button
+                              type="button"
                               onClick={() => setSelectedTicketForDrawer(rec.rawTicket!)}
                               className="text-indigo-600 font-bold"
                             >
@@ -2002,7 +1538,7 @@ export const SupportIntelligence: React.FC = () => {
               </div>
             )}
           </div>
-        </div>
+        </section>
       </div>
 
       {/* Ticket Drawer */}
