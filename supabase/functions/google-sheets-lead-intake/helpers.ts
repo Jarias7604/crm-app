@@ -429,3 +429,33 @@ export function formatSheetStatusCell(input: {
       return `⚠️ Fila incompleta${input.reason ? `: ${input.reason}` : ' (sin teléfono ni correo)'}`;
   }
 }
+
+export function buildAiMemoryFacts(
+  lead: NormalizedSheetLead,
+  meta: { sheetName: string; rowNumber: number; syncedAt: string },
+): Record<string, unknown> {
+  const facts: Record<string, unknown> = {
+    source: 'google_sheets',
+    sheet_origen: meta.sheetName,
+    fila_origen: meta.rowNumber,
+    synced_at: meta.syncedAt,
+    prioridad_urgencia: lead.priority,
+    raw_form_fields: lead.rawFields,
+  };
+
+  if (lead.roleTitle) facts.cargo = lead.roleTitle;
+  if (lead.annualInvoices) facts.facturas_anual = lead.annualInvoices;
+  if (lead.currentMethod) facts.metodo_actual = lead.currentMethod;
+  if (lead.improvementArea) facts.punto_de_mejora = lead.improvementArea;
+  if (lead.urgency) facts.urgencia = lead.urgency;
+  if (lead.projectsCount) facts.proyectos_disponibles = lead.projectsCount;
+  if (lead.adName) facts.anuncio = lead.adName;
+  if (lead.productLabel) facts.producto_interes = lead.productLabel;
+  if (lead.mappedIndustry || lead.rawIndustry) {
+    facts.industria = lead.mappedIndustry || lead.rawIndustry;
+  }
+  if (lead.comments) facts.comentarios = lead.comments;
+  if (lead.submittedAt) facts.fecha_formulario = lead.submittedAt;
+
+  return facts;
+}

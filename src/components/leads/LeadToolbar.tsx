@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, SlidersHorizontal, ChevronDown, CheckCircle, Filter, Calendar, X, User, ArrowLeft, Building2, Check } from 'lucide-react';
+import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, SlidersHorizontal, ChevronDown, CheckCircle, Filter, Calendar, X, User, ArrowLeft, Building2, Check, Target, Flame } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { CustomDatePicker } from '../ui/CustomDatePicker';
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '../../types';
@@ -54,6 +54,13 @@ interface LeadToolbarProps {
     industryFilter: string | 'all';
     setIndustryFilter: (v: string | 'all') => void;
     industries: Industry[];
+    painFilter?: string | 'all';
+    setPainFilter?: (v: string | 'all') => void;
+    painOptions?: string[];
+    urgencyFilter?: 'all' | 'high' | 'medium' | 'low';
+    setUrgencyFilter?: (v: 'all' | 'high' | 'medium' | 'low') => void;
+    onOpenIntakeSettings?: () => void;
+    isAdmin?: boolean;
 
     // 🏢 Hierarchical Workspaces (HubSpot / Salesforce style)
     workspaceProps?: {
@@ -85,6 +92,10 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     completedLeadIds, setCompletedLeadIds, calendarDateLabel, setCalendarDateLabel,
     productFilter, setProductFilter, products,
     industryFilter, setIndustryFilter, industries,
+    painFilter = 'all', setPainFilter, painOptions = [],
+    urgencyFilter = 'all', setUrgencyFilter,
+    onOpenIntakeSettings,
+    isAdmin = false,
     handleDownloadTemplate, handleImportCSV, isImporting, setIsModalOpen,
     navigate, cameFromRef, setMinContactCountFilter, csvHelper, workspaceProps
 }) => {
@@ -99,6 +110,8 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
     const [isProductFilterOpen, setIsProductFilterOpen] = useState(false);
     const [isIndustryFilterOpen, setIsIndustryFilterOpen] = useState(false);
+    const [isPainFilterOpen, setIsPainFilterOpen] = useState(false);
+    const [isUrgencyFilterOpen, setIsUrgencyFilterOpen] = useState(false);
 
     // Dynamic lead sources from DB
     const { options: dynamicSources, getBySlug } = useLeadSources();
@@ -111,6 +124,8 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
     const dateRangeRef = useRef<HTMLDivElement>(null);
     const productFilterRef = useRef<HTMLDivElement>(null);
     const industryFilterRef = useRef<HTMLDivElement>(null);
+    const painFilterRef = useRef<HTMLDivElement>(null);
+    const urgencyFilterRef = useRef<HTMLDivElement>(null);
     const exportMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -123,6 +138,8 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
             if (dateRangeRef.current && !dateRangeRef.current.contains(event.target as Node)) setIsDateRangeOpen(false);
             if (productFilterRef.current && !productFilterRef.current.contains(event.target as Node)) setIsProductFilterOpen(false);
             if (industryFilterRef.current && !industryFilterRef.current.contains(event.target as Node)) setIsIndustryFilterOpen(false);
+            if (painFilterRef.current && !painFilterRef.current.contains(event.target as Node)) setIsPainFilterOpen(false);
+            if (urgencyFilterRef.current && !urgencyFilterRef.current.contains(event.target as Node)) setIsUrgencyFilterOpen(false);
             if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) setIsExportMenuOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -679,6 +696,8 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                                 setLostAtStageFilter('all');
                                 setProductFilter('all');
                                 setIndustryFilter('all');
+                                setPainFilter?.('all');
+                                setUrgencyFilter?.('all');
                                 setStartDateFilter(null);
                                 setEndDateFilter(null);
                                 setIsMobileFilterOpen(false);
@@ -934,6 +953,18 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                                     <span className="hidden sm:inline ml-0.5">Importar</span>
                                 </Button>
                             </div>
+                            {onOpenIntakeSettings && (
+                                <Button
+                                    variant="outline"
+                                    type="button"
+                                    onClick={onOpenIntakeSettings}
+                                    title={isAdmin ? 'Configurar campos visibles del formulario Excel / Ads' : 'Ver configuración de campos del formulario'}
+                                    className="flex items-center gap-1.5 h-9 px-3 text-xs font-semibold border-indigo-200 text-indigo-700 bg-indigo-50/40 hover:bg-indigo-50"
+                                >
+                                    <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
+                                    <span className="hidden sm:inline">Campos Excel</span>
+                                </Button>
+                            )}
                         </div>
                         <Button onClick={() => setIsModalOpen(true)} className="flex-1 sm:flex-none h-9 bg-[#4449AA] hover:bg-[#383d8f] px-5 text-xs font-bold text-white shadow-md shadow-indigo-100 transition-all border-none rounded-xl">
                             <Plus className="w-4 h-4 mr-1.5" />Nuevo Prospecto
@@ -977,6 +1008,80 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                     </div>
                     <ProductDropdown />
                     <IndustryDropdown />
+                    {setPainFilter && painOptions.length > 0 && (
+                        <div className="relative" ref={painFilterRef}>
+                            <button
+                                onClick={() => setIsPainFilterOpen(!isPainFilterOpen)}
+                                className={`flex items-center gap-2 bg-white border px-3 py-2 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all shadow-sm h-9 min-w-[140px] justify-between ${painFilter !== 'all' ? 'border-indigo-300 text-indigo-700 bg-indigo-50/40' : 'border-gray-200 text-gray-600'}`}
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    <Target className="h-3.5 w-3.5 opacity-60 text-indigo-600" />
+                                    <span className="truncate max-w-[125px]">{painFilter === 'all' ? 'Punto de Mejora' : painFilter}</span>
+                                </div>
+                                <ChevronDown className={`h-3.5 w-3.5 opacity-40 transition-transform duration-300 ${isPainFilterOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            {isPainFilterOpen && (
+                                <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 py-2 animate-in fade-in slide-in-from-top-2 max-h-72 overflow-y-auto">
+                                    <button
+                                        onClick={() => { setPainFilter('all'); setIsPainFilterOpen(false); }}
+                                        className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors ${painFilter === 'all' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                                    >
+                                        Todos los puntos de mejora
+                                    </button>
+                                    <div className="border-t border-gray-100 my-1" />
+                                    {painOptions.map(pain => (
+                                        <button
+                                            key={pain}
+                                            onClick={() => { setPainFilter(pain); setIsPainFilterOpen(false); }}
+                                            className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors ${painFilter === pain ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}
+                                        >
+                                            {pain}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {setUrgencyFilter && (
+                        <div className="relative" ref={urgencyFilterRef}>
+                            <button
+                                onClick={() => setIsUrgencyFilterOpen(!isUrgencyFilterOpen)}
+                                className={`flex items-center gap-2 bg-white border px-3 py-2 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all shadow-sm h-9 min-w-[125px] justify-between ${urgencyFilter !== 'all' ? 'border-rose-300 text-rose-700 bg-rose-50/40' : 'border-gray-200 text-gray-600'}`}
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    <Flame className="h-3.5 w-3.5 opacity-70 text-rose-600" />
+                                    <span>
+                                        {urgencyFilter === 'all'
+                                            ? 'Urgencia Form'
+                                            : urgencyFilter === 'high'
+                                            ? 'Alta'
+                                            : urgencyFilter === 'medium'
+                                            ? 'Media'
+                                            : 'Evaluando'}
+                                    </span>
+                                </div>
+                                <ChevronDown className={`h-3.5 w-3.5 opacity-40 transition-transform duration-300 ${isUrgencyFilterOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            {isUrgencyFilterOpen && (
+                                <div className="absolute left-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                                    {[
+                                        { id: 'all', label: 'Todas las urgencias' },
+                                        { id: 'high', label: '🔥 Alta (Lo antes posible)' },
+                                        { id: 'medium', label: '⚡ Media (1 a 3 meses)' },
+                                        { id: 'low', label: 'ℹ️ Baja (Solo evaluando)' },
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => { setUrgencyFilter(opt.id as any); setIsUrgencyFilterOpen(false); }}
+                                            className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-colors ${urgencyFilter === opt.id ? 'bg-rose-50 text-rose-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <div className="w-px h-4 bg-gray-200 mx-1" />
                     <LossReasonDropdown />
                     <LossStageDropdown />
@@ -1095,7 +1200,7 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                 </div>
 
                 {/* ROW 3: Active filter chips */}
-                {(filteredLeadId || filteredLeadIds || calendarDateLabel || statusFilter !== 'all' || priorityFilter !== 'all' || assignedFilter !== 'all' || sourceFilter !== 'all' || lossReasonFilter !== 'all' || lostAtStageFilter !== 'all' || productFilter !== 'all' || industryFilter !== 'all' || startDateFilter || endDateFilter) && (
+                {(filteredLeadId || filteredLeadIds || calendarDateLabel || statusFilter !== 'all' || priorityFilter !== 'all' || assignedFilter !== 'all' || sourceFilter !== 'all' || lossReasonFilter !== 'all' || lostAtStageFilter !== 'all' || productFilter !== 'all' || industryFilter !== 'all' || painFilter !== 'all' || urgencyFilter !== 'all' || startDateFilter || endDateFilter) && (
                     <div className="hidden md:flex items-center gap-2 flex-wrap animate-in fade-in slide-in-from-top-1 duration-200">
                         <span className="text-[11px] text-gray-400 font-medium">Activos:</span>
                         {calendarDateLabel && (
@@ -1126,6 +1231,18 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                             <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
                                 Rubro: {industryFilter}
                                 <button onClick={() => setIndustryFilter('all')} className="hover:text-indigo-900 ml-0.5"><X className="w-3 h-3" /></button>
+                            </span>
+                        )}
+                        {painFilter !== 'all' && setPainFilter && (
+                            <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
+                                Dolor: {painFilter}
+                                <button onClick={() => setPainFilter('all')} className="hover:text-indigo-900 ml-0.5"><X className="w-3 h-3" /></button>
+                            </span>
+                        )}
+                        {urgencyFilter !== 'all' && setUrgencyFilter && (
+                            <span className="inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
+                                Urgencia: {urgencyFilter === 'high' ? 'Alta' : urgencyFilter === 'medium' ? 'Media' : 'Evaluando'}
+                                <button onClick={() => setUrgencyFilter('all')} className="hover:text-rose-900 ml-0.5"><X className="w-3 h-3" /></button>
                             </span>
                         )}
                         {assignedFilter !== 'all' && (
@@ -1192,6 +1309,8 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                                 setStartDateFilter(null); setEndDateFilter(null); setMinContactCountFilter(null);
                                 setProductFilter('all');
                                 setIndustryFilter('all');
+                                setPainFilter?.('all');
+                                setUrgencyFilter?.('all');
                             }}
                             className="text-xs font-semibold text-gray-400 hover:text-red-500 transition-colors ml-1 flex items-center gap-1"
                         >

@@ -8,10 +8,19 @@ import { StatusBadge } from '../components/leads/StatusBadge';
 import { PriorityBadge } from '../components/leads/PriorityBadge';
 import { BulkAssignModal } from '../components/leads/BulkAssignModal';
 import { WhatsAppReactivationModal } from '../components/leads/WhatsAppReactivationModal';
+import { IntakeFieldSettingsModal } from '../components/leads/IntakeFieldSettingsModal';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { leadsService } from '../services/leads';
+import { leadIntakeSettingsService } from '../services/leadIntakeSettings';
+import {
+    DEFAULT_INTAKE_DISPLAY_SETTINGS,
+    discoverAvailableIntakeFields,
+    extractLeadIntakeProfile,
+    getLeadIntakeFieldValue,
+    type LeadIntakeDisplaySettings,
+} from '../utils/leadIntakeProfile';
 import { clientsService } from '../services/clients';
 import { auditLogService } from '../services/auditLog';
 import { notificationsService } from '../services/notifications';
@@ -228,24 +237,59 @@ export default function Leads() {
         }
         return result;
     }, [waCampaignTickets, leads]);
-    const [sortConfig, setSortConfig] = useState<{ key: keyof Lead | 'value'; direction: 'asc' | 'desc' } | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
-    // All available columns with labels
-    const ALL_COLUMNS: { id: string; label: string; icon: string }[] = [
-        { id: 'name',              label: 'Nombre / Empresa',    icon: '👤' },
-        { id: 'email',             label: 'Email',               icon: '✉️' },
-        { id: 'phone',             label: 'Teléfono',            icon: '📞' },
-        { id: 'status',            label: 'Estado',              icon: '🏷️' },
-        { id: 'priority',          label: 'Prioridad',           icon: '⭐' },
-        { id: 'source',            label: 'Fuente',              icon: '📡' },
-        { id: 'industry',          label: 'Rubro / Industria',   icon: '🏢' },
-        { id: 'value',             label: 'Valor',               icon: '💰' },
-        { id: 'assigned_to',       label: 'Asignado',            icon: '👥' },
-        { id: 'last_follow_up_at', label: 'Último Seguimiento',  icon: '🕐' },
-        { id: 'internal_won_date', label: 'Fecha Cierre',        icon: '✅' },
-        { id: 'created_at',        label: 'Creado el',           icon: '📅' },
-        { id: 'interested_product_id', label: 'Producto',        icon: '📦' },
-    ];
+    const [intakeSettings, setIntakeSettings] = useState<LeadIntakeDisplaySettings>(() => ({
+        company_id: activeCompanyId,
+        ...DEFAULT_INTAKE_DISPLAY_SETTINGS,
+    }));
+    const [isIntakeSettingsOpen, setIsIntakeSettingsOpen] = useState(false);
+
+    useEffect(() => {
+        if (!activeCompanyId) return;
+        let cancelled = false;
+        leadIntakeSettingsService.getSettings(activeCompanyId).then((cfg) => {
+            if (!cancelled) setIntakeSettings(cfg);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [activeCompanyId]);
+
+    const discoveredIntakeFields = useMemo(
+        () => discoverAvailableIntakeFields(leads, intakeSettings.custom_field_labels),
+        [leads, intakeSettings.custom_field_labels],
+    );
+
+    const enabledTableIntakeFields = useMemo(() => {
+        const enabledSet = new Set(intakeSettings.visible_in_table || []);
+        return discoveredIntakeFields.filter((f) => enabledSet.has(f.key));
+    }, [discoveredIntakeFields, intakeSettings.visible_in_table]);
+
+    // All available columns with labels (base + SaaS-configured Excel/Form columns)
+    const ALL_COLUMNS: { id: string; label: string; icon: string }[] = useMemo(() => {
+        const base: { id: string; label: string; icon: string }[] = [
+            { id: 'name',              label: 'Nombre / Empresa',    icon: '👤' },
+            { id: 'email',             label: 'Email',               icon: '✉️' },
+            { id: 'phone',             label: 'Teléfono',            icon: '📞' },
+            { id: 'status',            label: 'Estado',              icon: '🏷️' },
+            { id: 'priority',          label: 'Prioridad',           icon: '⭐' },
+            { id: 'source',            label: 'Fuente',              icon: '📡' },
+            { id: 'industry',          label: 'Rubro / Industria',   icon: '🏢' },
+            { id: 'value',             label: 'Valor',               icon: '💰' },
+            { id: 'assigned_to',       label: 'Asignado',            icon: '👥' },
+            { id: 'last_follow_up_at', label: 'Último Seguimiento',  icon: '🕐' },
+            { id: 'internal_won_date', label: 'Fecha Cierre',        icon: '✅' },
+            { id: 'created_at',        label: 'Creado el',           icon: '📅' },
+            { id: 'interested_product_id', label: 'Producto',        icon: '📦' },
+        ];
+        const dynamicCols = enabledTableIntakeFields.map((f) => ({
+            id: `intake:${f.key}`,
+            label: f.shortLabel,
+            icon: f.key === 'punto_de_mejora' ? '🎯' : f.key === 'urgencia' ? '🔥' : '📋',
+        }));
+        return [...base, ...dynamicCols];
+    }, [enabledTableIntakeFields]);
 
     // Column order persistence
     const [columnOrder, setColumnOrder] = useState<string[]>(() => {
@@ -285,11 +329,61 @@ export default function Leads() {
     const [showColumnModal, setShowColumnModal] = useState(false);
     const columnModalRef = useRef<HTMLDivElement>(null);
 
+    // Sync company-configured Excel/Form columns into order & visibility without breaking saved columns
+    useEffect(() => {
+        const enabledIntakeIds = (intakeSettings.visible_in_table || []).map((k) => `intake:${k}`);
+        const enabledSet = new Set(enabledIntakeIds);
+
+        let manualHidden: string[] = [];
+        try {
+            const raw = localStorage.getItem('lead_manual_hidden_intake_cols');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) manualHidden = parsed;
+            }
+        } catch {}
+        const manualHiddenSet = new Set(manualHidden);
+
+        setColumnOrder((prev) => {
+            const cleaned = prev.filter((id) => !id.startsWith('intake:') || enabledSet.has(id));
+            const missing = enabledIntakeIds.filter((id) => !cleaned.includes(id));
+            if (missing.length === 0 && cleaned.length === prev.length) return prev;
+            const next = [...cleaned];
+            const anchorIdx = next.indexOf('industry');
+            const insertAt = anchorIdx >= 0 ? anchorIdx + 1 : Math.min(next.length, 7);
+            next.splice(insertAt, 0, ...missing);
+            localStorage.setItem('lead_column_order', JSON.stringify(next));
+            return next;
+        });
+
+        setVisibleColumns((prev) => {
+            const cleaned = prev.filter((id) => !id.startsWith('intake:') || enabledSet.has(id));
+            const toAdd = enabledIntakeIds.filter(
+                (id) => !cleaned.includes(id) && !manualHiddenSet.has(id),
+            );
+            if (toAdd.length === 0 && cleaned.length === prev.length) return prev;
+            const next = [...cleaned, ...toAdd];
+            localStorage.setItem('lead_visible_columns', JSON.stringify(next));
+            return next;
+        });
+    }, [intakeSettings.visible_in_table]);
+
     const toggleColumnVisibility = (colId: string) => {
         if (colId === 'name') return; // name is always required
         setVisibleColumns(prev => {
-            const next = prev.includes(colId) ? prev.filter(c => c !== colId) : [...prev, colId];
+            const removing = prev.includes(colId);
+            const next = removing ? prev.filter(c => c !== colId) : [...prev, colId];
             localStorage.setItem('lead_visible_columns', JSON.stringify(next));
+            if (colId.startsWith('intake:')) {
+                try {
+                    const raw = localStorage.getItem('lead_manual_hidden_intake_cols');
+                    const parsed: string[] = raw ? JSON.parse(raw) : [];
+                    const updatedHidden = removing
+                        ? [...new Set([...parsed, colId])]
+                        : parsed.filter((id) => id !== colId);
+                    localStorage.setItem('lead_manual_hidden_intake_cols', JSON.stringify(updatedHidden));
+                } catch {}
+            }
             return next;
         });
     };
@@ -309,6 +403,8 @@ export default function Leads() {
         priority: 120, source: 130, industry: 150, value: 110, assigned_to: 140,
         last_follow_up_at: 145, internal_won_date: 130, created_at: 120,
         interested_product_id: 140,
+        'intake:punto_de_mejora': 185,
+        'intake:urgencia': 170,
     };
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
         try {
@@ -376,6 +472,17 @@ export default function Leads() {
     const [productFilter, setProductFilter] = useState<string | 'all' | string[]>('all');
     const [products, setProducts] = useState<LeadProduct[]>([]);
     const [industryFilter, setIndustryFilter] = useState<string | 'all'>('all');
+    const [painFilter, setPainFilter] = useState<string | 'all'>('all');
+    const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+
+    const painOptions = useMemo(() => {
+        const set = new Set<string>();
+        for (const l of leads) {
+            const pain = getLeadIntakeFieldValue(l, 'punto_de_mejora');
+            if (pain) set.add(pain);
+        }
+        return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+    }, [leads]);
     const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
     const [isAssignedFilterOpen, setIsAssignedFilterOpen] = useState(false);
     const assignedFilterRef = useRef<HTMLDivElement>(null);
@@ -692,13 +799,15 @@ export default function Leads() {
             if (searchTerm.trim()) {
                 const term = searchTerm.toLowerCase().trim();
                 const prodName = products.find(p => p.id === lead.interested_product_id)?.name || '';
+                const intakeValues = Object.values(extractLeadIntakeProfile(lead).values);
                 const matchesSearch =
                     lead.name?.toLowerCase().includes(term) ||
                     lead.email?.toLowerCase().includes(term) ||
                     lead.company_name?.toLowerCase().includes(term) ||
                     lead.phone?.toLowerCase().includes(term) ||
                     lead.next_action_notes?.toLowerCase().includes(term) ||
-                    prodName.toLowerCase().includes(term);
+                    prodName.toLowerCase().includes(term) ||
+                    intakeValues.some(v => v.toLowerCase().includes(term));
 
                 if (!matchesSearch) return false;
             }
@@ -829,6 +938,16 @@ export default function Leads() {
                 if ((lead.industry || '') !== industryFilter) return false;
             }
 
+            // Filter by Punto de Mejora (Dolor del formulario)
+            if (painFilter !== 'all') {
+                if (getLeadIntakeFieldValue(lead, 'punto_de_mejora') !== painFilter) return false;
+            }
+
+            // Filter by Urgencia del formulario
+            if (urgencyFilter !== 'all') {
+                if (extractLeadIntakeProfile(lead).urgencyLevel !== urgencyFilter) return false;
+            }
+
             // Filter by uncontacted only (0 contacts and no follow up recorded)
             if (uncontactedOnly) {
                 if (lead.status !== 'Prospecto') return false;
@@ -869,7 +988,7 @@ export default function Leads() {
 
         // Apply pipeline intelligence filter on top of standard filters
         return applyPipelineFilter(base, pipelineFilter, profile?.company_id);
-    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, industryFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, uncontactedOnly, inactivityFilter, waCampaignFilter, waCampaignByLeadId, pipelineFilter, pipelineView]);
+    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, productFilter, industryFilter, painFilter, urgencyFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, uncontactedOnly, inactivityFilter, waCampaignFilter, waCampaignByLeadId, pipelineFilter, pipelineView]);
 
     const waCampaignCounts = useMemo(() => {
         let notSent = 0;
@@ -919,8 +1038,12 @@ export default function Leads() {
         if (!sortConfig) return filteredLeads;
         return [...filteredLeads].sort((a, b) => {
             const { key, direction } = sortConfig;
-            const valA = a[key] ?? '';
-            const valB = b[key] ?? '';
+            const valA = key.startsWith('intake:')
+                ? getLeadIntakeFieldValue(a, key.slice(7))
+                : ((a as any)[key] ?? '');
+            const valB = key.startsWith('intake:')
+                ? getLeadIntakeFieldValue(b, key.slice(7))
+                : ((b as any)[key] ?? '');
             if (valA < valB) return direction === 'asc' ? -1 : 1;
             if (valA > valB) return direction === 'asc' ? 1 : -1;
             return 0;
@@ -1019,6 +1142,51 @@ export default function Leads() {
 
         applyReadyFilter();
     }, [searchParams]);
+
+    // ── Deep-link /leads?lead=<uuid> (e.g. from WhatsApp hot-lead alerts) ──────
+    const handledDeepLinkRef = useRef<string | null>(null);
+    useEffect(() => {
+        const deepLinkId = searchParams.get('lead');
+        if (!deepLinkId) return;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(deepLinkId.trim());
+        if (!isUuid || loading) return;
+        if (handledDeepLinkRef.current === deepLinkId) return;
+
+        let cancelled = false;
+        const openFromDeepLink = async () => {
+            try {
+                let target = leads.find((l) => l.id === deepLinkId) || null;
+                if (!target) {
+                    target = await leadsService.getLeadById(deepLinkId);
+                }
+                if (cancelled) return;
+                handledDeepLinkRef.current = deepLinkId;
+                if (target) {
+                    setPipelineView('all');
+                    setFilteredLeadId(target.id);
+                    setViewMode((prev) => (prev === 'kanban' ? 'list' : prev));
+                    openLeadDetail(target);
+                } else {
+                    toast.error('No se encontró el prospecto solicitado');
+                }
+            } catch {
+                if (!cancelled) toast.error('No se pudo abrir el prospecto del enlace');
+            } finally {
+                if (!cancelled) {
+                    setSearchParams((prev) => {
+                        const next = new URLSearchParams(prev);
+                        next.delete('lead');
+                        return next;
+                    }, { replace: true });
+                }
+            }
+        };
+
+        openFromDeepLink();
+        return () => {
+            cancelled = true;
+        };
+    }, [searchParams, loading, leads.length]);
 
     const loadLossReasons = async () => {
         try {
@@ -1794,6 +1962,13 @@ export default function Leads() {
                 industryFilter={industryFilter}
                 setIndustryFilter={setIndustryFilter}
                 industries={industries}
+                painFilter={painFilter}
+                setPainFilter={setPainFilter}
+                painOptions={painOptions}
+                urgencyFilter={urgencyFilter}
+                setUrgencyFilter={setUrgencyFilter}
+                onOpenIntakeSettings={() => setIsIntakeSettingsOpen(true)}
+                isAdmin={isAdmin}
                 workspaceProps={{ workspaces, canRollup, selectedWorkspace, setSelectedWorkspace }}
             />
             {/* ── Uncontacted Filter Banner ──────────────────────────── */}
@@ -2261,7 +2436,12 @@ export default function Leads() {
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => {
-                                                        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'industry', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at', 'interested_product_id'];
+                                                        const defaultCols = [
+                                                            'name', 'email', 'phone', 'status', 'priority', 'source', 'industry',
+                                                            ...(intakeSettings.visible_in_table || []).map((k) => `intake:${k}`),
+                                                            'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at', 'interested_product_id',
+                                                        ];
+                                                        localStorage.removeItem('lead_manual_hidden_intake_cols');
                                                         setVisibleColumns(defaultCols);
                                                         localStorage.setItem('lead_visible_columns', JSON.stringify(defaultCols));
                                                     }}
@@ -2272,6 +2452,7 @@ export default function Leads() {
                                                 <button
                                                     onClick={() => {
                                                         const all = ALL_COLUMNS.map(c => c.id);
+                                                        localStorage.removeItem('lead_manual_hidden_intake_cols');
                                                         setVisibleColumns(all);
                                                         localStorage.setItem('lead_visible_columns', JSON.stringify(all));
                                                     }}
@@ -2279,7 +2460,7 @@ export default function Leads() {
                                                 >Todas</button>
                                             </div>
                                         </div>
-                                        <div className="py-1">
+                                        <div className="py-1 max-h-72 overflow-y-auto">
                                             {ALL_COLUMNS.map(col => {
                                                 const isVisible = visibleColumns.includes(col.id);
                                                 const isRequired = col.id === 'name';
@@ -2332,6 +2513,7 @@ export default function Leads() {
                                             navigate={navigate}
                                             products={products}
                                             waCampaignByLeadId={waCampaignByLeadId}
+                                            intakeFields={discoveredIntakeFields}
                                         />
                                     </div>
                                 </div>
@@ -2627,6 +2809,8 @@ export default function Leads() {
                 PriorityBadge={PriorityBadge}
                 products={products}
                 loadProducts={loadProducts}
+                intakeSettings={intakeSettings}
+                onOpenIntakeSettings={() => setIsIntakeSettingsOpen(true)}
             />
 
             {/* Won Modal */}
@@ -3215,6 +3399,21 @@ export default function Leads() {
                     }}
                 />
             )}
+
+            {/* ── CONFIGURACIÓN SAAS DE CAMPOS DE FORMULARIO ────────────── */}
+            <IntakeFieldSettingsModal
+                isOpen={isIntakeSettingsOpen}
+                onClose={() => setIsIntakeSettingsOpen(false)}
+                companyId={activeCompanyId}
+                userId={profile?.id}
+                isAdmin={isAdmin}
+                leads={leads}
+                settings={intakeSettings}
+                onSaved={(updated) => {
+                    localStorage.removeItem('lead_manual_hidden_intake_cols');
+                    setIntakeSettings(updated);
+                }}
+            />
         </>
     );
 }

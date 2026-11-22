@@ -297,4 +297,35 @@ test('8. Edge Function google-sheets-lead-intake/index.ts bundles cleanly for De
   assert.ok(code.includes('SHEETS_SYNC_SECRET'));
   assert.ok(code.includes('normalizeSheetRow'));
   assert.ok(code.includes('raw_meta_payload'));
+  assert.ok(code.includes('lead_ai_memory'));
+});
+
+test('9. Builds structured AI memory facts for downstream WhatsApp qualification', () => {
+  const lead = helpers.normalizeSheetRow({
+    'NOMBRE COMPLETO': 'Evany Susana Ortiz Calvo',
+    'TELÉFONO': '50378889900',
+    EMPRESA: 'Susana Calvo Salón',
+    CARGO: 'Propietaria',
+    'FACTURAS ANUAL': 'De 500 a 2,000',
+    'MÉTODO DE GESTIÓN ACTUAL': 'Manualmente (Excel, papel, etc.)',
+    'PUNTO DE MEJORA': 'Inventarios y productos',
+    'URGENCIA DE PROJECTO': 'Lo antes posible',
+    'ANUNCIO DE CONVERSION': 'ERP | Clientes potenciales',
+  });
+
+  const facts = helpers.buildAiMemoryFacts(lead, {
+    sheetName: 'NOVIEMBRE 2026',
+    rowNumber: 29,
+    syncedAt: '2026-11-22T20:00:00Z',
+  });
+
+  assert.equal(facts.cargo, 'Propietaria');
+  assert.equal(facts.facturas_anual, 'De 500 a 2,000');
+  assert.equal(facts.punto_de_mejora, 'Inventarios y productos');
+  assert.equal(facts.urgencia, 'Lo antes posible');
+  assert.equal(facts.prioridad_urgencia, 'high');
+  assert.equal(facts.producto_interes, 'ERP');
+  assert.equal(facts.sheet_origen, 'NOVIEMBRE 2026');
+  assert.equal(facts.fila_origen, 29);
+  assert.ok(facts.raw_form_fields && facts.raw_form_fields.CARGO === 'Propietaria');
 });

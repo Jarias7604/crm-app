@@ -5,6 +5,11 @@ import { format, differenceInHours, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SOURCE_CONFIG } from '../../types';
 import type { Lead, LeadProduct } from '../../types';
+import {
+    getLeadIntakeFieldValue,
+    inferUrgencyLevel,
+    type IntakeFieldDefinition,
+} from '../../utils/leadIntakeProfile';
 import { StatusBadge } from './StatusBadge';
 import { PriorityBadge } from './PriorityBadge';
 import { LeadScoreBadge } from './LeadScoreBadge';
@@ -21,8 +26,8 @@ interface LeadTableProps {
     toggleSelectAll: () => void;
     sortedLeads: Lead[];
     paginatedLeads: Lead[];
-    sortConfig: { key: keyof Lead; direction: 'asc' | 'desc' } | null;
-    setSortConfig: React.Dispatch<React.SetStateAction<{ key: keyof Lead; direction: 'asc' | 'desc' } | null>>;
+    sortConfig: { key: string; direction: 'asc' | 'desc' } | null;
+    setSortConfig: React.Dispatch<React.SetStateAction<{ key: string; direction: 'asc' | 'desc' } | null>>;
     teamMembers: any[];
     openLeadDetail: (lead: Lead) => void;
     completedLeadIds: string[] | null;
@@ -32,6 +37,7 @@ interface LeadTableProps {
     navigate: any;
     products: LeadProduct[];
     waCampaignByLeadId?: Record<string, { touch: number; campaign: string; sentAt?: string }>;
+    intakeFields?: IntakeFieldDefinition[];
 }
 
 export const LeadTable: React.FC<LeadTableProps> = ({
@@ -56,6 +62,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
     navigate,
     products,
     waCampaignByLeadId,
+    intakeFields = [],
 }) => {
     return (
         <table
@@ -284,6 +291,25 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                                         <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'interested_product_id' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
+
+                                                                                {colId.startsWith('intake:') && (() => {
+                                                                                    const fieldKey = colId.slice(7);
+                                                                                    const def = intakeFields.find(f => f.key === fieldKey);
+                                                                                    const label = def?.shortLabel || fieldKey.replace(/^extra:/, '').replace(/_/g, ' ');
+                                                                                    return (
+                                                                                        <div
+                                                                                            className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1 truncate"
+                                                                                            onClick={() => setSortConfig({
+                                                                                                key: colId,
+                                                                                                direction: sortConfig?.key === colId && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                            })}
+                                                                                            title={def?.label || label}
+                                                                                        >
+                                                                                            <span className="truncate">{label}</span>
+                                                                                            <ArrowUpDown className={`w-3 h-3 shrink-0 ${sortConfig?.key === colId ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
+                                                                                        </div>
+                                                                                    );
+                                                                                })()}
                                                                             </div>
                                                                             {/* Resize handle — always a thin visible line, indigo on hover */}
                                                                             <div
@@ -531,6 +557,46 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                         </span>
                                                                     ) : (
                                                                         <span className="text-gray-300">-</span>
+                                                                    );
+                                                                })()}
+
+                                                                {colId.startsWith('intake:') && (() => {
+                                                                    const fieldKey = colId.slice(7);
+                                                                    const val = getLeadIntakeFieldValue(lead, fieldKey);
+                                                                    if (!val) {
+                                                                        return <span className="text-[10px] text-slate-300 font-bold">—</span>;
+                                                                    }
+                                                                    if (fieldKey === 'urgencia') {
+                                                                        const lvl = inferUrgencyLevel(val);
+                                                                        const badgeCls =
+                                                                            lvl === 'high'
+                                                                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                                                                : lvl === 'low'
+                                                                                ? 'bg-slate-100 text-slate-600 border-slate-200'
+                                                                                : 'bg-amber-50 text-amber-800 border-amber-200';
+                                                                        return (
+                                                                            <span
+                                                                                className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-lg border max-w-[165px] truncate ${badgeCls}`}
+                                                                                title={val}
+                                                                            >
+                                                                                <span className="truncate">{val}</span>
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                    if (fieldKey === 'punto_de_mejora') {
+                                                                        return (
+                                                                            <span
+                                                                                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border bg-indigo-50 text-indigo-700 border-indigo-200 max-w-[175px] truncate"
+                                                                                title={val}
+                                                                            >
+                                                                                <span className="truncate">{val}</span>
+                                                                            </span>
+                                                                        );
+                                                                    }
+                                                                    return (
+                                                                        <span className="text-[11px] font-semibold text-slate-700 truncate block" title={val}>
+                                                                            {val}
+                                                                        </span>
                                                                     );
                                                                 })()}
                                                             </td>

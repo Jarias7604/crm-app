@@ -39,7 +39,7 @@ export const leadsService = {
     // PROTECTED by safeSelect — if ANY column is missing, auto-fallback to SELECT *
     async getLeads(page = 1, pageSize = 1000, companyId?: string | string[]) {
         this.purgeAutoCampaignFollowUps().catch(() => {});
-        const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, assigned_at, interested_product_id';
+        const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, assigned_at, interested_product_id, meta_campaign_name, raw_meta_payload';
 
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
@@ -75,7 +75,7 @@ export const leadsService = {
     // PROTECTED by safeSelect
     async getLeadsCursor(limit = 1000, offsetOrCursor?: string | number, companyId?: string | string[]) {
         this.purgeAutoCampaignFollowUps().catch(() => {});
-        const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, last_follow_up_at, first_follow_up_at, assigned_at, interested_product_id';
+        const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, last_follow_up_at, first_follow_up_at, assigned_at, interested_product_id, meta_campaign_name, raw_meta_payload';
 
         const resolvedCompanyId = companyId || (await this.getActiveCompanyId());
         const filters: any[] = [];
@@ -296,19 +296,15 @@ export const leadsService = {
         }
     },
 
-    // Get full details for a specific lead (called when opening the panel)
-    async getLeadById(id: string) {
-        const { data, error } = await supabase
-            .from('leads')
-            .select(`
-                *,
-                cotizaciones ( id, numero, total, status, created_at )
-            `)
-            .eq('id', id)
-            .single();
-
-        if (error) throw error;
-        return data as Lead;
+    // Get full details for a specific lead (called when opening the panel or deep-link)
+    async getLeadById(id: string): Promise<Lead | null> {
+        const result = await safeSelect<Lead>({
+            table: 'leads',
+            fields: '*',
+            filters: [{ column: 'id', op: 'eq', value: id }],
+            limit: 1,
+        });
+        return result.data[0] || null;
     },
 
     // Get lead statistics for Dashboard - Optimized selection

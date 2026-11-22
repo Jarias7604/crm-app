@@ -30,6 +30,12 @@ import { QuickActionLogger } from '../QuickCallLogger';
 import GoogleMeetScheduler from '../GoogleMeetScheduler';
 import { SectionErrorBoundary } from '../ui/SectionErrorBoundary';
 import { LeadWhatsappThread } from './LeadWhatsappThread';
+import { LeadIntakeDiagnosticCard } from './LeadIntakeDiagnosticCard';
+import {
+    buildLeadIntakeTimelineEvents,
+    isAutoSheetIntakeNote,
+    type LeadIntakeDisplaySettings,
+} from '../../utils/leadIntakeProfile';
 import toast from 'react-hot-toast';
 
 import { Input } from '../ui/Input';
@@ -65,6 +71,8 @@ interface LeadDetailPanelProps {
     PriorityBadge: React.FC<{ priority: any }>;
     products: LeadProduct[];
     loadProducts: () => Promise<void>;
+    intakeSettings?: LeadIntakeDisplaySettings;
+    onOpenIntakeSettings?: () => void;
 }
 
 export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
@@ -78,7 +86,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     isAdmin,
     navigate,
     storageService,
-    industries, onIndustriesChanged, handleFileDownload, handleFileDelete, handleFileUpload, isUploading, isCallLoggerOpen, setIsCallLoggerOpen, callStartedAt, setCallStartedAt, handleUpdateLead, handleDeleteLead, StatusBadge, PriorityBadge
+    industries, onIndustriesChanged, handleFileDownload, handleFileDelete, handleFileUpload, isUploading, isCallLoggerOpen, setIsCallLoggerOpen, callStartedAt, setCallStartedAt, handleUpdateLead, handleDeleteLead, StatusBadge, PriorityBadge, intakeSettings, onOpenIntakeSettings
 }) => {
     const [followUps, setFollowUps] = useState<FollowUp[]>([]);
     const [messages, setMessages] = useState<any[]>([]);
@@ -278,6 +286,11 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
     })();
     const ariasAnsweredCount = Object.keys(ariasDiscoveryAnswers).length;
 
+    const intakeTimelineEvents = (() => {
+        if (intakeSettings && !intakeSettings.show_in_timeline) return [];
+        return buildLeadIntakeTimelineEvents(selectedLead, intakeSettings?.custom_field_labels);
+    })();
+
     // ── Cálculo del NEXT TRIGGER (Próxima Reunión / Próximo Seguimiento Agendado) ──
     const nextTrigger = (() => {
         const now = new Date();
@@ -351,7 +364,11 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
             : null;
 
         const rawActionType = targetFu?.action_type || 'call';
-        const combinedNotes = String(targetFu?.notes || selectedLead.next_action_notes || callActivities[0]?.notes || '').trim();
+        const fallbackLeadNote =
+            !targetFu && isAutoSheetIntakeNote(selectedLead.next_action_notes)
+                ? ''
+                : String(selectedLead.next_action_notes || '');
+        const combinedNotes = String(targetFu?.notes || fallbackLeadNote || callActivities[0]?.notes || '').trim();
         const isMeetingNote = /reuni[oó]n|demo|meet|zoom|presentaci[oó]n|entrega/i.test(combinedNotes);
         const actionLabel =
             rawActionType === 'meeting' || isMeetingNote
@@ -602,9 +619,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         >
                             <Clock className={`w-3.5 h-3.5 ${activeTab === 'activity' ? 'text-blue-600' : 'text-slate-400'}`} />
                             <span>Seguimientos</span>
-                            {(followUps.length + messages.length + callActivities.length) > 0 && (
+                            {(followUps.length + messages.length + callActivities.length + intakeTimelineEvents.length) > 0 && (
                                 <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
-                                    {followUps.length + messages.length + callActivities.length}
+                                    {followUps.length + messages.length + callActivities.length + intakeTimelineEvents.length}
                                 </span>
                             )}
                         </button>
@@ -616,6 +633,12 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                     {/* ── TAB 1: FICHA & NEGOCIO ── */}
                     {activeTab === 'info' && (
                         <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
+                            <LeadIntakeDiagnosticCard
+                                lead={selectedLead}
+                                settings={intakeSettings}
+                                isAdmin={isAdmin}
+                                onOpenSettings={onOpenIntakeSettings}
+                            />
                             {/* 2-Column Responsive Layout for Details (Al grano, directo al formulario como en Item Master) */}
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                                 {/* Left Column: Parámetros del Lead */}
@@ -1470,7 +1493,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                                             Objetivo / Acuerdo para el Próximo Contacto
                                         </span>
-                                        <p className="text-xs font-semibold text-slate-800 leading-snug line-clamp-2">
+                                        <p className="text-xs font-semibold text-slate-800 leading-snug whitespace-pre-line max-h-28 overflow-y-auto">
                                             {nextTrigger.notes}
                                         </p>
                                     </div>
@@ -1483,7 +1506,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     <div className="flex items-center gap-2">
                                         <Clock className="w-4 h-4 text-blue-600" />
                                         <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                                            Línea de Tiempo ({followUps.length + messages.length + callActivities.length})
+                                            Línea de Tiempo ({followUps.length + messages.length + callActivities.length + intakeTimelineEvents.length})
                                         </h4>
                                     </div>
                                     <button
@@ -1535,7 +1558,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                                 : 'text-slate-500 hover:text-slate-800'
                                             }`}
                                     >
-                                        Seguimientos ({followUps.length})
+                                        Seguimientos ({followUps.length + intakeTimelineEvents.length})
                                     </button>
                                 </div>
                             </div>
@@ -1546,17 +1569,18 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                     ...followUps.map(f => ({ ...f, _type: 'follow_up' as const })),
                                     ...messages.map(m => ({ ...m, _type: 'message' as const, date: m.created_at })),
                                     ...callActivities.map(a => ({ ...a, _type: 'call_activity' as const })),
+                                    ...intakeTimelineEvents.map(ev => ({ ...ev, _type: 'sheet_intake' as const, created_at: ev.timestamp })),
                                 ].sort((a: any, b: any) => {
                                     const getDate = (x: any) => x._type === 'call_activity'
                                         ? new Date(x.call_date || x.created_at)
-                                        : new Date(x.created_at || x.date);
+                                        : new Date(x.created_at || x.date || 0);
                                     return getDate(b).getTime() - getDate(a).getTime();
                                 });
 
                                 const filteredItems = allItems.filter(item => {
                                     if (timelineFilter === 'calls') return item._type === 'call_activity';
                                     if (timelineFilter === 'messages') return item._type === 'message';
-                                    if (timelineFilter === 'followups') return item._type === 'follow_up';
+                                    if (timelineFilter === 'followups') return item._type === 'follow_up' || item._type === 'sheet_intake';
                                     return true;
                                 });
 
@@ -1574,6 +1598,52 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 return (
                                     <div className="relative pl-7 space-y-3 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
                                         {filteredItems.map((item: any) => {
+                                            if (item._type === 'sheet_intake') {
+                                                const isReentry = item.kind === 'reentry';
+                                                const intakeDate = (() => {
+                                                    try {
+                                                        if (!item.timestamp) return 'Google Sheets';
+                                                        return format(new Date(item.timestamp), 'dd MMM yyyy, HH:mm', { locale: es });
+                                                    } catch {
+                                                        return 'Google Sheets';
+                                                    }
+                                                })();
+                                                return (
+                                                    <div key={`${item._type}-${item.id}`} className="relative group">
+                                                        <div className={`absolute -left-[28px] top-2 w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs z-10 ${isReentry ? 'bg-amber-500' : 'bg-teal-600'}`} />
+                                                        <div className={`bg-white rounded-xl p-4 border shadow-2xs space-y-2.5 ${isReentry ? 'border-amber-200/90 bg-amber-50/20' : 'border-teal-200/90 bg-teal-50/15'}`}>
+                                                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${isReentry ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-teal-100 text-teal-800 border-teal-200'}`}>
+                                                                        {isReentry ? '♻️ Reingreso desde Formulario' : '📋 Ingreso desde Formulario'}
+                                                                    </span>
+                                                                    {(item.sheetName || item.rowNumber) && (
+                                                                        <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                                                                            {item.sheetName || 'Google Sheets'}
+                                                                            {item.rowNumber ? ` · Fila ${item.rowNumber}` : ''}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-slate-500">
+                                                                    {intakeDate}
+                                                                </span>
+                                                            </div>
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                                {(item.entries || []).map((entry: any) => (
+                                                                    <div key={entry.key} className="p-2 rounded-lg bg-white border border-slate-200/80">
+                                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                                                            {entry.label}
+                                                                        </span>
+                                                                        <span className="text-xs font-semibold text-slate-800 whitespace-pre-wrap break-words">
+                                                                            {entry.value}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
                                             const isActivity = item._type === 'call_activity';
                                             const isMessage = item._type === 'message';
                                             const isFollowUp = item._type === 'follow_up';

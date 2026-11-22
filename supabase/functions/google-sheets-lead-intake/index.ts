@@ -11,6 +11,7 @@ import {
   appendNotePreservingExisting,
   extractSyncKeys,
   formatSheetStatusCell,
+  buildAiMemoryFacts,
 } from './helpers.ts';
 
 const CORS_HEADERS = {
@@ -99,6 +100,48 @@ serve(async (req: Request) => {
 
     const items = rawItems.slice(0, MAX_BATCH_ROWS);
     const advisorNameCache = new Map<string, string>();
+
+    const upsertLeadAiMemory = async (params: {
+      leadId: string;
+      lead: ReturnType<typeof normalizeSheetRow>;
+      syncedAt: string;
+      rowNumber: number;
+    }) => {
+      try {
+        const { data: prevMem } = await supabase
+          .from('lead_ai_memory')
+          .select('known_facts, conversation_stage, next_action')
+          .eq('lead_id', params.leadId)
+          .maybeSingle();
+
+        const prevFacts =
+          prevMem?.known_facts && typeof prevMem.known_facts === 'object'
+            ? prevMem.known_facts
+            : {};
+
+        const incomingFacts = buildAiMemoryFacts(params.lead, {
+          sheetName,
+          rowNumber: params.rowNumber,
+          syncedAt: params.syncedAt,
+        });
+
+        await supabase
+          .from('lead_ai_memory')
+          .upsert(
+            {
+              lead_id: params.leadId,
+              company_id: companyId,
+              known_facts: { ...prevFacts, ...incomingFacts },
+              conversation_stage: prevMem?.conversation_stage || 'nuevo',
+              next_action: prevMem?.next_action || 'calificar',
+              updated_at: params.syncedAt,
+            },
+            { onConflict: 'lead_id' },
+          );
+      } catch (memErr: any) {
+        console.warn('[google-sheets-lead-intake] lead_ai_memory non-blocking warning:', memErr?.message || memErr);
+      }
+    };
 
     const resolveAdvisorName = async (assignedTo: string | null): Promise<string> => {
       if (!assignedTo) return 'Sin asignar';
@@ -246,6 +289,10 @@ serve(async (req: Request) => {
               row_number: rowNumber,
               ad_name: lead.adName,
               product: lead.productLabel,
+              urgency: lead.urgency,
+              improvement_area: lead.improvementArea,
+              comments: lead.comments,
+              fields: lead.rawFields,
             },
           ],
         };
@@ -260,6 +307,13 @@ serve(async (req: Request) => {
           .eq('id', existing.id);
 
         if (updErr) throw updErr;
+
+        await upsertLeadAiMemory({
+          leadId: existing.id,
+          lead,
+          syncedAt: now.toISOString(),
+          rowNumber,
+        });
 
         results.push({
           rowNumber,
@@ -326,6 +380,15 @@ serve(async (req: Request) => {
         .single();
 
       if (insErr) throw insErr;
+
+      if (inserted?.id) {
+        await upsertLeadAiMemory({
+          leadId: inserted.id,
+          lead,
+          syncedAt: now.toISOString(),
+          rowNumber,
+        });
+      }
 
       results.push({
         rowNumber,

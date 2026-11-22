@@ -122,6 +122,8 @@ export interface Lead {
     google_place_id?: string | null;       // Google Places ID — used by Lead Hunter AI for deduplication
     created_at: string;
     interested_product_id?: string | null;
+    meta_campaign_name?: string | null;
+    raw_meta_payload?: Record<string, any> | null;
     // ── Recovery Intelligence ─────────────────────────────────────────────────
     reengaged_from?: string | null;  // Original background status ("Llamada fría" / "En Nutrición")
     reengaged_via?: string | null;   // Channel that triggered re-engagement ("whatsapp" | "email" | "sms")
