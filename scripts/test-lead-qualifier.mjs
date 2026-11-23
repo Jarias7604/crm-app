@@ -214,3 +214,24 @@ test('8. Edge Function lead-qualifier-engine/index.ts bundles cleanly without sy
   assert.ok(fs.existsSync(indexOutFile));
   assert.ok(fs.statSync(indexOutFile).size > 2000);
 });
+
+test('9. Detects Google Sheets leads accurately via source, raw_meta_payload.source, or sheet_name', () => {
+  assert.equal(mod.isGoogleSheetsLead({ source: 'google_sheets' }), true);
+  assert.equal(
+    mod.isGoogleSheetsLead({
+      source: 'facebook_ads',
+      raw_meta_payload: { source: 'google_sheets', sheet_name: 'NOVIEMBRE 2026' },
+    }),
+    true,
+  );
+  assert.equal(
+    mod.isGoogleSheetsLead({
+      source: 'facebook_ads',
+      raw_meta_payload: { sheet_name: 'DICIEMBRE 2026' },
+    }),
+    true,
+  );
+  assert.equal(mod.isGoogleSheetsLead({ source: 'manual', raw_meta_payload: null }), false);
+  assert.equal(mod.isGoogleSheetsLead({ source: 'facebook_ads', raw_meta_payload: { source: 'meta' } }), false);
+  assert.equal(mod.isGoogleSheetsLead(null), false);
+});

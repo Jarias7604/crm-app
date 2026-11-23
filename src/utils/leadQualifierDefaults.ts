@@ -7,6 +7,7 @@ import {
     DEFAULT_PAIN_PLAYBOOKS,
     DEFAULT_QUALIFIER_SYSTEM_PROMPT,
     DEFAULT_TZ,
+    isGoogleSheetsLead,
     renderFirstTouchMessage,
     type BusinessHoursConfig,
     type DemoSlot,
@@ -25,6 +26,7 @@ export {
     DEFAULT_PAIN_PLAYBOOKS,
     DEFAULT_QUALIFIER_SYSTEM_PROMPT,
     DEFAULT_TZ,
+    isGoogleSheetsLead,
     renderFirstTouchMessage,
 };
 

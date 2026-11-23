@@ -8,10 +8,24 @@ import {
     DEFAULT_PAIN_PLAYBOOKS,
     DEFAULT_QUALIFIER_SYSTEM_PROMPT,
     DEFAULT_TZ,
+    isGoogleSheetsLead,
     type LeadQualifierConfig,
     type LeadQualifierSession,
     type RoutingRuleLike,
 } from '../utils/leadQualifierDefaults';
+
+export interface PendingSheetLead {
+    id: string;
+    name: string;
+    company_name?: string | null;
+    phone?: string | null;
+    status?: string | null;
+    priority?: string | null;
+    source?: string | null;
+    created_at: string;
+    interested_product_id?: string | null;
+    raw_meta_payload?: Record<string, any> | null;
+}
 
 export interface LeadDemoRoutingRule extends RoutingRuleLike {
     company_id: string;
@@ -233,6 +247,25 @@ export const leadQualifierService = {
         return (data || []) as LeadQualifierSession[];
     },
 
+    async getPendingSheetLeads(
+        companyId: string,
+        enrolledLeadIds: string[],
+        limit = 120,
+    ): Promise<PendingSheetLead[]> {
+        const { data, error } = await supabase
+            .from('leads')
+            .select('id, name, company_name, phone, status, priority, source, created_at, interested_product_id, raw_meta_payload')
+            .eq('company_id', companyId)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+        if (error) throw error;
+        const enrolledSet = new Set(enrolledLeadIds || []);
+        return ((data || []) as PendingSheetLead[]).filter(
+            (row) => isGoogleSheetsLead(row) && !enrolledSet.has(row.id),
+        );
+    },
+
     async updateSessionStatus(
         sessionId: string,
         status: LeadQualifierSession['status'],
@@ -285,6 +318,20 @@ export const leadQualifierService = {
             company_id: companyId,
             lead_id: leadId,
             message_text: messageText,
+        });
+    },
+
+    async enrollBatchLeads(companyId: string, leadIds: string[]) {
+        return this.invokeEngine<{
+            ok: boolean;
+            mode: 'draft' | 'auto';
+            enrolled_count: number;
+            skipped_count: number;
+            results: any[];
+        }>({
+            action: 'enroll_batch_leads',
+            company_id: companyId,
+            lead_ids: leadIds,
         });
     },
 

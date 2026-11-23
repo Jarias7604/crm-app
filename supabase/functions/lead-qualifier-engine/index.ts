@@ -12,6 +12,7 @@ import {
   detectExplicitHandoffIntent,
   extractLeadFirstName,
   generateAvailableDemoSlots,
+  isGoogleSheetsLead,
   isWithinBusinessHours,
   matchPainPlaybook,
   parseQualifierAiJson,
@@ -1223,6 +1224,118 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, outbox_id: waRes.outboxId, to_phone: prof.phone, to_name: prof.full_name });
     }
 
+async function enrollSingleLead(
+  supabase: any,
+  cfg: NormalizedConfig,
+  lead: any,
+  opts?: { actorUserId?: string | null; overrideSource?: string | null; skipSourceCheck?: boolean },
+) {
+  const effectiveSource = opts?.overrideSource || (isGoogleSheetsLead(lead) ? 'google_sheets' : lead.source);
+  if (!opts?.skipSourceCheck && !isSourceAllowed(cfg.allowed_sources, effectiveSource)) {
+    return { ok: true, skipped: true, reason: 'source_not_allowed', lead_id: lead.id };
+  }
+  if (!normalizeWaDigits(lead.phone)) {
+    return { ok: true, skipped: true, reason: 'no_valid_phone', lead_id: lead.id };
+  }
+
+  let productLabel: string | null = null;
+  if (lead.interested_product_id) {
+    const { data: pr } = await supabase
+      .from('lead_products')
+      .select('name')
+      .eq('id', lead.interested_product_id)
+      .maybeSingle();
+    productLabel = pr?.name || null;
+  }
+
+  const diagnostic = extractLeadDiagnostic(lead, productLabel);
+  const playbook = matchPainPlaybook(cfg.pain_playbooks, {
+    painText: diagnostic.painText,
+    productLabel,
+    adName: diagnostic.adName,
+  });
+
+  const firstMsg = renderFirstTouchMessage(cfg.first_touch_template, playbook, {
+    name: lead.name,
+    companyName: lead.company_name,
+    painText: diagnostic.painText,
+  });
+
+  if (cfg.notify_on_urgent_intake && isUrgentIntake(diagnostic.urgencyText, lead.priority)) {
+    const picked = await pickAdvisorForLead(supabase, cfg.company_id, lead, true);
+    const recipients = [picked.advisorId, ...picked.extraIds].filter(Boolean) as string[];
+    await notifyAdvisors(supabase, cfg, {
+      eventType: 'urgent_intake',
+      lead,
+      diagnostic,
+      recipientIds: recipients,
+      summary: diagnostic.comments || 'Ingresó con urgencia alta en el formulario.',
+      actorUserId: opts?.actorUserId || null,
+    });
+  }
+
+  const withinHours = isWithinBusinessHours(new Date(), cfg.business_hours, cfg.timezone);
+  if (cfg.mode === 'draft' || (cfg.mode === 'auto' && !cfg.response_24_7 && !withinHours)) {
+    const isAfterHoursQueued = cfg.mode === 'auto' && !cfg.response_24_7 && !withinHours;
+    await supabase.from('lead_qualifier_sessions').upsert(
+      {
+        company_id: cfg.company_id,
+        lead_id: lead.id,
+        status: 'draft_pending',
+        mode: cfg.mode,
+        turn_count: 0,
+        matched_playbook_id: playbook?.id || null,
+        first_message_draft: firstMsg,
+        last_ai_draft: firstMsg,
+        last_ai_action: isAfterHoursQueued ? 'queued_after_hours' : 'first_touch_draft',
+      },
+      { onConflict: 'lead_id' },
+    );
+    return {
+      ok: true,
+      lead_id: lead.id,
+      mode: cfg.mode,
+      status: 'draft_pending',
+      draft: firstMsg,
+      ...(isAfterHoursQueued ? { reason: 'outside_business_hours' } : {}),
+    };
+  }
+
+  const sent = await enqueueLeadWhatsApp(supabase, {
+    companyId: cfg.company_id,
+    lead,
+    text: firstMsg,
+    activeAfter: true,
+    qualifierStatus: 'active',
+    actorUserId: opts?.actorUserId || null,
+  });
+
+  await supabase.from('lead_qualifier_sessions').upsert(
+    {
+      company_id: cfg.company_id,
+      lead_id: lead.id,
+      ticket_id: sent.ticketId,
+      status: 'active',
+      mode: 'auto',
+      turn_count: 1,
+      matched_playbook_id: playbook?.id || null,
+      first_message_draft: firstMsg,
+      last_ai_draft: firstMsg,
+      last_ai_action: 'first_touch_sent',
+    },
+    { onConflict: 'lead_id' },
+  );
+
+  return {
+    ok: true,
+    lead_id: lead.id,
+    mode: 'auto',
+    status: 'active',
+    outbox_id: sent.outboxId,
+    ticket_id: sent.ticketId,
+  };
+}
+
     // ── Enroll New Lead from Sheets/Meta ────────────────────────────────────
     if (action === 'enroll_new_lead') {
       const leadId = String(payload?.lead_id || '').trim();
@@ -1237,111 +1350,84 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       if (!lead) return json({ ok: false, error: 'Lead no encontrado' }, 404);
 
-      if (!isSourceAllowed(cfg.allowed_sources, payload?.source || lead.source)) {
-        return json({ ok: true, skipped: true, reason: 'source_not_allowed' });
-      }
-      if (!normalizeWaDigits(lead.phone)) {
-        return json({ ok: true, skipped: true, reason: 'no_valid_phone' });
-      }
-
-      let productLabel: string | null = null;
-      if (lead.interested_product_id) {
-        const { data: pr } = await supabase
-          .from('lead_products')
-          .select('name')
-          .eq('id', lead.interested_product_id)
-          .maybeSingle();
-        productLabel = pr?.name || null;
-      }
-
-      const diagnostic = extractLeadDiagnostic(lead, productLabel);
-      const playbook = matchPainPlaybook(cfg.pain_playbooks, {
-        painText: diagnostic.painText,
-        productLabel,
-        adName: diagnostic.adName,
+      const res = await enrollSingleLead(supabase, cfg, lead, {
+        overrideSource: payload?.source ? String(payload.source) : null,
       });
+      return json(res);
+    }
 
-      const firstMsg = renderFirstTouchMessage(cfg.first_touch_template, playbook, {
-        name: lead.name,
-        companyName: lead.company_name,
-        painText: diagnostic.painText,
-      });
-
-      if (cfg.notify_on_urgent_intake && isUrgentIntake(diagnostic.urgencyText, lead.priority)) {
-        const picked = await pickAdvisorForLead(supabase, companyId, lead, true);
-        const recipients = [picked.advisorId, ...picked.extraIds].filter(Boolean) as string[];
-        await notifyAdvisors(supabase, cfg, {
-          eventType: 'urgent_intake',
-          lead,
-          diagnostic,
-          recipientIds: recipients,
-          summary: diagnostic.comments || 'Ingresó con urgencia alta en el formulario.',
-        });
-      }
-
-      if (cfg.mode === 'draft') {
-        await supabase.from('lead_qualifier_sessions').upsert(
+    // ── Enroll Batch Leads from Pending Google Sheets Queue ─────────────────
+    if (action === 'enroll_batch_leads') {
+      if (!cfg.is_enabled) {
+        return json(
           {
-            company_id: companyId,
-            lead_id: lead.id,
-            status: 'draft_pending',
-            mode: 'draft',
-            turn_count: 0,
-            matched_playbook_id: playbook?.id || null,
-            first_message_draft: firstMsg,
-            last_ai_draft: firstMsg,
-            last_ai_action: 'first_touch_draft',
+            ok: false,
+            error: 'Primero enciende el Motor IA arriba y pulsa Guardar Cambios antes de activar leads de la cola.',
           },
-          { onConflict: 'lead_id' },
+          400,
         );
-        return json({ ok: true, mode: 'draft', status: 'draft_pending', draft: firstMsg });
       }
 
-      // Auto mode: enqueue first WhatsApp only if 24/7 or inside business hours
-      const withinHours = isWithinBusinessHours(new Date(), cfg.business_hours, cfg.timezone);
-      if (!cfg.response_24_7 && !withinHours) {
-        await supabase.from('lead_qualifier_sessions').upsert(
-          {
-            company_id: companyId,
-            lead_id: lead.id,
-            status: 'draft_pending',
-            mode: 'auto',
-            turn_count: 0,
-            matched_playbook_id: playbook?.id || null,
-            first_message_draft: firstMsg,
-            last_ai_draft: firstMsg,
-            last_ai_action: 'queued_after_hours',
-          },
-          { onConflict: 'lead_id' },
-        );
-        return json({ ok: true, mode: 'auto', status: 'draft_pending', reason: 'outside_business_hours' });
+      const rawIds = Array.isArray(payload?.lead_ids) ? payload.lead_ids : [];
+      const uniqueIds = [...new Set(rawIds.map((id: any) => String(id || '').trim()).filter(Boolean))].slice(0, 50);
+      if (uniqueIds.length === 0) {
+        return json({ ok: false, error: 'Selecciona al menos un lead.' }, 400);
       }
 
-      const sent = await enqueueLeadWhatsApp(supabase, {
-        companyId,
-        lead,
-        text: firstMsg,
-        activeAfter: true,
-        qualifierStatus: 'active',
+      const { data: existingSessions } = await supabase
+        .from('lead_qualifier_sessions')
+        .select('lead_id')
+        .eq('company_id', companyId)
+        .in('lead_id', uniqueIds);
+      const existingSet = new Set((existingSessions || []).map((s: any) => s.lead_id));
+
+      const results: any[] = [];
+      let enrolledCount = 0;
+      let skippedCount = 0;
+
+      const remainingIds: string[] = [];
+      for (const id of uniqueIds) {
+        if (existingSet.has(id)) {
+          skippedCount++;
+          results.push({ lead_id: id, skipped: true, reason: 'already_enrolled' });
+        } else {
+          remainingIds.push(id);
+        }
+      }
+
+      if (remainingIds.length > 0) {
+        const { data: leadsToEnroll } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('company_id', companyId)
+          .in('id', remainingIds);
+
+        const foundSet = new Set<string>();
+        for (const lead of leadsToEnroll || []) {
+          foundSet.add(lead.id);
+          const res = await enrollSingleLead(supabase, cfg, lead, {
+            actorUserId: auth.userId,
+            skipSourceCheck: true,
+          });
+          if (res.skipped) skippedCount++;
+          else enrolledCount++;
+          results.push(res);
+        }
+        for (const id of remainingIds) {
+          if (!foundSet.has(id)) {
+            skippedCount++;
+            results.push({ lead_id: id, skipped: true, reason: 'lead_not_found' });
+          }
+        }
+      }
+
+      return json({
+        ok: true,
+        mode: cfg.mode,
+        enrolled_count: enrolledCount,
+        skipped_count: skippedCount,
+        results,
       });
-
-      await supabase.from('lead_qualifier_sessions').upsert(
-        {
-          company_id: companyId,
-          lead_id: lead.id,
-          ticket_id: sent.ticketId,
-          status: 'active',
-          mode: 'auto',
-          turn_count: 1,
-          matched_playbook_id: playbook?.id || null,
-          first_message_draft: firstMsg,
-          last_ai_draft: firstMsg,
-          last_ai_action: 'first_touch_sent',
-        },
-        { onConflict: 'lead_id' },
-      );
-
-      return json({ ok: true, mode: 'auto', status: 'active', outbox_id: sent.outboxId, ticket_id: sent.ticketId });
     }
 
     // ── Approve & Send Draft from CRM UI ────────────────────────────────────

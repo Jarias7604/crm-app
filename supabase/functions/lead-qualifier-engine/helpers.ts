@@ -179,6 +179,20 @@ export function normalizeQualifierText(raw: unknown): string {
     .trim();
 }
 
+export function isGoogleSheetsLead(
+  lead: { source?: string | null; raw_meta_payload?: Record<string, any> | null } | null | undefined,
+): boolean {
+  if (!lead || typeof lead !== 'object') return false;
+  const src = String(lead.source || '').toLowerCase().trim();
+  if (src.includes('sheet')) return true;
+  const payload =
+    lead.raw_meta_payload && typeof lead.raw_meta_payload === 'object' ? lead.raw_meta_payload : null;
+  if (!payload) return false;
+  const payloadSource = String(payload.source || '').toLowerCase().trim();
+  if (payloadSource.includes('sheet')) return true;
+  return Boolean(payload.sheet_name && String(payload.sheet_name).trim().length > 0);
+}
+
 function isBusinessNameLike(raw?: string | null): boolean {
   const clean = String(raw || '').replace(/\(\+?\d+\)/g, '').trim();
   if (!clean) return true;

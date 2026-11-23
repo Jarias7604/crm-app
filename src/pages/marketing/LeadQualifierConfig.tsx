@@ -10,6 +10,7 @@ import {
     CheckCircle2,
     Clock,
     ExternalLink,
+    FileSpreadsheet,
     FlaskConical,
     Loader2,
     MessageSquare,
@@ -33,6 +34,7 @@ import {
     buildDefaultQualifierConfig,
     leadQualifierService,
     type LeadDemoRoutingRule,
+    type PendingSheetLead,
     type ProductOption,
     type TeamMemberOption,
 } from '../../services/leadQualifierService';
@@ -44,6 +46,62 @@ import type {
 import { renderFirstTouchMessage } from '../../utils/leadQualifierDefaults';
 
 type ConfigTab = 'master' | 'prompts' | 'playbooks' | 'routing' | 'sessions';
+
+function getZonedDateKey(isoOrDate: string | Date, timeZone: string): string {
+    try {
+        return new Intl.DateTimeFormat('en-CA', {
+            timeZone: timeZone || 'America/El_Salvador',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).format(typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate);
+    } catch {
+        const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate;
+        return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+    }
+}
+
+function formatSheetLeadTime(iso: string, timeZone: string, todayKey: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    const tz = timeZone || 'America/El_Salvador';
+    const key = getZonedDateKey(d, tz);
+    try {
+        const timeStr = new Intl.DateTimeFormat('es-SV', {
+            timeZone: tz,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+        }).format(d);
+        if (key === todayKey) return `Hoy · ${timeStr}`;
+        const dateStr = new Intl.DateTimeFormat('es-SV', {
+            timeZone: tz,
+            day: '2-digit',
+            month: 'short',
+        }).format(d);
+        return `${dateStr} · ${timeStr}`;
+    } catch {
+        return key === todayKey ? 'Hoy' : key;
+    }
+}
+
+function extractSheetPainLabel(lead: PendingSheetLead): string {
+    const fields = lead.raw_meta_payload?.fields;
+    if (!fields || typeof fields !== 'object') return '';
+    for (const [k, v] of Object.entries(fields)) {
+        const nk = k
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+        if (nk.includes('PUNTO DE MEJORA') || nk.includes('AREA DE MEJORA') || nk === 'NECESIDAD') {
+            const val = String(v ?? '').trim();
+            if (val && val !== '—' && val !== '-') return val;
+        }
+    }
+    return '';
+}
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
     draft_pending: { label: 'Borrador Pendiente', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -65,8 +123,14 @@ export default function LeadQualifierConfig() {
     const [saving, setSaving] = useState(false);
 
     const [config, setConfig] = useState<QualifierConfigType | null>(null);
+    const [savedConfigIsEnabled, setSavedConfigIsEnabled] = useState(false);
     const [rules, setRules] = useState<LeadDemoRoutingRule[]>([]);
     const [sessions, setSessions] = useState<LeadQualifierSession[]>([]);
+    const [pendingSheetLeads, setPendingSheetLeads] = useState<PendingSheetLead[]>([]);
+    const [selectedSheetLeadIds, setSelectedSheetLeadIds] = useState<string[]>([]);
+    const [sheetDateFilter, setSheetDateFilter] = useState<'today' | '7d' | 'all'>('today');
+    const [enrollingBatch, setEnrollingBatch] = useState(false);
+    const filterInitializedRef = React.useRef(false);
     const [team, setTeam] = useState<TeamMemberOption[]>([]);
     const [products, setProducts] = useState<ProductOption[]>([]);
 
@@ -108,10 +172,29 @@ export default function LeadQualifierConfig() {
                 leadQualifierService.getProducts(companyId),
             ]);
             setConfig(cfg);
+            setSavedConfigIsEnabled(Boolean(cfg.is_enabled));
             setRules(rls);
             setSessions(sess);
             setTeam(tm);
             setProducts(pr);
+
+            const pending = await leadQualifierService.getPendingSheetLeads(
+                companyId,
+                sess.map((s) => s.lead_id),
+            );
+            setPendingSheetLeads(pending);
+            setSelectedSheetLeadIds((prev) => prev.filter((id) => pending.some((p) => p.id === id)));
+
+            if (!filterInitializedRef.current) {
+                filterInitializedRef.current = true;
+                const tz = cfg.timezone || 'America/El_Salvador';
+                const todayK = getZonedDateKey(new Date(), tz);
+                const sevenDaysAgoMs = Date.now() - 7 * 86_400_000;
+                const todayCnt = pending.filter((p) => getZonedDateKey(p.created_at, tz) === todayK).length;
+                const weekCnt = pending.filter((p) => new Date(p.created_at).getTime() >= sevenDaysAgoMs).length;
+                setSheetDateFilter(todayCnt > 0 ? 'today' : weekCnt > 0 ? '7d' : 'all');
+            }
+
             if (!testAdvisorId && tm.length > 0) {
                 const withPhone = tm.find((m) => m.phone) || tm[0];
                 setTestAdvisorId(withPhone.id);
@@ -140,6 +223,7 @@ export default function LeadQualifierConfig() {
         try {
             const saved = await leadQualifierService.saveConfig(companyId, profile?.id, config);
             setConfig(saved);
+            setSavedConfigIsEnabled(Boolean(saved.is_enabled));
             toast.success(
                 saved.is_enabled
                     ? `Configuración guardada (${saved.mode === 'draft' ? 'Modo Borrador Seguro' : 'Modo Automático'})`
@@ -344,6 +428,69 @@ export default function LeadQualifierConfig() {
         () => sessions.filter((s) => s.status === 'draft_pending').length,
         [sessions],
     );
+
+    const activeTz = config?.timezone || 'America/El_Salvador';
+    const todayDateKey = useMemo(() => getZonedDateKey(new Date(), activeTz), [activeTz]);
+    const sheetCounts = useMemo(() => {
+        const weekAgoMs = Date.now() - 7 * 86_400_000;
+        const today = pendingSheetLeads.filter((l) => getZonedDateKey(l.created_at, activeTz) === todayDateKey);
+        const week = pendingSheetLeads.filter((l) => new Date(l.created_at).getTime() >= weekAgoMs);
+        return {
+            today,
+            week,
+            all: pendingSheetLeads,
+        };
+    }, [pendingSheetLeads, activeTz, todayDateKey]);
+
+    const filteredSheetLeads = useMemo(() => {
+        if (sheetDateFilter === 'today') return sheetCounts.today;
+        if (sheetDateFilter === '7d') return sheetCounts.week;
+        return sheetCounts.all;
+    }, [sheetDateFilter, sheetCounts]);
+
+    const selectableFilteredIds = useMemo(
+        () => filteredSheetLeads.filter((l) => Boolean(l.phone && l.phone.trim())).map((l) => l.id),
+        [filteredSheetLeads],
+    );
+
+    const handleToggleSelectSheetLead = (leadId: string) => {
+        setSelectedSheetLeadIds((prev) =>
+            prev.includes(leadId) ? prev.filter((id) => id !== leadId) : [...prev, leadId],
+        );
+    };
+
+    const handleSelectAllFilteredSheetLeads = () => {
+        if (selectableFilteredIds.length === 0) return;
+        const allSelected = selectableFilteredIds.every((id) => selectedSheetLeadIds.includes(id));
+        if (allSelected) {
+            setSelectedSheetLeadIds((prev) => prev.filter((id) => !selectableFilteredIds.includes(id)));
+        } else {
+            setSelectedSheetLeadIds((prev) => [...new Set([...prev, ...selectableFilteredIds])]);
+        }
+    };
+
+    const handleEnrollSelectedSheetLeads = async () => {
+        if (!companyId || selectedSheetLeadIds.length === 0) return;
+        setEnrollingBatch(true);
+        try {
+            const res = await leadQualifierService.enrollBatchLeads(companyId, selectedSheetLeadIds);
+            setSelectedSheetLeadIds([]);
+            await loadAll();
+            if (res.enrolled_count === 0) {
+                toast.error('Ninguno de los leads seleccionados pudo activarse (sin teléfono válido o ya inscritos).');
+            } else if (res.mode === 'auto') {
+                toast.success(
+                    `IA activada para ${res.enrolled_count} lead(s): 1er WhatsApp encolado y visible en Chats WhatsApp`,
+                );
+            } else {
+                toast.success(`${res.enrolled_count} borrador(es) preparados abajo para aprobación`);
+            }
+        } catch (err: any) {
+            toast.error(err?.message || 'Error al activar leads de Google Sheets');
+        } finally {
+            setEnrollingBatch(false);
+        }
+    };
 
     if (loading || !config) {
         return (
@@ -1333,24 +1480,183 @@ export default function LeadQualifierConfig() {
             {/* TAB 5: DRAFTS, SESSIONS & SAFE SIMULATOR */}
             {activeTab === 'sessions' && (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-                    {/* Left: Pending Drafts & Sessions */}
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-sm font-bold text-slate-900">Cola de Borradores y Sesiones IA</h2>
-                                <p className="text-xs text-slate-500">
-                                    Aprueba mensajes en modo Borrador, pausa o reactiva un lead individual o abre su ficha CRM.
-                                </p>
+                    {/* Left: Pending Google Sheets Queue + Drafts & Sessions */}
+                    <div className="space-y-4">
+                        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
+                                        <FileSpreadsheet className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-sm font-bold text-slate-900">
+                                            Leads de Google Sheets sin IA Activa
+                                        </h2>
+                                        <p className="text-[11px] text-slate-500">
+                                            Activa en lote los leads que entraron antes de encender el motor.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                    {(
+                                        [
+                                            { id: 'today', label: `Hoy (${sheetCounts.today.length})` },
+                                            { id: '7d', label: `7 días (${sheetCounts.week.length})` },
+                                            { id: 'all', label: `Todos (${sheetCounts.all.length})` },
+                                        ] as const
+                                    ).map((pill) => (
+                                        <button
+                                            key={pill.id}
+                                            type="button"
+                                            onClick={() => setSheetDateFilter(pill.id)}
+                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition ${
+                                                sheetDateFilter === pill.id
+                                                    ? 'bg-[#4449AA] border-[#4449AA] text-white'
+                                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            {pill.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                            <button
-                                type="button"
-                                onClick={loadAll}
-                                className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600"
-                                title="Actualizar cola"
-                            >
-                                <RefreshCw className="w-4 h-4" />
-                            </button>
+
+                            {filteredSheetLeads.length === 0 ? (
+                                <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
+                                    No hay leads pendientes de Google Sheets en este rango de fechas.
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex items-center justify-between text-[11px] text-slate-500 px-0.5">
+                                        <span>
+                                            Mostrando {filteredSheetLeads.length} lead(s) sin sesión IA aún
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleSelectAllFilteredSheetLeads}
+                                                className="font-bold text-[#4449AA] hover:underline"
+                                            >
+                                                {selectableFilteredIds.length > 0 &&
+                                                selectableFilteredIds.every((id) => selectedSheetLeadIds.includes(id))
+                                                    ? 'Limpiar selección'
+                                                    : 'Seleccionar todos'}
+                                            </button>
+                                            {selectedSheetLeadIds.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedSheetLeadIds([])}
+                                                    className="text-slate-400 hover:text-slate-700"
+                                                >
+                                                    Limpiar
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                                        {filteredSheetLeads.map((lead) => {
+                                            const hasPhone = Boolean(lead.phone && lead.phone.trim());
+                                            const checked = selectedSheetLeadIds.includes(lead.id);
+                                            const painLabel = extractSheetPainLabel(lead);
+                                            return (
+                                                <label
+                                                    key={lead.id}
+                                                    className={`flex items-start gap-2.5 p-2.5 rounded-xl border text-xs transition ${
+                                                        !hasPhone
+                                                            ? 'opacity-55 bg-slate-50 border-slate-200 cursor-not-allowed'
+                                                            : checked
+                                                            ? 'bg-indigo-50/50 border-[#4449AA]/50 cursor-pointer'
+                                                            : 'bg-white border-slate-200 hover:bg-slate-50 cursor-pointer'
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        disabled={!hasPhone}
+                                                        checked={checked}
+                                                        onChange={() => handleToggleSelectSheetLead(lead.id)}
+                                                        className="mt-0.5 w-3.5 h-3.5 accent-[#4449AA]"
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                                            <div className="font-bold text-slate-900 truncate">
+                                                                {lead.name}
+                                                                {lead.company_name ? (
+                                                                    <span className="font-normal text-slate-500">
+                                                                        {' '}
+                                                                        · {lead.company_name}
+                                                                    </span>
+                                                                ) : null}
+                                                            </div>
+                                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 shrink-0">
+                                                                {formatSheetLeadTime(lead.created_at, activeTz, todayDateKey)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] text-slate-500">
+                                                            <span>{lead.phone || 'Sin teléfono válido'}</span>
+                                                            {painLabel && (
+                                                                <span className="px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-semibold">
+                                                                    {painLabel}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <p className="text-[11px] text-slate-500 leading-snug">
+                                    {!config.is_enabled
+                                        ? 'Enciende "Motor IA: ACTIVO" arriba y pulsa "Guardar Cambios" primero.'
+                                        : !savedConfigIsEnabled
+                                        ? 'Pulsa "Guardar Cambios" arriba para confirmar el Motor IA antes de enviar.'
+                                        : config.mode === 'auto'
+                                        ? 'Modo Automático: enviará el 1er WhatsApp al instante y aparecerán en Chats WhatsApp.'
+                                        : 'Modo Borrador: creará los borradores abajo para que los revises y envíes.'}
+                                </p>
+                                <Button
+                                    type="button"
+                                    onClick={handleEnrollSelectedSheetLeads}
+                                    disabled={
+                                        enrollingBatch ||
+                                        selectedSheetLeadIds.length === 0 ||
+                                        !config.is_enabled ||
+                                        !savedConfigIsEnabled
+                                    }
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold h-8 px-3.5 rounded-xl shrink-0"
+                                >
+                                    {enrollingBatch ? (
+                                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                                    ) : (
+                                        <Send className="w-3.5 h-3.5 mr-1.5" />
+                                    )}
+                                    Activar IA para Seleccionados ({selectedSheetLeadIds.length})
+                                </Button>
+                            </div>
                         </div>
+
+                        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-sm font-bold text-slate-900">Cola de Borradores y Sesiones IA</h2>
+                                    <p className="text-xs text-slate-500">
+                                        Aprueba mensajes en modo Borrador, pausa o reactiva un lead individual o abre su ficha CRM.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={loadAll}
+                                    className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600"
+                                    title="Actualizar cola"
+                                >
+                                    <RefreshCw className="w-4 h-4" />
+                                </button>
+                            </div>
 
                         {sessions.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-400">
@@ -1459,6 +1765,7 @@ export default function LeadQualifierConfig() {
                                 })}
                             </div>
                         )}
+                        </div>
                     </div>
 
                     {/* Right: Safe Simulator */}
