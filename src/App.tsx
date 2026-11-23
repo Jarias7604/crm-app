@@ -63,6 +63,7 @@ const ClientPortal      = lazy(() => import('./pages/clientes/ClientPortal'));
 const ProjectManagement = lazy(() => import('./pages/ProjectManagement'));
 const PipelineConfig    = lazy(() => import('./pages/admin/PipelineConfig'));
 const CallBot           = lazy(() => import('./pages/admin/CallBot'));
+const LeadQualifierConfig = lazy(() => import('./pages/marketing/LeadQualifierConfig'));
 const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
 const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
 const TestFlyer         = lazy(() => import('./pages/marketing/TestFlyer'));
@@ -250,6 +251,7 @@ function App() {
                     <Route path="/lead-sources" element={<Industries key="sources" defaultTab="sources" />} />
                     <Route path="/admin/pipeline" element={<PipelineConfig />} />
                     <Route path="/admin/call-bot" element={<CallBot />} />
+                    <Route path="/leads/calificador-ia" element={<LeadQualifierConfig />} />
                   </Route>
 
                   {/* System Admin Routes (Super Admin only) */}

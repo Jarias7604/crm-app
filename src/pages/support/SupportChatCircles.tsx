@@ -58,6 +58,8 @@ import {
   RotateCcw,
   Activity,
   Bug,
+  Pause,
+  Play,
   Ticket as TicketIcon,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -690,6 +692,41 @@ export const SupportChatCircles: React.FC = () => {
     }
     if (data && data.ok === false) throw new Error(data.error || 'Error');
     return data;
+  };
+
+  const [togglingQualifier, setTogglingQualifier] = useState(false);
+
+  const handleToggleThreadQualifier = async (active: boolean) => {
+    if (!activeCircle) return;
+    const t = activeCircle.activeTicket;
+    setTogglingQualifier(true);
+    try {
+      await invoke({
+        action: 'set_qualifier_thread_state',
+        ticket_id: t.id,
+        active,
+      });
+      setTickets((prev) =>
+        prev.map((row) =>
+          row.id === t.id
+            ? {
+                ...row,
+                metadata: {
+                  ...((row.metadata || {}) as Record<string, any>),
+                  ai_qualifier_enrolled: true,
+                  ai_qualifier_active: active,
+                  ai_qualifier_status: active ? 'active' : 'paused',
+                },
+              }
+            : row,
+        ),
+      );
+      toast.success(active ? 'Calificador IA reactivado en este chat' : 'Calificador IA pausado en este chat');
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudo actualizar el estado del Calificador IA');
+    } finally {
+      setTogglingQualifier(false);
+    }
   };
 
   const verifyAndLoadAiConfig = async (showToast = false) => {
@@ -4835,6 +4872,72 @@ export const SupportChatCircles: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Sales Lead AI Qualifier Control Strip */}
+            {!activeCircle.isGroup &&
+              activeCircle.scope === 'lead' &&
+              Boolean((activeCircle.activeTicket?.metadata as any)?.ai_qualifier_enrolled) && (() => {
+                const qMeta = (activeCircle.activeTicket?.metadata || {}) as Record<string, any>;
+                const isQActive = qMeta.ai_qualifier_active === true;
+                const qStatus = String(qMeta.ai_qualifier_status || (isQActive ? 'active' : 'paused'));
+                return (
+                  <div
+                    className={`px-4 py-1.5 border-b flex items-center justify-between gap-2 flex-wrap shrink-0 text-xs ${
+                      qStatus === 'handed_off'
+                        ? 'bg-rose-50 border-rose-200 text-rose-900'
+                        : isQActive
+                        ? 'bg-indigo-50/70 border-indigo-200 text-indigo-900'
+                        : 'bg-slate-100/80 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Bot className="w-3.5 h-3.5 shrink-0" />
+                      <span className="font-bold truncate">
+                        {qStatus === 'handed_off'
+                          ? '🙋 Lead solicitó hablar con un asesor humano'
+                          : qStatus === 'demo_booked'
+                          ? '📅 Demo agendada automáticamente por IA'
+                          : qStatus === 'human_takeover'
+                          ? '👤 Asesor humano tomó control (IA pausada)'
+                          : isQActive
+                          ? '🤖 Calificador IA Activo (si respondes tú, se pausa solo)'
+                          : '⏸ Calificador IA Pausado en esta conversación'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        disabled={togglingQualifier}
+                        onClick={() => handleToggleThreadQualifier(!isQActive)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition disabled:opacity-50 ${
+                          isQActive
+                            ? 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                            : 'bg-[#4449AA] text-white hover:bg-[#383d8f]'
+                        }`}
+                      >
+                        {togglingQualifier ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : isQActive ? (
+                          <Pause className="w-3 h-3" />
+                        ) : (
+                          <Play className="w-3 h-3" />
+                        )}
+                        <span>{isQActive ? 'Pausar IA aquí' : 'Reactivar IA aquí'}</span>
+                      </button>
+                      {isRealAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => navigate('/leads/calificador-ia')}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-slate-900 text-[11px] font-semibold"
+                        >
+                          <Settings className="w-3 h-3" />
+                          <span>Configurar</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-8 py-6 space-y-3">

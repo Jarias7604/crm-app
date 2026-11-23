@@ -641,7 +641,7 @@ serve(async (req: Request) => {
       'get_ai_config', 'test_openai', 'save_ai_config', 'save_ai_prompt', 'set_ticket_channel', 'set_technical_ticket',
       'promote_to_lead', 'classify_contact', 'send_reply', 'send_media', 'send_reactivation',
       'retry_media', 'bridge_status', 'rescope_now', 'request_history_import', 'request_evo_heal',
-      'get_wa_team_access', 'set_wa_user_access',
+      'get_wa_team_access', 'set_wa_user_access', 'set_qualifier_thread_state',
     ];
     if (uiActions.includes(action)) {
       const caller = await getCaller(req, supabase, supabaseUrl);
@@ -671,9 +671,13 @@ serve(async (req: Request) => {
         case 'classify_contact':
           return await handleClassify(supabase, caller, payload);
         case 'send_reply':
+          await pauseQualifierOnHumanReply(supabase, payload?.ticket_id, caller.fullName);
           return await handleSendReply(supabase, caller, payload);
         case 'send_media':
+          await pauseQualifierOnHumanReply(supabase, payload?.ticket_id, caller.fullName);
           return await handleSendMedia(supabase, caller, payload);
+        case 'set_qualifier_thread_state':
+          return await handleSetQualifierThreadState(supabase, caller, payload);
         case 'send_reactivation':
           return await handleSendReactivation(supabase, caller, payload);
         case 'retry_media':
@@ -711,6 +715,97 @@ serve(async (req: Request) => {
     return json({ ok: false, error: err?.message || 'Internal error' }, 500);
   }
 });
+
+// =============================================================================
+// Sales Lead Qualifier controls & takeover helpers
+// =============================================================================
+
+async function pauseQualifierOnHumanReply(supabase: any, ticketId: string | undefined, actorName: string) {
+  if (!ticketId) return;
+  try {
+    const { data: ticket } = await supabase
+      .from('tickets')
+      .select('id, company_id, lead_id, metadata')
+      .eq('id', ticketId)
+      .maybeSingle();
+    if (!ticket) return;
+    const meta = cleanMeta(ticket.metadata || {});
+    if (meta.ai_qualifier_active !== true) return;
+    const nowIso = new Date().toISOString();
+    await supabase
+      .from('tickets')
+      .update({
+        metadata: {
+          ...meta,
+          ai_qualifier_active: false,
+          ai_qualifier_status: 'human_takeover',
+          ai_qualifier_paused_by: actorName || 'Asesor CRM',
+          ai_qualifier_paused_at: nowIso,
+        },
+      })
+      .eq('id', ticket.id);
+    if (ticket.lead_id) {
+      await supabase
+        .from('lead_qualifier_sessions')
+        .update({
+          status: 'human_takeover',
+          handoff_reason: `Asesor humano (${actorName || 'CRM'}) tomó la conversación`,
+          handoff_at: nowIso,
+        })
+        .eq('company_id', ticket.company_id)
+        .eq('lead_id', ticket.lead_id);
+    }
+  } catch (err: any) {
+    console.warn('[evolution-whatsapp-webhook] pauseQualifierOnHumanReply warn:', err?.message || err);
+  }
+}
+
+async function handleSetQualifierThreadState(supabase: any, caller: Caller, payload: any): Promise<Response> {
+  const ticketId = String(payload?.ticket_id || '').trim();
+  const active = Boolean(payload?.active);
+  if (!ticketId) return json({ ok: false, error: 'ticket_id es requerido' }, 400);
+
+  const { data: ticket, error: tErr } = await supabase
+    .from('tickets')
+    .select('id, company_id, lead_id, metadata')
+    .eq('id', ticketId)
+    .maybeSingle();
+  if (tErr || !ticket) return json({ ok: false, error: 'Ticket no encontrado' }, 404);
+  if (!caller.isAdmin && caller.companyId && ticket.company_id !== caller.companyId) {
+    return json({ ok: false, error: 'Sin permiso para esta empresa' }, 403);
+  }
+
+  const nowIso = new Date().toISOString();
+  const meta = cleanMeta(ticket.metadata || {});
+  const nextMeta = {
+    ...meta,
+    ai_qualifier_enrolled: true,
+    ai_qualifier_active: active,
+    ai_qualifier_status: active ? 'active' : 'paused',
+    ai_qualifier_paused_by: active ? null : caller.fullName || 'Asesor CRM',
+    ai_qualifier_paused_at: active ? null : nowIso,
+  };
+  await supabase.from('tickets').update({ metadata: nextMeta }).eq('id', ticket.id);
+
+  if (ticket.lead_id) {
+    await supabase
+      .from('lead_qualifier_sessions')
+      .update({
+        status: active ? 'active' : 'paused',
+        ...(active ? {} : { handoff_reason: `Pausado manualmente por ${caller.fullName || 'Asesor'}` }),
+      })
+      .eq('company_id', ticket.company_id)
+      .eq('lead_id', ticket.lead_id);
+  } else {
+    await supabase
+      .from('lead_qualifier_sessions')
+      .update({ status: active ? 'active' : 'paused' })
+      .eq('company_id', ticket.company_id)
+      .eq('ticket_id', ticket.id);
+  }
+
+  return json({ ok: true, active, status: active ? 'active' : 'paused', ticket_id: ticket.id });
+}
 
 // =============================================================================
 // Inbound message
@@ -923,6 +1018,40 @@ async function ingestWhatsAppEntry(
       ? 'lead'
       : 'por_clasificar';
     supportChannel = 'ventas';
+  }
+
+  // Check direct WhatsApp outbox sends without a ticket (e.g. advisor alerts) first so echoes never open spurious chats.
+  if (fromMe) {
+    const since = new Date(msgDate.getTime() - 30 * 60 * 1000).toISOString();
+    const until = new Date(msgDate.getTime() + 30 * 60 * 1000).toISOString();
+    const { data: directOut } = await supabase
+      .from('whatsapp_outbox')
+      .select('id, kind, payload, wa_message_id')
+      .eq('company_id', companyId)
+      .is('ticket_id', null)
+      .eq('number', chatJid)
+      .gte('created_at', since)
+      .lte('created_at', until)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    const directEcho =
+      (directOut || []).find((o: any) => waMessageId && o.wa_message_id === waMessageId) ||
+      (directOut || []).find(
+        (o: any) =>
+          !o.wa_message_id &&
+          o.kind === 'text' &&
+          String(o.payload?.text || '').trim() === displayText.trim(),
+      );
+    if (directEcho) {
+      if (waMessageId) {
+        await supabase
+          .from('whatsapp_outbox')
+          .update({ wa_message_id: waMessageId })
+          .eq('id', directEcho.id)
+          .is('wa_message_id', null);
+      }
+      return { ok: true, ignored: true, reason: 'echo of direct advisor alert' };
+    }
   }
 
   // A fromMe message may be the echo of something the CRM itself sent through the bridge.
@@ -1201,11 +1330,90 @@ async function ingestWhatsAppEntry(
     description = lastNl > 0 ? `${description.slice(0, lastNl)}\n${line}${description.slice(lastNl)}` : `${description}\n${line}`;
   }
 
+  // Pause AI Sales Qualifier automatically if staff replies directly from mobile WhatsApp
+  if (!isCatchup && isStaff && currentMeta.ai_qualifier_active === true) {
+    const pausedAt = new Date().toISOString();
+    const takeoverPatch: Record<string, any> = {
+      ai_qualifier_active: false,
+      ai_qualifier_status: 'human_takeover',
+      ai_qualifier_paused_by: pushName || 'Asesor por WhatsApp',
+      ai_qualifier_paused_at: pausedAt,
+    };
+    Object.assign(currentMeta, takeoverPatch);
+    await supabase
+      .from('tickets')
+      .update({ metadata: { ...cleanMeta(currentMeta), ...takeoverPatch } })
+      .eq('id', targetTicket.id);
+    if (scopeInfo.leadId) {
+      await supabase
+        .from('lead_qualifier_sessions')
+        .update({
+          status: 'human_takeover',
+          handoff_reason: 'Asesor humano respondió directo por WhatsApp',
+          handoff_at: pausedAt,
+        })
+        .eq('company_id', companyId)
+        .eq('lead_id', scopeInfo.leadId);
+    }
+  }
+
   // Optional AI text auto-reply (OFF by default). Never for catchup, staff, team, spam or audio.
   let aiReplied = false;
   let aiReplyAuthor = '';
   let autoResolvedMetaPatch: Record<string, any> = {};
-  if (!isCatchup && !isStaff && !media && ['soporte', 'lead', 'por_clasificar'].includes(scope) && currentMeta.ai_auto_reply_text_enabled !== false) {
+
+  // Dedicated Sales Lead Qualifier AI route (only when this lead chat was enrolled & active)
+  if (
+    !isCatchup &&
+    !isStaff &&
+    !isGroup &&
+    !media &&
+    scope === 'lead' &&
+    Boolean(scopeInfo.leadId) &&
+    currentMeta.ai_qualifier_active === true &&
+    displayText
+  ) {
+    try {
+      const qualBaseUrl = Deno.env.get('CRM_SUPABASE_URL') || Deno.env.get('SUPABASE_URL') || '';
+      const qualSecret = Deno.env.get('SHEETS_SYNC_SECRET') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      if (qualBaseUrl.startsWith('http') && qualSecret) {
+        const qualResp = await Promise.race([
+          fetch(`${qualBaseUrl}/functions/v1/lead-qualifier-engine`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-sheets-sync-secret': qualSecret,
+            },
+            body: JSON.stringify({
+              action: 'process_inbound_reply',
+              company_id: companyId,
+              lead_id: scopeInfo.leadId,
+              ticket_id: targetTicket.id,
+              message_text: displayText,
+              sender_phone: senderPhone || chatPhone || '',
+              wa_message_id: waMessageId || null,
+            }),
+          }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 9000)),
+        ]);
+        if (qualResp && 'ok' in qualResp && qualResp.ok) {
+          const qualJson = await qualResp.json().catch(() => null);
+          if (qualJson?.handled === true) {
+            aiReplied = true;
+            aiReplyAuthor = 'Calificador IA';
+            if (qualJson.ticket_meta_patch && typeof qualJson.ticket_meta_patch === 'object') {
+              Object.assign(autoResolvedMetaPatch, qualJson.ticket_meta_patch);
+              Object.assign(currentMeta, qualJson.ticket_meta_patch);
+            }
+          }
+        }
+      }
+    } catch (qualErr: any) {
+      console.warn('[evolution-whatsapp-webhook] lead-qualifier-engine error:', qualErr?.message || qualErr);
+    }
+  }
+
+  if (!aiReplied && !isCatchup && !isStaff && !media && ['soporte', 'lead', 'por_clasificar'].includes(scope) && currentMeta.ai_auto_reply_text_enabled !== false) {
     const aiCfg = await getAiCfg();
     if (aiCfg.autoReplyText && aiCfg.openAiKey && !isGreetingOrClosingAgreement(displayText)) {
       const reply = await askOpenAi(

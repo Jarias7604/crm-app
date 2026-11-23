@@ -31,3 +31,8 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/google-sheets-lead-intake/index.ts"
 
+[functions.lead-qualifier-engine]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/lead-qualifier-engine/index.ts"
+

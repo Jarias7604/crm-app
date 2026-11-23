@@ -432,6 +432,9 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                     badge: hotLeadCount,
                     onClick: () => navigate('/leads?ready=1')
                 } as any,
+                ...(isSuperOrAdmin
+                    ? [{ name: 'Calificador IA', href: '/leads/calificador-ia', icon: Bot }]
+                    : []),
             ]
         });
     }

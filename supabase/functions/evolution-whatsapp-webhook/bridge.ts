@@ -103,7 +103,8 @@ export async function handleBridgeSh(
       .select('id');
     if (!claimed || claimed.length === 0) continue; // another poll took it
     const inst = shellSafe(normalizeInstance(item.instance || instance));
-    const ackUrl = `${selfUrl}?action=bridge_ack&ticket_id=${shellSafe(item.ticket_id)}&outbox_id=${shellSafe(item.id)}`;
+    const ticketParam = item.ticket_id ? `&ticket_id=${shellSafe(item.ticket_id)}` : '';
+    const ackUrl = `${selfUrl}?action=bridge_ack${ticketParam}&outbox_id=${shellSafe(item.id)}`;
     const p = item.payload || {};
     let endpoint = 'sendText';
     let body: Record<string, any> = { number: item.number, text: p.text || '' };
@@ -366,9 +367,10 @@ export async function handleBridgeSh(
 }
 
 export async function handleBridgeAck(supabase: any, url: URL, payload: any): Promise<Response> {
-  const ticketId = url.searchParams.get('ticket_id') || payload?.ticket_id;
+  const rawTicketId = String(url.searchParams.get('ticket_id') || payload?.ticket_id || '').trim();
+  const ticketId = rawTicketId && rawTicketId !== 'null' && rawTicketId !== 'undefined' ? rawTicketId : '';
   const outboxId = url.searchParams.get('outbox_id') || payload?.outbox_id || '';
-  if (!ticketId) return json({ ok: false, error: 'missing ticket_id' }, 400);
+  if (!ticketId && !outboxId) return json({ ok: false, error: 'missing ticket_id or outbox_id' }, 400);
   // New bridge lines post Evolution's raw response; legacy ones wrap it in evo_response.
   let evo: any = payload?.evo_response !== undefined ? payload.evo_response : payload;
   if (typeof evo === 'string') {
@@ -384,20 +386,23 @@ export async function handleBridgeAck(supabase: any, url: URL, payload: any): Pr
   await setBridgeState(supabase, 'bridge_last_ack', { at: nowIso, ok: Boolean(sentId), error: evoError || null });
 
   if (!outboxId) return json({ ok: true, legacy: true });
-  const { data: ob } = await supabase
+  let obQuery = supabase
     .from('whatsapp_outbox')
     .update({
       status: sentId ? 'sent' : 'error',
       acked_at: nowIso,
       ...(sentId ? { wa_message_id: sentId, error: null } : { error: evoError || 'Evolution no confirmó el envío' }),
     })
-    .eq('id', outboxId)
-    .eq('ticket_id', ticketId)
+    .eq('id', outboxId);
+  if (ticketId) {
+    obQuery = obQuery.eq('ticket_id', ticketId);
+  }
+  const { data: ob } = await obQuery
     .select('id, company_id, ticket_id, comment_id, number, kind')
     .maybeSingle();
   if (!ob) return json({ ok: false, error: 'outbox item not found' }, 404);
 
-  if (sentId && ob.comment_id) {
+  if (sentId && ob.comment_id && ob.ticket_id) {
     // Link the WhatsApp id to the chat line so the fromMe echo is recognised as a duplicate.
     const { data: linked } = await supabase
       .from('whatsapp_messages')

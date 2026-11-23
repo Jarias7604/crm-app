@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "audit:rls": "node scripts/audit-rls.cjs",
-    "test": "node --test scripts/test-financials.mjs scripts/test-whatsapp-sync.mjs scripts/test-support-pulse.mjs scripts/test-timesheet-validation.mjs scripts/test-sheets-lead-intake.mjs scripts/test-lead-intake-profile.mjs"
+    "test": "node --test scripts/test-financials.mjs scripts/test-whatsapp-sync.mjs scripts/test-support-pulse.mjs scripts/test-timesheet-validation.mjs scripts/test-sheets-lead-intake.mjs scripts/test-lead-intake-profile.mjs scripts/test-lead-qualifier.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

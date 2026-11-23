@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, SlidersHorizontal, ChevronDown, CheckCircle, Filter, Calendar, X, User, ArrowLeft, Building2, Check, Target, Flame } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Search, LayoutGrid, List, Layout, Download, Upload, Loader2, Plus, SlidersHorizontal, ChevronDown, CheckCircle, Filter, Calendar, X, User, ArrowLeft, Building2, Check, Target, Flame, Bot } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { CustomDatePicker } from '../ui/CustomDatePicker';
 import { PRIORITY_CONFIG, STATUS_CONFIG } from '../../types';
@@ -964,6 +965,16 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                                     <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
                                     <span className="hidden sm:inline">Campos Excel</span>
                                 </Button>
+                            )}
+                            {isAdmin && (
+                                <Link
+                                    to="/leads/calificador-ia"
+                                    title="Configurar Calificador IA por WhatsApp, Demos y Alertas"
+                                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-emerald-200 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50 text-xs font-semibold transition"
+                                >
+                                    <Bot className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span className="hidden lg:inline">Calificador IA</span>
+                                </Link>
                             )}
                         </div>
                         <Button onClick={() => setIsModalOpen(true)} className="flex-1 sm:flex-none h-9 bg-[#4449AA] hover:bg-[#383d8f] px-5 text-xs font-bold text-white shadow-md shadow-indigo-100 transition-all border-none rounded-xl">

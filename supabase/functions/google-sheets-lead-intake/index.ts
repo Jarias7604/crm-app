@@ -388,6 +388,29 @@ serve(async (req: Request) => {
           syncedAt: now.toISOString(),
           rowNumber,
         });
+
+        // Dispara el motor Calificador IA / Auto-Enrutamiento sin bloquear la respuesta a Google Sheets
+        try {
+          const engineUrl = `${supabaseUrl}/functions/v1/lead-qualifier-engine`;
+          await Promise.race([
+            fetch(engineUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-sheets-sync-secret': configuredSecret,
+              },
+              body: JSON.stringify({
+                action: 'enroll_new_lead',
+                company_id: companyId,
+                lead_id: inserted.id,
+                source: 'google_sheets',
+              }),
+            }),
+            new Promise((resolve) => setTimeout(resolve, 2500)),
+          ]);
+        } catch (qualErr: any) {
+          console.warn('[google-sheets-lead-intake] qualifier trigger warn:', qualErr?.message || qualErr);
+        }
       }
 
       results.push({

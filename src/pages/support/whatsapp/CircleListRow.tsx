@@ -30,6 +30,9 @@ export interface CircleListRowProps {
 
 export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unread, onSelect }) => {
   const isOverdue = circle.unreadOrWaitingReply && circle.waitMinutes >= 15 && circle.waitMinutes <= 24 * 60;
+  const ticketMeta = ((circle.activeTicket?.metadata || {}) as Record<string, any>);
+  const qualifierStatus = String(ticketMeta.ai_qualifier_status || '');
+  const isQualifierActive = ticketMeta.ai_qualifier_active === true;
   const shortType =
     circle.scope === 'soporte'
       ? circle.isGroup
@@ -92,6 +95,30 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
                 className="text-[11px] font-normal text-slate-400 shrink-0"
               >
                 {circle.reactivationReplied ? '· React.' : `· Toque ${circle.reactivationTouch || 1}`}
+              </span>
+            )}
+            {circle.scope === 'lead' && qualifierStatus === 'handed_off' && (
+              <span
+                title="El lead pidió hablar con un asesor humano"
+                className="px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold leading-none shrink-0"
+              >
+                🙋 Asesor
+              </span>
+            )}
+            {circle.scope === 'lead' && isQualifierActive && qualifierStatus !== 'handed_off' && (
+              <span
+                title="Calificador Comercial IA activo en este chat"
+                className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold leading-none shrink-0"
+              >
+                🤖 IA
+              </span>
+            )}
+            {circle.scope === 'lead' && qualifierStatus === 'demo_booked' && (
+              <span
+                title="Demo agendada automáticamente por IA"
+                className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold leading-none shrink-0"
+              >
+                📅 Demo
               </span>
             )}
           </div>
