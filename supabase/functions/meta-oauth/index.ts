@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
     if (!company_id) throw new Error('Missing company_id');
     if (!code) throw new Error('Missing OAuth authorization code');
 
-    const APP_ID = Deno.env.get('META_APP_ID') || '1187621119804509';
+    const APP_ID = Deno.env.get('META_APP_ID') || '1463889952375598';
     const APP_SECRET = Deno.env.get('META_APP_SECRET');
     if (!APP_SECRET) throw new Error('META_APP_SECRET not configured');
 

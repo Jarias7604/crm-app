@@ -5,7 +5,7 @@ import { ArrowLeft, Trash2, Star, Loader2, CheckCircle, RefreshCw, Globe } from 
 import { useAuth } from '../../auth/AuthProvider';
 import { socialPublishService, type SocialAccount } from '../../services/social/socialPublishService';
 
-const META_APP_ID = '1187621119804509';
+const META_APP_ID = '1463889952375598';
 const SCOPES = [
   'pages_manage_posts',
   'pages_read_engagement',
