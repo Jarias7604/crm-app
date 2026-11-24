@@ -175,11 +175,11 @@ const hdr = (code = 'SOP-COM-2026-04 | Uso interno') => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Marketing y Redes Sociales / Versión 1.2 · UI Comercial + Conector MCP OAuth 2.1</span>
+    <span>Marketing y Redes Sociales / Versión 1.3 · Planning + YouTube Multi-Canal + Conector MCP OAuth 2.1</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
-const html = `${commonHead('SOP-COM-2026-04 — Social Planning Comercial y Conector ChatGPT Plus (MCP + OAuth 2.1)')}
+const html = `${commonHead('SOP-COM-2026-04 — Social Planning, YouTube Multi-Canal y ChatGPT Plus (MCP + OAuth 2.1)')}
 
 <!-- PAGE 1: COVER -->
 <section class="page">
@@ -187,13 +187,13 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning Comercial y Cone
     ${hdr()}
     <div style="margin-top:34px;">
       <div class="kicker">MARKETING Y REDES SOCIALES / PROCEDIMIENTO ESTÁNDAR DE OPERACIÓN</div>
-      <div class="cover-title">Social Planning y<br/>conector ChatGPT Plus</div>
-      <div class="cover-sub">Suite editorial comercial (Calendario por Horas, Vista Previa y Conexiones) con Servidor MCP OAuth 2.1</div>
+      <div class="cover-title">Social Planning, YouTube y<br/>conector ChatGPT Plus</div>
+      <div class="cover-sub">Suite editorial comercial (Facebook, Instagram y YouTube multi-canal) con Servidor MCP OAuth 2.1</div>
 
       <div class="kicker" style="margin-top:24px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.2 · Rediseño UX/UI Comercial + Conector MCP Oficial OAuth 2.1</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.3 · YouTube Multi-Canal OAuth + Planning Comercial + MCP OAuth 2.1</td></tr>
         <tr><td class="kv-key">Vigencia</td><td class="kv-val">Noviembre 2026</td></tr>
         <tr><td class="kv-key">URL Servidor MCP</td><td class="kv-val"><code>https://www.ariascrm.com/mcp</code> (Streamable HTTP + PKCE S256)</td></tr>
         <tr><td class="kv-key">Alcance</td><td class="kv-val">Arias Defense Components LLC (flag <code>ai_content_studio_enabled</code>)</td></tr>
@@ -225,8 +225,8 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning Comercial y Cone
     <h1 class="sec-h1">Objetivo, alcance y flujo</h1>
     <p class="lead-p">Operación unificada estilo comercial para planificar flyers de ChatGPT Plus (\$0 extra API) sin depender de herramientas externas.</p>
 
-    <p class="body-p"><strong>Objetivo.</strong> Centralizar la planificación semanal en una interfaz comercial limpia (Calendario por Horas con mejores horarios, Lista con acciones en lote, Editor con vista previa real Facebook/Instagram y Hub de Conexiones en 3 columnas), conectada directo al ChatGPT Plus de cada usuario vía <code>https://www.ariascrm.com/mcp</code>.</p>
-    <p class="body-p"><strong>Alcance.</strong> Módulo <code>/marketing/planning</code>, gestión de redes <code>/company/social-accounts</code>, consentimiento <code>/oauth/chatgpt-authorize</code>, Edge Function <code>arias-social-bridge</code> y cron automático cada 5 minutos en zona El Salvador (<code>-06:00</code>). El módulo <code>Social Media Hub (/marketing/social)</code> permanece intacto.</p>
+    <p class="body-p"><strong>Objetivo.</strong> Centralizar la planificación semanal en una interfaz comercial limpia (Calendario por Horas, Lista con acciones en lote, Editor con vista previa real Facebook/Instagram/YouTube y Hub de Conexiones multi-canal), conectada directo al ChatGPT Plus de cada usuario vía <code>https://www.ariascrm.com/mcp</code>.</p>
+    <p class="body-p"><strong>Alcance.</strong> Módulo <code>/marketing/planning</code>, gestión de redes y canales YouTube (<code>Iclesia</code>, <code>Arias Defense Components</code> o clientes SaaS) vía <code>youtube-oauth</code> + <code>publish-youtube</code>, callback unificado <code>/integrations/google/callback</code>, Edge Function <code>arias-social-bridge</code> y cron cada 5 min en zona El Salvador (<code>-06:00</code>).</p>
 
     <div class="diagram-wrap">
       <svg viewBox="0 0 680 265" width="100%" height="248" xmlns="http://www.w3.org/2000/svg">
@@ -264,7 +264,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning Comercial y Cone
 
         <rect x="28" y="200" width="234" height="54" rx="5" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.3"/>
         <text x="145" y="218" text-anchor="middle" font-size="10" font-weight="700" fill="#0f172a">Publicación inmediata</text>
-        <text x="145" y="233" text-anchor="middle" font-size="8.8" fill="#475569">Invoca publish-facebook / publish-instagram</text>
+        <text x="145" y="233" text-anchor="middle" font-size="8.8" fill="#475569">Invoca publish-facebook / ig / youtube</text>
         <text x="145" y="246" text-anchor="middle" font-size="8.8" fill="#475569">Registra ID de publicación Meta</text>
 
         <rect x="418" y="200" width="234" height="54" rx="5" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.3"/>
@@ -304,13 +304,13 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning Comercial y Cone
         </tr>
         <tr>
           <td><strong>Editor + Vista Previa</strong></td>
-          <td>Modal en 2 columnas + <code>PostLivePreview</code></td>
-          <td>Selector visual con avatar de página, contador de caracteres, carga multimedia y simulación real de tarjeta Facebook / Instagram antes de enviar.</td>
+          <td>Modal 2 col. + <code>PostLivePreview</code></td>
+          <td>Selector visual con avatar de página o canal, título para YouTube, carga MP4/MOV y simulación real Facebook / Instagram / YouTube.</td>
         </tr>
         <tr>
-          <td><strong>Hub Conexiones (3 col.)</strong></td>
-          <td><code>SocialConnectionsGrid</code></td>
-          <td>Agrupa cuentas activas Meta (Facebook / Instagram) con botón Principal/Desconectar y mapa de canales Fase 2 (YouTube, TikTok, LinkedIn, X, Ads).</td>
+          <td><strong>YouTube Multi-Canal (2 clics)</strong></td>
+          <td><code>youtube-oauth</code> + <code>publish-youtube</code></td>
+          <td>Permite vincular múltiples canales (<em>Iclesia</em>, <em>Arias Defense Components</em>, etc.) con selector Google, auto-renovación de token y subida resumible MP4/MOV.</td>
         </tr>
         <tr>
           <td><strong>OAuth 2.1 + DCR + PKCE</strong></td>
@@ -320,7 +320,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning Comercial y Cone
         <tr>
           <td><strong>create_or_publish_social_post</strong></td>
           <td>MCP Write + <code>marketing_assets</code></td>
-          <td>Descarga el flyer (<code>image_file</code>, <code>openaiFileIdRefs</code> o URL/Base64), lo almacena en Storage público y crea en estado <em>published</em>, <em>scheduled</em> o <em>draft</em>.</td>
+          <td>Descarga el flyer o video (<code>image_file</code>, <code>openaiFileIdRefs</code> o URL), respalda en Storage público y crea en estado <em>published</em>, <em>scheduled</em> o <em>draft</em>.</td>
         </tr>
         <tr>
           <td><strong>Acciones en lote y Eliminados</strong></td>
@@ -361,9 +361,9 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning Comercial y Cone
     <div class="step-hdr"><span class="num">02 ·</span> Verificar Vista Previa y confirmar modo de salida</div>
     <p class="body-p">En el modal de 2 columnas, comprobar cómo luce el post en <strong>Vista previa en vivo</strong> (Facebook o Instagram), elegir <em>Publicar ahora</em>, <em>Programar fecha</em> o <em>Guardar borrador</em> y guardar.</p>
 
-    <h3 class="sub-h">C. Administración de conexiones y permisos</h3>
-    <div class="step-hdr"><span class="num">01 ·</span> Gestionar páginas y permisos de publicación directa</div>
-    <p class="body-p">Desde la pestaña <strong>Conexiones</strong> (o la píldora superior <code>6 redes</code>) se sincronizan páginas de Meta o se marca la cuenta principal; desde <em>Conectar ChatGPT</em> se alterna cada sesión entre <em>Publica directo</em> y <em>Solo Borrador</em>.</p>
+    <h3 class="sub-h">C. Conexión de YouTube Multi-Canal (proceso simple de 2 clics para cualquier usuario)</h3>
+    <div class="step-hdr"><span class="num">01 ·</span> Vincular todos los canales necesarios (Iclesia, Arias Defense o clientes SaaS)</div>
+    <p class="body-p">En <strong>Planning → Conexiones</strong>, pulsar <strong>+ Conectar canal de YouTube</strong>, elegir la cuenta Google y seleccionar el canal (ej. <em>Iclesia</em>). Repetir 1 vez para agregar otro canal (ej. <em>Arias Defense Components</em>) sin configurar llaves ni APIs manuales.</p>
   </div>
   ${ftr(4, 10)}
 </section>
@@ -439,8 +439,8 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning Comercial y Cone
         <tr><th style="width:22%;">Versión / fecha</th><th style="width:52%;">Descripción</th><th style="width:26%;">Estado</th></tr>
       </thead>
       <tbody>
-        <tr><td>1.2 / Nov. 2026</td><td>Rediseño UX/UI comercial completo (Calendario por Horas, Mejores horarios, Vista Lista con acciones en lote, Compositor 2 columnas con Vista Previa y Hub Conexiones 3 columnas).</td><td>Vigente en producción</td></tr>
-        <tr><td>1.1 / Nov. 2026</td><td>Incorpora Conector MCP Streamable HTTP + OAuth 2.1 en <code>chatgpt.com/plugins</code>.</td><td>Superada por v1.2</td></tr>
+        <tr><td>1.3 / Nov. 2026</td><td>Integración YouTube Multi-Canal (<code>youtube-oauth</code> + <code>publish-youtube</code>), selector de canales en 2 clics, vista previa YouTube en vivo y simplificación de acceso en Social Hub.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.2 / Nov. 2026</td><td>Rediseño UX/UI comercial completo (Calendario por Horas, Mejores horarios, Vista Lista con acciones en lote y Compositor 2 columnas).</td><td>Superada por v1.3</td></tr>
       </tbody>
     </table>
   </div>
@@ -494,26 +494,26 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning Comercial y Cone
     <h1 class="sec-h1" style="font-size:19px;">Compositor con Vista Previa y Hub de Conexiones</h1>
     <p class="lead-p" style="margin-bottom:6px;">Edición de publicaciones con simulación de feed en vivo y administración centralizada de redes sociales.</p>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">03 ·</span> Editar o programar posts verificando la Vista previa en vivo</div>
-    <p class="body-p" style="margin-bottom:4px;">Seleccione las cuentas con avatar a la izquierda, ajuste texto/media/fecha y confirme en la columna derecha cómo se verá en <strong>Facebook</strong> o <strong>Instagram</strong>.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">03 ·</span> Editar o programar posts verificando la Vista previa en vivo (FB / IG / YT)</div>
+    <p class="body-p" style="margin-bottom:4px;">Seleccione las cuentas o canales a la izquierda, ajuste texto/título/video y confirme en la columna derecha cómo se verá en <strong>Facebook</strong>, <strong>Instagram</strong> o <strong>YouTube</strong>.</p>
     <div class="shot-frame compact">
-      <img src="${pComposer}" alt="Modal Editor 2 Columnas con Vista Previa" />
-      <div class="callout-box" style="left:15.2%;top:14.8%;width:37.8%;height:19.6%;"><span class="callout-tag">1. Selector visual de páginas</span></div>
-      <div class="callout-box" style="left:15.2%;top:36.8%;width:37.8%;height:50.0%;"><span class="callout-tag bottom">2. Texto, media y programación</span></div>
-      <div class="callout-box" style="left:55.9%;top:14.4%;width:27.6%;height:61.5%;"><span class="callout-tag right">3. Vista previa en vivo (FB / IG)</span></div>
+      <img src="${pComposer}" alt="Modal Editor 2 Columnas con Vista Previa YouTube" />
+      <div class="callout-box" style="left:15.2%;top:14.8%;width:37.8%;height:19.6%;"><span class="callout-tag">1. Selector visual de páginas y canales</span></div>
+      <div class="callout-box" style="left:15.2%;top:36.8%;width:37.8%;height:50.0%;"><span class="callout-tag bottom">2. Texto, media MP4/imagen y programación</span></div>
+      <div class="callout-box" style="left:55.9%;top:14.4%;width:27.6%;height:52.0%;"><span class="callout-tag right">3. Vista previa en vivo (FB / IG / YT)</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 3. Modal de creación/edición en dos columnas con vista previa real del Episodio 21 antes de publicar.</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:5px;">Figura 3. Modal de creación/edición en dos columnas con vista previa real para Facebook, Instagram y YouTube.</div>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">04 ·</span> Administrar páginas Meta y canales futuros en Conexiones</div>
-    <p class="body-p" style="margin-bottom:4px;">La pestaña <strong>Conexiones</strong> (o la ruta <code>/company/social-accounts</code>) muestra sus páginas activas de Facebook e Instagram y las redes programadas para Fase 2.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">04 ·</span> Conectar Meta y múltiples canales YouTube en 2 clics</div>
+    <p class="body-p" style="margin-bottom:4px;">La pestaña <strong>Conexiones</strong> (o la ruta <code>/company/social-accounts</code>) permite vincular páginas Meta y cualquier canal YouTube (<em>Iclesia</em>, <em>Arias Defense</em>, clientes) en 2 clics.</p>
     <div class="shot-frame compact">
-      <img src="${pConn}" alt="Grid Conexiones de 3 columnas" />
+      <img src="${pConn}" alt="Grid Conexiones de 3 columnas con YouTube activo" />
       <div class="callout-box" style="left:23.1%;top:30.2%;width:23.0%;height:37.4%;"><span class="callout-tag">1. Facebook (4 activas)</span></div>
       <div class="callout-box" style="left:46.9%;top:30.2%;width:23.0%;height:23.0%;"><span class="callout-tag">2. Instagram (2 activas)</span></div>
-      <div class="callout-box" style="left:70.6%;top:30.2%;width:23.0%;height:11.2%;"><span class="callout-tag right">3. YouTube (Fase 2)</span></div>
-      <div class="callout-box" style="left:23.1%;top:68.8%;width:70.5%;height:24.4%;"><span class="callout-tag bottom">4. Roadmap redes Fase 2</span></div>
+      <div class="callout-box" style="left:70.6%;top:30.2%;width:23.0%;height:14.5%;"><span class="callout-tag right">3. YouTube Multi-Canal activo</span></div>
+      <div class="callout-box" style="left:23.1%;top:68.8%;width:70.5%;height:24.4%;"><span class="callout-tag bottom">4. Próximas integraciones</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 4. Panel de Conexiones en 3 columnas con sincronización Meta OAuth en 1 clic, cuenta principal y catálogo Fase 2.</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:0;">Figura 4. Panel de Conexiones con Facebook, Instagram y YouTube activos en 2 clics sin configuración técnica.</div>
   </div>
   ${ftr(7, 10)}
 </section>
