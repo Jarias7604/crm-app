@@ -182,6 +182,8 @@ async function resolveBridgeAuth(
 
 function extensionFromMime(mimeType: string, fallbackName = ''): string {
   const m = mimeType.toLowerCase();
+  if (m.includes('quicktime') || /\.mov$/i.test(fallbackName)) return 'mov';
+  if (m.includes('webm') || /\.webm$/i.test(fallbackName)) return 'webm';
   if (m.includes('mp4') || /\.mp4$/i.test(fallbackName)) return 'mp4';
   if (m.includes('jpeg') || m.includes('jpg') || /\.jpe?g$/i.test(fallbackName)) return 'jpg';
   if (m.includes('webp') || /\.webp$/i.test(fallbackName)) return 'webp';
@@ -244,7 +246,7 @@ async function persistIncomingMediaToStorage(
   }
 
   const ext = extensionFromMime(mimeType, candidate.fileName);
-  const isVideo = ext === 'mp4' || mimeType.startsWith('video/');
+  const isVideo = ext === 'mp4' || ext === 'mov' || ext === 'webm' || mimeType.startsWith('video/');
   const rand = Math.random().toString(36).slice(2, 8);
   const filePath = `social/${companyId}/planning-${Date.now()}-${rand}.${ext}`;
 
@@ -291,7 +293,7 @@ async function dispatchMetaPublish(
   }
 
   if (targets.length === 0) {
-    const errMsg = 'No hay páginas activas de Facebook/Instagram conectadas para esta empresa.';
+    const errMsg = 'No hay páginas o canales activos de Facebook/Instagram/YouTube conectados para esta empresa.';
     await supabase
       .from('social_posts')
       .update({
@@ -314,6 +316,8 @@ async function dispatchMetaPublish(
         ? 'publish-facebook'
         : target.platform === 'instagram'
         ? 'publish-instagram'
+        : target.platform === 'youtube'
+        ? 'publish-youtube'
         : null;
     if (!fnName) {
       const msg = `Plataforma aún no soportada: ${target.platform}`;
@@ -518,6 +522,9 @@ async function execCreateOrPublishPost(
   const captionsObj: Record<string, string> = { default: caption };
   for (const plat of distinctPlatforms) {
     captionsObj[plat] = caption;
+  }
+  if (body.youtube_title && String(body.youtube_title).trim()) {
+    captionsObj.youtube_title = String(body.youtube_title).trim().slice(0, 100);
   }
 
   const initialStatus =

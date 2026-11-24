@@ -1,7 +1,41 @@
 import React from 'react';
 import { Loader2, Plus, RefreshCw, Star, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { supabase } from '../../services/supabase';
 import type { SocialAccount } from '../../services/social/socialPublishService';
+
+const YOUTUBE_SCOPES = [
+    'https://www.googleapis.com/auth/youtube.upload',
+    'https://www.googleapis.com/auth/youtube.readonly',
+    'https://www.googleapis.com/auth/userinfo.email',
+].join(' ');
+
+export async function initiateYouTubeOAuth(companyId: string) {
+    const redirectUri = `${window.location.origin}/integrations/google/callback`;
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (clientId) {
+        const params = new URLSearchParams({
+            client_id: clientId,
+            redirect_uri: redirectUri,
+            response_type: 'code',
+            scope: YOUTUBE_SCOPES,
+            access_type: 'offline',
+            prompt: 'select_account consent',
+            state: `youtube:${companyId}`,
+        });
+        window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+        return;
+    }
+
+    const { data, error } = await supabase.functions.invoke('youtube-oauth', {
+        body: { action: 'get_auth_url', redirect_uri: redirectUri, company_id: companyId },
+    });
+    if (error || !data?.auth_url) {
+        toast.error(data?.error || error?.message || 'No se pudo iniciar la conexión con YouTube.');
+        return;
+    }
+    window.location.href = data.auth_url;
+}
 
 export const META_APP_ID = '1463889952375598';
 
@@ -257,52 +291,45 @@ interface FutureNetworkCard {
 
 const ROADMAP_NETWORKS: FutureNetworkCard[] = [
     {
-        key: 'youtube',
-        label: 'YouTube',
-        cta: 'Conectar canal de YouTube',
-        subtitle: 'Videos & Shorts · Fase 2',
-        btnClass: 'bg-[#FF0000]/90 hover:bg-[#FF0000] text-white',
-    },
-    {
         key: 'tiktok',
         label: 'TikTok',
         cta: 'Conectar cuenta de TikTok',
-        subtitle: 'Reels & Videos cortos · Fase 2',
+        subtitle: 'Reels & Videos cortos · Próximamente',
         btnClass: 'bg-[#0F172A]/90 hover:bg-[#0F172A] text-white',
     },
     {
         key: 'linkedin',
         label: 'LinkedIn',
         cta: 'Conectar página de LinkedIn',
-        subtitle: 'Perfil o empresa · Fase 2',
+        subtitle: 'Perfil o empresa · Próximamente',
         btnClass: 'bg-[#0A66C2]/90 hover:bg-[#0A66C2] text-white',
     },
     {
         key: 'google_business',
         label: 'Google Business Profile',
         cta: 'Conectar Google Business',
-        subtitle: 'Novedades locales · Fase 2',
+        subtitle: 'Novedades locales · Próximamente',
         btnClass: 'bg-[#4285F4]/90 hover:bg-[#4285F4] text-white',
     },
     {
         key: 'threads',
         label: 'Threads',
         cta: 'Conectar cuenta de Threads',
-        subtitle: 'Hilos cortos · Fase 2',
+        subtitle: 'Hilos cortos · Próximamente',
         btnClass: 'bg-zinc-900/90 hover:bg-zinc-900 text-white',
     },
     {
         key: 'x',
         label: 'X / Twitter',
         cta: 'Conectar cuenta de X',
-        subtitle: 'Publicaciones & hilos · Fase 2',
+        subtitle: 'Publicaciones & hilos · Próximamente',
         btnClass: 'bg-slate-900/90 hover:bg-slate-900 text-white',
     },
     {
         key: 'meta_ads',
         label: 'Meta Ads',
         cta: 'Conectar cuenta publicitaria',
-        subtitle: 'Métricas de campañas · Fase 2',
+        subtitle: 'Métricas de campañas · Próximamente',
         btnClass: 'bg-[#0081FB]/90 hover:bg-[#0081FB] text-white',
     },
 ];
@@ -318,6 +345,7 @@ export function SocialConnectionsGrid({
 }: SocialConnectionsGridProps) {
     const fbAccounts = accounts.filter((a) => a.platform === 'facebook');
     const igAccounts = accounts.filter((a) => a.platform === 'instagram');
+    const ytAccounts = accounts.filter((a) => a.platform === 'youtube');
 
     const handleConnectMeta = () => {
         if (!companyId) {
@@ -327,13 +355,24 @@ export function SocialConnectionsGrid({
         initiateMetaOAuth(companyId);
     };
 
+    const handleConnectYouTube = () => {
+        if (!companyId) {
+            toast.error('No se detectó la empresa activa para vincular YouTube.');
+            return;
+        }
+        initiateYouTubeOAuth(companyId);
+    };
+
     const renderActiveSection = (
-        platform: 'facebook' | 'instagram',
+        platform: 'facebook' | 'instagram' | 'youtube',
         title: string,
         typeLabel: string,
         list: SocialAccount[],
         btnLabel: string,
+        syncMoreLabel: string,
         btnStyle: string,
+        onConnect: () => void,
+        helperNote?: string,
     ) => (
         <div className="space-y-2.5">
             <div className="flex items-center justify-between">
@@ -371,6 +410,11 @@ export function SocialConnectionsGrid({
                                 <div className="text-[13px] font-semibold text-slate-900 truncate">
                                     {acc.display_name || acc.account_name}
                                 </div>
+                                {platform === 'youtube' && acc.follower_count > 0 && (
+                                    <div className="text-[10px] text-slate-400">
+                                        {acc.follower_count.toLocaleString()} suscriptores
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -406,15 +450,16 @@ export function SocialConnectionsGrid({
 
                 <button
                     type="button"
-                    onClick={handleConnectMeta}
+                    onClick={onConnect}
                     className={`w-full rounded-xl px-3.5 py-2.5 text-xs font-semibold flex items-center justify-between shadow-2xs transition cursor-pointer ${btnStyle}`}
                 >
                     <span className="truncate flex items-center gap-1.5">
                         <Plus className="w-3.5 h-3.5 shrink-0" />
-                        {list.length > 0 ? `Sincronizar otra cuenta de ${title}` : btnLabel}
+                        {list.length > 0 ? syncMoreLabel : btnLabel}
                     </span>
                     {renderPlatformIcon(platform, 'w-4 h-4 shrink-0 ring-1 ring-white/40 rounded-full')}
                 </button>
+                {helperNote && <p className="text-[11px] text-slate-400 px-0.5">{helperNote}</p>}
             </div>
         </div>
     );
@@ -433,7 +478,7 @@ export function SocialConnectionsGrid({
             <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
                 <div>
                     <p className="text-xs text-slate-500">
-                        Conecta tus páginas y canales por empresa. Los tokens se aíslan automáticamente con seguridad multi-tenant.
+                        Conecta tus páginas y canales en 2 clics. Cada empresa mantiene sus cuentas aisladas y seguras.
                     </p>
                 </div>
                 {onRefresh && (
@@ -455,7 +500,9 @@ export function SocialConnectionsGrid({
                     'Página',
                     fbAccounts,
                     'Conectar página de Facebook',
+                    'Sincronizar otra cuenta de Facebook',
                     'bg-[#1877F2] hover:bg-[#166FE5] text-white',
+                    handleConnectMeta,
                 )}
 
                 {renderActiveSection(
@@ -464,7 +511,21 @@ export function SocialConnectionsGrid({
                     'Profesional',
                     igAccounts,
                     'Conectar Instagram Business',
+                    'Sincronizar otra cuenta de Instagram',
                     'bg-gradient-to-r from-[#E1306C] to-[#C13584] hover:opacity-95 text-white',
+                    handleConnectMeta,
+                )}
+
+                {renderActiveSection(
+                    'youtube',
+                    'YouTube',
+                    'Canal',
+                    ytAccounts,
+                    'Conectar canal de YouTube',
+                    'Conectar otro canal de YouTube',
+                    'bg-[#FF0000] hover:bg-[#DC0000] text-white',
+                    handleConnectYouTube,
+                    '2 clics: elige tu cuenta Google y selecciona tu canal (Iclesia, Arias Defense, etc.).',
                 )}
 
                 {ROADMAP_NETWORKS.map((net) => (

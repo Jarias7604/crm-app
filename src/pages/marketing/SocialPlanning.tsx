@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
     ArrowLeft,
     Calendar as CalendarIcon,
@@ -154,7 +154,7 @@ function postDisplayDate(p: PlanningSocialPost): string {
 }
 
 function postCaption(p: PlanningSocialPost): string {
-    return p.captions?.facebook || p.captions?.instagram || p.captions?.default || '';
+    return p.captions?.facebook || p.captions?.instagram || p.captions?.youtube || p.captions?.default || '';
 }
 
 function getPostTargets(p: PlanningSocialPost): TargetAccountRef[] {
@@ -167,11 +167,25 @@ function getPostTargets(p: PlanningSocialPost): TargetAccountRef[] {
 export default function SocialPlanning() {
     const { profile, simulatedCompanyId } = useAuth();
     const companyId = simulatedCompanyId || profile?.company_id || '';
+    const [searchParams, setSearchParams] = useSearchParams();
 
-    const [activeTab, setActiveTab] = useState<PlanningTab>('calendar');
+    const initialTabParam = searchParams.get('tab');
+    const [activeTab, setActiveTab] = useState<PlanningTab>(
+        initialTabParam === 'list' || initialTabParam === 'deleted' || initialTabParam === 'connections'
+            ? initialTabParam
+            : 'calendar',
+    );
     const [calendarMode, setCalendarMode] = useState<CalendarMode>('hourly');
     const [showBestTimes, setShowBestTimes] = useState(true);
     const [showFiltersPopover, setShowFiltersPopover] = useState(false);
+
+    useEffect(() => {
+        const tabParam = searchParams.get('tab');
+        if (tabParam === 'connections' || tabParam === 'list' || tabParam === 'deleted' || tabParam === 'calendar') {
+            setActiveTab(tabParam);
+            setSearchParams({}, { replace: true });
+        }
+    }, [searchParams, setSearchParams]);
 
     const [loading, setLoading] = useState(true);
     const [flagEnabled, setFlagEnabled] = useState<boolean | null>(null);
@@ -209,6 +223,7 @@ export default function SocialPlanning() {
     const [showPostModal, setShowPostModal] = useState(false);
     const [editingPost, setEditingPost] = useState<PlanningSocialPost | null>(null);
     const [formCaption, setFormCaption] = useState('');
+    const [formYoutubeTitle, setFormYoutubeTitle] = useState('');
     const [formLine, setFormLine] = useState<string>('AI + LEAN™');
     const [formEpisode, setFormEpisode] = useState('');
     const [formTopic, setFormTopic] = useState('');
@@ -398,6 +413,7 @@ export default function SocialPlanning() {
     const openCreateModal = (presetDateKey?: string, presetHour?: number) => {
         setEditingPost(null);
         setFormCaption('');
+        setFormYoutubeTitle('');
         setFormLine('AI + LEAN™');
         setFormEpisode('');
         setFormTopic('');
@@ -436,6 +452,7 @@ export default function SocialPlanning() {
     const openEditModal = (post: PlanningSocialPost) => {
         setEditingPost(post);
         setFormCaption(postCaption(post));
+        setFormYoutubeTitle(post.captions?.youtube_title || '');
         setFormLine(post.editorial_line || 'AI + LEAN™');
         setFormEpisode(post.episode_label || '');
         setFormTopic(post.topic || '');
@@ -536,6 +553,7 @@ export default function SocialPlanning() {
             if (editingPost) {
                 await socialPlanningService.updatePlanningPost(editingPost.id, {
                     caption: formCaption.trim(),
+                    youtube_title: formYoutubeTitle.trim() || null,
                     content_url: formMediaUrl || editingPost.content_url,
                     content_type: formIsVideo ? 'video' : 'image',
                     editorial_line: formLine,
@@ -558,6 +576,7 @@ export default function SocialPlanning() {
                     contentUrl: formMediaUrl,
                     contentType: formIsVideo ? 'video' : 'image',
                     caption: formCaption.trim(),
+                    youtubeTitle: formYoutubeTitle.trim() || null,
                     targets: formSelectedAccounts,
                     editorialLine: formLine,
                     episodeLabel: formEpisode.trim() || null,
@@ -1892,6 +1911,32 @@ export default function SocialPlanning() {
 
                                 {/* Caption + Media */}
                                 <div className="space-y-3">
+                                    {formSelectedAccounts.some((t) => t.platform === 'youtube') && (
+                                        <div className="rounded-xl bg-red-50/70 border border-red-200/80 p-3 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[11px] font-bold text-red-900">
+                                                    Título del video en YouTube
+                                                </label>
+                                                <span className="text-[10px] text-red-600">
+                                                    {formYoutubeTitle.length} / 100
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                maxLength={100}
+                                                value={formYoutubeTitle}
+                                                onChange={(e) => setFormYoutubeTitle(e.target.value)}
+                                                placeholder="Ej. IA + Lean Episodio 22: Cómo eliminar errores"
+                                                className="w-full px-3 py-1.5 rounded-lg border border-red-200 bg-white text-xs text-slate-900 focus:outline-none focus:border-red-400"
+                                            />
+                                            {!formIsVideo && (
+                                                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1">
+                                                    YouTube solo admite archivo de video (MP4 o MOV). Sube un video abajo.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="flex items-center justify-between">
                                         <label className="text-xs font-semibold text-slate-800">Texto del post</label>
                                         <span className="text-[11px] text-slate-400">
@@ -1902,7 +1947,7 @@ export default function SocialPlanning() {
                                         rows={5}
                                         value={formCaption}
                                         onChange={(e) => setFormCaption(e.target.value)}
-                                        placeholder="Escribe aquí el mensaje para Facebook e Instagram…"
+                                        placeholder="Escribe aquí el mensaje para Facebook, Instagram o YouTube…"
                                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 leading-relaxed focus:outline-none focus:border-slate-400"
                                     />
 
@@ -1944,14 +1989,14 @@ export default function SocialPlanning() {
                                                             Subir imagen o video
                                                         </div>
                                                         <div className="text-[11px] text-slate-500">
-                                                            PNG, JPG o MP4 para tu publicación
+                                                            PNG, JPG, MP4 o MOV (YouTube usa MP4/MOV)
                                                         </div>
                                                     </div>
                                                 </>
                                             )}
                                             <input
                                                 type="file"
-                                                accept="image/*,video/mp4"
+                                                accept="image/*,video/mp4,video/quicktime,video/webm"
                                                 onChange={handleUploadMedia}
                                                 className="hidden"
                                             />
@@ -2045,6 +2090,7 @@ export default function SocialPlanning() {
                             <div className="lg:col-span-5">
                                 <PostLivePreview
                                     caption={formCaption}
+                                    youtubeTitle={formYoutubeTitle}
                                     mediaUrl={formMediaUrl}
                                     isVideo={formIsVideo}
                                     selectedAccounts={formSelectedAccounts}

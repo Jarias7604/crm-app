@@ -73,6 +73,8 @@ export function extractImageCandidate(body: any): ImageCandidate {
         ? 'jpg'
         : mime.includes('webp')
         ? 'webp'
+        : mime.includes('quicktime')
+        ? 'mov'
         : mime.includes('mp4')
         ? 'mp4'
         : 'png';
@@ -107,8 +109,10 @@ export function extractImageCandidate(body: any): ImageCandidate {
       url: rawUrl,
       base64: null,
       fileName: `flyer-${Date.now()}.png`,
-      mimeType: /\.mp4(\?|$)/i.test(rawUrl)
+      mimeType: /\.(mp4|m4v)(\?|$)/i.test(rawUrl)
         ? 'video/mp4'
+        : /\.mov(\?|$)/i.test(rawUrl)
+        ? 'video/quicktime'
         : /\.jpe?g(\?|$)/i.test(rawUrl)
         ? 'image/jpeg'
         : 'image/png',
@@ -346,8 +350,12 @@ export function buildChatGptOpenApiSchema(baseUrl: string): Record<string, any> 
                     },
                     platforms: {
                       type: 'array',
-                      items: { type: 'string', enum: ['facebook', 'instagram'] },
+                      items: { type: 'string', enum: ['facebook', 'instagram', 'youtube'] },
                       description: 'Redes destino si no indicaste page_names',
+                    },
+                    youtube_title: {
+                      type: 'string',
+                      description: 'Título del video o Short si publicas en YouTube (máximo 100 caracteres)',
                     },
                     openaiFileIdRefs: {
                       type: 'array',
@@ -480,7 +488,11 @@ export const MCP_TOOL_DEFINITIONS = [
         },
         caption: {
           type: 'string',
-          description: 'Texto completo de la publicación para Facebook / Instagram',
+          description: 'Texto completo de la publicación para Facebook / Instagram / YouTube',
+        },
+        youtube_title: {
+          type: 'string',
+          description: 'Título obligatorio si el destino incluye YouTube (máx 100 caracteres)',
         },
         editorial_line: {
           type: 'string',
@@ -501,11 +513,11 @@ export const MCP_TOOL_DEFINITIONS = [
         page_names: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Nombres de páginas destino (ej. ["Arias Group", "Jimmy Arias AI + Lean"])',
+          description: 'Nombres de páginas o canales destino (ej. ["Arias Group", "Jimmy Arias AI + Lean", "Iclesia"])',
         },
         platforms: {
           type: 'array',
-          items: { type: 'string', enum: ['facebook', 'instagram'] },
+          items: { type: 'string', enum: ['facebook', 'instagram', 'youtube'] },
           description: 'Plataformas destino si no se especifican page_names',
         },
         image_url: {

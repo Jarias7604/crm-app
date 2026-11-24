@@ -107,8 +107,9 @@ export const socialPublishService = {
                 let fnName = '';
                 if (platform === 'facebook') fnName = 'publish-facebook';
                 else if (platform === 'instagram') fnName = 'publish-instagram';
+                else if (platform === 'youtube') fnName = 'publish-youtube';
                 else {
-                    results[platform] = { error: `Platform ${platform} not yet supported in Phase 1` };
+                    results[platform] = { error: `Platform ${platform} not yet supported` };
                     continue;
                 }
 

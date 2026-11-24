@@ -83,18 +83,29 @@ export const socialPlanningService = {
 
     async uploadPlanningMedia(companyId: string, file: File): Promise<{ url: string; isVideo: boolean }> {
         const ext = (file.name.split('.').pop() || 'png').toLowerCase();
-        const isVideo = file.type.startsWith('video/') || ext === 'mp4' || ext === 'mov';
-        const filePath = `public/social-planning/${companyId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const isVideo = file.type.startsWith('video/') || ext === 'mp4' || ext === 'mov' || ext === 'webm';
+        const filePath = `social/${companyId}/planning-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
         const { error: upErr } = await supabase.storage
-            .from('avatars')
+            .from('marketing_assets')
             .upload(filePath, file, { cacheControl: '3600', upsert: true });
 
-        if (upErr) throw upErr;
+        if (!upErr) {
+            const {
+                data: { publicUrl },
+            } = supabase.storage.from('marketing_assets').getPublicUrl(filePath);
+            return { url: publicUrl, isVideo };
+        }
+
+        const fallbackPath = `public/social-planning/${companyId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error: fbErr } = await supabase.storage
+            .from('avatars')
+            .upload(fallbackPath, file, { cacheControl: '3600', upsert: true });
+        if (fbErr) throw fbErr;
 
         const {
             data: { publicUrl },
-        } = supabase.storage.from('avatars').getPublicUrl(filePath);
+        } = supabase.storage.from('avatars').getPublicUrl(fallbackPath);
 
         return { url: publicUrl, isVideo };
     },
@@ -104,6 +115,7 @@ export const socialPlanningService = {
         contentUrl: string | null;
         contentType: 'image' | 'video';
         caption: string;
+        youtubeTitle?: string | null;
         targets: TargetAccountRef[];
         editorialLine?: string | null;
         episodeLabel?: string | null;
@@ -118,6 +130,9 @@ export const socialPlanningService = {
         const captions: Record<string, string> = { default: input.caption };
         for (const plat of platforms) {
             captions[plat] = input.caption;
+        }
+        if (input.youtubeTitle?.trim()) {
+            captions.youtube_title = input.youtubeTitle.trim().slice(0, 100);
         }
 
         const { data, error } = await supabase
@@ -148,6 +163,7 @@ export const socialPlanningService = {
         postId: string,
         patch: {
             caption?: string;
+            youtube_title?: string | null;
             content_url?: string | null;
             content_type?: 'image' | 'video' | 'reel' | 'story';
             platforms?: string[];
@@ -166,6 +182,9 @@ export const socialPlanningService = {
             const plats = patch.platforms || ['facebook'];
             const capObj: Record<string, string> = { default: patch.caption };
             for (const p of plats) capObj[p] = patch.caption;
+            if (patch.youtube_title?.trim()) {
+                capObj.youtube_title = patch.youtube_title.trim().slice(0, 100);
+            }
             payload.captions = capObj;
         }
         if (patch.content_url !== undefined) payload.content_url = patch.content_url;

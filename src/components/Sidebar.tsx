@@ -549,12 +549,12 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({
             id: 'social',
             name: t('sidebar.socialMediaHub') || 'Social Media Hub',
-            href: '/marketing/social',
+            href: planningEnabled ? '/marketing/planning' : '/marketing/social',
             icon: Globe,
             current: socialPaths.some(path => location.pathname.startsWith(path) || location.pathname === path),
             subItems: [
-                { name: t('sidebar.socialDashboard') || 'Panel de Publicación', href: '/marketing/social', icon: LayoutDashboard },
                 ...(planningEnabled ? [{ name: 'Planning', href: '/marketing/planning', icon: Calendar }] : []),
+                { name: t('sidebar.socialDashboard') || 'Panel de Publicación', href: '/marketing/social', icon: LayoutDashboard },
                 { name: t('sidebar.flyerStudio'), href: '/marketing/flyers', icon: Sparkles },
                 { name: t('sidebar.connectedAccounts') || 'Cuentas Conectadas', href: '/company/social-accounts', icon: Network },
             ]

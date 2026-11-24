@@ -168,4 +168,35 @@ test('6. Verifies PKCE S256 challenges, OAuth 2.1 metadata, and MCP tool definit
   const createTool = mod.MCP_TOOL_DEFINITIONS.find((t) => t.name === 'create_or_publish_social_post');
   assert.deepEqual(createTool?._meta?.['openai/fileParams'], ['image_file']);
   assert.ok(createTool?.inputSchema?.properties?.image_file);
+  assert.ok(createTool?.inputSchema?.properties?.youtube_title);
+});
+
+test('7. Resolves multi-channel YouTube targets (Iclesia vs Arias Defense Components) and bundles YouTube functions', async () => {
+  const accounts = [
+    { platform: 'facebook', account_id: 'fb-1', account_name: 'Arias Group', is_default: true, is_active: true },
+    { platform: 'youtube', account_id: 'yt-iclesia', account_name: 'Iclesia', is_default: true, is_active: true },
+    { platform: 'youtube', account_id: 'yt-arias', account_name: 'Arias Defense Components', is_default: false, is_active: true },
+  ];
+
+  const byChannelName = mod.normalizeTargetAccounts({ page_names: ['Arias Defense Components'] }, accounts);
+  assert.equal(byChannelName.length, 1);
+  assert.equal(byChannelName[0].platform, 'youtube');
+  assert.equal(byChannelName[0].account_id, 'yt-arias');
+
+  const vidCandidate = mod.extractImageCandidate({ image_url: 'https://cdn.example.com/short-ep22.mov' });
+  assert.equal(vidCandidate.mimeType, 'video/quicktime');
+
+  for (const fn of ['youtube-oauth', 'publish-youtube']) {
+    const outFile = path.join(tmpDir, `${fn}.bundle.mjs`);
+    await esbuild.build({
+      entryPoints: [path.resolve(`supabase/functions/${fn}/index.ts`)],
+      bundle: true,
+      platform: 'neutral',
+      format: 'esm',
+      outfile: outFile,
+      external: ['https://deno.land/*', 'https://esm.sh/*'],
+      logLevel: 'silent',
+    });
+    assert.ok(fs.existsSync(outFile));
+  }
 });

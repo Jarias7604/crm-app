@@ -8,9 +8,10 @@ import toast from 'react-hot-toast';
 export default function GoogleCallback() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { profile } = useAuth();
+    const { profile, simulatedCompanyId } = useAuth();
     const [status, setStatus] = useState<'waiting' | 'loading' | 'success' | 'error'>('waiting');
     const [errorMessage, setErrorMessage] = useState<string>('');
+    const [successLabel, setSuccessLabel] = useState<string>('Redirigiendo a tus integraciones...');
     const [hasRun, setHasRun] = useState(false);
 
     useEffect(() => {
@@ -20,6 +21,8 @@ export default function GoogleCallback() {
         const params = new URLSearchParams(location.search);
         const code = params.get('code');
         const googleError = params.get('error');
+        const stateParam = params.get('state') || '';
+        const isYouTube = stateParam.startsWith('youtube:');
 
         // Case 1: Google returned an error (user cancelled, etc.)
         if (googleError) {
@@ -42,7 +45,6 @@ export default function GoogleCallback() {
         }
 
         // Case 3: Profile not loaded yet — wait for the next render cycle
-        // This fixes the race condition: useAuth is async, profile starts as null
         if (!profile?.id || !profile?.company_id) {
             setStatus('waiting');
             return;
@@ -55,6 +57,32 @@ export default function GoogleCallback() {
 
             try {
                 const redirectUri = `${window.location.origin}/integrations/google/callback`;
+
+                if (isYouTube) {
+                    const targetCompanyId =
+                        stateParam.slice('youtube:'.length).trim() || simulatedCompanyId || profile.company_id;
+                    const { data, error: ytErr } = await supabase.functions.invoke('youtube-oauth', {
+                        body: {
+                            action: 'exchange_code',
+                            code,
+                            redirect_uri: redirectUri,
+                            company_id: targetCompanyId,
+                        },
+                    });
+
+                    if (ytErr || !data?.success) {
+                        throw new Error(data?.error || ytErr?.message || 'Error conectando canal de YouTube.');
+                    }
+
+                    const names = Array.isArray(data.accounts)
+                        ? data.accounts.map((a: any) => a.account_name).filter(Boolean).join(', ')
+                        : '';
+                    toast.success(`¡YouTube conectado${names ? `: ${names}` : ''}!`);
+                    setSuccessLabel('Redirigiendo a Planning → Conexiones...');
+                    setStatus('success');
+                    setTimeout(() => navigate('/marketing/planning?tab=connections'), 1600);
+                    return;
+                }
 
                 const { data, error: fnError } = await supabase.functions.invoke('google-calendar-sync', {
                     body: {
@@ -71,6 +99,7 @@ export default function GoogleCallback() {
                 }
 
                 toast.success('¡Google Calendar conectado exitosamente!');
+                setSuccessLabel('Redirigiendo a tus integraciones...');
                 setStatus('success');
                 setTimeout(() => navigate('/company/integrations'), 1800);
 
@@ -83,7 +112,7 @@ export default function GoogleCallback() {
         };
 
         handleCallback();
-    }, [location.search, profile, hasRun, navigate]);
+    }, [location.search, profile, simulatedCompanyId, hasRun, navigate]);
 
     return (
         <div className="flex flex-col items-center justify-center h-full min-h-[400px] px-4">
@@ -113,7 +142,7 @@ export default function GoogleCallback() {
                         <CheckCircle2 className="w-8 h-8 text-emerald-500" />
                     </div>
                     <h2 className="text-xl font-black text-gray-900">¡Conexión Exitosa!</h2>
-                    <p className="text-gray-500 mt-2 text-sm">Redirigiendo a tus integraciones...</p>
+                    <p className="text-gray-500 mt-2 text-sm">{successLabel}</p>
                 </>
             )}
 
@@ -128,11 +157,17 @@ export default function GoogleCallback() {
                         <p className="text-red-500 mt-2 text-sm text-center max-w-sm">{errorMessage}</p>
                     )}
                     <button
-                        onClick={() => navigate('/company/integrations')}
+                        onClick={() =>
+                            navigate(
+                                new URLSearchParams(location.search).get('state')?.startsWith('youtube:')
+                                    ? '/marketing/planning?tab=connections'
+                                    : '/company/integrations',
+                            )
+                        }
                         className="mt-6 flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-all shadow-md"
                     >
                         <ArrowLeft className="w-4 h-4" />
-                        Volver a Integraciones
+                        Volver
                     </button>
                 </>
             )}

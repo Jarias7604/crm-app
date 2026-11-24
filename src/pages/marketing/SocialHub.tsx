@@ -1043,53 +1043,34 @@ export default function SocialHub() {
           </div>
 
 
-          {/* Future Networks */}
-          <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #d8dde6', padding: 14 }}>
-
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em', marginBottom: 10 }}>FUTURAS REDES</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {['tiktok', 'youtube'].map(p => {
-                const m = PLATFORM_META[p];
-                const BrandIcon = m.icon;
-                return (
-                  <div
-                    key={p}
-                    style={{
-                      flex: 1,
-                      background: '#f4f6f9',
-                      borderRadius: 8,
-                      padding: '10px',
-                      border: '1px dashed #d8dde6',
-                      textAlign: 'center',
-                      opacity: 0.65
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}><BrandIcon size={16} /></div>
-                    <div style={{ fontSize: 11, color: '#54698d', fontWeight: 700 }}>{m.label}</div>
-                    <div style={{ fontSize: 9, color: '#54698d', marginTop: 1 }}>Fase 2</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Schedule Picker placeholder */}
-          <div style={{
-            background: '#ffffff',
-            borderRadius: 8,
-            padding: '12px 14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            border: '1px solid #d8dde6',
-            opacity: 0.75
-          }}>
-            <Clock size={15} color="#54698d" />
+          {/* Planning Hub Shortcut (Calendario, YouTube y ChatGPT) */}
+          <button
+            type="button"
+            onClick={() => navigate('/marketing/planning')}
+            style={{
+              width: '100%',
+              textAlign: 'left',
+              background: '#f8fafc',
+              borderRadius: 8,
+              border: '1px solid #cbd5e1',
+              padding: '12px 14px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#54698d' }}>Programar publicación</div>
-              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>Fase 2 · Configurar hora</div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#0f172a', letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Clock size={12} color="#18181B" /> PLANNING &amp; YOUTUBE
+              </div>
+              <div style={{ fontSize: 11, color: '#475569', marginTop: 3 }}>
+                Programar por horas, conectar YouTube y enviar desde ChatGPT →
+              </div>
             </div>
-          </div>
+            <YouTubeIcon size={18} />
+          </button>
 
           {/* Action Publish Button */}
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
