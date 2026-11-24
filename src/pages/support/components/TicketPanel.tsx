@@ -1,20 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Edit2, Save, RefreshCw, ChevronRight, ChevronDown, UserCheck, MessageSquare, Lock, CalendarDays, Activity, ShieldCheck, CheckCircle2, Send, Search, Trash2, AlertTriangle, Clock, Paperclip, Image, FileVideo, ExternalLink, Microscope, Lightbulb, SearchCode, FileUp, FileBadge2, UploadCloud, Check, Plus } from 'lucide-react';
+import { X, Edit2, Save, RefreshCw, ChevronRight, ChevronDown, UserCheck, MessageSquare, Lock, CalendarDays, Activity, ShieldCheck, CheckCircle2, Send, Search, Trash2, AlertTriangle, Clock, Paperclip, Image, FileVideo, ExternalLink, Microscope, Lightbulb, SearchCode, FileUp, FileBadge2, UploadCloud, Check, Plus, Bell } from 'lucide-react';
 import { storageService } from '../../../services/storage';
 import { ticketService, computeTicketAiTimeBenchmark, type Ticket, type TicketCategory, type TicketStatus, type TicketPriority, type CompanyAgent, type TicketComment, type TicketLead, type ResolutionAttachment } from '../../../services/tickets';
+import { TICKET_STATUS_META } from '../../../lib/ticketWorkflow';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { CustomDatePicker } from '../../../components/ui/CustomDatePicker';
 import { CustomSelect } from '../../../components/ui/CustomSelect';
 
-const SC: Record<TicketStatus, { label: string; color: string; bg: string; darkColor: string }> = {
-    new: { label: 'Nuevo', color: 'text-blue-600', bg: 'bg-blue-50', darkColor: 'text-blue-300' },
-    open: { label: 'Abierto', color: 'text-indigo-600', bg: 'bg-indigo-50', darkColor: 'text-indigo-300' },
-    pending: { label: 'Pendiente', color: 'text-amber-600', bg: 'bg-amber-50', darkColor: 'text-amber-300' },
-    resolved: { label: 'Resuelto', color: 'text-emerald-600', bg: 'bg-emerald-50', darkColor: 'text-emerald-300' },
-    closed: { label: 'Cerrado', color: 'text-gray-500', bg: 'bg-gray-100', darkColor: 'text-gray-400' },
-};
+const SC: Record<TicketStatus, { label: string; color: string; bg: string; darkColor: string }> = TICKET_STATUS_META as Record<
+    TicketStatus,
+    { label: string; color: string; bg: string; darkColor: string }
+>;
 const PC: Record<TicketPriority, { label: string; color: string; bg: string; icon: string }> = {
     low: { label: 'Baja', color: 'text-gray-500', bg: 'bg-gray-100', icon: '↓' },
     medium: { label: 'Media', color: 'text-blue-500', bg: 'bg-blue-50', icon: '→' },
@@ -210,6 +208,10 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
     const [resFiles, setResFiles] = useState<File[]>([]);
     const [resUploading, setResUploading] = useState(false);
     const [resSaving, setResSaving] = useState(false);
+    const [watchers, setWatchers] = useState<string[]>(
+        Array.isArray(ticket.metadata?.watchers) ? (ticket.metadata?.watchers as string[]) : []
+    );
+    const [savingWatchers, setSavingWatchers] = useState(false);
     const resFileRef = useRef<HTMLInputElement>(null);
     const existingResAttachments: ResolutionAttachment[] = (ticket.metadata?.resolution_attachments as ResolutionAttachment[]) || [];
 
@@ -236,7 +238,28 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
         setEditingDate(false);
         setTempEst((ticket.estimated_hours ?? 0).toString());
         setTempAct((ticket.actual_hours ?? 0).toString());
+        setWatchers(Array.isArray(ticket.metadata?.watchers) ? (ticket.metadata?.watchers as string[]) : []);
     }, [ticket]);
+
+    async function handleToggleWatcher(uid: string) {
+        if (savingWatchers) return;
+        const nextWatchers = watchers.includes(uid)
+            ? watchers.filter(id => id !== uid)
+            : [...watchers, uid];
+        setWatchers(nextWatchers);
+        setSavingWatchers(true);
+        try {
+            const updated = await ticketService.updateTicket(ticket.id, {
+                metadata: { ...(ticket.metadata || {}), watchers: nextWatchers },
+            });
+            onUpdate(updated);
+        } catch (err: any) {
+            setWatchers(watchers);
+            toast.error(err?.message || 'Error al actualizar notificaciones');
+        } finally {
+            setSavingWatchers(false);
+        }
+    }
 
     const currentCatName = categories.find(c => c.id === ticket.category_id)?.name || '';
     const parsedActualHours = Number(resForm.actual_hours !== '' ? resForm.actual_hours : (ticket.actual_hours ?? 0));
@@ -307,14 +330,25 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                 },
             };
             if (closeTicketAfterSave) {
-                updatePayload.status = 'closed';
+                updatePayload.status = 'resolved';
                 updatePayload.resolved_at = ticket.resolved_at || new Date().toISOString();
             }
             const updated = await ticketService.updateTicket(ticket.id, updatePayload);
             onUpdate(updated);
             setResFiles([]);
             if (closeTicketAfterSave) {
-                toast.success('Tiempo, Resolución y Cierre guardados ✓');
+                const actorName = agents.find(a => a.id === authorId)?.full_name || 'Equipo Soporte';
+                ticketService.notifyTicketLifecycleChange({
+                    companyId,
+                    ticket: updated,
+                    previousStatus: ticket.status,
+                    newStatus: 'resolved',
+                    actorId: authorId,
+                    actorName,
+                    agents,
+                    extraWatcherIds: watchers,
+                });
+                toast.success('Ticket marcado como Completado ✓ y equipo notificado');
                 setTab('info');
             } else {
                 toast.success('Reporte de resolución guardado ✓');
@@ -367,7 +401,21 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                 root_cause: currentRootCause || null,
                 solution: currentSolution || null,
                 actual_hours: parsedActualHours,
+                metadata: { ...(ticket.metadata || {}), watchers },
             });
+            if (updated.status !== ticket.status) {
+                const actorName = agents.find(a => a.id === authorId)?.full_name || 'Equipo Soporte';
+                ticketService.notifyTicketLifecycleChange({
+                    companyId,
+                    ticket: updated,
+                    previousStatus: ticket.status,
+                    newStatus: updated.status,
+                    actorId: authorId,
+                    actorName,
+                    agents,
+                    extraWatcherIds: watchers,
+                });
+            }
             onUpdate(updated); setTab('info'); toast.success('Ticket actualizado ✓');
         } catch (err: any) {
             console.error('Error al actualizar ticket:', err);
@@ -596,6 +644,55 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                             <div className={`rounded-xl p-3.5 ${PC[ticket.priority].bg} border border-black/5`}>
                                 <p className="text-[9px] font-black text-gray-400 uppercase mb-0.5">Prioridad</p>
                                 <p className={`text-sm font-black ${PC[ticket.priority].color}`}>{PC[ticket.priority].icon} {PC[ticket.priority].label}</p>
+                            </div>
+                        </div>
+
+                        {/* Solución Aplicada destacada para equipo comercial */}
+                        {(ticket.solution || ['resolved', 'closed'].includes(ticket.status)) && (
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 space-y-1.5">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-[9px] font-black text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+                                        <CheckCircle2 className="w-3.5 h-3.5" />Solución Aplicada
+                                    </p>
+                                    {ticket.resolved_at && (
+                                        <span className="text-[9px] font-bold text-emerald-600">
+                                            Completado {format(new Date(ticket.resolved_at), 'dd MMM · HH:mm', { locale: es })}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-xs font-medium text-emerald-950 whitespace-pre-wrap leading-relaxed">
+                                    {ticket.solution || 'Resuelto (sin detalle escrito de solución aún).'}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Notificar al equipo (Campana + Email) */}
+                        <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5">
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="text-[9px] font-black text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Bell className="w-3 h-3 text-indigo-500" />Notificar cambios (Campana + Email)
+                                </p>
+                                {savingWatchers && <span className="text-[9px] text-indigo-500 font-bold">Guardando...</span>}
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                                {agents.map(a => {
+                                    const active = watchers.includes(a.id);
+                                    return (
+                                        <button
+                                            key={a.id}
+                                            type="button"
+                                            onClick={() => handleToggleWatcher(a.id)}
+                                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition ${
+                                                active
+                                                    ? 'bg-indigo-600 text-white border-indigo-600'
+                                                    : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+                                            }`}
+                                        >
+                                            {active && <Check className="w-2.5 h-2.5" />}
+                                            <span>{a.full_name}</span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
                         {ticket.due_date && (
@@ -1750,7 +1847,7 @@ export function TicketPanel({ ticket, allTickets, categories, agents, leads, com
                             className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-200/50 disabled:opacity-60 transition-all"
                         >
                             {resSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : resUploading ? <UploadCloud className="w-3.5 h-3.5 animate-pulse" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                            {['resolved', 'closed'].includes(ticket.status) ? 'Guardar Resolución ✓' : 'Guardar y Cerrar Ticket ✓'}
+                            {['resolved', 'closed'].includes(ticket.status) ? 'Guardar Resolución ✓' : 'Completar Ticket y Notificar ✓'}
                         </button>
                     </div>
                 </div>

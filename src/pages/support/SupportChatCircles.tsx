@@ -75,6 +75,7 @@ import { WhatsAppReactivationModal, type ReactivationTouchInfo } from '../../com
 import type { Lead } from '../../types';
 import NewFollowUpModal from '../../components/NewFollowUpModal';
 import GoogleMeetScheduler from '../../components/GoogleMeetScheduler';
+import { CreateTicketFromChatModal } from './components/CreateTicketFromChatModal';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../auth/AuthProvider';
 import { cotizacionesService } from '../../services/cotizaciones';
@@ -611,6 +612,7 @@ export const SupportChatCircles: React.FC = () => {
   const [showHistoryAccordion, setShowHistoryAccordion] = useState(false);
   const [savingResolution, setSavingResolution] = useState(false);
   const [togglingTechTicket, setTogglingTechTicket] = useState(false);
+  const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
   const [resForm, setResForm] = useState({
     actual_hours: '',
     findings: '',
@@ -4281,7 +4283,7 @@ export const SupportChatCircles: React.FC = () => {
                           <button
                             type="button"
                             disabled={togglingTechTicket}
-                            onClick={() => handleToggleTechnicalTicket(true)}
+                            onClick={() => setShowCreateTicketModal(true)}
                             title="Convertir esta conversación en Ticket Técnico formal"
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition disabled:opacity-50"
                           >
@@ -5510,7 +5512,7 @@ export const SupportChatCircles: React.FC = () => {
                     <button
                       type="button"
                       disabled={togglingTechTicket}
-                      onClick={() => handleToggleTechnicalTicket(true)}
+                      onClick={() => setShowCreateTicketModal(true)}
                       className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white text-xs font-black shadow-sm transition inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
                     >
                       <TicketIcon className="w-4 h-4" />
@@ -5937,6 +5939,25 @@ export const SupportChatCircles: React.FC = () => {
               sendImmediately: details.sendImmediately,
               shareToWhatsApp: true,
             });
+          }}
+        />
+      )}
+
+      {/* Modal estructurado para convertir chat de WhatsApp en Ticket Técnico formal */}
+      {activeCircle && activeCompanyId && showCreateTicketModal && (
+        <CreateTicketFromChatModal
+          isOpen={showCreateTicketModal}
+          onClose={() => setShowCreateTicketModal(false)}
+          ticketId={activeCircle.activeTicket.id}
+          clientName={activeCircle.clientName}
+          companyId={activeCompanyId}
+          currentUserId={profile?.id || ''}
+          currentUserName={profile?.full_name || profile?.email || 'Equipo Soporte'}
+          agents={agents}
+          categories={categories}
+          onCreated={() => {
+            loadSupportData(true);
+            loadThread(false);
           }}
         />
       )}

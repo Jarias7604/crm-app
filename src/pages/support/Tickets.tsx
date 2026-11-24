@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { TicketIcon, AlertCircle, CheckCircle2, Filter, Plus, Search, ChevronDown, ChevronRight, Timer, ShieldCheck, X, TrendingUp, RefreshCw, AlertTriangle, UserCheck, Edit2, MoreHorizontal, CalendarDays, Tag, Send, ArrowUpDown, CalendarRange, Trophy, CalendarClock, Settings, Users, Paperclip, Image, FileVideo, Trash2 } from 'lucide-react';
+import { TicketIcon, AlertCircle, CheckCircle2, Filter, Plus, Search, ChevronDown, ChevronRight, Timer, ShieldCheck, X, TrendingUp, RefreshCw, AlertTriangle, UserCheck, Edit2, MoreHorizontal, CalendarDays, Tag, Send, ArrowUpDown, CalendarRange, Trophy, CalendarClock, Settings, Users, Paperclip, Image, FileVideo, Trash2, Bell, Check } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { ticketService, type Ticket, type TicketCategory, type TicketStatus, type TicketPriority, type TicketStats, type CompanyAgent, type TicketLead } from '../../services/tickets';
 import { Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
@@ -11,14 +11,12 @@ import { CategoryManager } from './components/CategoryManager';
 import { TicketPanel } from './components/TicketPanel';
 import { storageService } from '../../services/storage';
 import { CustomSelect } from '../../components/ui/CustomSelect';
+import { TICKET_STATUS_META, TICKET_MODULES, buildStructuredTicketTitle } from '../../lib/ticketWorkflow';
 
-const SC: Record<TicketStatus, { label: string; color: string; bg: string }> = {
-    new: { label: 'Nuevo', color: 'text-blue-600', bg: 'bg-blue-50' },
-    open: { label: 'Abierto', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    pending: { label: 'Pendiente', color: 'text-amber-600', bg: 'bg-amber-50' },
-    resolved: { label: 'Resuelto', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    closed: { label: 'Cerrado', color: 'text-gray-500', bg: 'bg-gray-100' },
-};
+const SC: Record<TicketStatus, { label: string; color: string; bg: string }> = TICKET_STATUS_META as Record<
+    TicketStatus,
+    { label: string; color: string; bg: string }
+>;
 const PC: Record<TicketPriority, { label: string; color: string; bg: string; icon: string }> = {
     low: { label: 'Baja', color: 'text-gray-500', bg: 'bg-gray-100', icon: '↓' },
     medium: { label: 'Media', color: 'text-blue-500', bg: 'bg-blue-50', icon: '→' },
@@ -157,7 +155,7 @@ export default function Tickets() {
     const [agentFilter, setAgentFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState<TicketStatus[]>(['new', 'open', 'pending']);
     const [search, setSearch] = useState('');
-    const [newT, setNewT] = useState({ title: '', description: '', category_id: '', priority: 'medium' as TicketPriority, due_date: '', lead_id: '', created_by: '', parent_ticket_id: '' });
+    const [newT, setNewT] = useState({ title: '', moduleName: '', watchers: [] as string[], description: '', category_id: '', priority: 'medium' as TicketPriority, due_date: '', lead_id: '', created_by: '', parent_ticket_id: '' });
     const [attachFiles, setAttachFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [parentSearch, setParentSearch] = useState('');
@@ -216,21 +214,25 @@ export default function Tickets() {
 
     useEffect(() => {
         const state = location.state as { parentTicketId?: string; openTicketId?: string } | null;
+        const queryTicketId = new URLSearchParams(location.search).get('ticket');
+        const targetTicketId = state?.openTicketId || queryTicketId;
         if (state?.parentTicketId) {
             openCreateModalWithParent(state.parentTicketId);
             window.history.replaceState({}, document.title);
         }
-        if (state?.openTicketId && allTickets.length > 0) {
-            const target = allTickets.find(t => t.id === state.openTicketId);
+        if (targetTicketId && allTickets.length > 0) {
+            const target = allTickets.find(t => t.id === targetTicketId);
             if (target) {
                 if (!statusFilter.includes(target.status)) {
                     setStatusFilter(prev => [...prev, target.status]);
                 }
                 setSelected(target);
-                window.history.replaceState({}, document.title);
+                if (state?.openTicketId) {
+                    window.history.replaceState({}, document.title);
+                }
             }
         }
-    }, [location.state, allTickets, statusFilter]);
+    }, [location.state, location.search, allTickets, statusFilter]);
 
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
@@ -256,7 +258,7 @@ export default function Tickets() {
     }, [isParentDropdownOpen]);
 
     function openCreateModalWithParent(parentId: string) {
-        setNewT({ title: '', description: '', category_id: '', priority: 'medium', due_date: '', lead_id: '', created_by: '', parent_ticket_id: parentId });
+        setNewT({ title: '', moduleName: '', watchers: [], description: '', category_id: '', priority: 'medium', due_date: '', lead_id: '', created_by: '', parent_ticket_id: parentId });
         setIsCreateOpen(true);
     }
 
@@ -273,18 +275,36 @@ export default function Tickets() {
                     attachFiles.map(f => storageService.uploadTicketAttachment(profile.company_id!, f))
                 );
             }
-            await ticketService.createTicket({
-                company_id: profile.company_id!, title: newT.title, description: newT.description,
+            const structuredTitle = newT.moduleName
+                ? buildStructuredTicketTitle(newT.moduleName, newT.title)
+                : newT.title.trim();
+            const created = await ticketService.createTicket({
+                company_id: profile.company_id!, title: structuredTitle, description: newT.description,
                 category_id: newT.category_id || null, priority: newT.priority, status: 'new',
                 lead_id: newT.lead_id || null, assigned_to: null,
-                metadata: attachments.length > 0 ? { attachments } : {},
+                metadata: {
+                    ...(attachments.length > 0 ? { attachments } : {}),
+                    ...(newT.moduleName ? { module_name: newT.moduleName } : {}),
+                    ...(newT.watchers.length > 0 ? { watchers: newT.watchers } : {}),
+                },
                 created_by: newT.created_by || profile.id,
                 due_date: newT.due_date ? new Date(newT.due_date).toISOString() : null,
                 parent_ticket_id: newT.parent_ticket_id || null,
             });
-            toast.success('Ticket creado', { id: tid });
+            ticketService.notifyTicketLifecycleChange({
+                companyId: profile.company_id!,
+                ticket: created,
+                previousStatus: null,
+                newStatus: 'new',
+                actorId: profile.id,
+                actorName: profile.full_name || profile.email,
+                agents,
+                extraWatcherIds: newT.watchers,
+                forceNotify: true,
+            });
+            toast.success('Ticket Generado y equipo notificado', { id: tid });
             setIsCreateOpen(false);
-            setNewT({ title: '', description: '', category_id: '', priority: 'medium', due_date: '', lead_id: '', created_by: '', parent_ticket_id: '' });
+            setNewT({ title: '', moduleName: '', watchers: [], description: '', category_id: '', priority: 'medium', due_date: '', lead_id: '', created_by: '', parent_ticket_id: '' });
             setAttachFiles([]);
             setLeadSearch('');
             load();
@@ -314,7 +334,14 @@ export default function Tickets() {
         const pOrder: Record<TicketPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
         let list = tickets.filter(t => {
             const q = search.toLowerCase();
-            if (q && !t.title.toLowerCase().includes(q) && !(t.lead?.name || '').toLowerCase().includes(q)) return false;
+            if (
+                q &&
+                !t.title.toLowerCase().includes(q) &&
+                !(t.lead?.name || '').toLowerCase().includes(q) &&
+                !(t.solution || '').toLowerCase().includes(q) &&
+                !(String(t.metadata?.module_name || '')).toLowerCase().includes(q) &&
+                !t.id.toLowerCase().includes(q)
+            ) return false;
             if (priorityFilter.length && !priorityFilter.includes(t.priority)) return false;
             if (dateFrom && new Date(t.created_at) < new Date(dateFrom)) return false;
             if (dateTo && new Date(t.created_at) > new Date(dateTo + 'T23:59:59')) return false;
@@ -491,6 +518,41 @@ export default function Tickets() {
                                     </div>
                                 </div>
                                 <div className="h-4 w-px bg-gray-200" />
+                                {/* Quick-view presets for Commercial Team & Support */}
+                                <div className="flex bg-indigo-50/70 p-1 rounded-xl gap-0.5 border border-indigo-100">
+                                    {[
+                                        {
+                                            label: `Activos (${allTickets.filter(t => ['new', 'open', 'pending'].includes(t.status)).length})`,
+                                            statuses: ['new', 'open', 'pending'] as TicketStatus[],
+                                        },
+                                        {
+                                            label: `Completados (${allTickets.filter(t => ['resolved', 'closed'].includes(t.status)).length})`,
+                                            statuses: ['resolved', 'closed'] as TicketStatus[],
+                                        },
+                                        {
+                                            label: `Todos (${allTickets.length})`,
+                                            statuses: ['new', 'open', 'pending', 'resolved', 'closed'] as TicketStatus[],
+                                        },
+                                    ].map(preset => {
+                                        const isActivePreset =
+                                            preset.statuses.length === statusFilter.length &&
+                                            preset.statuses.every(s => statusFilter.includes(s));
+                                        return (
+                                            <button
+                                                key={preset.label}
+                                                onClick={() => setStatusFilter(preset.statuses)}
+                                                className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all ${
+                                                    isActivePreset
+                                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                                        : 'text-indigo-700/70 hover:text-indigo-900'
+                                                }`}
+                                            >
+                                                {preset.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="h-4 w-px bg-gray-200" />
                                 {/* Status pills */}
                                 <div className="flex bg-gray-50 p-1 rounded-xl gap-0.5 flex-wrap">
                                     {(Object.keys(SC) as TicketStatus[]).map(s => (
@@ -657,6 +719,11 @@ export default function Tickets() {
                                                         )}
                                                     </div>
                                                     <p className={`text-sm font-black ${isSelected ? 'text-indigo-700' : 'text-gray-900 group-hover:text-indigo-600'} transition-colors`}>{ticket.title}</p>
+                                                    {resolved && ticket.solution && (
+                                                        <p className="mt-1 text-[11px] font-medium text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded-lg px-2.5 py-1 line-clamp-2">
+                                                            <span className="font-black text-emerald-700">✓ Solución:</span> {ticket.solution}
+                                                        </p>
+                                                    )}
                                                     {Array.isArray(ticket.checklist) && ticket.checklist.length > 0 && (
                                                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 mt-1 select-none">
                                                              <CheckCircle2 size={11} className={ticket.checklist.every(c => c.status === 'passed') ? "text-emerald-500 shrink-0" : "text-indigo-400 shrink-0"} />
@@ -825,12 +892,27 @@ export default function Tickets() {
                                         <span className="text-sm font-black text-gray-900 uppercase tracking-wide">Información del Ticket</span>
                                     </div>
 
-                                    {/* Title */}
-                                    <div className="mb-4">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Título *</label>
-                                        <input required type="text" placeholder="Ej: Error al acceder al dashboard"
-                                            className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition"
-                                            value={newT.title} onChange={e => setNewT(p => ({ ...p, title: e.target.value }))} />
+                                    {/* Module + Title */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                                        <div>
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Módulo</label>
+                                            <select
+                                                value={newT.moduleName}
+                                                onChange={e => setNewT(p => ({ ...p, moduleName: e.target.value }))}
+                                                className="mt-1.5 w-full px-3.5 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold text-gray-800 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition"
+                                            >
+                                                <option value="">Sin prefijo de módulo</option>
+                                                {TICKET_MODULES.map(m => (
+                                                    <option key={m} value={m}>{m}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Problema concreto / Título *</label>
+                                            <input required type="text" placeholder="Ej: No reduce las cantidades del inventario al facturar"
+                                                className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition"
+                                                value={newT.title} onChange={e => setNewT(p => ({ ...p, title: e.target.value }))} />
+                                        </div>
                                     </div>
 
                                     {/* 3 columns: Category, Priority, Due Date */}
@@ -1030,6 +1112,39 @@ export default function Tickets() {
                                     <div className="flex items-center gap-2 mb-4">
                                         <span className="w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center text-xs font-black text-purple-600">2</span>
                                         <span className="text-sm font-black text-gray-900 uppercase tracking-wide">Descripción y Archivos</span>
+                                    </div>
+
+                                    {/* Notify Team (Bell + Email) */}
+                                    <div className="mb-4">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5 mb-2">
+                                            <Bell className="w-3.5 h-3.5 text-indigo-500" />
+                                            <span>Notificar estados al equipo (Campana + Email)</span>
+                                        </label>
+                                        <div className="flex flex-wrap gap-1.5 p-2.5 bg-gray-50 border border-gray-100 rounded-2xl max-h-28 overflow-y-auto">
+                                            {agents.map(a => {
+                                                const active = newT.watchers.includes(a.id);
+                                                return (
+                                                    <button
+                                                        key={a.id}
+                                                        type="button"
+                                                        onClick={() => setNewT(p => ({
+                                                            ...p,
+                                                            watchers: p.watchers.includes(a.id)
+                                                                ? p.watchers.filter(id => id !== a.id)
+                                                                : [...p.watchers, a.id],
+                                                        }))}
+                                                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold border transition ${
+                                                            active
+                                                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                                                : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+                                                        }`}
+                                                    >
+                                                        {active && <Check className="w-3 h-3" />}
+                                                        <span>{a.full_name}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
 
                                     {/* Description */}

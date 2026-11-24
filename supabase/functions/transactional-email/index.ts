@@ -239,6 +239,104 @@ function buildTrialExpiryEmail(data: {
 </html>`;
 }
 
+function escHtml(v: string): string {
+  return String(v || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function buildTicketStatusEmail(data: {
+  ticketCode: string;
+  title: string;
+  clientName: string;
+  moduleName: string;
+  previousStatusLabel: string;
+  newStatusLabel: string;
+  newStatusKey: string;
+  assignedName: string;
+  actorName: string;
+  solution: string;
+  ticketUrl: string;
+  senderName: string;
+}) {
+  const {
+    ticketCode,
+    title,
+    clientName,
+    moduleName,
+    previousStatusLabel,
+    newStatusLabel,
+    newStatusKey,
+    assignedName,
+    actorName,
+    solution,
+    ticketUrl,
+    senderName,
+  } = data;
+
+  const badgeColors: Record<string, { bg: string; fg: string; header: string }> = {
+    new: { bg: '#dbeafe', fg: '#1d4ed8', header: '#1e3a8a' },
+    open: { bg: '#e0e7ff', fg: '#4338ca', header: '#312e81' },
+    pending: { bg: '#fef3c7', fg: '#b45309', header: '#92400e' },
+    resolved: { bg: '#d1fae5', fg: '#047857', header: '#065f46' },
+    closed: { bg: '#f1f5f9', fg: '#334155', header: '#334155' },
+  };
+  const palette = badgeColors[newStatusKey] || badgeColors.open;
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>[${escHtml(ticketCode)}] ${escHtml(newStatusLabel)} · ${escHtml(title)}</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:28px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:white;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+  <tr>
+    <td style="background:${palette.header};padding:24px 32px;">
+      <p style="margin:0 0 6px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.75);letter-spacing:2px;text-transform:uppercase;">${escHtml(senderName)} · SEGUIMIENTO DE TICKET #${escHtml(ticketCode)}</p>
+      <h1 style="margin:0;font-size:20px;font-weight:900;color:white;line-height:1.3;">${escHtml(title)}</h1>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:28px 32px;">
+      <div style="margin-bottom:20px;">
+        ${previousStatusLabel ? `<span style="display:inline-block;padding:5px 10px;border-radius:8px;background:#f1f5f9;color:#475569;font-size:12px;font-weight:700;">${escHtml(previousStatusLabel)}</span> <span style="color:#94a3b8;font-weight:700;margin:0 6px;">→</span> ` : ''}
+        <span style="display:inline-block;padding:6px 12px;border-radius:8px;background:${palette.bg};color:${palette.fg};font-size:12px;font-weight:900;text-transform:uppercase;">${escHtml(newStatusLabel)}</span>
+      </div>
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:20px;">
+        <tr><td style="padding:16px 20px;font-size:13px;color:#334155;line-height:1.7;">
+          <div><strong>Cliente:</strong> ${escHtml(clientName || 'Sin cliente especificado')}</div>
+          <div><strong>Módulo:</strong> ${escHtml(moduleName || 'Soporte General')}</div>
+          <div><strong>Responsable técnico:</strong> ${escHtml(assignedName || 'Sin asignar')}</div>
+          <div><strong>Actualizado por:</strong> ${escHtml(actorName || 'Equipo Soporte')}</div>
+        </td></tr>
+      </table>
+      ${solution ? `
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;margin-bottom:20px;">
+        <tr><td style="padding:16px 20px;">
+          <p style="margin:0 0 6px;font-size:10px;font-weight:800;color:#047857;text-transform:uppercase;letter-spacing:1.5px;">Solución Aplicada</p>
+          <p style="margin:0;font-size:13px;color:#064e3b;line-height:1.6;">${escHtml(solution)}</p>
+        </td></tr>
+      </table>` : ''}
+      <div style="text-align:center;margin:24px 0 8px;">
+        <a href="${escHtml(ticketUrl)}" style="display:inline-block;background:#4f46e5;color:white;font-size:13px;font-weight:800;text-decoration:none;padding:12px 28px;border-radius:10px;">Ver Ticket en Arias CRM</a>
+      </div>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:14px 32px;">
+      <p style="margin:0;font-size:10px;color:#94a3b8;text-align:center;">© ${new Date().getFullYear()} ${escHtml(senderName)} · Notificación automática interna de soporte.</p>
+    </td>
+  </tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -251,7 +349,121 @@ serve(async (req) => {
     const body = await req.json();
     const { type, companyId, adminName, adminEmail, companyName, trialDays, daysLeft, expiryDate } = body;
 
-    if (!type || !companyId || !adminEmail) {
+    if (!type || !companyId) {
+      return new Response(JSON.stringify({ error: 'Missing required fields: type, companyId' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const platformBrand = 'Arias CRM';
+    const rawAppUrl = Deno.env.get('APP_URL');
+    const appUrl = (rawAppUrl && !rawAppUrl.includes('vercel.app') && !rawAppUrl.includes('88ff4cb4'))
+      ? rawAppUrl
+      : 'https://ariascrm.com';
+
+    // Handle internal team ticket status notifications (Bell + Email)
+    if (type === 'ticket_status') {
+      const ticketId = String(body.ticketId || '');
+      const ticketCode = String(body.ticketCode || ticketId.slice(0, 8).toUpperCase() || 'TICKET');
+      const title = String(body.title || 'Actualización de Ticket');
+      const clientName = String(body.clientName || '');
+      const moduleName = String(body.moduleName || 'Soporte General');
+      const previousStatusLabel = String(body.previousStatusLabel || '');
+      const newStatusLabel = String(body.newStatusLabel || 'Actualizado');
+      const newStatusKey = String(body.newStatusKey || 'open');
+      const assignedName = String(body.assignedName || 'Sin asignar');
+      const actorName = String(body.actorName || 'Equipo Soporte');
+      const actorId = String(body.actorId || '');
+      const solution = String(body.solution || '');
+      const ticketUrl = String(body.ticketUrl || `${appUrl}/support/tickets${ticketId ? `?ticket=${ticketId}` : ''}`);
+      const recipientUserIds: string[] = Array.isArray(body.recipientUserIds)
+        ? Array.from(new Set(body.recipientUserIds.map((id: any) => String(id || '').trim()).filter((id: string) => id && id !== actorId)))
+        : [];
+      const toEmails: string[] = Array.isArray(body.recipients)
+        ? Array.from(new Set(body.recipients.map((e: any) => String(e || '').trim()).filter((e: string) => e.includes('@'))))
+        : [];
+
+      // 1. Always deliver in-app Bell notifications via service role (bypasses cross-user RLS)
+      let bellCount = 0;
+      if (recipientUserIds.length > 0) {
+        const bellBodyParts = [
+          `Estado: ${newStatusLabel}`,
+          clientName ? `Cliente: ${clientName}` : '',
+          solution ? `Solución: ${solution.slice(0, 120)}` : '',
+          `Ver: /support/tickets${ticketId ? `?ticket=${ticketId}` : ''}`,
+        ].filter(Boolean);
+        const bellRows = recipientUserIds.map((uid) => ({
+          user_id: uid,
+          type: 'ticket',
+          title: `🎫 #${ticketCode} · ${newStatusLabel}: ${title.slice(0, 80)}`,
+          body: bellBodyParts.join(' · '),
+          read: false,
+          scheduled_for: new Date().toISOString(),
+        }));
+        const { error: bellErr } = await supabase.from('notifications').insert(bellRows);
+        if (bellErr) {
+          console.error('[transactional-email] Bell notification insert error:', bellErr);
+        } else {
+          bellCount = bellRows.length;
+        }
+      }
+
+      // 2. Send consolidated email via Resend if configured & recipients present
+      const resendConfig = await getResendConfig(supabase, companyId);
+      if (!resendConfig?.apiKey || toEmails.length === 0) {
+        return new Response(JSON.stringify({
+          success: true,
+          type,
+          bellCount,
+          emailSent: false,
+          reason: !resendConfig?.apiKey ? 'no_resend_config' : 'no_email_recipients',
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const senderName = resendConfig.senderName || platformBrand;
+      const senderEmail = resendConfig.senderEmail || 'notificaciones@ariascrm.com';
+      const subject = `🎫 [#${ticketCode}] ${newStatusLabel} — ${title.slice(0, 80)}${clientName ? ` (${clientName})` : ''}`;
+      const html = buildTicketStatusEmail({
+        ticketCode,
+        title,
+        clientName,
+        moduleName,
+        previousStatusLabel,
+        newStatusLabel,
+        newStatusKey,
+        assignedName,
+        actorName,
+        solution,
+        ticketUrl,
+        senderName,
+      });
+
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${resendConfig.apiKey}` },
+        body: JSON.stringify({
+          from: `${senderName} <${senderEmail}>`,
+          to: toEmails,
+          subject,
+          html,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        console.error('[transactional-email] ticket_status Resend error:', err);
+        return new Response(JSON.stringify({ success: true, type, bellCount, emailSent: false, emailError: err }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const result = await res.json();
+      return new Response(JSON.stringify({ success: true, type, bellCount, emailSent: true, emailId: result.id, to: toEmails }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!adminEmail) {
       return new Response(JSON.stringify({ error: 'Missing required fields: type, companyId, adminEmail' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -266,13 +478,8 @@ serve(async (req) => {
       });
     }
 
-    const platformBrand = 'Arias CRM';
     const senderName = (type === 'welcome') ? platformBrand : (resendConfig.senderName || platformBrand);
     const senderEmail = resendConfig.senderEmail || 'notificaciones@ariascrm.com';
-    const rawAppUrl = Deno.env.get('APP_URL');
-    const appUrl = (rawAppUrl && !rawAppUrl.includes('vercel.app') && !rawAppUrl.includes('88ff4cb4'))
-      ? rawAppUrl
-      : 'https://ariascrm.com';
 
     let subject = '';
     let html = '';

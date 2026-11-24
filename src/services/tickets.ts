@@ -1,4 +1,10 @@
 import { supabase } from './supabase';
+import {
+    TICKET_STATUS_META,
+    resolveTicketNotifyRecipients,
+    shouldSendTicketStatusEmail,
+    type TicketLifecycleKey,
+} from '../lib/ticketWorkflow';
 import { isSupportTicket } from '../lib/whatsappScopes';
 
 export type TicketStatus = 'new' | 'open' | 'pending' | 'resolved' | 'closed';
@@ -591,5 +597,101 @@ export const ticketService = {
             byPriority: Object.entries(priorityCounts).map(([priority, count]) => ({ priority, count })),
             byDay,
         };
+    },
+
+    async notifyTicketLifecycleChange(params: {
+        companyId: string;
+        ticket: Ticket;
+        previousStatus?: TicketStatus | null;
+        newStatus: TicketStatus;
+        actorId?: string | null;
+        actorName?: string | null;
+        agents?: CompanyAgent[];
+        extraWatcherIds?: string[];
+        forceNotify?: boolean;
+    }): Promise<{ bellCount: number; emailSent: boolean }> {
+        try {
+            if (!params.companyId || !params.ticket?.id) return { bellCount: 0, emailSent: false };
+            if (!params.forceNotify && params.previousStatus === params.newStatus) {
+                return { bellCount: 0, emailSent: false };
+            }
+            if (!shouldSendTicketStatusEmail(params.newStatus)) {
+                return { bellCount: 0, emailSent: false };
+            }
+
+            const agentList = params.agents && params.agents.length > 0
+                ? params.agents
+                : await this.getAgents(params.companyId).catch(() => [] as CompanyAgent[]);
+
+            const watchers = params.extraWatcherIds
+                ?? (Array.isArray(params.ticket.metadata?.watchers) ? params.ticket.metadata.watchers : []);
+
+            const recipientUserIds = resolveTicketNotifyRecipients({
+                actorId: params.actorId,
+                createdBy: params.ticket.created_by,
+                assignedTo: params.ticket.assigned_to,
+                watchers,
+            });
+
+            const emailMap = new Map<string, string>();
+            agentList.forEach(a => {
+                if (a.id && a.email) emailMap.set(a.id, a.email);
+            });
+            const recipients = recipientUserIds
+                .map(id => emailMap.get(id) || '')
+                .filter(Boolean);
+
+            if (recipientUserIds.length === 0 && recipients.length === 0) {
+                return { bellCount: 0, emailSent: false };
+            }
+
+            const metaStatusNew = TICKET_STATUS_META[params.newStatus as TicketLifecycleKey];
+            const metaStatusPrev = params.previousStatus
+                ? TICKET_STATUS_META[params.previousStatus as TicketLifecycleKey]
+                : null;
+            const assignedAgent = agentList.find(a => a.id === params.ticket.assigned_to);
+            const moduleName = String(
+                params.ticket.metadata?.module_name ||
+                params.ticket.category?.name ||
+                params.ticket.metadata?.ai_category ||
+                'Soporte General'
+            );
+            const clientName = String(params.ticket.lead?.name || params.ticket.lead_name || '');
+            const ticketCode = params.ticket.id.slice(0, 8).toUpperCase();
+            const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ariascrm.com';
+
+            const { data, error } = await supabase.functions.invoke('transactional-email', {
+                body: {
+                    type: 'ticket_status',
+                    companyId: params.companyId,
+                    ticketId: params.ticket.id,
+                    ticketCode,
+                    title: params.ticket.title,
+                    clientName,
+                    moduleName,
+                    previousStatusLabel: metaStatusPrev?.label || '',
+                    newStatusLabel: metaStatusNew?.label || params.newStatus,
+                    newStatusKey: params.newStatus,
+                    assignedName: assignedAgent?.full_name || 'Sin asignar',
+                    actorName: params.actorName || 'Equipo Soporte',
+                    actorId: params.actorId || '',
+                    solution: params.ticket.solution || '',
+                    recipientUserIds,
+                    recipients,
+                    ticketUrl: `${origin}/support/tickets?ticket=${params.ticket.id}`,
+                },
+            });
+            if (error) {
+                console.warn('[ticketService.notifyTicketLifecycleChange]', error);
+                return { bellCount: 0, emailSent: false };
+            }
+            return {
+                bellCount: Number(data?.bellCount || 0),
+                emailSent: Boolean(data?.emailSent),
+            };
+        } catch (err) {
+            console.warn('[ticketService.notifyTicketLifecycleChange] failed:', err);
+            return { bellCount: 0, emailSent: false };
+        }
     }
 };

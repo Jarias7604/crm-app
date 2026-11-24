@@ -638,7 +638,8 @@ serve(async (req: Request) => {
 
     // ── Actions from the CRM UI (require a logged-in user) ──
     const uiActions = [
-      'get_ai_config', 'test_openai', 'save_ai_config', 'save_ai_prompt', 'set_ticket_channel', 'set_technical_ticket',
+      'get_ai_config', 'test_openai', 'save_ai_config', 'save_ai_prompt', 'set_ticket_channel',
+      'draft_technical_ticket', 'set_technical_ticket', 'cleanup_auto_junk_tickets',
       'promote_to_lead', 'classify_contact', 'send_reply', 'send_media', 'send_reactivation',
       'retry_media', 'bridge_status', 'rescope_now', 'request_history_import', 'request_evo_heal',
       'get_wa_team_access', 'set_wa_user_access', 'set_qualifier_thread_state',
@@ -664,8 +665,13 @@ serve(async (req: Request) => {
           return await handleSetWaUserAccess(supabase, caller, payload);
         case 'set_ticket_channel':
           return await handleSetChannel(supabase, caller, payload);
+        case 'draft_technical_ticket':
+          return await handleDraftTechnicalTicket(supabase, caller, payload);
         case 'set_technical_ticket':
           return await handleSetTechnicalTicket(supabase, caller, payload);
+        case 'cleanup_auto_junk_tickets':
+          if (!caller.isAdmin) return json({ ok: false, error: 'Solo un administrador puede limpiar tickets automáticos' }, 403);
+          return await handleCleanupAutoJunkTickets(supabase, caller, payload);
         case 'promote_to_lead':
           return await handleClassify(supabase, caller, { ...payload, contact_type: 'lead' });
         case 'classify_contact':
@@ -1145,22 +1151,10 @@ async function ingestWhatsAppEntry(
     return aiCfgCache;
   };
 
-  let isTechProblem = scope === 'soporte' && !isStaff && classification.isActualSupportProblem;
-  if (
-    scope === 'soporte' &&
-    !isStaff &&
-    !isTechProblem &&
-    !isCatchup &&
-    !media &&
-    !isGreetingOrClosingAgreement(displayText) &&
-    !isNonTechnicalAdministrativeChat(displayText) &&
-    displayText.length >= 20
-  ) {
-    const aiCfg = await getAiCfg();
-    if (aiCfg.openAiKey) {
-      isTechProblem = await askOpenAiTechnicalClassifier(aiCfg.openAiKey, displayText);
-    }
-  }
+  // Incoming WhatsApp chats NEVER auto-create active technical tickets.
+  // They remain cleanly inside Chat WhatsApp until an agent promotes them
+  // explicitly via "Crear Ticket Técnico" (set_technical_ticket).
+  const isTechProblem = false;
 
   const baseMetaPatch: Record<string, any> = {
     source: 'whatsapp_evolution',
@@ -1504,14 +1498,9 @@ async function ingestWhatsAppEntry(
     }
   }
 
-  const nextIsTechTicket =
-    scope !== 'soporte'
-      ? false
-      : promoteToTechTicket || wasTechTicket
-      ? true
-      : currentMeta.is_technical_ticket === false
-      ? false
-      : undefined;
+  // Preserve manual promotion if the human already created a formal ticket;
+  // otherwise keep the conversation as Chat WhatsApp only (is_technical_ticket: false).
+  const nextIsTechTicket = scope !== 'soporte' ? false : wasTechTicket ? true : false;
 
   const prevScope = String(currentMeta.wa_scope || '');
   const scopeChanged = prevScope !== '' && prevScope !== scope;
@@ -1688,51 +1677,8 @@ async function handleUploadMedia(supabase: any, url: URL, payload: any): Promise
       const { data: t } = await supabase.from('tickets').select('*').eq('id', row.ticket_id).maybeSingle();
       let meta = cleanMeta(t?.metadata || {});
       const scope = String(meta.wa_scope || 'soporte') as WaScope;
-      if (t && transcript && scope === 'soporte') {
-        const trClass = classifyIssueCategory(transcript);
-        let trIsTech = trClass.isActualSupportProblem;
-        if (
-          !trIsTech &&
-          !isGreetingOrClosingAgreement(transcript) &&
-          !isNonTechnicalAdministrativeChat(transcript) &&
-          transcript.length >= 20 &&
-          aiCfg.openAiKey
-        ) {
-          trIsTech = await askOpenAiTechnicalClassifier(aiCfg.openAiKey, transcript);
-        }
-        if (trIsTech && (meta.is_technical_ticket === false || isGenericProblemTitle(t.title))) {
-          const cleanTr = stripLeadingGreetingForTicketTitle(transcript);
-          const snippet = cleanTr.length > 85 ? `${cleanTr.slice(0, 82).trim()}...` : cleanTr;
-          const nextTitle = `[WhatsApp · ${trClass.shortCategoryTag}] ${t.lead_name || 'Cliente'}: ${snippet}`;
-          const nextDesc = String(t.description || '').replace(
-            /^(?:📌 PROBLEMA REPORTADO \([^)]+\)|💬 Conversación de WhatsApp \([^)]+\)):\n[\s\S]*?(?=\n\n💬 Historial de WhatsApp:)/,
-            `📌 PROBLEMA REPORTADO (${trClass.category}):\n[Nota de voz]: ${transcript}`
-          );
-          const nextMeta = {
-            ...meta,
-            is_technical_ticket: true,
-            awaiting_problem_details: false,
-            ai_category: trClass.category,
-          };
-          const voicePatch: Record<string, any> = {
-            title: nextTitle,
-            description: nextDesc,
-            priority: trClass.priority,
-            updated_at: new Date().toISOString(),
-            metadata: nextMeta,
-          };
-          if (['resolved', 'closed'].includes(t.status)) {
-            voicePatch.status = 'open';
-            voicePatch.resolved_at = null;
-            voicePatch.last_status_change_at = new Date().toISOString();
-          }
-          await supabase
-            .from('tickets')
-            .update(voicePatch)
-            .eq('id', t.id);
-          meta = nextMeta;
-        }
-      }
+      // Voice transcripts are saved in chat history & reply context, without
+      // auto-promoting chats into technical tickets.
       if (t && isRecentMsg && aiCfg.autoReplyAudio && meta.ai_auto_reply_enabled !== false && ['soporte', 'lead', 'por_clasificar'].includes(scope)) {
         const ch: SupportChannelType = scope === 'soporte' ? (meta.support_channel as SupportChannelType) || 'soporte' : 'ventas';
         const reply = await askOpenAi(
@@ -2670,6 +2616,184 @@ async function handleSetChannel(supabase: any, caller: Caller, payload: any): Pr
   return json({ ok: true, support_channel: ch });
 }
 
+const DRAFT_MODULES = [
+  'Facturación DTE',
+  'Inventario',
+  'Contabilidad',
+  'Bancos / Caja',
+  'POS / Ventas',
+  'Compras',
+  'Clientes / CRM',
+  'Accesos y Usuarios',
+  'Reportes / Exportación',
+  'Integraciones / WhatsApp',
+  'Rendimiento / Sistema',
+  'Soporte General',
+];
+
+function mapCategoryTagToModule(tag: string, text: string): string {
+  const hay = `${tag} ${text}`.toLowerCase();
+  if (/inventar|stock|bodega|kardex|existencia|cantidad|producto/i.test(hay)) return 'Inventario';
+  if (/dte|factur|ccf|hacienda|mh|nrc|nit|invalidac|anulac|contingencia|firma|json/i.test(hay)) return 'Facturación DTE';
+  if (/contab|partida|libro|iva|balance|planilla|asiento|f07|f14/i.test(hay)) return 'Contabilidad';
+  if (/banco|caja|conciliac|cierre|arqueo|cobro|pago|cheque/i.test(hay)) return 'Bancos / Caja';
+  if (/pos|punto de venta|venta|ticket|cotizac/i.test(hay)) return 'POS / Ventas';
+  if (/compra|proveedor|orden de compra|importac/i.test(hay)) return 'Compras';
+  if (/acceso|permiso|usuario|contrase|login|rol|clave/i.test(hay)) return 'Accesos y Usuarios';
+  if (/reporte|excel|pdf|export|descarg/i.test(hay)) return 'Reportes / Exportación';
+  if (/whatsapp|correo|email|smtp|api|integrac|webhook/i.test(hay)) return 'Integraciones / WhatsApp';
+  if (/lento|ca[ií]do|error 500|no carga|pantalla en blanco|servidor/i.test(hay)) return 'Rendimiento / Sistema';
+  return 'Soporte General';
+}
+
+function cleanInlineProblemHeadline(raw: string): string {
+  let s = stripLeadingGreetingForTicketTitle(String(raw || ''))
+    .replace(/^\[WhatsApp\s*·[^\]]+\]\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (s.length > 90) s = `${s.slice(0, 87).trim()}...`;
+  return s;
+}
+
+async function handleDraftTechnicalTicket(supabase: any, caller: Caller, payload: any): Promise<Response> {
+  const ticketId = String(payload?.ticket_id || '');
+  if (!ticketId) return json({ ok: false, error: 'Falta ticket_id' }, 400);
+  if (!(await ticketVisibleTo(caller, ticketId))) return json({ ok: false, error: 'No tienes acceso a este chat' }, 403);
+
+  const { data: t } = await supabase
+    .from('tickets')
+    .select('id, company_id, title, lead_name, description, metadata')
+    .eq('id', ticketId)
+    .maybeSingle();
+  if (!t) return json({ ok: false, error: 'Ticket no encontrado' }, 404);
+
+  const [{ data: comments }, { data: cats }, aiCfg] = await Promise.all([
+    supabase
+      .from('ticket_comments')
+      .select('body, author_id, is_internal, created_at')
+      .eq('ticket_id', ticketId)
+      .eq('is_internal', false)
+      .order('created_at', { ascending: false })
+      .limit(20),
+    supabase
+      .from('ticket_categories')
+      .select('id, name')
+      .eq('company_id', t.company_id)
+      .order('name'),
+    loadSupportAiConfig(supabase, t.company_id),
+  ]);
+
+  const historyLines = ((comments || []) as any[])
+    .reverse()
+    .map((c) => String(c.body || '').trim())
+    .filter(Boolean);
+
+  // Build clean fallback from recent client messages
+  let fallbackMsg = '';
+  for (const line of [...historyLines].reverse()) {
+    const idx = line.indexOf(': ');
+    const msg = idx > 0 ? line.slice(idx + 2).trim() : line;
+    const isClientLine = !line.includes('👤') ? line.indexOf('Arias') === -1 : line.includes('👤');
+    if (
+      msg &&
+      isClientLine &&
+      !isGreetingOrClosingAgreement(msg) &&
+      !/^\[(Imagen|Video|Sticker|Nota de voz|Documento|Archivo)/i.test(msg)
+    ) {
+      fallbackMsg = msg;
+      break;
+    }
+  }
+  if (!fallbackMsg && historyLines.length > 0) {
+    const last = historyLines[historyLines.length - 1];
+    const idx = last.indexOf(': ');
+    fallbackMsg = idx > 0 ? last.slice(idx + 2).trim() : last;
+  }
+
+  const cls = classifyIssueCategory(fallbackMsg || String(t.title || ''));
+  let moduleName = mapCategoryTagToModule(cls.shortCategoryTag, `${fallbackMsg} ${historyLines.join(' ')}`);
+  let problemSummary = cleanInlineProblemHeadline(fallbackMsg) || 'Revisión técnica solicitada por cliente';
+  let descriptionSummary = fallbackMsg || `Conversación con ${t.lead_name || 'Cliente'}`;
+  let priority: 'low' | 'medium' | 'high' | 'urgent' =
+    cls.priority === 'urgent' || cls.priority === 'high' || cls.priority === 'low' ? cls.priority : 'medium';
+
+  const catList = ((cats || []) as Array<{ id: string; name: string }>);
+  let matchedCategory =
+    catList.find((c) => c.name.toLowerCase().includes(moduleName.split(' ')[0].toLowerCase())) ||
+    catList.find((c) => c.name.toLowerCase().includes(cls.shortCategoryTag.toLowerCase())) ||
+    null;
+
+  if (aiCfg.openAiKey && historyLines.length > 0) {
+    try {
+      const catNames = catList.map((c) => c.name).join(', ') || 'Ninguna';
+      const promptSystem = [
+        'Eres analista senior de Soporte Técnico para un ERP con Facturación Electrónica (DTE), Inventario, Contabilidad y CRM.',
+        'A partir de la conversación de WhatsApp del cliente, redacta el borrador de un Ticket Técnico claro y accionable.',
+        'Responde ÚNICAMENTE con un objeto JSON válido con estas claves exactas:',
+        '{',
+        `  "module": "<elige UNO exacto de: ${DRAFT_MODULES.join(' | ')}>",`,
+        '  "problem": "<problema técnico concreto en español de 4 a 11 palabras, SIN saludos, SIN nombre del cliente, SIN signos ni emojis. Ej: No reduce las cantidades del inventario al facturar>",',
+        '  "summary": "<resumen técnico claro en 1 a 3 oraciones explicando qué ocurre, dónde ocurre y datos clave reportados por el cliente>",',
+        '  "priority": "<low | medium | high | urgent>",',
+        `  "category_name": "<el nombre más cercano de [${catNames}] o vacío>"`,
+        '}',
+      ].join('\n');
+      const userContext = `Cliente: ${t.lead_name || 'Cliente'}\nMensajes recientes:\n${historyLines.join('\n').slice(0, 3000)}`;
+      const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${aiCfg.openAiKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          temperature: 0.1,
+          max_tokens: 320,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: promptSystem },
+            { role: 'user', content: userContext },
+          ],
+        }),
+      });
+      if (aiRes.ok) {
+        const aiJson = await aiRes.json();
+        const raw = String(aiJson?.choices?.[0]?.message?.content || '').trim();
+        const parsed = JSON.parse(raw);
+        if (parsed?.module && DRAFT_MODULES.includes(String(parsed.module))) {
+          moduleName = String(parsed.module);
+        }
+        if (parsed?.problem && String(parsed.problem).trim().length >= 6) {
+          problemSummary = cleanInlineProblemHeadline(String(parsed.problem));
+        }
+        if (parsed?.summary && String(parsed.summary).trim().length >= 8) {
+          descriptionSummary = String(parsed.summary).trim();
+        }
+        if (['low', 'medium', 'high', 'urgent'].includes(String(parsed?.priority))) {
+          priority = parsed.priority;
+        }
+        if (parsed?.category_name) {
+          const byAiCat = catList.find(
+            (c) => c.name.toLowerCase() === String(parsed.category_name).trim().toLowerCase()
+          );
+          if (byAiCat) matchedCategory = byAiCat;
+        }
+      }
+    } catch (e) {
+      console.warn('[draft_technical_ticket] OpenAI draft fallback used:', e);
+    }
+  }
+
+  return json({
+    ok: true,
+    draft: {
+      module: moduleName,
+      problem_summary: problemSummary,
+      structured_title: `${moduleName} — ${problemSummary}`,
+      description_summary: descriptionSummary,
+      priority,
+      category_id: matchedCategory?.id || '',
+    },
+  });
+}
+
 async function handleSetTechnicalTicket(supabase: any, caller: Caller, payload: any): Promise<Response> {
   const ticketId = String(payload?.ticket_id || '');
   if (!ticketId) return json({ ok: false, error: 'Falta ticket_id' }, 400);
@@ -2677,7 +2801,7 @@ async function handleSetTechnicalTicket(supabase: any, caller: Caller, payload: 
 
   const { data: t } = await supabase
     .from('tickets')
-    .select('id, company_id, title, status, lead_name, description, metadata')
+    .select('id, company_id, title, status, lead_id, lead_name, description, metadata, assigned_to, category_id, priority, created_by')
     .eq('id', ticketId)
     .maybeSingle();
   if (!t) return json({ ok: false, error: 'Ticket no encontrado' }, 404);
@@ -2685,6 +2809,18 @@ async function handleSetTechnicalTicket(supabase: any, caller: Caller, payload: 
   const isTech = payload?.is_technical_ticket === true;
   const closeChat = payload?.close_chat === true;
   const customTitle = String(payload?.custom_title || '').trim();
+  const moduleName = String(payload?.module || '').trim();
+  const problemSummary = String(payload?.problem_summary || '').trim();
+  const descriptionSummary = String(payload?.description_summary || '').trim();
+  const categoryId = payload?.category_id === null || payload?.category_id === '' ? null : String(payload.category_id);
+  const assignedTo = payload?.assigned_to === null || payload?.assigned_to === '' ? null : String(payload.assigned_to);
+  const dueDate = payload?.due_date ? String(payload.due_date) : null;
+  const requestedPriority = ['low', 'medium', 'high', 'urgent'].includes(String(payload?.priority))
+    ? String(payload.priority)
+    : null;
+  const watchers = Array.isArray(payload?.watchers)
+    ? Array.from(new Set(payload.watchers.map((w: any) => String(w || '').trim()).filter(Boolean)))
+    : null;
   const nowIso = new Date().toISOString();
   const curMeta = cleanMeta(t.metadata || {});
 
@@ -2697,6 +2833,9 @@ async function handleSetTechnicalTicket(supabase: any, caller: Caller, payload: 
     wa_ticket_override_by: caller.userId,
     wa_ticket_override_at: nowIso,
   };
+  if (moduleName) nextMeta.module_name = moduleName;
+  if (problemSummary) nextMeta.problem_summary = problemSummary;
+  if (watchers !== null) nextMeta.watchers = watchers;
 
   const updatePatch: Record<string, any> = {
     updated_at: nowIso,
@@ -2704,7 +2843,7 @@ async function handleSetTechnicalTicket(supabase: any, caller: Caller, payload: 
   };
 
   if (isTech) {
-    let summaryText = customTitle;
+    let summaryText = problemSummary || customTitle;
     if (!summaryText && isGenericProblemTitle(String(t.title || ''))) {
       const clientLines = String(t.description || '')
         .split('\n')
@@ -2720,21 +2859,44 @@ async function handleSetTechnicalTicket(supabase: any, caller: Caller, payload: 
       }
     }
     const cls = classifyIssueCategory(summaryText || String(t.title || ''));
-    nextMeta.ai_category = cls.category;
-    if (summaryText) {
+    const resolvedModule = moduleName || mapCategoryTagToModule(cls.shortCategoryTag, summaryText);
+    nextMeta.ai_category = resolvedModule;
+    nextMeta.module_name = resolvedModule;
+
+    if (problemSummary) {
+      const cleanProblem = cleanInlineProblemHeadline(problemSummary) || problemSummary;
+      const structuredTitle = `${resolvedModule} — ${cleanProblem}`;
+      updatePatch.title = structuredTitle.length > 130 ? `${structuredTitle.slice(0, 127).trim()}...` : structuredTitle;
+    } else if (summaryText) {
       const cleanSummary = customTitle ? summaryText : stripLeadingGreetingForTicketTitle(summaryText);
       const snippet = cleanSummary.length > 85 ? `${cleanSummary.slice(0, 82).trim()}...` : cleanSummary;
-      const clientName = String(t.lead_name || 'Cliente').trim() || 'Cliente';
-      updatePatch.title = `[WhatsApp · ${cls.shortCategoryTag}] ${clientName}: ${snippet}`;
-      updatePatch.description = String(t.description || '').replace(
-        /^(?:📌 PROBLEMA REPORTADO \([^)]+\)|💬 Conversación de WhatsApp \([^)]+\)):\n[\s\S]*?(?=\n\n💬 Historial de WhatsApp:)/,
-        `📌 PROBLEMA REPORTADO (${cls.category}):\n${summaryText}`
-      );
+      updatePatch.title = `${resolvedModule} — ${snippet}`;
     } else if (/^\[WhatsApp\s*·\s*Chat\]/i.test(String(t.title || ''))) {
-      updatePatch.title = String(t.title || '').replace(/^\[WhatsApp\s*·\s*Chat\]/i, `[WhatsApp · ${cls.shortCategoryTag}]`);
+      updatePatch.title = String(t.title || '').replace(/^\[WhatsApp\s*·\s*Chat\]/i, `${resolvedModule} —`);
     }
-    if (t.status !== 'open') {
-      updatePatch.status = 'open';
+
+    const headerBody = descriptionSummary || summaryText || '';
+    if (headerBody) {
+      const currentDesc = String(t.description || '');
+      const headerRegex = /^(?:📌 PROBLEMA REPORTADO \([^)]+\)|💬 Conversación de WhatsApp \([^)]+\)):\n[\s\S]*?(?=\n\n💬 Historial de WhatsApp:)/;
+      if (headerRegex.test(currentDesc)) {
+        updatePatch.description = currentDesc.replace(
+          headerRegex,
+          `📌 PROBLEMA REPORTADO (${resolvedModule}):\n${headerBody}`
+        );
+      } else {
+        updatePatch.description = `📌 PROBLEMA REPORTADO (${resolvedModule}):\n${headerBody}\n\n💬 Historial de WhatsApp:\n${currentDesc}`;
+      }
+    }
+
+    if (payload && 'category_id' in payload) updatePatch.category_id = categoryId;
+    if (payload && 'assigned_to' in payload) updatePatch.assigned_to = assignedTo;
+    if (payload && 'due_date' in payload) updatePatch.due_date = dueDate;
+    if (requestedPriority) updatePatch.priority = requestedPriority;
+
+    // Newly promoted WhatsApp chats start cleanly in "Ticket Generado" ('new')
+    if (curMeta.is_technical_ticket !== true || ['closed', 'resolved'].includes(t.status)) {
+      updatePatch.status = 'new';
       updatePatch.resolved_at = null;
       updatePatch.last_status_change_at = nowIso;
     }
@@ -2759,12 +2921,68 @@ async function handleSetTechnicalTicket(supabase: any, caller: Caller, payload: 
     company_id: t.company_id,
     author_id: caller.userId,
     body: isTech
-      ? `🎫 ${caller.fullName} activó Ticket Técnico para este chat`
+      ? `🎫 ${caller.fullName} generó el Ticket Técnico: ${updatePatch.title || t.title}`
       : `💬 ${caller.fullName} ${closeChat ? 'cerró el chat (sin problema técnico)' : 'marcó el chat como Solo Conversación (no requiere ticket técnico)'}`,
     is_internal: true,
   });
 
   return json({ ok: true, is_technical_ticket: isTech, ticket: updatedTicket });
+}
+
+async function handleCleanupAutoJunkTickets(supabase: any, caller: Caller, payload: any): Promise<Response> {
+  const companyId = String(payload?.company_id || caller.companyId || '');
+  if (!companyId) return json({ ok: false, error: 'Falta company_id' }, 400);
+  const dryRun = payload?.dry_run === true;
+
+  const { data: rows, error } = await supabase
+    .from('tickets')
+    .select('id, title, status, assigned_to, category_id, lead_name, metadata, created_at')
+    .eq('company_id', companyId)
+    .in('status', ['new', 'open', 'pending'])
+    .is('assigned_to', null)
+    .is('category_id', null)
+    .eq('metadata->>source', 'whatsapp_evolution');
+
+  if (error) return json({ ok: false, error: error.message }, 500);
+
+  const candidates = ((rows || []) as any[]).filter((row) => {
+    const meta = cleanMeta(row.metadata || {});
+    if (meta.wa_ticket_manual_override === true) return false;
+    return meta.is_technical_ticket !== false;
+  });
+
+  if (dryRun) {
+    return json({
+      ok: true,
+      dry_run: true,
+      count: candidates.length,
+      tickets: candidates.map((c) => ({ id: c.id, title: c.title, lead_name: c.lead_name, status: c.status, created_at: c.created_at })),
+    });
+  }
+
+  const nowIso = new Date().toISOString();
+  let cleaned = 0;
+  for (const row of candidates) {
+    const meta = cleanMeta(row.metadata || {});
+    const { error: uErr } = await supabase
+      .from('tickets')
+      .update({
+        status: 'closed',
+        updated_at: nowIso,
+        last_status_change_at: nowIso,
+        metadata: {
+          ...meta,
+          is_technical_ticket: false,
+          awaiting_problem_details: false,
+          auto_cleaned_at: nowIso,
+          auto_cleaned_by: caller.userId,
+        },
+      })
+      .eq('id', row.id);
+    if (!uErr) cleaned++;
+  }
+
+  return json({ ok: true, dry_run: false, matched: candidates.length, cleaned });
 }
 
 // Classify a WhatsApp number: cliente | lead | interno | spam | por_clasificar (undo).
