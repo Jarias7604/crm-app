@@ -1,4 +1,5 @@
 import { Globe, Twitter, Linkedin, Facebook, Youtube } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Logo from '../ui/Logo';
 
@@ -68,9 +69,9 @@ export default function LandingFooter() {
         <div className="pt-6 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-400">
           <span>© {new Date().getFullYear()} Arias Defense El Salvador. {en ? 'All rights reserved.' : 'Todos los derechos reservados.'}</span>
           <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-white transition-colors">Legal</a>
-            <a href="#" className="hover:text-white transition-colors">{en ? 'Terms of Service' : 'Términos de Servicio'}</a>
-            <a href="#" className="hover:text-white transition-colors">{en ? 'Privacy' : 'Privacidad'}</a>
+            <Link to="/terms" className="hover:text-white transition-colors">Legal</Link>
+            <Link to="/terms" className="hover:text-white transition-colors">{en ? 'Terms of Service' : 'Términos de Servicio'}</Link>
+            <Link to="/privacy" className="hover:text-white transition-colors">{en ? 'Privacy' : 'Privacidad'}</Link>
           </div>
         </div>
       </div>
