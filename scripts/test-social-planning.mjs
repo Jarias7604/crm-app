@@ -28,7 +28,19 @@ test.after(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-test('1. Extracts ChatGPT openaiFileIdRefs, direct image_url, and base64 payloads accurately', () => {
+test('1. Extracts ChatGPT image_file (openai/fileParams), openaiFileIdRefs, direct image_url, and base64 payloads accurately', () => {
+  const fromMcpFileParam = mod.extractImageCandidate({
+    image_file: {
+      file_id: 'file_mcp_123',
+      download_url: 'https://files.oaiusercontent.com/flyer-ep21.png',
+      mime_type: 'image/png',
+      file_name: 'ep21.png',
+    },
+  });
+  assert.equal(fromMcpFileParam.url, 'https://files.oaiusercontent.com/flyer-ep21.png');
+  assert.equal(fromMcpFileParam.mimeType, 'image/png');
+  assert.equal(fromMcpFileParam.fileName, 'ep21.png');
+
   const fromRef = mod.extractImageCandidate({
     openaiFileIdRefs: [
       {
@@ -153,4 +165,7 @@ test('6. Verifies PKCE S256 challenges, OAuth 2.1 metadata, and MCP tool definit
       'delete_planned_post',
     ],
   );
+  const createTool = mod.MCP_TOOL_DEFINITIONS.find((t) => t.name === 'create_or_publish_social_post');
+  assert.deepEqual(createTool?._meta?.['openai/fileParams'], ['image_file']);
+  assert.ok(createTool?.inputSchema?.properties?.image_file);
 });

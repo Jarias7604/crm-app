@@ -56,20 +56,18 @@ export function extractImageCandidate(body: any): ImageCandidate {
   };
   if (!body || typeof body !== 'object') return fallback;
 
-  // 1. OpenAI Custom GPT Actions file reference array (ChatGPT generated or uploaded images)
-  const fileRefs = Array.isArray(body.openaiFileIdRefs) ? body.openaiFileIdRefs : [];
-  for (const ref of fileRefs) {
-    if (!ref) continue;
+  const parseFileObject = (ref: any, defaultPrefix: string): ImageCandidate | null => {
+    if (!ref) return null;
     if (typeof ref === 'string' && /^https?:\/\//i.test(ref)) {
       return {
         url: ref.trim(),
         base64: null,
-        fileName: `chatgpt-flyer-${Date.now()}.png`,
+        fileName: `${defaultPrefix}-${Date.now()}.png`,
         mimeType: 'image/png',
       };
     }
     if (typeof ref === 'object') {
-      const link = String(ref.download_link || ref.url || '').trim();
+      const link = String(ref.download_url || ref.download_link || ref.url || '').trim();
       const mime = String(ref.mime_type || 'image/png').trim() || 'image/png';
       const ext = mime.includes('jpeg') || mime.includes('jpg')
         ? 'jpg'
@@ -78,7 +76,7 @@ export function extractImageCandidate(body: any): ImageCandidate {
         : mime.includes('mp4')
         ? 'mp4'
         : 'png';
-      const name = String(ref.name || `chatgpt-flyer-${Date.now()}.${ext}`).trim();
+      const name = String(ref.file_name || ref.name || `${defaultPrefix}-${Date.now()}.${ext}`).trim();
       if (/^https?:\/\//i.test(link)) {
         return {
           url: link,
@@ -88,9 +86,21 @@ export function extractImageCandidate(body: any): ImageCandidate {
         };
       }
     }
+    return null;
+  };
+
+  // 1. Official ChatGPT MCP _meta["openai/fileParams"] object (`image_file`)
+  const fromFileParam = parseFileObject(body.image_file, 'chatgpt-mcp-flyer');
+  if (fromFileParam) return fromFileParam;
+
+  // 2. OpenAI Custom GPT Actions file reference array (`openaiFileIdRefs`)
+  const fileRefs = Array.isArray(body.openaiFileIdRefs) ? body.openaiFileIdRefs : [];
+  for (const ref of fileRefs) {
+    const parsed = parseFileObject(ref, 'chatgpt-flyer');
+    if (parsed) return parsed;
   }
 
-  // 2. Direct URL fields
+  // 3. Direct URL fields
   const rawUrl = String(body.image_url || body.media_url || body.content_url || '').trim();
   if (/^https?:\/\//i.test(rawUrl)) {
     return {
@@ -105,23 +115,28 @@ export function extractImageCandidate(body: any): ImageCandidate {
     };
   }
 
-  // 3. Base64 payload fallback
+  // 4. Base64 payload fallback (normalizes base64url + missing padding cleanly)
   const rawB64 = String(body.image_base64 || '').trim();
   if (rawB64) {
+    const normalizeB64 = (s: string) => {
+      const clean = s.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+      const pad = clean.length % 4;
+      return pad === 0 ? clean : clean + '='.repeat(4 - pad);
+    };
     const dataUriMatch = rawB64.match(/^data:([^;]+);base64,(.+)$/s);
     if (dataUriMatch) {
       const mime = dataUriMatch[1].trim();
       const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'png';
       return {
         url: null,
-        base64: dataUriMatch[2].replace(/\s+/g, ''),
+        base64: normalizeB64(dataUriMatch[2]),
         fileName: `flyer-${Date.now()}.${ext}`,
         mimeType: mime,
       };
     }
     return {
       url: null,
-      base64: rawB64.replace(/\s+/g, ''),
+      base64: normalizeB64(rawB64),
       fileName: `flyer-${Date.now()}.png`,
       mimeType: 'image/png',
     };
@@ -391,7 +406,7 @@ export function buildChatGptSystemInstructions(companyName = 'Arias Defense'): s
     '3. Diseña el flyer manteniendo fidelidad facial de las fotos maestras cargadas, tipografía legible en español y la línea editorial elegida (AI + LEAN™ o Motivación Empresarial).',
     '4. Redacta la descripción (caption) lista para Facebook/Instagram y pregunta SIEMPRE antes de enviar:',
     '   "¿Deseas que lo publique de una vez o lo pongo en Planning (dime día, hora y en qué página o páginas)?"',
-    '5. Cuando el usuario confirme, llama a `createOrPublishSocialPost` enviando el flyer generado en `openaiFileIdRefs`, el `caption`, `editorial_line`, `episode_label`, `topic`, `page_names` y `mode` (`publish_now` o `schedule` con `scheduled_at` ISO en hora local -06:00).',
+    '5. Cuando el usuario confirme, llama a `create_or_publish_social_post` (o `createOrPublishSocialPost`) pasando el flyer generado en `image_file` (sin escribir base64 largo manualmente), junto con `caption`, `editorial_line`, `episode_label`, `topic`, `page_names` y `mode` (`publish_now` o `schedule` con `scheduled_at` ISO en hora local -06:00).',
   ].join('\n');
 }
 
@@ -437,11 +452,27 @@ export const MCP_TOOL_DEFINITIONS = [
     name: 'create_or_publish_social_post',
     description:
       'Envía el flyer generado y su descripción a Arias CRM para publicarlo de inmediato (publish_now), programarlo en Planning (schedule con scheduled_at) o guardarlo en borrador (draft). Pregunta SIEMPRE antes al usuario si desea publicarlo de una vez o ponerlo en Planning.',
+    _meta: {
+      'openai/fileParams': ['image_file'],
+    },
     inputSchema: {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       type: 'object',
       required: ['caption', 'mode'],
       properties: {
+        image_file: {
+          type: 'object',
+          description:
+            'Archivo de imagen o flyer recién generado o subido en el chat (ChatGPT inyecta file_id y download_url automáticamente). USAR SIEMPRE ESTE CAMPO para enviar flyers; no transcribas Base64 manualmente.',
+          properties: {
+            file_id: { type: 'string' },
+            download_url: { type: 'string' },
+            mime_type: { type: 'string' },
+            file_name: { type: 'string' },
+          },
+          required: ['file_id', 'download_url'],
+          additionalProperties: true,
+        },
         mode: {
           type: 'string',
           enum: ['publish_now', 'schedule', 'draft'],

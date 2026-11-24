@@ -202,7 +202,13 @@ async function persistIncomingMediaToStorage(
   let mimeType = candidate.mimeType || 'image/png';
 
   if (candidate.base64) {
-    bytes = decodeBase64(candidate.base64);
+    try {
+      bytes = decodeBase64(candidate.base64);
+    } catch {
+      throw new Error(
+        'El contenido Base64 de la imagen está incompleto o malformado. Envía el archivo mediante `image_file` en lugar de transcribir Base64.',
+      );
+    }
     if (bytes.byteLength > MAX_MEDIA_BYTES) {
       throw new Error('La imagen excede el límite de 15 MB.');
     }
@@ -240,10 +246,10 @@ async function persistIncomingMediaToStorage(
   const ext = extensionFromMime(mimeType, candidate.fileName);
   const isVideo = ext === 'mp4' || mimeType.startsWith('video/');
   const rand = Math.random().toString(36).slice(2, 8);
-  const filePath = `public/social-planning/${companyId}/${Date.now()}-${rand}.${ext}`;
+  const filePath = `social/${companyId}/planning-${Date.now()}-${rand}.${ext}`;
 
   const { error: upErr } = await supabase.storage
-    .from('avatars')
+    .from('marketing_assets')
     .upload(filePath, bytes, {
       contentType: mimeType,
       cacheControl: '3600',
@@ -256,7 +262,7 @@ async function persistIncomingMediaToStorage(
 
   const {
     data: { publicUrl },
-  } = supabase.storage.from('avatars').getPublicUrl(filePath);
+  } = supabase.storage.from('marketing_assets').getPublicUrl(filePath);
 
   return { publicUrl, isVideo };
 }
@@ -489,13 +495,22 @@ async function execCreateOrPublishPost(
     };
   }
 
-  const media = await persistIncomingMediaToStorage(supabase, auth.companyId, body);
+  let media: { publicUrl: string | null; isVideo: boolean };
+  try {
+    media = await persistIncomingMediaToStorage(supabase, auth.companyId, body);
+  } catch (mediaErr: any) {
+    return {
+      ok: false,
+      status: 400,
+      error: mediaErr?.message || 'Error procesando la imagen del flyer.',
+    };
+  }
   if (!media.publicUrl) {
     return {
       ok: false,
       status: 400,
       error:
-        'No recibí el archivo de imagen/flyer. Asegúrate de pasar openaiFileIdRefs (el flyer recién generado), image_url o image_base64.',
+        'No recibí el archivo de imagen/flyer. Pasa el archivo en `image_file` (file_id + download_url), `openaiFileIdRefs` o `image_url`.',
     };
   }
 
@@ -876,31 +891,54 @@ serve(async (req: Request) => {
           ? rpcParams.arguments
           : {};
 
-        let toolResult: Record<string, any>;
-        if (toolName === 'list_connected_social_pages') {
-          toolResult = await execListAccounts(supabase, mcpAuth);
-        } else if (toolName === 'get_content_memory') {
-          toolResult = await execGetMemory(supabase, mcpAuth);
-        } else if (toolName === 'create_or_publish_social_post') {
-          toolResult = await execCreateOrPublishPost(supabase, supabaseUrl, serviceKey, mcpAuth, toolArgs);
-        } else if (toolName === 'delete_planned_post') {
-          toolResult = await execDeletePost(supabase, mcpAuth, String(toolArgs.post_id || ''));
-        } else {
+        console.log('[arias-social-bridge][mcp tools/call]', toolName, 'argKeys=', Object.keys(toolArgs));
+
+        try {
+          let toolResult: Record<string, any>;
+          if (toolName === 'list_connected_social_pages') {
+            toolResult = await execListAccounts(supabase, mcpAuth);
+          } else if (toolName === 'get_content_memory') {
+            toolResult = await execGetMemory(supabase, mcpAuth);
+          } else if (toolName === 'create_or_publish_social_post') {
+            toolResult = await execCreateOrPublishPost(supabase, supabaseUrl, serviceKey, mcpAuth, toolArgs);
+          } else if (toolName === 'delete_planned_post') {
+            toolResult = await execDeletePost(supabase, mcpAuth, String(toolArgs.post_id || ''));
+          } else {
+            return json({
+              jsonrpc: '2.0',
+              id: rpcId,
+              error: { code: -32601, message: `Herramienta MCP desconocida: ${toolName}` },
+            });
+          }
+
           return json({
             jsonrpc: '2.0',
             id: rpcId,
-            error: { code: -32601, message: `Herramienta MCP desconocida: ${toolName}` },
+            result: {
+              content: [{ type: 'text', text: JSON.stringify(toolResult, null, 2) }],
+              isError: !toolResult.ok,
+            },
+          });
+        } catch (toolErr: any) {
+          console.error('[arias-social-bridge][mcp tools/call error]', toolName, toolErr?.message || toolErr);
+          return json({
+            jsonrpc: '2.0',
+            id: rpcId,
+            result: {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(
+                    { ok: false, error: toolErr?.message || 'Error ejecutando la herramienta MCP en Arias CRM' },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+              isError: true,
+            },
           });
         }
-
-        return json({
-          jsonrpc: '2.0',
-          id: rpcId,
-          result: {
-            content: [{ type: 'text', text: JSON.stringify(toolResult, null, 2) }],
-            isError: !toolResult.ok,
-          },
-        });
       }
 
       return json({
