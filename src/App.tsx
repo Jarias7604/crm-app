@@ -68,6 +68,8 @@ const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
 const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
 const TestFlyer         = lazy(() => import('./pages/marketing/TestFlyer'));
 const SocialHub         = lazy(() => import('./pages/marketing/SocialHub'));
+const SocialPlanning    = lazy(() => import('./pages/marketing/SocialPlanning'));
+const ChatGptAuthorize  = lazy(() => import('./pages/integrations/ChatGptAuthorize'));
 const AiCreditsAdmin    = lazy(() => import('./pages/marketing/AiCreditsAdmin'));
 const SocialAccounts    = lazy(() => import('./pages/company/SocialAccounts'));
 const MetaCallback      = lazy(() => import('./pages/company/MetaCallback'));
@@ -215,6 +217,7 @@ function App() {
               </Route>
 
               <Route element={<ProtectedRoute />}>
+                <Route path="/oauth/chatgpt-authorize" element={<ChatGptAuthorize />} />
                 <Route element={<DashboardLayout />}>
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/leads" element={<Leads />} />
@@ -291,6 +294,7 @@ function App() {
                     <Route path="/marketing/settings" element={<MarketingSettings />} />
                     <Route path="/marketing/flyers" element={<FlyerStudio />} />
                     <Route path="/marketing/social" element={<SocialHub />} />
+                    <Route path="/marketing/planning" element={<SocialPlanning />} />
                     <Route path="/marketing/ai-credits" element={<AiCreditsAdmin />} />
                     <Route path="/marketing/predictions" element={<PredictiveBoard />} />
                     <Route path="/marketing/data-hygiene" element={<DataHygiene />} />

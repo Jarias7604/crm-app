@@ -199,7 +199,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const isCallBotEnabled = import.meta.env.VITE_SHOW_CALL_BOT === 'true';
     const configPaths = ['/company/billing', '/company/branding', '/company/integrations', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/lead-sources', '/admin/call-bot'];
     const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings', '/marketing/cockpit', '/marketing/engine-config', '/marketing/predictions'];
-    const socialPaths = ['/marketing/social', '/marketing/flyers', '/company/social-accounts'];
+    const socialPaths = ['/marketing/social', '/marketing/planning', '/marketing/flyers', '/company/social-accounts'];
     const teamPaths = ['/company/team', '/company/teams', '/company/performance', '/company/payroll', '/company/training'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
 
@@ -545,6 +545,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             ]
         });
 
+        const planningEnabled = Boolean((company?.features as any)?.ai_content_studio_enabled);
         navigation.push({
             id: 'social',
             name: t('sidebar.socialMediaHub') || 'Social Media Hub',
@@ -552,7 +553,8 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             icon: Globe,
             current: socialPaths.some(path => location.pathname.startsWith(path) || location.pathname === path),
             subItems: [
-                { name: t('sidebar.socialDashboard') || 'Panel de Publicaci├│n', href: '/marketing/social', icon: LayoutDashboard },
+                { name: t('sidebar.socialDashboard') || 'Panel de Publicación', href: '/marketing/social', icon: LayoutDashboard },
+                ...(planningEnabled ? [{ name: 'Planning', href: '/marketing/planning', icon: Calendar }] : []),
                 { name: t('sidebar.flyerStudio'), href: '/marketing/flyers', icon: Sparkles },
                 { name: t('sidebar.connectedAccounts') || 'Cuentas Conectadas', href: '/company/social-accounts', icon: Network },
             ]

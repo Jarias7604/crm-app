@@ -36,3 +36,8 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/lead-qualifier-engine/index.ts"
 
+[functions.arias-social-bridge]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/arias-social-bridge/index.ts"
+
