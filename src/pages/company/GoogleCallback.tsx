@@ -11,6 +11,7 @@ export default function GoogleCallback() {
     const { profile, simulatedCompanyId } = useAuth();
     const [status, setStatus] = useState<'waiting' | 'loading' | 'success' | 'error'>('waiting');
     const [errorMessage, setErrorMessage] = useState<string>('');
+    const [enableUrl, setEnableUrl] = useState<string>('');
     const [successLabel, setSuccessLabel] = useState<string>('Redirigiendo a tus integraciones...');
     const [hasRun, setHasRun] = useState(false);
 
@@ -71,7 +72,19 @@ export default function GoogleCallback() {
                     });
 
                     if (ytErr || !data?.success) {
-                        throw new Error(data?.error || ytErr?.message || 'Error conectando canal de YouTube.');
+                        let detailedError = data?.error || '';
+                        let foundEnableUrl = data?.enable_url || '';
+                        if (!detailedError && ytErr) {
+                            try {
+                                const parsed = await (ytErr as any)?.context?.json?.();
+                                if (parsed?.error) detailedError = parsed.error;
+                                if (parsed?.enable_url) foundEnableUrl = parsed.enable_url;
+                            } catch {
+                                // fallback below
+                            }
+                        }
+                        if (foundEnableUrl) setEnableUrl(foundEnableUrl);
+                        throw new Error(detailedError || ytErr?.message || 'Error conectando canal de YouTube.');
                     }
 
                     const names = Array.isArray(data.accounts)
@@ -154,7 +167,17 @@ export default function GoogleCallback() {
                     </div>
                     <h2 className="text-xl font-black text-gray-900">Algo salió mal</h2>
                     {errorMessage && (
-                        <p className="text-red-500 mt-2 text-sm text-center max-w-sm">{errorMessage}</p>
+                        <p className="text-red-500 mt-2 text-sm text-center max-w-md">{errorMessage}</p>
+                    )}
+                    {enableUrl && (
+                        <a
+                            href={enableUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-4 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-all shadow-md"
+                        >
+                            Habilitar YouTube Data API v3 en Google Cloud
+                        </a>
                     )}
                     <button
                         onClick={() =>

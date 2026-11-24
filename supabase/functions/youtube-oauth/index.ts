@@ -12,11 +12,16 @@ const YOUTUBE_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
 ].join(' ');
 
-function jsonRes(body: Record<string, any>, status = 200) {
+function jsonRes(body: Record<string, any>) {
   return new Response(JSON.stringify(body), {
-    status,
+    status: 200,
     headers: { ...cors, 'Content-Type': 'application/json' },
   });
+}
+
+function extractEnableUrl(raw: string): string | null {
+  const match = String(raw || '').match(/https:\/\/console\.(?:developers\.google\.com|cloud\.google\.com)\/[^\s"')]+/i);
+  return match ? match[0] : null;
 }
 
 Deno.serve(async (req) => {
@@ -28,15 +33,17 @@ Deno.serve(async (req) => {
     const company_id = String(body.company_id || '').trim();
     const redirect_uri = String(body.redirect_uri || '').trim();
 
-    if (!company_id) return jsonRes({ success: false, error: 'Falta company_id para conectar YouTube.' }, 400);
+    if (!company_id) {
+      return jsonRes({ success: false, error: 'Falta company_id para conectar YouTube.' });
+    }
 
     const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID');
     const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET');
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-      return jsonRes(
-        { success: false, error: 'Credenciales GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET no configuradas en Supabase.' },
-        500,
-      );
+      return jsonRes({
+        success: false,
+        error: 'Credenciales GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET no configuradas en Supabase.',
+      });
     }
 
     const safeRedirect = redirect_uri || 'https://ariascrm.com/integrations/google/callback';
@@ -58,7 +65,9 @@ Deno.serve(async (req) => {
     }
 
     const code = String(body.code || '').trim();
-    if (!code) return jsonRes({ success: false, error: 'Falta el código de autorización de Google.' }, 400);
+    if (!code) {
+      return jsonRes({ success: false, error: 'Falta el código de autorización de Google.' });
+    }
 
     // 1. Exchange code -> tokens
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
@@ -75,8 +84,13 @@ Deno.serve(async (req) => {
 
     const tokens = await tokenRes.json();
     if (!tokenRes.ok || tokens.error || !tokens.access_token) {
-      const msg = tokens.error_description || tokens.error || 'No se pudo intercambiar el código de Google.';
-      return jsonRes({ success: false, error: msg }, 400);
+      const rawErr = tokens.error_description || tokens.error || 'No se pudo intercambiar el código de Google.';
+      console.error('[youtube-oauth] Token exchange error:', JSON.stringify(tokens));
+      return jsonRes({
+        success: false,
+        error: `Google OAuth (${tokens.error || tokenRes.status}): ${rawErr}`,
+        raw_error: rawErr,
+      });
     }
 
     // 2. Fetch YouTube channels managed by the selected Google / Brand Account
@@ -89,32 +103,36 @@ Deno.serve(async (req) => {
     if (!chRes.ok || chData.error) {
       const errReason = String(chData.error?.errors?.[0]?.reason || '');
       const rawMsg = String(chData.error?.message || '');
+      const enableUrl = extractEnableUrl(rawMsg);
+      console.error('[youtube-oauth] YouTube API error:', JSON.stringify(chData));
       if (errReason === 'accessNotConfigured' || rawMsg.toLowerCase().includes('youtube data api v3')) {
-        return jsonRes(
-          {
-            success: false,
-            error:
-              'Falta habilitar "YouTube Data API v3" en Google Cloud Console. Actívala una vez y vuelve a conectar tu canal.',
-          },
-          403,
-        );
+        return jsonRes({
+          success: false,
+          error:
+            'Falta habilitar "YouTube Data API v3" en tu proyecto de Google Cloud. Haz clic en el botón de abajo para activarla en 10 segundos y vuelve a intentar.',
+          raw_error: rawMsg,
+          enable_url:
+            enableUrl || 'https://console.cloud.google.com/apis/library/youtube.googleapis.com',
+        });
       }
-      return jsonRes({ success: false, error: rawMsg || 'Error consultando canales de YouTube.' }, 400);
+      return jsonRes({
+        success: false,
+        error: `YouTube API (${chData.error?.code || chRes.status}): ${rawMsg || 'Error consultando canales de YouTube.'}`,
+        raw_error: rawMsg,
+        enable_url: enableUrl,
+      });
     }
 
     const channels = Array.isArray(chData.items) ? chData.items : [];
     if (channels.length === 0) {
-      return jsonRes(
-        {
-          success: false,
-          error: 'La cuenta de Google elegida no tiene un canal de YouTube activo.',
-        },
-        400,
-      );
+      return jsonRes({
+        success: false,
+        error: 'La cuenta de Google elegida no tiene un canal de YouTube activo.',
+      });
     }
 
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const SUPABASE_URL = Deno.env.get('CRM_SUPABASE_URL') || Deno.env.get('SUPABASE_URL')!;
+    const SUPABASE_KEY = Deno.env.get('CRM_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
     const expiresAt = new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000).toISOString();
@@ -126,7 +144,6 @@ Deno.serve(async (req) => {
         ch.snippet?.thumbnails?.medium?.url || ch.snippet?.thumbnails?.default?.url || null;
       const subscriberCount = Number(ch.statistics?.subscriberCount || 0);
 
-      // Preserve existing refresh_token if Google didn't send one on re-authorization
       const { data: existingRow } = await supabase
         .from('social_accounts')
         .select('id, metadata')
@@ -169,7 +186,6 @@ Deno.serve(async (req) => {
       if (upserted) saved.push(upserted);
     }
 
-    // Ensure at least one active YouTube channel is marked default
     const { data: existingDefault } = await supabase
       .from('social_accounts')
       .select('id')
@@ -183,6 +199,8 @@ Deno.serve(async (req) => {
       await supabase.from('social_accounts').update({ is_default: true }).eq('id', saved[0].id);
     }
 
+    console.log(`[youtube-oauth] ✅ Connected ${saved.length} channel(s) for company ${company_id}`);
+
     return jsonRes({
       success: true,
       channels_connected: saved.length,
@@ -195,7 +213,7 @@ Deno.serve(async (req) => {
       })),
     });
   } catch (err: any) {
-    console.error('[youtube-oauth] Error:', err);
-    return jsonRes({ success: false, error: err?.message || 'Error conectando YouTube' }, 500);
+    console.error('[youtube-oauth] Unhandled error:', err);
+    return jsonRes({ success: false, error: err?.message || 'Error conectando YouTube' });
   }
 });
