@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useLocation } from 'react-router-dom';
 import { TicketIcon, AlertCircle, CheckCircle2, Filter, Plus, Search, ChevronDown, ChevronRight, Timer, ShieldCheck, X, TrendingUp, RefreshCw, AlertTriangle, UserCheck, Edit2, MoreHorizontal, CalendarDays, Tag, Send, ArrowUpDown, CalendarRange, Trophy, CalendarClock, Settings, Users, Paperclip, Image, FileVideo, Trash2, Bell, Check } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
+import { supabase } from '../../services/supabase';
 import { ticketService, type Ticket, type TicketCategory, type TicketStatus, type TicketPriority, type TicketStats, type CompanyAgent, type TicketLead } from '../../services/tickets';
 import { Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -151,6 +152,11 @@ export default function Tickets() {
     const [selected, setSelected] = useState<Ticket | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+    const [cleanupModalOpen, setCleanupModalOpen] = useState(false);
+    const [cleanupLoading, setCleanupLoading] = useState(false);
+    const [cleanupApplying, setCleanupApplying] = useState(false);
+    const [cleanupCandidates, setCleanupCandidates] = useState<Array<{ id: string; title: string; lead_name: string | null; status: string; created_at: string }>>([]);
+    const isAdmin = ['super_admin', 'company_admin', 'admin'].includes(profile?.role || '');
     const [catFilter, setCatFilter] = useState('');
     const [agentFilter, setAgentFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState<TicketStatus[]>(['new', 'open', 'pending']);
@@ -326,6 +332,44 @@ export default function Tickets() {
         if (profile?.company_id) ticketService.getStats(profile.company_id).then(setStats).catch(() => { });
     }
 
+    async function openAutoWaCleanupPreview() {
+        if (!profile?.company_id) return;
+        setCleanupModalOpen(true);
+        setCleanupLoading(true);
+        setCleanupCandidates([]);
+        try {
+            const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook?action=cleanup_auto_junk_tickets', {
+                body: { company_id: profile.company_id, dry_run: true },
+            });
+            if (error || !data?.ok) throw new Error(data?.error || error?.message || 'Error al analizar auto-tickets');
+            setCleanupCandidates(Array.isArray(data.tickets) ? data.tickets : []);
+        } catch (err: any) {
+            toast.error(err?.message || 'Error al consultar limpieza');
+            setCleanupModalOpen(false);
+        } finally {
+            setCleanupLoading(false);
+        }
+    }
+
+    async function confirmAutoWaCleanup() {
+        if (!profile?.company_id || cleanupApplying) return;
+        setCleanupApplying(true);
+        const tid = toast.loading('Limpiando auto-tickets sin eliminar historial...');
+        try {
+            const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook?action=cleanup_auto_junk_tickets', {
+                body: { company_id: profile.company_id, dry_run: false },
+            });
+            if (error || !data?.ok) throw new Error(data?.error || error?.message || 'Error en la limpieza');
+            toast.success(`Se limpiaron ${data.cleaned ?? 0} auto-tickets de WhatsApp (historial preservado)`, { id: tid });
+            setCleanupModalOpen(false);
+            load();
+        } catch (err: any) {
+            toast.error(err?.message || 'No se pudo completar la limpieza', { id: tid });
+        } finally {
+            setCleanupApplying(false);
+        }
+    }
+
     function handleDonutClick(status: TicketStatus) {
         setStatusFilter(p => p.includes(status) ? p.filter(s => s !== status) : [status]);
     }
@@ -415,6 +459,15 @@ export default function Tickets() {
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                         <button onClick={load} className="p-2 hover:bg-gray-100 rounded-xl text-gray-400"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /></button>
+                        {isAdmin && (
+                            <button
+                                onClick={openAutoWaCleanupPreview}
+                                className="bg-amber-50 border border-amber-200 text-amber-800 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:bg-amber-100 transition"
+                                title="Revisar y pasar a Solo Chat auto-tickets sin asignar ni categoría"
+                            >
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />Limpiar Auto-WA
+                            </button>
+                        )}
                         <button onClick={() => setIsCategoryOpen(true)} className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-1.5 shadow-sm hover:bg-gray-50"><Tag className="w-4 h-4 text-indigo-500" />Categorías</button>
                         <button onClick={() => setIsCreateOpen(true)} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5 shadow-lg shadow-indigo-200 hover:bg-indigo-700"><Plus className="w-4 h-4" />Nuevo Ticket</button>
                     </div>
@@ -866,6 +919,62 @@ export default function Tickets() {
             {/* Category Manager */}
             {isCategoryOpen && (
                 <CategoryManager categories={categories} companyId={profile?.company_id || ''} onClose={() => setIsCategoryOpen(false)} onChanged={setCategories} />
+            )}
+
+            {/* Admin Auto-WA Junk Cleanup Preview Modal */}
+            {cleanupModalOpen && (
+                <div className="fixed inset-0 z-[105] flex items-center justify-center p-4" onClick={() => !cleanupApplying && setCleanupModalOpen(false)}>
+                    <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" />
+                    <div className="relative bg-white w-full max-w-2xl max-h-[85vh] rounded-3xl shadow-2xl border border-gray-100 overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="px-6 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-black">Limpieza Segura de Auto-Tickets WhatsApp</h3>
+                                <p className="text-[11px] text-amber-50 font-semibold">Vista previa antes de pasar a Solo Chat (sin borrar historial)</p>
+                            </div>
+                            <button type="button" onClick={() => !cleanupApplying && setCleanupModalOpen(false)} className="w-8 h-8 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center"><X className="w-4 h-4" /></button>
+                        </div>
+                        <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 text-xs text-emerald-900 font-medium">
+                                <strong>Garantía de integridad:</strong> Esta acción únicamente marca como <code className="font-bold">Solo Chat</code> los tickets creados automáticamente desde WhatsApp que no tienen agente asignado ni categoría SLA. <strong>No se elimina ningún mensaje ni historial.</strong>
+                            </div>
+                            {cleanupLoading ? (
+                                <div className="py-10 text-center text-xs font-bold text-gray-400">Analizando tickets activos de WhatsApp...</div>
+                            ) : cleanupCandidates.length === 0 ? (
+                                <div className="py-10 text-center text-sm font-bold text-emerald-700">No hay auto-tickets basura pendientes. ¡Tu bandeja está limpia!</div>
+                            ) : (
+                                <>
+                                    <p className="text-xs font-black text-gray-700 uppercase tracking-wider">
+                                        {cleanupCandidates.length} auto-tickets detectados (sin asignar ni categoría):
+                                    </p>
+                                    <div className="max-h-72 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-2xl bg-gray-50/50">
+                                        {cleanupCandidates.map(c => (
+                                            <div key={c.id} className="px-4 py-2.5 flex items-start justify-between gap-3 text-xs">
+                                                <div className="min-w-0">
+                                                    <p className="font-bold text-gray-900 truncate">{c.title}</p>
+                                                    <p className="text-[11px] text-gray-500 truncate">{c.lead_name || 'Cliente WhatsApp'} · #{c.id.slice(0, 8).toUpperCase()}</p>
+                                                </div>
+                                                <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 uppercase">{c.status}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2.5">
+                            <button type="button" disabled={cleanupApplying} onClick={() => setCleanupModalOpen(false)} className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-white">Cancelar</button>
+                            {cleanupCandidates.length > 0 && (
+                                <button
+                                    type="button"
+                                    disabled={cleanupLoading || cleanupApplying}
+                                    onClick={confirmAutoWaCleanup}
+                                    className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black shadow-md disabled:opacity-60"
+                                >
+                                    {cleanupApplying ? 'Limpiando...' : `Confirmar Limpieza (${cleanupCandidates.length})`}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Create Modal — Wide Premium Design */}
