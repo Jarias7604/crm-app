@@ -148,6 +148,8 @@ export const socialPlanningService = {
         postId: string,
         patch: {
             caption?: string;
+            content_url?: string | null;
+            content_type?: 'image' | 'video' | 'reel' | 'story';
             platforms?: string[];
             target_account_ids?: TargetAccountRef[];
             editorial_line?: string | null;
@@ -166,6 +168,8 @@ export const socialPlanningService = {
             for (const p of plats) capObj[p] = patch.caption;
             payload.captions = capObj;
         }
+        if (patch.content_url !== undefined) payload.content_url = patch.content_url;
+        if (patch.content_type !== undefined) payload.content_type = patch.content_type;
         if (patch.platforms !== undefined) payload.platforms = patch.platforms;
         if (patch.target_account_ids !== undefined) payload.target_account_ids = patch.target_account_ids;
         if (patch.editorial_line !== undefined) payload.editorial_line = patch.editorial_line;
