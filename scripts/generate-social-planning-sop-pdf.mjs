@@ -33,6 +33,10 @@ const pCal = loadShot('p_01_planning_calendario.png');
 const pList = loadShot('p_02_planning_lista.png');
 const pDel = loadShot('p_03_planning_eliminados.png');
 const pModal = loadShot('p_04_modal_conectar_chatgpt.png');
+const cAddMcp = loadShot('c_01_chatgpt_plugins_add_mcp.png');
+const cOauth = loadShot('c_02_crm_oauth_autorizar.png');
+const cConnected = loadShot('c_03_chatgpt_plugin_conectado.png');
+const cLive = loadShot('c_04_chatgpt_prueba_vivo.png');
 
 const commonHead = (title) => `<!DOCTYPE html>
 <html lang="es">
@@ -175,11 +179,11 @@ const hdr = (code = 'SOP-COM-2026-04 | Uso interno') => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Marketing y Redes Sociales / Versión 1.0 · Documentación operativa</span>
+    <span>Marketing y Redes Sociales / Versión 1.1 · Conector MCP Oficial + OAuth 2.1</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
-const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatGPT Plus')}
+const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatGPT Plus (MCP + OAuth 2.1)')}
 
 <!-- PAGE 1: COVER -->
 <section class="page">
@@ -188,15 +192,16 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
     <div style="margin-top:34px;">
       <div class="kicker">MARKETING Y REDES SOCIALES / PROCEDIMIENTO ESTÁNDAR DE OPERACIÓN</div>
       <div class="cover-title">Social Planning y<br/>conector ChatGPT Plus</div>
-      <div class="cover-sub">Integración multi-usuario con Arias CRM y publicación directa en Meta</div>
+      <div class="cover-sub">Integración multi-usuario por Servidor MCP oficial (OAuth 2.1) y publicación en Meta</div>
 
       <div class="kicker" style="margin-top:24px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.0 · Producción</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.1 · Conector MCP Oficial + OAuth 2.1 (Plugins ChatGPT)</td></tr>
         <tr><td class="kv-key">Vigencia</td><td class="kv-val">Noviembre 2026</td></tr>
-        <tr><td class="kv-key">Alcance</td><td class="kv-val">Arias Defense Components LLC (flag ai_content_studio_enabled)</td></tr>
-        <tr><td class="kv-key">Relación operativa</td><td class="kv-val">Extiende Social Media Hub sin alterar /marketing/social</td></tr>
+        <tr><td class="kv-key">URL Servidor MCP</td><td class="kv-val"><code>https://www.ariascrm.com/mcp</code> (Streamable HTTP + PKCE S256)</td></tr>
+        <tr><td class="kv-key">Alcance</td><td class="kv-val">Arias Defense Components LLC (flag <code>ai_content_studio_enabled</code>)</td></tr>
+        <tr><td class="kv-key">Relación operativa</td><td class="kv-val">Extiende Social Media Hub sin alterar <code>/marketing/social</code></td></tr>
       </table>
 
       <h3 class="sub-h">Responsables de control documental</h3>
@@ -205,7 +210,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
           <tr><th style="width:48%;">Función</th><th style="width:52%;">Responsable / estado</th></tr>
         </thead>
         <tbody>
-          <tr><td>Elaboración · Arquitectura, Bridge y CRM</td><td>Implementado y verificado en producción</td></tr>
+          <tr><td>Elaboración · Servidor MCP, OAuth 2.1 y CRM</td><td>Implementado y verificado en producción</td></tr>
           <tr><td>Revisión · Dirección y Supervisión</td><td>Jimmy Arias (Super Admin · Arias Group)</td></tr>
           <tr><td>Uso operativo</td><td>Dirección, Equipo de Marketing (Patricia Morales) y Administración SaaS</td></tr>
         </tbody>
@@ -213,7 +218,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
       <p class="body-p" style="color:#475569;">Distribución prevista: Dirección, Marketing y Administración SaaS.</p>
     </div>
   </div>
-  ${ftr(1, 8)}
+  ${ftr(1, 10)}
 </section>
 
 <!-- PAGE 2: 01 / MARCO OPERATIVO -->
@@ -222,10 +227,10 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
     ${hdr()}
     <div class="kicker">01 / MARCO OPERATIVO</div>
     <h1 class="sec-h1">Objetivo, alcance y flujo</h1>
-    <p class="lead-p">Creación de flyers originales en ChatGPT Plus (\$20/mes) con envío directo o programación en Arias CRM.</p>
+    <p class="lead-p">Creación de flyers originales en ChatGPT Plus (\$20/mes) con conexión MCP en 1 clic hacia Arias CRM.</p>
 
-    <p class="body-p"><strong>Objetivo.</strong> Eliminar la descarga manual de flyers desde ChatGPT y el uso de plataformas externas como Metricool, permitiendo al equipo generar diseños originales en su cuenta ChatGPT Plus (\$0 costo extra de API) y elegir desde el chat si el post se publica al instante o entra al calendario de Planning.</p>
-    <p class="body-p"><strong>Alcance.</strong> Módulo <code>/marketing/planning</code>, asistente de autorización OAuth <code>/oauth/chatgpt-authorize</code>, Edge Function <code>arias-social-bridge</code>, tabla <code>social_bridge_tokens</code>, memoria persistente en <code>social_posts</code> y ejecución programada cada 5 minutos en zona El Salvador (<code>-06:00</code>). El módulo <code>Social Media Hub (/marketing/social)</code> se mantiene intacto.</p>
+    <p class="body-p"><strong>Objetivo.</strong> Eliminar la descarga manual de flyers desde ChatGPT y herramientas externas como Metricool, conectando el ChatGPT Plus de cada usuario (\$0 costo extra de API) al servidor oficial <code>https://www.ariascrm.com/mcp</code> mediante OAuth 2.1 para consultar memoria, publicar al instante o programar en Planning.</p>
+    <p class="body-p"><strong>Alcance.</strong> Módulo <code>/marketing/planning</code>, consentimiento OAuth <code>/oauth/chatgpt-authorize</code>, Edge Function <code>arias-social-bridge</code> (endpoints MCP + RFC 9728/8414/DCR), tabla <code>social_bridge_tokens</code> y cron automático cada 5 minutos en zona El Salvador (<code>-06:00</code>). El módulo <code>Social Media Hub (/marketing/social)</code> permanece intacto.</p>
 
     <div class="diagram-wrap">
       <svg viewBox="0 0 680 265" width="100%" height="248" xmlns="http://www.w3.org/2000/svg">
@@ -235,14 +240,14 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
           </marker>
         </defs>
         <rect x="20" y="14" width="175" height="54" rx="5" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.3"/>
-        <text x="107" y="36" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0f172a">1. ChatGPT Plus ($20/mes)</text>
-        <text x="107" y="52" text-anchor="middle" font-size="9" fill="#475569">Flyer original + openaiFileIdRefs</text>
+        <text x="107" y="36" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0f172a">1. ChatGPT Plugins / MCP</text>
+        <text x="107" y="52" text-anchor="middle" font-size="9" fill="#475569">OAuth 1 clic + openaiFileIdRefs</text>
 
         <line x1="196" y1="41" x2="246" y2="41" stroke="#475569" stroke-width="1.4" marker-end="url(#arr1)"/>
 
         <rect x="250" y="14" width="185" height="54" rx="5" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.3"/>
-        <text x="342" y="36" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0f172a">2. arias-social-bridge</text>
-        <text x="342" y="52" text-anchor="middle" font-size="9" fill="#475569">Valida OAuth/Token + Feature Flag</text>
+        <text x="342" y="36" text-anchor="middle" font-size="10.5" font-weight="700" fill="#0f172a">2. ariascrm.com/mcp</text>
+        <text x="342" y="52" text-anchor="middle" font-size="9" fill="#475569">Valida PKCE + Feature Flag SaaS</text>
 
         <line x1="436" y1="41" x2="484" y2="41" stroke="#475569" stroke-width="1.4" marker-end="url(#arr1)"/>
 
@@ -273,10 +278,10 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
       </svg>
     </div>
 
-    <p class="body-p"><strong>Resultado esperado:</strong> flujo continuo desde el chat hasta Facebook e Instagram sin descargas manuales y sin repetir episodios previos.</p>
-    <p class="body-p"><strong>Aislamiento SaaS:</strong> cualquier empresa con <code>ai_content_studio_enabled = false</code> no visualiza el menú ni puede operar la API (respuesta HTTP 403 en servidor).</p>
+    <p class="body-p"><strong>Resultado esperado:</strong> flujo continuo desde el chat hasta Facebook e Instagram con 1 sola URL (sin copiar esquemas JSON ni claves manuales).</p>
+    <p class="body-p"><strong>Aislamiento SaaS:</strong> cualquier empresa con <code>ai_content_studio_enabled = false</code> no visualiza el menú ni puede autorizar ChatGPT (HTTP 403 en servidor).</p>
   </div>
-  ${ftr(2, 8)}
+  ${ftr(2, 10)}
 </section>
 
 <!-- PAGE 3: 02 / CONFIGURACIÓN -->
@@ -284,55 +289,55 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
   <div>
     ${hdr()}
     <div class="kicker">02 / CONFIGURACIÓN</div>
-    <h1 class="sec-h1">Aislamiento, endpoints y reglas del puente</h1>
+    <h1 class="sec-h1">Aislamiento, herramientas MCP y OAuth 2.1</h1>
     <p class="lead-p">Todos los tokens, flyers, páginas conectadas y memoria editorial quedan aislados por <code>company_id</code>.</p>
 
     <table class="inst">
       <thead>
         <tr>
-          <th style="width:24%;">Componente / Endpoint</th>
-          <th style="width:30%;">Mecanismo técnico</th>
-          <th style="width:46%;">Regla operativa y seguridad</th>
+          <th style="width:28%;">Componente / Tool MCP</th>
+          <th style="width:28%;">Mecanismo técnico</th>
+          <th style="width:44%;">Regla operativa y seguridad</th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <td><strong>Feature flag SaaS</strong></td>
           <td><code>ai_content_studio_enabled</code> en <code>companies.features</code></td>
-          <td>Activado únicamente para Arias Defense Components LLC; bloquea menú en frontend y peticiones en backend para otros tenants.</td>
+          <td>Activado únicamente para Arias Defense Components LLC; bloquea UI, OAuth y llamadas MCP a otros tenants.</td>
         </tr>
         <tr>
-          <td><strong>Tokens y OAuth 2.0</strong></td>
-          <td><code>arias_gpt_*</code> (SHA-256) y <code>/oauth/chatgpt-authorize</code></td>
-          <td>Un solo Custom GPT sirve para Jimmy, Patricia y futuros clientes SaaS; cada miembro autentica su propio usuario con permiso directo o solo borrador.</td>
+          <td><strong>OAuth 2.1 + DCR + PKCE</strong></td>
+          <td><code>/.well-known/*</code>, <code>/oauth/register</code>, <code>/oauth/token</code></td>
+          <td>Cada usuario (Jimmy, Patricia o futuro cliente SaaS autorizado) conecta ChatGPT con 1 clic usando su propia sesión CRM y código S256.</td>
         </tr>
         <tr>
-          <td><strong>GET /accounts</strong></td>
-          <td>Bridge Bearer Token por usuario</td>
+          <td><strong>list_connected_social_pages</strong></td>
+          <td>MCP Read-Only (<code>readOnlyHint</code>)</td>
           <td>Devuelve únicamente las páginas de Facebook e Instagram autorizadas de la empresa del usuario autenticado.</td>
         </tr>
         <tr>
-          <td><strong>GET /memory</strong></td>
-          <td>Bridge Bearer Token por usuario</td>
-          <td>Consulta los últimos 15 posts de AI + LEAN™ y Motivación Empresarial para mantener secuencia exacta sin repetir temas.</td>
+          <td><strong>get_content_memory</strong></td>
+          <td>MCP Read-Only (<code>readOnlyHint</code>)</td>
+          <td>Consulta los últimos 30 posts de AI + LEAN™ y Motivación Empresarial para mantener secuencia exacta sin repetir temas.</td>
         </tr>
         <tr>
-          <td><strong>POST /posts</strong></td>
-          <td>Ingesta <code>openaiFileIdRefs</code> + Storage</td>
-          <td>Descarga la imagen temporal de ChatGPT, la respalda en Supabase Storage privado y la crea como <em>published</em>, <em>scheduled</em> o <em>draft</em>.</td>
+          <td><strong>create_or_publish_social_post</strong></td>
+          <td>MCP Write + Storage</td>
+          <td>Descarga el flyer (<code>openaiFileIdRefs</code> o URL/Base64), lo guarda en Storage privado y crea como <em>published</em>, <em>scheduled</em> o <em>draft</em>.</td>
         </tr>
         <tr>
-          <td><strong>Ejecución automática</strong></td>
-          <td><code>pg_cron</code> cada 5 minutos (<code>process-scheduled-social-posts-5m</code>)</td>
-          <td>Procesa posts con estado <em>scheduled</em> vencidos en hora local El Salvador (<code>-06:00</code>) y omite registros en papelera.</td>
+          <td><strong>delete_planned_post &amp; Cron</strong></td>
+          <td>Soft-delete + <code>pg_cron</code> cada 5 min</td>
+          <td>Mueve posts a <em>Eliminados</em> con auditoría y publica cola programada en hora local El Salvador (<code>-06:00</code>).</td>
         </tr>
       </tbody>
     </table>
 
     <h3 class="sub-h">Criterio multi-empresa y costo \$0 API</h3>
-    <p class="body-p">La generación visual se ejecuta íntegramente con el motor nativo de <strong>ChatGPT Plus (\$20/mes)</strong> mediante el conector <em>Actions</em>, evitando pagar por consumo adicional de API de imágenes y preservando intacto el módulo clásico <strong>Social Media Hub</strong> (<code>/marketing/social</code>).</p>
+    <p class="body-p">La generación visual se ejecuta íntegramente con el motor nativo de <strong>ChatGPT Plus (\$20/mes)</strong> mediante el conector oficial <em>Plugins → Custom MCP server</em> (<code>https://www.ariascrm.com/mcp</code>), evitando pagar consumo de API de imágenes y preservando intacto el módulo <strong>Social Media Hub</strong> (<code>/marketing/social</code>).</p>
   </div>
-  ${ftr(3, 8)}
+  ${ftr(3, 10)}
 </section>
 
 <!-- PAGE 4: 03 / EJECUCIÓN -->
@@ -341,33 +346,30 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
     ${hdr()}
     <div class="kicker">03 / EJECUCIÓN</div>
     <h1 class="sec-h1">Responsabilidades por área</h1>
-    <p class="lead-p">Operación diaria en ChatGPT Plus, Planning y administración de permisos por usuario.</p>
+    <p class="lead-p">Vinculación en 1 clic para cada integrante, operación diaria en ChatGPT Plus y administración de permisos.</p>
 
-    <h3 class="sub-h">A. Dirección y Administración CRM (Jimmy Arias)</h3>
-    <div class="step-hdr"><span class="num">01 ·</span> Configurar Custom GPT una sola vez</div>
-    <p class="body-p">Desde <strong>Social Media Hub → Planning → Conectar ChatGPT</strong>, copiar el Esquema OpenAPI e Instrucciones maestras en OpenAI y definir la autenticación (OAuth 2.0 multi-usuario o token Bearer personal).</p>
+    <h3 class="sub-h">A. Cómo se conecta cualquier usuario autorizado (Jimmy, Patricia o SaaS)</h3>
+    <div class="step-hdr"><span class="num">01 ·</span> Copiar URL MCP desde Arias CRM</div>
+    <p class="body-p">En <strong>Social Media Hub → Planning → Conectar ChatGPT</strong>, copiar la única URL oficial: <code>https://www.ariascrm.com/mcp</code>.</p>
 
-    <div class="step-hdr"><span class="num">02 ·</span> Administrar tokens y permisos</div>
-    <p class="body-p">Generar o revocar tokens por miembro (<em>Permitir publicar directo</em> vs <em>Solo Borrador</em>) sin compartir contraseñas ni exponer credenciales de Meta.</p>
+    <div class="step-hdr"><span class="num">02 ·</span> Agregar servidor MCP en ChatGPT Plugins</div>
+    <p class="body-p">Abrir <code>chatgpt.com/plugins</code>, elegir <strong>Add → Add custom MCP server</strong>, pegar la URL, seleccionar <strong>OAuth</strong> y pulsar <strong>Create</strong>.</p>
 
-    <div class="step-hdr"><span class="num">03 ·</span> Habilitar futuros tenants SaaS</div>
-    <p class="body-p">Activar la bandera <code>ai_content_studio_enabled</code> únicamente cuando otra empresa contrate el servicio; cada cliente verá su propio calendario y sus propias páginas.</p>
+    <div class="step-hdr"><span class="num">03 ·</span> Autorizar en 1 clic con sesión del CRM</div>
+    <p class="body-p">ChatGPT abre automáticamente <code>ariascrm.com/oauth/chatgpt-authorize</code>. Cada integrante inicia sesión con su propio usuario (sin compartir llaves ni mezclar empresas) y presiona <strong>Autorizar ChatGPT</strong>.</p>
 
-    <h3 class="sub-h">B. Equipo de Marketing (Patricia y usuarios autorizados)</h3>
-    <div class="step-hdr"><span class="num">01 ·</span> Vincular cuenta personal</div>
-    <p class="body-p">Ingresar con su usuario CRM en el enlace OAuth o solicitar su token <code>arias_gpt_*</code> dentro de <em>Conectar ChatGPT</em>.</p>
+    <h3 class="sub-h">B. Uso diario en ChatGPT Plus (AI + LEAN™ y Motivación)</h3>
+    <div class="step-hdr"><span class="num">01 ·</span> Invocar @Arias CRM Planning y consultar memoria</div>
+    <p class="body-p">Mencionar <code>@Arias CRM Planning</code> para que lea <code>get_content_memory</code> antes de proponer el siguiente número de episodio y las páginas conectadas.</p>
 
-    <div class="step-hdr"><span class="num">02 ·</span> Crear flyers en ChatGPT Plus con memoria</div>
-    <p class="body-p">Antes de diseñar un nuevo episodio de <em>AI + LEAN™</em> o <em>Motivación empresarial</em>, permitir que el GPT consulte <code>GET /memory</code> para continuar la numeración oficial.</p>
+    <div class="step-hdr"><span class="num">02 ·</span> Confirmar publicación directa o Planning</div>
+    <p class="body-p">Aprobar el flyer generado e indicar si se publica al instante o se programa en Planning indicando fecha/hora en El Salvador (<code>-06:00</code>) y páginas destino.</p>
 
-    <div class="step-hdr"><span class="num">03 ·</span> Confirmar publicación directa o Planning</div>
-    <p class="body-p">Responder a la pregunta del GPT (<em>"¿Lo publico de una vez o lo pongo en Planning?"</em>) indicando fecha/hora en El Salvador (<code>-06:00</code>) y páginas destino.</p>
-
-    <h3 class="sub-h">C. Supervisión de colas y Meta</h3>
-    <div class="step-hdr"><span class="num">01 ·</span> Verificar cuentas conectadas</div>
-    <p class="body-p">Confirmar en el indicador <em>Páginas</em> y en <em>Connected Accounts</em> que los tokens de Facebook e Instagram permanezcan vigentes.</p>
+    <h3 class="sub-h">C. Administración de permisos y revocación</h3>
+    <div class="step-hdr"><span class="num">01 ·</span> Controlar quién publica directo vs Solo Borrador</div>
+    <p class="body-p">Desde el modal <em>Conectar ChatGPT</em> en el CRM, Dirección puede cambiar en 1 clic cualquier sesión OAuth entre <em>Publica directo</em> y <em>Solo Borrador</em>, o revocarla de inmediato.</p>
   </div>
-  ${ftr(4, 8)}
+  ${ftr(4, 10)}
 </section>
 
 <!-- PAGE 5: 04 / CONTROL OPERATIVO Y SUPERVISIÓN -->
@@ -395,11 +397,11 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
         <tr>
           <td><strong>Publicado</strong></td>
           <td>Enviado correctamente a Facebook / Instagram con ID registrado.</td>
-          <td>Sirve de memoria editorial automática en <code>GET /memory</code>.</td>
+          <td>Sirve de memoria editorial automática en <code>get_content_memory</code>.</td>
         </tr>
         <tr>
           <td><strong>Borrador</strong></td>
-          <td>Generado por usuario sin permiso directo o pendiente de revisión.</td>
+          <td>Generado por usuario en modo Solo Borrador o pendiente de revisión.</td>
           <td>Revisar diseño/texto en <em>Lista → Editar</em> y cambiar a Programado.</td>
         </tr>
         <tr>
@@ -429,8 +431,8 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
 
     <h3 class="sub-h">Cuatro reglas de oro</h3>
     <ul class="rules-list">
-      <li><strong>01.</strong> Nunca re-crear manualmente en Canva o Metricool lo que ya diseñó ChatGPT Plus; enviarlo directo vía Actions al CRM.</li>
-      <li><strong>02.</strong> Mantener un token individual por cada integrante (Jimmy, Patricia) para auditar quién envió o eliminó cada post.</li>
+      <li><strong>01.</strong> Nunca re-crear en herramientas externas como Metricool lo que ya diseñó ChatGPT Plus; enviarlo directo vía MCP.</li>
+      <li><strong>02.</strong> Cada miembro (Jimmy, Patricia) debe autorizar el plugin MCP con su propia sesión CRM para mantener trazabilidad individual.</li>
       <li><strong>03.</strong> Verificar siempre la zona horaria El Salvador (<code>-06:00</code>) antes de confirmar una fecha programada en Planning.</li>
       <li><strong>04.</strong> No alterar el módulo clásico <code>Social Media Hub (/marketing/social)</code>; operar toda programación semanal desde <code>Planning</code>.</li>
     </ul>
@@ -441,11 +443,12 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
         <tr><th style="width:22%;">Versión / fecha</th><th style="width:52%;">Descripción</th><th style="width:26%;">Estado</th></tr>
       </thead>
       <tbody>
-        <tr><td>1.0 / Nov. 2026</td><td>Publicación inicial SOP-COM-2026-04 alineada al estándar ARIAS GROUP con capturas reales del CRM.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.1 / Nov. 2026</td><td>Incorpora Conector MCP Streamable HTTP + OAuth 2.1 oficial en <code>chatgpt.com/plugins</code> (reemplazo del antiguo GPT Builder) con capturas en vivo.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.0 / Nov. 2026</td><td>Publicación inicial del módulo Social Planning y puente CRM.</td><td>Superada por v1.1</td></tr>
       </tbody>
     </table>
   </div>
-  ${ftr(5, 8)}
+  ${ftr(5, 10)}
 </section>
 
 <!-- PAGE 6: 05 / PROCEDIMIENTO VISUAL (Conector ChatGPT + Calendario) -->
@@ -456,19 +459,18 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
       <span class="doc-code">SOP-COM-2026-04 | Uso interno</span>
     </div>
     <div class="kicker">05 / PROCEDIMIENTO VISUAL</div>
-    <h1 class="sec-h1" style="font-size:19px;">Conector ChatGPT Plus y Calendario Semanal</h1>
-    <p class="lead-p" style="margin-bottom:8px;">Vinculación segura por usuario y vista semanal de publicaciones en <code>/marketing/planning</code>.</p>
+    <h1 class="sec-h1" style="font-size:19px;">Conector MCP en Arias CRM y Calendario Semanal</h1>
+    <p class="lead-p" style="margin-bottom:8px;">Obtención de la URL MCP oficial en Arias CRM y vista semanal de publicaciones.</p>
 
-    <div class="step-hdr" style="margin-top:2px;"><span class="num">01 ·</span> Abrir Conectar ChatGPT y gestionar tokens por usuario o esquema OpenAPI</div>
-    <p class="body-p" style="margin-bottom:4px;">En la barra superior de Planning, presione <strong>Conectar ChatGPT</strong> para generar tokens individuales (Jimmy / Patricia), copiar el esquema OpenAPI e instrucciones o consultar las URLs OAuth 2.0 multi-usuario.</p>
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">01 ·</span> Copiar la URL MCP oficial y administrar sesiones del equipo</div>
+    <p class="body-p" style="margin-bottom:4px;">En Planning → <strong>Conectar ChatGPT</strong>, copie <code>https://www.ariascrm.com/mcp</code> con <strong>Copiar URL MCP</strong> y supervise abajo permisos o revocación para cada integrante del equipo.</p>
     <div class="shot-frame compact">
-      <img src="${pModal}" alt="Modal Conectar ChatGPT Plus" />
-      <div class="callout-box" style="left:54.5%;top:31.8%;width:20.1%;height:4.9%;"><span class="callout-tag">1. Generar Token</span></div>
-      <div class="callout-box" style="left:25.4%;top:37.3%;width:49.2%;height:11.0%;"><span class="callout-tag bottom">2. Tokens por usuario (Jimmy / Patricia)</span></div>
-      <div class="callout-box" style="left:55.6%;top:52.8%;width:19.0%;height:5.8%;"><span class="callout-tag right">3. Esquema e Instrucciones</span></div>
-      <div class="callout-box" style="left:25.4%;top:59.6%;width:49.2%;height:7.6%;"><span class="callout-tag bottom">4. URLs OAuth 2.0 (1 clic)</span></div>
+      <img src="${pModal}" alt="Modal Conectar ChatGPT MCP en Arias CRM" />
+      <div class="callout-box" style="left:63.9%;top:28.3%;width:10.0%;height:4.0%;"><span class="callout-tag right">1. Copiar URL MCP</span></div>
+      <div class="callout-box" style="left:26.1%;top:34.1%;width:47.7%;height:4.7%;"><span class="callout-tag">2. URL oficial del servidor MCP</span></div>
+      <div class="callout-box" style="left:26.1%;top:62.0%;width:47.7%;height:10.2%;"><span class="callout-tag bottom">3. Sesiones y permisos (Jimmy / Patricia)</span></div>
     </div>
-    <div class="fig-cap" style="text-align:center;margin-bottom:6px;">Figura 1. Asistente de vinculación multi-usuario con control granular de publicación directa vs solo borrador.</div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:6px;">Figura 1. Asistente simplificado MCP con conexión en 1 sola URL y control por usuario de Publica directo vs Solo Borrador.</div>
 
     <div class="step-hdr" style="margin-top:2px;"><span class="num">02 ·</span> Planificar publicaciones en la grilla del Calendario Semanal</div>
     <p class="body-p" style="margin-bottom:4px;">La vista principal muestra la semana en horario de El Salvador (<code>-06:00</code>), diferenciando flyers programados, publicados y tarjetas generadas desde ChatGPT (<code>GPT</code>).</p>
@@ -481,7 +483,7 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:2px;">Figura 2. Vista real del Calendario semanal con acceso directo al conector, creación manual por día e insignia GPT.</div>
   </div>
-  ${ftr(6, 8)}
+  ${ftr(6, 10)}
 </section>
 
 <!-- PAGE 7: 06 / PROCEDIMIENTO VISUAL (Lista y Publicación Inmediata) -->
@@ -503,18 +505,18 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
     <div class="fig-cap">Figura 3. Cola cronológica mostrando línea editorial (AI + LEAN™ / Motivación), páginas Meta destino y acciones directas.</div>
 
     <h3 class="sub-h">Flujo de publicación directa vs programación automática</h3>
-    <p class="body-p">Al hacer clic en <strong>Publicar ya</strong> (o cuando ChatGPT recibe confirmación de publicación inmediata), <code>arias-social-bridge</code> invoca de inmediato las funciones existentes <code>publish-facebook</code> y <code>publish-instagram</code>, registrando los identificadores devueltos por Meta. Los posts programados permanecen visibles hasta que <code>pg_cron</code> los ejecuta en su ventana de 5 minutos.</p>
+    <p class="body-p">Al hacer clic en <strong>Publicar ya</strong> (o cuando ChatGPT ejecuta <code>create_or_publish_social_post</code> en modo inmediato), <code>arias-social-bridge</code> invoca de inmediato las funciones existentes <code>publish-facebook</code> y <code>publish-instagram</code>, registrando los identificadores devueltos por Meta. Los posts programados permanecen en cola hasta que <code>pg_cron</code> los ejecuta en su ventana de 5 minutos.</p>
   </div>
-  ${ftr(7, 8)}
+  ${ftr(7, 10)}
 </section>
 
-<!-- PAGE 8: 07 / PROCEDIMIENTO VISUAL (Eliminados + Privacidad) -->
+<!-- PAGE 8: 07 / PROCEDIMIENTO VISUAL (Eliminados) -->
 <section class="page">
   <div>
     ${hdr()}
     <div class="kicker">07 / PROCEDIMIENTO VISUAL</div>
-    <h1 class="sec-h1">Papelera auditable y control de privacidad</h1>
-    <p class="lead-p">Trazabilidad completa de publicaciones descartadas con restauración en 1 clic sin pérdida del flyer.</p>
+    <h1 class="sec-h1">Papelera auditable y restauración en 1 clic</h1>
+    <p class="lead-p">Trazabilidad completa de publicaciones descartadas sin pérdida de archivos ni historial.</p>
 
     <div class="step-hdr"><span class="num">04 ·</span> Auditar eliminaciones y restaurar publicaciones al calendario</div>
     <p class="body-p">Todo post eliminado pasa a la pestaña <strong>Eliminados</strong> conservando la marca de tiempo (<strong>ELIMINADO EL</strong>) y el usuario responsable (<strong>ELIMINADO POR</strong>), con el botón <strong>Restaurar</strong> disponible para reactivarlo sin perder su imagen respaldada en Storage.</p>
@@ -526,13 +528,80 @@ const html = `${commonHead('SOP-COM-2026-04 — Social Planning y Conector ChatG
     </div>
     <div class="fig-cap">Figura 4. Papelera auditable equivalente a Metricool con registro de usuario y restauración instantánea.</div>
 
-    <div class="step-hdr"><span class="num">05 ·</span> Confirmación diaria en ChatGPT Plus</div>
-    <p class="body-p">Al finalizar cada flyer en ChatGPT, confirme si desea <strong>Publicar de una vez</strong> o enviarlo a <strong>Planning</strong> indicando fecha y hora local de El Salvador (<code>-06:00</code>); el registro aparecerá de inmediato en estas vistas.</p>
-
-    <div class="privacy-title">Control de privacidad</div>
-    <p class="body-p" style="color:#475569;">Las capturas incorporadas corresponden a un entorno ilustrativo con datos demostrativos. Los tokens personales <code>arias_gpt_*</code>, fotografías maestras autorizadas y credenciales OAuth son de uso exclusivo del personal autorizado de Arias Defense Components LLC y no deben compartirse fuera de la organización.</p>
+    <div class="step-hdr"><span class="num">05 ·</span> Política de respaldo de archivos generados en ChatGPT</div>
+    <p class="body-p">Cuando un flyer entra al CRM mediante <code>create_or_publish_social_post</code>, su imagen temporal de ChatGPT ya fue descargada y respaldada en Supabase Storage privado antes de aparecer en la cola. Moverla a Eliminados no destruye la imagen si posteriormente decide restaurarla.</p>
   </div>
-  ${ftr(8, 8)}
+  ${ftr(8, 10)}
+</section>
+
+<!-- PAGE 9: 08 / PROCEDIMIENTO VISUAL (Configurar Plugin MCP y Autorizar OAuth en 1 clic) -->
+<section class="page">
+  <div>
+    <div class="top-rule" style="margin-bottom:14px;">
+      <span class="brand">ARIAS GROUP</span>
+      <span class="doc-code">SOP-COM-2026-04 | Uso interno</span>
+    </div>
+    <div class="kicker">08 / PROCEDIMIENTO VISUAL</div>
+    <h1 class="sec-h1" style="font-size:19px;">Conectar Servidor MCP en ChatGPT y Autorizar OAuth</h1>
+    <p class="lead-p" style="margin-bottom:8px;">Configuración guiada paso a paso para cualquier usuario autorizado desde <code>chatgpt.com/plugins</code>.</p>
+
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">06 ·</span> Abrir Plugins → Add custom MCP server y pegar la URL oficial</div>
+    <p class="body-p" style="margin-bottom:4px;">Entre a <code>chatgpt.com/plugins</code>, presione <strong>Add → Add custom MCP server</strong>, escriba <em>Arias CRM Planning</em>, pegue <code>https://www.ariascrm.com/mcp</code>, elija <strong>OAuth</strong>, marque la casilla inferior y presione <strong>Create</strong>.</p>
+    <div class="shot-frame compact">
+      <img src="${cAddMcp}" alt="Modal Add custom MCP server en ChatGPT Plugins" />
+      <div class="callout-box" style="left:34.2%;top:24.2%;width:30.6%;height:17.2%;"><span class="callout-tag">1. Nombre y Descripción</span></div>
+      <div class="callout-box" style="left:34.2%;top:48.2%;width:30.6%;height:4.8%;"><span class="callout-tag right">2. Pegar https://www.ariascrm.com/mcp</span></div>
+      <div class="callout-box" style="left:34.2%;top:55.5%;width:30.6%;height:6.5%;"><span class="callout-tag bottom">3. Authentication: OAuth</span></div>
+      <div class="callout-box" style="left:35.0%;top:83.5%;width:29.5%;height:10.0%;"><span class="callout-tag right">4. Aceptar y Create</span></div>
+    </div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:6px;">Figura 5. Registro del servidor MCP de Arias CRM dentro de ChatGPT Plugins (sin copiar esquemas ni tokens manuales).</div>
+
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">07 ·</span> Aprobar el acceso en 1 clic con tu usuario de Arias CRM</div>
+    <p class="body-p" style="margin-bottom:4px;">ChatGPT abrirá la pantalla de consentimiento de Arias CRM verificando empresa y usuario. Presione <strong>Autorizar ChatGPT</strong> para completar el enlace OAuth 2.1 automáticamente.</p>
+    <div class="shot-frame compact">
+      <img src="${cOauth}" alt="Pantalla de consentimiento OAuth en Arias CRM" />
+      <div class="callout-box" style="left:39.4%;top:38.5%;width:21.2%;height:7.9%;"><span class="callout-tag right">1. Empresa y usuario CRM</span></div>
+      <div class="callout-box" style="left:39.4%;top:50.8%;width:21.2%;height:11.2%;"><span class="callout-tag">2. Alcance de permisos</span></div>
+      <div class="callout-box" style="left:50.1%;top:63.8%;width:10.5%;height:5.2%;"><span class="callout-tag bottom right">3. Autorizar en 1 clic</span></div>
+    </div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:2px;">Figura 6. Pantalla oficial de consentimiento OAuth 2.1 garantizando aislamiento estricto multi-empresa.</div>
+  </div>
+  ${ftr(9, 10)}
+</section>
+
+<!-- PAGE 10: 09 / PROCEDIMIENTO VISUAL (Plugin Conectado, Prueba Real & Privacidad) -->
+<section class="page">
+  <div>
+    <div class="top-rule" style="margin-bottom:14px;">
+      <span class="brand">ARIAS GROUP</span>
+      <span class="doc-code">SOP-COM-2026-04 | Uso interno</span>
+    </div>
+    <div class="kicker">09 / PROCEDIMIENTO VISUAL</div>
+    <h1 class="sec-h1" style="font-size:19px;">Verificación de Herramientas y Operación en el Chat</h1>
+    <p class="lead-p" style="margin-bottom:8px;">Confirmación de las 4 herramientas MCP activas y prueba real consultando páginas desde ChatGPT Plus.</p>
+
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">08 ·</span> Confirmar las 4 herramientas MCP activas en el plugin</div>
+    <p class="body-p" style="margin-bottom:4px;">Al finalizar el enlace OAuth, ChatGPT muestra conectado <strong>Arias CRM Planning</strong> con sus 2 herramientas de escritura y 2 de lectura listas para usar en cualquier chat.</p>
+    <div class="shot-frame compact">
+      <img src="${cConnected}" alt="Plugin Arias CRM Planning conectado con 4 herramientas MCP" />
+      <div class="callout-box" style="left:35.3%;top:25.2%;width:29.2%;height:38.3%;"><span class="callout-tag right">1. Write: Publicar / Programar / Borrar</span></div>
+      <div class="callout-box" style="left:35.3%;top:64.8%;width:29.2%;height:24.2%;"><span class="callout-tag bottom">2. Read: Memoria y Páginas Meta</span></div>
+    </div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:6px;">Figura 7. Detalle de herramientas MCP verificadas tras completar la autorización OAuth 2.1.</div>
+
+    <div class="step-hdr" style="margin-top:2px;"><span class="num">09 ·</span> Invocar @Arias CRM Planning dentro del chat para diseñar y publicar</div>
+    <p class="body-p" style="margin-bottom:4px;">En un chat nuevo, mencione <code>@Arias CRM Planning</code> para consultar sus páginas o memoria y crear flyers; al aprobar el diseño confirme si se publica de una vez o entra a Planning.</p>
+    <div class="shot-frame compact">
+      <img src="${cLive}" alt="Prueba en vivo de Arias CRM Planning en ChatGPT" />
+      <div class="callout-box" style="left:43.0%;top:10.1%;width:27.8%;height:12.0%;"><span class="callout-tag">1. Invocar @Arias CRM Planning</span></div>
+      <div class="callout-box" style="left:30.8%;top:33.2%;width:26.0%;height:37.0%;"><span class="callout-tag bottom">2. Respuesta en tiempo real del CRM</span></div>
+    </div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:4px;">Figura 8. Consulta real ejecutada desde ChatGPT Plus devolviendo las páginas conectadas de Arias Defense.</div>
+
+    <div class="privacy-title" style="margin-top:4px;">Control de privacidad</div>
+    <p class="body-p" style="color:#475569;margin-bottom:0;">Las capturas fueron tomadas con la barra lateral oculta y sin exponer credenciales ni chats personales. Los tokens OAuth, fotografías maestras y cuentas conectadas son de uso exclusivo del personal autorizado de Arias Defense Components LLC.</p>
+  </div>
+  ${ftr(10, 10)}
 </section>
 
 </body>
