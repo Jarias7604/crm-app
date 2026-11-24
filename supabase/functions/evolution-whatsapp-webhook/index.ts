@@ -526,19 +526,76 @@ interface Caller {
   userClient: any; // RLS-scoped client for "can this user see X" checks
 }
 
+let lastCallerAuthError = '';
+
 async function getCaller(req: Request, supabase: any, supabaseUrl: string): Promise<Caller | null> {
-  const authHeader = req.headers.get('Authorization') || '';
+  lastCallerAuthError = '';
+  const authHeader = req.headers.get('Authorization') || req.headers.get('authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (!token) return null;
-  const { data: userData, error } = await supabase.auth.getUser(token);
-  if (error || !userData?.user) return null;
-  const uid = userData.user.id;
-  const { data: prof } = await supabase
+  if (!token) {
+    lastCallerAuthError = 'missing_bearer_token';
+    return null;
+  }
+
+  let uid = '';
+  const { data: userData, error: getUserErr } = await supabase.auth.getUser(token);
+  if (userData?.user?.id) {
+    uid = userData.user.id;
+  } else {
+    // Fallback: direct Auth REST /user lookup with request apikey or platform anon key
+    try {
+      const apiKeyHeader =
+        Deno.env.get('SUPABASE_ANON_KEY') ||
+        req.headers.get('apikey') ||
+        Deno.env.get('CRM_SERVICE_ROLE_KEY') ||
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ||
+        '';
+      const uRes = await fetch(`${supabaseUrl.replace(/\/$/, '')}/auth/v1/user`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(apiKeyHeader ? { apikey: apiKeyHeader } : {}),
+        },
+      });
+      if (uRes.ok) {
+        const uJson = await uRes.json();
+        if (uJson?.id) uid = String(uJson.id);
+      } else {
+        const errBody = await uRes.text().catch(() => '');
+        lastCallerAuthError = `auth_user_${uRes.status}: ${errBody.slice(0, 120)}`;
+      }
+    } catch (fetchErr: any) {
+      lastCallerAuthError = `auth_fetch_err: ${String(fetchErr?.message || fetchErr)}`;
+    }
+  }
+
+  if (!uid) {
+    if (!lastCallerAuthError) {
+      lastCallerAuthError = `getUser_err: ${getUserErr?.message || 'no_user'}`;
+    }
+    console.warn('[evolution-whatsapp-webhook] getCaller rejected:', lastCallerAuthError);
+    return null;
+  }
+
+  let { data: prof, error: profErr } = await supabase
     .from('profiles')
     .select('id, full_name, email, role, custom_role_id, company_id, is_active, is_platform_owner, permissions')
     .eq('id', uid)
     .maybeSingle();
-  if (!prof || prof.is_active === false) return null;
+
+  if (profErr) {
+    console.warn('[evolution-whatsapp-webhook] profile full select fallback:', profErr.message);
+    const basic = await supabase
+      .from('profiles')
+      .select('id, full_name, email, role, company_id, is_active, is_platform_owner')
+      .eq('id', uid)
+      .maybeSingle();
+    prof = basic.data;
+  }
+
+  if (!prof || prof.is_active === false) {
+    lastCallerAuthError = !prof ? `profile_not_found:${uid}` : `profile_inactive:${uid}`;
+    return null;
+  }
   const role = String(prof.role || '');
   const p = (prof.permissions && typeof prof.permissions === 'object' ? prof.permissions : {}) as Record<string, any>;
   const explicitMode = String(p.wa_access_mode || '');
@@ -646,7 +703,7 @@ serve(async (req: Request) => {
     ];
     if (uiActions.includes(action)) {
       const caller = await getCaller(req, supabase, supabaseUrl);
-      if (!caller) return json({ ok: false, error: 'No autorizado' }, 401);
+      if (!caller) return json({ ok: false, error: 'No autorizado', reason: lastCallerAuthError || 'unknown' }, 401);
       if (caller.scopes.length === 0) return json({ ok: false, error: 'Sin acceso al Chat WhatsApp' }, 403);
 
       switch (action) {

@@ -338,8 +338,12 @@ export default function Tickets() {
         setCleanupLoading(true);
         setCleanupCandidates([]);
         try {
-            const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook?action=cleanup_auto_junk_tickets', {
-                body: { company_id: profile.company_id, dry_run: true },
+            const { data: sessionRes } = await supabase.auth.getSession();
+            if (!sessionRes?.session?.access_token) {
+                await supabase.auth.refreshSession().catch(() => { });
+            }
+            const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
+                body: { action: 'cleanup_auto_junk_tickets', company_id: profile.company_id, dry_run: true },
             });
             if (error || !data?.ok) throw new Error(data?.error || error?.message || 'Error al analizar auto-tickets');
             setCleanupCandidates(Array.isArray(data.tickets) ? data.tickets : []);
@@ -356,8 +360,8 @@ export default function Tickets() {
         setCleanupApplying(true);
         const tid = toast.loading('Limpiando auto-tickets sin eliminar historial...');
         try {
-            const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook?action=cleanup_auto_junk_tickets', {
-                body: { company_id: profile.company_id, dry_run: false },
+            const { data, error } = await supabase.functions.invoke('evolution-whatsapp-webhook', {
+                body: { action: 'cleanup_auto_junk_tickets', company_id: profile.company_id, dry_run: false },
             });
             if (error || !data?.ok) throw new Error(data?.error || error?.message || 'Error en la limpieza');
             toast.success(`Se limpiaron ${data.cleaned ?? 0} auto-tickets de WhatsApp (historial preservado)`, { id: tid });

@@ -85,8 +85,8 @@ export const CreateTicketFromChatModal: React.FC<CreateTicketFromChatModalProps>
     setDrafting(true);
 
     supabase.functions
-      .invoke('evolution-whatsapp-webhook?action=draft_technical_ticket', {
-        body: { ticket_id: ticketId },
+      .invoke('evolution-whatsapp-webhook', {
+        body: { action: 'draft_technical_ticket', ticket_id: ticketId },
       })
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -133,9 +133,10 @@ export const CreateTicketFromChatModal: React.FC<CreateTicketFromChatModalProps>
     const tid = toast.loading('Generando Ticket Técnico...');
     try {
       const { data, error } = await supabase.functions.invoke(
-        'evolution-whatsapp-webhook?action=set_technical_ticket',
+        'evolution-whatsapp-webhook',
         {
           body: {
+            action: 'set_technical_ticket',
             ticket_id: ticketId,
             is_technical_ticket: true,
             module: moduleName,
