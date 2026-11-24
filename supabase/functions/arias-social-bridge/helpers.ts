@@ -394,3 +394,151 @@ export function buildChatGptSystemInstructions(companyName = 'Arias Defense'): s
     '5. Cuando el usuario confirme, llama a `createOrPublishSocialPost` enviando el flyer generado en `openaiFileIdRefs`, el `caption`, `editorial_line`, `episode_label`, `topic`, `page_names` y `mode` (`publish_now` o `schedule` con `scheduled_at` ISO en hora local -06:00).',
   ].join('\n');
 }
+
+export async function verifyPkceS256(codeVerifier: string, expectedChallenge: string): Promise<boolean> {
+  if (!codeVerifier || !expectedChallenge) return false;
+  const data = new TextEncoder().encode(codeVerifier);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const bytes = new Uint8Array(hashBuffer);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  const actualChallenge = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return actualChallenge === expectedChallenge;
+}
+
+export const MCP_TOOL_DEFINITIONS = [
+  {
+    name: 'list_connected_social_pages',
+    description:
+      'Lista las páginas de Facebook e Instagram conectadas y autorizadas para tu empresa en Arias CRM.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'get_content_memory',
+    description:
+      'Consulta los últimos 30 episodios, principios y publicaciones guardadas en la memoria permanente del CRM para evitar repetir temas o numeración.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'create_or_publish_social_post',
+    description:
+      'Envía el flyer generado y su descripción a Arias CRM para publicarlo de inmediato (publish_now), programarlo en Planning (schedule con scheduled_at) o guardarlo en borrador (draft). Pregunta SIEMPRE antes al usuario si desea publicarlo de una vez o ponerlo en Planning.',
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      required: ['caption', 'mode'],
+      properties: {
+        mode: {
+          type: 'string',
+          enum: ['publish_now', 'schedule', 'draft'],
+          description: 'publish_now = publicar ya, schedule = Planning con fecha/hora, draft = borrador',
+        },
+        caption: {
+          type: 'string',
+          description: 'Texto completo de la publicación para Facebook / Instagram',
+        },
+        editorial_line: {
+          type: 'string',
+          description: 'Ejemplo: AI + LEAN™ o Motivación Empresarial',
+        },
+        episode_label: {
+          type: 'string',
+          description: 'Ejemplo: EPISODIO 15 o PRINCIPIO 11',
+        },
+        topic: {
+          type: 'string',
+          description: 'Título o tema principal del flyer',
+        },
+        scheduled_at: {
+          type: 'string',
+          description: 'Fecha/hora ISO en El Salvador -06:00 (obligatorio si mode=schedule), ej. 2026-11-24T10:00:00-06:00',
+        },
+        page_names: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Nombres de páginas destino (ej. ["Arias Group", "Jimmy Arias AI + Lean"])',
+        },
+        platforms: {
+          type: 'array',
+          items: { type: 'string', enum: ['facebook', 'instagram'] },
+          description: 'Plataformas destino si no se especifican page_names',
+        },
+        image_url: {
+          type: 'string',
+          description: 'URL HTTPS de la imagen o flyer si aplica',
+        },
+        image_base64: {
+          type: 'string',
+          description: 'Contenido Base64 o Data URL PNG/JPG de la imagen si no se envía download_link',
+        },
+        openaiFileIdRefs: {
+          type: 'array',
+          description: 'Referencia del flyer recién generado en ChatGPT',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              id: { type: 'string' },
+              mime_type: { type: 'string' },
+              download_link: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  },
+  {
+    name: 'delete_planned_post',
+    description: 'Mueve una publicación programada o borrador a Eliminados dentro de Planning (recuperable).',
+    inputSchema: {
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      required: ['post_id'],
+      properties: {
+        post_id: {
+          type: 'string',
+          description: 'UUID de la publicación en Arias CRM Planning',
+        },
+      },
+    },
+  },
+];
+
+export function buildOAuthProtectedResourceMetadata(origin = 'https://www.ariascrm.com') {
+  const cleanOrigin = origin.replace(/\/+$/, '');
+  return {
+    resource: `${cleanOrigin}/mcp`,
+    authorization_servers: [cleanOrigin],
+    scopes_supported: ['social:read', 'social:write'],
+    bearer_methods_supported: ['header'],
+  };
+}
+
+export function buildOAuthAuthorizationServerMetadata(origin = 'https://www.ariascrm.com') {
+  const cleanOrigin = origin.replace(/\/+$/, '');
+  return {
+    issuer: cleanOrigin,
+    authorization_endpoint: `${cleanOrigin}/oauth/chatgpt-authorize`,
+    token_endpoint: `${cleanOrigin}/oauth/token`,
+    registration_endpoint: `${cleanOrigin}/oauth/register`,
+    response_types_supported: ['code'],
+    grant_types_supported: ['authorization_code'],
+    token_endpoint_auth_methods_supported: ['none', 'client_secret_post', 'client_secret_basic'],
+    code_challenge_methods_supported: ['S256'],
+    scopes_supported: ['social:read', 'social:write'],
+  };
+}

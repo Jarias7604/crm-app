@@ -13,6 +13,8 @@ export default function ChatGptAuthorize() {
     const clientId = searchParams.get('client_id') || 'chatgpt';
     const redirectUri = searchParams.get('redirect_uri') || '';
     const state = searchParams.get('state') || '';
+    const codeChallenge = searchParams.get('code_challenge') || '';
+    const codeChallengeMethod = searchParams.get('code_challenge_method') || '';
 
     const [companyName, setCompanyName] = useState<string>('');
     const [flagEnabled, setFlagEnabled] = useState<boolean | null>(null);
@@ -57,6 +59,8 @@ export default function ChatGptAuthorize() {
                 profile.company_id,
                 clientId,
                 redirectUri,
+                codeChallenge || null,
+                codeChallengeMethod || null,
             );
             const target = new URL(redirectUri);
             target.searchParams.set('code', res.code);
@@ -119,7 +123,25 @@ export default function ChatGptAuthorize() {
                     </div>
                 </div>
 
-                {flagEnabled === false ? (
+                {!profile ? (
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-xs text-slate-700 space-y-3 text-center">
+                        <div className="font-bold text-slate-900">Inicia sesión en Arias CRM para continuar</div>
+                        <p>
+                            Para vincular ChatGPT con tu empresa, primero inicia sesión con tu cuenta autorizada en
+                            Arias CRM.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const nextUrl = `${window.location.pathname}${window.location.search}`;
+                                navigate(`/login?redirect=${encodeURIComponent(nextUrl)}`);
+                            }}
+                            className="w-full h-10 rounded-xl bg-[#4449AA] hover:bg-[#383d8f] text-white text-xs font-bold"
+                        >
+                            Ir a Iniciar Sesión
+                        </button>
+                    </div>
+                ) : flagEnabled === false ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs text-amber-900 space-y-1">
                         <div className="font-bold">Módulo no habilitado para esta empresa</div>
                         <p>

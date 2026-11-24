@@ -4,27 +4,35 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import {
   buildChatGptOpenApiSchema,
   buildChatGptSystemInstructions,
+  buildOAuthAuthorizationServerMetadata,
+  buildOAuthProtectedResourceMetadata,
   extractImageCandidate,
   generateSecureToken,
+  MCP_TOOL_DEFINITIONS,
   normalizeTargetAccounts,
   sha256Hex,
   validateScheduledIso,
+  verifyPkceS256,
   type ActiveSocialAccountLike,
   type TargetAccountRef,
 } from './helpers.ts';
 
+const PUBLIC_ORIGIN = 'https://www.ariascrm.com';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-company-id',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-company-id, mcp-session-id, mcp-protocol-version, accept',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Expose-Headers': 'WWW-Authenticate, Mcp-Session-Id',
 };
 
 const MAX_MEDIA_BYTES = 15 * 1024 * 1024; // 15 MB
 
-function json(data: unknown, status = 200): Response {
+function json(data: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', ...extraHeaders },
   });
 }
 
@@ -363,6 +371,221 @@ async function dispatchMetaPublish(
   return { success: anySuccess, partialError, results: combinedResults };
 }
 
+async function execListAccounts(supabase: any, auth: BridgeAuth) {
+  const { data: accounts, error } = await supabase
+    .from('social_accounts')
+    .select('id, platform, account_name, display_name, account_id, is_default, follower_count')
+    .eq('company_id', auth.companyId)
+    .eq('is_active', true)
+    .order('platform', { ascending: true })
+    .order('is_default', { ascending: false });
+
+  if (error) return { ok: false, status: 500, error: error.message };
+  return {
+    ok: true,
+    status: 200,
+    company_id: auth.companyId,
+    company_name: auth.companyName,
+    connected_by: auth.fullName,
+    accounts: (accounts || []).map((a: any) => ({
+      platform: a.platform,
+      account_id: a.account_id,
+      page_name: a.display_name || a.account_name,
+      is_default: Boolean(a.is_default),
+    })),
+  };
+}
+
+async function execGetMemory(supabase: any, auth: BridgeAuth) {
+  const { data: posts, error } = await supabase
+    .from('social_posts')
+    .select(
+      'id, editorial_line, episode_label, topic, captions, platforms, status, scheduled_at, published_at, source, created_at',
+    )
+    .eq('company_id', auth.companyId)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  if (error) return { ok: false, status: 500, error: error.message };
+  return {
+    ok: true,
+    status: 200,
+    company_name: auth.companyName,
+    total_recent: (posts || []).length,
+    episodes: (posts || []).map((p: any) => ({
+      id: p.id,
+      editorial_line: p.editorial_line || null,
+      episode_label: p.episode_label || null,
+      topic: p.topic || null,
+      caption_preview: String(p.captions?.facebook || p.captions?.instagram || p.captions?.default || '').slice(
+        0,
+        220,
+      ),
+      platforms: p.platforms || [],
+      status: p.status,
+      scheduled_at: p.scheduled_at,
+      published_at: p.published_at,
+      source: p.source || 'crm',
+    })),
+  };
+}
+
+async function execCreateOrPublishPost(
+  supabase: any,
+  supabaseUrl: string,
+  serviceKey: string,
+  auth: BridgeAuth,
+  body: Record<string, any>,
+) {
+  const caption = String(body.caption || '').trim();
+  if (!caption) {
+    return { ok: false, status: 400, error: 'El texto (caption) es obligatorio.' };
+  }
+
+  let mode = String(body.mode || 'schedule').toLowerCase().trim();
+  if (!['publish_now', 'schedule', 'draft'].includes(mode)) {
+    return { ok: false, status: 400, error: 'mode debe ser publish_now, schedule o draft.' };
+  }
+
+  let permissionDowngraded = false;
+  if (mode === 'publish_now' && !auth.canPublishDirectly) {
+    mode = 'draft';
+    permissionDowngraded = true;
+  }
+
+  const schedCheck = validateScheduledIso(body.scheduled_at);
+  if (!schedCheck.valid) {
+    return { ok: false, status: 400, error: schedCheck.error };
+  }
+  if (mode === 'schedule' && !schedCheck.iso) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'Falta scheduled_at (fecha y hora) para ponerlo en Planning.',
+    };
+  }
+
+  const { data: activeAccounts } = await supabase
+    .from('social_accounts')
+    .select('id, platform, account_id, account_name, display_name, is_default, is_active')
+    .eq('company_id', auth.companyId)
+    .eq('is_active', true);
+
+  const resolvedTargets = normalizeTargetAccounts(
+    {
+      target_account_ids: body.target_account_ids,
+      page_names: body.page_names,
+      platforms: body.platforms,
+    },
+    (activeAccounts || []) as ActiveSocialAccountLike[],
+  );
+
+  if (resolvedTargets.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'No encontré páginas activas de Facebook o Instagram conectadas en Cuentas Conectadas de esta empresa.',
+    };
+  }
+
+  const media = await persistIncomingMediaToStorage(supabase, auth.companyId, body);
+  if (!media.publicUrl) {
+    return {
+      ok: false,
+      status: 400,
+      error:
+        'No recibí el archivo de imagen/flyer. Asegúrate de pasar openaiFileIdRefs (el flyer recién generado), image_url o image_base64.',
+    };
+  }
+
+  const distinctPlatforms = [...new Set(resolvedTargets.map((t) => t.platform))];
+  const captionsObj: Record<string, string> = { default: caption };
+  for (const plat of distinctPlatforms) {
+    captionsObj[plat] = caption;
+  }
+
+  const initialStatus =
+    mode === 'publish_now' ? 'publishing' : mode === 'schedule' ? 'scheduled' : 'draft';
+
+  const { data: created, error: insErr } = await supabase
+    .from('social_posts')
+    .insert({
+      company_id: auth.companyId,
+      content_url: media.publicUrl,
+      content_type: media.isVideo ? 'video' : 'image',
+      captions: captionsObj,
+      platforms: distinctPlatforms,
+      target_account_ids: resolvedTargets,
+      editorial_line: body.editorial_line ? String(body.editorial_line).trim() : null,
+      episode_label: body.episode_label ? String(body.episode_label).trim() : null,
+      topic: body.topic ? String(body.topic).trim() : null,
+      source: auth.kind === 'bridge_token' ? 'chatgpt' : 'crm',
+      status: initialStatus,
+      scheduled_at: mode === 'schedule' ? schedCheck.iso : null,
+      created_by: auth.userId,
+    })
+    .select('*')
+    .single();
+
+  if (insErr || !created) {
+    return { ok: false, status: 500, error: insErr?.message || 'Error creando publicación' };
+  }
+
+  if (mode === 'publish_now') {
+    const pubRes = await dispatchMetaPublish(supabaseUrl, serviceKey, supabase, created);
+    return {
+      ok: pubRes.success,
+      status: 200,
+      post_id: created.id,
+      post_status: pubRes.success ? 'published' : 'failed',
+      content_url: media.publicUrl,
+      targets: resolvedTargets,
+      error: pubRes.partialError,
+      message: pubRes.success
+        ? `Publicado correctamente en ${resolvedTargets.map((t) => t.account_name || t.platform).join(', ')}.`
+        : `Falló la publicación: ${pubRes.partialError}`,
+    };
+  }
+
+  return {
+    ok: true,
+    status: 200,
+    post_id: created.id,
+    post_status: created.status,
+    scheduled_at: created.scheduled_at,
+    content_url: media.publicUrl,
+    targets: resolvedTargets,
+    permission_downgraded: permissionDowngraded,
+    message: permissionDowngraded
+      ? 'Tu token no tiene permiso de publicación directa, por lo que se guardó como Borrador en Planning para aprobación del administrador.'
+      : created.status === 'scheduled'
+      ? `Programado en Arias CRM Planning para ${created.scheduled_at} en ${resolvedTargets.map((t) => t.account_name || t.platform).join(', ')}.`
+      : 'Guardado como Borrador en Arias CRM Planning.',
+  };
+}
+
+async function execDeletePost(supabase: any, auth: BridgeAuth, postId: string) {
+  const cleanId = String(postId || '').trim();
+  if (!cleanId) return { ok: false, status: 400, error: 'post_id requerido' };
+
+  const { data: updated, error: delErr } = await supabase
+    .from('social_posts')
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: auth.userId,
+      deleted_by_email: auth.email,
+    })
+    .eq('id', cleanId)
+    .eq('company_id', auth.companyId)
+    .select('id')
+    .maybeSingle();
+
+  if (delErr) return { ok: false, status: 500, error: delErr.message };
+  if (!updated) return { ok: false, status: 404, error: 'Publicación no encontrada en esta empresa' };
+  return { ok: true, status: 200, id: updated.id, message: 'Movido a Eliminados en Planning.' };
+}
+
 async function parseBodyFlexible(req: Request): Promise<Record<string, any>> {
   const ctype = (req.headers.get('content-type') || '').toLowerCase();
   if (ctype.includes('application/x-www-form-urlencoded')) {
@@ -392,11 +615,56 @@ serve(async (req: Request) => {
   const subpath = getSubpath(req.url);
 
   try {
-    // ── Public OAuth 2.0 Token Exchange for Custom GPTs (/oauth/token) ──────
+    // ── Public OAuth 2.1 Discovery Metadata (RFC 9728 & RFC 8414) ───────────
+    if (
+      req.method === 'GET' &&
+      (subpath === '/.well-known/oauth-protected-resource' ||
+        subpath === '/.well-known/oauth-protected-resource/mcp')
+    ) {
+      return json(buildOAuthProtectedResourceMetadata(PUBLIC_ORIGIN));
+    }
+
+    if (
+      req.method === 'GET' &&
+      (subpath === '/.well-known/oauth-authorization-server' ||
+        subpath === '/.well-known/openid-configuration')
+    ) {
+      return json(buildOAuthAuthorizationServerMetadata(PUBLIC_ORIGIN));
+    }
+
+    // ── Public OAuth 2.0 Dynamic Client Registration (RFC 7591) for MCP ─────
+    if (req.method === 'POST' && subpath === '/oauth/register') {
+      const regBody = await parseBodyFlexible(req);
+      const rawRedirects = Array.isArray(regBody.redirect_uris) ? regBody.redirect_uris : [];
+      for (const u of rawRedirects) {
+        if (typeof u !== 'string' || !/^https:\/\//i.test(u)) {
+          return json(
+            { error: 'invalid_redirect_uri', error_description: 'redirect_uris deben usar HTTPS' },
+            400,
+          );
+        }
+      }
+      const clientId = generateSecureToken('arias_mcp_');
+      return json(
+        {
+          client_id: clientId,
+          client_id_issued_at: Math.floor(Date.now() / 1000),
+          client_name: String(regBody.client_name || 'ChatGPT MCP Client'),
+          redirect_uris: rawRedirects,
+          grant_types: ['authorization_code'],
+          response_types: ['code'],
+          token_endpoint_auth_method: String(regBody.token_endpoint_auth_method || 'none'),
+        },
+        201,
+      );
+    }
+
+    // ── Public OAuth 2.0/2.1 Token Exchange (/oauth/token) ──────────────────
     if (req.method === 'POST' && subpath === '/oauth/token') {
       const body = await parseBodyFlexible(req);
       const grantType = String(body.grant_type || 'authorization_code').trim();
       const rawCode = String(body.code || '').trim();
+      const codeVerifier = String(body.code_verifier || '').trim();
       if (grantType !== 'authorization_code' || !rawCode) {
         return json({ error: 'invalid_request', error_description: 'code y grant_type requeridos' }, 400);
       }
@@ -413,6 +681,17 @@ serve(async (req: Request) => {
 
       if (!codeRow) {
         return json({ error: 'invalid_grant', error_description: 'Código inválido o expirado' }, 400);
+      }
+
+      // Verify PKCE S256 challenge if bound to the authorization request
+      if (codeRow.code_challenge) {
+        const pkceOk = await verifyPkceS256(codeVerifier, codeRow.code_challenge);
+        if (!pkceOk) {
+          return json(
+            { error: 'invalid_grant', error_description: 'PKCE code_verifier inválido o faltante' },
+            400,
+          );
+        }
       }
 
       // Claim single-use code atomically
@@ -449,7 +728,7 @@ serve(async (req: Request) => {
       const { error: tokErr } = await supabase.from('social_bridge_tokens').insert({
         company_id: codeRow.company_id,
         user_id: codeRow.user_id,
-        label: 'ChatGPT OAuth (1 clic)',
+        label: 'ChatGPT MCP OAuth (1 clic)',
         token_prefix: rawToken.slice(0, 14),
         token_hash: tokenHash,
         can_publish_directly: Boolean(codeRow.can_publish_directly),
@@ -463,6 +742,7 @@ serve(async (req: Request) => {
         access_token: rawToken,
         token_type: 'Bearer',
         expires_in: 31536000,
+        scope: 'social:read social:write',
       });
     }
 
@@ -516,6 +796,120 @@ serve(async (req: Request) => {
       return json({ ok: true, processed, published, failed });
     }
 
+    // ── MCP Streamable HTTP Endpoint (/mcp) ─────────────────────────────────
+    if (subpath === '/mcp') {
+      if (req.method === 'DELETE') {
+        return json({ ok: true }, 200);
+      }
+
+      const mcpAuthRes = await resolveBridgeAuth(req, supabase, body?.company_id || null);
+      if (!mcpAuthRes.auth) {
+        const challengeHeader =
+          `Bearer resource_metadata="${PUBLIC_ORIGIN}/.well-known/oauth-protected-resource", scope="social:read social:write"`;
+        return json(
+          {
+            error: 'unauthorized',
+            error_description: mcpAuthRes.error || 'Se requiere autorización OAuth en Arias CRM',
+          },
+          401,
+          { 'WWW-Authenticate': challengeHeader },
+        );
+      }
+      const mcpAuth = mcpAuthRes.auth;
+
+      if (req.method === 'GET') {
+        return json(
+          { error: 'method_not_allowed', error_description: 'Usa POST JSON-RPC 2.0 sobre Streamable HTTP.' },
+          405,
+          { Allow: 'POST, DELETE, OPTIONS' },
+        );
+      }
+
+      if (req.method !== 'POST') {
+        return json({ error: 'method_not_allowed' }, 405, { Allow: 'POST, DELETE, OPTIONS' });
+      }
+
+      const rpcMethod = String(body?.method || '');
+      const rpcId = body?.id;
+      const rpcParams = body?.params || {};
+
+      // JSON-RPC notifications (no id, e.g. notifications/initialized) receive HTTP 202 empty body
+      if (rpcId === undefined || rpcId === null || rpcMethod.startsWith('notifications/')) {
+        return new Response(null, { status: 202, headers: corsHeaders });
+      }
+
+      if (rpcMethod === 'initialize') {
+        return json({
+          jsonrpc: '2.0',
+          id: rpcId,
+          result: {
+            protocolVersion: String(rpcParams?.protocolVersion || '2025-03-26'),
+            capabilities: {
+              tools: { listChanged: false },
+            },
+            serverInfo: {
+              name: 'Arias CRM Social Planning',
+              version: '1.1.0',
+            },
+            instructions: buildChatGptSystemInstructions(mcpAuth.companyName),
+          },
+        });
+      }
+
+      if (rpcMethod === 'ping') {
+        return json({ jsonrpc: '2.0', id: rpcId, result: {} });
+      }
+
+      if (rpcMethod === 'tools/list') {
+        return json({
+          jsonrpc: '2.0',
+          id: rpcId,
+          result: {
+            tools: MCP_TOOL_DEFINITIONS,
+          },
+        });
+      }
+
+      if (rpcMethod === 'tools/call') {
+        const toolName = String(rpcParams?.name || '').trim();
+        const toolArgs = (rpcParams?.arguments && typeof rpcParams.arguments === 'object')
+          ? rpcParams.arguments
+          : {};
+
+        let toolResult: Record<string, any>;
+        if (toolName === 'list_connected_social_pages') {
+          toolResult = await execListAccounts(supabase, mcpAuth);
+        } else if (toolName === 'get_content_memory') {
+          toolResult = await execGetMemory(supabase, mcpAuth);
+        } else if (toolName === 'create_or_publish_social_post') {
+          toolResult = await execCreateOrPublishPost(supabase, supabaseUrl, serviceKey, mcpAuth, toolArgs);
+        } else if (toolName === 'delete_planned_post') {
+          toolResult = await execDeletePost(supabase, mcpAuth, String(toolArgs.post_id || ''));
+        } else {
+          return json({
+            jsonrpc: '2.0',
+            id: rpcId,
+            error: { code: -32601, message: `Herramienta MCP desconocida: ${toolName}` },
+          });
+        }
+
+        return json({
+          jsonrpc: '2.0',
+          id: rpcId,
+          result: {
+            content: [{ type: 'text', text: JSON.stringify(toolResult, null, 2) }],
+            isError: !toolResult.ok,
+          },
+        });
+      }
+
+      return json({
+        jsonrpc: '2.0',
+        id: rpcId,
+        error: { code: -32601, message: `Método JSON-RPC no soportado: ${rpcMethod}` },
+      });
+    }
+
     // ── All remaining routes require authenticated user or scoped token ─────
     const authRes = await resolveBridgeAuth(req, supabase, body?.company_id || null);
     if (!authRes.auth) {
@@ -523,220 +917,35 @@ serve(async (req: Request) => {
     }
     const auth = authRes.auth;
 
-    // ── REST: GET /accounts (for ChatGPT Actions) ───────────────────────────
+    // ── REST: GET /accounts ─────────────────────────────────────────────────
     if (req.method === 'GET' && subpath === '/accounts') {
-      const { data: accounts, error } = await supabase
-        .from('social_accounts')
-        .select('id, platform, account_name, display_name, account_id, is_default, follower_count')
-        .eq('company_id', auth.companyId)
-        .eq('is_active', true)
-        .order('platform', { ascending: true })
-        .order('is_default', { ascending: false });
-
-      if (error) return json({ ok: false, error: error.message }, 500);
-      return json({
-        ok: true,
-        company_id: auth.companyId,
-        company_name: auth.companyName,
-        connected_by: auth.fullName,
-        accounts: (accounts || []).map((a: any) => ({
-          platform: a.platform,
-          account_id: a.account_id,
-          page_name: a.display_name || a.account_name,
-          is_default: Boolean(a.is_default),
-        })),
-      });
+      const res = await execListAccounts(supabase, auth);
+      return json(res, res.status || 200);
     }
 
-    // ── REST: GET /memory (last 30 episodes / posts) ────────────────────────
+    // ── REST: GET /memory ───────────────────────────────────────────────────
     if (req.method === 'GET' && subpath === '/memory') {
-      const { data: posts, error } = await supabase
-        .from('social_posts')
-        .select(
-          'id, editorial_line, episode_label, topic, captions, platforms, status, scheduled_at, published_at, source, created_at',
-        )
-        .eq('company_id', auth.companyId)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(30);
-
-      if (error) return json({ ok: false, error: error.message }, 500);
-      return json({
-        ok: true,
-        company_name: auth.companyName,
-        total_recent: (posts || []).length,
-        episodes: (posts || []).map((p: any) => ({
-          id: p.id,
-          editorial_line: p.editorial_line || null,
-          episode_label: p.episode_label || null,
-          topic: p.topic || null,
-          caption_preview: String(p.captions?.facebook || p.captions?.instagram || p.captions?.default || '').slice(
-            0,
-            220,
-          ),
-          platforms: p.platforms || [],
-          status: p.status,
-          scheduled_at: p.scheduled_at,
-          published_at: p.published_at,
-          source: p.source || 'crm',
-        })),
-      });
+      const res = await execGetMemory(supabase, auth);
+      return json(res, res.status || 200);
     }
 
-    // ── REST: POST /posts (ChatGPT Action: publish_now / schedule / draft) ──
+    // ── REST: POST /posts ───────────────────────────────────────────────────
     if (req.method === 'POST' && subpath === '/posts') {
-      const caption = String(body.caption || '').trim();
-      if (!caption) {
-        return json({ ok: false, error: 'El texto (caption) es obligatorio.' }, 400);
-      }
-
-      let mode = String(body.mode || 'schedule').toLowerCase().trim();
-      if (!['publish_now', 'schedule', 'draft'].includes(mode)) {
-        return json({ ok: false, error: 'mode debe ser publish_now, schedule o draft.' }, 400);
-      }
-
-      let permissionDowngraded = false;
-      if (mode === 'publish_now' && !auth.canPublishDirectly) {
-        mode = 'draft';
-        permissionDowngraded = true;
-      }
-
-      const schedCheck = validateScheduledIso(body.scheduled_at);
-      if (!schedCheck.valid) {
-        return json({ ok: false, error: schedCheck.error }, 400);
-      }
-      if (mode === 'schedule' && !schedCheck.iso) {
-        return json(
-          {
-            ok: false,
-            error: 'Falta scheduled_at (fecha y hora) para ponerlo en Planning.',
-          },
-          400,
-        );
-      }
-
-      const { data: activeAccounts } = await supabase
-        .from('social_accounts')
-        .select('id, platform, account_id, account_name, display_name, is_default, is_active')
-        .eq('company_id', auth.companyId)
-        .eq('is_active', true);
-
-      const resolvedTargets = normalizeTargetAccounts(
+      const res = await execCreateOrPublishPost(supabase, supabaseUrl, serviceKey, auth, body);
+      return json(
         {
-          target_account_ids: body.target_account_ids,
-          page_names: body.page_names,
-          platforms: body.platforms,
+          ...res,
+          status: res.post_status || undefined,
         },
-        (activeAccounts || []) as ActiveSocialAccountLike[],
+        res.status || 200,
       );
-
-      if (resolvedTargets.length === 0) {
-        return json(
-          {
-            ok: false,
-            error:
-              'No encontré páginas activas de Facebook o Instagram conectadas en Cuentas Conectadas de esta empresa.',
-          },
-          400,
-        );
-      }
-
-      const media = await persistIncomingMediaToStorage(supabase, auth.companyId, body);
-      if (!media.publicUrl) {
-        return json(
-          {
-            ok: false,
-            error:
-              'No recibí el archivo de imagen/flyer. Asegúrate de pasar openaiFileIdRefs (el flyer recién generado) o image_url.',
-          },
-          400,
-        );
-      }
-
-      const distinctPlatforms = [...new Set(resolvedTargets.map((t) => t.platform))];
-      const captionsObj: Record<string, string> = { default: caption };
-      for (const plat of distinctPlatforms) {
-        captionsObj[plat] = caption;
-      }
-
-      const initialStatus =
-        mode === 'publish_now' ? 'publishing' : mode === 'schedule' ? 'scheduled' : 'draft';
-
-      const { data: created, error: insErr } = await supabase
-        .from('social_posts')
-        .insert({
-          company_id: auth.companyId,
-          content_url: media.publicUrl,
-          content_type: media.isVideo ? 'video' : 'image',
-          captions: captionsObj,
-          platforms: distinctPlatforms,
-          target_account_ids: resolvedTargets,
-          editorial_line: body.editorial_line ? String(body.editorial_line).trim() : null,
-          episode_label: body.episode_label ? String(body.episode_label).trim() : null,
-          topic: body.topic ? String(body.topic).trim() : null,
-          source: auth.kind === 'bridge_token' ? 'chatgpt' : 'crm',
-          status: initialStatus,
-          scheduled_at: mode === 'schedule' ? schedCheck.iso : null,
-          created_by: auth.userId,
-        })
-        .select('*')
-        .single();
-
-      if (insErr || !created) {
-        return json({ ok: false, error: insErr?.message || 'Error creando publicación' }, 500);
-      }
-
-      if (mode === 'publish_now') {
-        const pubRes = await dispatchMetaPublish(supabaseUrl, serviceKey, supabase, created);
-        return json({
-          ok: pubRes.success,
-          post_id: created.id,
-          status: pubRes.success ? 'published' : 'failed',
-          content_url: media.publicUrl,
-          targets: resolvedTargets,
-          error: pubRes.partialError,
-          message: pubRes.success
-            ? `Publicado correctamente en ${resolvedTargets.map((t) => t.account_name || t.platform).join(', ')}.`
-            : `Falló la publicación: ${pubRes.partialError}`,
-        });
-      }
-
-      return json({
-        ok: true,
-        post_id: created.id,
-        status: created.status,
-        scheduled_at: created.scheduled_at,
-        content_url: media.publicUrl,
-        targets: resolvedTargets,
-        permission_downgraded: permissionDowngraded,
-        message: permissionDowngraded
-          ? 'Tu token no tiene permiso de publicación directa, por lo que se guardó como Borrador en Planning para aprobación del administrador.'
-          : created.status === 'scheduled'
-          ? `Programado en Arias CRM Planning para ${created.scheduled_at} en ${resolvedTargets.map((t) => t.account_name || t.platform).join(', ')}.`
-          : 'Guardado como Borrador en Arias CRM Planning.',
-      });
     }
 
-    // ── REST: DELETE /posts/:id (soft-delete into Eliminados) ───────────────
+    // ── REST: DELETE /posts/:id ─────────────────────────────────────────────
     if (req.method === 'DELETE' && subpath.startsWith('/posts/')) {
       const postId = subpath.slice('/posts/'.length).trim();
-      if (!postId) return json({ ok: false, error: 'post_id requerido' }, 400);
-
-      const { data: updated, error: delErr } = await supabase
-        .from('social_posts')
-        .update({
-          deleted_at: new Date().toISOString(),
-          deleted_by: auth.userId,
-          deleted_by_email: auth.email,
-        })
-        .eq('id', postId)
-        .eq('company_id', auth.companyId)
-        .select('id')
-        .maybeSingle();
-
-      if (delErr) return json({ ok: false, error: delErr.message }, 500);
-      if (!updated) return json({ ok: false, error: 'Publicación no encontrada en esta empresa' }, 404);
-      return json({ ok: true, id: updated.id, message: 'Movido a Eliminados en Planning.' });
+      const res = await execDeletePost(supabase, auth, postId);
+      return json(res, res.status || 200);
     }
 
     // ── CRM UI Management Actions (requires CRM JWT, not external GPT token) ─
@@ -751,8 +960,9 @@ serve(async (req: Request) => {
         const baseFnUrl = `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/arias-social-bridge`;
         return json({
           ok: true,
-          authorization_url: 'https://ariascrm.com/oauth/chatgpt-authorize',
-          token_url: `${baseFnUrl}/oauth/token`,
+          mcp_url: `${PUBLIC_ORIGIN}/mcp`,
+          authorization_url: `${PUBLIC_ORIGIN}/oauth/chatgpt-authorize`,
+          token_url: `${PUBLIC_ORIGIN}/oauth/token`,
           openapi_schema: buildChatGptOpenApiSchema(baseFnUrl),
           instructions: buildChatGptSystemInstructions(auth.companyName),
         });
@@ -857,6 +1067,10 @@ serve(async (req: Request) => {
           client_id: clientId,
           redirect_uri: redirectUri,
           can_publish_directly: body.can_publish_directly !== false,
+          code_challenge: body.code_challenge ? String(body.code_challenge).trim() : null,
+          code_challenge_method: body.code_challenge_method
+            ? String(body.code_challenge_method).trim()
+            : null,
           expires_at: expiresAt,
         });
         if (error) return json({ ok: false, error: error.message }, 500);

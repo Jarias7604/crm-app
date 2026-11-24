@@ -1,6 +1,34 @@
 {
     "rewrites": [
         {
+            "source": "/mcp",
+            "destination": "https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/arias-social-bridge/mcp"
+        },
+        {
+            "source": "/.well-known/oauth-protected-resource",
+            "destination": "https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/arias-social-bridge/.well-known/oauth-protected-resource"
+        },
+        {
+            "source": "/.well-known/oauth-protected-resource/mcp",
+            "destination": "https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/arias-social-bridge/.well-known/oauth-protected-resource"
+        },
+        {
+            "source": "/.well-known/oauth-authorization-server",
+            "destination": "https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/arias-social-bridge/.well-known/oauth-authorization-server"
+        },
+        {
+            "source": "/.well-known/openid-configuration",
+            "destination": "https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/arias-social-bridge/.well-known/oauth-authorization-server"
+        },
+        {
+            "source": "/oauth/token",
+            "destination": "https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/arias-social-bridge/oauth/token"
+        },
+        {
+            "source": "/oauth/register",
+            "destination": "https://mtxqqamitglhehaktgxm.supabase.co/functions/v1/arias-social-bridge/oauth/register"
+        },
+        {
             "source": "/(.*)",
             "destination": "/index.html"
         }

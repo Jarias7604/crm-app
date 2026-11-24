@@ -151,6 +151,7 @@ export default function SocialPlanning() {
     const [creatingToken, setCreatingToken] = useState(false);
     const [revealedToken, setRevealedToken] = useState<string | null>(null);
     const [bridgeSetup, setBridgeSetup] = useState<{
+        mcp_url?: string;
         authorization_url: string;
         token_url: string;
         openapi_schema: Record<string, any>;
@@ -1311,12 +1312,67 @@ export default function SocialPlanning() {
                             </div>
                         ) : (
                             <>
-                                {/* Step 1: Personal / Team Token */}
+                                {/* Step 1: Recommended ChatGPT Plugins / Custom MCP Server */}
+                                <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-4 space-y-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <span className="inline-block px-2 py-0.5 rounded-full bg-indigo-100 text-[#4449AA] text-[10px] font-bold uppercase tracking-wider mb-1">
+                                                Recomendado · Nuevo estándar ChatGPT Plugins
+                                            </span>
+                                            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                                                1. Conectar ChatGPT con 1 sola URL (MCP + OAuth 1 clic)
+                                            </h3>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                copyText(
+                                                    bridgeSetup?.mcp_url || 'https://www.ariascrm.com/mcp',
+                                                    'URL del Servidor MCP',
+                                                )
+                                            }
+                                            className="px-3 py-1.5 rounded-xl bg-[#4449AA] hover:bg-[#383d8f] text-white text-xs font-bold inline-flex items-center gap-1.5"
+                                        >
+                                            <Copy className="w-3.5 h-3.5" /> Copiar URL MCP
+                                        </button>
+                                    </div>
+
+                                    <div className="p-2.5 rounded-xl bg-white border border-indigo-200 flex items-center justify-between gap-2">
+                                        <code className="text-xs font-mono font-bold text-[#4449AA] truncate">
+                                            {bridgeSetup?.mcp_url || 'https://www.ariascrm.com/mcp'}
+                                        </code>
+                                        <a
+                                            href="https://chatgpt.com/plugins"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-[11px] font-bold text-slate-700 hover:text-[#4449AA] inline-flex items-center gap-1 shrink-0"
+                                        >
+                                            Abrir ChatGPT Plugins <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                    </div>
+
+                                    <ol className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-700">
+                                        <li className="p-2 rounded-xl bg-white border border-slate-200">
+                                            <strong className="text-slate-900 block">1. Abre Plugins</strong>
+                                            En <code>chatgpt.com/plugins</code> elige <strong>+ → Add custom MCP server</strong>.
+                                        </li>
+                                        <li className="p-2 rounded-xl bg-white border border-slate-200">
+                                            <strong className="text-slate-900 block">2. Pega esta URL</strong>
+                                            Pega la URL de arriba y selecciona autenticación <strong>OAuth</strong>.
+                                        </li>
+                                        <li className="p-2 rounded-xl bg-white border border-slate-200">
+                                            <strong className="text-slate-900 block">3. Autoriza 1 clic</strong>
+                                            Tú, Patricia y cualquier cliente autorizado inician sesión con su usuario CRM.
+                                        </li>
+                                    </ol>
+                                </div>
+
+                                {/* Step 2: Connected Sessions & Team Tokens */}
                                 <div className="rounded-2xl border border-slate-200 p-4 space-y-3">
                                     <div className="flex items-center gap-2">
                                         <Key className="w-4 h-4 text-[#4449AA]" />
                                         <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                                            1. Token Privado de Usuario (Jimmy / Patricia)
+                                            2. Sesiones Conectadas y Tokens de Equipo (Jimmy / Patricia)
                                         </h3>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2">
@@ -1408,42 +1464,41 @@ export default function SocialPlanning() {
                                     )}
                                 </div>
 
-                                {/* Step 2: Custom GPT OAuth + OpenAPI Schema */}
+                                {/* Step 3: Optional Instructions & Legacy OpenAPI */}
                                 {bridgeSetup && (
-                                    <div className="rounded-2xl border border-slate-200 p-4 space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                                                2. Configuración Custom GPT (1 sola vez para todo tu equipo/SaaS)
-                                            </h3>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        copyText(
-                                                            JSON.stringify(bridgeSetup.openapi_schema, null, 2),
-                                                            'Esquema OpenAPI',
-                                                        )
-                                                    }
-                                                    className="px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-[#4449AA] text-[11px] font-bold inline-flex items-center gap-1"
-                                                >
-                                                    <Copy className="w-3 h-3" /> Copiar Esquema
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        copyText(bridgeSetup.instructions, 'Instrucciones GPT')
-                                                    }
-                                                    className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 text-[11px] font-bold inline-flex items-center gap-1"
-                                                >
-                                                    <Copy className="w-3 h-3" /> Copiar Instrucciones
-                                                </button>
-                                            </div>
+                                    <details className="rounded-2xl border border-slate-200 p-4 space-y-3">
+                                        <summary className="text-xs font-bold text-slate-700 cursor-pointer select-none flex items-center justify-between">
+                                            <span>3. Instrucciones de Estilo &amp; Referencia OAuth / OpenAPI Avanzada</span>
+                                            <span className="text-[10px] font-normal text-slate-500">Clic para ver</span>
+                                        </summary>
+                                        <div className="flex flex-wrap gap-2 pt-3">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    copyText(bridgeSetup.instructions, 'Instrucciones Editorial ChatGPT')
+                                                }
+                                                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 text-[11px] font-bold inline-flex items-center gap-1"
+                                            >
+                                                <Copy className="w-3 h-3" /> Copiar Instrucciones AI + LEAN™
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    copyText(
+                                                        JSON.stringify(bridgeSetup.openapi_schema, null, 2),
+                                                        'Esquema OpenAPI',
+                                                    )
+                                                }
+                                                className="px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-[#4449AA] text-[11px] font-bold inline-flex items-center gap-1"
+                                            >
+                                                <Copy className="w-3 h-3" /> Copiar Esquema OpenAPI
+                                            </button>
                                         </div>
 
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
                                             <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                                                 <div className="font-bold text-slate-700 mb-0.5">
-                                                    OAuth Authorization URL (para Patricia / SaaS 1 clic)
+                                                    OAuth Authorization URL
                                                 </div>
                                                 <div className="flex items-center justify-between gap-1">
                                                     <code className="text-[10px] text-slate-600 truncate">
@@ -1476,14 +1531,7 @@ export default function SocialPlanning() {
                                                 </div>
                                             </div>
                                         </div>
-
-                                        <textarea
-                                            readOnly
-                                            rows={5}
-                                            value={JSON.stringify(bridgeSetup.openapi_schema, null, 2)}
-                                            className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-mono text-[10px] text-slate-700"
-                                        />
-                                    </div>
+                                    </details>
                                 )}
                             </>
                         )}

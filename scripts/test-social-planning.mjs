@@ -126,3 +126,31 @@ test('5. Edge Function arias-social-bridge/index.ts bundles cleanly without synt
   assert.ok(fs.existsSync(outFile));
   assert.ok(fs.statSync(outFile).size > 2000);
 });
+
+test('6. Verifies PKCE S256 challenges, OAuth 2.1 metadata, and MCP tool definitions', async () => {
+  const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+  const expectedChallenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+  assert.equal(await mod.verifyPkceS256(verifier, expectedChallenge), true);
+  assert.equal(await mod.verifyPkceS256('wrong-verifier', expectedChallenge), false);
+
+  const resMeta = mod.buildOAuthProtectedResourceMetadata('https://www.ariascrm.com');
+  assert.equal(resMeta.resource, 'https://www.ariascrm.com/mcp');
+  assert.deepEqual(resMeta.authorization_servers, ['https://www.ariascrm.com']);
+
+  const authMeta = mod.buildOAuthAuthorizationServerMetadata('https://www.ariascrm.com');
+  assert.equal(authMeta.authorization_endpoint, 'https://www.ariascrm.com/oauth/chatgpt-authorize');
+  assert.equal(authMeta.token_endpoint, 'https://www.ariascrm.com/oauth/token');
+  assert.equal(authMeta.registration_endpoint, 'https://www.ariascrm.com/oauth/register');
+  assert.deepEqual(authMeta.code_challenge_methods_supported, ['S256']);
+
+  assert.equal(mod.MCP_TOOL_DEFINITIONS.length, 4);
+  assert.deepEqual(
+    mod.MCP_TOOL_DEFINITIONS.map((t) => t.name),
+    [
+      'list_connected_social_pages',
+      'get_content_memory',
+      'create_or_publish_social_post',
+      'delete_planned_post',
+    ],
+  );
+});

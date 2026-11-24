@@ -214,6 +214,7 @@ export const socialPlanningService = {
     async getChatGptSetup(companyId: string) {
         return invokeBridge<{
             ok: boolean;
+            mcp_url?: string;
             authorization_url: string;
             token_url: string;
             openapi_schema: Record<string, any>;
@@ -258,12 +259,20 @@ export const socialPlanningService = {
         });
     },
 
-    async issueOAuthCode(companyId: string, clientId: string, redirectUri: string) {
+    async issueOAuthCode(
+        companyId: string,
+        clientId: string,
+        redirectUri: string,
+        codeChallenge?: string | null,
+        codeChallengeMethod?: string | null,
+    ) {
         return invokeBridge<{ ok: boolean; code: string }>({
             action: 'issue_oauth_code',
             company_id: companyId,
             client_id: clientId,
             redirect_uri: redirectUri,
+            code_challenge: codeChallenge || null,
+            code_challenge_method: codeChallengeMethod || null,
         });
     },
 };
