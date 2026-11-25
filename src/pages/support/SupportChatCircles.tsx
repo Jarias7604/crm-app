@@ -1695,6 +1695,21 @@ export const SupportChatCircles: React.FC = () => {
     [visibleCircleLimit, filteredCircles.length],
   );
 
+  // Mobile (< lg) uses native window scrolling so swiping up retracts browser chrome
+  useEffect(() => {
+    if (mobileChatOpen || visibleCircleLimit >= filteredCircles.length) return;
+    const onWindowScroll = () => {
+      if (window.innerWidth >= 1024) return;
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 450) {
+        setVisibleCircleLimit((prev) =>
+          prev >= filteredCircles.length ? prev : Math.min(filteredCircles.length, prev + 80),
+        );
+      }
+    };
+    window.addEventListener('scroll', onWindowScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onWindowScroll);
+  }, [mobileChatOpen, visibleCircleLimit, filteredCircles.length]);
+
   const handleSelectCircle = useCallback((circle: SupportCircle) => {
     markCircleAsRead(circle.circleId, circle.lastMessageAt, circle.activeTicket.id);
     setSelectedCircleId(circle.circleId);
@@ -3352,10 +3367,10 @@ export const SupportChatCircles: React.FC = () => {
   const roleChip = scopes.all ? 'ADMIN' : scopes.soporte && scopes.leads ? 'SOPORTE + VENTAS' : scopes.soporte ? 'SOPORTE' : 'VENTAS';
 
   return (
-    <div className="h-full flex-1 flex flex-col bg-[#F5F6FA] overflow-hidden">
-      {/* ── TOP HEADER (100% Light & Vector Clean; hidden on mobile when inside an active chat) ── */}
+    <div className="min-h-[100dvh] lg:min-h-0 lg:h-full flex-1 flex flex-col bg-[#F5F6FA] lg:overflow-hidden">
+      {/* ── TOP HEADER (Sticky on mobile list scroll; hidden on mobile when inside an active chat) ── */}
       <header
-        className={`h-12 bg-white border-b border-slate-200/80 px-3.5 md:px-5 items-center justify-between shrink-0 z-30 relative ${
+        className={`sticky top-0 lg:static h-12 bg-white border-b border-slate-200/80 px-3.5 md:px-5 items-center justify-between shrink-0 z-30 ${
           mobileChatOpen && activeCircle ? 'hidden lg:flex' : 'flex'
         }`}
       >
@@ -3760,7 +3775,7 @@ export const SupportChatCircles: React.FC = () => {
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex lg:overflow-hidden">
         {/* ── LEFT: chat list (Responsive on Tablet/Mobile + Collapsible on Desktop) ── */}
         <aside
           style={{ ['--left-w' as any]: `${leftPanelWidth}px` }}
@@ -4168,7 +4183,7 @@ export const SupportChatCircles: React.FC = () => {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100" onScroll={handleCirclesScroll}>
+          <div className="flex-1 lg:overflow-y-auto divide-y divide-slate-100" onScroll={handleCirclesScroll}>
             {loading && circles.length === 0 ? (
               <div className="p-8 text-center text-[13px] text-slate-400 font-medium">Cargando chats…</div>
             ) : filteredCircles.length === 0 ? (
@@ -4237,17 +4252,20 @@ export const SupportChatCircles: React.FC = () => {
         {/* ── CENTER: chat ── */}
         {activeCircle ? (
           <main
-            className={`flex-1 flex-col bg-[#F3F4F8] overflow-hidden min-w-0 ${
+            className={`flex-1 flex-col bg-[#F3F4F8] lg:overflow-hidden min-w-0 ${
               mobileChatOpen ? 'flex' : 'hidden lg:flex'
             }`}
           >
-            {/* Chat header (Clean 54px Mobile Native Header & 1-Bar Desktop Header) */}
-            <div className="h-[54px] md:h-auto bg-white border-b border-slate-200/70 px-2.5 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0">
+            {/* Chat header (Sticky 54px Mobile Native Header & 1-Bar Desktop Header) */}
+            <div className="sticky top-0 lg:static z-30 h-[54px] md:h-auto bg-white border-b border-slate-200/70 px-2.5 sm:px-4 py-1.5 flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
                 {/* Tablet / Mobile Back to List Button */}
                 <button
                   type="button"
-                  onClick={() => setMobileChatOpen(false)}
+                  onClick={() => {
+                    setMobileChatOpen(false);
+                    window.scrollTo({ top: 0, behavior: 'auto' });
+                  }}
                   title="Volver a la lista de conversaciones"
                   className="lg:hidden inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold shrink-0 transition"
                 >
@@ -5096,7 +5114,7 @@ export const SupportChatCircles: React.FC = () => {
               onClick={(e) => {
                 if (e.target === e.currentTarget) setSelectedMessageId(null);
               }}
-              className="flex-1 overflow-y-auto px-3 py-4 md:px-8 md:py-6 space-y-3"
+              className="flex-1 lg:overflow-y-auto px-3 py-4 md:px-8 md:py-6 space-y-3"
             >
               {loadingComments ? (
                 <div className="text-center py-12 text-[13px] font-medium text-slate-400">Cargando mensajes…</div>
@@ -5675,31 +5693,33 @@ export const SupportChatCircles: React.FC = () => {
               </div>
             )}
 
-            {/* Single-Row Clean Composer (Isolated from parent re-renders for zero typing lag) */}
-            <ChatComposer
-              ref={composerRef}
-              canSend={Boolean(canSend)}
-              scope={activeCircle.scope}
-              sendingMessage={sendingMessage}
-              uploadingFile={uploadingFile}
-              activeQuickReplies={activeQuickReplies}
-              replyingTo={replyingToMessage}
-              onCancelReply={() => setReplyingToMessage(null)}
-              onSendWhatsApp={handleSendReply}
-              onSaveInternalNote={handleSaveInternalNote}
-              onUploadAttachment={handleUploadAttachment}
-              onOpenNewQuickReply={() => {
-                setEditingQuickReply(null);
-                setQuickReplyInitialScope(activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'ventas' : 'soporte');
-                setShowQuickReplyModal(true);
-              }}
-              onEditQuickReply={(q) => {
-                setQuickReplyInitialScope(q.scope);
-                setEditingQuickReply(q);
-                setShowQuickReplyModal(true);
-              }}
-              onNavigateTickets={() => navigate('/support/tickets')}
-            />
+            {/* Single-Row Clean Composer (Sticky bottom flush on mobile, static on desktop) */}
+            <div className="sticky bottom-0 lg:static z-30 shrink-0">
+              <ChatComposer
+                ref={composerRef}
+                canSend={Boolean(canSend)}
+                scope={activeCircle.scope}
+                sendingMessage={sendingMessage}
+                uploadingFile={uploadingFile}
+                activeQuickReplies={activeQuickReplies}
+                replyingTo={replyingToMessage}
+                onCancelReply={() => setReplyingToMessage(null)}
+                onSendWhatsApp={handleSendReply}
+                onSaveInternalNote={handleSaveInternalNote}
+                onUploadAttachment={handleUploadAttachment}
+                onOpenNewQuickReply={() => {
+                  setEditingQuickReply(null);
+                  setQuickReplyInitialScope(activeCircle.scope === 'lead' || activeCircle.scope === 'por_clasificar' ? 'ventas' : 'soporte');
+                  setShowQuickReplyModal(true);
+                }}
+                onEditQuickReply={(q) => {
+                  setQuickReplyInitialScope(q.scope);
+                  setEditingQuickReply(q);
+                  setShowQuickReplyModal(true);
+                }}
+                onNavigateTickets={() => navigate('/support/tickets')}
+              />
+            </div>
           </main>
         ) : (
           <main className="hidden lg:flex flex-1 items-center justify-center bg-[#F3F4F8] text-slate-400 text-sm font-bold">

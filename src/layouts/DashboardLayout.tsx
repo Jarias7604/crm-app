@@ -43,7 +43,7 @@ export default function DashboardLayout() {
     useSessionTimeout();
 
     return (
-        <div className="min-h-screen bg-[#F8F9FD] w-full max-w-full overflow-x-hidden">
+        <div className="min-h-screen bg-[#F8F9FD] w-full max-w-full overflow-x-clip">
             {/* Desktop Sidebar - Hidden on mobile */}
             <div className="hidden md:block">
                 <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
@@ -55,11 +55,11 @@ export default function DashboardLayout() {
             {/* Main Content Area */}
             {/* Dynamic padding based on sidebar state */}
             <div className={cn(
-                "transition-all duration-300 ease-in-out flex flex-col w-full max-w-full overflow-x-hidden",
+                "transition-all duration-300 ease-in-out flex flex-col w-full max-w-full overflow-x-clip",
                 isImmersiveView
                     ? mobileChatFullscreen
-                        ? "h-[100dvh] overflow-hidden pb-0 md:pb-0"
-                        : "h-[100dvh] overflow-hidden pb-16 md:pb-0"
+                        ? "min-h-[100dvh] pb-0 lg:h-[100dvh] lg:overflow-hidden lg:pb-0"
+                        : "min-h-[100dvh] pb-20 lg:h-[100dvh] lg:overflow-hidden lg:pb-0"
                     : "min-h-screen pb-20 md:pb-0",
                 sidebarCollapsed ? "md:pl-20" : "md:pl-64"
             )}>
