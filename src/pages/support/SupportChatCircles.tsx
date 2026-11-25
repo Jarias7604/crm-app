@@ -3368,9 +3368,9 @@ export const SupportChatCircles: React.FC = () => {
 
   return (
     <div className="min-h-[100dvh] lg:min-h-0 lg:h-full flex-1 flex flex-col bg-[#F5F6FA] lg:overflow-hidden">
-      {/* ── TOP HEADER (Sticky on mobile list scroll; hidden on mobile when inside an active chat) ── */}
+      {/* ── TOP HEADER (Fixed on mobile list scroll; hidden on mobile when inside an active chat) ── */}
       <header
-        className={`sticky top-0 lg:static h-14 md:h-12 bg-white border-b border-slate-200/80 px-4 md:px-5 items-center justify-between shrink-0 z-30 ${
+        className={`fixed top-0 left-0 right-0 lg:static h-14 md:h-12 bg-white border-b border-slate-200/80 px-4 md:px-5 items-center justify-between shrink-0 z-30 ${
           mobileChatOpen && activeCircle ? 'hidden lg:flex' : 'flex'
         }`}
       >
@@ -3785,7 +3785,7 @@ export const SupportChatCircles: React.FC = () => {
         {/* ── LEFT: chat list (Responsive on Tablet/Mobile + Collapsible on Desktop) ── */}
         <aside
           style={{ ['--left-w' as any]: `${leftPanelWidth}px` }}
-          className={`bg-white flex-col shrink-0 relative w-full lg:w-[var(--left-w)] ${
+          className={`bg-white flex-col shrink-0 relative w-full lg:w-[var(--left-w)] pt-14 lg:pt-0 ${
             mobileChatOpen && activeCircle ? 'hidden' : 'flex'
           } ${leftListCollapsed ? 'lg:hidden' : 'lg:flex'}`}
         >
@@ -4264,12 +4264,12 @@ export const SupportChatCircles: React.FC = () => {
         {/* ── CENTER: chat ── */}
         {activeCircle ? (
           <main
-            className={`flex-1 flex-col bg-[#F3F4F8] lg:overflow-hidden min-w-0 ${
+            className={`flex-1 flex-col bg-[#F3F4F8] pt-[60px] pb-[76px] lg:pt-0 lg:pb-0 lg:overflow-hidden min-w-0 ${
               mobileChatOpen ? 'flex' : 'hidden lg:flex'
             }`}
           >
-            {/* Chat header (Sticky 60px Mobile Native Header & 1-Bar Desktop Header) */}
-            <div className="sticky top-0 lg:static z-30 h-[60px] md:h-auto bg-white border-b border-slate-200/70 px-3 sm:px-4 py-2 md:py-1.5 flex items-center justify-between gap-2 shrink-0">
+            {/* Chat header (Fixed 60px Mobile Native Header & 1-Bar Desktop Header) */}
+            <div className="fixed top-0 left-0 right-0 lg:static z-30 h-[60px] md:h-auto bg-white border-b border-slate-200/70 px-3 sm:px-4 py-2 md:py-1.5 flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
                 {/* Tablet / Mobile Back to List Button */}
                 <button
@@ -5468,7 +5468,7 @@ export const SupportChatCircles: React.FC = () => {
                   );
                 })
               )}
-              <div ref={messagesEndRef} />
+              <div ref={messagesEndRef} className="scroll-mb-24 lg:scroll-mb-0" />
             </div>
 
             {/* Clean, single-line bar when returning from CotizadorPro with a newly generated quote */}
@@ -5705,8 +5705,8 @@ export const SupportChatCircles: React.FC = () => {
               </div>
             )}
 
-            {/* Single-Row Clean Composer (Sticky bottom flush on mobile, static on desktop) */}
-            <div className="sticky bottom-0 lg:static z-30 shrink-0">
+            {/* Single-Row Clean Composer (Fixed bottom flush on mobile, static on desktop) */}
+            <div className="fixed bottom-0 left-0 right-0 lg:static z-30 shrink-0">
               <ChatComposer
                 ref={composerRef}
                 canSend={Boolean(canSend)}
