@@ -43,7 +43,7 @@ const hdr = () => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Comercial &amp; Soporte Técnico / Versión 1.0 · Documentación operativa</span>
+    <span>Comercial &amp; Soporte Técnico / Versión 1.1 · Documentación operativa</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
@@ -227,8 +227,8 @@ const html = `<!DOCTYPE html>
       <div class="kicker" style="margin-top: 4px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.0 · Desplegado en producción (ariascrm.com)</td></tr>
-        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">24 de noviembre de 2026</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.1 · Desplegado en producción (ariascrm.com)</td></tr>
+        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">24 de noviembre de 2026 (Actualización v1.1: Scroll nativo móvil que retrae barra del navegador)</td></tr>
         <tr><td class="kv-key">Áreas usuarias</td><td class="kv-val">Equipo Comercial (Diana, Patricia, Grecia), Soporte Técnico y Dirección</td></tr>
         <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">MobileNav, Sidebar, retiro/redirección de /marketing/chat → /support/chat y ChatComposer responsivo</td></tr>
       </table>
@@ -311,9 +311,9 @@ const html = `<!DOCTYPE html>
         <tr><th style="width:30%;">Mecanismo</th><th style="width:70%;">Beneficio directo para el usuario en celular</th></tr>
       </thead>
       <tbody>
-        <tr><td><strong>Modo pantalla completa al abrir chat</strong></td><td>Cuando el usuario entra a una conversación en móvil, <code>SupportChatCircles</code> emite <code>arias:mobile-chat-open</code>; <code>MobileNav</code> y el header global superior desaparecen temporalmente, liberando ~120 px de alto.</td></tr>
-        <tr><td><strong>Viewport dinámico <code>100dvh</code> + <code>visualViewport</code></strong></td><td>Al desplegarse el teclado virtual en iOS o Android, el área de mensajes se ajusta a la altura visible real y hace scroll automático al último mensaje sin tapar las burbujas ni el botón de enviar.</td></tr>
-        <tr><td><strong>Tipografía <code>16px</code> en caja móvil</strong></td><td>Previene el zoom automático forzado de iOS Safari al tocar el campo de escritura <em>Escribe un mensaje…</em>.</td></tr>
+        <tr><td><strong>Scroll nativo de documento (<code>window</code>) + <code>sticky</code></strong></td><td>En móvil (<code>min-h-[100dvh]</code> + <code>overflow-x-clip</code>), deslizar el dedo hacia arriba retrae automáticamente la barra de direcciones de Safari/Chrome dejando el compositor pegado al borde inferior (igual que <em>Leads</em> y <em>Calendario</em>).</td></tr>
+        <tr><td><strong>Modo pantalla completa al abrir chat</strong></td><td>Cuando el usuario entra a una conversación en móvil, <code>SupportChatCircles</code> emite <code>arias:mobile-chat-open</code>; <code>MobileNav</code> y el header global desaparecen liberando ~120 px de alto.</td></tr>
+        <tr><td><strong>Tipografía <code>16px</code> + <code>visualViewport</code></strong></td><td>Previene zoom forzado de iOS Safari al escribir y mantiene el compositor pegado abajo (<code>sticky bottom-0</code>) sin tapar mensajes.</td></tr>
         <tr><td><strong>Estándar 100% SVG vectorial</strong></td><td>Todos los botones, navegación inferior, indicadores de IA y acciones de burbuja usan vectores nítidos (cero emojis).</td></tr>
       </tbody>
     </table>
