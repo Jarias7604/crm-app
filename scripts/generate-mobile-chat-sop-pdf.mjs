@@ -45,7 +45,7 @@ const hdr = () => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Comercial &amp; Soporte Técnico / Versión 1.3 · Documentación operativa</span>
+    <span>Comercial &amp; Soporte Técnico / Versión 1.4 · Documentación operativa</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
@@ -229,8 +229,8 @@ const html = `<!DOCTYPE html>
       <div class="kicker" style="margin-top: 4px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.3 · Desplegado en producción (ariascrm.com)</td></tr>
-        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">24 de noviembre de 2026 (v1.3: Nombres completos en Línea 1 móvil, tarjetas 3 líneas y tipografía ampliada en modales)</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.4 · Desplegado en producción (ariascrm.com)</td></tr>
+        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">24 de noviembre de 2026 (v1.4: Jerarquía visual leídos suaves vs. no leídos en negrita)</td></tr>
         <tr><td class="kv-key">Áreas usuarias</td><td class="kv-val">Equipo Comercial (Diana, Patricia, Grecia), Soporte Técnico y Dirección</td></tr>
         <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">MobileNav, Sidebar, retiro/redirección de /marketing/chat → /support/chat y ChatComposer responsivo</td></tr>
       </table>
@@ -314,7 +314,7 @@ const html = `<!DOCTYPE html>
       </thead>
       <tbody>
         <tr><td><strong>Scroll nativo (<code>window</code>) + barras <code>fixed</code> en móvil</strong></td><td>En móvil (<code>min-h-[100dvh]</code> + <code>fixed top-0 / bottom-0</code>), deslizar el dedo retrae la barra del navegador manteniendo cabecera (<code>60px</code>) y compositor siempre visibles aun en hilos muy largos.</td></tr>
-        <tr><td><strong>Tarjetas móviles de 3 líneas (&lt; 768 px)</strong></td><td>Línea 1 muestra únicamente <strong>Nombre completo</strong> + hora (<code>16px</code>); Línea 2 vista previa + estado; Línea 3 agrupa chips (<em>Lead</em>, <em>Grupo</em>, <em>IA</em>, SLA) sin recortar nombres ni alterar la vista Desktop de 2 líneas.</td></tr>
+        <tr><td><strong>Tarjetas móviles de 3 líneas (&lt; 768 px)</strong></td><td>Línea 1 muestra únicamente <strong>Nombre completo</strong> + hora (<code>16px</code>); Línea 2 vista previa + estado; Línea 3 agrupa chips (<em>Lead</em>, <em>Grupo</em>, <em>IA</em>, SLA) con contraste atenuado (<code>text-slate-600</code>) en chats leídos frente a no leídos en negrita (<code>text-slate-950</code>).</td></tr>
         <tr><td><strong>Escala táctil nativa (&lt; 768 px)</strong></td><td>Tipografía legible en burbujas/lista (<code>15.5px–16px</code>), botones de <code>44px</code> y modales centrados ampliados (<code>15.5px</code>) igualando la comodidad de <em>Leads</em> y <em>Calendario</em>.</td></tr>
         <tr><td><strong>Modales centradas (Alertas y Filtros)</strong></td><td>Los paneles <em>Centro de Alertas WhatsApp</em> y <em>Refinar conversaciones</em> se centran automáticamente (<code>fixed inset-x-3</code>) con nombres legibles y salto directo al chat al tocar una alerta.</td></tr>
         <tr><td><strong>Estándar 100% SVG vectorial</strong></td><td>Todos los botones, navegación inferior, indicadores de IA y acciones de burbuja usan vectores nítidos (cero emojis).</td></tr>
