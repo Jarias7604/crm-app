@@ -77,7 +77,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2 md:gap-1.5">
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            <span className={`text-[16px] md:text-[14px] leading-snug truncate ${unread ? 'font-bold text-slate-950' : 'font-semibold md:font-normal text-slate-800 md:text-slate-700'}`}>
+            <span className={`text-[16px] md:text-[14px] leading-snug truncate ${unread ? 'font-bold text-slate-950' : 'font-medium md:font-normal text-slate-600'}`}>
               {circle.clientName}
             </span>
             <span
@@ -141,7 +141,7 @@ export const CircleListRow = memo<CircleListRowProps>(({ circle, isSelected, unr
           </div>
         </div>
         <div className="flex items-center justify-between gap-2 mt-1 md:mt-0.5">
-          <p className={`text-[14px] md:text-[13px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-500 md:text-slate-400 font-normal'}`}>
+          <p className={`text-[14px] md:text-[13px] truncate ${unread ? 'text-slate-800 font-semibold' : 'text-slate-400 font-normal'}`}>
             {circle.lastMessageSender}: {circle.lastMessageText}
           </p>
           {circle.teamStatus === 'unopened' ? (
