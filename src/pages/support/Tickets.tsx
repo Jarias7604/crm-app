@@ -12,7 +12,7 @@ import { CategoryManager } from './components/CategoryManager';
 import { TicketPanel } from './components/TicketPanel';
 import { storageService } from '../../services/storage';
 import { CustomSelect } from '../../components/ui/CustomSelect';
-import { TICKET_STATUS_META, TICKET_MODULES, buildStructuredTicketTitle } from '../../lib/ticketWorkflow';
+import { TICKET_STATUS_META, TICKET_MODULES, buildStructuredTicketTitle, matchesTicketSearchQuery } from '../../lib/ticketWorkflow';
 
 const SC: Record<TicketStatus, { label: string; color: string; bg: string }> = TICKET_STATUS_META as Record<
     TicketStatus,
@@ -221,24 +221,49 @@ export default function Tickets() {
     useEffect(() => {
         const state = location.state as { parentTicketId?: string; openTicketId?: string } | null;
         const queryTicketId = new URLSearchParams(location.search).get('ticket');
-        const targetTicketId = state?.openTicketId || queryTicketId;
+        const targetTicketId = (state?.openTicketId || queryTicketId || '').trim();
         if (state?.parentTicketId) {
             openCreateModalWithParent(state.parentTicketId);
             window.history.replaceState({}, document.title);
         }
-        if (targetTicketId && allTickets.length > 0) {
-            const target = allTickets.find(t => t.id === targetTicketId);
-            if (target) {
-                if (!statusFilter.includes(target.status)) {
-                    setStatusFilter(prev => [...prev, target.status]);
-                }
-                setSelected(target);
-                if (state?.openTicketId) {
-                    window.history.replaceState({}, document.title);
-                }
+        if (!targetTicketId) return;
+
+        const cleanId = targetTicketId.replace(/^#+/, '').toLowerCase();
+        const target = allTickets.find(
+            t => t.id.toLowerCase() === cleanId || t.id.toLowerCase().startsWith(cleanId)
+        );
+        if (target) {
+            if (!statusFilter.includes(target.status)) {
+                setStatusFilter(prev => [...prev, target.status]);
             }
+            setSelected(target);
+            if (state?.openTicketId) {
+                window.history.replaceState({}, document.title);
+            }
+            return;
         }
-    }, [location.state, location.search, allTickets, statusFilter]);
+
+        if (!loading && profile?.company_id && cleanId.length >= 8) {
+            supabase
+                .from('tickets')
+                .select('*')
+                .eq('company_id', profile.company_id)
+                .eq('id', targetTicketId)
+                .maybeSingle()
+                .then(
+                    ({ data }) => {
+                        if (data) {
+                            const fetched = {
+                                ...data,
+                                lead: data.lead_name ? { name: data.lead_name, email: null } : undefined,
+                            } as Ticket;
+                            setSelected(fetched);
+                        }
+                    },
+                    () => { }
+                );
+        }
+    }, [location.state, location.search, allTickets, statusFilter, loading, profile?.company_id]);
 
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
@@ -321,7 +346,9 @@ export default function Tickets() {
     }
 
     function handleUpdated(u: Ticket) {
-        setTickets(p => p.map(t => t.id === u.id ? u : t)); setSelected(u);
+        setTickets(p => p.map(t => t.id === u.id ? u : t));
+        setAllTickets(p => p.map(t => t.id === u.id ? u : t));
+        setSelected(u);
         if (profile?.company_id) ticketService.getStats(profile.company_id).then(setStats).catch(() => { });
     }
 
@@ -380,16 +407,16 @@ export default function Tickets() {
 
     const filtered = useMemo(() => {
         const pOrder: Record<TicketPriority, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
-        let list = tickets.filter(t => {
-            const q = search.toLowerCase();
-            if (
-                q &&
-                !t.title.toLowerCase().includes(q) &&
-                !(t.lead?.name || '').toLowerCase().includes(q) &&
-                !(t.solution || '').toLowerCase().includes(q) &&
-                !(String(t.metadata?.module_name || '')).toLowerCase().includes(q) &&
-                !t.id.toLowerCase().includes(q)
-            ) return false;
+        const agentNameMap = new Map<string, string>();
+        agents.forEach(a => {
+            if (a.id && a.full_name) agentNameMap.set(a.id, a.full_name);
+        });
+        const hasSearch = search.trim().length > 0;
+        const pool = hasSearch && allTickets.length > 0 ? allTickets : tickets;
+        let list = pool.filter(t => {
+            if (hasSearch && !matchesTicketSearchQuery(t, search, agentNameMap)) return false;
+            if (catFilter && t.category_id !== catFilter) return false;
+            if (agentFilter && t.assigned_to !== agentFilter) return false;
             if (priorityFilter.length && !priorityFilter.includes(t.priority)) return false;
             if (dateFrom && new Date(t.created_at) < new Date(dateFrom)) return false;
             if (dateTo && new Date(t.created_at) > new Date(dateTo + 'T23:59:59')) return false;
@@ -409,7 +436,7 @@ export default function Tickets() {
             return sortAsc ? d : -d;
         });
         return list;
-    }, [tickets, search, priorityFilter, dateFrom, dateTo, closedFrom, closedTo, sortKey, sortAsc]);
+    }, [tickets, allTickets, agents, search, catFilter, agentFilter, priorityFilter, dateFrom, dateTo, closedFrom, closedTo, sortKey, sortAsc]);
 
     // Agent compliance: uses ALL tickets (incl. resolved/closed) — not the table's filtered state
     const agentCompliance = useMemo(() => {
@@ -649,9 +676,32 @@ export default function Tickets() {
                                     ))}
                                 </div>
                                 {/* Search */}
-                                <div className="relative">
-                                    <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2" />
-                                    <input type="text" placeholder="Buscar ticket..." className="pl-9 pr-4 py-2 bg-gray-50 border-none rounded-xl text-sm w-44 focus:ring-2 focus:ring-indigo-500/20" value={search} onChange={e => setSearch(e.target.value)} />
+                                <div className="relative flex items-center gap-2">
+                                    {search.trim().length > 0 && (
+                                        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                            Buscando en todos los estados
+                                        </span>
+                                    )}
+                                    <div className="relative">
+                                        <Search className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2" />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar #ID, cliente, módulo..."
+                                            className="pl-9 pr-7 py-2 bg-gray-50 border-none rounded-xl text-sm w-52 focus:ring-2 focus:ring-indigo-500/20"
+                                            value={search}
+                                            onChange={e => setSearch(e.target.value)}
+                                        />
+                                        {search && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSearch('')}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                title="Limpiar búsqueda"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

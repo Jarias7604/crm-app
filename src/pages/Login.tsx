@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Eye, EyeOff, KeyRound, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { sanitizePostLoginNextPath } from '../lib/ticketWorkflow';
 
 type LoginMode = 'password' | 'otp';
 
@@ -124,15 +125,16 @@ export default function Login() {
                 return;
             }
 
+            const postLoginPath = sanitizePostLoginNextPath(searchParams.get('next'));
             if (data?.session?.user) {
                 const isActive = await checkUserActiveStatus(data.session.user.id);
                 if (!isActive) {
                     setLoading(false);
                     return;
                 }
-                navigate('/dashboard', { replace: true });
+                navigate(postLoginPath, { replace: true });
             } else {
-                navigate('/dashboard', { replace: true });
+                navigate(postLoginPath, { replace: true });
             }
         } catch (err: any) {
             setError(translateAuthError(err?.message || ''));
@@ -188,15 +190,16 @@ export default function Login() {
                 return;
             }
 
+            const postLoginPath = sanitizePostLoginNextPath(searchParams.get('next'));
             if (data?.session?.user) {
                 const isActive = await checkUserActiveStatus(data.session.user.id);
                 if (!isActive) {
                     setLoading(false);
                     return;
                 }
-                navigate('/dashboard', { replace: true });
+                navigate(postLoginPath, { replace: true });
             } else {
-                navigate('/dashboard', { replace: true });
+                navigate(postLoginPath, { replace: true });
             }
         } catch (err: any) {
             setError(translateAuthError(err?.message || ''));

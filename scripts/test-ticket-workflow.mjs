@@ -58,3 +58,47 @@ test('resolveTicketNotifyRecipients deduplicates creator, assignee and watchers 
     });
     assert.deepEqual(recipients, ['agent-1', 'diana-1', 'patricia-1', 'grecia-1']);
 });
+
+test('buildCanonicalTicketUrl rewrites Vercel preview/branch origins to https://ariascrm.com', () => {
+    assert.equal(
+        mod.buildCanonicalTicketUrl('8295834d-1d2d-4396-8def-07708f41ef1a', 'https://crm-app-v2.vercel.app'),
+        'https://ariascrm.com/support/tickets?ticket=8295834d-1d2d-4396-8def-07708f41ef1a',
+    );
+    assert.equal(
+        mod.buildCanonicalTicketUrl('8295834d-1d2d-4396-8def-07708f41ef1a', 'http://localhost:5173'),
+        'https://ariascrm.com/support/tickets?ticket=8295834d-1d2d-4396-8def-07708f41ef1a',
+    );
+    assert.equal(
+        mod.buildCanonicalTicketUrl('8295834d-1d2d-4396-8def-07708f41ef1a', 'https://www.ariascrm.com/'),
+        'https://www.ariascrm.com/support/tickets?ticket=8295834d-1d2d-4396-8def-07708f41ef1a',
+    );
+});
+
+test('sanitizePostLoginNextPath preserves internal ticket deep-links and blocks external URLs', () => {
+    assert.equal(
+        mod.sanitizePostLoginNextPath('/support/tickets?ticket=8295834d-1d2d-4396-8def-07708f41ef1a'),
+        '/support/tickets?ticket=8295834d-1d2d-4396-8def-07708f41ef1a',
+    );
+    assert.equal(mod.sanitizePostLoginNextPath('https://evil.example/steal'), '/dashboard');
+    assert.equal(mod.sanitizePostLoginNextPath('//evil.example/steal'), '/dashboard');
+    assert.equal(mod.sanitizePostLoginNextPath('/login?next=/dashboard'), '/dashboard');
+});
+
+test('matchesTicketSearchQuery finds tickets by 4-char ID, #ID, client, accents, and solution', () => {
+    const sample = {
+        id: '8295834d-1d2d-4396-8def-07708f41ef1a',
+        title: 'Facturación DTE — No se puede emitir factura de sujeto excluido',
+        lead_name: 'Soporte Técnico Salinera San Jorge',
+        solution: 'Se corrigió el correlativo en bodega principal',
+        metadata: { module_name: 'Facturación DTE' },
+        assigned_to: 'dev-melvin',
+    };
+    const agents = new Map([['dev-melvin', 'Melvin Rodriguez']]);
+    assert.equal(mod.matchesTicketSearchQuery(sample, '8295', agents), true);
+    assert.equal(mod.matchesTicketSearchQuery(sample, '#8295834D', agents), true);
+    assert.equal(mod.matchesTicketSearchQuery(sample, 'facturacion sujeto excluido', agents), true);
+    assert.equal(mod.matchesTicketSearchQuery(sample, 'Salinera', agents), true);
+    assert.equal(mod.matchesTicketSearchQuery(sample, 'Melvin', agents), true);
+    assert.equal(mod.matchesTicketSearchQuery(sample, 'correlativo', agents), true);
+    assert.equal(mod.matchesTicketSearchQuery(sample, '9999inexistente', agents), false);
+});

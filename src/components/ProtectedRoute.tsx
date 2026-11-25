@@ -57,7 +57,12 @@ export default function ProtectedRoute() {
     }
 
     if (!session) {
-        return <Navigate to="/login" replace />;
+        const nextTarget = `${location.pathname}${location.search}${location.hash}`;
+        const loginUrl =
+            nextTarget && nextTarget !== '/' && !nextTarget.startsWith('/login')
+                ? `/login?next=${encodeURIComponent(nextTarget)}`
+                : '/login';
+        return <Navigate to={loginUrl} replace />;
     }
 
     // 🛑 SEGURIDAD CRÍTICA: Bloquear colaboradores pausados o inactivos

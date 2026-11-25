@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import {
     TICKET_STATUS_META,
+    buildCanonicalTicketUrl,
     resolveTicketNotifyRecipients,
     shouldSendTicketStatusEmail,
     type TicketLifecycleKey,
@@ -360,8 +361,8 @@ export const ticketService = {
         };
 
         let rows: Record<string, unknown>[] = [];
+        const PAGE = 1000;
         if (filters?.includeNonSupportWhatsapp) {
-            const PAGE = 1000;
             for (let from = 0; from < 10000; from += PAGE) {
                 const { data, error } = await buildBaseQuery()
                     .order('updated_at', { ascending: false })
@@ -372,9 +373,15 @@ export const ticketService = {
                 if (batch.length < PAGE) break;
             }
         } else {
-            const { data, error } = await buildBaseQuery().order('created_at', { ascending: false });
-            if (error) throw error;
-            rows = (data || []) as Record<string, unknown>[];
+            for (let from = 0; from < 5000; from += PAGE) {
+                const { data, error } = await buildBaseQuery()
+                    .order('created_at', { ascending: false })
+                    .range(from, from + PAGE - 1);
+                if (error) throw error;
+                const batch = (data || []) as Record<string, unknown>[];
+                rows.push(...batch);
+                if (batch.length < PAGE) break;
+            }
         }
 
         const visible = filters?.includeNonSupportWhatsapp
@@ -658,7 +665,10 @@ export const ticketService = {
             );
             const clientName = String(params.ticket.lead?.name || params.ticket.lead_name || '');
             const ticketCode = params.ticket.id.slice(0, 8).toUpperCase();
-            const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ariascrm.com';
+            const ticketUrl = buildCanonicalTicketUrl(
+                params.ticket.id,
+                typeof window !== 'undefined' ? window.location.origin : 'https://ariascrm.com'
+            );
 
             const { data, error } = await supabase.functions.invoke('transactional-email', {
                 body: {
@@ -678,7 +688,7 @@ export const ticketService = {
                     solution: params.ticket.solution || '',
                     recipientUserIds,
                     recipients,
-                    ticketUrl: `${origin}/support/tickets?ticket=${params.ticket.id}`,
+                    ticketUrl,
                 },
             });
             if (error) {

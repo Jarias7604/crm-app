@@ -132,3 +132,94 @@ export function resolveTicketNotifyRecipients(input: {
     }
     return Array.from(set);
 }
+
+export const CANONICAL_CRM_ORIGIN = 'https://ariascrm.com';
+
+export function resolveCanonicalCrmOrigin(rawOrigin?: string | null): string {
+    const clean = String(rawOrigin || '').trim().replace(/\/+$/, '');
+    if (
+        !clean ||
+        !clean.startsWith('http') ||
+        /vercel\.app/i.test(clean) ||
+        /localhost|127\.0\.0\.1/i.test(clean)
+    ) {
+        return CANONICAL_CRM_ORIGIN;
+    }
+    return clean;
+}
+
+export function buildCanonicalTicketUrl(ticketId: string, rawOrigin?: string | null): string {
+    const origin = resolveCanonicalCrmOrigin(rawOrigin);
+    const id = encodeURIComponent(String(ticketId || '').trim());
+    return id ? `${origin}/support/tickets?ticket=${id}` : `${origin}/support/tickets`;
+}
+
+export function sanitizePostLoginNextPath(rawNext?: string | null): string {
+    const clean = String(rawNext || '').trim();
+    if (
+        !clean ||
+        !clean.startsWith('/') ||
+        clean.startsWith('//') ||
+        clean.startsWith('/login') ||
+        /^[a-z]+:/i.test(clean)
+    ) {
+        return '/dashboard';
+    }
+    return clean;
+}
+
+function normalizeSearchToken(value?: string | null): string {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+export function matchesTicketSearchQuery(
+    ticket: {
+        id: string;
+        title?: string | null;
+        description?: string | null;
+        solution?: string | null;
+        lead?: { name?: string | null } | null;
+        lead_name?: string | null;
+        category?: { name?: string | null } | null;
+        metadata?: Record<string, any> | null;
+        assigned_to?: string | null;
+        created_by?: string | null;
+    },
+    rawQuery: string,
+    agentNameMap?: Map<string, string>,
+): boolean {
+    const cleaned = normalizeSearchToken(rawQuery).replace(/^#+/, '').trim();
+    if (!cleaned) return true;
+    const tokens = cleaned
+        .split(/\s+/)
+        .map((tok) => tok.replace(/^#+/, ''))
+        .filter(Boolean);
+    if (tokens.length === 0) return true;
+
+    const assignedName = ticket.assigned_to ? agentNameMap?.get(ticket.assigned_to) || '' : '';
+    const creatorName = ticket.created_by ? agentNameMap?.get(ticket.created_by) || '' : '';
+
+    const haystack = [
+        ticket.id,
+        ticket.id.slice(0, 8),
+        ticket.title,
+        ticket.lead?.name,
+        ticket.lead_name,
+        ticket.solution,
+        ticket.description,
+        ticket.category?.name,
+        ticket.metadata?.module_name,
+        ticket.metadata?.ai_category,
+        assignedName,
+        creatorName,
+    ]
+        .map((part) => normalizeSearchToken(part))
+        .filter(Boolean)
+        .join(' | ');
+
+    return tokens.every((tok) => haystack.includes(tok));
+}

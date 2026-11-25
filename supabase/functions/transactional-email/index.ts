@@ -375,7 +375,12 @@ serve(async (req) => {
       const actorName = String(body.actorName || 'Equipo Soporte');
       const actorId = String(body.actorId || '');
       const solution = String(body.solution || '');
-      const ticketUrl = String(body.ticketUrl || `${appUrl}/support/tickets${ticketId ? `?ticket=${ticketId}` : ''}`);
+      const canonicalTicketUrl = `${appUrl}/support/tickets${ticketId ? `?ticket=${ticketId}` : ''}`;
+      const rawTicketUrl = String(body.ticketUrl || '').trim();
+      const ticketUrl =
+        !rawTicketUrl || /vercel\.app|localhost|127\.0\.0\.1/i.test(rawTicketUrl)
+          ? canonicalTicketUrl
+          : rawTicketUrl;
       const recipientUserIds: string[] = Array.isArray(body.recipientUserIds)
         ? Array.from(new Set(body.recipientUserIds.map((id: any) => String(id || '').trim()).filter((id: string) => id && id !== actorId)))
         : [];
