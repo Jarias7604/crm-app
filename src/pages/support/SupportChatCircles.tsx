@@ -658,6 +658,8 @@ export const SupportChatCircles: React.FC = () => {
   // WhatsApp connection status (admin)
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [bridgeStatus, setBridgeStatus] = useState<Record<string, any> | null>(null);
+  const [reconnectingBridge, setReconnectingBridge] = useState(false);
+  const [waConnectionState, setWaConnectionState] = useState<'open' | 'close' | 'connecting' | null>(null);
 
   // AI auto-responder settings (admin)
   const [showAiPromptModal, setShowAiPromptModal] = useState(false);
@@ -3226,15 +3228,67 @@ export const SupportChatCircles: React.FC = () => {
     }
   };
 
+  const refreshBridgeStatus = async () => {
+    try {
+      const res = await invoke({ action: 'bridge_status' });
+      setBridgeStatus(res);
+      if (res?.evo_connection_state) {
+        setWaConnectionState(res.evo_connection_state);
+      }
+      return res;
+    } catch (e: any) {
+      setBridgeStatus({ ok: false, error: e?.message });
+      return null;
+    }
+  };
+
   const openBridgeStatus = async () => {
     setShowStatusModal(true);
     setBridgeStatus(null);
+    await refreshBridgeStatus();
+  };
+
+  const handleReconnectBridge = async () => {
+    setReconnectingBridge(true);
     try {
-      setBridgeStatus(await invoke({ action: 'bridge_status' }));
+      await invoke({ action: 'request_evo_heal', mode: 'restart_and_catchup' });
+      toast.success('Reconexión solicitada al servidor WhatsApp…');
+      for (const delay of [5000, 9000]) {
+        await new Promise((r) => setTimeout(r, delay));
+        const st = await refreshBridgeStatus();
+        if (st?.evo_connection_state === 'open') {
+          toast.success('WhatsApp (+503 7971-8911) reconectado');
+          break;
+        }
+        if (st?.evo_qr_base64) {
+          toast('Escanea el código QR en pantalla desde +503 7971-8911', { duration: 6000 });
+          break;
+        }
+      }
     } catch (e: any) {
-      setBridgeStatus({ ok: false, error: e?.message });
+      toast.error(e?.message || 'Error al solicitar reconexión');
+    } finally {
+      setReconnectingBridge(false);
     }
   };
+
+  useEffect(() => {
+    if (!activeCompanyId || !scopes.any) return;
+    let cancelled = false;
+    invoke({ action: 'bridge_status' })
+      .then((res) => {
+        if (!cancelled && res?.evo_connection_state) {
+          setWaConnectionState(res.evo_connection_state);
+        }
+      })
+      .catch(() => {
+        /* ignore background probe */
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCompanyId, scopes.any]);
 
   const greetingTime = () => {
     const hr = new Date().getHours();
@@ -3769,9 +3823,12 @@ export const SupportChatCircles: React.FC = () => {
               <button
                 onClick={openBridgeStatus}
                 title="Estado de la conexión WhatsApp"
-                className="hidden md:inline-flex p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 transition"
+                className="relative hidden md:inline-flex p-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/80 transition"
               >
                 <Settings className="w-4 h-4" />
+                {waConnectionState && waConnectionState !== 'open' && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-600 border-2 border-white absolute -top-1 -right-1 animate-pulse" />
+                )}
               </button>
             </>
           )}
@@ -3781,11 +3838,37 @@ export const SupportChatCircles: React.FC = () => {
         </div>
       </header>
 
+      {waConnectionState && waConnectionState !== 'open' && (
+        <div
+          className={`${
+            mobileChatOpen && activeCircle ? 'mt-[60px] lg:mt-0' : 'mt-14 lg:mt-0'
+          } bg-rose-50 border-b border-rose-200 px-4 py-2 flex items-center justify-between gap-3 shrink-0`}
+        >
+          <div className="flex items-center gap-2 min-w-0 text-xs sm:text-[13px] font-semibold text-rose-800">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span className="truncate sm:whitespace-normal">
+              WhatsApp (+503 7971-8911) está desconectado — no se envían ni reciben mensajes.
+            </span>
+          </div>
+          {isRealAdmin && (
+            <button
+              type="button"
+              onClick={openBridgeStatus}
+              className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shrink-0 transition"
+            >
+              Reconectar / Ver QR
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="flex-1 flex lg:overflow-hidden">
         {/* ── LEFT: chat list (Responsive on Tablet/Mobile + Collapsible on Desktop) ── */}
         <aside
           style={{ ['--left-w' as any]: `${leftPanelWidth}px` }}
-          className={`bg-white flex-col shrink-0 relative w-full lg:w-[var(--left-w)] pt-14 lg:pt-0 ${
+          className={`bg-white flex-col shrink-0 relative w-full lg:w-[var(--left-w)] ${
+            waConnectionState && waConnectionState !== 'open' ? 'pt-0' : 'pt-14'
+          } lg:pt-0 ${
             mobileChatOpen && activeCircle ? 'hidden' : 'flex'
           } ${leftListCollapsed ? 'lg:hidden' : 'lg:flex'}`}
         >
@@ -4264,7 +4347,9 @@ export const SupportChatCircles: React.FC = () => {
         {/* ── CENTER: chat ── */}
         {activeCircle ? (
           <main
-            className={`flex-1 flex-col bg-[#F3F4F8] pt-[60px] pb-[76px] lg:pt-0 lg:pb-0 lg:overflow-hidden min-w-0 ${
+            className={`flex-1 flex-col bg-[#F3F4F8] ${
+              waConnectionState && waConnectionState !== 'open' ? 'pt-0' : 'pt-[60px]'
+            } pb-[76px] lg:pt-0 lg:pb-0 lg:overflow-hidden min-w-0 ${
               mobileChatOpen ? 'flex' : 'hidden lg:flex'
             }`}
           >
@@ -6045,6 +6130,10 @@ export const SupportChatCircles: React.FC = () => {
         isOpen={showStatusModal}
         bridgeStatus={bridgeStatus}
         onClose={() => setShowStatusModal(false)}
+        onRefresh={refreshBridgeStatus}
+        onReconnect={handleReconnectBridge}
+        reconnecting={reconnectingBridge}
+        isAdmin={isRealAdmin}
       />
 
       {/* ── AI prompts (admin) ── */}

@@ -226,7 +226,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   const [productFilter, setProductFilter] = useState<string>('all');
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
   const [companyName, setCompanyName] = useState<string>('');
-  const [batchLimit, setBatchLimit] = useState<number>(30);
+  const [batchLimit, setBatchLimit] = useState<number>(20);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [hideAlreadyInCampaign, setHideAlreadyInCampaign] = useState<boolean>(true);
   const [includeLandlines, setIncludeLandlines] = useState<boolean | null>(null);
@@ -237,7 +237,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
   );
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(initialTemplate.id);
   const [messageTemplate, setMessageTemplate] = useState<string>(initialTemplate.body);
-  const [delaySeconds, setDelaySeconds] = useState<number>(10);
+  const [delaySeconds, setDelaySeconds] = useState<number>(25);
 
   // Media attachment state (Flyer Image, Video MP4, or PDF)
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -767,6 +767,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       }
     }
 
+    let consecutiveErrors = 0;
     for (let i = 0; i < activeBatchLeads.length; i++) {
       if (abortRef.current) break;
       const lead = activeBatchLeads[i];
@@ -775,6 +776,7 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
 
       try {
         const res = await sendSingleLeadReactivation(lead, cleanCampaignTag, uploadedMedia);
+        consecutiveErrors = 0;
         if (res.skipped) {
           skipped++;
           setSkippedCount(skipped);
@@ -789,13 +791,21 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
       } catch (err: any) {
         console.warn('[WhatsAppReactivation] Error sending to lead:', lead.id, err);
         fail++;
+        consecutiveErrors++;
         setFailedCount(fail);
         lastErr = String(err?.message || 'Error al enviar');
         setLastErrorMsg(lastErr);
+        if (/Anti-Ban|desconectado|restringido|429|503/i.test(lastErr) || consecutiveErrors >= 3) {
+          abortRef.current = true;
+          toast.error(lastErr, { duration: 6000 });
+          break;
+        }
       }
 
       if (sentOk && i < activeBatchLeads.length - 1 && !abortRef.current) {
-        await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+        const baseSec = Math.max(20, delaySeconds);
+        const jitterMs = Math.round((baseSec + Math.random() * 12) * 1000);
+        await new Promise((resolve) => setTimeout(resolve, jitterMs));
       }
     }
 
@@ -1068,11 +1078,9 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
               }}
               className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/90 text-xs font-semibold text-indigo-700 focus:outline-none"
             >
-              <option value={20}>Lote: 20 prospectos</option>
-              <option value={30}>Lote: 30 prospectos (Recomendado)</option>
-              <option value={50}>Lote: 50 prospectos</option>
-              <option value={100}>Lote: 100 prospectos</option>
-              <option value={0}>Todos ({matchingLeads.length})</option>
+              <option value={10}>Lote: 10 prospectos (Ultra seguro)</option>
+              <option value={20}>Lote: 20 prospectos (Recomendado · máx/hora)</option>
+              <option value={30}>Lote: 30 prospectos (Límite máximo)</option>
             </select>
           </div>
         </div>
@@ -1550,21 +1558,21 @@ export const WhatsAppReactivationModal: React.FC<WhatsAppReactivationModalProps>
         <div className="px-6 py-3 bg-white border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
             <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-indigo-600" />
-              <span>Pausa segura entre envíos:</span>
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <span>Escudo Anti-Ban (máx. 20/h · 60/día) · Pausa:</span>
             </span>
             <select
               disabled={isSending}
               value={delaySeconds}
-              onChange={(e) => setDelaySeconds(Number(e.target.value))}
+              onChange={(e) => setDelaySeconds(Math.max(20, Number(e.target.value)))}
               className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 focus:outline-none"
             >
-              <option value={8}>Cada 8s</option>
-              <option value={10}>Cada 10s (Recomendado)</option>
-              <option value={15}>Cada 15s</option>
+              <option value={25}>25–37s (Recomendado)</option>
+              <option value={35}>35–47s (Ultra seguro)</option>
+              <option value={45}>45–57s (Máxima protección)</option>
             </select>
             <span className="text-slate-400">
-              · Tiempo estimado: <b className="text-slate-600">~{Math.max(1, Math.ceil((activeBatchLeads.length * delaySeconds) / 60))} min</b>
+              · Tiempo estimado: <b className="text-slate-600">~{Math.max(1, Math.ceil((activeBatchLeads.length * (delaySeconds + 6)) / 60))} min</b>
             </span>
           </div>
 

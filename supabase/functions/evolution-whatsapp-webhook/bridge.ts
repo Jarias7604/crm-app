@@ -516,7 +516,23 @@ export async function handleBridgeStatus(supabase: any): Promise<Response> {
         .eq('status', 'error')
         .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
     ]);
-  const { key } = await evolutionCredentials(supabase);
+  const { key, instance } = await evolutionCredentials(supabase);
+  const wdTs = wd.checked_at ? new Date(wd.checked_at).getTime() : 0;
+  const healTs = heal.completed_at ? new Date(heal.completed_at).getTime() : 0;
+  const wdState = typeof wd.connection_state === 'string' && wd.connection_state ? wd.connection_state : null;
+  const healState = typeof heal.connection_after === 'string' && heal.connection_after ? heal.connection_after : null;
+  const effectiveState = healTs >= wdTs ? (healState || wdState) : (wdState || healState);
+  const evoInfoList = Array.isArray(heal.evo_info) ? heal.evo_info : [];
+  const evoInfoItem =
+    evoInfoList.find((i: any) => String(i?.name || i?.instance?.instanceName || '').toLowerCase() === String(instance).toLowerCase()) ||
+    evoInfoList[0] ||
+    (!Array.isArray(heal.evo_info) ? heal.evo_info : null);
+  const qrFresh = effectiveState !== 'open' && healTs > 0 && Date.now() - healTs < 3 * 60 * 1000;
+  const rawQrBase64 = qrFresh
+    ? String(heal.restart?.base64 || heal.restart?.qrcode?.base64 || '').trim() || null
+    : null;
+  const rawPairingCode = qrFresh && heal.restart?.pairingCode ? String(heal.restart.pairingCode) : null;
+
   return json({
     ok: true,
     bridge_last_poll: poll.at || null,
@@ -524,7 +540,14 @@ export async function handleBridgeStatus(supabase: any): Promise<Response> {
     bridge_last_error: ack.error || null,
     last_webhook_in: lastWh.at || null,
     webhook_events_version: whSync.version || null,
-    evo_connection_state: wd.connection_state || heal.connection_after || null,
+    evo_connection_state: effectiveState,
+    evo_heal_status: heal.status || null,
+    evo_heal_completed_at: heal.completed_at || null,
+    evo_heal_requested_at: heal.requested_at || null,
+    evo_disconnection_reason:
+      evoInfoItem?.disconnectionReasonCode ?? evoInfoItem?.instance?.disconnectionReasonCode ?? null,
+    evo_qr_base64: rawQrBase64,
+    evo_pairing_code: rawPairingCode,
     evo_watchdog_checked_at: wd.checked_at || null,
     evo_watchdog_recovered_total: wd.recovered_total || 0,
     catchup_status: mc.status || null,

@@ -2418,6 +2418,18 @@ async function handleWatchdogCheck(supabase: any, url: URL, payload: any): Promi
   }
 
   const baileysUnpatched = String(payload?.baileys_unpatched || '0') === '1';
+  const curHeal = await getBridgeState(supabase, 'evo_heal');
+  const curHealAt = curHeal?.completed_at ? new Date(curHeal.completed_at).getTime() : 0;
+  const recentQrWaiting =
+    connState !== 'open' &&
+    curHealAt > 0 &&
+    now - curHealAt < 30 * 60 * 1000 &&
+    Boolean(
+      curHeal?.restart?.base64 ||
+      curHeal?.restart?.code ||
+      curHeal?.restart?.qrcode?.base64 ||
+      curHeal?.restart?.pairingCode,
+    );
   const lastAutoHealMs = wd.last_auto_heal_at ? new Date(wd.last_auto_heal_at).getTime() : 0;
   const canAutoHeal = now - lastAutoHealMs > 15 * 60 * 1000;
   let autoHealTriggered = false;
@@ -2429,11 +2441,16 @@ async function handleWatchdogCheck(supabase: any, url: URL, payload: any): Promi
       requested_at: nowIso,
     });
     autoHealTriggered = true;
-  } else if (canAutoHeal && (recovered >= 3 || connState === 'connecting')) {
+  } else if (canAutoHeal && !recentQrWaiting && (recovered >= 3 || connState === 'connecting' || connState === 'close')) {
     await setBridgeState(supabase, 'evo_heal', {
       status: 'requested',
       mode: 'restart_and_catchup',
-      reason: recovered >= 3 ? `watchdog_recovered_${recovered}` : 'watchdog_connecting_stuck',
+      reason:
+        recovered >= 3
+          ? `watchdog_recovered_${recovered}`
+          : connState === 'close'
+          ? 'watchdog_connection_closed'
+          : 'watchdog_connecting_stuck',
       requested_at: nowIso,
     });
     autoHealTriggered = true;
@@ -3523,6 +3540,71 @@ async function handleSendReactivation(supabase: any, caller: Caller, payload: an
   const jid = `${normPhone}@s.whatsapp.net`;
   const now = new Date();
   const nowIso = now.toISOString();
+
+  // Hard Anti-Ban & session guard: never queue cold reactivations while WhatsApp is disconnected or over safe limits
+  const [wdState, healState, rateState] = await Promise.all([
+    getBridgeState(supabase, 'evo_watchdog'),
+    getBridgeState(supabase, 'evo_heal'),
+    getBridgeState(supabase, 'reactivation_rate'),
+  ]);
+  const wdTs = wdState?.checked_at ? new Date(wdState.checked_at).getTime() : 0;
+  const healTs = healState?.completed_at ? new Date(healState.completed_at).getTime() : 0;
+  const effectiveConnState = healTs >= wdTs
+    ? (healState?.connection_after || wdState?.connection_state || null)
+    : (wdState?.connection_state || healState?.connection_after || null);
+  if (effectiveConnState && effectiveConnState !== 'open') {
+    return json(
+      {
+        ok: false,
+        disconnected: true,
+        error: 'WhatsApp (+503 7971-8911) está desconectado o restringido. Reconecta la sesión antes de enviar reactivaciones.',
+      },
+      503,
+    );
+  }
+
+  const nowMs = now.getTime();
+  const dayCutoff = nowMs - 24 * 60 * 60 * 1000;
+  const hourCutoff = nowMs - 60 * 60 * 1000;
+  const recentTimestamps = Array.isArray(rateState?.timestamps)
+    ? (rateState.timestamps as string[]).filter((ts) => {
+        const t = Date.parse(String(ts));
+        return Number.isFinite(t) && t >= dayCutoff;
+      })
+    : [];
+  const lastHourCount = recentTimestamps.filter((ts) => Date.parse(ts) >= hourCutoff).length;
+  const latestSendMs = recentTimestamps.reduce((max, ts) => Math.max(max, Date.parse(ts) || 0), 0);
+  if (recentTimestamps.length >= 60) {
+    return json(
+      {
+        ok: false,
+        rate_limited: true,
+        error: 'Escudo Anti-Ban: límite diario alcanzado (60 reactivaciones/24h). Espera para proteger el número +503 7971-8911.',
+      },
+      429,
+    );
+  }
+  if (lastHourCount >= 20) {
+    return json(
+      {
+        ok: false,
+        rate_limited: true,
+        error: 'Escudo Anti-Ban: límite por hora alcanzado (20 reactivaciones/hora). Continúa en la siguiente hora.',
+      },
+      429,
+    );
+  }
+  if (latestSendMs > 0 && nowMs - latestSendMs < 20_000) {
+    return json(
+      {
+        ok: false,
+        rate_limited: true,
+        error: 'Escudo Anti-Ban: pausa mínima de 20 segundos entre envíos de reactivación.',
+      },
+      429,
+    );
+  }
+
   const campaignTag = String(payload?.campaign_tag || 'Reactivación WhatsApp').trim();
   const rawSellerName = String(payload?.seller_display_name || caller.fullName || 'Equipo Comercial').trim();
   const sellerName = /simulaci|platform\s*owner/i.test(rawSellerName) ? 'Jimmy Arias' : rawSellerName;
@@ -3796,6 +3878,15 @@ async function handleSendReactivation(supabase: any, caller: Caller, payload: an
 
   if (!outboxId) {
     return json({ ok: false, error: 'No se pudo encolar el envío en whatsapp_outbox' }, 500);
+  }
+
+  try {
+    await setBridgeState(supabase, 'reactivation_rate', {
+      timestamps: [...recentTimestamps, nowIso].slice(-120),
+      updated_at: nowIso,
+    });
+  } catch {
+    // non-blocking
   }
 
   const prevDesc = String(targetTicket.description || '');
