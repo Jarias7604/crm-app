@@ -6,7 +6,10 @@ import { pathToFileURL } from 'node:url';
 const WORKSPACE = process.cwd();
 const SCRATCH_SHOTS = 'C:/Users/jaria/.gemini/antigravity/brain/504f55bd-3e21-4700-afcf-dfa2a973fe47/scratch/screenshots';
 const OUT_PDF = path.join(WORKSPACE, 'docs', 'SOP_Fase2_y_3_Calificador_IA_Demos_Notificaciones_CRM.pdf');
-const TMP_HTML = path.join(WORKSPACE, 'scratch_sop_fases2_3.html');
+const TMP_HTML = path.join(
+  'C:/Users/jaria/.gemini/antigravity/brain/504f55bd-3e21-4700-afcf-dfa2a973fe47/scratch',
+  'sop_fases2_3.html'
+);
 
 function resolveChromePath() {
   const candidates = [
@@ -32,6 +35,8 @@ const m3 = loadShot('f23_03_playbooks_dolor.png');
 const m4 = loadShot('f23_04_enrutamiento_sla.png');
 const m5 = loadShot('f23_05_cola_y_simulador.png');
 const m6 = loadShot('f23_06_chat_whatsapp_control.png');
+const mSyncLead = loadShot('sync_01_lead_erroneo.png');
+const mSyncChat = loadShot('sync_02_chat_erroneo.png');
 
 const commonHead = (title) => `<!DOCTYPE html>
 <html lang="es">
@@ -113,6 +118,11 @@ const commonHead = (title) => `<!DOCTYPE html>
     width: 83%;
     margin: 4px auto 3px auto;
   }
+  .shot-frame.sync-shot {
+    width: 67%;
+    margin: 5px auto 2px auto;
+    overflow: visible;
+  }
   .shot-frame img {
     width: 100%;
     height: auto;
@@ -141,6 +151,20 @@ const commonHead = (title) => `<!DOCTYPE html>
   .callout-tag.bottom {
     top: auto;
     bottom: -14px;
+  }
+  .callout-tag.right {
+    left: auto;
+    right: -1px;
+  }
+  .callout-tag.out-left {
+    top: 2px;
+    left: auto;
+    right: calc(100% + 6px);
+  }
+  .callout-tag.out-right {
+    top: 2px;
+    left: calc(100% + 6px);
+    right: auto;
   }
   .fig-cap { font-size: 8.3px; color: #64748b; margin-bottom: 9px; line-height: 1.32; }
   .rules-list { list-style: none; margin: 5px 0 12px 0; }
@@ -177,7 +201,7 @@ const hdr = (code = 'SOP-COM-2026-03 | Uso interno') => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Gestión comercial / Versión 1.1 · Calificador IA, Cola Sheets y SLA</span>
+    <span>Gestión comercial / Versión 1.2 · Calificador IA, Cola Sheets y Sincronización Bidireccional</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
@@ -195,7 +219,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       <div class="kicker" style="margin-top:22px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-03</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.1 · Fases 2 y 3 + Cola por Lote Google Sheets</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.2 · Fases 2 y 3 + Cola Sheets + Sincronización Chat ⇄ Lead</td></tr>
         <tr><td class="kv-key">Vigencia</td><td class="kv-val">Noviembre 2026</td></tr>
         <tr><td class="kv-key">Alcance</td><td class="kv-val">SaaS Multi-Empresa (aislado de Soporte Técnico)</td></tr>
         <tr><td class="kv-key">Estado inicial seguro</td><td class="kv-val">Motor APAGADO (is_enabled = false) · Modo Borrador</td></tr>
@@ -215,7 +239,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       <p class="body-p" style="color:#475569;">Distribución prevista: Comercial, Supervisión operativa y Administración SaaS.</p>
     </div>
   </div>
-  ${ftr(1, 9)}
+  ${ftr(1, 10)}
 </section>
 
 <!-- PAGE 2: 01 / MARCO OPERATIVO & FLOW -->
@@ -284,7 +308,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       </tbody>
     </table>
   </div>
-  ${ftr(2, 9)}
+  ${ftr(2, 10)}
 </section>
 
 <!-- PAGE 3: 02 / CONFIGURACIÓN -->
@@ -321,7 +345,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       </tbody>
     </table>
   </div>
-  ${ftr(3, 9)}
+  ${ftr(3, 10)}
 </section>
 
 <!-- PAGE 4: 03 / EJECUCIÓN Y ACTIVACIÓN GRADUAL -->
@@ -353,7 +377,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       <li><strong>04.</strong> Si el asesor interviene manualmente en cualquier chat, la IA se pausa sola; solo reactivarla con <em>Reactivar IA aquí</em> si se requiere retomar calificación.</li>
     </ul>
   </div>
-  ${ftr(4, 9)}
+  ${ftr(4, 10)}
 </section>
 
 <!-- PAGE 5: 04 / PROCEDIMIENTO VISUAL (Control Maestro & Prompts) -->
@@ -387,7 +411,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:2px;">Figura 2. Edición de prompts consultivos y respuestas diferenciadas en horario laboral vs nocturno (10:00 PM).</div>
   </div>
-  ${ftr(5, 9)}
+  ${ftr(5, 10)}
 </section>
 
 <!-- PAGE 6: 05 / PROCEDIMIENTO VISUAL (Playbooks & Enrutamiento) -->
@@ -420,7 +444,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
     </div>
     <div class="fig-cap" style="text-align:center;margin-bottom:2px;">Figura 4. Reglas activas por producto, prueba directa al celular del asesor y respaldo SLA anti-fuga.</div>
   </div>
-  ${ftr(6, 9)}
+  ${ftr(6, 10)}
 </section>
 
 <!-- PAGE 7: 06 / PROCEDIMIENTO VISUAL (Cola Sheets, Borradores & Simulador) -->
@@ -450,7 +474,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
       <strong>Abrir ficha completa en CRM:</strong> <code>https://ariascrm.com/leads?lead=&lt;UUID&gt;</code>
     </div>
   </div>
-  ${ftr(7, 9)}
+  ${ftr(7, 10)}
 </section>
 
 <!-- PAGE 8: 07 / PROCEDIMIENTO VISUAL (Chat WhatsApp CRM) -->
@@ -473,14 +497,45 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
     <h3 class="sub-h">Comportamiento ante intervención humana</h3>
     <p class="body-p">Al hacer clic en <strong>Pausar IA aquí</strong> o enviar cualquier texto/archivo manual, el ticket cambia internamente a <code>human_takeover</code> o <code>paused</code>, protegiendo al cliente contra respuestas cruzadas entre el bot y el vendedor.</p>
   </div>
-  ${ftr(8, 9)}
+  ${ftr(8, 10)}
 </section>
 
-<!-- PAGE 9: 08 / SUPERVISIÓN & PRIVACIDAD -->
+<!-- PAGE 9: 08 / SINCRONIZACIÓN BIDIRECCIONAL CHAT <-> LEAD -->
 <section class="page">
   <div>
     ${hdr()}
-    <div class="kicker">08 / SUPERVISIÓN Y CONTROL DE CAMBIOS</div>
+    <div class="kicker">08 / SINCRONIZACIÓN DE ETAPAS (SSOT)</div>
+    <h1 class="sec-h1">Sincronización bidireccional Chat WhatsApp ⇄ Lead Discovery</h1>
+    <p class="lead-p">Cero discrepancias: cualquier cambio a <strong>Perdido</strong>, <strong>Erróneo</strong> o etapa comercial refleja el mismo estado en ambas pantallas.</p>
+
+    <p class="body-p">La tabla <code>leads.status</code> actúa como fuente única de verdad reforzada por trigger PostgreSQL, backend Edge (<code>update_lead_status</code> + <code>handleBridgeAck</code>) y pausa automática de IA al marcar <strong>Perdido</strong>, <strong>Erróneo</strong>, <strong>Cerrado</strong> o <strong>Cliente</strong>:</p>
+    <ul class="rules-list" style="margin-bottom:6px;">
+      <li><strong>• Sin cuenta de WhatsApp (<code>exists:false</code>):</strong> Si el envío falla por número inexistente sin respuesta del cliente, el sistema marca automáticamente <code>Erróneo</code> en Chat y Lead y pausa el Calificador IA.</li>
+      <li><strong>• Cambio manual prevalece:</strong> Si un asesor cambia la etapa desde Chat (ej. a <code>Perdido</code>) o desde Ficha Lead, se guarda con override manual en ambos módulos sin revertirse.</li>
+    </ul>
+
+    <div class="shot-frame sync-shot">
+      <img src="${mSyncLead}" alt="Ficha Lead mostrando Estado del Embudo sincronizado en Erróneo" />
+      <div class="callout-box" style="left:52.0%;top:65.6%;width:20.4%;height:7.2%;"><span class="callout-tag out-left">1. Mismo estado en Ficha Lead (Erróneo)</span></div>
+    </div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:6px;">Figura 7a. Prospecto en <code>/leads</code> sincronizado automáticamente con el resultado real de entrega en WhatsApp.</div>
+
+    <div class="shot-frame sync-shot">
+      <img src="${mSyncChat}" alt="Chat WhatsApp mostrando Erróneo sincronizado e IA pausada" />
+      <div class="callout-box" style="left:18.2%;top:54.3%;width:26.0%;height:6.6%;"><span class="callout-tag out-right">2. Badge sincronizado en lista</span></div>
+      <div class="callout-box" style="left:65.1%;top:6.4%;width:7.2%;height:3.9%;"><span class="callout-tag out-left">3. Selector etapa</span></div>
+      <div class="callout-box" style="left:60.0%;top:11.8%;width:39.2%;height:4.0%;"><span class="callout-tag bottom right">4. Calificador IA pausado automáticamente</span></div>
+    </div>
+    <div class="fig-cap" style="text-align:center;margin-bottom:2px;">Figura 7b. Vista en <code>/support/chat</code> coincidiendo al 100% con Ficha Lead y con el bot detenido.</div>
+  </div>
+  ${ftr(9, 10)}
+</section>
+
+<!-- PAGE 10: 09 / SUPERVISIÓN & PRIVACIDAD -->
+<section class="page">
+  <div>
+    ${hdr()}
+    <div class="kicker">09 / SUPERVISIÓN Y CONTROL DE CAMBIOS</div>
     <h1 class="sec-h1">Lista de verificación, SLA y control documental</h1>
     <p class="lead-p">Auditoría semanal recomendada para gerencia y líderes comerciales.</p>
 
@@ -504,7 +559,8 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
         <tr><th style="width:22%;">Versión / fecha</th><th style="width:52%;">Descripción</th><th style="width:26%;">Estado</th></tr>
       </thead>
       <tbody>
-        <tr><td>1.1 / Nov. 2026</td><td>Incorpora Cola por Lote de Google Sheets (filtro Hoy/7d/Todos y botón Activar IA para Seleccionados) con captura real actualizada.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.2 / Nov. 2026</td><td>Agrega sincronización bidireccional Chat WhatsApp ⇄ Lead Discovery (SSOT trigger PostgreSQL, marcado automático Erróneo y pausa automática IA) con capturas reales.</td><td>Vigente en producción</td></tr>
+        <tr><td>1.1 / Nov. 2026</td><td>Incorpora Cola por Lote de Google Sheets (filtro Hoy/7d/Todos y botón Activar IA para Seleccionados) con captura real actualizada.</td><td>Versión previa</td></tr>
         <tr><td>1.0 / Nov. 2026</td><td>SOP oficial Fases 2 y 3 con capturas reales del entorno CRM y trazabilidad visual.</td><td>Versión base</td></tr>
       </tbody>
     </table>
@@ -512,7 +568,7 @@ const html = `${commonHead('SOP-COM-2026-03 — Calificador IA 24/7, Auto-Demos 
     <div class="privacy-title">Control de privacidad</div>
     <p class="body-p" style="color:#475569;">Las capturas incorporadas son evidencia ilustrativa generada con datos demostrativos sanitizados. No se deben distribuir hojas ni registros reales de prospectos fuera de los canales autorizados de Arias Group.</p>
   </div>
-  ${ftr(9, 9)}
+  ${ftr(10, 10)}
 </section>
 
 </body>
