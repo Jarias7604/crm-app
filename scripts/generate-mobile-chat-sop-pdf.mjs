@@ -35,6 +35,7 @@ const sAbierto = loadShot('mobile_chat_abierto.png');
 const sAccionesMsg = loadShot('mobile_chat_acciones_mensaje.png');
 const sMenu = loadShot('mobile_chat_menu_acciones.png');
 const sAlertas = loadShot('mobile_chat_alertas_centrado.png');
+const sFiltros = loadShot('mobile_chat_filtros.png');
 
 const hdr = () => `
   <div class="top-rule">
@@ -44,7 +45,7 @@ const hdr = () => `
 
 const ftr = (page, total) => `
   <div class="footer-rule">
-    <span>Comercial &amp; Soporte Técnico / Versión 1.2 · Documentación operativa</span>
+    <span>Comercial &amp; Soporte Técnico / Versión 1.3 · Documentación operativa</span>
     <span>${String(page).padStart(2, '0')} / ${String(total).padStart(2, '0')}</span>
   </div>`;
 
@@ -228,8 +229,8 @@ const html = `<!DOCTYPE html>
       <div class="kicker" style="margin-top: 4px;">CONTROL DOCUMENTAL</div>
       <table class="kv-table">
         <tr><td class="kv-key">Código</td><td class="kv-val">SOP-COM-2026-04</td></tr>
-        <tr><td class="kv-key">Versión</td><td class="kv-val">1.2 · Desplegado en producción (ariascrm.com)</td></tr>
-        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">24 de noviembre de 2026 (v1.2: Escala táctil móvil, barras fixed y modales centradas)</td></tr>
+        <tr><td class="kv-key">Versión</td><td class="kv-val">1.3 · Desplegado en producción (ariascrm.com)</td></tr>
+        <tr><td class="kv-key">Fecha de vigencia</td><td class="kv-val">24 de noviembre de 2026 (v1.3: Nombres completos en Línea 1 móvil, tarjetas 3 líneas y tipografía ampliada en modales)</td></tr>
         <tr><td class="kv-key">Áreas usuarias</td><td class="kv-val">Equipo Comercial (Diana, Patricia, Grecia), Soporte Técnico y Dirección</td></tr>
         <tr><td class="kv-key">Alcance técnico</td><td class="kv-val">MobileNav, Sidebar, retiro/redirección de /marketing/chat → /support/chat y ChatComposer responsivo</td></tr>
       </table>
@@ -313,8 +314,9 @@ const html = `<!DOCTYPE html>
       </thead>
       <tbody>
         <tr><td><strong>Scroll nativo (<code>window</code>) + barras <code>fixed</code> en móvil</strong></td><td>En móvil (<code>min-h-[100dvh]</code> + <code>fixed top-0 / bottom-0</code>), deslizar el dedo retrae la barra del navegador manteniendo cabecera (<code>60px</code>) y compositor siempre visibles aun en hilos muy largos.</td></tr>
-        <tr><td><strong>Escala táctil nativa (&lt; 768 px)</strong></td><td>Tipografía de lista/mensajes (<code>15.5px</code>) y botones de <code>44px</code> en celular igualando la comodidad visual de <em>Leads</em> y <em>Calendario</em> sin alterar Desktop.</td></tr>
-        <tr><td><strong>Modales centradas (Alertas y Filtros)</strong></td><td>Los paneles <em>Centro de Alertas WhatsApp</em> y <em>Refinar conversaciones</em> se centran automáticamente (<code>fixed inset-x-3</code>) con apertura directa del chat al tocar una alerta.</td></tr>
+        <tr><td><strong>Tarjetas móviles de 3 líneas (&lt; 768 px)</strong></td><td>Línea 1 muestra únicamente <strong>Nombre completo</strong> + hora (<code>16px</code>); Línea 2 vista previa + estado; Línea 3 agrupa chips (<em>Lead</em>, <em>Grupo</em>, <em>IA</em>, SLA) sin recortar nombres ni alterar la vista Desktop de 2 líneas.</td></tr>
+        <tr><td><strong>Escala táctil nativa (&lt; 768 px)</strong></td><td>Tipografía legible en burbujas/lista (<code>15.5px–16px</code>), botones de <code>44px</code> y modales centrados ampliados (<code>15.5px</code>) igualando la comodidad de <em>Leads</em> y <em>Calendario</em>.</td></tr>
+        <tr><td><strong>Modales centradas (Alertas y Filtros)</strong></td><td>Los paneles <em>Centro de Alertas WhatsApp</em> y <em>Refinar conversaciones</em> se centran automáticamente (<code>fixed inset-x-3</code>) con nombres legibles y salto directo al chat al tocar una alerta.</td></tr>
         <tr><td><strong>Estándar 100% SVG vectorial</strong></td><td>Todos los botones, navegación inferior, indicadores de IA y acciones de burbuja usan vectores nítidos (cero emojis).</td></tr>
       </tbody>
     </table>
@@ -336,11 +338,12 @@ const html = `<!DOCTYPE html>
         <div class="step-hdr" style="text-align:center;"><span class="num">01 ·</span> Lista aireada y barra inferior única</div>
         <div class="phone-frame" style="margin-top: 20px;">
           <img src="${sLista}" alt="Lista de Chat WhatsApp en móvil" />
-          <div class="callout-box" style="left:1.5%;top:0.4%;width:97%;height:6.2%;"><span class="callout-tag">1. Cabecera 56px + Alertas</span></div>
-          <div class="callout-box" style="left:1.5%;top:13.8%;width:97%;height:4.5%;"><span class="callout-tag bottom">2. 1 sola fila deslizable de filtros</span></div>
-          <div class="callout-box" style="left:1.5%;top:92.2%;width:97%;height:7.3%;"><span class="callout-tag">3. Barra MobileNav → /support/chat</span></div>
+          <div class="callout-box" style="left:1.5%;top:0.4%;width:97%;height:6.4%;"><span class="callout-tag">1. Cabecera 56px + Alertas</span></div>
+          <div class="callout-box" style="left:1.5%;top:14.2%;width:97%;height:5.3%;"><span class="callout-tag bottom">2. 1 sola fila deslizable de filtros</span></div>
+          <div class="callout-box" style="left:1.5%;top:34.8%;width:97%;height:12.4%;"><span class="callout-tag right">3. Nombre completo + chips abajo</span></div>
+          <div class="callout-box" style="left:1.5%;top:91.8%;width:97%;height:7.8%;"><span class="callout-tag">4. Barra MobileNav → /support/chat</span></div>
         </div>
-        <div class="fig-cap"><strong>Figura 1.</strong> Vista lista móvil con escala táctil legible (<code>15.5px</code>), 1 tira de filtros y tarjetas con íconos vectoriales.</div>
+        <div class="fig-cap"><strong>Figura 1.</strong> Tarjetas móviles de 3 líneas: Línea 1 dedicada al nombre completo (<code>16px</code>), vista previa y chips compactos abajo.</div>
       </div>
 
       <!-- Column 2: Active Chat -->
@@ -405,33 +408,37 @@ const html = `<!DOCTYPE html>
   <div>
     ${hdr()}
     <div class="kicker">04 / MODALES CENTRADAS EN MÓVIL · ALERTAS Y FILTROS</div>
-    <h1 class="sec-h1">Centro de Alertas WhatsApp centrado y acceso en 1 toque</h1>
-    <p class="lead-p">Tanto el <strong>Centro de Alertas</strong> como el menú de <strong>Filtros</strong> se adaptan centrados con márgenes iguales a izquierda y derecha en pantallas de <code>390 px</code>.</p>
+    <h1 class="sec-h1">Centro de Alertas y Filtros centrados con lectura cómoda</h1>
+    <p class="lead-p">Ambos modales se centran en pantalla con márgenes simétricos (<code>fixed inset-x-3</code>), cero recorte lateral y tipografía ampliada (<code>15.5px–16px</code>) para operar sin esfuerzo en celular.</p>
 
-    <div style="display: grid; grid-template-columns: 240px 1fr; gap: 24px; align-items: start; margin-top: 10px;">
+    <div class="two-phones">
+      <!-- Column 1: Centered Alerts Modal -->
       <div class="phone-col">
-        <div class="phone-frame" style="margin-top: 14px;">
+        <div class="step-hdr" style="text-align:center;"><span class="num">05 ·</span> Centro de Alertas WhatsApp</div>
+        <div class="phone-frame" style="margin-top: 16px;">
           <img src="${sAlertas}" alt="Modal Centro de Alertas WhatsApp centrada en móvil" />
-          <div class="callout-box" style="left:2.6%;top:7.2%;width:92.2%;height:85.2%;"><span class="callout-tag">1. Modal centrada (márgenes simétricos)</span></div>
+          <div class="callout-box" style="left:2.4%;top:7.6%;width:92.2%;height:83.5%;"><span class="callout-tag">1. Centrada + nombres completos (15.5px)</span></div>
         </div>
-        <div class="fig-cap" style="margin-top: 10px;"><strong>Figura 5.</strong> Al tocar la campana, el modal de Alertas queda centrado sin recortes laterales.</div>
+        <div class="fig-cap"><strong>Figura 5.</strong> Al tocar cualquier alerta abre directo la conversación en modo móvil completo.</div>
       </div>
 
-      <div style="padding-top: 12px;">
-        <div class="step-hdr"><span class="num">05 ·</span> Qué mejora para Ventas y Soporte en celular</div>
-        <ul class="rules-list" style="margin-top: 6px;">
-          <li><strong>Cero recorte izquierdo:</strong> antes el popover anclado a la derecha se salía del borde en teléfonos angostos; ahora usa <code>fixed inset-x-3</code> centrado con fondo atenuado.</li>
-          <li><strong>Cabecera adaptada:</strong> el título <em>Centro de Alertas WhatsApp</em> y el botón compacto <em>Sonido</em> conviven sin encimarse ni cortarse.</li>
-          <li><strong>Salto directo a pantalla completa:</strong> al tocar cualquier contacto dentro de <em>Leads nuevos por tomar</em>, <em>Espera &gt; 15 min</em> o <em>En espera reciente</em>, el modal se cierra y abre de inmediato la conversación en modo móvil completo.</li>
-          <li><strong>Filtros avanzados centrados:</strong> el botón <strong>Filtros</strong> también abre centrado con scroll interno cómodo para elegir responsable, área o mensajes respondidos.</li>
-        </ul>
-
-        <div class="info-box" style="margin-top: 14px;">
-          <strong>Checklist de calidad verificado en producción (ariascrm.com):</strong><br/>
-          • <code>390×844</code> Lista de Chats, Alertas centradas, Filtros centrados y Chat pantalla completa (<em>Vanessa García</em>): <strong>0 errores de consola</strong>.<br/>
-          • <code>1440×900</code> Desktop: columnas, filtros, herramientas de venta y panel de tickets intactos.
+      <!-- Column 2: Centered Filters Modal -->
+      <div class="phone-col">
+        <div class="step-hdr" style="text-align:center;"><span class="num">06 ·</span> Menú de Filtros (Refinar)</div>
+        <div class="phone-frame" style="margin-top: 16px;">
+          <img src="${sFiltros}" alt="Modal Refinar conversaciones centrada en móvil" />
+          <div class="callout-box" style="left:2.4%;top:13.4%;width:92.2%;height:71.2%;"><span class="callout-tag">2. Opciones amplias (15.5px) y táctiles</span></div>
         </div>
+        <div class="fig-cap"><strong>Figura 6.</strong> Botón <strong>Filtros</strong> centrado para elegir responsable, SLA, bandejas o área sin desbordes.</div>
       </div>
+    </div>
+
+    <div class="info-box" style="margin-top: 10px;">
+      <strong>Checklist de calidad verificado en producción (<code>ariascrm.com/support/chat</code>):</strong>
+      <ul class="rules-list" style="margin-bottom:0; margin-top:4px;">
+        <li><strong>Móvil (<code>390×844</code>):</strong> lista de 3 líneas sin nombres recortados, Alertas y Filtros centrados, barras fijas arriba/abajo y <strong>0 errores de consola</strong>.</li>
+        <li><strong>Desktop (<code>1440×900</code>):</strong> conserva sus filas compactas de 2 líneas, 3 columnas y suite comercial/IA intacta con <strong>0 errores de consola</strong>.</li>
+      </ul>
     </div>
   </div>
   ${ftr(5, TOTAL_PAGES)}
